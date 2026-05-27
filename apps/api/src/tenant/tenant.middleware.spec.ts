@@ -7,6 +7,8 @@ import { TenantMiddleware } from './tenant.middleware.js';
 function mockReq(path: string, headers: Record<string, string> = {}): Request {
   return {
     path,
+    url: path,
+    originalUrl: path,
     header: (name: string) => headers[name],
   } as unknown as Request;
 }
