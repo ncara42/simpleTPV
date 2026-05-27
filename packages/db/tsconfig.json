@@ -2,7 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./prisma"
+    "rootDir": "./prisma",
+    "types": ["node"]
   },
   "include": ["prisma/**/*.ts"],
   "exclude": ["generated", "dist", "node_modules"]
