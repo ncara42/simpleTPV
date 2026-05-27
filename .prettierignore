@@ -9,3 +9,7 @@ pnpm-lock.yaml
 apps/*/playwright-report
 apps/*/test-results
 **/generated/
+
+# Documentos vivos del producto (formato manual)
+PRD_TPV_Multitienda.md
+Plan_Desarrollo_MVP.md
