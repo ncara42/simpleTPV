@@ -1,12 +1,12 @@
 # Spec — F3: `apps/api` NestJS mínimo
 
-| Campo       | Valor                                                                                                                                                                                                                                                                        |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fecha       | 2026-05-28                                                                                                                                                                                                                                                                   |
-| Autor       | noel@noelcaravaca.com                                                                                                                                                                                                                                                        |
-| Estado      | Aprobado para implementación                                                                                                                                                                                                                                                 |
-| Fase        | F3 (de 4 de scaffolding) — depende de F1 y F2; precede a F4 y al plan de CI                                                                                                                                                                                                  |
-| Referencias | `Plan_Desarrollo_MVP.md` §1 (NestJS 11), §2 (arquitectura), §6 (RLS); `docs/superpowers/specs/2026-05-28-f2-db-prisma-design.md`; `docs/superpowers/specs/2026-05-28-ci-pipeline-design.md` §5.1 (el job E2E hace `pnpm --filter @qrush/api start` y consulta `GET /health`) |
+| Campo       | Valor                                                                                                                                                                                                                                                                            |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fecha       | 2026-05-28                                                                                                                                                                                                                                                                       |
+| Autor       | noel@noelcaravaca.com                                                                                                                                                                                                                                                            |
+| Estado      | Aprobado para implementación                                                                                                                                                                                                                                                     |
+| Fase        | F3 (de 4 de scaffolding) — depende de F1 y F2; precede a F4 y al plan de CI                                                                                                                                                                                                      |
+| Referencias | `Plan_Desarrollo_MVP.md` §1 (NestJS 11), §2 (arquitectura), §6 (RLS); `docs/superpowers/specs/2026-05-28-f2-db-prisma-design.md`; `docs/superpowers/specs/2026-05-28-ci-pipeline-design.md` §5.1 (el job E2E hace `pnpm --filter @simpletpv/api start` y consulta `GET /health`) |
 
 ## 1. Objetivo
 
@@ -16,9 +16,9 @@ F3 entrega la **capa de servidor mínima** sobre la que el MVP semana 1+ constru
 
 Al cerrar F3:
 
-- `pnpm --filter @qrush/api start` arranca un servidor en `:3000` con `/health` 200.
-- `pnpm --filter @qrush/api test` corre tests unitarios con cobertura.
-- `pnpm --filter @qrush/api test:int` corre tests de integración contra Postgres real que **demuestran** que org A no ve datos de org B.
+- `pnpm --filter @simpletpv/api start` arranca un servidor en `:3000` con `/health` 200.
+- `pnpm --filter @simpletpv/api test` corre tests unitarios con cobertura.
+- `pnpm --filter @simpletpv/api test:int` corre tests de integración contra Postgres real que **demuestran** que org A no ve datos de org B.
 - El job E2E del plan de CI puede arrancar la API y validar `/health`.
 
 ## 2. Alcance
@@ -26,7 +26,7 @@ Al cerrar F3:
 **Incluido:**
 
 - Scaffolding NestJS 11 en `apps/api/` (`main.ts`, `app.module.ts`, `nest-cli.json`, `tsconfig.json`, `tsconfig.build.json`).
-- `package.json` del workspace `@qrush/api` con deps NestJS, vitest, dependencia `@qrush/db: workspace:*`.
+- `package.json` del workspace `@simpletpv/api` con deps NestJS, vitest, dependencia `@simpletpv/db: workspace:*`.
 - Módulo `PrismaModule` (global) con `PrismaService` que extiende `PrismaClient`, aplica `$extends` para inyectar `SET LOCAL app.current_organization_id` por query usando `AsyncLocalStorage`.
 - Helper `tenant-context.ts` con `AsyncLocalStorage<TenantContext>`.
 - `TenantMiddleware` que valida `X-Org-Id` (UUID estricto, regex), exenta `/health`, pobla `AsyncLocalStorage` o lanza 400.
@@ -64,7 +64,7 @@ Al cerrar F3:
 | F3-D9  | `vitest.config.ts` (unit) separado de `vitest.integration.config.ts` (integration)                     | Unit es rápido y sin DB; integration necesita DB, timeouts mayores, run secuencial. Separación clara evita acoplamientos.                                                         |
 | F3-D10 | `$executeRawUnsafe` con interpolación de `organizationId`                                              | Aceptado riesgo conocido y mitigado: el middleware valida regex UUID estricto antes de poblar `AsyncLocalStorage`. Imposible llegar a `SET LOCAL` con valor no-UUID. Documentado. |
 | F3-D11 | Sin Swagger, sin guards globales, sin pipes globales de validación en F3                               | YAGNI. No hay endpoints reales que documentar/validar. MVP semana 1 los añade con el primer CRUD.                                                                                 |
-| F3-D12 | `@qrush/db` como `workspace:*`                                                                         | Resolución estándar de pnpm workspaces. F3 importa el cliente Prisma generado por F2.                                                                                             |
+| F3-D12 | `@simpletpv/db` como `workspace:*`                                                                     | Resolución estándar de pnpm workspaces. F3 importa el cliente Prisma generado por F2.                                                                                             |
 | F3-D13 | Sin contexto de tenant → query corre como rol `app` sin `SET LOCAL` → RLS devuelve 0 filas (fail-safe) | Diseño explícito. Si alguien olvida poblar contexto, NUNCA fuga datos: ve 0 en lugar de todos. Mejor query rota que tenant filtration.                                            |
 | F3-D14 | Bootstrap con Express (no Fastify)                                                                     | Default de NestJS 11. Cambio a Fastify es decisión separada cuando se note necesidad de performance.                                                                              |
 | F3-D15 | `NODE_ENV` no se usa para condicionar lógica de seguridad                                              | Mismo binario en dev, CI y prod; diferencias solo via env vars. Evita "funciona en dev pero rompe en prod".                                                                       |
@@ -73,7 +73,7 @@ Al cerrar F3:
 
 ```
 apps/api/
-├── package.json                       (actualizado: deps Nest + vitest + @qrush/db workspace)
+├── package.json                       (actualizado: deps Nest + vitest + @simpletpv/db workspace)
 ├── tsconfig.json                      (extends raíz, override module: CommonJS)
 ├── tsconfig.build.json                (excluye tests del build de Nest)
 ├── nest-cli.json                      (config CLI Nest)
@@ -110,7 +110,7 @@ Y, **fuera de `apps/api/`**, F3 también toca:
 
 ```json
 {
-  "name": "@qrush/api",
+  "name": "@simpletpv/api",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -128,7 +128,7 @@ Y, **fuera de `apps/api/`**, F3 también toca:
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
-    "@qrush/db": "workspace:*",
+    "@simpletpv/db": "workspace:*",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0"
   },
@@ -212,7 +212,7 @@ export function getCurrentTenant(): TenantContext | undefined {
 
 ```ts
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { PrismaClient } from '@qrush/db';
+import { PrismaClient } from '@simpletpv/db';
 
 import { getCurrentTenant } from './tenant-context.js';
 
@@ -571,7 +571,7 @@ describe('RLS aislamiento multi-tenant', () => {
     `;
     if (found1.length === 0 || found2.length === 0) {
       throw new Error(
-        'Seed no ejecutado. Corre `pnpm --filter @qrush/db exec prisma db seed` antes.',
+        'Seed no ejecutado. Corre `pnpm --filter @simpletpv/db exec prisma db seed` antes.',
       );
     }
     org1Id = found1[0].id;
@@ -640,13 +640,13 @@ Descomentar y completar:
 # Postgres local (docker compose up -d postgres)
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
-POSTGRES_DB=qrush
+POSTGRES_DB=simpletpv
 
 # Prisma migrate/seed usa este (superuser).
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/qrush?schema=public
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/simpletpv?schema=public
 
 # API runtime usa este (rol app con RLS aplicada).
-DATABASE_URL_APP=postgresql://app:app_dev_password@localhost:5432/qrush?schema=public
+DATABASE_URL_APP=postgresql://app:app_dev_password@localhost:5432/simpletpv?schema=public
 ```
 
 ### 5.21 Actualización de `CLAUDE.md` (raíz)
@@ -663,24 +663,24 @@ Añadir bajo la sección "Convenciones":
 
 Pasos manuales desde la raíz. Asumen F1 + F2 completas y Postgres corriendo.
 
-| #   | Comando                                                                                                                         | Resultado esperado                                                                                   |
-| --- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| 1   | `pnpm install`                                                                                                                  | Sin warnings strict-peer.                                                                            |
-| 2   | `pnpm --filter @qrush/db exec prisma migrate deploy`                                                                            | Aplica `add_rls` (de F2) y `app_login` (de F3) si faltan.                                            |
-| 3   | `docker compose exec -T postgres psql -U postgres -d qrush -c "SELECT rolname, rolcanlogin FROM pg_roles WHERE rolname='app';"` | `rolcanlogin = t`.                                                                                   |
-| 4   | `pnpm --filter @qrush/db exec prisma db seed`                                                                                   | "Seed completado: 2 organizaciones."                                                                 |
-| 5   | `pnpm --filter @qrush/db build`                                                                                                 | Genera el cliente Prisma.                                                                            |
-| 6   | `pnpm --filter @qrush/api build`                                                                                                | NestJS build → `dist/main.js`.                                                                       |
-| 7   | `pnpm --filter @qrush/api test`                                                                                                 | Tests unitarios pasan; genera `apps/api/coverage/coverage-summary.json`.                             |
-| 8   | `pnpm --filter @qrush/api test:int`                                                                                             | Tests de integración pasan (los 4 casos de RLS).                                                     |
-| 9   | `pnpm --filter @qrush/api start &` luego `curl -s http://localhost:3000/health`                                                 | `{"status":"ok","uptime":<numérico>}`. Status 200.                                                   |
-| 10  | `curl -s -o /dev/null -w '%{http_code}\n' http://localhost:3000/products`                                                       | `400` (sin X-Org-Id).                                                                                |
-| 11  | `curl -s -o /dev/null -w '%{http_code}\n' -H 'X-Org-Id: not-a-uuid' http://localhost:3000/products`                             | `400`.                                                                                               |
-| 12  | `curl -s -o /dev/null -w '%{http_code}\n' -H 'X-Org-Id: 11111111-1111-1111-1111-111111111111' http://localhost:3000/products`   | `404` (no hay controller de products todavía — confirma que el middleware deja pasar UUIDs válidos). |
-| 13  | Matar el proceso API: `kill %1` o equivalente                                                                                   | Termina limpio.                                                                                      |
-| 14  | `pnpm lint && pnpm format`                                                                                                      | F1/F2 siguen verdes.                                                                                 |
-| 15  | `pnpm typecheck`                                                                                                                | `apps/api` y `packages/db` typecheck OK.                                                             |
-| 16  | `git status --porcelain`                                                                                                        | Vacío (todo commiteado).                                                                             |
+| #   | Comando                                                                                                                             | Resultado esperado                                                                                   |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| 1   | `pnpm install`                                                                                                                      | Sin warnings strict-peer.                                                                            |
+| 2   | `pnpm --filter @simpletpv/db exec prisma migrate deploy`                                                                            | Aplica `add_rls` (de F2) y `app_login` (de F3) si faltan.                                            |
+| 3   | `docker compose exec -T postgres psql -U postgres -d simpletpv -c "SELECT rolname, rolcanlogin FROM pg_roles WHERE rolname='app';"` | `rolcanlogin = t`.                                                                                   |
+| 4   | `pnpm --filter @simpletpv/db exec prisma db seed`                                                                                   | "Seed completado: 2 organizaciones."                                                                 |
+| 5   | `pnpm --filter @simpletpv/db build`                                                                                                 | Genera el cliente Prisma.                                                                            |
+| 6   | `pnpm --filter @simpletpv/api build`                                                                                                | NestJS build → `dist/main.js`.                                                                       |
+| 7   | `pnpm --filter @simpletpv/api test`                                                                                                 | Tests unitarios pasan; genera `apps/api/coverage/coverage-summary.json`.                             |
+| 8   | `pnpm --filter @simpletpv/api test:int`                                                                                             | Tests de integración pasan (los 4 casos de RLS).                                                     |
+| 9   | `pnpm --filter @simpletpv/api start &` luego `curl -s http://localhost:3000/health`                                                 | `{"status":"ok","uptime":<numérico>}`. Status 200.                                                   |
+| 10  | `curl -s -o /dev/null -w '%{http_code}\n' http://localhost:3000/products`                                                           | `400` (sin X-Org-Id).                                                                                |
+| 11  | `curl -s -o /dev/null -w '%{http_code}\n' -H 'X-Org-Id: not-a-uuid' http://localhost:3000/products`                                 | `400`.                                                                                               |
+| 12  | `curl -s -o /dev/null -w '%{http_code}\n' -H 'X-Org-Id: 11111111-1111-1111-1111-111111111111' http://localhost:3000/products`       | `404` (no hay controller de products todavía — confirma que el middleware deja pasar UUIDs válidos). |
+| 13  | Matar el proceso API: `kill %1` o equivalente                                                                                       | Termina limpio.                                                                                      |
+| 14  | `pnpm lint && pnpm format`                                                                                                          | F1/F2 siguen verdes.                                                                                 |
+| 15  | `pnpm typecheck`                                                                                                                    | `apps/api` y `packages/db` typecheck OK.                                                             |
+| 16  | `git status --porcelain`                                                                                                            | Vacío (todo commiteado).                                                                             |
 
 ## 7. Riesgos y mitigaciones
 
@@ -707,5 +707,5 @@ Pasos manuales desde la raíz. Asumen F1 + F2 completas y Postgres corriendo.
 ## 9. Fuera de alcance — siguiente fase
 
 - **F4** (`...-f4-frontends-vite-design.md` — pendiente): React 19 + Vite 6 en `apps/tpv` y `apps/backoffice`, Playwright configurado, smoke tests E2E por cada frontend que toquen el `/health` de la API.
-- **CI** (plan ya escrito): tras F4, el job E2E ya invoca `pnpm --filter @qrush/api start`, espera healthcheck en `:3000/health`, y corre Playwright. Todo el contrato que el plan de CI espera de F3 está cubierto en este spec.
+- **CI** (plan ya escrito): tras F4, el job E2E ya invoca `pnpm --filter @simpletpv/api start`, espera healthcheck en `:3000/health`, y corre Playwright. Todo el contrato que el plan de CI espera de F3 está cubierto en este spec.
 - **MVP semana 1**: auth real (JWT), pipes globales de validación, primer CRUD (Product), Swagger, eliminación del header `X-Org-Id` stub.

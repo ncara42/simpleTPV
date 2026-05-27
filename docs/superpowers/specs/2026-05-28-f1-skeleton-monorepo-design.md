@@ -10,7 +10,7 @@
 
 ## 1. Objetivo
 
-Inicializar el repositorio `qrush_tpv` como **monorepo TypeScript** con Turborepo + pnpm workspaces, ESLint flat + Prettier + tsconfig compartido, y stubs vacíos de los 4 workspaces que F2-F4 llenarán. Al cerrar F1, un dev puede clonar el repo y ejecutar `pnpm install && pnpm lint && pnpm format && pnpm typecheck && pnpm build` en verde sin errores.
+Inicializar el repositorio `simpletpv` como **monorepo TypeScript** con Turborepo + pnpm workspaces, ESLint flat + Prettier + tsconfig compartido, y stubs vacíos de los 4 workspaces que F2-F4 llenarán. Al cerrar F1, un dev puede clonar el repo y ejecutar `pnpm install && pnpm lint && pnpm format && pnpm typecheck && pnpm build` en verde sin errores.
 
 F1 entrega el **esqueleto** y las **reglas del juego** del monorepo. Sin código de aplicación; sin DB; sin CI. Solo la base sobre la que se asentarán las fases siguientes.
 
@@ -57,7 +57,7 @@ F1 entrega el **esqueleto** y las **reglas del juego** del monorepo. Sin código
 ## 4. Estructura de archivos al cerrar F1
 
 ```
-qrush_tpv/
+simpletpv/
 ├── .git/                            (git init)
 ├── .github/                         (vacío de momento; lo llena el plan de CI)
 ├── .gitignore
@@ -80,14 +80,14 @@ qrush_tpv/
 │   └── superpowers/                 (preexistente; specs y plans)
 ├── apps/
 │   ├── api/
-│   │   └── package.json             (stub @qrush/api)
+│   │   └── package.json             (stub @simpletpv/api)
 │   ├── tpv/
-│   │   └── package.json             (stub @qrush/tpv)
+│   │   └── package.json             (stub @simpletpv/tpv)
 │   └── backoffice/
-│       └── package.json             (stub @qrush/backoffice)
+│       └── package.json             (stub @simpletpv/backoffice)
 └── packages/
     └── db/
-        └── package.json             (stub @qrush/db)
+        └── package.json             (stub @simpletpv/db)
 ```
 
 ## 5. Contenido de cada archivo
@@ -314,7 +314,7 @@ packages:
 
 ```json
 {
-  "name": "qrush-tpv",
+  "name": "simpletpv",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -360,7 +360,7 @@ Cada uno con el mismo patrón mínimo, sustituyendo `<name>`:
 
 ```json
 {
-  "name": "@qrush/api",
+  "name": "@simpletpv/api",
   "version": "0.0.0",
   "private": true
 }
@@ -370,7 +370,7 @@ Cada uno con el mismo patrón mínimo, sustituyendo `<name>`:
 
 ```json
 {
-  "name": "@qrush/tpv",
+  "name": "@simpletpv/tpv",
   "version": "0.0.0",
   "private": true
 }
@@ -380,7 +380,7 @@ Cada uno con el mismo patrón mínimo, sustituyendo `<name>`:
 
 ```json
 {
-  "name": "@qrush/backoffice",
+  "name": "@simpletpv/backoffice",
   "version": "0.0.0",
   "private": true
 }
@@ -390,7 +390,7 @@ Cada uno con el mismo patrón mínimo, sustituyendo `<name>`:
 
 ```json
 {
-  "name": "@qrush/db",
+  "name": "@simpletpv/db",
   "version": "0.0.0",
   "private": true
 }
@@ -401,7 +401,7 @@ Sin scripts. Sin dependencias. F2-F4 los llenan.
 ### 5.14 `README.md`
 
 ````markdown
-# qrush_tpv
+# simpletpv
 
 TPV multitienda SaaS — monorepo TypeScript.
 
@@ -438,7 +438,7 @@ pnpm build
 ### 5.15 `CLAUDE.md`
 
 ```markdown
-# Instrucciones para agentes Claude en qrush_tpv
+# Instrucciones para agentes Claude en simpletpv
 
 ## Idioma
 - Español de España (tuteo peninsular, nunca voseo).

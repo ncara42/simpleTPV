@@ -1,4 +1,4 @@
-# qrush_tpv
+# simpletpv
 
 TPV multitienda SaaS — monorepo TypeScript.
 

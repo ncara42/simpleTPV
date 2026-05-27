@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Implantar en `qrush_tpv` los workflows de CI/CD, configs y hooks descritos en `docs/superpowers/specs/2026-05-28-ci-pipeline-design.md`, portados y adaptados desde el proyecto `vivienda`.
+**Goal:** Implantar en `simpletpv` los workflows de CI/CD, configs y hooks descritos en `docs/superpowers/specs/2026-05-28-ci-pipeline-design.md`, portados y adaptados desde el proyecto `vivienda`.
 
 **Architecture:** Tres workflows GitHub Actions (`ci.yml`, `security.yml`, `trivy.yml`) sobre `ubuntu-latest`, más Dependabot, CODEOWNERS, hooks Husky y configs raíz. Quality gate con coverage ratchet, E2E con Postgres efímero (`services:`), deploy automático a Dokploy via webhook.
 
@@ -12,7 +12,7 @@
 
 ## Convenciones del plan
 
-- **Rutas:** todas relativas a la raíz del repo `/Users/admin/Desktop/qrush_tpv/`.
+- **Rutas:** todas relativas a la raíz del repo `/Users/admin/Desktop/simpletpv/`.
 - **SHAs pinneados:** cada acción de GitHub se referencia por SHA + comentario de versión, como en vivienda. Los SHAs concretos están en este plan; si Dependabot ya los actualizó cuando se ejecute, usar los más recientes mostrando el comentario de versión.
 - **Commits:** Conventional Commits. Frecuentes, uno por tarea.
 - **Verificación local:** GitHub Actions no se puede ejecutar 100% localmente. Donde aplique, el plan indica cómo simular cada paso con `act` (opcional) o validar el YAML con `actionlint` antes de pushear.
@@ -66,7 +66,7 @@ Si falla, el scaffolding del monorepo no está hecho. Crear `package.json` raíz
 
 ```json
 {
-  "name": "qrush-tpv",
+  "name": "simpletpv",
   "private": true,
   "engines": { "node": ">=22", "pnpm": ">=11" },
   "packageManager": "pnpm@11.1.3",
@@ -88,7 +88,7 @@ Expected: contiene al menos `packages:` con `apps/*` y `packages/*`.
 - [ ] **Step 4: Verificar workspaces declarados**
 
 Run: `pnpm -r exec node -e "console.log(require('./package.json').name)"`
-Expected: lista que incluya `@qrush/api`, `@qrush/tpv`, `@qrush/backoffice`, `@qrush/db`.
+Expected: lista que incluya `@simpletpv/api`, `@simpletpv/tpv`, `@simpletpv/backoffice`, `@simpletpv/db`.
 
 Si falta alguno, el plan se bloquea hasta que el scaffolding cree esos workspaces. Anotar qué falta y avisar al usuario.
 
@@ -98,19 +98,19 @@ Run:
 
 ```bash
 for pkg in api tpv backoffice; do
-  echo "--- @qrush/$pkg ---"
-  pnpm --filter @qrush/$pkg exec node -e "
+  echo "--- @simpletpv/$pkg ---"
+  pnpm --filter @simpletpv/$pkg exec node -e "
     const s = require('./package.json').scripts || {};
     ['build','typecheck'].forEach(k => console.log(k + ': ' + (s[k] || 'MISSING')));
   "
 done
-pnpm --filter @qrush/db exec node -e "
+pnpm --filter @simpletpv/db exec node -e "
   const s = require('./package.json').scripts || {};
   console.log('prisma generate / migrate / seed scripts:', JSON.stringify(s, null, 2));
 "
 ```
 
-Expected: ningún `MISSING` para `build` y `typecheck` en api/tpv/backoffice. `@qrush/db` con scripts para `prisma generate`, `prisma migrate deploy`, `prisma db seed`.
+Expected: ningún `MISSING` para `build` y `typecheck` en api/tpv/backoffice. `@simpletpv/db` con scripts para `prisma generate`, `prisma migrate deploy`, `prisma db seed`.
 
 - [ ] **Step 6: Verificar que `apps/tpv` y `apps/backoffice` tienen Playwright**
 
@@ -118,9 +118,9 @@ Run:
 
 ```bash
 for pkg in tpv backoffice; do
-  echo "--- @qrush/$pkg ---"
+  echo "--- @simpletpv/$pkg ---"
   test -f apps/$pkg/playwright.config.ts && echo "playwright.config: OK" || echo "playwright.config: MISSING"
-  pnpm --filter @qrush/$pkg exec node -e "
+  pnpm --filter @simpletpv/$pkg exec node -e "
     const s = require('./package.json').scripts || {};
     console.log('test:e2e: ' + (s['test:e2e'] || 'MISSING'));
   "
@@ -134,7 +134,7 @@ Expected: `playwright.config: OK` y `test:e2e: ...` (no MISSING) para los dos.
 Run:
 
 ```bash
-pnpm --filter @qrush/api exec node -e "
+pnpm --filter @simpletpv/api exec node -e "
   const fs = require('fs');
   const files = ['vitest.config.ts','vitest.config.js','vitest.config.mjs'];
   const cfg = files.find(f => fs.existsSync(f));
@@ -349,8 +349,8 @@ Expected: no error de "config not found" ni de parsing. Findings de dead code so
 Run:
 
 ```bash
-echo "// test" > /tmp/qrush-hook-test.ts
-mv /tmp/qrush-hook-test.ts ./hook-test.ts
+echo "// test" > /tmp/simpletpv-hook-test.ts
+mv /tmp/simpletpv-hook-test.ts ./hook-test.ts
 git add hook-test.ts
 git commit -m "test: pre-commit hook" --dry-run 2>&1 | head
 ```
@@ -526,9 +526,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # El cliente Prisma generado es un prerrequisito de compilación:
-      # @qrush/api no tipa sin él, así que va antes de lint/typecheck.
+      # @simpletpv/api no tipa sin él, así que va antes de lint/typecheck.
       - name: Generate Prisma client
-        run: pnpm --filter @qrush/db exec prisma generate
+        run: pnpm --filter @simpletpv/db exec prisma generate
 
       - name: Audit dependencies
         run: pnpm audit --audit-level=high --prod
@@ -543,7 +543,7 @@ jobs:
         run: pnpm run -r typecheck
 
       - name: Tests with coverage
-        run: pnpm --filter @qrush/api exec vitest run --coverage --coverage.reporter=json-summary --coverage.reporter=text
+        run: pnpm --filter @simpletpv/api exec vitest run --coverage --coverage.reporter=json-summary --coverage.reporter=text
 
       # Ratchet de lectura: falla el gate si la cobertura baja del suelo.
       # No escribe nada — solo lee y decide si el job pasa o falla.
@@ -649,10 +649,10 @@ ratchet:
       run: pnpm install --frozen-lockfile
 
     - name: Generate Prisma client
-      run: pnpm --filter @qrush/db exec prisma generate
+      run: pnpm --filter @simpletpv/db exec prisma generate
 
     - name: Run tests with coverage
-      run: pnpm --filter @qrush/api exec vitest run --coverage --coverage.reporter=json-summary
+      run: pnpm --filter @simpletpv/api exec vitest run --coverage --coverage.reporter=json-summary
 
     - name: Raise floor if coverage improved
       run: |
@@ -743,7 +743,7 @@ e2e:
       env:
         POSTGRES_USER: postgres
         POSTGRES_PASSWORD: postgres
-        POSTGRES_DB: qrush_test
+        POSTGRES_DB: simpletpv_test
       options: >-
         --health-cmd "pg_isready -U postgres"
         --health-interval 3s
@@ -753,7 +753,7 @@ e2e:
         - 5432:5432
 
   env:
-    DATABASE_URL: postgresql://postgres:postgres@localhost:5432/qrush_test
+    DATABASE_URL: postgresql://postgres:postgres@localhost:5432/simpletpv_test
     NODE_ENV: test
 
   steps:
@@ -773,13 +773,13 @@ e2e:
       run: pnpm install --frozen-lockfile
 
     - name: Generate Prisma client
-      run: pnpm --filter @qrush/db exec prisma generate
+      run: pnpm --filter @simpletpv/db exec prisma generate
 
     - name: Apply Prisma migrations
-      run: pnpm --filter @qrush/db exec prisma migrate deploy
+      run: pnpm --filter @simpletpv/db exec prisma migrate deploy
 
     - name: Seed multi-tenant fixtures
-      run: pnpm --filter @qrush/db exec prisma db seed
+      run: pnpm --filter @simpletpv/db exec prisma db seed
 
     - name: Build apps
       run: pnpm -r --filter "./apps/*" build
@@ -789,7 +789,7 @@ e2e:
     # colgar el job si la app no arranca.
     - name: Start API
       run: |
-        pnpm --filter @qrush/api start > /tmp/api.log 2>&1 &
+        pnpm --filter @simpletpv/api start > /tmp/api.log 2>&1 &
         echo $! > /tmp/api.pid
         for i in $(seq 1 30); do
           if curl -sf http://localhost:3000/health >/dev/null 2>&1; then
@@ -803,13 +803,13 @@ e2e:
         exit 1
 
     - name: Install Playwright Chromium
-      run: pnpm --filter @qrush/tpv exec playwright install --with-deps chromium
+      run: pnpm --filter @simpletpv/tpv exec playwright install --with-deps chromium
 
     - name: Run E2E tests (TPV)
-      run: pnpm --filter @qrush/tpv test:e2e
+      run: pnpm --filter @simpletpv/tpv test:e2e
 
     - name: Run E2E tests (Backoffice)
-      run: pnpm --filter @qrush/backoffice test:e2e
+      run: pnpm --filter @simpletpv/backoffice test:e2e
 
     - name: Upload Playwright reports
       if: failure()
@@ -1033,7 +1033,7 @@ jobs:
       - name: Run OWASP Dependency-Check
         uses: dependency-check/Dependency-Check_Action@75ba02d6183445fe0761d26e836bde58b1560600 # v1.1.0
         with:
-          project: qrush-tpv
+          project: simpletpv
           path: .
           format: HTML
           args: >
@@ -1149,9 +1149,9 @@ jobs:
   # Escaneo de imágenes Docker
   # TODO (despliegue): Activar cuando existan los Dockerfiles.
   # Job image-scan con matrix:
-  #   - app: qrush-api,        dockerfile: apps/api/Dockerfile
-  #   - app: qrush-tpv,        dockerfile: apps/tpv/Dockerfile
-  #   - app: qrush-backoffice, dockerfile: apps/backoffice/Dockerfile
+  #   - app: simpletpv-api,        dockerfile: apps/api/Dockerfile
+  #   - app: simpletpv,        dockerfile: apps/tpv/Dockerfile
+  #   - app: simpletpv-backoffice, dockerfile: apps/backoffice/Dockerfile
   # -----------------------------------------------------------------------
 
   # -----------------------------------------------------------------------
@@ -1247,14 +1247,14 @@ Run:
 git remote -v
 ```
 
-Expected: muestra `origin` apuntando a `git@github.com:<user>/qrush_tpv.git` o equivalente HTTPS.
+Expected: muestra `origin` apuntando a `git@github.com:<user>/simpletpv.git` o equivalente HTTPS.
 
 - [ ] **Step 2: Añadir `DOKPLOY_WEBHOOK_URL`**
 
 En la UI de GitHub: `Settings → Secrets and variables → Actions → New repository secret`.
 
 - Name: `DOKPLOY_WEBHOOK_URL`
-- Value: la URL del webhook de Dokploy (copiada desde el panel Dokploy del servicio qrush_tpv).
+- Value: la URL del webhook de Dokploy (copiada desde el panel Dokploy del servicio simpletpv).
 
 - [ ] **Step 3: (Opcional) Añadir `NVD_API_KEY`**
 
@@ -1285,7 +1285,7 @@ git push -u origin chore/ci-smoke-test
 Si `README.md` no existe, crearlo con una línea:
 
 ```bash
-echo "# qrush_tpv" > README.md
+echo "# simpletpv" > README.md
 git add README.md
 git commit -m "chore: smoke test CI (add readme)"
 ```
@@ -1373,7 +1373,7 @@ En la UI: `Insights → Dependency graph → Dependabot`. Debe mostrar las dos e
 
 **3. Consistencia de tipos/nombres:**
 
-- `@qrush/api`, `@qrush/tpv`, `@qrush/backoffice`, `@qrush/db` usados consistentemente en todos los workflows y tareas.
+- `@simpletpv/api`, `@simpletpv/tpv`, `@simpletpv/backoffice`, `@simpletpv/db` usados consistentemente en todos los workflows y tareas.
 - `coverage-threshold.json` con clave `api.statements` consistente entre Task 1 step 5, ci.yml quality (Task 4), ci.yml ratchet (Task 5).
 - `apps/api/coverage/coverage-summary.json` consistente entre Tasks 4 y 5.
 - `DOKPLOY_WEBHOOK_URL` consistente entre Task 7 y Task 10.

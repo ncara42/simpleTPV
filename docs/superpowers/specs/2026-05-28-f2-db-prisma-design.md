@@ -15,9 +15,9 @@ Implantar `packages/db` con un **schema Prisma mínimo viable** (5 modelos), mig
 Al cerrar F2:
 
 - `docker compose up -d postgres` deja Postgres corriendo en `127.0.0.1:5432`.
-- `pnpm --filter @qrush/db exec prisma migrate dev` aplica dos migraciones (tablas + RLS) sin error.
-- `pnpm --filter @qrush/db exec prisma db seed` inserta 2 organizaciones con sus stores, users y products.
-- F3 puede importar el cliente Prisma generado desde `@qrush/db`.
+- `pnpm --filter @simpletpv/db exec prisma migrate dev` aplica dos migraciones (tablas + RLS) sin error.
+- `pnpm --filter @simpletpv/db exec prisma db seed` inserta 2 organizaciones con sus stores, users y products.
+- F3 puede importar el cliente Prisma generado desde `@simpletpv/db`.
 
 F2 entrega la **base de datos**; F3 entrega el código que la consume.
 
@@ -58,7 +58,7 @@ F2 entrega la **base de datos**; F3 entrega el código que la consume.
 | F2-D7  | `current_setting('app.current_organization_id', true)::uuid` con segundo arg `true`                                                           | `missing_ok=true` devuelve NULL si nadie hizo `SET LOCAL`. Una comparación con NULL es FALSE → filtra a 0 filas (fail-safe).                            |
 | F2-D8  | IDs como `@db.Uuid` nativo (no `String` raw)                                                                                                  | Mejor índice y semántica. Postgres tiene tipo UUID first-class.                                                                                         |
 | F2-D9  | Cliente Prisma generado a `packages/db/generated/client` (fuera de node_modules)                                                              | Reproducibilidad CI; `pnpm install` no toca el cliente; `prisma generate` lo escribe explícitamente. Gitignored.                                        |
-| F2-D10 | `main`/`types` del package apuntan al cliente generado                                                                                        | Imports de F3 (`import { PrismaClient } from '@qrush/db'`) resuelven sin gymnastics de paths.                                                           |
+| F2-D10 | `main`/`types` del package apuntan al cliente generado                                                                                        | Imports de F3 (`import { PrismaClient } from '@simpletpv/db'`) resuelven sin gymnastics de paths.                                                       |
 | F2-D11 | Seed con 2 organizaciones, idempotente vía `upsert`                                                                                           | 2 orgs es el mínimo para probar aislamiento RLS. Idempotencia permite re-correr en CI sin duplicar.                                                     |
 | F2-D12 | `bcryptjs` (no `bcrypt` nativo)                                                                                                               | Sin compilación nativa = funciona en cualquier runner sin node-gyp ni paquetes de SO extra. Aceptamos el ~3× más lento porque solo se usa en seed/auth. |
 | F2-D13 | `DATABASE_URL` del `.env.example` apunta al superuser `postgres`                                                                              | Para que `prisma migrate dev` y `prisma db seed` funcionen out-of-the-box. F3 añadirá `DATABASE_URL_APP` para runtime.                                  |
@@ -68,7 +68,7 @@ F2 entrega la **base de datos**; F3 entrega el código que la consume.
 ## 4. Estructura final
 
 ```
-qrush_tpv/
+simpletpv/
 ├── docker-compose.yml                         (raíz, nuevo)
 ├── .env.example                               (raíz, nuevo)
 ├── .gitignore                                 (raíz, actualizado: + packages/db/generated/)
@@ -94,11 +94,11 @@ qrush_tpv/
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: qrush-postgres
+    container_name: simpletpv-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-qrush}
+      POSTGRES_DB: ${POSTGRES_DB:-simpletpv}
     ports:
       - '127.0.0.1:5432:5432'
     volumes:
@@ -119,14 +119,14 @@ volumes:
 # Postgres local (docker compose up -d postgres)
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
-POSTGRES_DB=qrush
+POSTGRES_DB=simpletpv
 
 # Prisma usa esta — se conecta como superuser para migraciones y seed.
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/qrush?schema=public
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/simpletpv?schema=public
 
 # URL del rol aplicación (la usará el API en F3, sin password porque
 # será authentication peer/trust en local y password real en producción).
-# DATABASE_URL_APP=postgresql://app:app@localhost:5432/qrush?schema=public
+# DATABASE_URL_APP=postgresql://app:app@localhost:5432/simpletpv?schema=public
 ```
 
 ### 5.3 `.gitignore` (actualización)
@@ -142,7 +142,7 @@ packages/db/generated/
 
 ```json
 {
-  "name": "@qrush/db",
+  "name": "@simpletpv/db",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -460,21 +460,21 @@ main()
 
 Pasos manuales para verificar que F2 está completa. Cada uno debe pasar.
 
-| #   | Comando                                                                                                                                                | Resultado esperado                                             |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| 1   | `docker compose up -d postgres`                                                                                                                        | Servicio `qrush-postgres` en estado `Up (healthy)` tras ~10 s. |
-| 2   | `docker compose ps postgres`                                                                                                                           | Estado `Up (healthy)`.                                         |
-| 3   | `cp .env.example .env`                                                                                                                                 | Sin error. `.env` no se commitea.                              |
-| 4   | `pnpm install`                                                                                                                                         | Sin warnings de strict-peer.                                   |
-| 5   | `pnpm --filter @qrush/db exec prisma generate`                                                                                                         | Genera `packages/db/generated/client/`.                        |
-| 6   | `pnpm --filter @qrush/db exec prisma migrate dev --name initial`                                                                                       | (Primera vez) crea migración initial y la aplica.              |
-| 7   | Crear `packages/db/prisma/migrations/<ts>_add_rls/migration.sql` manualmente (T9 del plan), después: `pnpm --filter @qrush/db exec prisma migrate dev` | Aplica `add_rls` sin error.                                    |
-| 8   | `pnpm --filter @qrush/db exec prisma db seed`                                                                                                          | Imprime `Seed completado: 2 organizaciones.`                   |
-| 9   | Re-ejecutar `prisma db seed`                                                                                                                           | Imprime el mismo mensaje sin duplicar (idempotente).           |
-| 10  | `docker compose exec postgres psql -U postgres -d qrush -c 'SELECT COUNT(*) FROM "Organization";'`                                                     | `count = 2`.                                                   |
-| 11  | `docker compose exec postgres psql -U postgres -d qrush -c "SELECT polname FROM pg_policy WHERE polname = 'tenant_isolation';"`                        | 4 filas (Organization, Store, User, Product).                  |
-| 12  | `docker compose exec postgres psql -U postgres -d qrush -c "SELECT rolname FROM pg_roles WHERE rolname IN ('app', 'app_admin');"`                      | 2 filas.                                                       |
-| 13  | `git status --porcelain`                                                                                                                               | Vacío salvo el `.env` (que está en `.gitignore`).              |
+| #   | Comando                                                                                                                                                    | Resultado esperado                                                 |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| 1   | `docker compose up -d postgres`                                                                                                                            | Servicio `simpletpv-postgres` en estado `Up (healthy)` tras ~10 s. |
+| 2   | `docker compose ps postgres`                                                                                                                               | Estado `Up (healthy)`.                                             |
+| 3   | `cp .env.example .env`                                                                                                                                     | Sin error. `.env` no se commitea.                                  |
+| 4   | `pnpm install`                                                                                                                                             | Sin warnings de strict-peer.                                       |
+| 5   | `pnpm --filter @simpletpv/db exec prisma generate`                                                                                                         | Genera `packages/db/generated/client/`.                            |
+| 6   | `pnpm --filter @simpletpv/db exec prisma migrate dev --name initial`                                                                                       | (Primera vez) crea migración initial y la aplica.                  |
+| 7   | Crear `packages/db/prisma/migrations/<ts>_add_rls/migration.sql` manualmente (T9 del plan), después: `pnpm --filter @simpletpv/db exec prisma migrate dev` | Aplica `add_rls` sin error.                                        |
+| 8   | `pnpm --filter @simpletpv/db exec prisma db seed`                                                                                                          | Imprime `Seed completado: 2 organizaciones.`                       |
+| 9   | Re-ejecutar `prisma db seed`                                                                                                                               | Imprime el mismo mensaje sin duplicar (idempotente).               |
+| 10  | `docker compose exec postgres psql -U postgres -d simpletpv -c 'SELECT COUNT(*) FROM "Organization";'`                                                     | `count = 2`.                                                       |
+| 11  | `docker compose exec postgres psql -U postgres -d simpletpv -c "SELECT polname FROM pg_policy WHERE polname = 'tenant_isolation';"`                        | 4 filas (Organization, Store, User, Product).                      |
+| 12  | `docker compose exec postgres psql -U postgres -d simpletpv -c "SELECT rolname FROM pg_roles WHERE rolname IN ('app', 'app_admin');"`                      | 2 filas.                                                           |
+| 13  | `git status --porcelain`                                                                                                                                   | Vacío salvo el `.env` (que está en `.gitignore`).                  |
 
 ## 7. Riesgos y mitigaciones
 

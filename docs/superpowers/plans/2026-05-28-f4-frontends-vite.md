@@ -14,10 +14,10 @@
 
 ## Convenciones del plan
 
-- **Rutas:** todas absolutas a `/Users/admin/Desktop/qrush_tpv/`.
+- **Rutas:** todas absolutas a `/Users/admin/Desktop/simpletpv/`.
 - **Commits:** Conventional Commits, uno por tarea (o agrupado donde tiene sentido).
 - **F1, F2, F3 asumidos completos:** monorepo Turborepo, configs raíz, `packages/db` con migraciones + seed, `apps/api` con `/health` funcional, Postgres corriendo.
-- **API arriba para tests E2E:** los tests E2E asumen `pnpm --filter @qrush/api start` corriendo en `:3000`. T11/T12 documentan cómo arrancarlo.
+- **API arriba para tests E2E:** los tests E2E asumen `pnpm --filter @simpletpv/api start` corriendo en `:3000`. T11/T12 documentan cómo arrancarlo.
 
 ---
 
@@ -58,15 +58,15 @@
 
 **Files:**
 
-- Create: `/Users/admin/Desktop/qrush_tpv/packages/web-config/package.json`
-- Create: `/Users/admin/Desktop/qrush_tpv/packages/web-config/vite.base.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/packages/web-config/tailwind.preset.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/packages/web-config/eslint.react.js`
-- Create: `/Users/admin/Desktop/qrush_tpv/packages/web-config/tsconfig.frontend.json`
+- Create: `/Users/admin/Desktop/simpletpv/packages/web-config/package.json`
+- Create: `/Users/admin/Desktop/simpletpv/packages/web-config/vite.base.ts`
+- Create: `/Users/admin/Desktop/simpletpv/packages/web-config/tailwind.preset.ts`
+- Create: `/Users/admin/Desktop/simpletpv/packages/web-config/eslint.react.js`
+- Create: `/Users/admin/Desktop/simpletpv/packages/web-config/tsconfig.frontend.json`
 
 - [ ] **Step 1: Crear directorio**
 
-Run: `mkdir -p /Users/admin/Desktop/qrush_tpv/packages/web-config`
+Run: `mkdir -p /Users/admin/Desktop/simpletpv/packages/web-config`
 
 - [ ] **Step 2: Crear `package.json`**
 
@@ -74,7 +74,7 @@ Contenido exacto:
 
 ```json
 {
-  "name": "@qrush/web-config",
+  "name": "@simpletpv/web-config",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -232,8 +232,8 @@ Contenido exacto:
 
 - [ ] **Step 7: Instalar**
 
-Run: `cd /Users/admin/Desktop/qrush_tpv && pnpm install`
-Expected: pnpm reconoce `@qrush/web-config` y resuelve sus deps sin warnings strict-peer.
+Run: `cd /Users/admin/Desktop/simpletpv && pnpm install`
+Expected: pnpm reconoce `@simpletpv/web-config` y resuelve sus deps sin warnings strict-peer.
 
 - [ ] **Step 8: Validar JSON**
 
@@ -260,14 +260,14 @@ git commit -m "feat(web-config): packages/web-config con base Vite + Tailwind + 
 
 **Files:**
 
-- Create: `/Users/admin/Desktop/qrush_tpv/packages/ui/package.json`
-- Create: `/Users/admin/Desktop/qrush_tpv/packages/ui/tsconfig.json`
-- Create: `/Users/admin/Desktop/qrush_tpv/packages/ui/vitest.config.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/packages/ui/vitest.setup.ts`
+- Create: `/Users/admin/Desktop/simpletpv/packages/ui/package.json`
+- Create: `/Users/admin/Desktop/simpletpv/packages/ui/tsconfig.json`
+- Create: `/Users/admin/Desktop/simpletpv/packages/ui/vitest.config.ts`
+- Create: `/Users/admin/Desktop/simpletpv/packages/ui/vitest.setup.ts`
 
 - [ ] **Step 1: Crear directorios**
 
-Run: `mkdir -p /Users/admin/Desktop/qrush_tpv/packages/ui/src/lib /Users/admin/Desktop/qrush_tpv/packages/ui/src/components`
+Run: `mkdir -p /Users/admin/Desktop/simpletpv/packages/ui/src/lib /Users/admin/Desktop/simpletpv/packages/ui/src/components`
 
 - [ ] **Step 2: Crear `package.json`**
 
@@ -275,7 +275,7 @@ Contenido exacto:
 
 ```json
 {
-  "name": "@qrush/ui",
+  "name": "@simpletpv/ui",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -357,13 +357,13 @@ import '@testing-library/jest-dom/vitest';
 - [ ] **Step 6: Instalar**
 
 Run: `pnpm install`
-Expected: sin warnings strict-peer. React resuelve desde `@qrush/ui` propio.
+Expected: sin warnings strict-peer. React resuelve desde `@simpletpv/ui` propio.
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add packages/ui/package.json packages/ui/tsconfig.json packages/ui/vitest.config.ts packages/ui/vitest.setup.ts pnpm-lock.yaml
-git commit -m "feat(ui): @qrush/ui esqueleto (package.json + tsconfig + vitest)"
+git commit -m "feat(ui): @simpletpv/ui esqueleto (package.json + tsconfig + vitest)"
 ```
 
 ---
@@ -372,10 +372,10 @@ git commit -m "feat(ui): @qrush/ui esqueleto (package.json + tsconfig + vitest)"
 
 **Files:**
 
-- Create: `/Users/admin/Desktop/qrush_tpv/packages/ui/src/lib/cn.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/packages/ui/src/components/Button.tsx`
-- Create: `/Users/admin/Desktop/qrush_tpv/packages/ui/src/components/Button.test.tsx`
-- Create: `/Users/admin/Desktop/qrush_tpv/packages/ui/src/index.ts`
+- Create: `/Users/admin/Desktop/simpletpv/packages/ui/src/lib/cn.ts`
+- Create: `/Users/admin/Desktop/simpletpv/packages/ui/src/components/Button.tsx`
+- Create: `/Users/admin/Desktop/simpletpv/packages/ui/src/components/Button.test.tsx`
+- Create: `/Users/admin/Desktop/simpletpv/packages/ui/src/index.ts`
 
 - [ ] **Step 1: Escribir test fallando (TDD)**
 
@@ -408,7 +408,7 @@ describe('Button', () => {
 
 - [ ] **Step 2: Correr test → debe FALLAR**
 
-Run: `pnpm --filter @qrush/ui test`
+Run: `pnpm --filter @simpletpv/ui test`
 Expected: FAIL con `Cannot find module './Button.js'` o equivalente.
 
 - [ ] **Step 3: Crear `cn.ts`**
@@ -465,12 +465,12 @@ export { cn } from './lib/cn.js';
 
 - [ ] **Step 6: Correr test → debe PASAR**
 
-Run: `pnpm --filter @qrush/ui test`
+Run: `pnpm --filter @simpletpv/ui test`
 Expected: 3 tests pasan. Genera `packages/ui/coverage/coverage-summary.json`.
 
 - [ ] **Step 7: Verificar typecheck**
 
-Run: `pnpm --filter @qrush/ui typecheck`
+Run: `pnpm --filter @simpletpv/ui typecheck`
 Expected: sin errores.
 
 - [ ] **Step 8: Commit**
@@ -486,11 +486,11 @@ git commit -m "feat(ui): Button + helper cn con tests"
 
 **Files:**
 
-- Modify: `/Users/admin/Desktop/qrush_tpv/apps/tpv/package.json`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/tpv/tsconfig.json`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/tpv/vite.config.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/tpv/tailwind.config.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/tpv/postcss.config.js`
+- Modify: `/Users/admin/Desktop/simpletpv/apps/tpv/package.json`
+- Create: `/Users/admin/Desktop/simpletpv/apps/tpv/tsconfig.json`
+- Create: `/Users/admin/Desktop/simpletpv/apps/tpv/vite.config.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/tpv/tailwind.config.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/tpv/postcss.config.js`
 
 - [ ] **Step 1: Sobrescribir `apps/tpv/package.json` (era stub de F1)**
 
@@ -498,7 +498,7 @@ Contenido exacto:
 
 ```json
 {
-  "name": "@qrush/tpv",
+  "name": "@simpletpv/tpv",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -510,7 +510,7 @@ Contenido exacto:
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@qrush/ui": "workspace:*",
+    "@simpletpv/ui": "workspace:*",
     "@tanstack/react-query": "^5.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -518,7 +518,7 @@ Contenido exacto:
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0",
-    "@qrush/web-config": "workspace:*",
+    "@simpletpv/web-config": "workspace:*",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0"
   }
@@ -548,7 +548,7 @@ Contenido exacto:
 Contenido exacto:
 
 ```ts
-import { createViteConfig } from '@qrush/web-config/vite';
+import { createViteConfig } from '@simpletpv/web-config/vite';
 
 export default createViteConfig({
   port: 5173,
@@ -563,7 +563,7 @@ Contenido exacto:
 ```ts
 import type { Config } from 'tailwindcss';
 
-import { tailwindBasePreset } from '@qrush/web-config/tailwind';
+import { tailwindBasePreset } from '@simpletpv/web-config/tailwind';
 
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}', '../../packages/ui/src/**/*.{ts,tsx}'],
@@ -584,7 +584,7 @@ export default {};
 - [ ] **Step 6: Instalar**
 
 Run: `pnpm install`
-Expected: sin warnings; `@qrush/ui` y `@qrush/web-config` resuelven desde workspace.
+Expected: sin warnings; `@simpletpv/ui` y `@simpletpv/web-config` resuelven desde workspace.
 
 - [ ] **Step 7: Commit**
 
@@ -599,15 +599,15 @@ git commit -m "feat(tpv): package.json + configs (vite + tailwind + tsconfig)"
 
 **Files:**
 
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/tpv/index.html`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/tpv/src/main.tsx`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/tpv/src/App.tsx`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/tpv/src/lib/api.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/tpv/src/styles.css`
+- Create: `/Users/admin/Desktop/simpletpv/apps/tpv/index.html`
+- Create: `/Users/admin/Desktop/simpletpv/apps/tpv/src/main.tsx`
+- Create: `/Users/admin/Desktop/simpletpv/apps/tpv/src/App.tsx`
+- Create: `/Users/admin/Desktop/simpletpv/apps/tpv/src/lib/api.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/tpv/src/styles.css`
 
 - [ ] **Step 1: Crear directorio src/lib**
 
-Run: `mkdir -p /Users/admin/Desktop/qrush_tpv/apps/tpv/src/lib`
+Run: `mkdir -p /Users/admin/Desktop/simpletpv/apps/tpv/src/lib`
 
 - [ ] **Step 2: Crear `apps/tpv/index.html`**
 
@@ -619,7 +619,7 @@ Contenido exacto:
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>qrush TPV</title>
+    <title>simpleTPV</title>
   </head>
   <body>
     <div id="root"></div>
@@ -652,7 +652,7 @@ export async function pingHealth(): Promise<HealthResponse> {
 Contenido exacto:
 
 ```tsx
-import { Button } from '@qrush/ui';
+import { Button } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 
 import { pingHealth } from './lib/api.js';
@@ -666,7 +666,7 @@ export default function App() {
 
   return (
     <main className="min-h-screen p-8">
-      <h1 className="text-2xl font-semibold">qrush TPV</h1>
+      <h1 className="text-2xl font-semibold">simpleTPV</h1>
       <p className="mt-2 text-sm text-gray-600">Punto de venta — scaffolding</p>
       <section className="mt-6">
         <h2 className="text-lg font-medium">API status</h2>
@@ -715,14 +715,14 @@ Contenido exacto:
 
 - [ ] **Step 7: Verificar typecheck**
 
-Run: `pnpm --filter @qrush/tpv typecheck`
+Run: `pnpm --filter @simpletpv/tpv typecheck`
 Expected: sin errores.
 
-> **Si tsc rompe con `Cannot find module '@qrush/ui'`:** verificar que F1 + F2 instalaron el monorepo correctamente y que `pnpm install` corrió tras T2. Ejecutar `pnpm install` y reintentar.
+> **Si tsc rompe con `Cannot find module '@simpletpv/ui'`:** verificar que F1 + F2 instalaron el monorepo correctamente y que `pnpm install` corrió tras T2. Ejecutar `pnpm install` y reintentar.
 
 - [ ] **Step 8: Build**
 
-Run: `pnpm --filter @qrush/tpv build`
+Run: `pnpm --filter @simpletpv/tpv build`
 Expected: produce `apps/tpv/dist/index.html` + assets. Sin errores TS ni Vite.
 
 - [ ] **Step 9: Commit**
@@ -738,12 +738,12 @@ git commit -m "feat(tpv): App placeholder con TanStack Query + ping /api/health"
 
 **Files:**
 
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/tpv/playwright.config.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/tpv/e2e/smoke.spec.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/tpv/playwright.config.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/tpv/e2e/smoke.spec.ts`
 
 - [ ] **Step 1: Crear directorio e2e**
 
-Run: `mkdir -p /Users/admin/Desktop/qrush_tpv/apps/tpv/e2e`
+Run: `mkdir -p /Users/admin/Desktop/simpletpv/apps/tpv/e2e`
 
 - [ ] **Step 2: Crear `apps/tpv/playwright.config.ts`**
 
@@ -780,7 +780,7 @@ import { expect, test } from '@playwright/test';
 
 test('carga TPV y muestra status de API', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'qrush TPV' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'simpleTPV' })).toBeVisible();
 
   const status = page.getByTestId('api-status');
   await expect(status).toBeVisible();
@@ -792,14 +792,14 @@ test('carga TPV y muestra status de API', async ({ page }) => {
 
 - [ ] **Step 4: Instalar Chromium de Playwright (primera vez)**
 
-Run: `pnpm --filter @qrush/tpv exec playwright install --with-deps chromium`
+Run: `pnpm --filter @simpletpv/tpv exec playwright install --with-deps chromium`
 Expected: descarga Chromium (~150MB) y dependencias del sistema.
 
-> **Si pide sudo y no quieres dárselo:** usar `pnpm --filter @qrush/tpv exec playwright install chromium` (sin `--with-deps`); en macOS suele bastar.
+> **Si pide sudo y no quieres dárselo:** usar `pnpm --filter @simpletpv/tpv exec playwright install chromium` (sin `--with-deps`); en macOS suele bastar.
 
 - [ ] **Step 5: Asegurar build existe**
 
-Run: `pnpm --filter @qrush/tpv build`
+Run: `pnpm --filter @simpletpv/tpv build`
 Expected: `dist/` existe.
 
 - [ ] **Step 6: Arrancar API en background (para que el smoke test reciba "ok")**
@@ -807,10 +807,10 @@ Expected: `dist/` existe.
 Run (en background):
 
 ```bash
-cd /Users/admin/Desktop/qrush_tpv
+cd /Users/admin/Desktop/simpletpv
 set -a && source .env && set +a
-pnpm --filter @qrush/api start > /tmp/qrush-api.log 2>&1 &
-echo $! > /tmp/qrush-api.pid
+pnpm --filter @simpletpv/api start > /tmp/simpletpv-api.log 2>&1 &
+echo $! > /tmp/simpletpv-api.pid
 for i in $(seq 1 15); do
   curl -sf http://localhost:3000/health > /dev/null && break
   sleep 1
@@ -820,11 +820,11 @@ curl -s http://localhost:3000/health
 
 Expected: imprime `{"status":"ok",...}`.
 
-> **Si la API no arranca:** revisar `/tmp/qrush-api.log`. Posibles causas: Postgres no corriendo, falta `DATABASE_URL_APP` en `.env`, build de api desactualizado (`pnpm --filter @qrush/api build`).
+> **Si la API no arranca:** revisar `/tmp/simpletpv-api.log`. Posibles causas: Postgres no corriendo, falta `DATABASE_URL_APP` en `.env`, build de api desactualizado (`pnpm --filter @simpletpv/api build`).
 
 - [ ] **Step 7: Ejecutar smoke test**
 
-Run: `pnpm --filter @qrush/tpv test:e2e`
+Run: `pnpm --filter @simpletpv/tpv test:e2e`
 Expected: 1 test pasa. Salida tipo:
 
 ```
@@ -839,7 +839,7 @@ Running 1 test using 1 worker
 
 - [ ] **Step 8: Matar API**
 
-Run: `kill $(cat /tmp/qrush-api.pid) 2>/dev/null; rm -f /tmp/qrush-api.pid`
+Run: `kill $(cat /tmp/simpletpv-api.pid) 2>/dev/null; rm -f /tmp/simpletpv-api.pid`
 
 - [ ] **Step 9: Commit**
 
@@ -854,11 +854,11 @@ git commit -m "test(tpv): playwright smoke test (placeholder + ping /api/health)
 
 **Files:**
 
-- Modify: `/Users/admin/Desktop/qrush_tpv/apps/backoffice/package.json`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/backoffice/tsconfig.json`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/backoffice/vite.config.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/backoffice/tailwind.config.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/backoffice/postcss.config.js`
+- Modify: `/Users/admin/Desktop/simpletpv/apps/backoffice/package.json`
+- Create: `/Users/admin/Desktop/simpletpv/apps/backoffice/tsconfig.json`
+- Create: `/Users/admin/Desktop/simpletpv/apps/backoffice/vite.config.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/backoffice/tailwind.config.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/backoffice/postcss.config.js`
 
 - [ ] **Step 1: Sobrescribir `apps/backoffice/package.json`**
 
@@ -866,7 +866,7 @@ Contenido exacto (idéntico a TPV salvo `name` y script `preview` con puerto 417
 
 ```json
 {
-  "name": "@qrush/backoffice",
+  "name": "@simpletpv/backoffice",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -878,7 +878,7 @@ Contenido exacto (idéntico a TPV salvo `name` y script `preview` con puerto 417
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@qrush/ui": "workspace:*",
+    "@simpletpv/ui": "workspace:*",
     "@tanstack/react-query": "^5.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -886,7 +886,7 @@ Contenido exacto (idéntico a TPV salvo `name` y script `preview` con puerto 417
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0",
-    "@qrush/web-config": "workspace:*",
+    "@simpletpv/web-config": "workspace:*",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0"
   }
@@ -916,7 +916,7 @@ Contenido exacto (idéntico a TPV):
 Contenido exacto (puertos cambian a 5174/4174):
 
 ```ts
-import { createViteConfig } from '@qrush/web-config/vite';
+import { createViteConfig } from '@simpletpv/web-config/vite';
 
 export default createViteConfig({
   port: 5174,
@@ -931,7 +931,7 @@ Contenido exacto (idéntico a TPV):
 ```ts
 import type { Config } from 'tailwindcss';
 
-import { tailwindBasePreset } from '@qrush/web-config/tailwind';
+import { tailwindBasePreset } from '@simpletpv/web-config/tailwind';
 
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}', '../../packages/ui/src/**/*.{ts,tsx}'],
@@ -967,15 +967,15 @@ git commit -m "feat(backoffice): package.json + configs (puertos 5174/4174)"
 
 **Files:**
 
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/backoffice/index.html`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/backoffice/src/main.tsx`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/backoffice/src/App.tsx`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/backoffice/src/lib/api.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/backoffice/src/styles.css`
+- Create: `/Users/admin/Desktop/simpletpv/apps/backoffice/index.html`
+- Create: `/Users/admin/Desktop/simpletpv/apps/backoffice/src/main.tsx`
+- Create: `/Users/admin/Desktop/simpletpv/apps/backoffice/src/App.tsx`
+- Create: `/Users/admin/Desktop/simpletpv/apps/backoffice/src/lib/api.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/backoffice/src/styles.css`
 
 - [ ] **Step 1: Crear directorio src/lib**
 
-Run: `mkdir -p /Users/admin/Desktop/qrush_tpv/apps/backoffice/src/lib`
+Run: `mkdir -p /Users/admin/Desktop/simpletpv/apps/backoffice/src/lib`
 
 - [ ] **Step 2: Crear `apps/backoffice/index.html`**
 
@@ -987,7 +987,7 @@ Contenido exacto (cambia `<title>`):
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>qrush Backoffice</title>
+    <title>simpleTPV Backoffice</title>
   </head>
   <body>
     <div id="root"></div>
@@ -1020,7 +1020,7 @@ export async function pingHealth(): Promise<HealthResponse> {
 Contenido exacto (cambia título y descripción):
 
 ```tsx
-import { Button } from '@qrush/ui';
+import { Button } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 
 import { pingHealth } from './lib/api.js';
@@ -1034,7 +1034,7 @@ export default function App() {
 
   return (
     <main className="min-h-screen p-8">
-      <h1 className="text-2xl font-semibold">qrush Backoffice</h1>
+      <h1 className="text-2xl font-semibold">simpleTPV Backoffice</h1>
       <p className="mt-2 text-sm text-gray-600">Backoffice administrativo — scaffolding</p>
       <section className="mt-6">
         <h2 className="text-lg font-medium">API status</h2>
@@ -1086,8 +1086,8 @@ Contenido exacto (idéntico a TPV):
 Run:
 
 ```bash
-pnpm --filter @qrush/backoffice typecheck
-pnpm --filter @qrush/backoffice build
+pnpm --filter @simpletpv/backoffice typecheck
+pnpm --filter @simpletpv/backoffice build
 ```
 
 Expected: ambos pasan. `apps/backoffice/dist/index.html` existe.
@@ -1105,12 +1105,12 @@ git commit -m "feat(backoffice): App placeholder (espejo de tpv con título dist
 
 **Files:**
 
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/backoffice/playwright.config.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/backoffice/e2e/smoke.spec.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/backoffice/playwright.config.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/backoffice/e2e/smoke.spec.ts`
 
 - [ ] **Step 1: Crear directorio e2e**
 
-Run: `mkdir -p /Users/admin/Desktop/qrush_tpv/apps/backoffice/e2e`
+Run: `mkdir -p /Users/admin/Desktop/simpletpv/apps/backoffice/e2e`
 
 - [ ] **Step 2: Crear `apps/backoffice/playwright.config.ts`**
 
@@ -1147,7 +1147,7 @@ import { expect, test } from '@playwright/test';
 
 test('carga Backoffice y muestra status de API', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'qrush Backoffice' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'simpleTPV Backoffice' })).toBeVisible();
 
   const status = page.getByTestId('api-status');
   await expect(status).toBeVisible();
@@ -1160,10 +1160,10 @@ test('carga Backoffice y muestra status de API', async ({ page }) => {
 Run:
 
 ```bash
-cd /Users/admin/Desktop/qrush_tpv
+cd /Users/admin/Desktop/simpletpv
 set -a && source .env && set +a
-pnpm --filter @qrush/api start > /tmp/qrush-api.log 2>&1 &
-echo $! > /tmp/qrush-api.pid
+pnpm --filter @simpletpv/api start > /tmp/simpletpv-api.log 2>&1 &
+echo $! > /tmp/simpletpv-api.pid
 for i in $(seq 1 15); do
   curl -sf http://localhost:3000/health > /dev/null && break
   sleep 1
@@ -1172,14 +1172,14 @@ done
 
 - [ ] **Step 5: Ejecutar smoke test del backoffice**
 
-Run: `pnpm --filter @qrush/backoffice test:e2e`
+Run: `pnpm --filter @simpletpv/backoffice test:e2e`
 Expected: 1 test pasa.
 
-> **Si Chromium no está instalado** (porque solo se hizo para tpv en T6): `pnpm --filter @qrush/backoffice exec playwright install chromium`. El binario es compartido entre apps via `~/.cache/ms-playwright/`, así que no se descarga dos veces.
+> **Si Chromium no está instalado** (porque solo se hizo para tpv en T6): `pnpm --filter @simpletpv/backoffice exec playwright install chromium`. El binario es compartido entre apps via `~/.cache/ms-playwright/`, así que no se descarga dos veces.
 
 - [ ] **Step 6: Matar API**
 
-Run: `kill $(cat /tmp/qrush-api.pid) 2>/dev/null; rm -f /tmp/qrush-api.pid`
+Run: `kill $(cat /tmp/simpletpv-api.pid) 2>/dev/null; rm -f /tmp/simpletpv-api.pid`
 
 - [ ] **Step 7: Commit**
 
@@ -1200,24 +1200,24 @@ git commit -m "test(backoffice): playwright smoke test (placeholder + ping /api/
 # 1. install limpio
 pnpm install
 
-# 2. tests de @qrush/ui
-pnpm --filter @qrush/ui test
+# 2. tests de @simpletpv/ui
+pnpm --filter @simpletpv/ui test
 # Expected: 3 tests pasan
 
 # 3-4. typecheck por app
-pnpm --filter @qrush/tpv typecheck
-pnpm --filter @qrush/backoffice typecheck
+pnpm --filter @simpletpv/tpv typecheck
+pnpm --filter @simpletpv/backoffice typecheck
 
 # 5-6. builds
-pnpm --filter @qrush/tpv build
-pnpm --filter @qrush/backoffice build
+pnpm --filter @simpletpv/tpv build
+pnpm --filter @simpletpv/backoffice build
 ls apps/tpv/dist/index.html apps/backoffice/dist/index.html
 # Expected: ambos existen
 
 # 7. arrancar API
 set -a && source .env && set +a
-pnpm --filter @qrush/api start > /tmp/qrush-api.log 2>&1 &
-echo $! > /tmp/qrush-api.pid
+pnpm --filter @simpletpv/api start > /tmp/simpletpv-api.log 2>&1 &
+echo $! > /tmp/simpletpv-api.pid
 for i in $(seq 1 15); do
   curl -sf http://localhost:3000/health > /dev/null && break
   sleep 1
@@ -1226,13 +1226,13 @@ curl -s http://localhost:3000/health
 # Expected: {"status":"ok",...}
 
 # 8-10. E2E
-pnpm --filter @qrush/tpv test:e2e
-pnpm --filter @qrush/backoffice test:e2e
+pnpm --filter @simpletpv/tpv test:e2e
+pnpm --filter @simpletpv/backoffice test:e2e
 # Expected: ambos pasan (1 test cada uno)
 
 # 11. matar API
-kill $(cat /tmp/qrush-api.pid) 2>/dev/null
-rm -f /tmp/qrush-api.pid
+kill $(cat /tmp/simpletpv-api.pid) 2>/dev/null
+rm -f /tmp/simpletpv-api.pid
 
 # 12. lint + format
 pnpm lint && pnpm format
@@ -1254,8 +1254,8 @@ Run:
 
 ```bash
 docker compose ps postgres | grep healthy && echo "postgres OK"
-pnpm --filter @qrush/db build
-pnpm --filter @qrush/api test
+pnpm --filter @simpletpv/db build
+pnpm --filter @simpletpv/api test
 ```
 
 Expected: postgres healthy, db build OK, tests api OK.
@@ -1265,9 +1265,9 @@ Expected: postgres healthy, db build OK, tests api OK.
 Verificar que los comandos que invoca el plan de CI (Task 6 del plan CI) están alineados con los scripts de F4:
 
 - `pnpm -r --filter "./apps/*" build` → ahora construye api + tpv + backoffice + (db lo hace por dependencia).
-- `pnpm --filter @qrush/tpv exec playwright install --with-deps chromium` → existe.
-- `pnpm --filter @qrush/tpv test:e2e` → existe.
-- `pnpm --filter @qrush/backoffice test:e2e` → existe.
+- `pnpm --filter @simpletpv/tpv exec playwright install --with-deps chromium` → existe.
+- `pnpm --filter @simpletpv/tpv test:e2e` → existe.
+- `pnpm --filter @simpletpv/backoffice test:e2e` → existe.
 
 Run para confirmar todos los scripts existen:
 
@@ -1277,7 +1277,7 @@ const fs = require('fs');
 const apps = ['tpv','backoffice'];
 for (const a of apps) {
   const pkg = JSON.parse(fs.readFileSync('apps/'+a+'/package.json','utf8'));
-  console.log('@qrush/'+a+' scripts:', Object.keys(pkg.scripts||{}).join(', '));
+  console.log('@simpletpv/'+a+' scripts:', Object.keys(pkg.scripts||{}).join(', '));
 }
 "
 ```
@@ -1334,10 +1334,10 @@ Sin gaps.
 
 **3. Consistencia de tipos/nombres:**
 
-- `@qrush/tpv` (5173/4173), `@qrush/backoffice` (5174/4174), `@qrush/ui`, `@qrush/web-config` consistentes en todas las tareas.
+- `@simpletpv/tpv` (5173/4173), `@simpletpv/backoffice` (5174/4174), `@simpletpv/ui`, `@simpletpv/web-config` consistentes en todas las tareas.
 - `Button`, `cn`, `pingHealth`, `HealthResponse`, `tailwindBasePreset`, `createViteConfig`, `FrontendViteOptions` consistentes entre archivos y consumidores.
 - `data-testid="api-status"` consistente entre App.tsx (T5/T8) y smoke.spec.ts (T6/T9).
 - `/api/health` consistente entre lib/api.ts y proxy rewrite del vite.base.ts (que reescribe a `/health`).
-- Workspace links `@qrush/ui: workspace:*` y `@qrush/web-config: workspace:*` consistentes en T4 step 1 y T7 step 1.
+- Workspace links `@simpletpv/ui: workspace:*` y `@simpletpv/web-config: workspace:*` consistentes en T4 step 1 y T7 step 1.
 
 Sin issues detectados.

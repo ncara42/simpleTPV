@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Inicializar `qrush_tpv` como monorepo TypeScript con Turborepo + pnpm workspaces, ESLint flat + Prettier + tsconfig compartido, y stubs vacíos de los 4 workspaces que F2-F4 llenarán.
+**Goal:** Inicializar `simpletpv` como monorepo TypeScript con Turborepo + pnpm workspaces, ESLint flat + Prettier + tsconfig compartido, y stubs vacíos de los 4 workspaces que F2-F4 llenarán.
 
 **Architecture:** Configs en la raíz (ESLint, Prettier, tsconfig.base.json, turbo.json), workspaces stub con `package.json` mínimo en `apps/api`, `apps/tpv`, `apps/backoffice`, `packages/db`. Scripts raíz envolventes — `build/typecheck/test/test:e2e` por Turborepo, `lint/format` por binarios directos.
 
@@ -14,7 +14,7 @@
 
 ## Convenciones del plan
 
-- **Rutas:** todas absolutas a `/Users/admin/Desktop/qrush_tpv/`.
+- **Rutas:** todas absolutas a `/Users/admin/Desktop/simpletpv/`.
 - **Commits:** Conventional Commits, uno por tarea (o agrupado donde tiene sentido).
 - **Verificación:** cada tarea de creación de archivos termina validando que el resultado existe y/o pasa los checks correspondientes.
 - **Node activo:** se asume `nvm use 22` antes de empezar. Si no, el primer comando de Task 0 lo detecta.
@@ -36,10 +36,10 @@ Archivos que crea este plan, agrupados por responsabilidad:
 | `.prettierignore`              | Paths fuera de Prettier           | T3    |
 | `package.json`                 | Manifest raíz + scripts + devDeps | T4    |
 | `pnpm-workspace.yaml`          | Declaración de workspaces         | T4    |
-| `apps/api/package.json`        | Stub @qrush/api                   | T5    |
-| `apps/tpv/package.json`        | Stub @qrush/tpv                   | T5    |
-| `apps/backoffice/package.json` | Stub @qrush/backoffice            | T5    |
-| `packages/db/package.json`     | Stub @qrush/db                    | T5    |
+| `apps/api/package.json`        | Stub @simpletpv/api               | T5    |
+| `apps/tpv/package.json`        | Stub @simpletpv/tpv               | T5    |
+| `apps/backoffice/package.json` | Stub @simpletpv/backoffice        | T5    |
+| `packages/db/package.json`     | Stub @simpletpv/db                | T5    |
 | `tsconfig.base.json`           | Compiler options compartidas      | T6    |
 | `tsconfig.json`                | References a workspaces (raíz)    | T6    |
 | `eslint.config.js`             | ESLint 10 flat config raíz        | T7    |
@@ -61,7 +61,7 @@ Archivos que crea este plan, agrupados por responsabilidad:
 Run:
 
 ```bash
-cd /Users/admin/Desktop/qrush_tpv && node --version
+cd /Users/admin/Desktop/simpletpv && node --version
 ```
 
 Expected: `v22.x.x`.
@@ -80,10 +80,10 @@ Si no, ejecutar `npm install -g pnpm@11`.
 Run:
 
 ```bash
-cd /Users/admin/Desktop/qrush_tpv && git init -b main
+cd /Users/admin/Desktop/simpletpv && git init -b main
 ```
 
-Expected: `Initialized empty Git repository in /Users/admin/Desktop/qrush_tpv/.git/`.
+Expected: `Initialized empty Git repository in /Users/admin/Desktop/simpletpv/.git/`.
 
 - [ ] **Step 4: Verificar que el branch por defecto es `main`**
 
@@ -270,7 +270,7 @@ Contenido exacto:
 
 ```json
 {
-  "name": "qrush-tpv",
+  "name": "simpletpv",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -348,7 +348,7 @@ Contenido exacto:
 
 ```json
 {
-  "name": "@qrush/api",
+  "name": "@simpletpv/api",
   "version": "0.0.0",
   "private": true
 }
@@ -360,7 +360,7 @@ Contenido exacto:
 
 ```json
 {
-  "name": "@qrush/tpv",
+  "name": "@simpletpv/tpv",
   "version": "0.0.0",
   "private": true
 }
@@ -372,7 +372,7 @@ Contenido exacto:
 
 ```json
 {
-  "name": "@qrush/backoffice",
+  "name": "@simpletpv/backoffice",
   "version": "0.0.0",
   "private": true
 }
@@ -384,7 +384,7 @@ Contenido exacto:
 
 ```json
 {
-  "name": "@qrush/db",
+  "name": "@simpletpv/db",
   "version": "0.0.0",
   "private": true
 }
@@ -396,10 +396,10 @@ Run: `pnpm -r exec node -e "console.log(require('./package.json').name)"`
 Expected output (orden puede variar):
 
 ```
-@qrush/api
-@qrush/backoffice
-@qrush/db
-@qrush/tpv
+@simpletpv/api
+@simpletpv/backoffice
+@simpletpv/db
+@simpletpv/tpv
 ```
 
 - [ ] **Step 7: Reinstalar para enlazar workspaces**
@@ -411,7 +411,7 @@ Expected: sin warnings de "no projects matched". `pnpm-lock.yaml` actualizado si
 
 ```bash
 git add apps packages pnpm-lock.yaml
-git commit -m "chore: stubs de workspaces (@qrush/api|tpv|backoffice|db)"
+git commit -m "chore: stubs de workspaces (@simpletpv/api|tpv|backoffice|db)"
 ```
 
 ---
@@ -645,7 +645,7 @@ git commit -m "chore: turborepo pipelines (build/typecheck/test/test:e2e)"
 Contenido exacto:
 
 ````markdown
-# qrush_tpv
+# simpletpv
 
 TPV multitienda SaaS — monorepo TypeScript.
 
@@ -682,7 +682,7 @@ pnpm build
 Contenido exacto:
 
 ```markdown
-# Instrucciones para agentes Claude en qrush_tpv
+# Instrucciones para agentes Claude en simpletpv
 
 ## Idioma
 
@@ -778,7 +778,7 @@ Expected: Turborepo corre sin tareas reales (ningún workspace declara `build` a
 - [ ] **Step 6: Verificar workspaces declarados**
 
 Run: `pnpm -r exec node -e "console.log(require('./package.json').name)"`
-Expected: lista que incluye los 4 workspaces (`@qrush/api`, `@qrush/backoffice`, `@qrush/db`, `@qrush/tpv`).
+Expected: lista que incluye los 4 workspaces (`@simpletpv/api`, `@simpletpv/backoffice`, `@simpletpv/db`, `@simpletpv/tpv`).
 
 - [ ] **Step 7: Verificar git log**
 
@@ -830,7 +830,7 @@ Sin gaps.
 
 **3. Consistencia de tipos/nombres:**
 
-- Nombres de workspace `@qrush/api`, `@qrush/tpv`, `@qrush/backoffice`, `@qrush/db` consistentes en T4, T5, T6, T10.
+- Nombres de workspace `@simpletpv/api`, `@simpletpv/tpv`, `@simpletpv/backoffice`, `@simpletpv/db` consistentes en T4, T5, T6, T10.
 - Scripts del `package.json` raíz declarados en T4 step 2 y consumidos en T7, T8, T10 sin divergencias.
 - Versiones `^x.0.0` consistentes en T4 step 2 (pisos mínimos) — la resolución real queda en `pnpm-lock.yaml`.
 

@@ -1,4 +1,4 @@
-# Spec — Pipeline CI/CD para qrush_tpv
+# Spec — Pipeline CI/CD para simpletpv
 
 | Campo      | Valor                                                                       |
 | ---------- | --------------------------------------------------------------------------- |
@@ -9,13 +9,13 @@
 
 ## 1. Objetivo
 
-Implantar en `qrush_tpv` la misma disciplina de CI/CD que el proyecto `vivienda`, adaptada al stack del TPV (Turborepo + pnpm + NestJS + Prisma + React/Vite x2 + Postgres 16 sin PostGIS) y al hecho de que los workflows correrán en GitHub-hosted runners (no en self-hosted), dentro del free tier de GitHub Actions.
+Implantar en `simpletpv` la misma disciplina de CI/CD que el proyecto `vivienda`, adaptada al stack del TPV (Turborepo + pnpm + NestJS + Prisma + React/Vite x2 + Postgres 16 sin PostGIS) y al hecho de que los workflows correrán en GitHub-hosted runners (no en self-hosted), dentro del free tier de GitHub Actions.
 
 El objetivo es que **desde el primer PR del scaffolding del monorepo**:
 
 1. Todo cambio pase un gate de calidad (lint, typecheck, dead code, tests con cobertura, build).
 2. Todo cambio pase un gate de seguridad (gitleaks, semgrep, OWASP Dependency-Check, OSV, Trivy filesystem).
-3. La cobertura de tests de `@qrush/api` solo pueda subir (coverage ratchet).
+3. La cobertura de tests de `@simpletpv/api` solo pueda subir (coverage ratchet).
 4. Todo push a `main` que pase quality + e2e dispare un redeploy automático en Dokploy.
 
 ## 2. Alcance
@@ -30,7 +30,7 @@ El objetivo es que **desde el primer PR del scaffolding del monorepo**:
 
 **Excluido:**
 
-- Workflow `pipeline.yml` de ingesta mensual de datos públicos (no aplica a qrush_tpv — no hay ingesta SERPAVI/Atlas/EPA equivalente).
+- Workflow `pipeline.yml` de ingesta mensual de datos públicos (no aplica a simpletpv — no hay ingesta SERPAVI/Atlas/EPA equivalente).
 - Job `image-scan` de Trivy (queda como TODO comentado hasta que existan los Dockerfiles de cada app).
 - Migración a runners self-hosted (decisión futura cuando el consumo de minutos lo justifique).
 - Scaffolding del monorepo en sí (es prerequisito de este spec, no parte de él).
@@ -57,13 +57,13 @@ Si alguna de estas piezas falta cuando se ejecute la implementación, el plan se
 | D2  | Node **22 LTS**, no 24                                                   | 22 está más probado en hosted runners. NestJS 11 y Prisma 6 aún muestran edge cases con 24. Alineamiento con vivienda no compensa la inestabilidad.                                 |
 | D3  | E2E desde el primer día con Postgres efímero                             | El plan MVP arranca semana 0 con seed multi-tenant; tener E2E desde el principio evita deuda de testing.                                                                            |
 | D4  | Postgres efímero vía `services:` de Actions, no `docker run` hermano     | En hosted runners `services:` es nativo, simplifica la red, evita la danza de `$HOSTNAME` + descubrir red Docker que necesita vivienda al correr el runner dentro de un contenedor. |
-| D5  | `postgres:16-alpine` oficial, no `postgis/postgis`                       | qrush no usa PostGIS. Imagen más ligera, menos superficie.                                                                                                                          |
-| D6  | Coverage ratchet replicado, apuntando a `@qrush/api`                     | Mismo patrón que vivienda. Suelo inicial `0` para que el primer push lo establezca.                                                                                                 |
+| D5  | `postgres:16-alpine` oficial, no `postgis/postgis`                       | simpletpv no usa PostGIS. Imagen más ligera, menos superficie.                                                                                                                      |
+| D6  | Coverage ratchet replicado, apuntando a `@simpletpv/api`                 | Mismo patrón que vivienda. Suelo inicial `0` para que el primer push lo establezca.                                                                                                 |
 | D7  | Deploy automático Dokploy desde día 1                                    | El usuario va a usar Dokploy. Mismo patrón que vivienda (webhook, secret en env, validación 2xx).                                                                                   |
-| D8  | `pre-commit` hook con gitleaks **opcional** (avisa, no rompe)            | Reduce fricción de onboarding del equipo. vivienda lo hace obligatorio pero allí el repo es de un solo dev; qrush previsiblemente tendrá más manos.                                 |
-| D9  | Sin `pipeline.yml`                                                       | qrush no tiene ingesta mensual de fuentes públicas; mantener el archivo crearía confusión.                                                                                          |
+| D8  | `pre-commit` hook con gitleaks **opcional** (avisa, no rompe)            | Reduce fricción de onboarding del equipo. vivienda lo hace obligatorio pero allí el repo es de un solo dev; simpletpv previsiblemente tendrá más manos.                             |
+| D9  | Sin `pipeline.yml`                                                       | simpletpv no tiene ingesta mensual de fuentes públicas; mantener el archivo crearía confusión.                                                                                      |
 | D10 | Image-scan de Trivy comentado como TODO                                  | No hay Dockerfiles de apps todavía. Se activa cuando existan `apps/api/Dockerfile`, `apps/tpv/Dockerfile`, `apps/backoffice/Dockerfile`.                                            |
-| D11 | Semgrep sin `p/nextjs` (qrush usa Vite/SPA, no Next)                     | Reglas: `p/typescript`, `p/nodejs`, `p/secrets`, `p/owasp-top-ten`.                                                                                                                 |
+| D11 | Semgrep sin `p/nextjs` (simpletpv usa Vite/SPA, no Next)                 | Reglas: `p/typescript`, `p/nodejs`, `p/secrets`, `p/owasp-top-ten`.                                                                                                                 |
 | D12 | Actions pinneadas por SHA con comentario `# vX.Y.Z`                      | Una credencial de maintainer robada no puede reetiquetar. Dependabot propone upgrades.                                                                                              |
 | D13 | `permissions: {}` a nivel workflow + permisos mínimos por job            | Principio de mínimo privilegio. Solo el job `ratchet` tiene `contents: write`.                                                                                                      |
 | D14 | `concurrency` con `cancel-in-progress: true` salvo en jobs irreversibles | Ahorro de minutos. (`pipeline.yml` con `cancel-in-progress: false` no aplica porque ese workflow se descarta.)                                                                      |
@@ -84,12 +84,12 @@ Si alguna de estas piezas falta cuando se ejecute la implementación, el plan se
   2. Setup pnpm (`pnpm/action-setup` pinneado por SHA; lee la versión de `packageManager` del `package.json`).
   3. Setup Node 22 (`actions/setup-node` con `cache: pnpm`).
   4. `pnpm install --frozen-lockfile`.
-  5. `pnpm --filter @qrush/db exec prisma generate`.
+  5. `pnpm --filter @simpletpv/db exec prisma generate`.
   6. `pnpm audit --audit-level=high --prod`.
   7. `pnpm lint`.
   8. `pnpm knip`.
   9. `pnpm -r typecheck`.
-  10. `pnpm --filter @qrush/api exec vitest run --coverage --coverage.reporter=json-summary --coverage.reporter=text`.
+  10. `pnpm --filter @simpletpv/api exec vitest run --coverage --coverage.reporter=json-summary --coverage.reporter=text`.
   11. **Coverage ratchet gate** (lectura, no escritura): script `node -e '...'` inline que lee `apps/api/coverage/coverage-summary.json` y `coverage-threshold.json`. Si `summary.total.statements.pct < threshold.api.statements`, falla. Si no hay cobertura instrumentada todavía, sale `0` con mensaje "ratchet omitido".
   12. Build de todas las apps: `pnpm -r --filter "./apps/*" build`.
 
@@ -118,7 +118,7 @@ Si alguna de estas piezas falta cuando se ejecute la implementación, el plan se
     env:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: qrush_test
+      POSTGRES_DB: simpletpv_test
     options: >-
       --health-cmd "pg_isready -U postgres"
       --health-interval 3s
@@ -126,17 +126,17 @@ Si alguna de estas piezas falta cuando se ejecute la implementación, el plan se
       --health-retries 10
     ports: ['5432:5432']
   ```
-- `env: DATABASE_URL: postgresql://postgres:postgres@localhost:5432/qrush_test`.
+- `env: DATABASE_URL: postgresql://postgres:postgres@localhost:5432/simpletpv_test`.
 - Pasos:
   1. Checkout + setup pnpm + setup Node 22 + install.
-  2. `pnpm --filter @qrush/db exec prisma generate`.
-  3. `pnpm --filter @qrush/db exec prisma migrate deploy`.
-  4. `pnpm --filter @qrush/db exec prisma db seed` (seed multi-tenant: ≥ 2 organizaciones, corre como superuser para BYPASSRLS).
+  2. `pnpm --filter @simpletpv/db exec prisma generate`.
+  3. `pnpm --filter @simpletpv/db exec prisma migrate deploy`.
+  4. `pnpm --filter @simpletpv/db exec prisma db seed` (seed multi-tenant: ≥ 2 organizaciones, corre como superuser para BYPASSRLS).
   5. `pnpm -r --filter "./apps/*" build`.
-  6. Arrancar `apps/api` en background y esperar a que responda. El comando concreto y el endpoint de healthcheck (esperado `GET /health` devolviendo 200) los define el scaffolding de la app — el job lanza `pnpm --filter @qrush/api start` con `&` y hace polling con `curl --retry` o equivalente sobre la URL local hasta 30s de timeout. Si pasados los 30s no responde, el job falla con mensaje explícito.
-  7. `pnpm --filter @qrush/tpv exec playwright install --with-deps chromium`.
-  8. `pnpm --filter @qrush/tpv test:e2e`.
-  9. `pnpm --filter @qrush/backoffice test:e2e` (reutiliza el Chromium ya instalado).
+  6. Arrancar `apps/api` en background y esperar a que responda. El comando concreto y el endpoint de healthcheck (esperado `GET /health` devolviendo 200) los define el scaffolding de la app — el job lanza `pnpm --filter @simpletpv/api start` con `&` y hace polling con `curl --retry` o equivalente sobre la URL local hasta 30s de timeout. Si pasados los 30s no responde, el job falla con mensaje explícito.
+  7. `pnpm --filter @simpletpv/tpv exec playwright install --with-deps chromium`.
+  8. `pnpm --filter @simpletpv/tpv test:e2e`.
+  9. `pnpm --filter @simpletpv/backoffice test:e2e` (reutiliza el Chromium ya instalado).
   10. `if: failure()` → upload artifact `playwright-report` con `apps/tpv/playwright-report/`, `apps/tpv/test-results/`, `apps/backoffice/playwright-report/`, `apps/backoffice/test-results/`, retention 7d.
 
 #### Job `deploy` (≈ 1 min)
@@ -195,9 +195,9 @@ Sección comentada como TODO para activar image-scan con matrix cuando existan l
 
 ```
 # matrix:
-#   - app: qrush-api,        dockerfile: apps/api/Dockerfile
-#   - app: qrush-tpv,        dockerfile: apps/tpv/Dockerfile
-#   - app: qrush-backoffice, dockerfile: apps/backoffice/Dockerfile
+#   - app: simpletpv-api,        dockerfile: apps/api/Dockerfile
+#   - app: simpletpv,        dockerfile: apps/tpv/Dockerfile
+#   - app: simpletpv-backoffice, dockerfile: apps/backoffice/Dockerfile
 ```
 
 ## 6. `.github/dependabot.yml`
@@ -258,7 +258,7 @@ Vacío al inicio. Cualquier excepción futura documenta el ID, paths afectados y
 
 ### 8.5 `knip.json`
 
-Adaptado al stack qrush (sin scripts de ingesta):
+Adaptado al stack simpletpv (sin scripts de ingesta):
 
 ```json
 {
@@ -318,7 +318,7 @@ Definición de done:
 
 ## 12. Fuera de alcance — futuro
 
-- **Self-hosted runner** para qrush_tpv (reutilizando infra de vivienda o nuevo). Disparador: consumo de minutos > 80% del free tier.
+- **Self-hosted runner** para simpletpv (reutilizando infra de vivienda o nuevo). Disparador: consumo de minutos > 80% del free tier.
 - **Image-scan de Trivy** con matrix de Dockerfiles.
 - **Workflow de release** (changelog, tag, publish) cuando exista versionado público.
 - **Preview deployments** por PR (Dokploy lo permite, pero requiere infra extra).

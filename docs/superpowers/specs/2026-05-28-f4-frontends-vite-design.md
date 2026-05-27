@@ -24,10 +24,10 @@ Cada SPA renderiza un placeholder con un ping al `/api/health` (proxyeado via Vi
 
 Al cerrar F4:
 
-- `pnpm --filter @qrush/tpv dev` arranca dev server en `:5173`.
-- `pnpm --filter @qrush/backoffice dev` arranca dev server en `:5174`.
-- `pnpm --filter @qrush/tpv build` produce `apps/tpv/dist/`.
-- `pnpm --filter @qrush/tpv test:e2e` arranca `vite preview` y pasa el smoke test.
+- `pnpm --filter @simpletpv/tpv dev` arranca dev server en `:5173`.
+- `pnpm --filter @simpletpv/backoffice dev` arranca dev server en `:5174`.
+- `pnpm --filter @simpletpv/tpv build` produce `apps/tpv/dist/`.
+- `pnpm --filter @simpletpv/tpv test:e2e` arranca `vite preview` y pasa el smoke test.
 - Igual para backoffice.
 - El job E2E del plan de CI (ya escrito) ejecuta el contrato sin modificaciones.
 
@@ -39,10 +39,10 @@ Al cerrar F4:
 - `packages/ui/` con `Button` (shadcn-style), helper `cn` (clsx + tailwind-merge), tests Vitest + testing-library.
 - `apps/tpv/` y `apps/backoffice/` idénticos salvo nombre y puertos, con:
   - `index.html`, `src/main.tsx`, `src/App.tsx`, `src/styles.css` (`@import 'tailwindcss';`), `src/lib/api.ts`.
-  - `vite.config.ts` usando `createViteConfig` de `@qrush/web-config`.
-  - `tailwind.config.ts` usando el preset de `@qrush/web-config`.
+  - `vite.config.ts` usando `createViteConfig` de `@simpletpv/web-config`.
+  - `tailwind.config.ts` usando el preset de `@simpletpv/web-config`.
   - `postcss.config.js` vacío (Tailwind 4 no lo necesita pero algunos tools lo buscan).
-  - `tsconfig.json` extendiendo `@qrush/web-config/tsconfig`.
+  - `tsconfig.json` extendiendo `@simpletpv/web-config/tsconfig`.
   - `playwright.config.ts` con `webServer: vite preview`.
   - `e2e/smoke.spec.ts` que verifica placeholder + ping a `/api/health`.
 - `package.json` actualizado en ambas apps con deps reales (React 19, TanStack Query 5, Zustand 5, Playwright, etc.) y workspace deps.
@@ -88,7 +88,7 @@ Al cerrar F4:
 ## 4. Estructura final
 
 ```
-qrush_tpv/
+simpletpv/
 ├── packages/
 │   ├── web-config/                            (nuevo workspace)
 │   │   ├── package.json
@@ -135,7 +135,7 @@ qrush_tpv/
 
 ```json
 {
-  "name": "@qrush/web-config",
+  "name": "@simpletpv/web-config",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -287,7 +287,7 @@ export const reactConfig = [
 
 ```json
 {
-  "name": "@qrush/ui",
+  "name": "@simpletpv/ui",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -437,7 +437,7 @@ export { cn } from './lib/cn.js';
 
 ```json
 {
-  "name": "@qrush/tpv",
+  "name": "@simpletpv/tpv",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -449,7 +449,7 @@ export { cn } from './lib/cn.js';
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@qrush/ui": "workspace:*",
+    "@simpletpv/ui": "workspace:*",
     "@tanstack/react-query": "^5.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -457,7 +457,7 @@ export { cn } from './lib/cn.js';
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0",
-    "@qrush/web-config": "workspace:*",
+    "@simpletpv/web-config": "workspace:*",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0"
   }
@@ -483,7 +483,7 @@ export { cn } from './lib/cn.js';
 ### 5.16 `apps/tpv/vite.config.ts`
 
 ```ts
-import { createViteConfig } from '@qrush/web-config/vite';
+import { createViteConfig } from '@simpletpv/web-config/vite';
 
 export default createViteConfig({
   port: 5173,
@@ -496,7 +496,7 @@ export default createViteConfig({
 ```ts
 import type { Config } from 'tailwindcss';
 
-import { tailwindBasePreset } from '@qrush/web-config/tailwind';
+import { tailwindBasePreset } from '@simpletpv/web-config/tailwind';
 
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}', '../../packages/ui/src/**/*.{ts,tsx}'],
@@ -520,7 +520,7 @@ export default {};
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>qrush TPV</title>
+    <title>simpleTPV</title>
   </head>
   <body>
     <div id="root"></div>
@@ -553,7 +553,7 @@ createRoot(document.getElementById('root')!).render(
 ### 5.21 `apps/tpv/src/App.tsx`
 
 ```tsx
-import { Button } from '@qrush/ui';
+import { Button } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 
 import { pingHealth } from './lib/api.js';
@@ -567,7 +567,7 @@ export default function App() {
 
   return (
     <main className="min-h-screen p-8">
-      <h1 className="text-2xl font-semibold">qrush TPV</h1>
+      <h1 className="text-2xl font-semibold">simpleTPV</h1>
       <p className="mt-2 text-sm text-gray-600">Punto de venta — scaffolding</p>
       <section className="mt-6">
         <h2 className="text-lg font-medium">API status</h2>
@@ -637,7 +637,7 @@ import { expect, test } from '@playwright/test';
 
 test('carga TPV y muestra status de API', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'qrush TPV' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'simpleTPV' })).toBeVisible();
 
   const status = page.getByTestId('api-status');
   await expect(status).toBeVisible();
@@ -651,19 +651,19 @@ test('carga TPV y muestra status de API', async ({ page }) => {
 
 Estructura **idéntica** a `apps/tpv/*` salvo:
 
-- `apps/backoffice/package.json`: `"name": "@qrush/backoffice"`.
+- `apps/backoffice/package.json`: `"name": "@simpletpv/backoffice"`.
 - `apps/backoffice/vite.config.ts`:
   ```ts
-  import { createViteConfig } from '@qrush/web-config/vite';
+  import { createViteConfig } from '@simpletpv/web-config/vite';
   export default createViteConfig({ port: 5174, previewPort: 4174 });
   ```
-- `apps/backoffice/index.html`: `<title>qrush Backoffice</title>`.
-- `apps/backoffice/src/App.tsx`: cambiar `qrush TPV` → `qrush Backoffice` y `Punto de venta` → `Backoffice administrativo`.
+- `apps/backoffice/index.html`: `<title>simpleTPV Backoffice</title>`.
+- `apps/backoffice/src/App.tsx`: cambiar `simpleTPV` → `simpleTPV Backoffice` y `Punto de venta` → `Backoffice administrativo`.
 - `apps/backoffice/playwright.config.ts`:
   - `baseURL: 'http://localhost:4174'`
   - `webServer.command: 'pnpm exec vite preview --port 4174'`
   - `webServer.url: 'http://localhost:4174'`
-- `apps/backoffice/e2e/smoke.spec.ts`: `name: 'qrush Backoffice'`.
+- `apps/backoffice/e2e/smoke.spec.ts`: `name: 'simpleTPV Backoffice'`.
 - `apps/backoffice/package.json` script `preview`: `vite preview --port 4174`.
 - `apps/backoffice/tailwind.config.ts`: igual que TPV (mismo preset, mismo `content[]`).
 - `apps/backoffice/tsconfig.json`: igual que TPV.
@@ -676,44 +676,44 @@ Estructura **idéntica** a `apps/tpv/*` salvo:
 
 Con F1, F2, F3 completos y Postgres corriendo.
 
-| #   | Comando                                                                               | Resultado esperado                                                  |
-| --- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| 1   | `pnpm install`                                                                        | Resuelve nuevos workspaces sin warnings strict-peer.                |
-| 2   | `pnpm --filter @qrush/ui test`                                                        | 3 tests pasan; genera `packages/ui/coverage/coverage-summary.json`. |
-| 3   | `pnpm --filter @qrush/tpv typecheck`                                                  | Sin errores.                                                        |
-| 4   | `pnpm --filter @qrush/backoffice typecheck`                                           | Sin errores.                                                        |
-| 5   | `pnpm --filter @qrush/tpv build`                                                      | Genera `apps/tpv/dist/index.html` + assets.                         |
-| 6   | `pnpm --filter @qrush/backoffice build`                                               | Genera `apps/backoffice/dist/index.html` + assets.                  |
-| 7   | API arriba: `pnpm --filter @qrush/api start &` (background)                           | API en `:3000`.                                                     |
-| 8   | `pnpm --filter @qrush/tpv exec playwright install --with-deps chromium` (primera vez) | Chromium instalado.                                                 |
-| 9   | `pnpm --filter @qrush/tpv test:e2e`                                                   | Smoke test pasa contra `vite preview` en `:4173`.                   |
-| 10  | `pnpm --filter @qrush/backoffice test:e2e`                                            | Smoke test pasa contra `vite preview` en `:4174`.                   |
-| 11  | Matar API (`kill %1` o equivalente)                                                   | Termina limpio.                                                     |
-| 12  | `pnpm lint && pnpm format`                                                            | F1-F3 siguen verdes.                                                |
-| 13  | `pnpm typecheck`                                                                      | Todos los workspaces verdes.                                        |
-| 14  | `pnpm build` (Turborepo raíz)                                                         | Construye api + tpv + backoffice + ui sin error.                    |
-| 15  | `git status --porcelain`                                                              | Vacío (todo commiteado).                                            |
+| #   | Comando                                                                                   | Resultado esperado                                                  |
+| --- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 1   | `pnpm install`                                                                            | Resuelve nuevos workspaces sin warnings strict-peer.                |
+| 2   | `pnpm --filter @simpletpv/ui test`                                                        | 3 tests pasan; genera `packages/ui/coverage/coverage-summary.json`. |
+| 3   | `pnpm --filter @simpletpv/tpv typecheck`                                                  | Sin errores.                                                        |
+| 4   | `pnpm --filter @simpletpv/backoffice typecheck`                                           | Sin errores.                                                        |
+| 5   | `pnpm --filter @simpletpv/tpv build`                                                      | Genera `apps/tpv/dist/index.html` + assets.                         |
+| 6   | `pnpm --filter @simpletpv/backoffice build`                                               | Genera `apps/backoffice/dist/index.html` + assets.                  |
+| 7   | API arriba: `pnpm --filter @simpletpv/api start &` (background)                           | API en `:3000`.                                                     |
+| 8   | `pnpm --filter @simpletpv/tpv exec playwright install --with-deps chromium` (primera vez) | Chromium instalado.                                                 |
+| 9   | `pnpm --filter @simpletpv/tpv test:e2e`                                                   | Smoke test pasa contra `vite preview` en `:4173`.                   |
+| 10  | `pnpm --filter @simpletpv/backoffice test:e2e`                                            | Smoke test pasa contra `vite preview` en `:4174`.                   |
+| 11  | Matar API (`kill %1` o equivalente)                                                       | Termina limpio.                                                     |
+| 12  | `pnpm lint && pnpm format`                                                                | F1-F3 siguen verdes.                                                |
+| 13  | `pnpm typecheck`                                                                          | Todos los workspaces verdes.                                        |
+| 14  | `pnpm build` (Turborepo raíz)                                                             | Construye api + tpv + backoffice + ui sin error.                    |
+| 15  | `git status --porcelain`                                                                  | Vacío (todo commiteado).                                            |
 
 Verificación manual de dev experience (opcional pero recomendado):
 
-| #   | Comando                                                                     | Resultado                                                                                                   |
-| --- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| M1  | API arriba + `pnpm --filter @qrush/tpv dev` → abrir `http://localhost:5173` | Pantalla muestra "qrush TPV", "Punto de venta — scaffolding", "ok · uptime …s" y un botón estilado en azul. |
-| M2  | Igual con backoffice (`:5174`)                                              | Misma pantalla con título "qrush Backoffice".                                                               |
+| #   | Comando                                                                         | Resultado                                                                                                   |
+| --- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| M1  | API arriba + `pnpm --filter @simpletpv/tpv dev` → abrir `http://localhost:5173` | Pantalla muestra "simpleTPV", "Punto de venta — scaffolding", "ok · uptime …s" y un botón estilado en azul. |
+| M2  | Igual con backoffice (`:5174`)                                                  | Misma pantalla con título "simpleTPV Backoffice".                                                           |
 
 ## 7. Riesgos y mitigaciones
 
-| Riesgo                                                                   | Mitigación                                                                                                                                                                     |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Tailwind v4 (relativamente nuevo) tiene edge cases con el plugin Vite    | Fallback documentado: migrar a Tailwind v3.4 + `postcss.config.js` + `tailwind.config.ts` clásico si rompe. Si solo afecta a dev (no a build/E2E), aceptar y esperar release.  |
-| `@qrush/web-config` exporta `.ts` directamente sin compilar              | Funciona porque Vite/ESBuild transforma on-the-fly. Si el `vite.config.ts` rompe al importarlo, alternativa: añadir `tsx` y entrypoint que precompile.                         |
-| `packages/ui` con React como peer puede dar conflictos                   | pnpm con `strict-peer-dependencies` + `peerDependencies` en `packages/ui` + `dependencies` en apps → resolución correcta. Si rompe, revisar versión exacta.                    |
-| `vite preview` no proxyea bien                                           | Vite 6 soporta `preview.proxy` igual que `server.proxy`. Si rompe, alternativa: `serve` o express trivial.                                                                     |
-| Tests E2E flaky por timing del API                                       | `webServer.timeout: 30000`, `expect.toContainText` con timeout 10s. Si flaky, subir timeouts.                                                                                  |
-| `apps/backoffice` se separa de `apps/tpv` sin querer (drift)             | Aceptado: F4 los deja idénticos. Cuando MVP semana 1 los diverge intencionalmente, está documentado.                                                                           |
-| Plan de CI E2E ya escrito asume rutas/scripts específicos                | Verificado: el plan de CI invoca `pnpm --filter @qrush/tpv test:e2e` y `pnpm --filter @qrush/backoffice test:e2e` (Task 6 step 1 del plan CI). Encaja sin tocar el plan de CI. |
-| Inter font no se carga (cae a system-ui)                                 | Aceptado: F4 no instala fuente web. MVP semana 1 decide (Google Fonts vs Fontsource vs nada).                                                                                  |
-| Coverage de `packages/ui` (0% real porque solo hay 1 componente trivial) | Aceptado en F4. Suelo de cobertura en `coverage-threshold.json` solo aplica a `api` (no a `ui`). Si futuro plan de CI quiere incluir `ui` en ratchet, se añade entonces.       |
+| Riesgo                                                                   | Mitigación                                                                                                                                                                             |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tailwind v4 (relativamente nuevo) tiene edge cases con el plugin Vite    | Fallback documentado: migrar a Tailwind v3.4 + `postcss.config.js` + `tailwind.config.ts` clásico si rompe. Si solo afecta a dev (no a build/E2E), aceptar y esperar release.          |
+| `@simpletpv/web-config` exporta `.ts` directamente sin compilar          | Funciona porque Vite/ESBuild transforma on-the-fly. Si el `vite.config.ts` rompe al importarlo, alternativa: añadir `tsx` y entrypoint que precompile.                                 |
+| `packages/ui` con React como peer puede dar conflictos                   | pnpm con `strict-peer-dependencies` + `peerDependencies` en `packages/ui` + `dependencies` en apps → resolución correcta. Si rompe, revisar versión exacta.                            |
+| `vite preview` no proxyea bien                                           | Vite 6 soporta `preview.proxy` igual que `server.proxy`. Si rompe, alternativa: `serve` o express trivial.                                                                             |
+| Tests E2E flaky por timing del API                                       | `webServer.timeout: 30000`, `expect.toContainText` con timeout 10s. Si flaky, subir timeouts.                                                                                          |
+| `apps/backoffice` se separa de `apps/tpv` sin querer (drift)             | Aceptado: F4 los deja idénticos. Cuando MVP semana 1 los diverge intencionalmente, está documentado.                                                                                   |
+| Plan de CI E2E ya escrito asume rutas/scripts específicos                | Verificado: el plan de CI invoca `pnpm --filter @simpletpv/tpv test:e2e` y `pnpm --filter @simpletpv/backoffice test:e2e` (Task 6 step 1 del plan CI). Encaja sin tocar el plan de CI. |
+| Inter font no se carga (cae a system-ui)                                 | Aceptado: F4 no instala fuente web. MVP semana 1 decide (Google Fonts vs Fontsource vs nada).                                                                                          |
+| Coverage de `packages/ui` (0% real porque solo hay 1 componente trivial) | Aceptado en F4. Suelo de cobertura en `coverage-threshold.json` solo aplica a `api` (no a `ui`). Si futuro plan de CI quiere incluir `ui` en ratchet, se añade entonces.               |
 
 ## 8. Definición de "done" para F4
 

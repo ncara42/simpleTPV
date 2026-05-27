@@ -1,4 +1,4 @@
-# Instrucciones para agentes Claude en qrush_tpv
+# Instrucciones para agentes Claude en simpletpv
 
 ## Idioma
 

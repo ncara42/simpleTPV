@@ -14,11 +14,11 @@
 
 ## Convenciones del plan
 
-- **Rutas:** todas absolutas a `/Users/admin/Desktop/qrush_tpv/`.
+- **Rutas:** todas absolutas a `/Users/admin/Desktop/simpletpv/`.
 - **Commits:** Conventional Commits, uno por tarea.
 - **Verificación:** cada tarea valida antes de commitear; los tests son código real, no placeholders.
 - **F1 y F2 asumidos completos:** repo git, monorepo Turborepo, `packages/db` con migraciones `initial` y `add_rls`, Postgres corriendo via docker-compose.
-- **Cliente Prisma generado:** Task 2 corre `prisma generate` antes de cualquier código TS que importe de `@qrush/db`.
+- **Cliente Prisma generado:** Task 2 corre `prisma generate` antes de cualquier código TS que importe de `@simpletpv/db`.
 
 ---
 
@@ -51,16 +51,16 @@
 
 ---
 
-## Task 1: Scaffolding del workspace `@qrush/api`
+## Task 1: Scaffolding del workspace `@simpletpv/api`
 
 **Files:**
 
-- Modify: `/Users/admin/Desktop/qrush_tpv/apps/api/package.json`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/tsconfig.json`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/tsconfig.build.json`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/nest-cli.json`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/vitest.config.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/vitest.integration.config.ts`
+- Modify: `/Users/admin/Desktop/simpletpv/apps/api/package.json`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/tsconfig.json`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/tsconfig.build.json`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/nest-cli.json`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/vitest.config.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/vitest.integration.config.ts`
 
 - [ ] **Step 1: Sobrescribir `apps/api/package.json`**
 
@@ -68,7 +68,7 @@ Contenido exacto (reemplaza el stub de F1):
 
 ```json
 {
-  "name": "@qrush/api",
+  "name": "@simpletpv/api",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -86,7 +86,7 @@ Contenido exacto (reemplaza el stub de F1):
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
-    "@qrush/db": "workspace:*",
+    "@simpletpv/db": "workspace:*",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0"
   },
@@ -200,7 +200,7 @@ Run: `mkdir -p apps/api/src apps/api/test`
 - [ ] **Step 8: Instalar dependencias**
 
 Run: `pnpm install`
-Expected: pnpm resuelve `@qrush/db` desde el workspace (link interno), instala todas las deps Nest + vitest sin errores ni warnings strict-peer.
+Expected: pnpm resuelve `@simpletpv/db` desde el workspace (link interno), instala todas las deps Nest + vitest sin errores ni warnings strict-peer.
 
 > **Si strict-peer falla por `reflect-metadata`:** añadir `reflect-metadata` como devDependency también o ajustar a la versión que pida Nest. No relajar `strict-peer-dependencies`.
 
@@ -224,7 +224,7 @@ Expected: `OK`.
 git add apps/api/package.json apps/api/tsconfig.json apps/api/tsconfig.build.json \
         apps/api/nest-cli.json apps/api/vitest.config.ts apps/api/vitest.integration.config.ts \
         pnpm-lock.yaml
-git commit -m "feat(api): scaffolding @qrush/api (nest 11 + vitest + tsconfig CJS override)"
+git commit -m "feat(api): scaffolding @simpletpv/api (nest 11 + vitest + tsconfig CJS override)"
 ```
 
 ---
@@ -234,8 +234,8 @@ git commit -m "feat(api): scaffolding @qrush/api (nest 11 + vitest + tsconfig CJ
 **Files:**
 
 - Create: `packages/db/prisma/migrations/<timestamp>_app_login/migration.sql`
-- Modify: `/Users/admin/Desktop/qrush_tpv/.env.example`
-- Modify: `/Users/admin/Desktop/qrush_tpv/.env` (local, no commiteable)
+- Modify: `/Users/admin/Desktop/simpletpv/.env.example`
+- Modify: `/Users/admin/Desktop/simpletpv/.env` (local, no commiteable)
 
 - [ ] **Step 1: Generar timestamp y crear directorio de la migración**
 
@@ -245,7 +245,7 @@ Run:
 TS=$(date -u +%Y%m%d%H%M%S)
 echo "Timestamp: $TS"
 mkdir -p "packages/db/prisma/migrations/${TS}_app_login"
-echo "$TS" > /tmp/qrush-app-login-ts
+echo "$TS" > /tmp/simpletpv-app-login-ts
 ```
 
 Expected: imprime el timestamp; carpeta creada vacía.
@@ -269,7 +269,7 @@ Run:
 
 ```bash
 set -a && source .env && set +a
-pnpm --filter @qrush/db exec prisma migrate dev --skip-seed
+pnpm --filter @simpletpv/db exec prisma migrate dev --skip-seed
 ```
 
 Expected: salida que incluye `Applying migration '<timestamp>_app_login'` y termina con `Your database is now in sync with your schema.`
@@ -279,7 +279,7 @@ Expected: salida que incluye `Applying migration '<timestamp>_app_login'` y term
 Run:
 
 ```bash
-docker compose exec -T postgres psql -U postgres -d qrush -c \
+docker compose exec -T postgres psql -U postgres -d simpletpv -c \
   "SELECT rolname, rolcanlogin FROM pg_roles WHERE rolname='app';"
 ```
 
@@ -290,13 +290,13 @@ Expected: 1 fila, `rolcanlogin = t`.
 Run:
 
 ```bash
-PGPASSWORD=app_dev_password psql -h localhost -U app -d qrush -c 'SELECT current_user;'
+PGPASSWORD=app_dev_password psql -h localhost -U app -d simpletpv -c 'SELECT current_user;'
 ```
 
 Expected: imprime `app` como current_user. Si `psql` no está en el host, hacerlo desde dentro del contenedor:
 
 ```bash
-docker compose exec -T postgres bash -c "PGPASSWORD=app_dev_password psql -h localhost -U app -d qrush -c 'SELECT current_user;'"
+docker compose exec -T postgres bash -c "PGPASSWORD=app_dev_password psql -h localhost -U app -d simpletpv -c 'SELECT current_user;'"
 ```
 
 - [ ] **Step 6: Actualizar `.env.example`**
@@ -307,13 +307,13 @@ Sobrescribir `.env.example` con contenido exacto:
 # Postgres local (docker compose up -d postgres)
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
-POSTGRES_DB=qrush
+POSTGRES_DB=simpletpv
 
 # Prisma migrate/seed usa este (superuser).
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/qrush?schema=public
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/simpletpv?schema=public
 
 # API runtime usa este (rol app con RLS aplicada).
-DATABASE_URL_APP=postgresql://app:app_dev_password@localhost:5432/qrush?schema=public
+DATABASE_URL_APP=postgresql://app:app_dev_password@localhost:5432/simpletpv?schema=public
 ```
 
 - [ ] **Step 7: Actualizar `.env` local**
@@ -322,7 +322,7 @@ Run:
 
 ```bash
 if ! grep -q '^DATABASE_URL_APP=' .env; then
-  echo 'DATABASE_URL_APP=postgresql://app:app_dev_password@localhost:5432/qrush?schema=public' >> .env
+  echo 'DATABASE_URL_APP=postgresql://app:app_dev_password@localhost:5432/simpletpv?schema=public' >> .env
 fi
 grep DATABASE_URL .env
 ```
@@ -344,7 +344,7 @@ git commit -m "feat(db): migración app_login + .env.example con DATABASE_URL_AP
 
 **Files:**
 
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/src/prisma/tenant-context.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/src/prisma/tenant-context.ts`
 
 - [ ] **Step 1: Crear directorio**
 
@@ -370,8 +370,8 @@ export function getCurrentTenant(): TenantContext | undefined {
 
 - [ ] **Step 3: Verificar typecheck del archivo**
 
-Run: `pnpm --filter @qrush/api exec tsc --noEmit src/prisma/tenant-context.ts`
-Expected: sin errores (la opción `--noEmit` con un solo archivo puede ignorar `tsconfig.json`; alternativa: `pnpm --filter @qrush/api typecheck`).
+Run: `pnpm --filter @simpletpv/api exec tsc --noEmit src/prisma/tenant-context.ts`
+Expected: sin errores (la opción `--noEmit` con un solo archivo puede ignorar `tsconfig.json`; alternativa: `pnpm --filter @simpletpv/api typecheck`).
 
 Si falla por `tsc` no encontrado: `pnpm install` desde la raíz.
 
@@ -388,12 +388,12 @@ git commit -m "feat(api): tenant-context con AsyncLocalStorage"
 
 **Files:**
 
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/src/prisma/prisma.service.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/src/prisma/prisma.module.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/src/prisma/prisma.service.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/src/prisma/prisma.module.ts`
 
 - [ ] **Step 1: Asegurar cliente Prisma generado**
 
-Run: `pnpm --filter @qrush/db exec prisma generate`
+Run: `pnpm --filter @simpletpv/db exec prisma generate`
 Expected: `✔ Generated Prisma Client` o equivalente.
 
 - [ ] **Step 2: Crear `prisma.service.ts`**
@@ -402,7 +402,7 @@ Contenido exacto:
 
 ```ts
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { PrismaClient } from '@qrush/db';
+import { PrismaClient } from '@simpletpv/db';
 
 import { getCurrentTenant } from './tenant-context.js';
 
@@ -477,10 +477,10 @@ export class PrismaModule {}
 
 - [ ] **Step 4: Typecheck**
 
-Run: `pnpm --filter @qrush/api typecheck`
+Run: `pnpm --filter @simpletpv/api typecheck`
 Expected: sin errores.
 
-> **Si tsc se queja de `Cannot find module '@qrush/db'`:** ejecutar `pnpm --filter @qrush/db exec prisma generate` y reintentar. El cliente debe existir en `packages/db/generated/client/`.
+> **Si tsc se queja de `Cannot find module '@simpletpv/db'`:** ejecutar `pnpm --filter @simpletpv/db exec prisma generate` y reintentar. El cliente debe existir en `packages/db/generated/client/`.
 
 > **Si tsc se queja de `useFactory` con tipos:** la conversión `as unknown as PrismaService` es deliberada — el extended client tiene tipos distintos pero compatibles en runtime. Aceptado en F3, refinable cuando MVP semana 1 añada DI más estricta.
 
@@ -497,9 +497,9 @@ git commit -m "feat(api): PrismaService con \$extends para RLS por request"
 
 **Files:**
 
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/src/tenant/tenant.middleware.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/src/tenant/tenant.middleware.spec.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/src/tenant/tenant.module.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/src/tenant/tenant.middleware.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/src/tenant/tenant.middleware.spec.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/src/tenant/tenant.module.ts`
 
 - [ ] **Step 1: Crear directorio**
 
@@ -574,7 +574,7 @@ describe('TenantMiddleware', () => {
 
 - [ ] **Step 3: Correr test → debe FALLAR (no existe el módulo todavía)**
 
-Run: `pnpm --filter @qrush/api test`
+Run: `pnpm --filter @simpletpv/api test`
 Expected: FAIL con `Cannot find module './tenant.middleware.js'` o similar.
 
 - [ ] **Step 4: Crear `tenant.middleware.ts`**
@@ -629,7 +629,7 @@ export class TenantModule {}
 
 - [ ] **Step 6: Correr test → debe PASAR**
 
-Run: `pnpm --filter @qrush/api test`
+Run: `pnpm --filter @simpletpv/api test`
 Expected: los 5 tests de `TenantMiddleware` pasan.
 
 - [ ] **Step 7: Commit**
@@ -645,9 +645,9 @@ git commit -m "feat(api): TenantMiddleware (valida X-Org-Id UUID, pobla AsyncLoc
 
 **Files:**
 
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/src/health/health.controller.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/src/health/health.controller.spec.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/src/health/health.module.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/src/health/health.controller.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/src/health/health.controller.spec.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/src/health/health.module.ts`
 
 - [ ] **Step 1: Crear directorio**
 
@@ -675,7 +675,7 @@ describe('HealthController', () => {
 
 - [ ] **Step 3: Correr test → debe FALLAR**
 
-Run: `pnpm --filter @qrush/api test src/health`
+Run: `pnpm --filter @simpletpv/api test src/health`
 Expected: FAIL por `Cannot find module './health.controller.js'`.
 
 - [ ] **Step 4: Crear `health.controller.ts`**
@@ -711,7 +711,7 @@ export class HealthModule {}
 
 - [ ] **Step 6: Correr test → debe PASAR**
 
-Run: `pnpm --filter @qrush/api test src/health`
+Run: `pnpm --filter @simpletpv/api test src/health`
 Expected: 1 test pasa.
 
 - [ ] **Step 7: Commit**
@@ -727,8 +727,8 @@ git commit -m "feat(api): HealthController GET /health (sin tocar DB)"
 
 **Files:**
 
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/src/app.module.ts`
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/src/main.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/src/app.module.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/src/main.ts`
 
 - [ ] **Step 1: Crear `app.module.ts`**
 
@@ -780,7 +780,7 @@ bootstrap().catch((err) => {
 
 - [ ] **Step 3: Build**
 
-Run: `pnpm --filter @qrush/api build`
+Run: `pnpm --filter @simpletpv/api build`
 Expected: NestJS compila a `apps/api/dist/`. Sin errores TS.
 
 - [ ] **Step 4: Arrancar manualmente y validar `/health`**
@@ -789,7 +789,7 @@ Run en terminal 1:
 
 ```bash
 set -a && source .env && set +a
-pnpm --filter @qrush/api start
+pnpm --filter @simpletpv/api start
 ```
 
 Expected: imprime `API escuchando en :3000`.
@@ -839,7 +839,7 @@ git commit -m "feat(api): AppModule + bootstrap (TenantMiddleware global)"
 
 **Files:**
 
-- Create: `/Users/admin/Desktop/qrush_tpv/apps/api/test/rls.integration.spec.ts`
+- Create: `/Users/admin/Desktop/simpletpv/apps/api/test/rls.integration.spec.ts`
 
 - [ ] **Step 1: Asegurar prerrequisitos**
 
@@ -849,8 +849,8 @@ Run:
 docker compose ps postgres | grep -q healthy && echo "postgres OK" || \
   (docker compose up -d postgres && sleep 6)
 set -a && source .env && set +a
-pnpm --filter @qrush/db exec prisma migrate deploy
-pnpm --filter @qrush/db exec prisma db seed
+pnpm --filter @simpletpv/db exec prisma migrate deploy
+pnpm --filter @simpletpv/db exec prisma db seed
 ```
 
 Expected: postgres healthy, migraciones aplicadas, seed con 2 orgs.
@@ -897,7 +897,7 @@ describe('RLS aislamiento multi-tenant', () => {
     if (!adminUrl) {
       throw new Error('DATABASE_URL (superuser) requerido para descubrir IDs en setup.');
     }
-    const { PrismaClient: AdminClient } = await import('@qrush/db');
+    const { PrismaClient: AdminClient } = await import('@simpletpv/db');
     const admin = new AdminClient({ datasources: { db: { url: adminUrl } } });
     try {
       const found1 = await admin.$queryRaw<Array<{ id: string }>>`
@@ -907,7 +907,9 @@ describe('RLS aislamiento multi-tenant', () => {
         SELECT id::text FROM "Organization" WHERE nif = 'B22222222'
       `;
       if (found1.length === 0 || found2.length === 0) {
-        throw new Error('Seed no ejecutado. Corre `pnpm --filter @qrush/db exec prisma db seed`.');
+        throw new Error(
+          'Seed no ejecutado. Corre `pnpm --filter @simpletpv/db exec prisma db seed`.',
+        );
       }
       org1Id = found1[0].id;
       org2Id = found2[0].id;
@@ -963,7 +965,7 @@ Run:
 
 ```bash
 set -a && source .env && set +a
-pnpm --filter @qrush/api test:int
+pnpm --filter @simpletpv/api test:int
 ```
 
 Expected: 4 tests pasan. Salida tipo:
@@ -999,7 +1001,7 @@ git commit -m "test(api): integration spec que prueba aislamiento RLS contra pos
 
 **Files:** ninguno permanente.
 
-Esta tarea verifica que `pnpm --filter @qrush/api test` genera `coverage-summary.json` que el plan de CI necesita.
+Esta tarea verifica que `pnpm --filter @simpletpv/api test` genera `coverage-summary.json` que el plan de CI necesita.
 
 - [ ] **Step 1: Limpiar coverage previo**
 
@@ -1007,7 +1009,7 @@ Run: `rm -rf apps/api/coverage`
 
 - [ ] **Step 2: Ejecutar tests unitarios con cobertura**
 
-Run: `pnpm --filter @qrush/api test`
+Run: `pnpm --filter @simpletpv/api test`
 Expected:
 
 - Los 6 tests (5 de TenantMiddleware + 1 de HealthController) pasan.
@@ -1042,7 +1044,7 @@ Expected: imprime `statements pct: <número>` y `OK`. El plan de CI consume exac
 
 **Files:**
 
-- Modify: `/Users/admin/Desktop/qrush_tpv/CLAUDE.md`
+- Modify: `/Users/admin/Desktop/simpletpv/CLAUDE.md`
 
 - [ ] **Step 1: Leer la versión actual**
 
@@ -1086,34 +1088,34 @@ pnpm install
 
 # 2. migraciones aplicadas
 set -a && source .env && set +a
-pnpm --filter @qrush/db exec prisma migrate deploy
+pnpm --filter @simpletpv/db exec prisma migrate deploy
 
 # 3. app puede login
-docker compose exec -T postgres psql -U postgres -d qrush -c \
+docker compose exec -T postgres psql -U postgres -d simpletpv -c \
   "SELECT rolname, rolcanlogin FROM pg_roles WHERE rolname='app';"
 # Expected: rolcanlogin = t
 
 # 4. seed
-pnpm --filter @qrush/db exec prisma db seed
+pnpm --filter @simpletpv/db exec prisma db seed
 # Expected: Seed completado: 2 organizaciones.
 
 # 5. db build (genera cliente Prisma)
-pnpm --filter @qrush/db build
+pnpm --filter @simpletpv/db build
 
 # 6. api build
-pnpm --filter @qrush/api build
+pnpm --filter @simpletpv/api build
 # Expected: dist/ creado
 
 # 7. tests unitarios con cobertura
-pnpm --filter @qrush/api test
+pnpm --filter @simpletpv/api test
 # Expected: todos pasan, coverage-summary.json creado
 
 # 8. tests de integración
-pnpm --filter @qrush/api test:int
+pnpm --filter @simpletpv/api test:int
 # Expected: 4 tests RLS pasan
 
 # 9-12. healthcheck + middleware (terminal 1 arranca, terminal 2 prueba)
-pnpm --filter @qrush/api start &
+pnpm --filter @simpletpv/api start &
 API_PID=$!
 sleep 3
 curl -s http://localhost:3000/health
@@ -1144,8 +1146,8 @@ git status --porcelain
 Run:
 
 ```bash
-pnpm lint && pnpm format && pnpm --filter @qrush/db build
-docker compose exec -T postgres psql -U postgres -d qrush -tc 'SELECT COUNT(*) FROM "Organization";'
+pnpm lint && pnpm format && pnpm --filter @simpletpv/db build
+docker compose exec -T postgres psql -U postgres -d simpletpv -tc 'SELECT COUNT(*) FROM "Organization";'
 ```
 
 Expected: lint/format/build OK; conteo de Organization = 2.
@@ -1166,7 +1168,7 @@ Expected: al menos 10 commits de F3 (uno por cada Task 1-8 + Task 10), Conventio
 | Spec §                             | Cubierto por                     |
 | ---------------------------------- | -------------------------------- |
 | §4 estructura completa             | T1-T7 (cada archivo tiene tarea) |
-| §5.1 package.json @qrush/api       | T1 step 1                        |
+| §5.1 package.json @simpletpv/api   | T1 step 1                        |
 | §5.2 tsconfig.json (CJS override)  | T1 step 2                        |
 | §5.3 tsconfig.build.json           | T1 step 3                        |
 | §5.4 nest-cli.json                 | T1 step 4                        |
@@ -1202,7 +1204,7 @@ Sin gaps.
 
 **3. Consistencia de tipos/nombres:**
 
-- `@qrush/api`, `@qrush/db` consistentes.
+- `@simpletpv/api`, `@simpletpv/db` consistentes.
 - `tenantStorage`, `getCurrentTenant`, `applyTenantExtension`, `PrismaService`, `TenantMiddleware`, `HealthController`, `AppModule` consistentes entre archivos y tests.
 - `app.current_organization_id` consistente entre migración add_rls (F2), `prisma.service.ts` (T4), `tenant-context.ts` (T3), tests integration (T8), spec §3.
 - `X-Org-Id` consistente entre middleware (T5), curl checks (T7), spec §3.
