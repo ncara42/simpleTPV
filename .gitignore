@@ -1,0 +1,35 @@
+# Dependencias
+node_modules/
+
+# Builds
+dist/
+build/
+.next/
+out/
+
+# Coverage / test
+coverage/
+playwright-report/
+test-results/
+*.lcov
+
+# Logs y tmp
+*.log
+.DS_Store
+.vite/
+.turbo/
+
+# Entorno
+.env
+.env.*.local
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# Prisma
+**/generated/
+
+# Misc
+*.tsbuildinfo
