@@ -36,6 +36,14 @@ importers:
         specifier: ^8.0.0
         version: 8.60.0(eslint@10.4.0)(typescript@6.0.3)
 
+  apps/api: {}
+
+  apps/backoffice: {}
+
+  apps/tpv: {}
+
+  packages/db: {}
+
 packages:
 
   '@eslint-community/eslint-utils@4.9.1':
