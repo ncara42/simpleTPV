@@ -1,0 +1,9 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./apps/api" },
+    { "path": "./apps/tpv" },
+    { "path": "./apps/backoffice" },
+    { "path": "./packages/db" }
+  ]
+}
