@@ -31,5 +31,8 @@ test-results/
 # Prisma
 **/generated/
 
+# Prisma generated client (packages/db)
+packages/db/generated/
+
 # Misc
 *.tsbuildinfo
