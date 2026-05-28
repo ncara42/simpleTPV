@@ -107,6 +107,28 @@ export interface Sale {
   lines: SaleLine[];
 }
 
+// Resumen de venta para el listado/historial que devuelve GET /sales (#14).
+// Los Decimal de Prisma viajan como string sobre HTTP, igual que en Sale.
+export interface SaleSummary {
+  id: string;
+  ticketNumber: string;
+  createdAt: string;
+  total: string;
+  paymentMethod: string;
+  status: string;
+  storeId: string;
+}
+
+// Página de ventas con metadatos de paginación y totales del día. `totals`
+// agrega SOLO ventas COMPLETED (las VOIDED se listan en items pero no suman).
+export interface SalesPage {
+  items: SaleSummary[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totals: { count: number; totalAmount: string };
+}
+
 // Ticket-resumen para impresión que devuelve GET /sales/:id/ticket.
 // Los Decimal de Prisma viajan como string sobre HTTP, igual que en Sale/SaleLine.
 export interface TicketLine {

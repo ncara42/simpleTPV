@@ -7,16 +7,18 @@ import { useState } from 'react';
 import { CatalogPage } from './CatalogPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { api, useAuthStore } from './lib/auth.js';
+import { SalesHistoryPage } from './SalesHistoryPage.js';
 import { StoresPage } from './StoresPage.js';
 import { UsersPage } from './UsersPage.js';
 
-type Tab = 'catalog' | 'families' | 'users' | 'stores';
+type Tab = 'catalog' | 'families' | 'users' | 'stores' | 'sales';
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'catalog', label: 'Catálogo' },
   { id: 'families', label: 'Familias' },
   { id: 'users', label: 'Usuarios' },
   { id: 'stores', label: 'Tiendas' },
+  { id: 'sales', label: 'Ventas' },
 ];
 
 function Home() {
@@ -46,6 +48,7 @@ function Home() {
       {tab === 'families' && <FamiliesPage />}
       {tab === 'users' && <UsersPage />}
       {tab === 'stores' && <StoresPage />}
+      {tab === 'sales' && <SalesHistoryPage />}
     </main>
   );
 }

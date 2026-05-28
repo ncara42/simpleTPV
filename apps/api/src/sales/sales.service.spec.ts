@@ -7,6 +7,7 @@ import {
   buildTaxBreakdown,
   computeChange,
   computeTotals,
+  dayRange,
   formatTicket,
   SalesService,
 } from './sales.service.js';
@@ -17,6 +18,25 @@ describe('formatTicket', () => {
   it('formatea code + contador con padding a 6', () => {
     expect(formatTicket('01', 1)).toBe('T01-000001');
     expect(formatTicket('02', 123456)).toBe('T02-123456');
+  });
+});
+
+describe('dayRange', () => {
+  it('devuelve el rango UTC semiabierto [00:00 del día, 00:00 del día siguiente)', () => {
+    const { gte, lt } = dayRange('2026-05-28');
+    expect(gte.toISOString()).toBe('2026-05-28T00:00:00.000Z');
+    expect(lt.toISOString()).toBe('2026-05-29T00:00:00.000Z');
+  });
+
+  it('cruza el límite de mes correctamente', () => {
+    const { gte, lt } = dayRange('2026-01-31');
+    expect(gte.toISOString()).toBe('2026-01-31T00:00:00.000Z');
+    expect(lt.toISOString()).toBe('2026-02-01T00:00:00.000Z');
+  });
+
+  it('el rango cubre exactamente 24 horas', () => {
+    const { gte, lt } = dayRange('2026-12-25');
+    expect(lt.getTime() - gte.getTime()).toBe(24 * 60 * 60 * 1000);
   });
 });
 
@@ -241,6 +261,14 @@ function makePrisma() {
   return {
     sale: {
       findFirst: vi.fn(async (_a?: unknown): Promise<unknown> => null),
+      findMany: vi.fn(async (_a?: unknown): Promise<unknown[]> => []),
+      count: vi.fn(async (_a?: unknown): Promise<number> => 0),
+      aggregate: vi.fn(
+        async (_a?: unknown): Promise<{ _sum: { total: unknown }; _count: number }> => ({
+          _sum: { total: null },
+          _count: 0,
+        }),
+      ),
       updateMany: vi.fn(async (_a?: unknown): Promise<{ count: number }> => ({ count: 1 })),
       findFirstOrThrow: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'sale-1' })),
     },
@@ -484,5 +512,97 @@ describe('SalesService.create', () => {
     await expect(
       tenantStorage.run({ organizationId: ORG }, () => service.create(dto, 'user-1', 'ADMIN')),
     ).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('SalesService.findSales', () => {
+  const STORE = '22222222-2222-2222-2222-222222222222';
+
+  it('lanza si no hay contexto de tenant', async () => {
+    const prisma = makePrisma();
+    const service = makeService(prisma);
+    await expect(service.findSales({})).rejects.toThrow();
+  });
+
+  it('sin filtros: where solo con organizationId, paginación por defecto (page 1, size 20)', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findMany = vi.fn(async () => [{ id: 's1' }]);
+    prisma.sale.count = vi.fn(async () => 1);
+    const service = makeService(prisma);
+
+    const res = await tenantStorage.run({ organizationId: ORG }, () => service.findSales({}));
+
+    const arg = prisma.sale.findMany.mock.calls[0]![0] as {
+      where: Record<string, unknown>;
+      orderBy: { createdAt: string };
+      skip: number;
+      take: number;
+    };
+    expect(arg.where).toEqual({ organizationId: ORG });
+    expect(arg.orderBy).toEqual({ createdAt: 'desc' });
+    expect(arg.skip).toBe(0);
+    expect(arg.take).toBe(20);
+    expect(res.page).toBe(1);
+    expect(res.pageSize).toBe(20);
+    expect(res.totalItems).toBe(1);
+    expect(res.items).toHaveLength(1);
+  });
+
+  it('con storeId y date: el where incluye storeId y createdAt en el rango del día', async () => {
+    const prisma = makePrisma();
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.findSales({ storeId: STORE, date: '2026-05-28' }),
+    );
+
+    const arg = prisma.sale.findMany.mock.calls[0]![0] as {
+      where: { organizationId: string; storeId: string; createdAt: { gte: Date; lt: Date } };
+    };
+    expect(arg.where.storeId).toBe(STORE);
+    expect(arg.where.createdAt.gte.toISOString()).toBe('2026-05-28T00:00:00.000Z');
+    expect(arg.where.createdAt.lt.toISOString()).toBe('2026-05-29T00:00:00.000Z');
+  });
+
+  it('paginación: page 3 con pageSize 10 → skip 20, take 10', async () => {
+    const prisma = makePrisma();
+    const service = makeService(prisma);
+
+    const res = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.findSales({ page: 3, pageSize: 10 }),
+    );
+
+    const arg = prisma.sale.findMany.mock.calls[0]![0] as { skip: number; take: number };
+    expect(arg.skip).toBe(20);
+    expect(arg.take).toBe(10);
+    expect(res.page).toBe(3);
+    expect(res.pageSize).toBe(10);
+  });
+
+  it('totals: el aggregate añade status COMPLETED al where (excluye VOIDED)', async () => {
+    const prisma = makePrisma();
+    prisma.sale.aggregate = vi.fn(async () => ({ _sum: { total: 150.5 }, _count: 3 }));
+    const service = makeService(prisma);
+
+    const res = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.findSales({ storeId: STORE }),
+    );
+
+    const arg = prisma.sale.aggregate.mock.calls[0]![0] as {
+      where: { organizationId: string; storeId: string; status: string };
+    };
+    expect(arg.where.status).toBe('COMPLETED');
+    expect(arg.where.organizationId).toBe(ORG);
+    expect(arg.where.storeId).toBe(STORE);
+    expect(res.totals).toEqual({ count: 3, totalAmount: 150.5 });
+  });
+
+  it('totals.totalAmount es 0 cuando no hay ventas COMPLETED (sum null)', async () => {
+    const prisma = makePrisma();
+    prisma.sale.aggregate = vi.fn(async () => ({ _sum: { total: null }, _count: 0 }));
+    const service = makeService(prisma);
+
+    const res = await tenantStorage.run({ organizationId: ORG }, () => service.findSales({}));
+    expect(res.totals).toEqual({ count: 0, totalAmount: 0 });
   });
 });
