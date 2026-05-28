@@ -480,10 +480,26 @@ describe('Ventas — integración', () => {
   }
 
   describe('findSales (historial #14)', () => {
-    const DAY = '2026-03-15';
-    const OTHER_DAY = '2026-03-16';
+    // Días ÚNICOS por ejecución: el test de integración corre contra una BD que
+    // conserva datos de runs anteriores (no se trunca entre ejecuciones). Forzamos
+    // el createdAt de cada venta a un día lejano y distinto en cada run (derivado
+    // del reloj) para que los filtros por día devuelvan SOLO las ventas que crea
+    // este test y los counts sean deterministas y repetibles.
+    // Punto de partida ÚNICO por run: un día futuro (año de 4 dígitos, válido
+    // para el regex YYYY-MM-DD del DTO) derivado del reloj. Cada llamada avanza un
+    // día, garantizando días contiguos sin colisión entre tests del mismo run.
+    let dayCursor = new Date(
+      Date.UTC(2100, 0, 1) + (Date.now() % (365 * 200)) * 86400000 - 200 * 86400000,
+    );
+    function uniqueDay(): string {
+      const day = dayCursor.toISOString().slice(0, 10);
+      dayCursor = new Date(dayCursor.getTime() + 86400000);
+      return day;
+    }
 
     it('filtra por tienda y día; pagina; totals suma solo COMPLETED', async () => {
+      const DAY = uniqueDay();
+      const OTHER_DAY = uniqueDay();
       // store1, día DAY: 2 COMPLETED + 1 VOIDED. store1 OTHER_DAY: 1. store2 DAY: 1.
       await createSaleAt(store1Id, `${DAY}T09:00:00.000Z`);
       await createSaleAt(store1Id, `${DAY}T11:00:00.000Z`);
@@ -515,7 +531,7 @@ describe('Ventas — integración', () => {
     });
 
     it('pagina: page/pageSize controlan skip/take y los metadatos', async () => {
-      const day = '2026-04-01';
+      const day = uniqueDay();
       for (let i = 0; i < 3; i++) {
         await createSaleAt(store1Id, `${day}T0${i}:00:00.000Z`);
       }
@@ -538,7 +554,7 @@ describe('Ventas — integración', () => {
     });
 
     it('aísla por tenant: org2 no ve las ventas de org1', async () => {
-      const day = '2026-04-10';
+      const day = uniqueDay();
       await createSaleAt(store1Id, `${day}T09:00:00.000Z`);
 
       const seenByOrg2 = await tenantStorage.run({ organizationId: org2Id }, async () => {
