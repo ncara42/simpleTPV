@@ -1,7 +1,31 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { MovementType } from '@simpletpv/db';
 
-import type { PrismaService } from '../prisma/prisma.service.js';
+import { CACHE, type Cache } from '../cache/cache.interface.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { requireTenant } from '../prisma/tenant-context.js';
+
+// Clave de cache del stock de un par producto+tienda dentro de un tenant.
+export function stockCacheKey(organizationId: string, storeId: string, productId: string): string {
+  return `stock:${organizationId}:${storeId}:${productId}`;
+}
+
+// Nivel de stock tipo semáforo, derivado de quantity vs minStock:
+//   - red:    sin stock (quantity <= 0).
+//   - yellow: en/por debajo del mínimo (0 < quantity <= minStock).
+//   - green:  por encima del mínimo (quantity > minStock).
+// Función pura, testeable. minStock 0 → solo red (<=0) o green (>0).
+export type StockLevel = 'red' | 'yellow' | 'green';
+
+export function stockLevel(quantity: number, minStock: number): StockLevel {
+  if (quantity <= 0) {
+    return 'red';
+  }
+  if (quantity <= minStock) {
+    return 'yellow';
+  }
+  return 'green';
+}
 
 // Cliente transaccional de Prisma (lo que recibe el callback de $transaction),
 // idéntico al tipo usado en with-tenant-tx. applyMovement opera SIEMPRE sobre un
@@ -24,6 +48,12 @@ export interface ApplyMovementInput {
 
 @Injectable()
 export class StockService {
+  constructor(
+    // Extendido: lecturas con RLS por-operación (las consultas de stock).
+    private readonly prisma: PrismaService,
+    @Inject(CACHE) private readonly cache: Cache,
+  ) {}
+
   /**
    * Aplica un movimiento de stock de forma atómica dentro de la transacción `tx`
    * recibida: upsert del Stock (incrementa/decrementa quantity) + registro del
@@ -56,6 +86,149 @@ export class StockService {
       },
     });
 
-    return Number(stock.quantity);
+    const resulting = Number(stock.quantity);
+
+    // Actualiza el cache con la cantidad resultante. Best-effort: si el cache
+    // falla no rompe el movimiento (la implementación no lanza). Postgres sigue
+    // siendo la fuente de verdad; el cache solo acelera las lecturas (#28).
+    await this.cache.set(stockCacheKey(organizationId, storeId, productId), String(resulting));
+
+    return resulting;
+  }
+
+  /**
+   * Stock de todos los productos de una tienda: cantidad, mínimo y nivel
+   * semáforo. RLS + organizationId explícito (defensa en profundidad). Lee de
+   * Postgres (un único query con join al producto): la lista necesita
+   * minStock/nombre que el cache puntual no guarda.
+   */
+  async byStore(storeId: string) {
+    const tenant = requireTenant();
+    const rows = await this.prisma.stock.findMany({
+      where: { storeId, organizationId: tenant.organizationId },
+      include: { product: { select: { name: true } } },
+      orderBy: { product: { name: 'asc' } },
+    });
+    return rows.map((r) => {
+      const quantity = Number(r.quantity);
+      const minStock = Number(r.minStock);
+      return {
+        productId: r.productId,
+        productName: r.product.name,
+        storeId: r.storeId,
+        quantity,
+        minStock,
+        level: stockLevel(quantity, minStock),
+      };
+    });
+  }
+
+  /**
+   * Stock global agregado: por producto, su stock en cada tienda y el total del
+   * tenant. Para la vista central del backoffice. RLS + organizationId explícito.
+   */
+  async global() {
+    const tenant = requireTenant();
+    const rows = await this.prisma.stock.findMany({
+      where: { organizationId: tenant.organizationId },
+      include: {
+        product: { select: { name: true } },
+        store: { select: { name: true } },
+      },
+    });
+
+    const byProduct = new Map<
+      string,
+      {
+        productId: string;
+        productName: string;
+        total: number;
+        stores: Array<{
+          storeId: string;
+          storeName: string;
+          quantity: number;
+          minStock: number;
+          level: StockLevel;
+        }>;
+      }
+    >();
+
+    for (const r of rows) {
+      const quantity = Number(r.quantity);
+      const minStock = Number(r.minStock);
+      let entry = byProduct.get(r.productId);
+      if (!entry) {
+        entry = { productId: r.productId, productName: r.product.name, total: 0, stores: [] };
+        byProduct.set(r.productId, entry);
+      }
+      entry.total += quantity;
+      entry.stores.push({
+        storeId: r.storeId,
+        storeName: r.store.name,
+        quantity,
+        minStock,
+        level: stockLevel(quantity, minStock),
+      });
+    }
+
+    return [...byProduct.values()].sort((a, b) => a.productName.localeCompare(b.productName));
+  }
+
+  /**
+   * Stock de un producto en todas las tiendas del tenant. La cantidad puntual de
+   * cada par producto+tienda se sirve desde el cache (Redis) si está; en miss,
+   * cae a la quantity de Postgres y repuebla el cache. minStock/nivel siempre de
+   * Postgres (el cache solo guarda quantity). RLS + organizationId explícito.
+   */
+  async byProduct(productId: string) {
+    const tenant = requireTenant();
+    const rows = await this.prisma.stock.findMany({
+      where: { productId, organizationId: tenant.organizationId },
+      include: { store: { select: { name: true } } },
+      orderBy: { store: { name: 'asc' } },
+    });
+
+    return Promise.all(
+      rows.map(async (r) => {
+        const minStock = Number(r.minStock);
+        const quantity = await this.cachedQuantity(
+          tenant.organizationId,
+          r.storeId,
+          productId,
+          Number(r.quantity),
+        );
+        return {
+          productId,
+          storeId: r.storeId,
+          storeName: r.store.name,
+          quantity,
+          minStock,
+          level: stockLevel(quantity, minStock),
+        };
+      }),
+    );
+  }
+
+  /**
+   * Cantidad de un par producto+tienda leyendo primero del cache; en miss usa el
+   * valor de Postgres recibido (`fromDb`) y repuebla el cache. Si el cache está
+   * caído, get devuelve null → usamos Postgres (degradación transparente).
+   */
+  private async cachedQuantity(
+    organizationId: string,
+    storeId: string,
+    productId: string,
+    fromDb: number,
+  ): Promise<number> {
+    const key = stockCacheKey(organizationId, storeId, productId);
+    const cached = await this.cache.get(key);
+    if (cached !== null) {
+      const parsed = Number(cached);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+    await this.cache.set(key, String(fromDb));
+    return fromDb;
   }
 }
