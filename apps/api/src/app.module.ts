@@ -6,6 +6,7 @@ import { AuthGuard } from './auth/auth.guard.js';
 import { AuthModule } from './auth/auth.module.js';
 import { RolesGuard } from './auth/roles.guard.js';
 import { TenantContextInterceptor } from './auth/tenant-context.interceptor.js';
+import { CacheModule } from './cache/cache.module.js';
 import { CashSessionsModule } from './cash-sessions/cash-sessions.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MeModule } from './me/me.module.js';
@@ -21,6 +22,7 @@ import { UsersModule } from './users/users.module.js';
 @Module({
   imports: [
     PrismaModule,
+    CacheModule,
     AuthModule,
     HealthModule,
     ProductsModule,

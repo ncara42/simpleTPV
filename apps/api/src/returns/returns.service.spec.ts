@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
+import { MemoryCache } from '../cache/memory-cache.js';
 import { tenantStorage } from '../prisma/tenant-context.js';
 import { StockService } from '../stock/stock.service.js';
 import { computeReturnable, computeReturnLineTotal, ReturnsService } from './returns.service.js';
@@ -88,7 +89,11 @@ function makeBase(
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>, base: unknown) {
-  return new ReturnsService(prisma as never, base as never, new StockService());
+  return new ReturnsService(
+    prisma as never,
+    base as never,
+    new StockService({} as never, new MemoryCache()),
+  );
 }
 
 // Venta de ejemplo con dos líneas (helper para los tests de create).
