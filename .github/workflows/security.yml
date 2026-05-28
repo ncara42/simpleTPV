@@ -35,7 +35,7 @@ jobs:
           persist-credentials: false
 
       - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@cb7149b9b57195b609c63e8518d2c37118bf6265 # v2.3.9
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -90,7 +90,7 @@ jobs:
           persist-credentials: false
 
       - name: Run OSV Scanner
-        uses: google/osv-scanner-action/osv-scanner-action@cb19f4ad03f8b87a16cf36e1cf2eed7d5dabf9bd # v1.9.2
+        uses: google/osv-scanner-action/osv-scanner-action@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
         with:
           scan-args: |-
             --lockfile=./pnpm-lock.yaml
