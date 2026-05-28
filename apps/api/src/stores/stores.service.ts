@@ -1,8 +1,8 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Store } from '@simpletpv/db';
 
 import { PrismaService } from '../prisma/prisma.service.js';
-import { getCurrentTenant } from '../prisma/tenant-context.js';
+import { requireTenant } from '../prisma/tenant-context.js';
 import type { CreateStoreDto, UpdateStoreDto } from './stores.dto.js';
 
 @Injectable()
@@ -10,10 +10,7 @@ export class StoresService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(input: CreateStoreDto): Promise<Store> {
-    const tenant = getCurrentTenant();
-    if (!tenant) {
-      throw new InternalServerErrorException('Sin contexto de tenant');
-    }
+    const tenant = requireTenant();
     return this.prisma.store.create({
       data: { ...input, organizationId: tenant.organizationId },
     });

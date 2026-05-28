@@ -1,14 +1,9 @@
-import {
-  BadRequestException,
-  Injectable,
-  InternalServerErrorException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@simpletpv/db';
 import bcrypt from 'bcryptjs';
 
 import { PrismaService } from '../prisma/prisma.service.js';
-import { getCurrentTenant } from '../prisma/tenant-context.js';
+import { requireTenant } from '../prisma/tenant-context.js';
 import type { CreateUserDto, UpdateUserDto } from './users.dto.js';
 
 const SALT_ROUNDS = 10;
@@ -32,10 +27,7 @@ export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(input: CreateUserDto): Promise<PublicUser> {
-    const tenant = getCurrentTenant();
-    if (!tenant) {
-      throw new InternalServerErrorException('Sin contexto de tenant');
-    }
+    const tenant = requireTenant();
     const { password, ...rest } = input;
     return this.prisma.user.create({
       data: {

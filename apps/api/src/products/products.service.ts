@@ -1,8 +1,8 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, type Product } from '@simpletpv/db';
 
 import { PrismaService } from '../prisma/prisma.service.js';
-import { getCurrentTenant } from '../prisma/tenant-context.js';
+import { requireTenant } from '../prisma/tenant-context.js';
 import type { CreateProductDto, UpdateProductDto } from './products.dto.js';
 
 export interface ImportResult {
@@ -17,10 +17,7 @@ export class ProductsService {
   async create(input: CreateProductDto): Promise<Product> {
     // RLS filtra lectura/escritura por la policy, pero el INSERT necesita el
     // organizationId explícito (lo toma del contexto de tenant del JWT).
-    const tenant = getCurrentTenant();
-    if (!tenant) {
-      throw new InternalServerErrorException('Sin contexto de tenant');
-    }
+    const tenant = requireTenant();
     return this.prisma.product.create({
       data: { ...input, organizationId: tenant.organizationId },
     });
@@ -74,10 +71,7 @@ export class ProductsService {
   // Importación masiva desde CSV. Parsea, valida fila a fila, inserta las
   // válidas en bulk y devuelve un reporte de errores (no aborta por una mala).
   async importCsv(csv: string): Promise<ImportResult> {
-    const tenant = getCurrentTenant();
-    if (!tenant) {
-      throw new InternalServerErrorException('Sin contexto de tenant');
-    }
+    const tenant = requireTenant();
 
     const rows = parseCsv(csv);
     const valid: Prisma.ProductCreateManyInput[] = [];

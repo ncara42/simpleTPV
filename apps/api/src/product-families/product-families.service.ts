@@ -1,13 +1,8 @@
-import {
-  BadRequestException,
-  Injectable,
-  InternalServerErrorException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { ProductFamily } from '@simpletpv/db';
 
 import { PrismaService } from '../prisma/prisma.service.js';
-import { getCurrentTenant } from '../prisma/tenant-context.js';
+import { requireTenant } from '../prisma/tenant-context.js';
 import type { CreateFamilyDto, UpdateFamilyDto } from './product-families.dto.js';
 
 // Nodo del árbol: el modelo Prisma más sus hijos resueltos en memoria.
@@ -18,10 +13,7 @@ export class ProductFamiliesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(input: CreateFamilyDto): Promise<ProductFamily> {
-    const tenant = getCurrentTenant();
-    if (!tenant) {
-      throw new InternalServerErrorException('Sin contexto de tenant');
-    }
+    const tenant = requireTenant();
     if (input.parentId) {
       await this.requireExists(input.parentId);
     }
