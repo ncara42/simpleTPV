@@ -387,3 +387,80 @@ describe('StockService.setMin', () => {
     expect(res.level).toBe('yellow');
   });
 });
+
+describe('StockService.adjust', () => {
+  it('calcula el delta (newQuantity - actual) y aplica un movimiento ADJUSTMENT', async () => {
+    // Actual 30 (del lock FOR UPDATE), newQuantity 50 → delta +20.
+    const upsert = vi.fn(async () => ({ quantity: 50, minStock: 10 }));
+    const movementCreate = vi.fn(async (_a?: unknown) => ({ id: 'mov-1' }));
+    const tx = {
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => [{ quantity: '30' }]),
+      stock: {
+        upsert,
+        findFirstOrThrow: vi.fn(async () => ({ quantity: 50, minStock: 10 })),
+      },
+      stockMovement: { create: movementCreate },
+      stockAlert: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async () => ({ id: 'a' })),
+        update: vi.fn(async () => ({})),
+      },
+    };
+    const base = { $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)) };
+    const service = new StockService({} as never, new MemoryCache(), base as never);
+
+    const res = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.adjust({
+        productId: 'p1',
+        storeId: 's1',
+        newQuantity: 50,
+        reason: 'recuento',
+        userId: 'user-1',
+      }),
+    );
+
+    // El movimiento ADJUSTMENT lleva el delta (+20) y el motivo.
+    const movArg = movementCreate.mock.calls[0]![0] as {
+      data: { type: string; quantity: number; reason: string };
+    };
+    expect(movArg.data.type).toBe('ADJUSTMENT');
+    expect(movArg.data.quantity).toBe(20);
+    expect(movArg.data.reason).toBe('recuento');
+    expect(res.quantity).toBe(50);
+    expect(res.level).toBe('green');
+  });
+
+  it('sin fila de Stock previa: actual 0, delta = newQuantity', async () => {
+    const movementCreate = vi.fn(async (_a?: unknown) => ({ id: 'mov-1' }));
+    const tx = {
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => []),
+      stock: {
+        upsert: vi.fn(async () => ({ quantity: 15, minStock: 0 })),
+        findFirstOrThrow: vi.fn(async () => ({ quantity: 15, minStock: 0 })),
+      },
+      stockMovement: { create: movementCreate },
+      stockAlert: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async () => ({ id: 'a' })),
+        update: vi.fn(async () => ({})),
+      },
+    };
+    const base = { $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)) };
+    const service = new StockService({} as never, new MemoryCache(), base as never);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.adjust({
+        productId: 'p1',
+        storeId: 's1',
+        newQuantity: 15,
+        reason: 'alta inicial',
+        userId: 'u1',
+      }),
+    );
+
+    const movArg = movementCreate.mock.calls[0]![0] as { data: { quantity: number } };
+    expect(movArg.data.quantity).toBe(15);
+  });
+});

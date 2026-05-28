@@ -13,8 +13,13 @@ function makeController() {
     byProduct: vi.fn(async (_productId: string) => [{ storeId: STORE, quantity: 5 }]),
     alerts: vi.fn(async (_opts: unknown) => [{ id: 'a1', alertType: 'OUT_OF_STOCK' }]),
     setMin: vi.fn(async (_p: string, _s: string, _m: number) => ({ minStock: 5, level: 'yellow' })),
+    adjust: vi.fn(async (_input: unknown) => ({ quantity: 50, level: 'green' })),
   } as unknown as StockService;
   return { controller: new StockController(service), service };
+}
+
+function req(): { user: { sub: string; organizationId: string; role: string } } {
+  return { user: { sub: 'user-1', organizationId: 'org-1', role: 'ADMIN' } };
 }
 
 describe('StockController', () => {
@@ -60,5 +65,21 @@ describe('StockController', () => {
     })) as { level: string };
     expect(service.setMin).toHaveBeenCalledWith(PRODUCT, STORE, 5);
     expect(res.level).toBe('yellow');
+  });
+
+  it('POST /stock/adjust delega con el sub del usuario como userId', async () => {
+    const { controller, service } = makeController();
+    const res = (await controller.adjust(
+      { productId: PRODUCT, storeId: STORE, newQuantity: 50, reason: 'recuento' },
+      req(),
+    )) as { quantity: number };
+    expect(service.adjust).toHaveBeenCalledWith({
+      productId: PRODUCT,
+      storeId: STORE,
+      newQuantity: 50,
+      reason: 'recuento',
+      userId: 'user-1',
+    });
+    expect(res.quantity).toBe(50);
   });
 });

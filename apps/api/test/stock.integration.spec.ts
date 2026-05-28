@@ -254,4 +254,22 @@ describe('Stock — integración', () => {
     // El cache quedó repoblado con el valor de Postgres.
     expect(await cache.get(key)).toBe(String(dbQty));
   });
+
+  it('adjust: fija el stock al valor indicado y registra un movimiento ADJUSTMENT', async () => {
+    const adjustBefore = await countMovements(product1Id, store1Id, 'ADJUSTMENT');
+
+    const res = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return stockService.adjust({
+        productId: product1Id,
+        storeId: store1Id,
+        newQuantity: 42,
+        reason: 'recuento físico',
+        userId: user1Id,
+      });
+    });
+
+    expect(res.quantity).toBeCloseTo(42, 3);
+    expect(await readQuantity(product1Id, store1Id)).toBeCloseTo(42, 3);
+    expect(await countMovements(product1Id, store1Id, 'ADJUSTMENT')).toBe(adjustBefore + 1);
+  });
 });
