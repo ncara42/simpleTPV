@@ -6,6 +6,7 @@ import { AuthGuard } from './auth/auth.guard.js';
 import { AuthModule } from './auth/auth.module.js';
 import { RolesGuard } from './auth/roles.guard.js';
 import { TenantContextInterceptor } from './auth/tenant-context.interceptor.js';
+import { CashSessionsModule } from './cash-sessions/cash-sessions.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MeModule } from './me/me.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
@@ -25,6 +26,7 @@ import { UsersModule } from './users/users.module.js';
     UsersModule,
     StoresModule,
     SalesModule,
+    CashSessionsModule,
     MeModule,
   ],
   // Orden de guards: AuthGuard primero (popula request.user desde el JWT),
