@@ -12,6 +12,8 @@ export type {
   ProductInput,
   Sale,
   SaleLine,
+  SalesPage,
+  SaleSummary,
   SaleTicket,
   Store,
   StoreInput,
