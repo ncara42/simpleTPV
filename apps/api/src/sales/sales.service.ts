@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -240,6 +241,17 @@ export class SalesService {
 
   async create(dto: CreateSaleDto, userId: string, role: SaleRole) {
     const tenant = requireTenant();
+
+    // Caja obligatoria: no se puede cobrar sin una sesión de caja abierta para
+    // la tienda. Invierte la decisión "caja opcional" de #13 (ver spec
+    // 2026-05-28-caja-obligatoria-design.md). El cliente extendido aplica RLS,
+    // así que esta lectura solo ve cajas del tenant. Sin caja abierta → 409.
+    const openSession = await this.prisma.cashSession.findFirst({
+      where: { storeId: dto.storeId, organizationId: tenant.organizationId, status: 'OPEN' },
+    });
+    if (!openSession) {
+      throw new ConflictException('No hay caja abierta en esta tienda');
+    }
 
     // El cliente extendido ya aplica RLS por-operación: esta lectura solo ve
     // productos del tenant. Si falta alguno → error (no se mezcla con otro tenant).

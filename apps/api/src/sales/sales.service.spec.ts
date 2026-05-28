@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
 import { tenantStorage } from '../prisma/tenant-context.js';
@@ -278,6 +278,14 @@ function makePrisma() {
     return: {
       count: vi.fn(async (_a?: unknown): Promise<number> => 0),
     },
+    // Caja obligatoria: create comprueba que haya una sesión OPEN. Por defecto
+    // el mock devuelve una sesión abierta para que el camino feliz pase; los
+    // tests que quieran probar "sin caja" sobrescriben este findFirst → null.
+    cashSession: {
+      findFirst: vi.fn(
+        async (_a?: unknown): Promise<unknown> => ({ id: 'cash-1', status: 'OPEN' }),
+      ),
+    },
   };
 }
 
@@ -526,6 +534,30 @@ describe('SalesService.create', () => {
     expect(result.ticketNumber).toBe('T01-000007');
     expect(result.total).toBeCloseTo(3, 2);
     expect(result.organizationId).toBe(ORG);
+  });
+
+  it('lanza 409 si no hay caja abierta en la tienda (caja obligatoria)', async () => {
+    const prisma = makePrisma();
+    // Sin sesión OPEN → la comprobación de caja falla antes de preciar líneas.
+    prisma.cashSession.findFirst = vi.fn(async () => null);
+    prisma.product.findMany = vi.fn(async () => [
+      { id: 'p1', name: 'Café', salePrice: 1.5, taxRate: 21 },
+    ]);
+    const base = makeBase();
+    const service = makeService(prisma, base);
+
+    const dto = {
+      storeId: '22222222-2222-2222-2222-222222222222',
+      paymentMethod: 'CASH' as const,
+      cashGiven: 5,
+      lines: [{ productId: 'p1', qty: 2 }],
+    };
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.create(dto, 'user-1', 'ADMIN')),
+    ).rejects.toThrow(ConflictException);
+    // No debe abrir la transacción de venta si no hay caja.
+    expect(base.$transaction).not.toHaveBeenCalled();
   });
 
   it('lanza 400 si un producto del carrito no existe', async () => {
