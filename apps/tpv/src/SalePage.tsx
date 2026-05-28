@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { CartPanel } from './CartPanel.js';
+import { CashPanel } from './CashPanel.js';
 import { useCart } from './lib/cart.js';
 import { findByBarcode, listFamilies, type Product, searchProducts } from './lib/catalog.js';
 import { listStores } from './lib/sales.js';
@@ -58,6 +59,8 @@ export function SalePage() {
             </label>
           </div>
         )}
+
+        <CashPanel storeId={activeStore} />
 
         <div className="sale-search-row">
           <input

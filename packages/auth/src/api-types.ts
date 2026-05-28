@@ -146,3 +146,30 @@ export interface CreateSaleInput {
   ticketDiscountPct?: number;
   ticketDiscountAmt?: number;
 }
+
+// Sesión de caja (apertura/cierre con cuadre). Los Decimal de Prisma viajan
+// como string sobre HTTP; los opcionales (cierre) son null mientras la caja
+// sigue abierta.
+export type CashSessionStatus = 'OPEN' | 'CLOSED';
+
+export interface CashSession {
+  id: string;
+  storeId: string;
+  userId: string;
+  openingAmount: string;
+  closingAmount: string | null;
+  expectedAmount: string | null;
+  difference: string | null;
+  status: CashSessionStatus;
+  openedAt: string;
+  closedAt: string | null;
+}
+
+export interface OpenCashSessionInput {
+  storeId: string;
+  openingAmount: number;
+}
+
+export interface CloseCashSessionInput {
+  countedAmount: number;
+}
