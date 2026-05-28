@@ -14,6 +14,12 @@ function makeController() {
     alerts: vi.fn(async (_opts: unknown) => [{ id: 'a1', alertType: 'OUT_OF_STOCK' }]),
     setMin: vi.fn(async (_p: string, _s: string, _m: number) => ({ minStock: 5, level: 'yellow' })),
     adjust: vi.fn(async (_input: unknown) => ({ quantity: 50, level: 'green' })),
+    movements: vi.fn(async (_opts: unknown) => ({
+      items: [],
+      totalItems: 0,
+      page: 1,
+      pageSize: 50,
+    })),
   } as unknown as StockService;
   return { controller: new StockController(service), service };
 }
@@ -81,5 +87,15 @@ describe('StockController', () => {
       userId: 'user-1',
     });
     expect(res.quantity).toBe(50);
+  });
+
+  it('GET /stock/movements convierte fechas y números y delega los filtros', async () => {
+    const { controller, service } = makeController();
+    await controller.movements(PRODUCT, STORE, '2026-05-01', '2026-05-29', '2', '10');
+    const arg = (service.movements as unknown as { mock: { calls: unknown[][] } }).mock
+      .calls[0]![0] as { productId: string; from: Date; page: number };
+    expect(arg.productId).toBe(PRODUCT);
+    expect(arg.from).toBeInstanceOf(Date);
+    expect(arg.page).toBe(2);
   });
 });

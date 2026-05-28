@@ -16,6 +16,7 @@ import type { PrismaClient } from '@simpletpv/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { MemoryCache } from '../src/cache/memory-cache.js';
+import { InMemoryEventBus } from '../src/events/in-memory-event-bus.js';
 import { applyTenantExtension, PrismaService } from '../src/prisma/prisma.service.js';
 import { tenantStorage } from '../src/prisma/tenant-context.js';
 import { SalesService } from '../src/sales/sales.service.js';
@@ -54,7 +55,13 @@ describe('Ventas — integración', () => {
     service = new SalesService(
       prisma as unknown as PrismaService,
       base,
-      new StockService(prisma as unknown as PrismaService, new MemoryCache(), base),
+      new StockService(
+        prisma as unknown as PrismaService,
+        new MemoryCache(),
+        base,
+        new InMemoryEventBus(),
+      ),
+      new InMemoryEventBus(),
     );
 
     const adminUrl = process.env.DATABASE_URL;

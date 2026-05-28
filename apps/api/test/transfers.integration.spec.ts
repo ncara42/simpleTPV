@@ -8,6 +8,7 @@ import type { PrismaClient } from '@simpletpv/db';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { MemoryCache } from '../src/cache/memory-cache.js';
+import { InMemoryEventBus } from '../src/events/in-memory-event-bus.js';
 import { applyTenantExtension, PrismaService } from '../src/prisma/prisma.service.js';
 import { tenantStorage } from '../src/prisma/tenant-context.js';
 import { StockService } from '../src/stock/stock.service.js';
@@ -37,7 +38,12 @@ describe('Traspasos — integración', () => {
     base = new PrismaService();
     await base.onModuleInit();
     prisma = applyTenantExtension(base);
-    const stock = new StockService(prisma as unknown as PrismaService, new MemoryCache(), base);
+    const stock = new StockService(
+      prisma as unknown as PrismaService,
+      new MemoryCache(),
+      base,
+      new InMemoryEventBus(),
+    );
     transfers = new TransfersService(prisma as unknown as PrismaService, base, stock);
 
     const adminUrl = process.env.DATABASE_URL;

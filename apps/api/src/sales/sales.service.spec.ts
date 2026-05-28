@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, NotFoundException } from '@nest
 import { describe, expect, it, vi } from 'vitest';
 
 import { MemoryCache } from '../cache/memory-cache.js';
+import { InMemoryEventBus } from '../events/in-memory-event-bus.js';
 import { tenantStorage } from '../prisma/tenant-context.js';
 import { StockService } from '../stock/stock.service.js';
 import {
@@ -318,7 +319,8 @@ function makeService(prisma: ReturnType<typeof makePrisma>, base?: unknown) {
   return new SalesService(
     prisma as never,
     resolvedBase as never,
-    new StockService({} as never, new MemoryCache(), {} as never),
+    new StockService({} as never, new MemoryCache(), {} as never, new InMemoryEventBus()),
+    new InMemoryEventBus(),
   );
 }
 

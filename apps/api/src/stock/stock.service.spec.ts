@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { MemoryCache } from '../cache/memory-cache.js';
+import { InMemoryEventBus } from '../events/in-memory-event-bus.js';
 import { tenantStorage } from '../prisma/tenant-context.js';
 import { alertTypeFor, stockCacheKey, stockLevel, StockService } from './stock.service.js';
 
@@ -28,7 +29,12 @@ function makeTx(resultingQuantity = 0, minStock = 0) {
 describe('StockService.applyMovement', () => {
   it('salida (venta): upsert con increment negativo + movimiento SALE', async () => {
     const tx = makeTx(98);
-    const service = new StockService({} as never, new MemoryCache(), {} as never);
+    const service = new StockService(
+      {} as never,
+      new MemoryCache(),
+      {} as never,
+      new InMemoryEventBus(),
+    );
 
     const result = await service.applyMovement(tx as never, {
       organizationId: ORG,
@@ -66,7 +72,12 @@ describe('StockService.applyMovement', () => {
 
   it('entrada (reposición): increment positivo + movimiento RETURN', async () => {
     const tx = makeTx(102);
-    const service = new StockService({} as never, new MemoryCache(), {} as never);
+    const service = new StockService(
+      {} as never,
+      new MemoryCache(),
+      {} as never,
+      new InMemoryEventBus(),
+    );
 
     await service.applyMovement(tx as never, {
       organizationId: ORG,
@@ -93,7 +104,12 @@ describe('StockService.applyMovement', () => {
 
   it('ajuste con motivo: pasa reason al movimiento ADJUSTMENT', async () => {
     const tx = makeTx(50);
-    const service = new StockService({} as never, new MemoryCache(), {} as never);
+    const service = new StockService(
+      {} as never,
+      new MemoryCache(),
+      {} as never,
+      new InMemoryEventBus(),
+    );
 
     await service.applyMovement(tx as never, {
       organizationId: ORG,
@@ -114,7 +130,7 @@ describe('StockService.applyMovement', () => {
   it('escribe la cantidad resultante en el cache tras el movimiento', async () => {
     const tx = makeTx(98);
     const cache = new MemoryCache();
-    const service = new StockService({} as never, cache, {} as never);
+    const service = new StockService({} as never, cache, {} as never, new InMemoryEventBus());
 
     await service.applyMovement(tx as never, {
       organizationId: ORG,
@@ -165,7 +181,12 @@ describe('StockService.byStore', () => {
       { productId: 'p1', storeId: 's1', quantity: 0, minStock: 5, product: { name: 'Café' } },
       { productId: 'p2', storeId: 's1', quantity: 8, minStock: 5, product: { name: 'Té' } },
     ]);
-    const service = new StockService(prisma as never, new MemoryCache(), {} as never);
+    const service = new StockService(
+      prisma as never,
+      new MemoryCache(),
+      {} as never,
+      new InMemoryEventBus(),
+    );
 
     const rows = await tenantStorage.run({ organizationId: ORG }, () => service.byStore('s1'));
 
@@ -199,7 +220,12 @@ describe('StockService.global', () => {
         store: { name: 'Sur' },
       },
     ]);
-    const service = new StockService(prisma as never, new MemoryCache(), {} as never);
+    const service = new StockService(
+      prisma as never,
+      new MemoryCache(),
+      {} as never,
+      new InMemoryEventBus(),
+    );
 
     const rows = await tenantStorage.run({ organizationId: ORG }, () => service.global());
 
@@ -217,7 +243,7 @@ describe('StockService.byProduct (cache)', () => {
     ]);
     const cache = new MemoryCache();
     await cache.set(stockCacheKey(ORG, 's1', 'p1'), '777');
-    const service = new StockService(prisma as never, cache, {} as never);
+    const service = new StockService(prisma as never, cache, {} as never, new InMemoryEventBus());
 
     const rows = await tenantStorage.run({ organizationId: ORG }, () => service.byProduct('p1'));
     expect(rows[0]!.quantity).toBe(777);
@@ -228,7 +254,7 @@ describe('StockService.byProduct (cache)', () => {
       { productId: 'p1', storeId: 's1', quantity: 10, minStock: 5, store: { name: 'Centro' } },
     ]);
     const cache = new MemoryCache();
-    const service = new StockService(prisma as never, cache, {} as never);
+    const service = new StockService(prisma as never, cache, {} as never, new InMemoryEventBus());
 
     const rows = await tenantStorage.run({ organizationId: ORG }, () => service.byProduct('p1'));
     expect(rows[0]!.quantity).toBe(10);
@@ -242,7 +268,7 @@ describe('StockService.byProduct (cache)', () => {
     ]);
     const cache = new MemoryCache();
     await cache.set(stockCacheKey(ORG, 's1', 'p1'), 'no-es-un-número');
-    const service = new StockService(prisma as never, cache, {} as never);
+    const service = new StockService(prisma as never, cache, {} as never, new InMemoryEventBus());
 
     const rows = await tenantStorage.run({ organizationId: ORG }, () => service.byProduct('p1'));
     expect(rows[0]!.quantity).toBe(10);
@@ -278,7 +304,12 @@ function makeAlertTx(active: { id: string; alertType: string } | null = null) {
 }
 
 describe('StockService.reevaluateAlert', () => {
-  const service = new StockService({} as never, new MemoryCache(), {} as never);
+  const service = new StockService(
+    {} as never,
+    new MemoryCache(),
+    {} as never,
+    new InMemoryEventBus(),
+  );
 
   it('crea alerta OUT_OF_STOCK si no había y el stock se agotó', async () => {
     const tx = makeAlertTx(null);
@@ -350,7 +381,12 @@ describe('StockService.alerts', () => {
         ]),
       },
     };
-    const service = new StockService(prisma as never, new MemoryCache(), {} as never);
+    const service = new StockService(
+      prisma as never,
+      new MemoryCache(),
+      {} as never,
+      new InMemoryEventBus(),
+    );
 
     const rows = await tenantStorage.run({ organizationId: ORG }, () => service.alerts({}));
 
@@ -375,7 +411,12 @@ describe('StockService.setMin', () => {
     const base = {
       $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
     };
-    const service = new StockService({} as never, new MemoryCache(), base as never);
+    const service = new StockService(
+      {} as never,
+      new MemoryCache(),
+      base as never,
+      new InMemoryEventBus(),
+    );
 
     const res = await tenantStorage.run({ organizationId: ORG }, () =>
       service.setMin('p1', 's1', 5),
@@ -408,7 +449,12 @@ describe('StockService.adjust', () => {
       },
     };
     const base = { $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)) };
-    const service = new StockService({} as never, new MemoryCache(), base as never);
+    const service = new StockService(
+      {} as never,
+      new MemoryCache(),
+      base as never,
+      new InMemoryEventBus(),
+    );
 
     const res = await tenantStorage.run({ organizationId: ORG }, () =>
       service.adjust({
@@ -448,7 +494,12 @@ describe('StockService.adjust', () => {
       },
     };
     const base = { $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)) };
-    const service = new StockService({} as never, new MemoryCache(), base as never);
+    const service = new StockService(
+      {} as never,
+      new MemoryCache(),
+      base as never,
+      new InMemoryEventBus(),
+    );
 
     await tenantStorage.run({ organizationId: ORG }, () =>
       service.adjust({
@@ -462,5 +513,68 @@ describe('StockService.adjust', () => {
 
     const movArg = movementCreate.mock.calls[0]![0] as { data: { quantity: number } };
     expect(movArg.data.quantity).toBe(15);
+  });
+});
+
+describe('StockService.movements', () => {
+  it('aplica filtros (producto, tienda, fechas) y pagina, aislado por tenant', async () => {
+    const prisma = {
+      stockMovement: {
+        findMany: vi.fn(async (_a?: unknown) => [{ id: 'm1' }]),
+        count: vi.fn(async (_a?: unknown) => 1),
+      },
+    };
+    const service = new StockService(
+      prisma as never,
+      new MemoryCache(),
+      {} as never,
+      new InMemoryEventBus(),
+    );
+
+    const res = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.movements({
+        productId: 'p1',
+        storeId: 's1',
+        from: new Date('2026-05-01T00:00:00Z'),
+        to: new Date('2026-05-29T00:00:00Z'),
+        page: 2,
+        pageSize: 10,
+      }),
+    );
+
+    expect(res.totalItems).toBe(1);
+    expect(res.page).toBe(2);
+    const arg = prisma.stockMovement.findMany.mock.calls[0]![0] as {
+      where: { organizationId: string; productId: string; storeId: string; createdAt: object };
+      skip: number;
+      take: number;
+    };
+    expect(arg.where.organizationId).toBe(ORG);
+    expect(arg.where.productId).toBe('p1');
+    expect(arg.where.createdAt).toBeDefined();
+    expect(arg.skip).toBe(10); // (page 2 - 1) * pageSize 10
+    expect(arg.take).toBe(10);
+  });
+
+  it('sin filtros de fecha no incluye createdAt en el where', async () => {
+    const prisma = {
+      stockMovement: {
+        findMany: vi.fn(async (_a?: unknown) => []),
+        count: vi.fn(async (_a?: unknown) => 0),
+      },
+    };
+    const service = new StockService(
+      prisma as never,
+      new MemoryCache(),
+      {} as never,
+      new InMemoryEventBus(),
+    );
+
+    await tenantStorage.run({ organizationId: ORG }, () => service.movements({}));
+
+    const arg = prisma.stockMovement.findMany.mock.calls[0]![0] as {
+      where: Record<string, unknown>;
+    };
+    expect(arg.where.createdAt).toBeUndefined();
   });
 });
