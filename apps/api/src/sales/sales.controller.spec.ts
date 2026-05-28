@@ -11,6 +11,7 @@ function makeController() {
   const service = {
     create: vi.fn(async (_dto: unknown, _userId: string, _role: string) => ({ id: 'sale-1' })),
     getTicket: vi.fn(async (_id: string) => ({ ticketNumber: 'T01-000001' })),
+    findByTicket: vi.fn(async (_t: string) => ({ id: 'sale-1', ticketNumber: 'T01-000001' })),
     voidSale: vi.fn(async (_id: string, _userId: string) => ({ id: 'sale-1', status: 'VOIDED' })),
     findSales: vi.fn(async (_q: unknown) => ({
       items: [],
@@ -45,6 +46,15 @@ describe('SalesController', () => {
 
     expect(service.getTicket).toHaveBeenCalledWith('sale-1');
     expect(res.ticketNumber).toBe('T01-000001');
+  });
+
+  it('GET /sales/by-ticket/:ticketNumber pasa el nº de ticket al servicio', async () => {
+    const { controller, service } = makeController();
+
+    const res = (await controller.findByTicket('T01-000001')) as { id: string };
+
+    expect(service.findByTicket).toHaveBeenCalledWith('T01-000001');
+    expect(res.id).toBe('sale-1');
   });
 
   it('POST /sales/:id/void pasa id y sub del usuario', async () => {

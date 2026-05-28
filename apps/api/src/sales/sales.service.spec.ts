@@ -431,6 +431,39 @@ describe('SalesService.getTicket', () => {
   });
 });
 
+describe('SalesService.findByTicket', () => {
+  it('lanza 404 si el ticket no existe en el tenant', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findFirst = vi.fn(async () => null);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.findByTicket('T01-999999')),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('devuelve la venta con líneas filtrando por ticketNumber y organizationId', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findFirst = vi.fn(async () => ({
+      id: 'sale-1',
+      ticketNumber: 'T01-000001',
+      lines: [{ id: 'sl-1' }],
+    }));
+    const service = makeService(prisma);
+
+    const res = (await tenantStorage.run({ organizationId: ORG }, () =>
+      service.findByTicket('T01-000001'),
+    )) as { id: string };
+
+    const arg = prisma.sale.findFirst.mock.calls[0]![0] as {
+      where: { ticketNumber: string; organizationId: string };
+    };
+    expect(arg.where.ticketNumber).toBe('T01-000001');
+    expect(arg.where.organizationId).toBe(ORG);
+    expect(res.id).toBe('sale-1');
+  });
+});
+
 describe('SalesService.create', () => {
   // Mock de withTenantTx vía base.$transaction: el callback recibe un tx con
   // $executeRaw, $queryRaw y sale.create. Así cubrimos el camino feliz de create

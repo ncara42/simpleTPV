@@ -21,3 +21,8 @@ export function getTicket(id: string): Promise<SaleTicket> {
 export function voidSale(id: string): Promise<Sale> {
   return api.post<Sale>(`/sales/${id}/void`);
 }
+
+// Localiza una venta por su nº de ticket (flujo de devolución). 404 si no existe.
+export function findSaleByTicket(ticketNumber: string): Promise<Sale> {
+  return api.get<Sale>(`/sales/by-ticket/${encodeURIComponent(ticketNumber)}`);
+}

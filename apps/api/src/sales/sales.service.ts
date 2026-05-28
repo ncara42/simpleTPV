@@ -375,6 +375,23 @@ export class SalesService {
   }
 
   /**
+   * Localiza una venta del tenant por su número de ticket, con sus líneas. Sirve
+   * al flujo de devolución del TPV (buscar el ticket por su nº impreso). RLS +
+   * filtro por organizationId explícito; si no existe en el tenant → 404.
+   */
+  async findByTicket(ticketNumber: string) {
+    const tenant = requireTenant();
+    const sale = await this.prisma.sale.findFirst({
+      where: { ticketNumber, organizationId: tenant.organizationId },
+      include: { lines: true },
+    });
+    if (!sale) {
+      throw new NotFoundException(`Ticket ${ticketNumber} no encontrado`);
+    }
+    return sale;
+  }
+
+  /**
    * Anula una venta del tenant (rol MANAGER/ADMIN, validado en el controller por
    * el RolesGuard global). Marca status=VOIDED, voidedAt=now y voidedBy=userId.
    *
