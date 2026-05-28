@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { RolesGuard } from './auth/roles.guard.js';
 import { TenantContextInterceptor } from './auth/tenant-context.interceptor.js';
 import { HealthModule } from './health/health.module.js';
+import { MeModule } from './me/me.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProductFamiliesModule } from './product-families/product-families.module.js';
 import { ProductsModule } from './products/products.module.js';
@@ -24,6 +25,7 @@ import { UsersModule } from './users/users.module.js';
     UsersModule,
     StoresModule,
     SalesModule,
+    MeModule,
   ],
   // Orden de guards: AuthGuard primero (popula request.user desde el JWT),
   // luego RolesGuard (lee user.role). Los APP_GUARD corren en orden de registro.
