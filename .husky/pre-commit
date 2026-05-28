@@ -1,0 +1,8 @@
+pnpm exec lint-staged
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks git --pre-commit --staged --no-banner --redact
+else
+  echo "⚠ gitleaks no instalado — escaneo de secretos local omitido."
+  echo "  Instálalo con: brew install gitleaks"
+fi

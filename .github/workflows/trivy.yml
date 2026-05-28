@@ -1,0 +1,91 @@
+name: Trivy
+
+# Escaneo del filesystem: dependencias npm + secretos + misconfiguraciones.
+# Job de imagen Docker pendiente hasta que existan los Dockerfiles de las apps.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/Dockerfile'
+      - '**/package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/trivy.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/Dockerfile'
+      - '**/package.json'
+      - 'pnpm-lock.yaml'
+  schedule:
+    - cron: '0 7 * * 1' # lunes 07:00 UTC
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  # -----------------------------------------------------------------------
+  # TODO (despliegue): Activar image-scan cuando existan los Dockerfiles.
+  # Job image-scan con matrix:
+  #   - app: simpletpv-api,        dockerfile: apps/api/Dockerfile
+  #   - app: simpletpv-tpv,        dockerfile: apps/tpv/Dockerfile
+  #   - app: simpletpv-backoffice, dockerfile: apps/backoffice/Dockerfile
+  # -----------------------------------------------------------------------
+
+  filesystem-scan:
+    name: Scan filesystem (deps + secrets + misconfig)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Cache Trivy DB
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v4.3.0
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ github.run_id }}
+          restore-keys: |
+            trivy-db-
+
+      - name: Run Trivy gate (CRITICAL,HIGH)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+          scanners: vuln,secret,misconfig
+          skip-dirs: node_modules,build,dist,data,coverage
+          trivyignores: .trivyignore.yaml
+
+      - name: Run Trivy SARIF report
+        if: always()
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-fs.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          trivyignores: .trivyignore.yaml
+          skip-dirs: node_modules,build,dist,data,coverage
+
+      - name: Upload SARIF
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba # v4.35.5
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs

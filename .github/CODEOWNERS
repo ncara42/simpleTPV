@@ -1,0 +1,20 @@
+# Ownership de las piezas sensibles del repo. GitHub solicita revisión de
+# los owners para PRs que toquen estos paths — defensa en profundidad contra
+# cambios accidentales en seguridad, CI o infra.
+
+# CI/CD y workflows
+/.github/                          @ncara42 @marcogmurciano
+
+# Auth y RLS del API
+/apps/api/src/tenant/              @ncara42 @marcogmurciano
+/apps/api/src/prisma/              @ncara42 @marcogmurciano
+
+# Infraestructura
+/docker-compose.yml                @ncara42 @marcogmurciano
+/.trivyignore.yaml                 @ncara42 @marcogmurciano
+
+# Gitignore (filtros de secretos)
+/.gitignore                        @ncara42 @marcogmurciano
+
+# Schema de la base de datos
+/packages/db/prisma/               @ncara42 @marcogmurciano

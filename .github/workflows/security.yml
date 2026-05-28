@@ -1,0 +1,96 @@
+name: Security
+
+# Escaneo de seguridad sobre GitHub-hosted runners.
+# Actions oficiales pinneadas por SHA.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 8 * * 1' # lunes 08:00 UTC
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Detección de secretos en el historial git completo
+  # -----------------------------------------------------------------------
+  gitleaks:
+    name: Gitleaks (secrets)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@cb7149b9b57195b609c63e8518d2c37118bf6265 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # -----------------------------------------------------------------------
+  # Análisis estático (SAST) — Semgrep
+  # Reglas: typescript, nodejs, secrets, owasp-top-ten.
+  # -----------------------------------------------------------------------
+  semgrep:
+    name: Semgrep (SAST)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    container:
+      image: returntocorp/semgrep:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Run Semgrep
+        run: |
+          semgrep scan \
+            --config=p/typescript \
+            --config=p/nodejs \
+            --config=p/secrets \
+            --config=p/owasp-top-ten \
+            --error \
+            --exclude=node_modules \
+            --exclude=dist \
+            --exclude=build \
+            --exclude=coverage \
+            --exclude='*.spec.ts' \
+            --exclude='*.test.ts' \
+            --exclude=data \
+            --exclude=generated
+
+  # -----------------------------------------------------------------------
+  # Vulnerabilidades conocidas en el lockfile (pnpm)
+  # -----------------------------------------------------------------------
+  osv:
+    name: OSV Scanner (pnpm-lock)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Run OSV Scanner
+        uses: google/osv-scanner-action/osv-scanner-action@cb19f4ad03f8b87a16cf36e1cf2eed7d5dabf9bd # v1.9.2
+        with:
+          scan-args: |-
+            --lockfile=./pnpm-lock.yaml

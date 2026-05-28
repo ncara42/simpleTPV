@@ -1,0 +1,26 @@
+version: 2
+
+updates:
+  # GitHub Actions — mantiene los SHAs pinneados actualizados
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '08:00'
+    labels: [dependencies, ci-cd]
+
+  # npm — el monorepo pnpm tiene un único lockfile en la raíz;
+  # Dependabot descubre todos los workspaces desde ahí.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '08:00'
+    labels: [dependencies]
+    open-pull-requests-limit: 10
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]

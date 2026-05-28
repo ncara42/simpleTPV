@@ -1,0 +1,301 @@
+name: CI
+
+# Quality gate. Cada PR y cada push a main pasa lint + typecheck + tests
+# + build sobre todo el monorepo. El gate de cobertura se aplica inline.
+#
+# Actions pinneadas por SHA con comentario de versión: una credencial de
+# maintainer robada no puede reetiquetar. Dependabot propone upgrades.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  quality:
+    name: Lint, typecheck, tests y build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a15d269cd4658e1107c09f1fabf4cbd7bd1f308a # v4.4.0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # El cliente Prisma generado es prerrequisito de compilación.
+      - name: Generate Prisma client
+        run: pnpm --filter @simpletpv/db exec prisma generate
+
+      - name: Audit dependencies
+        run: pnpm audit --audit-level=high --prod
+        continue-on-error: true
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Detect unused code (knip)
+        run: pnpm knip
+        continue-on-error: true
+
+      - name: Type-check
+        run: pnpm typecheck
+
+      - name: Tests with coverage
+        run: pnpm --filter @simpletpv/api test
+
+      - name: Coverage ratchet (gate)
+        run: |
+          node -e '
+            const fs = require("fs");
+            const summary = require("./apps/api/coverage/coverage-summary.json");
+            const threshold = JSON.parse(fs.readFileSync("coverage-threshold.json", "utf8"));
+
+            const current = summary.total.statements.pct;
+            const floor = threshold.api.statements;
+
+            if (typeof current !== "number") {
+              console.log("sin cobertura instrumentada todavía — ratchet omitido");
+              process.exit(0);
+            }
+
+            console.log("api statements: " + current + "% (floor: " + floor + "%)");
+
+            if (current < floor) {
+              console.error("coverage dropped below floor — ratchet triggered");
+              process.exit(1);
+            }
+
+            console.log("gate passed");
+          '
+
+      - name: Build apps
+        run: pnpm build
+
+  # -----------------------------------------------------------------------
+  # Ratchet: actualiza coverage-threshold.json si la cobertura subió.
+  # Solo corre en push a main (no en PRs: solo leemos + fallamos ahí).
+  # -----------------------------------------------------------------------
+  ratchet:
+    name: Raise coverage floor
+    runs-on: ubuntu-latest
+    needs: [quality]
+    if: github.event_name == 'push'
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a15d269cd4658e1107c09f1fabf4cbd7bd1f308a # v4.4.0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @simpletpv/db exec prisma generate
+
+      - name: Run tests with coverage
+        run: pnpm --filter @simpletpv/api test
+
+      - name: Raise floor if coverage improved
+        run: |
+          node -e '
+            const fs = require("fs");
+            const summary = require("./apps/api/coverage/coverage-summary.json");
+            const threshold = JSON.parse(fs.readFileSync("coverage-threshold.json", "utf8"));
+
+            const current = summary.total.statements.pct;
+            const floor = threshold.api.statements;
+
+            if (typeof current !== "number") {
+              console.log("sin cobertura instrumentada — floor sin cambios");
+              process.exit(0);
+            }
+
+            if (current > floor) {
+              threshold.api.statements = current;
+              fs.writeFileSync("coverage-threshold.json", JSON.stringify(threshold, null, 2) + "\n");
+              console.log("floor raised to " + current + "%");
+            } else {
+              console.log("floor unchanged (" + floor + "%)");
+            }
+          '
+
+      - name: Commit raised floor
+        env:
+          TARGET_BRANCH: ${{ github.ref_name }}
+        run: |
+          git diff --quiet coverage-threshold.json && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add coverage-threshold.json
+          git commit -m "chore: ratchet coverage floor [skip ci]"
+          git push origin "HEAD:${TARGET_BRANCH}"
+
+  # -----------------------------------------------------------------------
+  # E2E smoke tests — Playwright / Chromium
+  # Postgres efímero via services: nativo de Actions.
+  # RLS: el seed corre como superuser (BYPASSRLS); los tests E2E acceden
+  # a la app mediante la API, que internamente fija el rol aplicación.
+  # -----------------------------------------------------------------------
+  e2e:
+    name: E2E smoke test (Playwright)
+    runs-on: ubuntu-latest
+    needs: [quality]
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: simpletpv
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 3s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/simpletpv?schema=public
+      DATABASE_URL_APP: postgresql://app:app_dev_password@localhost:5432/simpletpv?schema=public
+      NODE_ENV: test
+      PORT: '3001'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a15d269cd4658e1107c09f1fabf4cbd7bd1f308a # v4.4.0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @simpletpv/db exec prisma generate
+
+      - name: Apply Prisma migrations
+        run: pnpm --filter @simpletpv/db exec prisma migrate deploy
+
+      - name: Seed multi-tenant fixtures
+        run: pnpm --filter @simpletpv/db exec prisma db seed
+
+      - name: Build apps
+        run: pnpm build
+
+      - name: Start API
+        run: |
+          pnpm --filter @simpletpv/api start > /tmp/api.log 2>&1 &
+          echo $! > /tmp/api.pid
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3001/health >/dev/null 2>&1; then
+              echo "API healthy tras ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API no respondió en 30s — log:"
+          cat /tmp/api.log
+          exit 1
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @simpletpv/tpv exec playwright install --with-deps chromium
+
+      - name: Run E2E tests (TPV)
+        run: pnpm --filter @simpletpv/tpv test:e2e
+
+      - name: Run E2E tests (Backoffice)
+        run: pnpm --filter @simpletpv/backoffice test:e2e
+
+      - name: Upload Playwright reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: |
+            apps/tpv/test-results/
+            apps/tpv/playwright-report/
+            apps/backoffice/test-results/
+            apps/backoffice/playwright-report/
+            /tmp/api.log
+          retention-days: 7
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f /tmp/api.pid ]; then
+            kill "$(cat /tmp/api.pid)" 2>/dev/null || true
+          fi
+
+  # -----------------------------------------------------------------------
+  # Deploy a producción — solo en push a main, tras pasar quality + e2e.
+  # Llama al webhook de Dokploy que redespliega la imagen Docker.
+  # -----------------------------------------------------------------------
+  deploy:
+    name: Deploy a producción (Dokploy)
+    runs-on: ubuntu-latest
+    needs: [e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Trigger redeploy
+        env:
+          DOKPLOY_WEBHOOK_URL: ${{ secrets.DOKPLOY_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DOKPLOY_WEBHOOK_URL" ]; then
+            echo "::warning::DOKPLOY_WEBHOOK_URL no configurado — saltando deploy"
+            exit 0
+          fi
+          read -r code redirects <<<"$(curl -sS -L \
+            --proto-redir =http,https \
+            --max-redirs 10 \
+            -o /dev/null \
+            -w "%{http_code} %{num_redirects}" \
+            -X GET "$DOKPLOY_WEBHOOK_URL")"
+          echo "Webhook HTTP $code tras $redirects redirección(es)"
+          case "$code" in
+            2*) echo "Redeploy disparado." ;;
+            *) echo "::error::El webhook de Dokploy devolvió $code (esperado 2xx)"; exit 1 ;;
+          esac

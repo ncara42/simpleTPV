@@ -1,0 +1,5 @@
+# Excepciones de Trivy. Cada entrada debe documentar:
+#   - id: <CVE-id o DS-id>
+#   - paths: [archivos afectados]
+#   - razón: por qué se ignora
+# Vacío al inicio — añadir entradas solo con justificación explícita.
