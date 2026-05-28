@@ -54,6 +54,18 @@ export class ReturnsService {
     const tenant = requireTenant();
 
     return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+      // 0. Lock pesimista de la fila de la venta ANTES de leer las devoluciones
+      //    previas. Serializa las devoluciones concurrentes de la MISMA venta:
+      //    en READ COMMITTED (default) dos devoluciones simultáneas podrían leer
+      //    ambas el mismo "ya devuelto", pasar la validación de exceso y crear
+      //    sendos Return → se devolvería más de lo vendido. Con FOR UPDATE la
+      //    segunda transacción espera al commit de la primera y entonces lee el
+      //    "ya devuelto" actualizado → la validación de exceso la rechaza.
+      //    El lock vive dentro de withTenantTx (sobre tx) y RLS ya restringe la
+      //    fila al tenant; si la venta no existe, no bloquea ninguna fila y el
+      //    findFirst posterior lanzará 404.
+      await tx.$executeRaw`SELECT id FROM "Sale" WHERE id = ${dto.saleId}::uuid FOR UPDATE`;
+
       // 1. Carga la venta del tenant con sus líneas. Defensa en profundidad:
       //    además de RLS, filtramos por organizationId explícito.
       const sale = await tx.sale.findFirst({
