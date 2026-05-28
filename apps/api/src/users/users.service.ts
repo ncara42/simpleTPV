@@ -20,6 +20,16 @@ export interface UpdateUserInput {
 
 const SALT_ROUNDS = 10;
 
+// Campos seguros para devolver al cliente: NUNCA passwordHash ni pinHash.
+const PUBLIC_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+  active: true,
+  createdAt: true,
+} as const;
+
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -36,48 +46,40 @@ export class UsersService {
         organizationId: tenant.organizationId,
         passwordHash: await bcrypt.hash(password, SALT_ROUNDS),
       },
+      select: PUBLIC_SELECT,
     });
   }
 
   async findAll(): Promise<unknown[]> {
-    return this.prisma.user.findMany({
-      orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        active: true,
-        createdAt: true,
-      },
-    });
+    return this.prisma.user.findMany({ orderBy: { name: 'asc' }, select: PUBLIC_SELECT });
   }
 
-  async findOne(id: string): Promise<unknown> {
-    const user = await this.prisma.user.findFirst({ where: { id } });
+  // Guard interno de existencia (no se expone en ningún endpoint). Solo
+  // selecciona el id para no traer hashes a memoria innecesariamente.
+  private async requireExists(id: string): Promise<void> {
+    const user = await this.prisma.user.findFirst({ where: { id }, select: { id: true } });
     if (!user) {
       throw new NotFoundException(`Usuario ${id} no encontrado`);
     }
-    return user;
   }
 
   async update(id: string, input: UpdateUserInput): Promise<unknown> {
-    await this.findOne(id);
+    await this.requireExists(id);
     const { password, ...rest } = input;
     const data: Record<string, unknown> = { ...rest };
     if (password) {
       data.passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
     }
-    return this.prisma.user.update({ where: { id }, data });
+    return this.prisma.user.update({ where: { id }, data, select: PUBLIC_SELECT });
   }
 
   async remove(id: string): Promise<void> {
-    await this.findOne(id);
+    await this.requireExists(id);
     await this.prisma.user.delete({ where: { id } });
   }
 
   async setPin(id: string, pin: string): Promise<void> {
-    await this.findOne(id);
+    await this.requireExists(id);
     await this.prisma.user.update({
       where: { id },
       data: { pinHash: await bcrypt.hash(pin, SALT_ROUNDS) },
@@ -85,7 +87,7 @@ export class UsersService {
   }
 
   async assignStores(id: string, storeIds: string[]): Promise<void> {
-    await this.findOne(id);
+    await this.requireExists(id);
     await this.prisma.userStore.deleteMany({ where: { userId: id } });
     await this.prisma.userStore.createMany({
       data: storeIds.map((storeId) => ({ userId: id, storeId })),

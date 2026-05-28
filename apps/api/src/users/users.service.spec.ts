@@ -73,10 +73,25 @@ describe('UsersService', () => {
     expect(arg.data.passwordHash).toBeUndefined();
   });
 
-  it('findOne lanza 404 si no existe', async () => {
+  it('update lanza 404 si el usuario no existe', async () => {
     const prisma = makePrisma();
     prisma.user.findFirst = vi.fn(async () => null);
     const service = new UsersService(prisma as never);
-    await expect(service.findOne('nope')).rejects.toThrow();
+    await expect(service.update('nope', { name: 'x' })).rejects.toThrow();
+  });
+
+  it('create devuelve solo campos públicos (sin passwordHash ni pinHash)', async () => {
+    const prisma = makePrisma();
+    const service = new UsersService(prisma as never);
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.create({ email: 'x@org.test', name: 'X', password: 'pw', role: 'CLERK' }),
+    );
+    const arg = prisma.user.create.mock.calls[0]![0] as unknown as {
+      select: Record<string, boolean>;
+    };
+    expect(arg.select).toBeDefined();
+    expect(arg.select.passwordHash).toBeUndefined();
+    expect(arg.select.pinHash).toBeUndefined();
+    expect(arg.select.email).toBe(true);
   });
 });
