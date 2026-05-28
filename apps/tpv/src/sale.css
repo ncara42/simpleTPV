@@ -190,6 +190,130 @@
   font-size: 0.9rem;
 }
 
+/* Modal de cobro */
+.pay-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.pay-modal {
+  background: #fff;
+  border-radius: 0.9rem;
+  padding: 1.5rem;
+  width: min(24rem, 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 20px 60px -20px rgba(0, 0, 0, 0.5);
+}
+.pay-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+.pay-total {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+.pay-total span:last-child {
+  font-family: 'Fraunces', Georgia, serif;
+  color: var(--tpv-teal-700, #0f766e);
+}
+.pay-methods {
+  display: flex;
+  gap: 0.6rem;
+}
+.pay-method {
+  flex: 1;
+  min-height: 3rem;
+  border: 2px solid var(--tpv-line, #e4e2db);
+  border-radius: 0.7rem;
+  background: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pay-method.active {
+  background: var(--tpv-teal-700, #0f766e);
+  border-color: var(--tpv-teal-700, #0f766e);
+  color: #fff;
+}
+.pay-cash-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.pay-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+.pay-field input {
+  height: 3rem;
+  border: 2px solid var(--tpv-line, #e4e2db);
+  border-radius: 0.6rem;
+  padding: 0 0.9rem;
+  font-size: 1.2rem;
+}
+.pay-field input:focus {
+  outline: none;
+  border-color: var(--tpv-teal-500, #14b8a6);
+}
+.pay-change {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.pay-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+.pay-cancel,
+.pay-confirm {
+  flex: 1;
+  min-height: 3rem;
+  border-radius: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+.pay-cancel {
+  background: #f0efe9;
+  color: #444;
+}
+.pay-confirm {
+  background: var(--tpv-teal-700, #0f766e);
+  color: #fff;
+}
+.pay-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Confirmación post-venta */
+.sale-confirmation {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.conf-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.conf-change strong {
+  color: var(--tpv-teal-700, #0f766e);
+  font-size: 1.2rem;
+}
+
 .sale-layout {
   display: flex;
   gap: 1.5rem;

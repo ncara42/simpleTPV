@@ -1,4 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type { PaymentMethod } from '@simpletpv/db';
 
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
@@ -17,14 +18,41 @@ export function formatTicket(code: string, counter: number): string {
   return `T${code}-${String(counter).padStart(6, '0')}`;
 }
 
+// Redondeo a 2 decimales (céntimos) para que el cálculo coincida con la columna
+// DECIMAL(12,2) y con el total que el TPV muestra al cobrar. Sin esto, el float
+// de unitPrice*qty puede arrastrar imprecisión y divergir del cambio mostrado.
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
 export function computeTotals(lines: PricedLine[]): {
   lines: Array<PricedLine & { lineTotal: number }>;
   subtotal: number;
   total: number;
 } {
-  const priced = lines.map((l) => ({ ...l, lineTotal: l.unitPrice * l.qty }));
-  const subtotal = priced.reduce((acc, l) => acc + l.lineTotal, 0);
+  const priced = lines.map((l) => ({ ...l, lineTotal: round2(l.unitPrice * l.qty) }));
+  const subtotal = round2(priced.reduce((acc, l) => acc + l.lineTotal, 0));
   return { lines: priced, subtotal, total: subtotal };
+}
+
+/**
+ * Calcula el detalle de efectivo de una venta. Para CARD (o CASH sin importe
+ * entregado) devuelve null/null. Para CASH con importe entregado calcula el
+ * cambio (redondeado a 2 decimales) y rechaza si el efectivo es insuficiente.
+ */
+export function computeChange(
+  paymentMethod: PaymentMethod,
+  total: number,
+  cashGiven: number | undefined,
+): { cashGiven: number | null; cashChange: number | null } {
+  if (paymentMethod !== 'CASH' || cashGiven === undefined) {
+    return { cashGiven: null, cashChange: null };
+  }
+  if (cashGiven < total) {
+    throw new BadRequestException('Efectivo insuficiente');
+  }
+  const cashChange = round2(cashGiven - total);
+  return { cashGiven, cashChange };
 }
 
 @Injectable()
@@ -59,6 +87,7 @@ export class SalesService {
     });
 
     const { lines, subtotal, total } = computeTotals(priced);
+    const { cashGiven, cashChange } = computeChange(dto.paymentMethod, total, dto.cashGiven);
 
     // Usamos el cliente BASE (sin extensiones) para que withTenantTx abra UNA
     // sola transacción: el incremento del contador (tx.$queryRaw) y la creación
@@ -87,6 +116,9 @@ export class SalesService {
           ticketNumber,
           subtotal,
           total,
+          paymentMethod: dto.paymentMethod,
+          cashGiven,
+          cashChange,
           lines: {
             create: lines.map((l) => ({
               organizationId: tenant.organizationId,

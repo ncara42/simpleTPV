@@ -93,6 +93,9 @@ export interface Sale {
   ticketNumber: string;
   subtotal: string;
   total: string;
+  paymentMethod: string;
+  cashGiven: string | null;
+  cashChange: string | null;
   createdAt: string;
   lines: SaleLine[];
 }
@@ -100,4 +103,6 @@ export interface Sale {
 export interface CreateSaleInput {
   storeId: string;
   lines: Array<{ productId: string; qty: number }>;
+  paymentMethod: 'CASH' | 'CARD';
+  cashGiven?: number;
 }

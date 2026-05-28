@@ -103,25 +103,34 @@ describe('Ventas — integración', () => {
   it('crea venta + líneas atómicamente y devuelve nº de ticket', async () => {
     const sale = await tenantStorage.run({ organizationId: org1Id }, async () => {
       return service.create(
-        { storeId: store1Id, lines: [{ productId: product1Id, qty: 2 }] },
+        {
+          storeId: store1Id,
+          lines: [{ productId: product1Id, qty: 2 }],
+          paymentMethod: 'CASH',
+          cashGiven: 1000,
+        },
         user1Id,
       );
     });
     expect(sale.ticketNumber).toMatch(/^T\d{2}-\d{6}$/);
     expect(sale.lines).toHaveLength(1);
     expect(Number(sale.total)).toBeGreaterThan(0);
+    // Cobro en efectivo: persiste método y calcula el cambio (1000 - total).
+    expect(sale.paymentMethod).toBe('CASH');
+    expect(Number(sale.cashGiven)).toBe(1000);
+    expect(Number(sale.cashChange)).toBeCloseTo(1000 - Number(sale.total), 2);
   });
 
   it('numera tickets secuencialmente por tienda', async () => {
     const a = await tenantStorage.run({ organizationId: org1Id }, async () => {
       return service.create(
-        { storeId: store2Id, lines: [{ productId: product1Id, qty: 1 }] },
+        { storeId: store2Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
         user1Id,
       );
     });
     const b = await tenantStorage.run({ organizationId: org1Id }, async () => {
       return service.create(
-        { storeId: store2Id, lines: [{ productId: product1Id, qty: 1 }] },
+        { storeId: store2Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
         user1Id,
       );
     });
@@ -139,6 +148,7 @@ describe('Ventas — integración', () => {
           {
             storeId: store1Id,
             lines: [{ productId: '00000000-0000-0000-0000-000000000000', qty: 1 }],
+            paymentMethod: 'CASH',
           },
           user1Id,
         );
@@ -153,7 +163,7 @@ describe('Ventas — integración', () => {
   it('aísla por tenant: org2 no ve la venta creada por org1', async () => {
     const sale = await tenantStorage.run({ organizationId: org1Id }, async () => {
       return service.create(
-        { storeId: store1Id, lines: [{ productId: product1Id, qty: 1 }] },
+        { storeId: store1Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
         user1Id,
       );
     });
@@ -190,13 +200,13 @@ describe('Ventas — integración', () => {
 
     const a = await tenantStorage.run({ organizationId: org1Id }, async () => {
       return service.create(
-        { storeId: store2Id, lines: [{ productId: product1Id, qty: 1 }] },
+        { storeId: store2Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
         user1Id,
       );
     });
     const b = await tenantStorage.run({ organizationId: org1Id }, async () => {
       return service.create(
-        { storeId: store2Id, lines: [{ productId: product1Id, qty: 1 }] },
+        { storeId: store2Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
         user1Id,
       );
     });
