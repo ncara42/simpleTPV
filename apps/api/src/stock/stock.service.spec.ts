@@ -200,6 +200,27 @@ describe('StockService.byStore', () => {
   });
 });
 
+describe('StockService.toReorder', () => {
+  it('devuelve solo los productos que no están en verde', async () => {
+    const prisma = makeQueryPrisma([
+      { productId: 'p1', storeId: 's1', quantity: 0, minStock: 5, product: { name: 'Café' } }, // red
+      { productId: 'p2', storeId: 's1', quantity: 3, minStock: 5, product: { name: 'Té' } }, // yellow
+      { productId: 'p3', storeId: 's1', quantity: 8, minStock: 5, product: { name: 'Vape' } }, // green
+    ]);
+    const service = new StockService(
+      prisma as never,
+      new MemoryCache(),
+      {} as never,
+      new InMemoryEventBus(),
+    );
+
+    const rows = await tenantStorage.run({ organizationId: ORG }, () => service.toReorder('s1'));
+
+    expect(rows.map((r) => r.productId)).toEqual(['p1', 'p2']);
+    expect(rows.every((r) => r.level !== 'green')).toBe(true);
+  });
+});
+
 describe('StockService.global', () => {
   it('agrega por producto el stock de cada tienda y el total', async () => {
     const prisma = makeQueryPrisma([

@@ -10,7 +10,24 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import { withTenantTx } from '../prisma/with-tenant-tx.js';
-import type { CreatePurchaseOrderDto } from './purchases.dto.js';
+import type { CreatePurchaseOrderDto, SuggestPurchaseOrderDto } from './purchases.dto.js';
+
+// Cantidad sugerida a pedir (#45). Cubre el mínimo más la demanda esperada
+// durante el plazo de cobertura, descontando lo que ya hay. Nunca negativa.
+// Función pura, testeable.
+//   sugerida = max(0, minStock - stockActual + ventaMediaDiaria * diasCobertura)
+export function suggestQuantity(
+  minStock: number,
+  stockActual: number,
+  ventaMediaDiaria: number,
+  diasCobertura: number,
+): number {
+  const raw = minStock - stockActual + ventaMediaDiaria * diasCobertura;
+  return Math.max(0, Math.round(raw * 1000) / 1000);
+}
+
+const DEFAULT_DAYS_COVERAGE = 14;
+const SALES_WINDOW_DAYS = 30;
 
 @Injectable()
 export class PurchasesService {
@@ -118,5 +135,68 @@ export class PurchasesService {
         include: { lines: true },
       });
     });
+  }
+
+  /**
+   * Propuesta de pedido para una tienda (#45). Por cada producto con stock en la
+   * tienda calcula la cantidad sugerida y devuelve los datos de contexto que la
+   * explican (stock actual, mínimo, venta media 30d, rotación, cobertura). La
+   * venta media usa los movimientos SALE (salidas) de los últimos 30 días —
+   * StockMovement ya excluye las ventas anuladas porque al anular se repone el
+   * stock con un movimiento RETURN que no es SALE. RLS + organizationId explícito.
+   */
+  async suggest(dto: SuggestPurchaseOrderDto) {
+    const tenant = requireTenant();
+    const daysCoverage = dto.daysCoverage ?? DEFAULT_DAYS_COVERAGE;
+    const since = new Date(Date.now() - SALES_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+    // Stock de la tienda (cantidad y mínimo por producto).
+    const stockRows = await this.prisma.stock.findMany({
+      where: { storeId: dto.storeId, organizationId: tenant.organizationId },
+      include: { product: { select: { name: true } } },
+    });
+
+    // Ventas (movimientos SALE) de los últimos 30 días en la tienda, agrupadas
+    // por producto. quantity es negativo (salida); usamos el valor absoluto.
+    const salesMovements = await this.prisma.stockMovement.findMany({
+      where: {
+        storeId: dto.storeId,
+        organizationId: tenant.organizationId,
+        type: 'SALE',
+        createdAt: { gte: since },
+      },
+      select: { productId: true, quantity: true },
+    });
+    const soldByProduct = new Map<string, number>();
+    for (const m of salesMovements) {
+      soldByProduct.set(
+        m.productId,
+        (soldByProduct.get(m.productId) ?? 0) + Math.abs(Number(m.quantity)),
+      );
+    }
+
+    const round3 = (n: number): number => Math.round(n * 1000) / 1000;
+
+    return stockRows
+      .map((row) => {
+        const stockActual = Number(row.quantity);
+        const minStock = Number(row.minStock);
+        const sold30 = soldByProduct.get(row.productId) ?? 0;
+        const ventaMediaDiaria = round3(sold30 / SALES_WINDOW_DAYS);
+        const suggested = suggestQuantity(minStock, stockActual, ventaMediaDiaria, daysCoverage);
+        return {
+          productId: row.productId,
+          productName: row.product.name,
+          stockActual,
+          minStock,
+          ventaMedia30d: sold30,
+          ventaMediaDiaria,
+          rotacion: stockActual > 0 ? round3(ventaMediaDiaria / stockActual) : null,
+          coberturaDias: ventaMediaDiaria > 0 ? round3(stockActual / ventaMediaDiaria) : null,
+          cantidadSugerida: suggested,
+        };
+      })
+      .filter((line) => line.cantidadSugerida > 0)
+      .sort((a, b) => b.cantidadSugerida - a.cantidadSugerida);
   }
 }

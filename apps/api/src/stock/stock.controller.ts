@@ -82,6 +82,13 @@ export class StockController {
     });
   }
 
+  // Productos "para pedir" de una tienda (bajo/sin stock) — atajo para reposición (#45).
+  @Get('to-reorder')
+  @Roles('ADMIN', 'MANAGER', 'CLERK')
+  toReorder(@Query('storeId', new ParseUUIDPipe()) storeId: string) {
+    return this.stock.toReorder(storeId);
+  }
+
   // Stock de un producto en todas las tiendas del tenant.
   @Get('product/:productId')
   @Roles('ADMIN', 'MANAGER', 'CLERK')

@@ -12,6 +12,7 @@ function makeController() {
     list: vi.fn(async (_s?: string) => [{ id: ID }]),
     get: vi.fn(async (_id: string) => ({ id: ID })),
     confirm: vi.fn(async (_id: string) => ({ id: ID, status: 'CONFIRMED' })),
+    suggest: vi.fn(async (_dto: unknown) => [{ productId: 'p1', cantidadSugerida: 10 }]),
   } as unknown as PurchasesService;
   return { controller: new PurchasesController(service), service };
 }
@@ -45,5 +46,13 @@ describe('PurchasesController', () => {
     const res = (await controller.confirm(ID)) as { status: string };
     expect(service.confirm).toHaveBeenCalledWith(ID);
     expect(res.status).toBe('CONFIRMED');
+  });
+
+  it('POST /purchase-orders/suggest delega el body en suggest', async () => {
+    const { controller, service } = makeController();
+    const dto = { storeId: 't', daysCoverage: 7 };
+    const res = (await controller.suggest(dto as never)) as Array<{ cantidadSugerida: number }>;
+    expect(service.suggest).toHaveBeenCalledWith(dto);
+    expect(res[0]!.cantidadSugerida).toBe(10);
   });
 });

@@ -20,6 +20,7 @@ function makeController() {
       page: 1,
       pageSize: 50,
     })),
+    toReorder: vi.fn(async (_storeId: string) => [{ productId: PRODUCT, level: 'red' }]),
   } as unknown as StockService;
   return { controller: new StockController(service), service };
 }
@@ -97,5 +98,12 @@ describe('StockController', () => {
     expect(arg.productId).toBe(PRODUCT);
     expect(arg.from).toBeInstanceOf(Date);
     expect(arg.page).toBe(2);
+  });
+
+  it('GET /stock/to-reorder delega el storeId en toReorder', async () => {
+    const { controller, service } = makeController();
+    const res = (await controller.toReorder(STORE)) as Array<{ level: string }>;
+    expect(service.toReorder).toHaveBeenCalledWith(STORE);
+    expect(res[0]!.level).toBe('red');
   });
 });

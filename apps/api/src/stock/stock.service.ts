@@ -235,6 +235,15 @@ export class StockService {
   }
 
   /**
+   * Productos "para pedir" de una tienda (#45): los que están por debajo o en el
+   * mínimo (nivel amarillo/rojo). Atajo sobre byStore para la vista de reposición.
+   */
+  async toReorder(storeId: string) {
+    const rows = await this.byStore(storeId);
+    return rows.filter((r) => r.level !== 'green');
+  }
+
+  /**
    * Stock global agregado: por producto, su stock en cada tienda y el total del
    * tenant. Para la vista central del backoffice. RLS + organizationId explícito.
    */

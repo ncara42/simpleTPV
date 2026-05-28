@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, NotFoundException } from '@nest
 import { describe, expect, it, vi } from 'vitest';
 
 import { tenantStorage } from '../prisma/tenant-context.js';
-import { PurchasesService } from './purchases.service.js';
+import { PurchasesService, suggestQuantity } from './purchases.service.js';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const SUP = '22222222-2222-2222-2222-222222222222';
@@ -160,5 +160,87 @@ describe('PurchasesService.get', () => {
     await expect(
       tenantStorage.run({ organizationId: ORG }, () => service.get('nope')),
     ).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('suggestQuantity', () => {
+  it('cubre el déficit hasta el mínimo más la demanda de cobertura', () => {
+    // min 10, stock 4, venta 2/día, 14 días → 10-4+2*14 = 34.
+    expect(suggestQuantity(10, 4, 2, 14)).toBe(34);
+  });
+
+  it('nunca negativa: stock muy por encima del mínimo y sin ventas → 0', () => {
+    expect(suggestQuantity(5, 100, 0, 14)).toBe(0);
+  });
+
+  it('sin mínimo ni stock, solo demanda esperada', () => {
+    expect(suggestQuantity(0, 0, 1.5, 10)).toBe(15);
+  });
+
+  it('redondea a 3 decimales', () => {
+    expect(suggestQuantity(0, 0, 0.3333, 3)).toBeCloseTo(1, 3);
+  });
+});
+
+describe('PurchasesService.suggest', () => {
+  function makeSuggestPrisma(
+    stock: Array<{ productId: string; quantity: number; minStock: number; name: string }>,
+    sales: Array<{ productId: string; quantity: number }>,
+  ) {
+    return {
+      stock: {
+        findMany: vi.fn(async (_a?: unknown) =>
+          stock.map((s) => ({
+            productId: s.productId,
+            quantity: s.quantity,
+            minStock: s.minStock,
+            product: { name: s.name },
+          })),
+        ),
+      },
+      stockMovement: {
+        findMany: vi.fn(async (_a?: unknown) => sales),
+      },
+    };
+  }
+
+  it('calcula cantidad sugerida y contexto; filtra los que no necesitan pedido', async () => {
+    // p1: min 10, stock 2, vendió 60 en 30d (2/día) → 10-2+2*14=36 → se incluye.
+    // p2: min 5, stock 100, sin ventas → 0 → se excluye.
+    const prisma = makeSuggestPrisma(
+      [
+        { productId: 'p1', quantity: 2, minStock: 10, name: 'Café' },
+        { productId: 'p2', quantity: 100, minStock: 5, name: 'Té' },
+      ],
+      [
+        { productId: 'p1', quantity: -30 },
+        { productId: 'p1', quantity: -30 },
+      ],
+    );
+    const service = new PurchasesService(prisma as never, {} as never);
+
+    const rows = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.suggest({ storeId: STORE }),
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.productId).toBe('p1');
+    expect(rows[0]!.ventaMedia30d).toBe(60);
+    expect(rows[0]!.ventaMediaDiaria).toBe(2);
+    expect(rows[0]!.cantidadSugerida).toBe(36);
+    expect(rows[0]!.coberturaDias).toBe(1); // stock 2 / 2 por día
+  });
+
+  it('usa daysCoverage del dto', async () => {
+    const prisma = makeSuggestPrisma(
+      [{ productId: 'p1', quantity: 0, minStock: 0, name: 'X' }],
+      [{ productId: 'p1', quantity: -30 }],
+    );
+    const service = new PurchasesService(prisma as never, {} as never);
+    const rows = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.suggest({ storeId: STORE, daysCoverage: 7 }),
+    );
+    // venta 1/día * 7 = 7.
+    expect(rows[0]!.cantidadSugerida).toBe(7);
   });
 });
