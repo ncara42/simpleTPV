@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query, Req } from '@nestjs/common';
 
+import type { JwtPayload } from '../auth/jwt-payload.js';
 import { Roles } from '../auth/roles.decorator.js';
-import { SetMinStockDto } from './stock.dto.js';
+import { AdjustStockDto, SetMinStockDto } from './stock.dto.js';
 import { StockService } from './stock.service.js';
 
 // Consultas de stock (#28) y alertas/mínimos (#29). AuthGuard global exige
@@ -43,6 +44,21 @@ export class StockController {
   @Roles('ADMIN', 'MANAGER')
   setMin(@Body() body: SetMinStockDto) {
     return this.stock.setMin(body.productId, body.storeId, body.minStock);
+  }
+
+  // Ajuste manual de inventario: fija el stock a newQuantity con motivo (#30).
+  // Solo ADMIN/MANAGER (CLERK → 403 vía RolesGuard). El AuditInterceptor global
+  // registra el POST; el movimiento ADJUSTMENT con su reason es la trazabilidad.
+  @Post('adjust')
+  @Roles('ADMIN', 'MANAGER')
+  adjust(@Body() body: AdjustStockDto, @Req() req: { user: JwtPayload }) {
+    return this.stock.adjust({
+      productId: body.productId,
+      storeId: body.storeId,
+      newQuantity: body.newQuantity,
+      reason: body.reason,
+      userId: req.user.sub,
+    });
   }
 
   // Stock de un producto en todas las tiendas del tenant.
