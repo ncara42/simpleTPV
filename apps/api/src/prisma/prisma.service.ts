@@ -56,9 +56,9 @@ export function applyTenantExtension(client: PrismaService) {
             return query(args);
           }
           // El cliente Prisma indexa modelos por nombre lowercase de la primera letra.
-          const delegate = (tx as unknown as Record<string, Record<string, (a: unknown) => unknown>>)[
-            model.charAt(0).toLowerCase() + model.slice(1)
-          ];
+          const delegate = (
+            tx as unknown as Record<string, Record<string, (a: unknown) => unknown>>
+          )[model.charAt(0).toLowerCase() + model.slice(1)];
           if (!delegate) {
             return query(args);
           }

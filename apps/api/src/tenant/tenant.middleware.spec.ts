@@ -24,9 +24,9 @@ describe('TenantMiddleware', () => {
   });
 
   it('rechaza request sin X-Org-Id', () => {
-    expect(() =>
-      middleware.use(mockReq('/products'), res, vi.fn() as NextFunction),
-    ).toThrow(/X-Org-Id/);
+    expect(() => middleware.use(mockReq('/products'), res, vi.fn() as NextFunction)).toThrow(
+      /X-Org-Id/,
+    );
   });
 
   it('rechaza X-Org-Id que no es UUID', () => {
@@ -53,13 +53,9 @@ describe('TenantMiddleware', () => {
     const validUuid = '11111111-1111-1111-1111-111111111111';
     let observed: string | undefined;
 
-    middleware.use(
-      mockReq('/products', { 'X-Org-Id': validUuid }),
-      res,
-      (() => {
-        observed = tenantStorage.getStore()?.organizationId;
-      }) as NextFunction,
-    );
+    middleware.use(mockReq('/products', { 'X-Org-Id': validUuid }), res, (() => {
+      observed = tenantStorage.getStore()?.organizationId;
+    }) as NextFunction);
 
     expect(observed).toBe(validUuid);
   });
