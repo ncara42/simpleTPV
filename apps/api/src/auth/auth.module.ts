@@ -32,6 +32,9 @@ function authConfig(): AuthConfig {
     },
     AuthGuard,
   ],
-  exports: [AuthService, AuthGuard],
+  // Exportamos JwtModule y el token de config para que módulos que importen
+  // AuthModule (p.ej. ProductsModule con @UseGuards(AuthGuard)) puedan resolver
+  // las dependencias del guard al reinstanciarlo en su propio contexto.
+  exports: [AuthService, AuthGuard, AUTH_GUARD_CONFIG, JwtModule],
 })
 export class AuthModule {}

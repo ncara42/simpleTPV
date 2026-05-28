@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UnauthorizedException } from '@nestjs/common';
 
-import { AuthGuard } from './auth.guard.js';
 import { AuthService } from './auth.service.js';
 import type { JwtPayload } from './jwt-payload.js';
+import { Public } from './public.decorator.js';
 
 interface LoginDto {
   email: string;
@@ -18,6 +18,7 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('login')
+  @Public()
   async login(@Body() dto: LoginDto): Promise<{ accessToken: string; refreshToken: string }> {
     const user = await this.auth.validateUser(dto.email, dto.password);
     if (!user) {
@@ -27,12 +28,13 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Public()
   async refresh(@Body() dto: RefreshDto): Promise<{ accessToken: string }> {
     return this.auth.refresh(dto.refreshToken);
   }
 
+  // Protegida por el AuthGuard global (no @Public).
   @Get('me')
-  @UseGuards(AuthGuard)
   me(@Req() req: { user: JwtPayload }): JwtPayload {
     return req.user;
   }

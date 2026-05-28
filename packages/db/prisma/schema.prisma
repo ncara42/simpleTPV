@@ -64,8 +64,17 @@ model UserStore {
 model Product {
   id             String   @id @default(uuid()) @db.Uuid
   organizationId String   @db.Uuid
+  familyId       String?  @db.Uuid
   name           String
+  description    String?
+  barcode        String?
+  sku            String?
+  saleUnit       SaleUnit @default(UNIT)
+  unitSymbol     String   @default("ud")
   salePrice      Decimal  @db.Decimal(10, 4)
+  costPrice      Decimal  @default(0) @db.Decimal(10, 4)
+  taxRate        Decimal  @default(21) @db.Decimal(5, 2)
+  imageUrl       String?
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -73,6 +82,14 @@ model Product {
   organization Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId, active])
+  @@index([organizationId, barcode])
+}
+
+enum SaleUnit {
+  UNIT
+  WEIGHT
+  VOLUME
+  LENGTH
 }
 
 enum UserRole {
