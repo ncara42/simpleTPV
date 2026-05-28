@@ -357,3 +357,76 @@ export interface AppEvent {
   type: AppEventType;
   data: Record<string, unknown>;
 }
+
+// Compras / proveedores (semana 4).
+export interface Supplier {
+  id: string;
+  name: string;
+  nif: string | null;
+  email: string | null;
+  phone: string | null;
+  leadTimeDays: number;
+  active: boolean;
+}
+
+export interface SupplierInput {
+  name: string;
+  nif?: string;
+  email?: string;
+  phone?: string;
+  leadTimeDays?: number;
+}
+
+export type PurchaseOrderStatus = 'DRAFT' | 'CONFIRMED' | 'PARTIALLY_RECEIVED' | 'RECEIVED';
+
+export interface PurchaseOrderLine {
+  id: string;
+  productId: string;
+  quantityOrdered: string;
+  quantityReceived: string;
+  unitCost: string | null;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  supplierId: string;
+  storeId: string;
+  status: PurchaseOrderStatus;
+  notes: string | null;
+  createdAt: string;
+  confirmedAt: string | null;
+  receivedAt: string | null;
+  lines: PurchaseOrderLine[];
+  supplier?: { name: string; leadTimeDays?: number } | Supplier;
+  kpis?: { leadTimeDays: number | null; fillRate: number | null };
+}
+
+export interface CreatePurchaseOrderInput {
+  supplierId: string;
+  storeId: string;
+  notes?: string;
+  lines: Array<{ productId: string; quantityOrdered: number; unitCost?: number }>;
+}
+
+export interface ReceivePurchaseOrderInput {
+  lines: Array<{ lineId: string; quantityReceived: number }>;
+}
+
+export interface SuggestPurchaseInput {
+  storeId: string;
+  supplierId?: string;
+  daysCoverage?: number;
+}
+
+// Línea de la propuesta de pedido con datos de contexto (#45).
+export interface SuggestionRow {
+  productId: string;
+  productName: string;
+  stockActual: number;
+  minStock: number;
+  ventaMedia30d: number;
+  ventaMediaDiaria: number;
+  rotacion: number | null;
+  coberturaDias: number | null;
+  cantidadSugerida: number;
+}
