@@ -1,10 +1,11 @@
-import { ApiError, type Sale } from '@simpletpv/auth';
+import { ApiError, type SaleTicket } from '@simpletpv/auth';
 import { useState } from 'react';
 
 import { DiscountModal } from './DiscountModal.js';
 import { useCart } from './lib/cart.js';
-import { createSale } from './lib/sales.js';
+import { createSale, getTicket } from './lib/sales.js';
 import { type PaymentData, PaymentModal } from './PaymentModal.js';
+import { TicketView } from './TicketView.js';
 
 export function CartPanel({ storeId }: { storeId: string | null }) {
   const items = useCart((s) => s.items);
@@ -23,7 +24,11 @@ export function CartPanel({ storeId }: { storeId: string | null }) {
   const [busy, setBusy] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [discountOpen, setDiscountOpen] = useState(false);
-  const [confirmed, setConfirmed] = useState<Sale | null>(null);
+  // Tras cobrar pasamos a la pantalla de confirmación; mientras pedimos el
+  // ticket al servidor mostramos un estado de carga, y luego el ticket-resumen.
+  const [confirmed, setConfirmed] = useState(false);
+  const [ticket, setTicket] = useState<SaleTicket | null>(null);
+  const [ticketError, setTicketError] = useState<string | null>(null);
 
   function openCheckout() {
     if (!storeId || items.length === 0) return;
@@ -49,7 +54,14 @@ export function CartPanel({ storeId }: { storeId: string | null }) {
         ...(ticketDiscountAmt === 0 && ticketDiscountPct > 0 ? { ticketDiscountPct } : {}),
       });
       setModalOpen(false);
-      setConfirmed(sale);
+      setConfirmed(true);
+      // Pedimos el ticket-resumen completo (con IVA desglosado) por su id.
+      try {
+        const t = await getTicket(sale.id);
+        setTicket(t);
+      } catch {
+        setTicketError('No se pudo cargar el ticket. La venta se registró correctamente.');
+      }
     } catch (e) {
       // Error → mensaje, sin limpiar el carrito ni cerrar (el operario reintenta).
       // Un 403 es el límite de descuento por rol: mostramos el mensaje del servidor.
@@ -66,34 +78,28 @@ export function CartPanel({ storeId }: { storeId: string | null }) {
 
   function newSale() {
     clear();
-    setConfirmed(null);
+    setConfirmed(false);
+    setTicket(null);
+    setTicketError(null);
     setError(null);
   }
 
-  // Pantalla de confirmación post-venta: resumen + "Nueva venta".
+  // Pantalla de confirmación post-venta: ticket-resumen + "Nueva venta".
   if (confirmed) {
-    const isCash = confirmed.paymentMethod === 'CASH';
     return (
       <aside className="cart" data-testid="cart">
         <div className="sale-confirmation" data-testid="sale-confirmation">
           <h2 className="cart-title">Venta confirmada</h2>
-          <div className="conf-row">
-            <span>Ticket</span>
-            <strong data-testid="conf-ticket">{confirmed.ticketNumber}</strong>
-          </div>
-          <div className="conf-row">
-            <span>Total</span>
-            <strong data-testid="conf-total">{Number(confirmed.total).toFixed(2)} €</strong>
-          </div>
-          <div className="conf-row">
-            <span>Método</span>
-            <strong data-testid="conf-method">{isCash ? 'Efectivo' : 'Tarjeta'}</strong>
-          </div>
-          {isCash && confirmed.cashChange !== null && (
-            <div className="conf-row conf-change">
-              <span>Cambio</span>
-              <strong data-testid="conf-change">{Number(confirmed.cashChange).toFixed(2)} €</strong>
-            </div>
+          {ticket ? (
+            <TicketView ticket={ticket} />
+          ) : ticketError ? (
+            <p className="cart-msg" data-testid="ticket-error">
+              {ticketError}
+            </p>
+          ) : (
+            <p className="cart-msg" data-testid="ticket-loading">
+              Cargando ticket…
+            </p>
           )}
           <button className="cart-create" onClick={newSale} data-testid="new-sale">
             Nueva venta

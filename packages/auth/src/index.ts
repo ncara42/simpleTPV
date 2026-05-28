@@ -8,8 +8,11 @@ export type {
   ProductInput,
   Sale,
   SaleLine,
+  SaleTicket,
   Store,
   StoreInput,
+  TaxBreakdownRow,
+  TicketLine,
   User,
   UserRole,
 } from './api-types.js';

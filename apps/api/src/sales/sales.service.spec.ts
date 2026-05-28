@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   assertDiscountWithinRoleLimit,
+  buildTaxBreakdown,
   computeChange,
   computeTotals,
   formatTicket,
@@ -113,6 +114,92 @@ describe('assertDiscountWithinRoleLimit', () => {
 
   it('grossTotal 0 no divide por cero ni lanza', () => {
     expect(() => assertDiscountWithinRoleLimit('CLERK', 0, 0)).not.toThrow();
+  });
+});
+
+describe('buildTaxBreakdown', () => {
+  it('un tipo de IVA: base + cuota = neto', () => {
+    // Precio IVA incluido: 121 al 21% → base 100, cuota 21.
+    const r = buildTaxBreakdown([{ taxRate: 21, lineTotal: 121 }]);
+    expect(r).toHaveLength(1);
+    expect(r[0]!.taxRate).toBe(21);
+    expect(r[0]!.base).toBeCloseTo(100, 2);
+    expect(r[0]!.cuota).toBeCloseTo(21, 2);
+    expect(r[0]!.base + r[0]!.cuota).toBeCloseTo(121, 2);
+  });
+
+  it('agrupa por tipo y suma los netos del grupo', () => {
+    const r = buildTaxBreakdown([
+      { taxRate: 21, lineTotal: 121 },
+      { taxRate: 21, lineTotal: 60.5 },
+      { taxRate: 10, lineTotal: 110 },
+    ]);
+    expect(r).toHaveLength(2);
+    // Orden ascendente por taxRate.
+    expect(r[0]!.taxRate).toBe(10);
+    expect(r[1]!.taxRate).toBe(21);
+    // Grupo 10%: neto 110 → base 100, cuota 10.
+    expect(r[0]!.base).toBeCloseTo(100, 2);
+    expect(r[0]!.cuota).toBeCloseTo(10, 2);
+    // Grupo 21%: neto 181.5 → base 150, cuota 31.5.
+    expect(r[1]!.base).toBeCloseTo(150, 2);
+    expect(r[1]!.cuota).toBeCloseTo(31.5, 2);
+  });
+
+  it('IVA 0% deja toda la base sin cuota', () => {
+    const r = buildTaxBreakdown([{ taxRate: 0, lineTotal: 50 }]);
+    expect(r[0]!.base).toBeCloseTo(50, 2);
+    expect(r[0]!.cuota).toBeCloseTo(0, 2);
+  });
+
+  it('sin descuento de ticket: Σ(base+cuota) = subtotal = total', () => {
+    const lines = [
+      { taxRate: 21, lineTotal: 121 },
+      { taxRate: 10, lineTotal: 110 },
+    ];
+    const r = buildTaxBreakdown(lines, 0);
+    const sum = r.reduce((acc, t) => acc + t.base + t.cuota, 0);
+    expect(sum).toBeCloseTo(231, 2);
+  });
+
+  it('con descuento de ticket: prorratea y Σ(base+cuota) = total', () => {
+    // Subtotal 231 (121 al 21% + 110 al 10%). Descuento de ticket 23.1 (10%).
+    // total = 207.9. El desglose debe sumar 207.9, no 231.
+    const lines = [
+      { taxRate: 21, lineTotal: 121 },
+      { taxRate: 10, lineTotal: 110 },
+    ];
+    const ticketDiscount = 23.1;
+    const r = buildTaxBreakdown(lines, ticketDiscount);
+    const sum = r.reduce((acc, t) => acc + t.base + t.cuota, 0);
+    expect(sum).toBeCloseTo(231 - ticketDiscount, 2);
+    // Cada grupo mantiene su proporción: el neto ajustado conserva el reparto.
+    // Grupo 21%: neto 121 → prorrateo 121*23.1/231 = 12.1 → netoAjustado 108.9.
+    // Grupo 10%: neto 110 → prorrateo 11 → netoAjustado 99.
+    const g21 = r.find((t) => t.taxRate === 21)!;
+    const g10 = r.find((t) => t.taxRate === 10)!;
+    expect(g21.base + g21.cuota).toBeCloseTo(108.9, 2);
+    expect(g10.base + g10.cuota).toBeCloseTo(99, 2);
+    // Y dentro de cada grupo base/cuota siguen el tipo.
+    expect(g21.base).toBeCloseTo(90, 2);
+    expect(g21.cuota).toBeCloseTo(18.9, 2);
+    expect(g10.base).toBeCloseTo(90, 2);
+    expect(g10.cuota).toBeCloseTo(9, 2);
+  });
+
+  it('descuento de ticket con redondeo: Σ cuadra al céntimo ajustando el último grupo', () => {
+    // Netos que provocan prorrateos no exactos; el ajuste del último grupo evita
+    // descuadres de 1 céntimo.
+    const lines = [
+      { taxRate: 21, lineTotal: 33.33 },
+      { taxRate: 10, lineTotal: 33.33 },
+      { taxRate: 4, lineTotal: 33.34 },
+    ];
+    const subtotal = 100;
+    const ticketDiscount = 7.77;
+    const r = buildTaxBreakdown(lines, ticketDiscount);
+    const sum = r.reduce((acc, t) => acc + t.base + t.cuota, 0);
+    expect(sum).toBeCloseTo(subtotal - ticketDiscount, 2);
   });
 });
 
