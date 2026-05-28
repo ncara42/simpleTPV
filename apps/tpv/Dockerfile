@@ -23,8 +23,9 @@ FROM deps AS builder
 COPY . .
 RUN pnpm --filter @simpletpv/tpv run build
 
-FROM nginx:1.27-alpine AS runner
+# Imagen unprivileged: corre como usuario `nginx` (no root) y escucha en 8080.
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS runner
 ENV API_URL=http://simpletpv-api:3001
 COPY --from=builder /repo/apps/tpv/dist /usr/share/nginx/html
 COPY apps/tpv/nginx.conf.template /etc/nginx/templates/default.conf.template
-EXPOSE 80
+EXPOSE 8080

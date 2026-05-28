@@ -36,5 +36,7 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /repo/apps/api/dist ./dist
 COPY --from=builder /repo/packages/db/generated ./node_modules/@simpletpv/db/generated
+# Corre como el usuario `node` (no root) que ya trae la imagen oficial.
+USER node
 EXPOSE 3001
 CMD ["node", "dist/main.js"]
