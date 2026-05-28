@@ -1,4 +1,5 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@simpletpv/db';
 
 import { getCurrentTenant } from './tenant-context.js';
@@ -12,8 +13,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         'DATABASE_URL_APP o DATABASE_URL debe estar definida para arrancar PrismaService',
       );
     }
+    // Prisma 7 ya no acepta datasources.db.url en el constructor — usa adapter.
+    const adapter = new PrismaPg({ connectionString: url });
     super({
-      datasources: { db: { url } },
+      adapter,
       log: ['warn', 'error'],
     });
   }

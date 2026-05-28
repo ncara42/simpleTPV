@@ -26,3 +26,7 @@ peerDependencyRules:
 # para el CVE GHSA-67mh-4wv8-2f99 que OSV detectó como transitivo).
 overrides:
   esbuild: ~0.25.0
+
+allowBuilds:
+  '@prisma/engines': set this to true or false
+  prisma: set this to true or false

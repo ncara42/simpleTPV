@@ -1,12 +1,23 @@
 // Seed idempotente: 2 organizaciones, 2 stores cada una, 3 users por org,
 // 5 products por org. Usa upsert para que correr 2 veces no duplique.
 // Corre asumiendo conexión como superuser (DATABASE_URL del .env).
+//
+// Prisma 7 ya no acepta url en schema.prisma — pasamos adapter explícito
+// con la URL del entorno.
 
+import 'dotenv/config';
+
+import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcryptjs';
 
 import { PrismaClient, UserRole } from '../generated/client/index.js';
 
-const prisma = new PrismaClient();
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL no definido — necesario para seed');
+}
+const adapter = new PrismaPg({ connectionString: databaseUrl });
+const prisma = new PrismaClient({ adapter });
 
 interface OrgSeed {
   nif: string;

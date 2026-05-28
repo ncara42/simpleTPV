@@ -29,7 +29,8 @@ describe('RLS aislamiento multi-tenant', () => {
       throw new Error('DATABASE_URL (superuser) requerido para descubrir IDs en setup.');
     }
     const { PrismaClient: AdminClient } = await import('@simpletpv/db');
-    const admin = new AdminClient({ datasources: { db: { url: adminUrl } } });
+    const { PrismaPg } = await import('@prisma/adapter-pg');
+    const admin = new AdminClient({ adapter: new PrismaPg({ connectionString: adminUrl }) });
     try {
       const found1 = await admin.$queryRaw<Array<{ id: string }>>`
         SELECT id::text FROM "Organization" WHERE nif = 'B11111111'
