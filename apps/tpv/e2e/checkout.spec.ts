@@ -42,11 +42,13 @@ test('cobro en efectivo: del carrito a la confirmación con cambio', async ({ pa
   // Confirmar el cobro.
   await page.getByTestId('pay-confirm').click();
 
-  // Pantalla de confirmación con el nº de ticket.
+  // Pantalla de confirmación con el ticket-resumen (se pide al servidor tras
+  // cobrar, así que esperamos a que aparezca el TicketView).
   await expect(page.getByTestId('sale-confirmation')).toBeVisible({ timeout: 10000 });
-  await expect(page.getByTestId('conf-ticket')).toContainText(/^T\d{2}-\d{6}$/);
-  await expect(page.getByTestId('conf-method')).toContainText('Efectivo');
-  await expect(page.getByTestId('conf-change')).toBeVisible();
+  await expect(page.getByTestId('ticket-view')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByTestId('ticket-number')).toContainText(/^T\d{2}-\d{6}$/);
+  await expect(page.getByTestId('ticket-method')).toContainText('Efectivo');
+  await expect(page.getByTestId('ticket-change')).toBeVisible();
 
   // "Nueva venta" limpia el carrito y vuelve al estado inicial.
   await page.getByTestId('new-sale').click();
