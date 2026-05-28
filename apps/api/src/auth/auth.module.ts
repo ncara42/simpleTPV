@@ -6,10 +6,18 @@ import { AUTH_GUARD_CONFIG, AuthGuard, type AuthGuardConfig } from './auth.guard
 import { type AuthConfig, AuthService } from './auth.service.js';
 import { AuthLookupService } from './auth-lookup.service.js';
 
+function requireSecret(name: 'JWT_SECRET' | 'JWT_REFRESH_SECRET'): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} es obligatoria: no hay valor por defecto para el secreto JWT`);
+  }
+  return value;
+}
+
 function authConfig(): AuthConfig {
   return {
-    accessSecret: process.env.JWT_SECRET ?? 'dev-access-secret-change-me',
-    refreshSecret: process.env.JWT_REFRESH_SECRET ?? 'dev-refresh-secret-change-me',
+    accessSecret: requireSecret('JWT_SECRET'),
+    refreshSecret: requireSecret('JWT_REFRESH_SECRET'),
     accessTtl: (process.env.JWT_ACCESS_TTL ?? '15m') as AuthConfig['accessTtl'],
     refreshTtl: (process.env.JWT_REFRESH_TTL ?? '7d') as AuthConfig['refreshTtl'],
   };
