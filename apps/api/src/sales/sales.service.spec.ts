@@ -292,10 +292,16 @@ function makePrisma() {
     },
     // Stock: usado por applyMovement dentro de la tx (venta y voidSale).
     stock: {
-      upsert: vi.fn(async (_a?: unknown): Promise<unknown> => ({ quantity: 0 })),
+      upsert: vi.fn(async (_a?: unknown): Promise<unknown> => ({ quantity: 0, minStock: 0 })),
     },
     stockMovement: {
       create: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'mov-1' })),
+    },
+    // applyMovement reevalúa la alerta de stock (#29).
+    stockAlert: {
+      findFirst: vi.fn(async (_a?: unknown): Promise<unknown> => null),
+      create: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'alert-1' })),
+      update: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'alert-1' })),
     },
     // voidSale corre dentro de withTenantTx → el tx hace SELECT set_config.
     $executeRaw: vi.fn(async (): Promise<number> => 1),
@@ -312,7 +318,7 @@ function makeService(prisma: ReturnType<typeof makePrisma>, base?: unknown) {
   return new SalesService(
     prisma as never,
     resolvedBase as never,
-    new StockService({} as never, new MemoryCache()),
+    new StockService({} as never, new MemoryCache(), {} as never),
   );
 }
 
@@ -528,12 +534,18 @@ describe('SalesService.create', () => {
           ...data,
         })),
       },
-      // applyMovement (tras sale.create) hace upsert de Stock + create de movimiento.
+      // applyMovement (tras sale.create) hace upsert de Stock + create de movimiento
+      // + reevaluación de alerta (#29).
       stock: {
-        upsert: vi.fn(async () => ({ quantity: 98 })),
+        upsert: vi.fn(async () => ({ quantity: 98, minStock: 0 })),
       },
       stockMovement: {
         create: vi.fn(async () => ({ id: 'mov-1' })),
+      },
+      stockAlert: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async () => ({ id: 'alert-1' })),
+        update: vi.fn(async () => ({ id: 'alert-1' })),
       },
     };
     return {

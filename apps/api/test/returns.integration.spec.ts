@@ -34,7 +34,7 @@ describe('Devoluciones — integración', () => {
     base = new PrismaService();
     await base.onModuleInit();
     prisma = applyTenantExtension(base);
-    const stock = new StockService(prisma as unknown as PrismaService, new MemoryCache());
+    const stock = new StockService(prisma as unknown as PrismaService, new MemoryCache(), base);
     sales = new SalesService(prisma as unknown as PrismaService, base, stock);
     returns = new ReturnsService(prisma as unknown as PrismaService, base, stock);
 

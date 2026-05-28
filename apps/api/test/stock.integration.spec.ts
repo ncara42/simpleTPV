@@ -55,7 +55,7 @@ describe('Stock — integración', () => {
     await base.onModuleInit();
     prisma = applyTenantExtension(base);
     cache = new MemoryCache();
-    stockService = new StockService(prisma as unknown as PrismaService, cache);
+    stockService = new StockService(prisma as unknown as PrismaService, cache, base);
     sales = new SalesService(prisma as unknown as PrismaService, base, stockService);
     returns = new ReturnsService(prisma as unknown as PrismaService, base, stockService);
 

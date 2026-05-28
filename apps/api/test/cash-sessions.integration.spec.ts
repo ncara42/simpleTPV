@@ -43,7 +43,7 @@ describe('Sesiones de caja — integración', () => {
     sales = new SalesService(
       prisma as unknown as PrismaService,
       base,
-      new StockService(prisma as unknown as PrismaService, new MemoryCache()),
+      new StockService(prisma as unknown as PrismaService, new MemoryCache(), base),
     );
 
     const adminUrl = process.env.DATABASE_URL;

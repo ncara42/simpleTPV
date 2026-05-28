@@ -2,19 +2,25 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { MemoryCache } from '../cache/memory-cache.js';
 import { tenantStorage } from '../prisma/tenant-context.js';
-import { stockCacheKey, stockLevel, StockService } from './stock.service.js';
+import { alertTypeFor, stockCacheKey, stockLevel, StockService } from './stock.service.js';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 
 // Mock del cliente transaccional (lo que applyMovement recibe como `tx`). Solo
 // declaramos stock.upsert y stockMovement.create, que es lo que toca.
-function makeTx(resultingQuantity = 0) {
+function makeTx(resultingQuantity = 0, minStock = 0) {
   return {
     stock: {
-      upsert: vi.fn(async (_a?: unknown) => ({ quantity: resultingQuantity })),
+      upsert: vi.fn(async (_a?: unknown) => ({ quantity: resultingQuantity, minStock })),
     },
     stockMovement: {
       create: vi.fn(async (_a?: unknown) => ({ id: 'mov-1' })),
+    },
+    // applyMovement reevalúa la alerta tras el movimiento (#29).
+    stockAlert: {
+      findFirst: vi.fn(async () => null),
+      create: vi.fn(async (_a?: unknown) => ({ id: 'alert-1' })),
+      update: vi.fn(async (_a?: unknown) => ({ id: 'alert-1' })),
     },
   };
 }
@@ -22,7 +28,7 @@ function makeTx(resultingQuantity = 0) {
 describe('StockService.applyMovement', () => {
   it('salida (venta): upsert con increment negativo + movimiento SALE', async () => {
     const tx = makeTx(98);
-    const service = new StockService({} as never, new MemoryCache());
+    const service = new StockService({} as never, new MemoryCache(), {} as never);
 
     const result = await service.applyMovement(tx as never, {
       organizationId: ORG,
@@ -60,7 +66,7 @@ describe('StockService.applyMovement', () => {
 
   it('entrada (reposición): increment positivo + movimiento RETURN', async () => {
     const tx = makeTx(102);
-    const service = new StockService({} as never, new MemoryCache());
+    const service = new StockService({} as never, new MemoryCache(), {} as never);
 
     await service.applyMovement(tx as never, {
       organizationId: ORG,
@@ -87,7 +93,7 @@ describe('StockService.applyMovement', () => {
 
   it('ajuste con motivo: pasa reason al movimiento ADJUSTMENT', async () => {
     const tx = makeTx(50);
-    const service = new StockService({} as never, new MemoryCache());
+    const service = new StockService({} as never, new MemoryCache(), {} as never);
 
     await service.applyMovement(tx as never, {
       organizationId: ORG,
@@ -108,7 +114,7 @@ describe('StockService.applyMovement', () => {
   it('escribe la cantidad resultante en el cache tras el movimiento', async () => {
     const tx = makeTx(98);
     const cache = new MemoryCache();
-    const service = new StockService({} as never, cache);
+    const service = new StockService({} as never, cache, {} as never);
 
     await service.applyMovement(tx as never, {
       organizationId: ORG,
@@ -159,7 +165,7 @@ describe('StockService.byStore', () => {
       { productId: 'p1', storeId: 's1', quantity: 0, minStock: 5, product: { name: 'Café' } },
       { productId: 'p2', storeId: 's1', quantity: 8, minStock: 5, product: { name: 'Té' } },
     ]);
-    const service = new StockService(prisma as never, new MemoryCache());
+    const service = new StockService(prisma as never, new MemoryCache(), {} as never);
 
     const rows = await tenantStorage.run({ organizationId: ORG }, () => service.byStore('s1'));
 
@@ -193,7 +199,7 @@ describe('StockService.global', () => {
         store: { name: 'Sur' },
       },
     ]);
-    const service = new StockService(prisma as never, new MemoryCache());
+    const service = new StockService(prisma as never, new MemoryCache(), {} as never);
 
     const rows = await tenantStorage.run({ organizationId: ORG }, () => service.global());
 
@@ -211,7 +217,7 @@ describe('StockService.byProduct (cache)', () => {
     ]);
     const cache = new MemoryCache();
     await cache.set(stockCacheKey(ORG, 's1', 'p1'), '777');
-    const service = new StockService(prisma as never, cache);
+    const service = new StockService(prisma as never, cache, {} as never);
 
     const rows = await tenantStorage.run({ organizationId: ORG }, () => service.byProduct('p1'));
     expect(rows[0]!.quantity).toBe(777);
@@ -222,7 +228,7 @@ describe('StockService.byProduct (cache)', () => {
       { productId: 'p1', storeId: 's1', quantity: 10, minStock: 5, store: { name: 'Centro' } },
     ]);
     const cache = new MemoryCache();
-    const service = new StockService(prisma as never, cache);
+    const service = new StockService(prisma as never, cache, {} as never);
 
     const rows = await tenantStorage.run({ organizationId: ORG }, () => service.byProduct('p1'));
     expect(rows[0]!.quantity).toBe(10);
@@ -236,9 +242,148 @@ describe('StockService.byProduct (cache)', () => {
     ]);
     const cache = new MemoryCache();
     await cache.set(stockCacheKey(ORG, 's1', 'p1'), 'no-es-un-número');
-    const service = new StockService(prisma as never, cache);
+    const service = new StockService(prisma as never, cache, {} as never);
 
     const rows = await tenantStorage.run({ organizationId: ORG }, () => service.byProduct('p1'));
     expect(rows[0]!.quantity).toBe(10);
+  });
+});
+
+describe('alertTypeFor', () => {
+  it('OUT_OF_STOCK si quantity <= 0', () => {
+    expect(alertTypeFor(0, 5)).toBe('OUT_OF_STOCK');
+    expect(alertTypeFor(-2, 5)).toBe('OUT_OF_STOCK');
+  });
+
+  it('LOW_STOCK si 0 < quantity <= minStock', () => {
+    expect(alertTypeFor(5, 5)).toBe('LOW_STOCK');
+    expect(alertTypeFor(1, 5)).toBe('LOW_STOCK');
+  });
+
+  it('null si quantity > minStock', () => {
+    expect(alertTypeFor(6, 5)).toBeNull();
+  });
+});
+
+// Mock de un tx con stockAlert para reevaluateAlert. `active` = alerta activa
+// existente (o null). Registra las llamadas a create/update.
+function makeAlertTx(active: { id: string; alertType: string } | null = null) {
+  return {
+    stockAlert: {
+      findFirst: vi.fn(async () => active),
+      create: vi.fn(async (_a?: unknown) => ({ id: 'new-alert' })),
+      update: vi.fn(async (_a?: unknown) => ({ id: active?.id ?? 'x' })),
+    },
+  };
+}
+
+describe('StockService.reevaluateAlert', () => {
+  const service = new StockService({} as never, new MemoryCache(), {} as never);
+
+  it('crea alerta OUT_OF_STOCK si no había y el stock se agotó', async () => {
+    const tx = makeAlertTx(null);
+    await service.reevaluateAlert(tx as never, ORG, 'p1', 's1', 0, 5);
+    expect(tx.stockAlert.create).toHaveBeenCalledOnce();
+    const arg = tx.stockAlert.create.mock.calls[0]![0] as { data: { alertType: string } };
+    expect(arg.data.alertType).toBe('OUT_OF_STOCK');
+  });
+
+  it('resuelve la alerta activa si el stock vuelve por encima del mínimo', async () => {
+    const tx = makeAlertTx({ id: 'a1', alertType: 'LOW_STOCK' });
+    await service.reevaluateAlert(tx as never, ORG, 'p1', 's1', 10, 5);
+    const arg = tx.stockAlert.update.mock.calls[0]![0] as { data: { resolved: boolean } };
+    expect(arg.data.resolved).toBe(true);
+    expect(tx.stockAlert.create).not.toHaveBeenCalled();
+  });
+
+  it('actualiza el tipo si la alerta activa cambia (LOW_STOCK → OUT_OF_STOCK)', async () => {
+    const tx = makeAlertTx({ id: 'a1', alertType: 'LOW_STOCK' });
+    await service.reevaluateAlert(tx as never, ORG, 'p1', 's1', 0, 5);
+    const arg = tx.stockAlert.update.mock.calls[0]![0] as { data: { alertType: string } };
+    expect(arg.data.alertType).toBe('OUT_OF_STOCK');
+    expect(tx.stockAlert.create).not.toHaveBeenCalled();
+  });
+
+  it('no-op si ya hay una alerta del mismo tipo (no duplica ni actualiza)', async () => {
+    const tx = makeAlertTx({ id: 'a1', alertType: 'LOW_STOCK' });
+    await service.reevaluateAlert(tx as never, ORG, 'p1', 's1', 3, 5);
+    expect(tx.stockAlert.create).not.toHaveBeenCalled();
+    expect(tx.stockAlert.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('StockService.alerts', () => {
+  it('ordena por urgencia (OUT_OF_STOCK antes) y luego por antigüedad', async () => {
+    const prisma = {
+      stockAlert: {
+        findMany: vi.fn(async () => [
+          {
+            id: 'a1',
+            productId: 'p1',
+            storeId: 's1',
+            alertType: 'LOW_STOCK',
+            resolved: false,
+            createdAt: new Date('2026-05-28T08:00:00Z'),
+            product: { name: 'Café' },
+            store: { name: 'Centro' },
+          },
+          {
+            id: 'a2',
+            productId: 'p2',
+            storeId: 's1',
+            alertType: 'OUT_OF_STOCK',
+            resolved: false,
+            createdAt: new Date('2026-05-28T09:00:00Z'),
+            product: { name: 'Té' },
+            store: { name: 'Centro' },
+          },
+          {
+            id: 'a3',
+            productId: 'p3',
+            storeId: 's1',
+            alertType: 'OUT_OF_STOCK',
+            resolved: false,
+            createdAt: new Date('2026-05-28T07:00:00Z'),
+            product: { name: 'Vape' },
+            store: { name: 'Centro' },
+          },
+        ]),
+      },
+    };
+    const service = new StockService(prisma as never, new MemoryCache(), {} as never);
+
+    const rows = await tenantStorage.run({ organizationId: ORG }, () => service.alerts({}));
+
+    // OUT_OF_STOCK primero (a3 más antigua, luego a2), después LOW_STOCK (a1).
+    expect(rows.map((r) => r.id)).toEqual(['a3', 'a2', 'a1']);
+  });
+});
+
+describe('StockService.setMin', () => {
+  it('actualiza el mínimo y reevalúa la alerta en una tx', async () => {
+    const tx = {
+      stock: {
+        upsert: vi.fn(async () => ({ quantity: 2, minStock: 5 })),
+      },
+      stockAlert: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async (_a?: unknown) => ({ id: 'new-alert' })),
+        update: vi.fn(async () => ({})),
+      },
+      $executeRaw: vi.fn(async () => 1),
+    };
+    const base = {
+      $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
+    };
+    const service = new StockService({} as never, new MemoryCache(), base as never);
+
+    const res = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.setMin('p1', 's1', 5),
+    );
+
+    // Subir el mínimo a 5 con quantity 2 → dispara LOW_STOCK.
+    expect(tx.stockAlert.create).toHaveBeenCalledOnce();
+    expect(res.minStock).toBe(5);
+    expect(res.level).toBe('yellow');
   });
 });
