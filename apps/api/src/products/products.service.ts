@@ -35,19 +35,20 @@ export class ProductsService {
     });
   }
 
-  async findAll(search?: string): Promise<unknown[]> {
-    const where =
-      search && search.trim()
-        ? {
-            OR: [
-              { name: { contains: search, mode: 'insensitive' as const } },
-              { sku: { contains: search, mode: 'insensitive' as const } },
-              { barcode: { contains: search, mode: 'insensitive' as const } },
-            ],
-          }
-        : undefined;
+  async findAll(search?: string, familyId?: string): Promise<unknown[]> {
+    const where: Record<string, unknown> = {};
+    if (search && search.trim()) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' as const } },
+        { sku: { contains: search, mode: 'insensitive' as const } },
+        { barcode: { contains: search, mode: 'insensitive' as const } },
+      ];
+    }
+    if (familyId) {
+      where.familyId = familyId;
+    }
     return this.prisma.product.findMany({
-      ...(where ? { where } : {}),
+      ...(Object.keys(where).length ? { where } : {}),
       orderBy: { name: 'asc' },
     });
   }

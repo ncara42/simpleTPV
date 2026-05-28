@@ -53,6 +53,25 @@ describe('ProductsService.findAll', () => {
     expect(fields).toEqual(expect.arrayContaining(['name', 'sku', 'barcode']));
     expect(arg.where.OR[0]!.name).toEqual({ contains: 'caf', mode: 'insensitive' });
   });
+
+  it('con familyId filtra por familia', async () => {
+    const prisma = makePrisma();
+    const service = new ProductsService(prisma as never);
+    await service.findAll(undefined, 'fam-1');
+    const arg = prisma.product.findMany.mock.calls[0]![0] as { where: { familyId: string } };
+    expect(arg.where.familyId).toBe('fam-1');
+  });
+
+  it('combina search y familyId', async () => {
+    const prisma = makePrisma();
+    const service = new ProductsService(prisma as never);
+    await service.findAll('caf', 'fam-1');
+    const arg = prisma.product.findMany.mock.calls[0]![0] as {
+      where: { familyId: string; OR: unknown[] };
+    };
+    expect(arg.where.familyId).toBe('fam-1');
+    expect(Array.isArray(arg.where.OR)).toBe(true);
+  });
 });
 
 describe('ProductsService.findOne', () => {

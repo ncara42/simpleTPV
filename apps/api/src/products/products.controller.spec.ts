@@ -15,10 +15,10 @@ function makeController() {
 }
 
 describe('ProductsController', () => {
-  it('GET /products pasa el search al servicio', async () => {
+  it('GET /products pasa search y familyId al servicio', async () => {
     const { controller, service } = makeController();
-    await controller.findAll('caf');
-    expect(service.findAll).toHaveBeenCalledWith('caf');
+    await controller.findAll('caf', 'fam-1');
+    expect(service.findAll).toHaveBeenCalledWith('caf', 'fam-1');
   });
 
   it('POST /products crea', async () => {

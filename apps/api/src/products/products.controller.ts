@@ -14,8 +14,11 @@ export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
   @Get()
-  findAll(@Query('search') search?: string): Promise<unknown[]> {
-    return this.products.findAll(search);
+  findAll(
+    @Query('search') search?: string,
+    @Query('familyId') familyId?: string,
+  ): Promise<unknown[]> {
+    return this.products.findAll(search, familyId);
   }
 
   @Get(':id')
