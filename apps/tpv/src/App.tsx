@@ -7,12 +7,13 @@ import { useState } from 'react';
 import { api, useAuthStore } from './lib/auth.js';
 import { ReturnPanel } from './ReturnPanel.js';
 import { SalePage } from './SalePage.js';
+import { TransferReceivePanel } from './TransferReceivePanel.js';
 
 function Home() {
   const logout = useAuthStore((s) => s.clear);
-  // Pestaña activa: venta (por defecto) o devolución. No estorba el flujo de
-  // venta — la devolución es una vista aparte a la que se accede con el botón.
-  const [view, setView] = useState<'sale' | 'return'>('sale');
+  // Pestaña activa: venta (por defecto), devolución o recepción de traspasos. No
+  // estorban el flujo de venta — son vistas aparte a las que se accede por botón.
+  const [view, setView] = useState<'sale' | 'return' | 'transfers'>('sale');
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto mb-5 flex max-w-[64rem] items-center justify-between">
@@ -32,12 +33,21 @@ function Home() {
           >
             Devolución
           </button>
+          <button
+            className={`tpv-tab ${view === 'transfers' ? 'active' : ''}`}
+            onClick={() => setView('transfers')}
+            data-testid="tab-transfers"
+          >
+            Traspasos
+          </button>
           <Button variant="ghost" onClick={logout} data-testid="logout">
             Cerrar sesión
           </Button>
         </div>
       </div>
-      {view === 'sale' ? <SalePage /> : <ReturnPanel />}
+      {view === 'sale' && <SalePage />}
+      {view === 'return' && <ReturnPanel />}
+      {view === 'transfers' && <TransferReceivePanel />}
     </main>
   );
 }

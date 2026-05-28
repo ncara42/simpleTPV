@@ -1,12 +1,15 @@
-import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
 
 import { CartPanel } from './CartPanel.js';
 import { CashPanel } from './CashPanel.js';
+import { api } from './lib/auth.js';
 import { useCart } from './lib/cart.js';
 import { currentCashSession } from './lib/cash.js';
 import { findByBarcode, listFamilies, type Product, searchProducts } from './lib/catalog.js';
+import { useHealthCheck } from './lib/health.js';
 import { listStores } from './lib/sales.js';
+import { getProductStock, getStoreStock, type StockRow } from './lib/stock.js';
 import { useBarcodeScanner } from './lib/useBarcodeScanner.js';
 import { useDebounce } from './lib/useDebounce.js';
 
@@ -14,7 +17,13 @@ export function SalePage() {
   const [search, setSearch] = useState('');
   const [familyId, setFamilyId] = useState<string | null>(null);
   const [scanned, setScanned] = useState<{ product: Product | null; code: string } | null>(null);
+  const [stockDetail, setStockDetail] = useState<Product | null>(null);
   const debouncedSearch = useDebounce(search, 200);
+  const qc = useQueryClient();
+
+  // Health-check (#34): si la API no responde, el cobro se bloquea y se muestra
+  // un banner de estado degradado. Se suma al bloqueo por caja cerrada.
+  const apiHealthy = useHealthCheck();
 
   const addToCart = useCart((s) => s.addItem);
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
@@ -40,6 +49,31 @@ export function SalePage() {
     queryKey: ['sale-products', debouncedSearch, familyId],
     queryFn: () => searchProducts(debouncedSearch, familyId),
   });
+
+  // Stock de la tienda activa: para mostrar la cantidad/nivel en cada tarjeta.
+  const { data: stockRows = [] } = useQuery({
+    queryKey: ['store-stock', activeStore],
+    queryFn: () => getStoreStock(activeStore as string),
+    enabled: activeStore !== null,
+  });
+  const stockByProduct = useMemo(() => {
+    const map = new Map<string, StockRow>();
+    for (const row of stockRows) {
+      map.set(row.productId, row);
+    }
+    return map;
+  }, [stockRows]);
+
+  // Stock vivo (#34): el SSE actualiza el stock visible al escuchar stock.changed
+  // de la tienda activa. Invalida la query de stock para refrescar las tarjetas.
+  useEffect(() => {
+    const unsubscribe = api.subscribeEvents((event) => {
+      if (event.type === 'stock.changed' && event.data.storeId === activeStore) {
+        void qc.invalidateQueries({ queryKey: ['store-stock', activeStore] });
+      }
+    });
+    return unsubscribe;
+  }, [qc, activeStore]);
 
   // Escáner USB: al leer un código, busca el producto, lo destaca y lo añade al carrito.
   useBarcodeScanner((code) => {
@@ -68,6 +102,15 @@ export function SalePage() {
                 ))}
               </select>
             </label>
+          </div>
+        )}
+
+        {!apiHealthy && (
+          <div className="api-banner-error" data-testid="api-degraded">
+            <span>
+              <strong>Conexión con el servidor degradada.</strong> El cobro está bloqueado hasta
+              recuperar la conexión.
+            </span>
           </div>
         )}
 
@@ -131,25 +174,88 @@ export function SalePage() {
           </p>
         ) : (
           <div className="sale-grid" data-testid="sale-grid">
-            {products.map((p: Product) => (
-              <button
-                key={p.id}
-                className="prod-card"
-                data-testid="prod-card"
-                onClick={() => addToCart(p)}
-              >
-                <span className="prod-name">{p.name}</span>
-                <span className="prod-meta">
-                  <span className="prod-price">{Number(p.salePrice).toFixed(2)} €</span>
-                  {/* Stock placeholder hasta el módulo de stock (Semana 3) */}
-                  <span className="prod-stock neutral">—</span>
-                </span>
-              </button>
-            ))}
+            {products.map((p: Product) => {
+              const stock = stockByProduct.get(p.id);
+              return (
+                <button
+                  key={p.id}
+                  className="prod-card"
+                  data-testid="prod-card"
+                  onClick={() => addToCart(p)}
+                >
+                  <span className="prod-name">{p.name}</span>
+                  <span className="prod-meta">
+                    <span className="prod-price">{Number(p.salePrice).toFixed(2)} €</span>
+                    {/* Stock vivo (#34): cantidad + semáforo. Click abre el detalle
+                        sin añadir al carrito (stopPropagation). */}
+                    {stock ? (
+                      <span
+                        className={`prod-stock stock-${stock.level}`}
+                        data-testid="prod-stock"
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setStockDetail(p);
+                        }}
+                        title="Ver stock por tienda"
+                      >
+                        {stock.quantity}
+                      </span>
+                    ) : (
+                      <span className="prod-stock neutral" data-testid="prod-stock">
+                        —
+                      </span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
-      <CartPanel storeId={activeStore} cashOpen={cashOpen} />
+      <CartPanel storeId={activeStore} cashOpen={cashOpen} apiHealthy={apiHealthy} />
+      {stockDetail && (
+        <ProductStockModal product={stockDetail} onClose={() => setStockDetail(null)} />
+      )}
+    </div>
+  );
+}
+
+// Modal de consulta de stock de un producto en todas las tiendas (#34). Se abre
+// desde la tarjeta de producto sin salir de la venta.
+function ProductStockModal({ product, onClose }: { product: Product; onClose: () => void }) {
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ['product-stock', product.id],
+    queryFn: () => getProductStock(product.id),
+  });
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="product-stock-modal">
+        <h3>Stock · {product.name}</h3>
+        {isLoading ? (
+          <p className="sale-empty">Cargando…</p>
+        ) : rows.length === 0 ? (
+          <p className="sale-empty" data-testid="product-stock-empty">
+            Sin stock registrado.
+          </p>
+        ) : (
+          <ul className="prod-stock-list">
+            {rows.map((r) => (
+              <li key={r.storeId} data-testid="product-stock-row">
+                <span className={`stock-dot stock-${r.level}`} /> {r.storeName}:{' '}
+                <strong>{r.quantity}</strong> <span className="muted">(mín {r.minStock})</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="modal-foot">
+          <button type="button" onClick={onClose} data-testid="product-stock-close">
+            Cerrar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
