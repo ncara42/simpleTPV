@@ -109,6 +109,9 @@ importers:
 
   apps/backoffice:
     dependencies:
+      '@simpletpv/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@simpletpv/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -146,6 +149,9 @@ importers:
 
   apps/tpv:
     dependencies:
+      '@simpletpv/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@simpletpv/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -180,6 +186,25 @@ importers:
       vite:
         specifier: ^8.0.14
         version: 8.0.14(@types/node@25.9.1)(esbuild@0.25.12)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0)
+
+  packages/auth:
+    dependencies:
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
+      zustand:
+        specifier: ^5.0.0
+        version: 5.0.13(@types/react@19.2.15)(react@19.2.6)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.15
+      jsdom:
+        specifier: ^29.1.1
+        version: 29.1.1
+      vitest:
+        specifier: ^4.0.0
+        version: 4.1.7(@types/node@25.9.1)(@vitest/coverage-v8@4.1.7)(jsdom@29.1.1)(vite@8.0.14(@types/node@25.9.1)(esbuild@0.25.12)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/db:
     dependencies:

@@ -1,0 +1,25 @@
+{
+  "name": "@simpletpv/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "jsdom": "^29.1.1",
+    "vitest": "^4.0.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

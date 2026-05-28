@@ -1,0 +1,175 @@
+/* Identidad visual de simpleTPV — login.
+   Comercio cálido y confiable: teal profundo + acento ámbar, tipografía
+   display con carácter. Deliberadamente lejos del card gris genérico. */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Geist:wght@400;500;600&display=swap');
+
+:root {
+  --tpv-teal-900: #0a3f3a;
+  --tpv-teal-700: #0f766e;
+  --tpv-teal-500: #14b8a6;
+  --tpv-amber: #f59e0b;
+  --tpv-amber-dark: #d97706;
+  --tpv-ink: #0c1413;
+  --tpv-paper: #fbfaf7;
+  --tpv-muted: #6b7d7a;
+  --tpv-line: #e4e2db;
+  --tpv-danger: #c0392b;
+}
+
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  font-family: 'Geist', system-ui, sans-serif;
+  color: var(--tpv-ink);
+  background:
+    radial-gradient(120% 90% at 15% 0%, rgba(20, 184, 166, 0.22), transparent 55%),
+    radial-gradient(110% 80% at 100% 100%, rgba(245, 158, 11, 0.16), transparent 50%),
+    linear-gradient(160deg, var(--tpv-teal-900) 0%, #06201d 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Grano sutil para dar textura al fondo, sin imágenes externas. */
+.login-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+.login-card {
+  position: relative;
+  width: 100%;
+  max-width: 25rem;
+  background: var(--tpv-paper);
+  border-radius: 1.25rem;
+  padding: 2.5rem 2.25rem;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.4) inset,
+    0 24px 60px -20px rgba(0, 0, 0, 0.5);
+  animation: login-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes login-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.login-brand {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.login-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, var(--tpv-teal-700), var(--tpv-teal-500));
+  color: #fff;
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 8px 20px -8px rgba(15, 118, 110, 0.7);
+}
+
+.login-title {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 600;
+  font-size: 1.85rem;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.login-subtitle {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--tpv-muted);
+  letter-spacing: 0.01em;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.login-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--tpv-muted);
+}
+
+.login-input {
+  height: 3rem;
+  border: 1.5px solid var(--tpv-line);
+  border-radius: 0.7rem;
+  padding: 0 0.95rem;
+  font-size: 1rem;
+  background: #fff;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: var(--tpv-teal-500);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
+}
+
+.login-error {
+  font-size: 0.85rem;
+  color: var(--tpv-danger);
+  background: rgba(192, 57, 43, 0.08);
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.75rem;
+}
+
+.login-submit {
+  height: 3.1rem;
+  margin-top: 0.3rem;
+  border: none;
+  border-radius: 0.7rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--tpv-amber), var(--tpv-amber-dark));
+  box-shadow: 0 10px 24px -10px rgba(217, 119, 6, 0.8);
+  transition:
+    transform 0.1s,
+    filter 0.15s;
+}
+
+.login-submit:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.login-submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.login-submit:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
