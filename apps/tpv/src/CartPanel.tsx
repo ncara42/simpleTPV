@@ -11,11 +11,15 @@ import { TicketView } from './TicketView.js';
 export function CartPanel({
   storeId,
   cashOpen,
+  apiHealthy = true,
 }: {
   storeId: string | null;
   // Caja obligatoria: sin una sesión de caja abierta no se puede cobrar (el
   // backend lo exige con 409). El botón "Cobrar" se bloquea y se avisa al usuario.
   cashOpen: boolean;
+  // Estado degradado (#34): si la API no responde, se bloquea el cobro para no
+  // cobrar a ciegas. Se suma al bloqueo por caja cerrada.
+  apiHealthy?: boolean;
 }) {
   const items = useCart((s) => s.items);
   const setQty = useCart((s) => s.setQty);
@@ -253,7 +257,7 @@ export function CartPanel({
         <button
           className="cart-create"
           onClick={openCheckout}
-          disabled={items.length === 0 || !storeId || !cashOpen}
+          disabled={items.length === 0 || !storeId || !cashOpen || !apiHealthy}
           data-testid="cart-checkout"
         >
           Cobrar
@@ -261,6 +265,11 @@ export function CartPanel({
         {!cashOpen && items.length > 0 && (
           <p className="cart-msg cart-cash-warning" data-testid="cart-cash-warning">
             Abre la caja para poder cobrar
+          </p>
+        )}
+        {!apiHealthy && items.length > 0 && (
+          <p className="cart-msg cart-api-warning" data-testid="cart-api-warning">
+            Servidor no disponible. No se puede cobrar hasta recuperar la conexión.
           </p>
         )}
         {error && (
