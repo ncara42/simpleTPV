@@ -67,10 +67,36 @@ export interface Store {
   id: string;
   name: string;
   address: string | null;
+  code: string;
   active: boolean;
 }
 
 export interface StoreInput {
   name: string;
   address?: string | null;
+}
+
+export interface SaleLine {
+  id: string;
+  productId: string;
+  name: string;
+  unitPrice: string;
+  qty: string;
+  lineTotal: string;
+}
+
+export interface Sale {
+  id: string;
+  storeId: string;
+  userId: string;
+  ticketNumber: string;
+  subtotal: string;
+  total: string;
+  createdAt: string;
+  lines: SaleLine[];
+}
+
+export interface CreateSaleInput {
+  storeId: string;
+  lines: Array<{ productId: string; qty: number }>;
 }
