@@ -1,39 +1,24 @@
+import { ApiError, type FamilyNode, type Product } from '@simpletpv/auth';
+
 import { api } from './auth.js';
 
-export interface Product {
-  id: string;
-  name: string;
-  sku: string | null;
-  salePrice: string;
-  familyId: string | null;
+export type { FamilyNode, Product };
+
+export function searchProducts(search: string, familyId: string | null): Promise<Product[]> {
+  return api.get<Product[]>('/products', { search, familyId });
 }
 
-export interface FamilyNode {
-  id: string;
-  name: string;
-  color: string | null;
-  children: FamilyNode[];
-}
-
-export async function searchProducts(search: string, familyId: string | null): Promise<Product[]> {
-  const params = new URLSearchParams();
-  if (search) params.set('search', search);
-  if (familyId) params.set('familyId', familyId);
-  const qs = params.toString();
-  const res = await api.fetch(`/products${qs ? `?${qs}` : ''}`);
-  if (!res.ok) throw new Error(`Error ${res.status} buscando productos`);
-  return (await res.json()) as Product[];
-}
-
-export async function listFamilies(): Promise<FamilyNode[]> {
-  const res = await api.fetch('/product-families');
-  if (!res.ok) throw new Error(`Error ${res.status} listando familias`);
-  return (await res.json()) as FamilyNode[];
+export function listFamilies(): Promise<FamilyNode[]> {
+  return api.get<FamilyNode[]>('/product-families');
 }
 
 export async function findByBarcode(code: string): Promise<Product | null> {
-  const res = await api.fetch(`/products/barcode/${encodeURIComponent(code)}`);
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Error ${res.status} buscando por código`);
-  return (await res.json()) as Product;
+  try {
+    return await api.get<Product>(`/products/barcode/${encodeURIComponent(code)}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      return null;
+    }
+    throw err;
+  }
 }
