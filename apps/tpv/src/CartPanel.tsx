@@ -1,7 +1,9 @@
+import type { Sale } from '@simpletpv/auth';
 import { useState } from 'react';
 
 import { useCart } from './lib/cart.js';
 import { createSale } from './lib/sales.js';
+import { type PaymentData, PaymentModal } from './PaymentModal.js';
 
 export function CartPanel({ storeId }: { storeId: string | null }) {
   const items = useCart((s) => s.items);
@@ -10,25 +12,75 @@ export function CartPanel({ storeId }: { storeId: string | null }) {
   const clear = useCart((s) => s.clear);
   const subtotal = useCart((s) => s.subtotal());
   const total = useCart((s) => s.total());
-  const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [confirmed, setConfirmed] = useState<Sale | null>(null);
 
-  async function onCreate() {
+  function openCheckout() {
+    if (!storeId || items.length === 0) return;
+    setError(null);
+    setModalOpen(true);
+  }
+
+  async function onConfirmPayment(payment: PaymentData) {
     if (!storeId || items.length === 0) return;
     setBusy(true);
-    setMsg(null);
+    setError(null);
     try {
       const sale = await createSale({
         storeId,
         lines: items.map((i) => ({ productId: i.productId, qty: i.qty })),
+        paymentMethod: payment.paymentMethod,
+        ...(payment.cashGiven !== undefined ? { cashGiven: payment.cashGiven } : {}),
       });
-      clear();
-      setMsg(`Venta creada: ${sale.ticketNumber}`);
+      setModalOpen(false);
+      setConfirmed(sale);
     } catch {
-      setMsg('Error al crear la venta. Inténtalo de nuevo.');
+      // Error → mensaje, sin limpiar el carrito ni cerrar (el operario reintenta).
+      setError('Error al cobrar la venta. Inténtalo de nuevo.');
     } finally {
       setBusy(false);
     }
+  }
+
+  function newSale() {
+    clear();
+    setConfirmed(null);
+    setError(null);
+  }
+
+  // Pantalla de confirmación post-venta: resumen + "Nueva venta".
+  if (confirmed) {
+    const isCash = confirmed.paymentMethod === 'CASH';
+    return (
+      <aside className="cart" data-testid="cart">
+        <div className="sale-confirmation" data-testid="sale-confirmation">
+          <h2 className="cart-title">Venta confirmada</h2>
+          <div className="conf-row">
+            <span>Ticket</span>
+            <strong data-testid="conf-ticket">{confirmed.ticketNumber}</strong>
+          </div>
+          <div className="conf-row">
+            <span>Total</span>
+            <strong data-testid="conf-total">{Number(confirmed.total).toFixed(2)} €</strong>
+          </div>
+          <div className="conf-row">
+            <span>Método</span>
+            <strong data-testid="conf-method">{isCash ? 'Efectivo' : 'Tarjeta'}</strong>
+          </div>
+          {isCash && confirmed.cashChange !== null && (
+            <div className="conf-row conf-change">
+              <span>Cambio</span>
+              <strong data-testid="conf-change">{Number(confirmed.cashChange).toFixed(2)} €</strong>
+            </div>
+          )}
+          <button className="cart-create" onClick={newSale} data-testid="new-sale">
+            Nueva venta
+          </button>
+        </div>
+      </aside>
+    );
   }
 
   return (
@@ -75,18 +127,27 @@ export function CartPanel({ storeId }: { storeId: string | null }) {
         </div>
         <button
           className="cart-create"
-          onClick={onCreate}
-          disabled={busy || items.length === 0 || !storeId}
-          data-testid="cart-create"
+          onClick={openCheckout}
+          disabled={items.length === 0 || !storeId}
+          data-testid="cart-checkout"
         >
-          {busy ? 'Creando…' : 'Crear venta'}
+          Cobrar
         </button>
-        {msg && (
+        {error && (
           <p className="cart-msg" data-testid="cart-msg">
-            {msg}
+            {error}
           </p>
         )}
       </div>
+
+      {modalOpen && (
+        <PaymentModal
+          total={total}
+          onConfirm={onConfirmPayment}
+          onCancel={() => setModalOpen(false)}
+          busy={busy}
+        />
+      )}
     </aside>
   );
 }
