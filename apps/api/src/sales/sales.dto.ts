@@ -1,5 +1,14 @@
+import { PaymentMethod } from '@simpletpv/db';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsPositive, IsUUID, ValidateNested } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsEnum,
+  IsOptional,
+  IsPositive,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 
 export class CreateSaleLineDto {
   @IsUUID()
@@ -18,4 +27,12 @@ export class CreateSaleDto {
   @ValidateNested({ each: true })
   @Type(() => CreateSaleLineDto)
   lines!: CreateSaleLineDto[];
+
+  @IsEnum(PaymentMethod)
+  paymentMethod!: PaymentMethod;
+
+  // Solo aplica en efectivo; el servicio valida que cubra el total.
+  @IsOptional()
+  @IsPositive()
+  cashGiven?: number;
 }

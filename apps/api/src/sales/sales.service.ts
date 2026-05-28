@@ -1,4 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type { PaymentMethod } from '@simpletpv/db';
 
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
@@ -25,6 +26,26 @@ export function computeTotals(lines: PricedLine[]): {
   const priced = lines.map((l) => ({ ...l, lineTotal: l.unitPrice * l.qty }));
   const subtotal = priced.reduce((acc, l) => acc + l.lineTotal, 0);
   return { lines: priced, subtotal, total: subtotal };
+}
+
+/**
+ * Calcula el detalle de efectivo de una venta. Para CARD (o CASH sin importe
+ * entregado) devuelve null/null. Para CASH con importe entregado calcula el
+ * cambio (redondeado a 2 decimales) y rechaza si el efectivo es insuficiente.
+ */
+export function computeChange(
+  paymentMethod: PaymentMethod,
+  total: number,
+  cashGiven: number | undefined,
+): { cashGiven: number | null; cashChange: number | null } {
+  if (paymentMethod !== 'CASH' || cashGiven === undefined) {
+    return { cashGiven: null, cashChange: null };
+  }
+  if (cashGiven < total) {
+    throw new BadRequestException('Efectivo insuficiente');
+  }
+  const cashChange = Math.round((cashGiven - total) * 100) / 100;
+  return { cashGiven, cashChange };
 }
 
 @Injectable()
@@ -59,6 +80,7 @@ export class SalesService {
     });
 
     const { lines, subtotal, total } = computeTotals(priced);
+    const { cashGiven, cashChange } = computeChange(dto.paymentMethod, total, dto.cashGiven);
 
     // Usamos el cliente BASE (sin extensiones) para que withTenantTx abra UNA
     // sola transacción: el incremento del contador (tx.$queryRaw) y la creación
@@ -87,6 +109,9 @@ export class SalesService {
           ticketNumber,
           subtotal,
           total,
+          paymentMethod: dto.paymentMethod,
+          cashGiven,
+          cashChange,
           lines: {
             create: lines.map((l) => ({
               organizationId: tenant.organizationId,
