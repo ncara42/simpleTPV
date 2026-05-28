@@ -14,6 +14,7 @@ import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import { withTenantTx } from '../prisma/with-tenant-tx.js';
 import { StockService } from '../stock/stock.service.js';
+import { VerifactuService } from '../verifactu/verifactu.service.js';
 import type { CreateSaleDto } from './sales.dto.js';
 
 export type SaleRole = 'ADMIN' | 'MANAGER' | 'CLERK';
@@ -243,6 +244,8 @@ export class SalesService {
     private readonly stock: StockService,
     // Bus de eventos para emitir sale.completed tras commit (#32).
     @Inject(EVENT_BUS) private readonly events: EventBus,
+    // Genera el registro VeriFactu de la venta tras commit (#47).
+    private readonly verifactu: VerifactuService,
   ) {}
 
   async create(dto: CreateSaleDto, userId: string, role: SaleRole) {
@@ -367,6 +370,26 @@ export class SalesService {
             storeId: dto.storeId,
             ticketNumber,
             total: Number(total),
+          },
+        });
+      });
+
+      // Registro VeriFactu de la venta tras commit (#47): encadenado y encolado.
+      // No bloquea la venta si falla (afterCommit es best-effort).
+      afterCommit(async () => {
+        const org = await this.prisma.organization.findFirst({
+          where: { id: tenant.organizationId },
+          select: { nif: true },
+        });
+        await this.verifactu.recordFor({
+          type: 'INVOICE',
+          saleId: sale.id,
+          payload: {
+            nif: org?.nif ?? null,
+            invoiceNumber: ticketNumber,
+            date: new Date().toISOString(),
+            total: Number(total),
+            type: 'INVOICE',
           },
         });
       });
