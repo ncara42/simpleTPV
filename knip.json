@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {},
+    "packages/db": {
+      "ignoreDependencies": ["@prisma/client"]
+    },
+    "apps/tpv": {
+      "playwright": {
+        "config": ["playwright.config.ts"]
+      }
+    },
+    "apps/backoffice": {
+      "playwright": {
+        "config": ["playwright.config.ts"]
+      }
+    }
+  }
+}
