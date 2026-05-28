@@ -10,5 +10,10 @@ export default defineConfig({
     hookTimeout: 30000,
     pool: 'forks',
     forks: { singleFork: true },
+    // Ficheros en SERIE (no concurrentes en el mismo fork): los tests de
+    // integración comparten la misma BD (org1/store1/store2) y, con caja
+    // obligatoria, abren/cierran CashSession. Si dos ficheros se solaparan, sus
+    // sesiones OPEN chocarían con el índice único parcial "una OPEN por tienda".
+    fileParallelism: false,
   },
 });
