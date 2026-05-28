@@ -14,10 +14,12 @@ import { MeModule } from './me/me.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProductFamiliesModule } from './product-families/product-families.module.js';
 import { ProductsModule } from './products/products.module.js';
+import { PurchasesModule } from './purchases/purchases.module.js';
 import { ReturnsModule } from './returns/returns.module.js';
 import { SalesModule } from './sales/sales.module.js';
 import { StockModule } from './stock/stock.module.js';
 import { StoresModule } from './stores/stores.module.js';
+import { SuppliersModule } from './suppliers/suppliers.module.js';
 import { TransfersModule } from './transfers/transfers.module.js';
 import { UsersModule } from './users/users.module.js';
 
@@ -36,6 +38,8 @@ import { UsersModule } from './users/users.module.js';
     StockModule,
     ReturnsModule,
     TransfersModule,
+    SuppliersModule,
+    PurchasesModule,
     CashSessionsModule,
     MeModule,
   ],
