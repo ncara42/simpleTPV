@@ -219,3 +219,15 @@
   background: var(--tpv-teal-700, #0f766e);
   color: #fff;
 }
+
+.modal select {
+  height: 2.6rem;
+  border: 1.5px solid var(--tpv-line, #e4e2db);
+  border-radius: 0.55rem;
+  padding: 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  background: #fff;
+}

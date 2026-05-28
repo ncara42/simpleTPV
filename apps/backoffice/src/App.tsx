@@ -7,10 +7,21 @@ import { useState } from 'react';
 import { CatalogPage } from './CatalogPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { api, useAuthStore } from './lib/auth.js';
+import { StoresPage } from './StoresPage.js';
+import { UsersPage } from './UsersPage.js';
+
+type Tab = 'catalog' | 'families' | 'users' | 'stores';
+
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: 'catalog', label: 'Catálogo' },
+  { id: 'families', label: 'Familias' },
+  { id: 'users', label: 'Usuarios' },
+  { id: 'stores', label: 'Tiendas' },
+];
 
 function Home() {
   const logout = useAuthStore((s) => s.clear);
-  const [tab, setTab] = useState<'catalog' | 'families'>('catalog');
+  const [tab, setTab] = useState<Tab>('catalog');
   return (
     <main className="min-h-screen p-8">
       <div className="mx-auto mb-6 flex max-w-[60rem] items-center justify-between">
@@ -20,22 +31,21 @@ function Home() {
         </Button>
       </div>
       <nav className="bo-tabs">
-        <button
-          className={`bo-tab ${tab === 'catalog' ? 'active' : ''}`}
-          onClick={() => setTab('catalog')}
-          data-testid="tab-catalog"
-        >
-          Catálogo
-        </button>
-        <button
-          className={`bo-tab ${tab === 'families' ? 'active' : ''}`}
-          onClick={() => setTab('families')}
-          data-testid="tab-families"
-        >
-          Familias
-        </button>
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            className={`bo-tab ${tab === t.id ? 'active' : ''}`}
+            onClick={() => setTab(t.id)}
+            data-testid={`tab-${t.id}`}
+          >
+            {t.label}
+          </button>
+        ))}
       </nav>
-      {tab === 'catalog' ? <CatalogPage /> : <FamiliesPage />}
+      {tab === 'catalog' && <CatalogPage />}
+      {tab === 'families' && <FamiliesPage />}
+      {tab === 'users' && <UsersPage />}
+      {tab === 'stores' && <StoresPage />}
     </main>
   );
 }

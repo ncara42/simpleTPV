@@ -20,6 +20,7 @@ model Organization {
   users           User[]
   products        Product[]
   productFamilies ProductFamily[]
+  auditLogs       AuditLog[]
 }
 
 model Store {
@@ -42,6 +43,7 @@ model User {
   email          String   @unique
   name           String
   passwordHash   String
+  pinHash        String?
   role           UserRole
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
@@ -105,6 +107,20 @@ model ProductFamily {
   products     Product[]
 
   @@index([organizationId, parentId])
+}
+
+model AuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  userId         String?  @db.Uuid
+  action         String
+  entity         String
+  entityId       String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, createdAt])
 }
 
 enum SaleUnit {
