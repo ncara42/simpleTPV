@@ -382,9 +382,21 @@ export class SalesService {
 
     // TODO: stock semana 3 — restaurar el stock de las líneas al anular (no-op por ahora).
 
-    return this.prisma.sale.update({
-      where: { id },
+    // Transición atómica: la condición status=COMPLETED viaja al WHERE de la DB,
+    // así dos anulaciones concurrentes no pueden ambas tener éxito (la segunda
+    // afecta 0 filas). organizationId en el WHERE refuerza el aislamiento del write.
+    const updated = await this.prisma.sale.updateMany({
+      where: { id, organizationId: tenant.organizationId, status: 'COMPLETED' },
       data: { status: 'VOIDED', voidedAt: new Date(), voidedBy: userId },
+    });
+    if (updated.count === 0) {
+      // Otra request la anuló entre la lectura y el update.
+      throw new BadRequestException('La venta ya está anulada');
+    }
+
+    // La venta existe y la acabamos de anular en esta misma request → no es null.
+    return this.prisma.sale.findFirstOrThrow({
+      where: { id, organizationId: tenant.organizationId },
     });
   }
 }
