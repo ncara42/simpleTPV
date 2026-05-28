@@ -51,6 +51,8 @@ export type {
   TransferStatus,
   User,
   UserRole,
+  VerifactuRecord,
+  VerifactuStatus,
 } from './api-types.js';
 export { type AuthState, type AuthStore, type AuthTokens, createAuthStore } from './auth-store.js';
 export { type AuthSetup, setupAuth } from './setup.js';

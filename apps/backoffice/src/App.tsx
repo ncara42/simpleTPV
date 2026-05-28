@@ -12,8 +12,17 @@ import { SalesHistoryPage } from './SalesHistoryPage.js';
 import { StockPage } from './StockPage.js';
 import { StoresPage } from './StoresPage.js';
 import { UsersPage } from './UsersPage.js';
+import { VerifactuPage } from './VerifactuPage.js';
 
-type Tab = 'catalog' | 'families' | 'users' | 'stores' | 'sales' | 'stock' | 'purchases';
+type Tab =
+  | 'catalog'
+  | 'families'
+  | 'users'
+  | 'stores'
+  | 'sales'
+  | 'stock'
+  | 'purchases'
+  | 'verifactu';
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'catalog', label: 'Catálogo' },
@@ -23,6 +32,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'sales', label: 'Ventas' },
   { id: 'stock', label: 'Stock' },
   { id: 'purchases', label: 'Compras' },
+  { id: 'verifactu', label: 'VeriFactu' },
 ];
 
 function Home() {
@@ -55,6 +65,7 @@ function Home() {
       {tab === 'sales' && <SalesHistoryPage />}
       {tab === 'stock' && <StockPage />}
       {tab === 'purchases' && <PurchasesPage />}
+      {tab === 'verifactu' && <VerifactuPage />}
     </main>
   );
 }
