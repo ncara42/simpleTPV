@@ -381,4 +381,80 @@ describe('Ventas — integración', () => {
       }),
     ).rejects.toThrow(/límite del rol CLERK/);
   });
+
+  // NOTA: el rechazo de un CLERK con 403 al anular es responsabilidad del
+  // RolesGuard global (@Roles('ADMIN','MANAGER') en el controller), no de
+  // voidSale. Ese guard se valida a nivel HTTP en otros tests; aquí cubrimos la
+  // lógica de transición y el aislamiento por tenant del servicio.
+  it('anula una venta: status VOIDED y voidedBy correcto', async () => {
+    const sale = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.create(
+        { storeId: store1Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
+        user1Id,
+        'ADMIN',
+      );
+    });
+
+    const voided = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.voidSale(sale.id, user1Id);
+    });
+
+    expect(voided.status).toBe('VOIDED');
+    expect(voided.voidedBy).toBe(user1Id);
+    expect(voided.voidedAt).toBeInstanceOf(Date);
+    // El total no se toca: la venta sigue existiendo, solo cambia su estado.
+    expect(Number(voided.total)).toBeCloseTo(Number(sale.total), 2);
+  });
+
+  it('no se puede anular dos veces la misma venta', async () => {
+    const sale = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.create(
+        { storeId: store1Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
+        user1Id,
+        'ADMIN',
+      );
+    });
+
+    await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.voidSale(sale.id, user1Id);
+    });
+
+    await expect(
+      tenantStorage.run({ organizationId: org1Id }, async () => {
+        return service.voidSale(sale.id, user1Id);
+      }),
+    ).rejects.toThrow(/ya está anulada/);
+  });
+
+  it('anular un id inexistente lanza NotFound', async () => {
+    await expect(
+      tenantStorage.run({ organizationId: org1Id }, async () => {
+        return service.voidSale('00000000-0000-0000-0000-000000000000', user1Id);
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('aísla por tenant: org2 no puede anular una venta de org1', async () => {
+    const sale = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.create(
+        { storeId: store1Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
+        user1Id,
+        'ADMIN',
+      );
+    });
+
+    // Bajo el contexto de org2, RLS + el filtro por organizationId no ven la
+    // venta → findFirst null → NotFound. No se puede anular entre tenants.
+    await expect(
+      tenantStorage.run({ organizationId: org2Id }, async () => {
+        return service.voidSale(sale.id, user1Id);
+      }),
+    ).rejects.toThrow();
+
+    // Sanity: la venta de org1 sigue COMPLETED (org2 no la tocó).
+    const own = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return prisma.sale.findUnique({ where: { id: sale.id } });
+    });
+    expect(own?.status).toBe('COMPLETED');
+  });
 });
