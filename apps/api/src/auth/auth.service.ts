@@ -1,16 +1,11 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
+import type { User } from '@simpletpv/db';
 import bcrypt from 'bcryptjs';
 
-export interface AuthUser {
-  id: string;
-  organizationId: string;
-  email: string;
-  name: string;
-  passwordHash: string;
-  role: string;
-  active: boolean;
-}
+// El login opera sobre el registro completo del usuario (necesita passwordHash y
+// organizationId), así que reutilizamos el tipo generado por Prisma.
+export type AuthUser = User;
 
 // Puerto mínimo para buscar usuarios durante el login. Se implementa con una
 // conexión BYPASSRLS (rol `app_admin`), porque el login busca al usuario por

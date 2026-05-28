@@ -32,4 +32,5 @@ overrides:
   '@hono/node-server': '>=1.19.13'
 
 allowBuilds:
+  '@nestjs/core': set this to true or false
   prisma: set this to true or false

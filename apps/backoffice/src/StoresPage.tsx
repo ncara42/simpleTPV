@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { storesApi } from './lib/admin.js';
+import { createStore, deleteStore, listStores } from './lib/admin.js';
 
 interface StoreForm {
   name: string;
@@ -14,20 +14,20 @@ export function StoresPage() {
 
   const { data: stores = [], isLoading } = useQuery({
     queryKey: ['stores'],
-    queryFn: storesApi.list,
+    queryFn: listStores,
   });
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['stores'] });
 
   const createMut = useMutation({
     mutationFn: (s: StoreForm) =>
-      storesApi.create(s.address ? { name: s.name, address: s.address } : { name: s.name }),
+      createStore(s.address ? { name: s.name, address: s.address } : { name: s.name }),
     onSuccess: () => {
       setForm(null);
       invalidate();
     },
   });
   const delMut = useMutation({
-    mutationFn: (id: string) => storesApi.remove(id),
+    mutationFn: (id: string) => deleteStore(id),
     onSuccess: invalidate,
   });
 

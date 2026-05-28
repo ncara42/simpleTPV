@@ -9,8 +9,10 @@ const USER: AuthUser = {
   email: 'admin@org1.test',
   name: 'Admin',
   passwordHash: 'x',
+  pinHash: null,
   role: 'ADMIN',
   active: true,
+  createdAt: new Date(),
 };
 
 function makeController(opts: { valid?: boolean }): AuthController {

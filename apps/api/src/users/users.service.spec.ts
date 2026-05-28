@@ -19,6 +19,13 @@ function makePrisma() {
       deleteMany: vi.fn(async (_a?: unknown): Promise<unknown> => ({ count: 0 })),
       createMany: vi.fn(async (_a?: unknown): Promise<unknown> => ({ count: 1 })),
     },
+    store: {
+      // Por defecto devuelve como propias todas las tiendas pedidas (RLS las
+      // filtraría al tenant actual en la BD real).
+      findMany: vi.fn(async ({ where }: { where: { id: { in: string[] } } }) =>
+        where.id.in.map((id) => ({ id })),
+      ),
+    },
   };
 }
 
@@ -62,6 +69,15 @@ describe('UsersService', () => {
       data: Array<{ userId: string; storeId: string }>;
     };
     expect(arg.data).toHaveLength(2);
+  });
+
+  it('assignStores rechaza tiendas que no pertenecen al tenant', async () => {
+    const prisma = makePrisma();
+    // RLS solo deja ver 's1'; 's2' es de otra organización.
+    prisma.store.findMany = vi.fn(async () => [{ id: 's1' }]);
+    const service = new UsersService(prisma as never);
+    await expect(service.assignStores('u1', ['s1', 's2'])).rejects.toThrow();
+    expect(prisma.userStore.createMany).not.toHaveBeenCalled();
   });
 
   it('update no expone passwordHash si no se cambia password', async () => {
