@@ -3,33 +3,18 @@ import { Prisma, type Product } from '@simpletpv/db';
 
 import { PrismaService } from '../prisma/prisma.service.js';
 import { getCurrentTenant } from '../prisma/tenant-context.js';
+import type { CreateProductDto, UpdateProductDto } from './products.dto.js';
 
 export interface ImportResult {
   inserted: number;
   errors: Array<{ row: number; message: string }>;
 }
 
-export interface CreateProductInput {
-  name: string;
-  salePrice: number;
-  description?: string | null;
-  barcode?: string | null;
-  sku?: string | null;
-  costPrice?: number;
-  taxRate?: number;
-  saleUnit?: 'UNIT' | 'WEIGHT' | 'VOLUME' | 'LENGTH';
-  unitSymbol?: string;
-  familyId?: string | null;
-  active?: boolean;
-}
-
-export type UpdateProductInput = Partial<CreateProductInput>;
-
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(input: CreateProductInput): Promise<Product> {
+  async create(input: CreateProductDto): Promise<Product> {
     // RLS filtra lectura/escritura por la policy, pero el INSERT necesita el
     // organizationId explícito (lo toma del contexto de tenant del JWT).
     const tenant = getCurrentTenant();
@@ -68,7 +53,7 @@ export class ProductsService {
     return product;
   }
 
-  async update(id: string, input: UpdateProductInput): Promise<Product> {
+  async update(id: string, input: UpdateProductDto): Promise<Product> {
     await this.findOne(id);
     return this.prisma.product.update({ where: { id }, data: input });
   }
