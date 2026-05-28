@@ -68,3 +68,11 @@ Funciones puras testeables: `computeExpected(opening, cashSales)` y `computeDiff
 - Unit: `computeExpected`/`computeDifference` (cuadre exacto, sobrante, faltante).
 - Integración: abrir caja; abrir dos veces misma tienda → error; cerrar calcula esperado = inicial + ventas efectivo del turno (crear ventas CASH y CARD, verificar que solo CASH cuenta y solo las del rango); cerrar dos veces → error; aislamiento por tenant.
 - Tests unitarios del servicio (no solo integración) para mantener la cobertura sobre el floor del ratchet.
+
+## 7. Decisión: ventas anuladas (VOIDED) y el cuadre
+
+El cuadre suma solo ventas `COMPLETED` en efectivo. Una venta CASH **anulada** (void) NO cuenta en el esperado: se trata como si no hubiera ocurrido. La gestión del efectivo físico cuando se anula/devuelve una venta cobrada en efectivo (salida del cajón) pertenece a las devoluciones (#15), no a #13. En el MVP, anular es una corrección, no una devolución de dinero al cliente. Decisión confirmada con el responsable de producto.
+
+## 8. Concurrencia: una sola caja OPEN por tienda
+
+Además de la validación en el servicio (findFirst OPEN antes de crear), un **índice único parcial** en SQL (`UNIQUE (organizationId, storeId) WHERE status='OPEN'`) garantiza a nivel de DB que no puedan existir dos cajas abiertas a la vez en la misma tienda, cerrando la ventana de carrera del findFirst+create. Definido en la migración (Prisma no soporta partial unique indexes en el schema).

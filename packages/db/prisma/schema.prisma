@@ -200,6 +200,8 @@ model CashSession {
   user         User         @relation(fields: [userId], references: [id])
 
   @@index([organizationId, storeId, status])
+  // Índice único parcial "una sola caja OPEN por tienda" definido en SQL en la
+  // migración (Prisma no soporta partial unique indexes en el schema).
 }
 
 enum SaleUnit {

@@ -40,3 +40,9 @@ ALTER TABLE "CashSession" FORCE  ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON "CashSession";
 CREATE POLICY tenant_isolation ON "CashSession"
   USING ("organizationId" = NULLIF(current_setting('app.current_organization_id', true), '')::uuid);
+
+-- Garantiza a nivel de DB una sola caja OPEN por tienda (cierra la carrera de
+-- doble apertura: el findFirst+create del servicio no es atómico, este índice sí).
+CREATE UNIQUE INDEX "CashSession_one_open_per_store"
+  ON "CashSession" ("organizationId", "storeId")
+  WHERE status = 'OPEN';
