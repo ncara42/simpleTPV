@@ -1,12 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { describe, expect, it, vi } from 'vitest';
 
+import { tenantStorage } from '../prisma/tenant-context.js';
 import {
   assertDiscountWithinRoleLimit,
   buildTaxBreakdown,
   computeChange,
   computeTotals,
   formatTicket,
+  SalesService,
 } from './sales.service.js';
+
+const ORG = '11111111-1111-1111-1111-111111111111';
 
 describe('formatTicket', () => {
   it('formatea code + contador con padding a 6', () => {
@@ -226,5 +231,258 @@ describe('computeChange', () => {
 
   it('CASH con cashGiven < total lanza error de efectivo insuficiente', () => {
     expect(() => computeChange('CASH', 30, 20)).toThrow('Efectivo insuficiente');
+  });
+});
+
+// Mock mínimo del cliente Prisma extendido (el que usa SalesService para
+// lecturas y para voidSale). Solo declaramos los modelos/operaciones que
+// tocan los métodos bajo test.
+function makePrisma() {
+  return {
+    sale: {
+      findFirst: vi.fn(async (_a?: unknown): Promise<unknown> => null),
+      updateMany: vi.fn(async (_a?: unknown): Promise<{ count: number }> => ({ count: 1 })),
+      findFirstOrThrow: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'sale-1' })),
+    },
+    product: {
+      findMany: vi.fn(async (_a?: unknown): Promise<unknown[]> => []),
+    },
+  };
+}
+
+// Construye el servicio con el mismo mock como cliente extendido y base. Para
+// los métodos bajo test (voidSale/getTicket) solo se usa el extendido; el base
+// solo lo necesita create (que mockeamos su $transaction aparte).
+function makeService(prisma: ReturnType<typeof makePrisma>, base?: unknown) {
+  return new SalesService(prisma as never, (base ?? prisma) as never);
+}
+
+describe('SalesService.voidSale', () => {
+  it('lanza 404 si la venta no existe', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findFirst = vi.fn(async () => null);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.voidSale('nope', 'user-1')),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('lanza 400 si la venta ya está anulada (VOIDED)', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findFirst = vi.fn(async () => ({ id: 'sale-1', status: 'VOIDED' }));
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.voidSale('sale-1', 'user-1')),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('anula la venta: updateMany con count 1 → devuelve la venta VOIDED', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findFirst = vi.fn(async () => ({ id: 'sale-1', status: 'COMPLETED' }));
+    prisma.sale.updateMany = vi.fn(async () => ({ count: 1 }));
+    prisma.sale.findFirstOrThrow = vi.fn(async () => ({ id: 'sale-1', status: 'VOIDED' }));
+    const service = makeService(prisma);
+
+    const result = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.voidSale('sale-1', 'user-1'),
+    );
+
+    // El WHERE del update viaja con status COMPLETED y el organizationId del tenant.
+    const arg = prisma.sale.updateMany.mock.calls[0]![0] as {
+      where: { status: string; organizationId: string };
+      data: { status: string; voidedBy: string };
+    };
+    expect(arg.where.status).toBe('COMPLETED');
+    expect(arg.where.organizationId).toBe(ORG);
+    expect(arg.data.status).toBe('VOIDED');
+    expect(arg.data.voidedBy).toBe('user-1');
+    expect(result).toMatchObject({ id: 'sale-1', status: 'VOIDED' });
+  });
+
+  it('lanza 400 si updateMany afecta 0 filas (carrera concurrente)', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findFirst = vi.fn(async () => ({ id: 'sale-1', status: 'COMPLETED' }));
+    prisma.sale.updateMany = vi.fn(async () => ({ count: 0 }));
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.voidSale('sale-1', 'user-1')),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('lanza 500 si no hay contexto de tenant', async () => {
+    const prisma = makePrisma();
+    const service = makeService(prisma);
+    await expect(service.voidSale('sale-1', 'user-1')).rejects.toThrow();
+  });
+});
+
+describe('SalesService.getTicket', () => {
+  it('lanza 404 si la venta no existe', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findFirst = vi.fn(async () => null);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.getTicket('nope')),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('devuelve el DTO del ticket con el taxBreakdown calculado', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findFirst = vi.fn(async () => ({
+      id: 'sale-1',
+      ticketNumber: 'T01-000001',
+      createdAt: new Date('2026-05-28T10:00:00Z'),
+      subtotal: 231,
+      discountTotal: 0,
+      total: 231,
+      paymentMethod: 'CASH',
+      cashGiven: 250,
+      cashChange: 19,
+      organization: { name: 'Org SL', nif: 'B00000000' },
+      store: { name: 'Tienda Centro', code: '01' },
+      lines: [
+        { name: 'A', qty: 1, unitPrice: 121, discountPct: 0, taxRate: 21, lineTotal: 121 },
+        { name: 'B', qty: 1, unitPrice: 110, discountPct: 0, taxRate: 10, lineTotal: 110 },
+      ],
+    }));
+    const service = makeService(prisma);
+
+    const result = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.getTicket('sale-1'),
+    );
+
+    // Filtra explícitamente por id y organizationId (defensa en profundidad).
+    const arg = prisma.sale.findFirst.mock.calls[0]![0] as {
+      where: { id: string; organizationId: string };
+    };
+    expect(arg.where.id).toBe('sale-1');
+    expect(arg.where.organizationId).toBe(ORG);
+
+    expect(result.organization).toEqual({ name: 'Org SL', nif: 'B00000000' });
+    expect(result.store).toEqual({ name: 'Tienda Centro', code: '01' });
+    expect(result.ticketNumber).toBe('T01-000001');
+    expect(result.lines).toHaveLength(2);
+
+    // Sin descuento de ticket: Σ(base+cuota) == total. Grupos ordenados por tipo.
+    const sum = result.taxBreakdown.reduce((acc, t) => acc + t.base + t.cuota, 0);
+    expect(sum).toBeCloseTo(231, 2);
+    expect(result.taxBreakdown.map((t) => t.taxRate)).toEqual([10, 21]);
+  });
+
+  it('calcula y prorratea el descuento de ticket en el taxBreakdown', async () => {
+    const prisma = makePrisma();
+    // subtotal 231, total 207.9 → descuento de ticket 23.1.
+    prisma.sale.findFirst = vi.fn(async () => ({
+      id: 'sale-2',
+      ticketNumber: 'T01-000002',
+      createdAt: new Date(),
+      subtotal: 231,
+      discountTotal: 23.1,
+      total: 207.9,
+      paymentMethod: 'CARD',
+      cashGiven: null,
+      cashChange: null,
+      organization: { name: 'Org', nif: 'B1' },
+      store: { name: 'T', code: '01' },
+      lines: [
+        { name: 'A', qty: 1, unitPrice: 121, discountPct: 0, taxRate: 21, lineTotal: 121 },
+        { name: 'B', qty: 1, unitPrice: 110, discountPct: 0, taxRate: 10, lineTotal: 110 },
+      ],
+    }));
+    const service = makeService(prisma);
+
+    const result = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.getTicket('sale-2'),
+    );
+    const sum = result.taxBreakdown.reduce((acc, t) => acc + t.base + t.cuota, 0);
+    expect(sum).toBeCloseTo(207.9, 2);
+  });
+});
+
+describe('SalesService.create', () => {
+  // Mock de withTenantTx vía base.$transaction: el callback recibe un tx con
+  // $executeRaw, $queryRaw y sale.create. Así cubrimos el camino feliz de create
+  // sin tocar la DB. Devolvemos el contador del Store y la venta creada.
+  function makeBase(opts: { storeFound?: boolean } = {}) {
+    const storeFound = opts.storeFound ?? true;
+    const tx = {
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => (storeFound ? [{ code: '01', ticketCounter: 7 }] : [])),
+      sale: {
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+          id: 'new-sale',
+          ...data,
+        })),
+      },
+    };
+    return {
+      $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
+      __tx: tx,
+    };
+  }
+
+  it('camino feliz: precia desde productos, abre tx y crea la venta', async () => {
+    const prisma = makePrisma();
+    prisma.product.findMany = vi.fn(async () => [
+      { id: 'p1', name: 'Café', salePrice: 1.5, taxRate: 21 },
+    ]);
+    const base = makeBase();
+    const service = makeService(prisma, base);
+
+    const dto = {
+      storeId: '22222222-2222-2222-2222-222222222222',
+      paymentMethod: 'CASH' as const,
+      cashGiven: 5,
+      lines: [{ productId: 'p1', qty: 2 }],
+    };
+
+    const result = (await tenantStorage.run({ organizationId: ORG }, () =>
+      service.create(dto, 'user-1', 'ADMIN'),
+    )) as unknown as { ticketNumber: string; total: number; organizationId: string };
+
+    expect(base.$transaction).toHaveBeenCalledOnce();
+    expect(base.__tx.sale.create).toHaveBeenCalledOnce();
+    expect(result.ticketNumber).toBe('T01-000007');
+    expect(result.total).toBeCloseTo(3, 2);
+    expect(result.organizationId).toBe(ORG);
+  });
+
+  it('lanza 400 si un producto del carrito no existe', async () => {
+    const prisma = makePrisma();
+    prisma.product.findMany = vi.fn(async () => []);
+    const service = makeService(prisma, makeBase());
+
+    const dto = {
+      storeId: '22222222-2222-2222-2222-222222222222',
+      paymentMethod: 'CARD' as const,
+      lines: [{ productId: 'ghost', qty: 1 }],
+    };
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.create(dto, 'user-1', 'ADMIN')),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('lanza 404 dentro de la tx si la tienda no existe', async () => {
+    const prisma = makePrisma();
+    prisma.product.findMany = vi.fn(async () => [
+      { id: 'p1', name: 'Café', salePrice: 1.5, taxRate: 21 },
+    ]);
+    const base = makeBase({ storeFound: false });
+    const service = makeService(prisma, base);
+
+    const dto = {
+      storeId: '22222222-2222-2222-2222-222222222222',
+      paymentMethod: 'CARD' as const,
+      lines: [{ productId: 'p1', qty: 1 }],
+    };
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.create(dto, 'user-1', 'ADMIN')),
+    ).rejects.toThrow(NotFoundException);
   });
 });
