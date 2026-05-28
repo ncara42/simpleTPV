@@ -18,9 +18,12 @@ export interface AuthState {
   getRole: () => UserRole | null;
 }
 
-// Lee el claim `role` del payload del JWT sin verificar la firma (la verificación
-// es responsabilidad del backend; aquí solo decidimos qué pintar). Devuelve null
-// si el token falta o no es decodificable.
+// SOLO PARA UI. Lee el claim `role` del payload del JWT SIN verificar la firma:
+// un cliente podría falsificarlo, así que getRole() jamás debe usarse como
+// frontera de seguridad. La autoridad real es el backend, que verifica la firma
+// del token (AuthGuard) y el rol (@Roles) en CADA petición — un rol falseado aquí
+// solo cambia qué se pinta; toda acción/lectura protegida sigue devolviendo 403.
+// No uses getRole() para decidir algo que sustituya una llamada a la API.
 function decodeRole(token: string | null): UserRole | null {
   if (!token) {
     return null;
