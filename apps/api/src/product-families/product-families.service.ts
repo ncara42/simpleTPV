@@ -8,16 +8,7 @@ import type { ProductFamily } from '@simpletpv/db';
 
 import { PrismaService } from '../prisma/prisma.service.js';
 import { getCurrentTenant } from '../prisma/tenant-context.js';
-
-export interface CreateFamilyInput {
-  name: string;
-  parentId?: string | null;
-  color?: string | null;
-  icon?: string | null;
-  sortOrder?: number;
-}
-
-export type UpdateFamilyInput = Partial<CreateFamilyInput>;
+import type { CreateFamilyDto, UpdateFamilyDto } from './product-families.dto.js';
 
 // Nodo del árbol: el modelo Prisma más sus hijos resueltos en memoria.
 export type FamilyNode = ProductFamily & { children: FamilyNode[] };
@@ -26,7 +17,7 @@ export type FamilyNode = ProductFamily & { children: FamilyNode[] };
 export class ProductFamiliesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(input: CreateFamilyInput): Promise<ProductFamily> {
+  async create(input: CreateFamilyDto): Promise<ProductFamily> {
     const tenant = getCurrentTenant();
     if (!tenant) {
       throw new InternalServerErrorException('Sin contexto de tenant');
@@ -59,7 +50,7 @@ export class ProductFamiliesService {
     return roots;
   }
 
-  async update(id: string, input: UpdateFamilyInput): Promise<ProductFamily> {
+  async update(id: string, input: UpdateFamilyDto): Promise<ProductFamily> {
     await this.requireExists(id);
     if (input.parentId !== undefined && input.parentId !== null) {
       if (input.parentId === id) {

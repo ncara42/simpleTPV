@@ -4,25 +4,12 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, UserRole } from '@simpletpv/db';
+import { Prisma } from '@simpletpv/db';
 import bcrypt from 'bcryptjs';
 
 import { PrismaService } from '../prisma/prisma.service.js';
 import { getCurrentTenant } from '../prisma/tenant-context.js';
-
-export interface CreateUserInput {
-  email: string;
-  name: string;
-  password: string;
-  role: UserRole;
-}
-
-export interface UpdateUserInput {
-  name?: string;
-  role?: UserRole;
-  active?: boolean;
-  password?: string;
-}
+import type { CreateUserDto, UpdateUserDto } from './users.dto.js';
 
 const SALT_ROUNDS = 10;
 
@@ -44,7 +31,7 @@ export type PublicUser = Prisma.UserGetPayload<{ select: typeof PUBLIC_SELECT }>
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(input: CreateUserInput): Promise<PublicUser> {
+  async create(input: CreateUserDto): Promise<PublicUser> {
     const tenant = getCurrentTenant();
     if (!tenant) {
       throw new InternalServerErrorException('Sin contexto de tenant');
@@ -73,7 +60,7 @@ export class UsersService {
     }
   }
 
-  async update(id: string, input: UpdateUserInput): Promise<PublicUser> {
+  async update(id: string, input: UpdateUserDto): Promise<PublicUser> {
     await this.requireExists(id);
     const { password, ...rest } = input;
     const data: Prisma.UserUpdateInput = { ...rest };
