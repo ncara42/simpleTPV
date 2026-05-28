@@ -28,4 +28,7 @@ FROM nginxinc/nginx-unprivileged:1.27-alpine AS runner
 ENV API_URL=http://simpletpv-api:3001
 COPY --from=builder /repo/apps/tpv/dist /usr/share/nginx/html
 COPY apps/tpv/nginx.conf.template /etc/nginx/templates/default.conf.template
+# La imagen base ya corre como `nginx`; lo declaramos explícito para el análisis
+# estático (Trivy DS-0002 no resuelve el USER de la imagen base).
+USER nginx
 EXPOSE 8080
