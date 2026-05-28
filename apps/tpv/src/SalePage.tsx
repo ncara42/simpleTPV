@@ -1,20 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import {
-  type FamilyNode,
-  findByBarcode,
-  listFamilies,
-  type Product,
-  searchProducts,
-} from './lib/catalog.js';
+import { findByBarcode, listFamilies, type Product, searchProducts } from './lib/catalog.js';
 import { useBarcodeScanner } from './lib/useBarcodeScanner.js';
 import { useDebounce } from './lib/useDebounce.js';
-
-function flattenRoots(tree: FamilyNode[]): FamilyNode[] {
-  // Para la barra del TPV mostramos las familias raíz (botones de primer nivel).
-  return tree;
-}
 
 export function SalePage() {
   const [search, setSearch] = useState('');
@@ -37,8 +26,6 @@ export function SalePage() {
     void findByBarcode(code).then((product) => setScanned({ product, code }));
   });
 
-  const roots = flattenRoots(families);
-
   return (
     <div className="sale">
       <div className="sale-search-row">
@@ -60,7 +47,7 @@ export function SalePage() {
         >
           Todas
         </button>
-        {roots.map((f) => (
+        {families.map((f) => (
           <button
             key={f.id}
             className={`fam-chip ${familyId === f.id ? 'active' : ''}`}
