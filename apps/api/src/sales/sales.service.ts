@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import { withTenantTx } from '../prisma/with-tenant-tx.js';
 import type { CreateSaleDto } from './sales.dto.js';
@@ -28,7 +29,12 @@ export function computeTotals(lines: PricedLine[]): {
 
 @Injectable()
 export class SalesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    // Extendido: lecturas con RLS por-operación (p.ej. findMany de productos).
+    private readonly prisma: PrismaService,
+    // Base: para withTenantTx, que abre UNA sola transacción atómica.
+    @Inject(PRISMA_BASE) private readonly base: PrismaService,
+  ) {}
 
   async create(dto: CreateSaleDto, userId: string) {
     const tenant = requireTenant();
@@ -54,12 +60,12 @@ export class SalesService {
 
     const { lines, subtotal, total } = computeTotals(priced);
 
-    // El cliente inyectado es el extendido; necesitamos el base para abrir UNA
-    // transacción que incluya el incremento del contador + la creación. Como el
-    // extendido envuelve cada operación en su propia tx, usamos el método
-    // $transaction del propio cliente: withTenantTx fija el tenant con set_config
-    // LOCAL y todo corre en esa única tx.
-    return withTenantTx(this.prisma, tenant.organizationId, async (tx) => {
+    // Usamos el cliente BASE (sin extensiones) para que withTenantTx abra UNA
+    // sola transacción: el incremento del contador (tx.$queryRaw) y la creación
+    // de la venta (tx.sale.create) corren en la MISMA tx con el set_config LOCAL
+    // aplicado. Pasar el extendido anidaría transacciones y rompería la
+    // atomicidad (contador incrementado aunque la venta falle).
+    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
       const updated = await tx.$queryRaw<Array<{ code: string; ticketCounter: number }>>`
         UPDATE "Store" SET "ticketCounter" = "ticketCounter" + 1
         WHERE id = ${dto.storeId}::uuid
