@@ -1,6 +1,13 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# pnpm 11 trata `ERR_PNPM_IGNORED_BUILDS` como fatal (default). En CI con
+# --frozen-lockfile el error aparece aunque listemos los paquetes en
+# onlyBuiltDependencies, porque las versiones transitivas (esbuild@0.21,
+# 0.25, 0.28) se reportan por separado. Desactivamos el modo strict.
+strictDepBuilds: false
+
 onlyBuiltDependencies:
   - '@nestjs/core'
   - '@prisma/client'
