@@ -301,6 +301,39 @@ describe('Ventas — integración', () => {
     }
   });
 
+  it('getTicket con descuento de ticket: el desglose de IVA cuadra con el total', async () => {
+    const sale = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.create(
+        {
+          storeId: store1Id,
+          lines: [{ productId: product1Id, qty: 3 }],
+          paymentMethod: 'CARD',
+          // Descuento de ticket del 15%: el desglose debe sumar el total, no el subtotal.
+          ticketDiscountPct: 15,
+        },
+        user1Id,
+        'ADMIN',
+      );
+    });
+
+    const ticket = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.getTicket(sale.id);
+    });
+
+    // Hay descuento de ticket: total < subtotal.
+    expect(Number(ticket.total)).toBeLessThan(Number(ticket.subtotal));
+
+    // El desglose de IVA suma el TOTAL (tras descuento de ticket), no el subtotal.
+    expect(ticket.taxBreakdown.length).toBeGreaterThan(0);
+    const sumBaseCuota = ticket.taxBreakdown.reduce(
+      (acc, t) => acc + Number(t.base) + Number(t.cuota),
+      0,
+    );
+    expect(sumBaseCuota).toBeCloseTo(Number(ticket.total), 2);
+    // Y NO suma el subtotal (prueba de que el prorrateo se aplicó de verdad).
+    expect(sumBaseCuota).not.toBeCloseTo(Number(ticket.subtotal), 2);
+  });
+
   it('getTicket de un id inexistente lanza NotFound', async () => {
     await expect(
       tenantStorage.run({ organizationId: org1Id }, async () => {

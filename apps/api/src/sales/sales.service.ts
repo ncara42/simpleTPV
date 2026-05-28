@@ -128,24 +128,68 @@ export function assertDiscountWithinRoleLimit(
 
 /**
  * Desglosa el IVA de un ticket agrupando las líneas por tipo. Convención retail
- * España: los importes de línea (lineTotal) llevan el IVA incluido. Para cada
- * grupo, sobre el neto (Σ lineTotal del grupo): base = round2(neto/(1+t/100)),
- * cuota = round2(neto − base). El resultado va ordenado ascendente por taxRate.
+ * España: los importes de línea (lineTotal) llevan el IVA incluido.
+ *
+ * El descuento de TICKET (ticketDiscount = subtotal − total) se prorratea entre
+ * los grupos de IVA proporcionalmente al neto de cada grupo ANTES de calcular
+ * base/cuota. Sin esto, Σ(base+cuota) sumaría el subtotal (neto sin descuento de
+ * ticket) y no el total impreso → descuadre fiscal cuando hay descuento de ticket.
+ *
+ * Para cada grupo, sobre el neto ajustado (neto del grupo − su prorrateo):
+ * base = round2(netoAjustado/(1+t/100)), cuota = round2(netoAjustado − base).
+ *
+ * El prorrateo de los grupos se redondea a céntimos; para que Σ prorrateos sea
+ * EXACTAMENTE el descuento de ticket (sin descuadre de 1 céntimo), el grupo de
+ * mayor neto absorbe la diferencia residual. Resultado ordenado ascendente por
+ * taxRate.
  */
 export function buildTaxBreakdown(
   lines: { taxRate: number; lineTotal: number }[],
+  ticketDiscount = 0,
 ): { taxRate: number; base: number; cuota: number }[] {
   const byRate = new Map<number, number>();
   for (const l of lines) {
     byRate.set(l.taxRate, (byRate.get(l.taxRate) ?? 0) + l.lineTotal);
   }
-  return [...byRate.entries()]
-    .map(([taxRate, neto]) => {
-      const base = round2(neto / (1 + taxRate / 100));
-      const cuota = round2(neto - base);
-      return { taxRate, base, cuota };
-    })
+
+  const subtotal = round2([...byRate.values()].reduce((acc, n) => acc + n, 0));
+  if (subtotal <= 0) {
+    return [];
+  }
+
+  // Grupos ordenados por taxRate ascendente para una salida estable.
+  const groups = [...byRate.entries()]
+    .map(([taxRate, neto]) => ({ taxRate, neto }))
     .sort((a, b) => a.taxRate - b.taxRate);
+
+  // Prorrateo del descuento de ticket por grupo. Para evitar descuadres de
+  // céntimo, el grupo de MAYOR neto absorbe el residuo: calculamos el prorrateo
+  // redondeado de todos los demás y el grupo gordo se lleva lo que falte.
+  const discount = round2(ticketDiscount);
+  let absorberIdx = 0;
+  for (let i = 1; i < groups.length; i++) {
+    if (groups[i]!.neto > groups[absorberIdx]!.neto) {
+      absorberIdx = i;
+    }
+  }
+
+  let assigned = 0;
+  const prorate = groups.map((g, i) => {
+    if (i === absorberIdx) {
+      return 0; // se calcula al final con el residuo
+    }
+    const p = round2((discount * g.neto) / subtotal);
+    assigned = round2(assigned + p);
+    return p;
+  });
+  prorate[absorberIdx] = round2(discount - assigned);
+
+  return groups.map((g, i) => {
+    const netoAjustado = round2(g.neto - prorate[i]!);
+    const base = round2(netoAjustado / (1 + g.taxRate / 100));
+    const cuota = round2(netoAjustado - base);
+    return { taxRate: g.taxRate, base, cuota };
+  });
 }
 
 /**
@@ -282,8 +326,13 @@ export class SalesService {
       throw new NotFoundException(`Venta ${id} no encontrada`);
     }
 
+    // El descuento de TICKET es subtotal − total (discountTotal incluye además
+    // los descuentos de línea, que ya están reflejados en lineTotal). Lo pasamos
+    // para que el desglose de IVA prorratee y Σ(base+cuota) == total.
+    const ticketDiscount = round2(Number(sale.subtotal) - Number(sale.total));
     const taxBreakdown = buildTaxBreakdown(
       sale.lines.map((l) => ({ taxRate: Number(l.taxRate), lineTotal: Number(l.lineTotal) })),
+      ticketDiscount,
     );
 
     return {

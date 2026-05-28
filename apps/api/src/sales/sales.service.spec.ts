@@ -151,6 +151,56 @@ describe('buildTaxBreakdown', () => {
     expect(r[0]!.base).toBeCloseTo(50, 2);
     expect(r[0]!.cuota).toBeCloseTo(0, 2);
   });
+
+  it('sin descuento de ticket: Σ(base+cuota) = subtotal = total', () => {
+    const lines = [
+      { taxRate: 21, lineTotal: 121 },
+      { taxRate: 10, lineTotal: 110 },
+    ];
+    const r = buildTaxBreakdown(lines, 0);
+    const sum = r.reduce((acc, t) => acc + t.base + t.cuota, 0);
+    expect(sum).toBeCloseTo(231, 2);
+  });
+
+  it('con descuento de ticket: prorratea y Σ(base+cuota) = total', () => {
+    // Subtotal 231 (121 al 21% + 110 al 10%). Descuento de ticket 23.1 (10%).
+    // total = 207.9. El desglose debe sumar 207.9, no 231.
+    const lines = [
+      { taxRate: 21, lineTotal: 121 },
+      { taxRate: 10, lineTotal: 110 },
+    ];
+    const ticketDiscount = 23.1;
+    const r = buildTaxBreakdown(lines, ticketDiscount);
+    const sum = r.reduce((acc, t) => acc + t.base + t.cuota, 0);
+    expect(sum).toBeCloseTo(231 - ticketDiscount, 2);
+    // Cada grupo mantiene su proporción: el neto ajustado conserva el reparto.
+    // Grupo 21%: neto 121 → prorrateo 121*23.1/231 = 12.1 → netoAjustado 108.9.
+    // Grupo 10%: neto 110 → prorrateo 11 → netoAjustado 99.
+    const g21 = r.find((t) => t.taxRate === 21)!;
+    const g10 = r.find((t) => t.taxRate === 10)!;
+    expect(g21.base + g21.cuota).toBeCloseTo(108.9, 2);
+    expect(g10.base + g10.cuota).toBeCloseTo(99, 2);
+    // Y dentro de cada grupo base/cuota siguen el tipo.
+    expect(g21.base).toBeCloseTo(90, 2);
+    expect(g21.cuota).toBeCloseTo(18.9, 2);
+    expect(g10.base).toBeCloseTo(90, 2);
+    expect(g10.cuota).toBeCloseTo(9, 2);
+  });
+
+  it('descuento de ticket con redondeo: Σ cuadra al céntimo ajustando el último grupo', () => {
+    // Netos que provocan prorrateos no exactos; el ajuste del último grupo evita
+    // descuadres de 1 céntimo.
+    const lines = [
+      { taxRate: 21, lineTotal: 33.33 },
+      { taxRate: 10, lineTotal: 33.33 },
+      { taxRate: 4, lineTotal: 33.34 },
+    ];
+    const subtotal = 100;
+    const ticketDiscount = 7.77;
+    const r = buildTaxBreakdown(lines, ticketDiscount);
+    const sum = r.reduce((acc, t) => acc + t.base + t.cuota, 0);
+    expect(sum).toBeCloseTo(subtotal - ticketDiscount, 2);
+  });
 });
 
 describe('computeChange', () => {
