@@ -22,6 +22,8 @@ interface PricedLine {
   qty: number;
   // % de descuento de la línea (0–100). Ausente o 0 = sin descuento.
   discountPct?: number;
+  // IVA del producto congelado en el momento de la venta.
+  taxRate?: number;
 }
 
 interface TicketDiscount {
@@ -125,6 +127,28 @@ export function assertDiscountWithinRoleLimit(
 }
 
 /**
+ * Desglosa el IVA de un ticket agrupando las líneas por tipo. Convención retail
+ * España: los importes de línea (lineTotal) llevan el IVA incluido. Para cada
+ * grupo, sobre el neto (Σ lineTotal del grupo): base = round2(neto/(1+t/100)),
+ * cuota = round2(neto − base). El resultado va ordenado ascendente por taxRate.
+ */
+export function buildTaxBreakdown(
+  lines: { taxRate: number; lineTotal: number }[],
+): { taxRate: number; base: number; cuota: number }[] {
+  const byRate = new Map<number, number>();
+  for (const l of lines) {
+    byRate.set(l.taxRate, (byRate.get(l.taxRate) ?? 0) + l.lineTotal);
+  }
+  return [...byRate.entries()]
+    .map(([taxRate, neto]) => {
+      const base = round2(neto / (1 + taxRate / 100));
+      const cuota = round2(neto - base);
+      return { taxRate, base, cuota };
+    })
+    .sort((a, b) => a.taxRate - b.taxRate);
+}
+
+/**
  * Calcula el detalle de efectivo de una venta. Para CARD (o CASH sin importe
  * entregado) devuelve null/null. Para CASH con importe entregado calcula el
  * cambio (redondeado a 2 decimales) y rechaza si el efectivo es insuficiente.
@@ -173,6 +197,7 @@ export class SalesService {
         unitPrice: Number(product.salePrice),
         qty: l.qty,
         discountPct: l.discountPct ?? 0,
+        taxRate: Number(product.taxRate),
       };
     });
 
@@ -228,6 +253,7 @@ export class SalesService {
               qty: l.qty,
               discountPct: l.discountPct ?? 0,
               discountAmt: l.discountAmt,
+              taxRate: l.taxRate ?? 21,
               lineTotal: l.lineTotal,
             })),
           },
@@ -235,5 +261,46 @@ export class SalesService {
         include: { lines: true },
       });
     });
+  }
+
+  /**
+   * Carga una venta del tenant y devuelve el ticket-resumen para impresión.
+   * RLS aísla por tenant: una venta de otra organización no es visible aquí
+   * (findFirst → null) → NotFoundException (404). El desglose de IVA se calcula
+   * al vuelo desde el taxRate congelado de cada línea.
+   */
+  async getTicket(id: string) {
+    const sale = await this.prisma.sale.findFirst({
+      where: { id },
+      include: { lines: true, store: true, organization: true },
+    });
+    if (!sale) {
+      throw new NotFoundException(`Venta ${id} no encontrada`);
+    }
+
+    const taxBreakdown = buildTaxBreakdown(
+      sale.lines.map((l) => ({ taxRate: Number(l.taxRate), lineTotal: Number(l.lineTotal) })),
+    );
+
+    return {
+      organization: { name: sale.organization.name, nif: sale.organization.nif },
+      store: { name: sale.store.name, code: sale.store.code },
+      ticketNumber: sale.ticketNumber,
+      createdAt: sale.createdAt,
+      lines: sale.lines.map((l) => ({
+        name: l.name,
+        qty: l.qty,
+        unitPrice: l.unitPrice,
+        discountPct: l.discountPct,
+        lineTotal: l.lineTotal,
+      })),
+      subtotal: sale.subtotal,
+      discountTotal: sale.discountTotal,
+      total: sale.total,
+      paymentMethod: sale.paymentMethod,
+      cashGiven: sale.cashGiven,
+      cashChange: sale.cashChange,
+      taxBreakdown,
+    };
   }
 }
