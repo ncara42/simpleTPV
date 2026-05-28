@@ -60,6 +60,11 @@ export function formatTicket(code: string, counter: number): string {
  * exactamente ese día: gte = 00:00:00.000Z del día, lt = 00:00:00.000Z del día
  * siguiente. Usar este rango en `createdAt: { gte, lt }` evita problemas de
  * comparación con horas y deja el límite superior abierto. Función pura, testeable.
+ *
+ * DEUDA CONOCIDA (MVP): el día se interpreta en UTC, no en la zona local del
+ * usuario (España +1/+2). Las ventas de la madrugada local pueden caer en el día
+ * UTC contiguo. Aceptable para el MVP; al internacionalizar, recibir el offset o
+ * normalizar a Europe/Madrid en el servidor.
  */
 export function dayRange(date: string): { gte: Date; lt: Date } {
   const gte = new Date(`${date}T00:00:00.000Z`);
