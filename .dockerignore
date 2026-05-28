@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/build
+**/.turbo
+**/coverage
+**/generated
+**/.next
+**/playwright-report
+**/test-results
+**/*.log
+.git
+.github
+.claude
+docs
+*.md

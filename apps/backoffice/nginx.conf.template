@@ -1,0 +1,35 @@
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    # Proxy a la API: /api/* -> ${API_URL}/* (quita el prefijo /api, igual que el dev proxy de Vite).
+    # Resolver de Docker (127.0.0.11) + variable en proxy_pass => la resolución DNS del upstream
+    # ocurre por petición, no al arrancar, así nginx levanta aunque la API aún no esté lista.
+    location ~ ^/api/(.*)$ {
+        resolver 127.0.0.11 valid=10s ipv6=off;
+        set $upstream ${API_URL};
+        proxy_pass $upstream/$1$is_args$args;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # SPA fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+}
