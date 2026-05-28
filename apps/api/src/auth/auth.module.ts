@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 
 import { AuthController } from './auth.controller.js';
-import { AuthGuard, type AuthGuardConfig } from './auth.guard.js';
+import { AUTH_GUARD_CONFIG, AuthGuard, type AuthGuardConfig } from './auth.guard.js';
 import { type AuthConfig, AuthService } from './auth.service.js';
 import { AuthLookupService } from './auth-lookup.service.js';
 
@@ -27,11 +27,10 @@ function authConfig(): AuthConfig {
       inject: [AuthLookupService, JwtService],
     },
     {
-      provide: AuthGuard,
-      useFactory: (jwt: JwtService) =>
-        new AuthGuard(jwt, { accessSecret: authConfig().accessSecret } satisfies AuthGuardConfig),
-      inject: [JwtService],
+      provide: AUTH_GUARD_CONFIG,
+      useFactory: (): AuthGuardConfig => ({ accessSecret: authConfig().accessSecret }),
     },
+    AuthGuard,
   ],
   exports: [AuthService, AuthGuard],
 })

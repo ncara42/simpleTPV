@@ -1,6 +1,7 @@
 import {
   type CanActivate,
   type ExecutionContext,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -11,6 +12,10 @@ import type { JwtPayload } from './jwt-payload.js';
 export interface AuthGuardConfig {
   accessSecret: string;
 }
+
+// Token de inyección para la config del guard, necesario para que Nest pueda
+// instanciar AuthGuard cuando se usa vía @UseGuards(AuthGuard).
+export const AUTH_GUARD_CONFIG = Symbol('AUTH_GUARD_CONFIG');
 
 function extractBearer(header: unknown): string | null {
   if (typeof header !== 'string') {
@@ -24,7 +29,7 @@ function extractBearer(header: unknown): string | null {
 export class AuthGuard implements CanActivate {
   constructor(
     private readonly jwt: JwtService,
-    private readonly config: AuthGuardConfig,
+    @Inject(AUTH_GUARD_CONFIG) private readonly config: AuthGuardConfig,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
