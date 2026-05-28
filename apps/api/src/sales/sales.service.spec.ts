@@ -275,6 +275,9 @@ function makePrisma() {
     product: {
       findMany: vi.fn(async (_a?: unknown): Promise<unknown[]> => []),
     },
+    return: {
+      count: vi.fn(async (_a?: unknown): Promise<number> => 0),
+    },
   };
 }
 
@@ -304,6 +307,19 @@ describe('SalesService.voidSale', () => {
     await expect(
       tenantStorage.run({ organizationId: ORG }, () => service.voidSale('sale-1', 'user-1')),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('lanza 400 si la venta tiene devoluciones (no se puede anular)', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findFirst = vi.fn(async () => ({ id: 'sale-1', status: 'COMPLETED' }));
+    prisma.return.count = vi.fn(async () => 1);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.voidSale('sale-1', 'user-1')),
+    ).rejects.toThrow(/devoluciones/);
+    // No debe intentar el updateMany si hay devoluciones.
+    expect(prisma.sale.updateMany).not.toHaveBeenCalled();
   });
 
   it('anula la venta: updateMany con count 1 → devuelve la venta VOIDED', async () => {

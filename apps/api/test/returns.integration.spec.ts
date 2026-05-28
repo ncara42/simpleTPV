@@ -183,6 +183,24 @@ describe('Devoluciones — integración', () => {
     ).rejects.toThrow(/anulada/);
   });
 
+  it('no se puede anular una venta que ya tiene devoluciones', async () => {
+    const sale = await createSale(3);
+    const saleLine = sale.lines[0]!;
+
+    // Devolución parcial: deja la venta con un Return asociado.
+    await tenantStorage.run({ organizationId: org1Id }, async () =>
+      returns.create(
+        { saleId: sale.id, reason: 'parcial', lines: [{ saleLineId: saleLine.id, qty: 1 }] },
+        user1Id,
+      ),
+    );
+
+    // Anular ahora debe fallar: dejaría un Return colgando de una venta anulada.
+    await expect(
+      tenantStorage.run({ organizationId: org1Id }, async () => sales.voidSale(sale.id, user1Id)),
+    ).rejects.toThrow(/devoluciones/);
+  });
+
   it('aísla por tenant: org2 no puede devolver contra una venta de org1', async () => {
     const sale = await createSale(2);
     const saleLine = sale.lines[0]!;
