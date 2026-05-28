@@ -457,4 +457,100 @@ describe('Ventas — integración', () => {
     });
     expect(own?.status).toBe('COMPLETED');
   });
+
+  // Helper: crea una venta con createdAt forzado a una fecha concreta usando el
+  // cliente admin (superuser, sin RLS), para poder testear el filtro por día sin
+  // depender del reloj real. Devuelve el id de la venta.
+  async function createSaleAt(
+    storeId: string,
+    isoCreatedAt: string,
+    paymentMethod: 'CASH' | 'CARD' = 'CARD',
+  ): Promise<string> {
+    const sale = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.create(
+        { storeId, lines: [{ productId: product1Id, qty: 1 }], paymentMethod },
+        user1Id,
+        'ADMIN',
+      );
+    });
+    await admin.$executeRaw`
+      UPDATE "Sale" SET "createdAt" = ${new Date(isoCreatedAt)} WHERE id = ${sale.id}::uuid
+    `;
+    return sale.id;
+  }
+
+  describe('findSales (historial #14)', () => {
+    const DAY = '2026-03-15';
+    const OTHER_DAY = '2026-03-16';
+
+    it('filtra por tienda y día; pagina; totals suma solo COMPLETED', async () => {
+      // store1, día DAY: 2 COMPLETED + 1 VOIDED. store1 OTHER_DAY: 1. store2 DAY: 1.
+      await createSaleAt(store1Id, `${DAY}T09:00:00.000Z`);
+      await createSaleAt(store1Id, `${DAY}T11:00:00.000Z`);
+      const voidedId = await createSaleAt(store1Id, `${DAY}T13:00:00.000Z`);
+      await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.voidSale(voidedId, user1Id),
+      );
+      await createSaleAt(store1Id, `${OTHER_DAY}T09:00:00.000Z`);
+      await createSaleAt(store2Id, `${DAY}T09:00:00.000Z`);
+
+      const res = await tenantStorage.run({ organizationId: org1Id }, async () => {
+        return service.findSales({ storeId: store1Id, date: DAY });
+      });
+
+      // Solo las 3 ventas de store1 en DAY (2 COMPLETED + 1 VOIDED). Ni la de
+      // OTHER_DAY ni la de store2 aparecen.
+      expect(res.totalItems).toBe(3);
+      expect(res.items).toHaveLength(3);
+      for (const item of res.items) {
+        expect(item.storeId).toBe(store1Id);
+      }
+      // Orden createdAt desc: la VOIDED (13:00) es la primera.
+      expect(res.items[0]!.status).toBe('VOIDED');
+      // La VOIDED se lista pero NO suma: totals.count = 2 (solo COMPLETED).
+      expect(res.totals.count).toBe(2);
+      const completed = res.items.filter((i) => i.status === 'COMPLETED');
+      const expectedSum = completed.reduce((acc, i) => acc + Number(i.total), 0);
+      expect(Number(res.totals.totalAmount)).toBeCloseTo(expectedSum, 2);
+    });
+
+    it('pagina: page/pageSize controlan skip/take y los metadatos', async () => {
+      const day = '2026-04-01';
+      for (let i = 0; i < 3; i++) {
+        await createSaleAt(store1Id, `${day}T0${i}:00:00.000Z`);
+      }
+
+      const p1 = await tenantStorage.run({ organizationId: org1Id }, async () => {
+        return service.findSales({ storeId: store1Id, date: day, page: 1, pageSize: 2 });
+      });
+      const p2 = await tenantStorage.run({ organizationId: org1Id }, async () => {
+        return service.findSales({ storeId: store1Id, date: day, page: 2, pageSize: 2 });
+      });
+
+      expect(p1.totalItems).toBe(3);
+      expect(p1.items).toHaveLength(2);
+      expect(p1.page).toBe(1);
+      expect(p1.pageSize).toBe(2);
+      expect(p2.items).toHaveLength(1);
+      // Sin solapamiento entre páginas.
+      const ids = new Set([...p1.items, ...p2.items].map((i) => i.id));
+      expect(ids.size).toBe(3);
+    });
+
+    it('aísla por tenant: org2 no ve las ventas de org1', async () => {
+      const day = '2026-04-10';
+      await createSaleAt(store1Id, `${day}T09:00:00.000Z`);
+
+      const seenByOrg2 = await tenantStorage.run({ organizationId: org2Id }, async () => {
+        return service.findSales({ date: day });
+      });
+      // Las ventas de este test son todas de org1 (creadas en store1Id).
+      expect(seenByOrg2.items.every((i) => i.storeId !== store1Id)).toBe(true);
+
+      const seenByOrg1 = await tenantStorage.run({ organizationId: org1Id }, async () => {
+        return service.findSales({ storeId: store1Id, date: day });
+      });
+      expect(seenByOrg1.totalItems).toBeGreaterThanOrEqual(1);
+    });
+  });
 });
