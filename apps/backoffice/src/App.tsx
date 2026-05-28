@@ -8,10 +8,11 @@ import { CatalogPage } from './CatalogPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { SalesHistoryPage } from './SalesHistoryPage.js';
+import { StockPage } from './StockPage.js';
 import { StoresPage } from './StoresPage.js';
 import { UsersPage } from './UsersPage.js';
 
-type Tab = 'catalog' | 'families' | 'users' | 'stores' | 'sales';
+type Tab = 'catalog' | 'families' | 'users' | 'stores' | 'sales' | 'stock';
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'catalog', label: 'Catálogo' },
@@ -19,6 +20,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'users', label: 'Usuarios' },
   { id: 'stores', label: 'Tiendas' },
   { id: 'sales', label: 'Ventas' },
+  { id: 'stock', label: 'Stock' },
 ];
 
 function Home() {
@@ -49,6 +51,7 @@ function Home() {
       {tab === 'users' && <UsersPage />}
       {tab === 'stores' && <StoresPage />}
       {tab === 'sales' && <SalesHistoryPage />}
+      {tab === 'stock' && <StockPage />}
     </main>
   );
 }

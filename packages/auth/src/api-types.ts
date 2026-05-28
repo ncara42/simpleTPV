@@ -223,3 +223,137 @@ export interface CreateReturnInput {
   reason: string;
   lines: Array<{ saleLineId: string; qty: number }>;
 }
+
+// Stock en tiempo real (semana 3). Los Decimal viajan como number en estas
+// respuestas (el servicio ya los convierte con Number()). level es el semáforo.
+export type StockLevel = 'red' | 'yellow' | 'green';
+export type AlertType = 'LOW_STOCK' | 'OUT_OF_STOCK';
+export type MovementType =
+  | 'SALE'
+  | 'RETURN'
+  | 'TRANSFER_IN'
+  | 'TRANSFER_OUT'
+  | 'PURCHASE_RECEIPT'
+  | 'ADJUSTMENT';
+
+// Fila de GET /stock?storeId= (stock de una tienda).
+export interface StockRow {
+  productId: string;
+  productName: string;
+  storeId: string;
+  quantity: number;
+  minStock: number;
+  level: StockLevel;
+}
+
+// Entrada de GET /stock/global (por producto, su stock en cada tienda + total).
+export interface StockGlobalRow {
+  productId: string;
+  productName: string;
+  total: number;
+  stores: Array<{
+    storeId: string;
+    storeName: string;
+    quantity: number;
+    minStock: number;
+    level: StockLevel;
+  }>;
+}
+
+// Fila de GET /stock/product/:id (un producto en todas las tiendas).
+export interface StockByProductRow {
+  productId: string;
+  storeId: string;
+  storeName: string;
+  quantity: number;
+  minStock: number;
+  level: StockLevel;
+}
+
+export interface StockAlert {
+  id: string;
+  productId: string;
+  productName: string;
+  storeId: string;
+  storeName: string;
+  alertType: AlertType;
+  resolved: boolean;
+  createdAt: string;
+}
+
+export interface SetMinStockInput {
+  productId: string;
+  storeId: string;
+  minStock: number;
+}
+
+export interface AdjustStockInput {
+  productId: string;
+  storeId: string;
+  newQuantity: number;
+  reason: string;
+}
+
+export interface StockMovement {
+  id: string;
+  productId: string;
+  storeId: string;
+  userId: string | null;
+  type: MovementType;
+  quantity: string;
+  referenceId: string | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface StockMovementsPage {
+  items: StockMovement[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+}
+
+// Traspasos central→tienda (semana 3).
+export type TransferStatus = 'DRAFT' | 'SENT' | 'RECEIVED' | 'CLOSED';
+
+export interface TransferLine {
+  id: string;
+  transferId: string;
+  productId: string;
+  quantitySent: string;
+  quantityReceived: string | null;
+  discrepancy: string | null;
+  discrepancyNote: string | null;
+}
+
+export interface Transfer {
+  id: string;
+  originStoreId: string;
+  destStoreId: string;
+  status: TransferStatus;
+  notes: string | null;
+  createdBy: string;
+  createdAt: string;
+  sentAt: string | null;
+  receivedAt: string | null;
+  closedAt: string | null;
+  lines: TransferLine[];
+}
+
+export interface CreateTransferInput {
+  originStoreId: string;
+  destStoreId: string;
+  notes?: string;
+  lines: Array<{ productId: string; quantitySent: number }>;
+}
+
+export interface ReceiveTransferInput {
+  lines: Array<{ lineId: string; quantityReceived: number; discrepancyNote?: string }>;
+}
+
+// Evento del canal SSE GET /events (semana 3). El cliente filtra por `type`.
+export type AppEventType = 'stock.changed' | 'sale.completed' | 'alert.created';
+export interface AppEvent {
+  type: AppEventType;
+  data: Record<string, unknown>;
+}
