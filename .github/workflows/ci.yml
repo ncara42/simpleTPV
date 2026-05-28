@@ -193,11 +193,24 @@ jobs:
           --health-retries 10
         ports:
           - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 3s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 6379:6379
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/simpletpv?schema=public
       DATABASE_URL_APP: postgresql://app:app_dev_password@localhost:5432/simpletpv?schema=public
       DATABASE_URL_AUTH: postgresql://app_admin:app_admin_dev_password@localhost:5432/simpletpv?schema=public
+      # Cache de stock (#28). En CI el service expone Redis en 6379; la API lo usa
+      # si está, y degrada a Postgres si no. Los tests de integración usan un cache
+      # en memoria, así que esto solo ejercita el cache real en el E2E de la API.
+      REDIS_URL: redis://localhost:6379
       # Secretos JWT de test: la API exige JWT_SECRET/JWT_REFRESH_SECRET al
       # arrancar (sin defaults hardcodeados, por seguridad). Valores de CI, no de
       # producción (en prod los inyecta Dokploy).
