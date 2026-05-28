@@ -15,16 +15,17 @@
     "db:seed": "prisma db seed",
     "db:bootstrap-dev": "docker compose -f ../../docker-compose.yml exec -T postgres psql -U postgres -d simpletpv -f - < scripts/dev-bootstrap.sql"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "dependencies": {
-    "@prisma/client": "^6.0.0",
-    "bcryptjs": "^3.0.0"
+    "@prisma/adapter-pg": "^7.0.0",
+    "@prisma/client": "^7.0.0",
+    "bcryptjs": "^3.0.0",
+    "dotenv": "^16.0.0",
+    "pg": "^8.0.0"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
-    "prisma": "^6.0.0",
+    "@types/pg": "^8.0.0",
+    "prisma": "^7.0.0",
     "tsx": "^4.0.0",
     "typescript": "^6.0.0"
   }
