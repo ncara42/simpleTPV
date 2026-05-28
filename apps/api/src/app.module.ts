@@ -7,10 +7,11 @@ import { RolesGuard } from './auth/roles.guard.js';
 import { TenantContextInterceptor } from './auth/tenant-context.interceptor.js';
 import { HealthModule } from './health/health.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { ProductFamiliesModule } from './product-families/product-families.module.js';
 import { ProductsModule } from './products/products.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, HealthModule, ProductsModule],
+  imports: [PrismaModule, AuthModule, HealthModule, ProductsModule, ProductFamiliesModule],
   // Orden de guards: AuthGuard primero (popula request.user desde el JWT),
   // luego RolesGuard (lee user.role). Los APP_GUARD corren en orden de registro.
   // Rutas marcadas con @Public() saltan el AuthGuard.

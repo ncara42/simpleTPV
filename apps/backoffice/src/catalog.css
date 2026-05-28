@@ -159,3 +159,63 @@
   background: #fff;
   cursor: pointer;
 }
+
+/* Árbol de familias */
+.fam-tree {
+  border: 1px solid var(--tpv-line, #e4e2db);
+  border-radius: 0.7rem;
+  overflow: hidden;
+}
+.fam-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid #f0efe9;
+  font-size: 0.92rem;
+}
+.fam-row:last-child {
+  border-bottom: none;
+}
+.fam-bullet {
+  color: #98a4a1;
+  margin-right: 0.2rem;
+}
+.fam-actions {
+  display: flex;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+.fam-actions button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--tpv-teal-700, #0f766e);
+  padding: 0.2rem 0.5rem;
+}
+.fam-actions button.danger {
+  color: #c0392b;
+}
+
+/* Pestañas de navegación del backoffice */
+.bo-tabs {
+  display: flex;
+  gap: 0.5rem;
+  max-width: 60rem;
+  margin: 0 auto 1.5rem;
+}
+.bo-tab {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0.5rem 0.9rem;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #6b7d7a;
+}
+.bo-tab.active {
+  background: var(--tpv-teal-700, #0f766e);
+  color: #fff;
+}

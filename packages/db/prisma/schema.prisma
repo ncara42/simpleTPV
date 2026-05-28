@@ -16,9 +16,10 @@ model Organization {
   currency  String   @default("EUR")
   createdAt DateTime @default(now())
 
-  stores   Store[]
-  users    User[]
-  products Product[]
+  stores          Store[]
+  users           User[]
+  products        Product[]
+  productFamilies ProductFamily[]
 }
 
 model Store {
@@ -79,10 +80,31 @@ model Product {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  family       ProductFamily? @relation(fields: [familyId], references: [id])
 
   @@index([organizationId, active])
   @@index([organizationId, barcode])
+  @@index([organizationId, familyId])
+}
+
+model ProductFamily {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  parentId       String?  @db.Uuid
+  name           String
+  color          String?
+  icon           String?
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  parent       ProductFamily?  @relation("FamilyHierarchy", fields: [parentId], references: [id])
+  children     ProductFamily[] @relation("FamilyHierarchy")
+  products     Product[]
+
+  @@index([organizationId, parentId])
 }
 
 enum SaleUnit {
