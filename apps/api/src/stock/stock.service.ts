@@ -375,4 +375,58 @@ export class StockService {
       };
     });
   }
+
+  /**
+   * Ajuste manual de inventario (#30): fija el stock de un producto+tienda a
+   * `newQuantity`, calculando internamente el delta (newQuantity - actual) y
+   * aplicándolo como movimiento ADJUSTMENT con el motivo. Atómico: lee la
+   * cantidad actual con lock pesimista (FOR UPDATE) para que el delta sea
+   * consistente bajo concurrencia, y applyMovement reevalúa las alertas dentro
+   * de la misma tx. RLS + organizationId explícito.
+   */
+  async adjust(input: {
+    productId: string;
+    storeId: string;
+    newQuantity: number;
+    reason: string;
+    userId: string;
+  }) {
+    const { productId, storeId, newQuantity, reason, userId } = input;
+    const tenant = requireTenant();
+    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+      // Lock pesimista de la fila de Stock del par para serializar ajustes
+      // concurrentes: dos ajustes simultáneos leerían el mismo "actual" y el
+      // segundo pisaría al primero. Con FOR UPDATE el segundo espera y lee el
+      // valor ya ajustado. Si no existe la fila, no bloquea ninguna (current 0).
+      const rows = await tx.$queryRaw<Array<{ quantity: string }>>`
+        SELECT quantity::text FROM "Stock"
+        WHERE "productId" = ${productId}::uuid AND "storeId" = ${storeId}::uuid
+        FOR UPDATE
+      `;
+      const current = rows.length > 0 ? Number(rows[0]!.quantity) : 0;
+      const delta = newQuantity - current;
+
+      const resulting = await this.applyMovement(tx, {
+        organizationId: tenant.organizationId,
+        productId,
+        storeId,
+        type: 'ADJUSTMENT',
+        quantity: delta,
+        reason,
+        userId,
+      });
+
+      const updated = await tx.stock.findFirstOrThrow({
+        where: { productId, storeId, organizationId: tenant.organizationId },
+      });
+      const minStock = Number(updated.minStock);
+      return {
+        productId,
+        storeId,
+        quantity: resulting,
+        minStock,
+        level: stockLevel(resulting, minStock),
+      };
+    });
+  }
 }
