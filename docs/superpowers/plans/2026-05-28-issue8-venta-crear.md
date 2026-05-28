@@ -484,6 +484,7 @@ export class SalesService {
           total,
           lines: {
             create: lines.map((l) => ({
+              organizationId: tenant.organizationId,
               productId: l.productId,
               name: l.name,
               unitPrice: l.unitPrice,

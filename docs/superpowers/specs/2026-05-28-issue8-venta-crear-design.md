@@ -103,7 +103,8 @@ model SaleLine {
 
 - `name` y `unitPrice` **congelados** en la línea: si el producto cambia de precio/nombre, el ticket histórico no varía.
 - `qty` es `Decimal(10,3)`: las cantidades no siempre son enteras (productos por peso).
-- `SaleLine` **no tiene `organizationId` propio**: se aísla vía la venta padre (que sí está bajo RLS). Solo se accede a líneas a través de su venta.
+- `SaleLine` **tiene `organizationId` propio** con su propia policy RLS. Inicialmente se planteó aislarla solo vía la venta padre, pero eso permitiría leer líneas de otro tenant con un `SELECT` directo sobre `SaleLine` sin `JOIN` a `Sale` (fuga). Con `organizationId` + policy directa, el aislamiento es coherente con el resto del schema y no depende de hacer siempre el `JOIN`. El servicio debe poblar `organizationId` en cada línea del nested create.
+- **Todas las policies usan `NULLIF`**: `NULLIF(current_setting('app.current_organization_id', true), '')::uuid`. Sin contexto, `current_setting(..., true)` devuelve `''` (no NULL); castear `''::uuid` lanza error 22P02 en vez del fail-safe a 0 filas. Documentado en la migración `20260527235720_rls_nullif_fix`.
 
 ### 3.4 Migración
 
