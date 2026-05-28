@@ -110,6 +110,7 @@ describe('Ventas — integración', () => {
           cashGiven: 1000,
         },
         user1Id,
+        'ADMIN',
       );
     });
     expect(sale.ticketNumber).toMatch(/^T\d{2}-\d{6}$/);
@@ -126,12 +127,14 @@ describe('Ventas — integración', () => {
       return service.create(
         { storeId: store2Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
         user1Id,
+        'ADMIN',
       );
     });
     const b = await tenantStorage.run({ organizationId: org1Id }, async () => {
       return service.create(
         { storeId: store2Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
         user1Id,
+        'ADMIN',
       );
     });
     const numA = Number(a.ticketNumber.split('-')[1]);
@@ -151,6 +154,7 @@ describe('Ventas — integración', () => {
             paymentMethod: 'CASH',
           },
           user1Id,
+          'ADMIN',
         );
       }),
     ).rejects.toThrow();
@@ -165,6 +169,7 @@ describe('Ventas — integración', () => {
       return service.create(
         { storeId: store1Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
         user1Id,
+        'ADMIN',
       );
     });
 
@@ -202,12 +207,14 @@ describe('Ventas — integración', () => {
       return service.create(
         { storeId: store2Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
         user1Id,
+        'ADMIN',
       );
     });
     const b = await tenantStorage.run({ organizationId: org1Id }, async () => {
       return service.create(
         { storeId: store2Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
         user1Id,
+        'ADMIN',
       );
     });
 
@@ -217,5 +224,55 @@ describe('Ventas — integración', () => {
     // Los nº de ticket reflejan exactamente los valores del contador persistido.
     expect(Number(a.ticketNumber.split('-')[1])).toBe(before + 1);
     expect(Number(b.ticketNumber.split('-')[1])).toBe(before + 2);
+  });
+
+  it('persiste descuentos de línea y de ticket con totales correctos', async () => {
+    const sale = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.create(
+        {
+          storeId: store1Id,
+          // Descuento de línea del 10% + descuento de ticket del 5%.
+          lines: [{ productId: product1Id, qty: 2, discountPct: 10 }],
+          paymentMethod: 'CARD',
+          ticketDiscountPct: 5,
+        },
+        user1Id,
+        'ADMIN',
+      );
+    });
+
+    const line = sale.lines[0]!;
+    const unitPrice = Number(line.unitPrice);
+    const gross = Math.round(unitPrice * 2 * 100) / 100;
+    const lineDisc = Math.round(gross * 0.1 * 100) / 100;
+    const lineNet = Math.round((gross - lineDisc) * 100) / 100;
+    const ticketDisc = Math.round(lineNet * 0.05 * 100) / 100;
+
+    // Línea: el % y el importe de descuento persisten y el neto es correcto.
+    expect(Number(line.discountPct)).toBeCloseTo(10, 2);
+    expect(Number(line.discountAmt)).toBeCloseTo(lineDisc, 2);
+    expect(Number(line.lineTotal)).toBeCloseTo(lineNet, 2);
+
+    // Venta: subtotal = neto de líneas; discountTotal = línea + ticket; total = subtotal − ticket.
+    expect(Number(sale.subtotal)).toBeCloseTo(lineNet, 2);
+    expect(Number(sale.discountTotal)).toBeCloseTo(lineDisc + ticketDisc, 2);
+    expect(Number(sale.total)).toBeCloseTo(lineNet - ticketDisc, 2);
+  });
+
+  it('rechaza con 403 a un CLERK con descuento por encima de su límite (10%)', async () => {
+    await expect(
+      tenantStorage.run({ organizationId: org1Id }, async () => {
+        return service.create(
+          {
+            storeId: store1Id,
+            // 50% de descuento de línea: muy por encima del 10% permitido a CLERK.
+            lines: [{ productId: product1Id, qty: 1, discountPct: 50 }],
+            paymentMethod: 'CARD',
+          },
+          user1Id,
+          'CLERK',
+        );
+      }),
+    ).rejects.toThrow(/límite del rol CLERK/);
   });
 });

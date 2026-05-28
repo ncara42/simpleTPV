@@ -14,10 +14,33 @@ export interface ApiClient {
 export type QueryParams = Record<string, string | null | undefined>;
 
 export class ApiError extends Error {
-  constructor(readonly status: number) {
-    super(`Error ${status}`);
+  // `body` es el mensaje legible que devuelve la API (p.ej. el límite de rol en
+  // un 403). Si la respuesta no trae cuerpo útil, queda undefined y el consumidor
+  // usa un mensaje genérico.
+  constructor(
+    readonly status: number,
+    readonly body?: string,
+  ) {
+    super(body ?? `Error ${status}`);
     this.name = 'ApiError';
   }
+}
+
+// Extrae el mensaje de error de una respuesta no-ok de NestJS. El formato típico
+// es { message: string | string[], ... }. Devuelve undefined si no hay cuerpo.
+async function readErrorBody(res: Response): Promise<string | undefined> {
+  try {
+    const data = (await res.clone().json()) as { message?: string | string[] };
+    if (Array.isArray(data.message)) {
+      return data.message.join(', ');
+    }
+    if (typeof data.message === 'string') {
+      return data.message;
+    }
+  } catch {
+    // Cuerpo no-JSON o vacío: caemos al mensaje genérico.
+  }
+  return undefined;
 }
 
 function buildPath(path: string, query?: QueryParams): string {
@@ -104,28 +127,28 @@ export function createApiClient(store: AuthStore, baseUrl = '/api'): ApiClient {
     async get<T>(path: string, query?: QueryParams): Promise<T> {
       const res = await authedFetch(buildPath(path, query));
       if (!res.ok) {
-        throw new ApiError(res.status);
+        throw new ApiError(res.status, await readErrorBody(res));
       }
       return (await res.json()) as T;
     },
     async post<T>(path: string, body?: unknown): Promise<T> {
       const res = await authedFetch(path, jsonInit(body));
       if (!res.ok) {
-        throw new ApiError(res.status);
+        throw new ApiError(res.status, await readErrorBody(res));
       }
       return (await res.json()) as T;
     },
     async patch<T>(path: string, body?: unknown): Promise<T> {
       const res = await authedFetch(path, { ...jsonInit(body), method: 'PATCH' });
       if (!res.ok) {
-        throw new ApiError(res.status);
+        throw new ApiError(res.status, await readErrorBody(res));
       }
       return (await res.json()) as T;
     },
     async del(path: string): Promise<void> {
       const res = await authedFetch(path, { method: 'DELETE' });
       if (!res.ok) {
-        throw new ApiError(res.status);
+        throw new ApiError(res.status, await readErrorBody(res));
       }
     },
   };

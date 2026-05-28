@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Sale" ADD COLUMN     "discountTotal" DECIMAL(12,2) NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "SaleLine" ADD COLUMN     "discountAmt" DECIMAL(12,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "discountPct" DECIMAL(5,2) NOT NULL DEFAULT 0;

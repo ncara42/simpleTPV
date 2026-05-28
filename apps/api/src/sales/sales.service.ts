@@ -1,4 +1,10 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { PaymentMethod } from '@simpletpv/db';
 
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -7,12 +13,41 @@ import { requireTenant } from '../prisma/tenant-context.js';
 import { withTenantTx } from '../prisma/with-tenant-tx.js';
 import type { CreateSaleDto } from './sales.dto.js';
 
+export type SaleRole = 'ADMIN' | 'MANAGER' | 'CLERK';
+
 interface PricedLine {
   productId: string;
   name: string;
   unitPrice: number;
   qty: number;
+  // % de descuento de la línea (0–100). Ausente o 0 = sin descuento.
+  discountPct?: number;
 }
+
+interface TicketDiscount {
+  ticketDiscountPct?: number;
+  ticketDiscountAmt?: number;
+}
+
+interface ComputedLine extends PricedLine {
+  // Importe bruto de la línea (unitPrice*qty) antes del descuento de línea.
+  gross: number;
+  // Importe del descuento de la línea (round2(gross * pct/100)).
+  discountAmt: number;
+  // Neto tras el descuento de línea (round2(gross - discountAmt)).
+  lineTotal: number;
+}
+
+// Límite de % de descuento efectivo total del ticket por rol (null = sin límite).
+export const DISCOUNT_LIMITS: Record<SaleRole, number | null> = {
+  ADMIN: null,
+  MANAGER: 50,
+  CLERK: 10,
+};
+
+// Tolerancia para comparar floats: evita falsos positivos por imprecisión al
+// calcular el % efectivo (p.ej. 10.0000000001% con límite 10%).
+const LIMIT_EPSILON = 1e-6;
 
 export function formatTicket(code: string, counter: number): string {
   return `T${code}-${String(counter).padStart(6, '0')}`;
@@ -25,14 +60,68 @@ function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
-export function computeTotals(lines: PricedLine[]): {
-  lines: Array<PricedLine & { lineTotal: number }>;
+export function computeTotals(
+  lines: PricedLine[],
+  ticket: TicketDiscount = {},
+): {
+  lines: ComputedLine[];
   subtotal: number;
+  ticketDiscount: number;
+  discountTotal: number;
   total: number;
 } {
-  const priced = lines.map((l) => ({ ...l, lineTotal: round2(l.unitPrice * l.qty) }));
+  // 1. Por línea: bruto, descuento de línea y neto. Todos los pasos con round2
+  //    para que el cálculo coincida con la columna DECIMAL y con el TPV.
+  const priced: ComputedLine[] = lines.map((l) => {
+    const gross = round2(l.unitPrice * l.qty);
+    const pct = l.discountPct ?? 0;
+    const discountAmt = round2((gross * pct) / 100);
+    const lineTotal = round2(gross - discountAmt);
+    return { ...l, gross, discountAmt, lineTotal };
+  });
+
+  // 2. subtotal = Σ netos de línea (tras descuento de línea, antes del de ticket).
   const subtotal = round2(priced.reduce((acc, l) => acc + l.lineTotal, 0));
-  return { lines: priced, subtotal, total: subtotal };
+
+  // 3. Descuento de ticket: el importe fijo tiene precedencia sobre el %.
+  //    El importe se capa al subtotal para que el total nunca sea negativo.
+  let ticketDiscount = 0;
+  if (ticket.ticketDiscountAmt !== undefined) {
+    ticketDiscount = round2(Math.min(ticket.ticketDiscountAmt, subtotal));
+  } else if (ticket.ticketDiscountPct !== undefined) {
+    ticketDiscount = round2((subtotal * ticket.ticketDiscountPct) / 100);
+  }
+
+  // 4. discountTotal = Σ descuentos de línea + descuento de ticket.
+  const lineDiscounts = round2(priced.reduce((acc, l) => acc + l.discountAmt, 0));
+  const discountTotal = round2(lineDiscounts + ticketDiscount);
+
+  // 5. total = subtotal − descuento de ticket.
+  const total = round2(subtotal - ticketDiscount);
+
+  return { lines: priced, subtotal, ticketDiscount, discountTotal, total };
+}
+
+/**
+ * Verifica que el % de descuento efectivo total del ticket no supere el límite
+ * del rol. El % efectivo = discountTotal / grossTotal × 100 (grossTotal = suma
+ * de unitPrice*qty sin descuentos). Lanza ForbiddenException (403) si lo supera.
+ * Con grossTotal 0 (carrito vacío de importe) no hay descuento posible → no-op.
+ */
+export function assertDiscountWithinRoleLimit(
+  role: SaleRole,
+  discountTotal: number,
+  grossTotal: number,
+): void {
+  const limit = DISCOUNT_LIMITS[role];
+  if (limit === null || grossTotal <= 0) {
+    return;
+  }
+  const effectivePct = (discountTotal / grossTotal) * 100;
+  if (effectivePct > limit + LIMIT_EPSILON) {
+    const shown = Math.round(effectivePct * 100) / 100;
+    throw new ForbiddenException(`Descuento ${shown}% supera el límite del rol ${role}: ${limit}%`);
+  }
 }
 
 /**
@@ -64,7 +153,7 @@ export class SalesService {
     @Inject(PRISMA_BASE) private readonly base: PrismaService,
   ) {}
 
-  async create(dto: CreateSaleDto, userId: string) {
+  async create(dto: CreateSaleDto, userId: string, role: SaleRole) {
     const tenant = requireTenant();
 
     // El cliente extendido ya aplica RLS por-operación: esta lectura solo ve
@@ -83,10 +172,20 @@ export class SalesService {
         name: product.name,
         unitPrice: Number(product.salePrice),
         qty: l.qty,
+        discountPct: l.discountPct ?? 0,
       };
     });
 
-    const { lines, subtotal, total } = computeTotals(priced);
+    const ticket: TicketDiscount = {
+      ...(dto.ticketDiscountPct !== undefined ? { ticketDiscountPct: dto.ticketDiscountPct } : {}),
+      ...(dto.ticketDiscountAmt !== undefined ? { ticketDiscountAmt: dto.ticketDiscountAmt } : {}),
+    };
+    const { lines, subtotal, discountTotal, total } = computeTotals(priced, ticket);
+
+    // Límite por rol sobre el % efectivo total (sobre el bruto, sin descuentos).
+    const grossTotal = round2(priced.reduce((acc, l) => acc + l.unitPrice * l.qty, 0));
+    assertDiscountWithinRoleLimit(role, discountTotal, grossTotal);
+
     const { cashGiven, cashChange } = computeChange(dto.paymentMethod, total, dto.cashGiven);
 
     // Usamos el cliente BASE (sin extensiones) para que withTenantTx abra UNA
@@ -115,6 +214,7 @@ export class SalesService {
           userId,
           ticketNumber,
           subtotal,
+          discountTotal,
           total,
           paymentMethod: dto.paymentMethod,
           cashGiven,
@@ -126,6 +226,8 @@ export class SalesService {
               name: l.name,
               unitPrice: l.unitPrice,
               qty: l.qty,
+              discountPct: l.discountPct ?? 0,
+              discountAmt: l.discountAmt,
               lineTotal: l.lineTotal,
             })),
           },
