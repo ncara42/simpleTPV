@@ -55,6 +55,18 @@ export function formatTicket(code: string, counter: number): string {
   return `T${code}-${String(counter).padStart(6, '0')}`;
 }
 
+/**
+ * Convierte un día (YYYY-MM-DD) en el rango UTC semiabierto [gte, lt) que cubre
+ * exactamente ese día: gte = 00:00:00.000Z del día, lt = 00:00:00.000Z del día
+ * siguiente. Usar este rango en `createdAt: { gte, lt }` evita problemas de
+ * comparación con horas y deja el límite superior abierto. Función pura, testeable.
+ */
+export function dayRange(date: string): { gte: Date; lt: Date } {
+  const gte = new Date(`${date}T00:00:00.000Z`);
+  const lt = new Date(gte.getTime() + 24 * 60 * 60 * 1000);
+  return { gte, lt };
+}
+
 // Redondeo a 2 decimales (céntimos) para que el cálculo coincida con la columna
 // DECIMAL(12,2) y con el total que el TPV muestra al cobrar. Sin esto, el float
 // de unitPrice*qty puede arrastrar imprecisión y divergir del cambio mostrado.
@@ -398,5 +410,73 @@ export class SalesService {
     return this.prisma.sale.findFirstOrThrow({
       where: { id, organizationId: tenant.organizationId },
     });
+  }
+
+  /**
+   * Historial de ventas paginado del tenant (#14). Filtros opcionales por tienda
+   * y por día (rango UTC vía dayRange). Orden por createdAt descendente (lo más
+   * reciente primero). Devuelve la página de items + metadatos de paginación +
+   * totales.
+   *
+   * IMPORTANTE: `items` incluye ventas VOIDED (para auditoría visual con su
+   * status), pero `totals` (count + totalAmount) agrega SOLO status=COMPLETED:
+   * las anuladas se listan pero no suman en el importe del día.
+   *
+   * Defensa en profundidad: además de RLS, el where lleva organizationId explícito.
+   */
+  async findSales({
+    storeId,
+    date,
+    page = 1,
+    pageSize = 20,
+  }: {
+    storeId?: string;
+    date?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const tenant = requireTenant();
+
+    const where = {
+      organizationId: tenant.organizationId,
+      ...(storeId ? { storeId } : {}),
+      ...(date ? { createdAt: dayRange(date) } : {}),
+    };
+
+    const [items, totalItems, totals] = await Promise.all([
+      this.prisma.sale.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          ticketNumber: true,
+          createdAt: true,
+          total: true,
+          paymentMethod: true,
+          status: true,
+          storeId: true,
+        },
+      }),
+      this.prisma.sale.count({ where }),
+      this.prisma.sale.aggregate({
+        // Los totales del día solo cuentan ventas COMPLETED (las VOIDED no suman).
+        where: { ...where, status: 'COMPLETED' },
+        _sum: { total: true },
+        _count: true,
+      }),
+    ]);
+
+    return {
+      items,
+      page,
+      pageSize,
+      totalItems,
+      totals: {
+        count: totals._count,
+        totalAmount: totals._sum.total ?? 0,
+      },
+    };
   }
 }

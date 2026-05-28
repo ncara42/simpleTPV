@@ -4,9 +4,11 @@ import {
   ArrayMinSize,
   IsArray,
   IsEnum,
+  IsInt,
   IsOptional,
   IsPositive,
   IsUUID,
+  Matches,
   Max,
   Min,
   ValidateNested,
@@ -55,4 +57,32 @@ export class CreateSaleDto {
   @IsOptional()
   @Min(0)
   ticketDiscountAmt?: number;
+}
+
+// Query del listado de ventas (#14). Todos los campos son opcionales: sin
+// filtros devuelve todas las ventas del tenant paginadas. Los numéricos llegan
+// como string en el querystring, de ahí @Type(() => Number) para transformarlos
+// antes de validar @IsInt.
+export class ListSalesQueryDto {
+  @IsOptional()
+  @IsUUID()
+  storeId?: string;
+
+  // Día a filtrar en formato YYYY-MM-DD. El servicio lo convierte al rango UTC.
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'date debe tener formato YYYY-MM-DD' })
+  date?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
 }
