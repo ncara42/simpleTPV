@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
 import { tenantStorage } from '../prisma/tenant-context.js';
+import { StockService } from '../stock/stock.service.js';
 import { computeReturnable, computeReturnLineTotal, ReturnsService } from './returns.service.js';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
@@ -72,6 +73,13 @@ function makeBase(
         lines: (data.lines as { create: unknown[] }).create,
       })),
     },
+    // applyMovement (tras return.create) repone el stock de cada línea devuelta.
+    stock: {
+      upsert: vi.fn(async () => ({ quantity: 102 })),
+    },
+    stockMovement: {
+      create: vi.fn(async () => ({ id: 'mov-1' })),
+    },
   };
   return {
     $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
@@ -80,7 +88,7 @@ function makeBase(
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>, base: unknown) {
-  return new ReturnsService(prisma as never, base as never);
+  return new ReturnsService(prisma as never, base as never, new StockService());
 }
 
 // Venta de ejemplo con dos líneas (helper para los tests de create).

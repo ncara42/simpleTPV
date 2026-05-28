@@ -15,6 +15,7 @@ import { applyTenantExtension, PrismaService } from '../src/prisma/prisma.servic
 import { tenantStorage } from '../src/prisma/tenant-context.js';
 import { ReturnsService } from '../src/returns/returns.service.js';
 import { SalesService } from '../src/sales/sales.service.js';
+import { StockService } from '../src/stock/stock.service.js';
 
 describe('Devoluciones — integración', () => {
   let base: PrismaService;
@@ -32,8 +33,9 @@ describe('Devoluciones — integración', () => {
     base = new PrismaService();
     await base.onModuleInit();
     prisma = applyTenantExtension(base);
-    sales = new SalesService(prisma as unknown as PrismaService, base);
-    returns = new ReturnsService(prisma as unknown as PrismaService, base);
+    const stock = new StockService();
+    sales = new SalesService(prisma as unknown as PrismaService, base, stock);
+    returns = new ReturnsService(prisma as unknown as PrismaService, base, stock);
 
     const adminUrl = process.env.DATABASE_URL;
     if (!adminUrl) {

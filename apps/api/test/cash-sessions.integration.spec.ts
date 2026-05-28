@@ -18,6 +18,7 @@ import { CashSessionsService } from '../src/cash-sessions/cash-sessions.service.
 import { applyTenantExtension, PrismaService } from '../src/prisma/prisma.service.js';
 import { tenantStorage } from '../src/prisma/tenant-context.js';
 import { SalesService } from '../src/sales/sales.service.js';
+import { StockService } from '../src/stock/stock.service.js';
 
 describe('Sesiones de caja — integración', () => {
   let base: PrismaService;
@@ -38,7 +39,7 @@ describe('Sesiones de caja — integración', () => {
     prisma = applyTenantExtension(base);
     service = new CashSessionsService(prisma as unknown as PrismaService);
     // SalesService crea las ventas del turno (mismo patrón de dos clientes).
-    sales = new SalesService(prisma as unknown as PrismaService, base);
+    sales = new SalesService(prisma as unknown as PrismaService, base, new StockService());
 
     const adminUrl = process.env.DATABASE_URL;
     if (!adminUrl) {

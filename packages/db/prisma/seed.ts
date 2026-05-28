@@ -112,6 +112,26 @@ async function seedOrg(spec: OrgSeed, passwordHash: string): Promise<void> {
       });
     }
   }
+
+  // Stock inicial: 100 unidades de cada producto en cada tienda de la org, para
+  // tener datos con los que probar venta/devolución/traspasos. Idempotente: el
+  // @@unique([productId, storeId]) + upsert evita duplicar al re-sembrar.
+  const products = await prisma.product.findMany({ where: { organizationId: org.id } });
+  const stores = await prisma.store.findMany({ where: { organizationId: org.id } });
+  for (const product of products) {
+    for (const store of stores) {
+      await prisma.stock.upsert({
+        where: { productId_storeId: { productId: product.id, storeId: store.id } },
+        update: {},
+        create: {
+          organizationId: org.id,
+          productId: product.id,
+          storeId: store.id,
+          quantity: 100,
+        },
+      });
+    }
+  }
 }
 
 async function main(): Promise<void> {

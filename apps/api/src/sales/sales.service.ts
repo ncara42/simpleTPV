@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import { withTenantTx } from '../prisma/with-tenant-tx.js';
+import { StockService } from '../stock/stock.service.js';
 import type { CreateSaleDto } from './sales.dto.js';
 
 export type SaleRole = 'ADMIN' | 'MANAGER' | 'CLERK';
@@ -237,6 +238,8 @@ export class SalesService {
     private readonly prisma: PrismaService,
     // Base: para withTenantTx, que abre UNA sola transacción atómica.
     @Inject(PRISMA_BASE) private readonly base: PrismaService,
+    // Servicio interno de stock: aplica movimientos dentro de la tx de la venta.
+    private readonly stock: StockService,
   ) {}
 
   async create(dto: CreateSaleDto, userId: string, role: SaleRole) {
@@ -303,9 +306,7 @@ export class SalesService {
       }
       const ticketNumber = formatTicket(store.code, store.ticketCounter);
 
-      // TODO: stock semana 3 — decrementar stock atómicamente aquí (no-op por ahora).
-
-      return tx.sale.create({
+      const sale = await tx.sale.create({
         data: {
           organizationId: tenant.organizationId,
           storeId: dto.storeId,
@@ -333,6 +334,23 @@ export class SalesService {
         },
         include: { lines: true },
       });
+
+      // Decrementa el stock de cada línea (salida tipo SALE, quantity negativo),
+      // dentro de la MISMA transacción de la venta → atómico. referenceId = saleId
+      // para trazar el movimiento. El stock puede quedar negativo (no bloquea).
+      for (const l of lines) {
+        await this.stock.applyMovement(tx, {
+          organizationId: tenant.organizationId,
+          productId: l.productId,
+          storeId: dto.storeId,
+          type: 'SALE',
+          quantity: -l.qty,
+          referenceId: sale.id,
+          userId,
+        });
+      }
+
+      return sale;
     });
   }
 
@@ -416,43 +434,61 @@ export class SalesService {
    */
   async voidSale(id: string, userId: string) {
     const tenant = requireTenant();
-    const sale = await this.prisma.sale.findFirst({
-      where: { id, organizationId: tenant.organizationId },
-    });
-    if (!sale) {
-      throw new NotFoundException(`Venta ${id} no encontrada`);
-    }
-    if (sale.status === 'VOIDED') {
-      throw new BadRequestException('La venta ya está anulada');
-    }
 
-    // No se puede anular una venta que ya tiene devoluciones: dejaría un Return
-    // colgando contra una venta anulada, un estado incoherente. El count usa el
-    // cliente extendido (RLS) + organizationId explícito (defensa en profundidad).
-    const returns = await this.prisma.return.count({
-      where: { saleId: id, organizationId: tenant.organizationId },
-    });
-    if (returns > 0) {
-      throw new BadRequestException('No se puede anular una venta con devoluciones');
-    }
+    // Todo en una sola transacción atómica (cliente base): la transición de
+    // estado y la reposición de stock de las líneas deben aplicarse juntas o no
+    // aplicarse — si la reposición fallara, la anulación no debe quedar a medias.
+    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+      const sale = await tx.sale.findFirst({
+        where: { id, organizationId: tenant.organizationId },
+        include: { lines: true },
+      });
+      if (!sale) {
+        throw new NotFoundException(`Venta ${id} no encontrada`);
+      }
+      if (sale.status === 'VOIDED') {
+        throw new BadRequestException('La venta ya está anulada');
+      }
 
-    // TODO: stock semana 3 — restaurar el stock de las líneas al anular (no-op por ahora).
+      // No se puede anular una venta que ya tiene devoluciones: dejaría un Return
+      // colgando contra una venta anulada, un estado incoherente.
+      const returns = await tx.return.count({
+        where: { saleId: id, organizationId: tenant.organizationId },
+      });
+      if (returns > 0) {
+        throw new BadRequestException('No se puede anular una venta con devoluciones');
+      }
 
-    // Transición atómica: la condición status=COMPLETED viaja al WHERE de la DB,
-    // así dos anulaciones concurrentes no pueden ambas tener éxito (la segunda
-    // afecta 0 filas). organizationId en el WHERE refuerza el aislamiento del write.
-    const updated = await this.prisma.sale.updateMany({
-      where: { id, organizationId: tenant.organizationId, status: 'COMPLETED' },
-      data: { status: 'VOIDED', voidedAt: new Date(), voidedBy: userId },
-    });
-    if (updated.count === 0) {
-      // Otra request la anuló entre la lectura y el update.
-      throw new BadRequestException('La venta ya está anulada');
-    }
+      // Transición atómica: la condición status=COMPLETED viaja al WHERE de la DB,
+      // así dos anulaciones concurrentes no pueden ambas tener éxito (la segunda
+      // afecta 0 filas). organizationId en el WHERE refuerza el aislamiento del write.
+      const updated = await tx.sale.updateMany({
+        where: { id, organizationId: tenant.organizationId, status: 'COMPLETED' },
+        data: { status: 'VOIDED', voidedAt: new Date(), voidedBy: userId },
+      });
+      if (updated.count === 0) {
+        // Otra request la anuló entre la lectura y el update.
+        throw new BadRequestException('La venta ya está anulada');
+      }
 
-    // La venta existe y la acabamos de anular en esta misma request → no es null.
-    return this.prisma.sale.findFirstOrThrow({
-      where: { id, organizationId: tenant.organizationId },
+      // Repone el stock de cada línea (entrada tipo RETURN, quantity positivo),
+      // dentro de la misma tx que la anulación. referenceId = saleId.
+      for (const l of sale.lines) {
+        await this.stock.applyMovement(tx, {
+          organizationId: tenant.organizationId,
+          productId: l.productId,
+          storeId: sale.storeId,
+          type: 'RETURN',
+          quantity: Number(l.qty),
+          referenceId: sale.id,
+          userId,
+        });
+      }
+
+      // La venta existe y la acabamos de anular en esta misma tx → no es null.
+      return tx.sale.findFirstOrThrow({
+        where: { id, organizationId: tenant.organizationId },
+      });
     });
   }
 

@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import { withTenantTx } from '../prisma/with-tenant-tx.js';
+import { StockService } from '../stock/stock.service.js';
 import type { CreateReturnDto } from './returns.dto.js';
 
 // Redondeo a 2 decimales (céntimos), idéntico al de ventas, para que el cálculo
@@ -43,6 +44,8 @@ export class ReturnsService {
     private readonly prisma: PrismaService,
     // Base: para withTenantTx (una sola transacción atómica).
     @Inject(PRISMA_BASE) private readonly base: PrismaService,
+    // Servicio interno de stock: repone el stock de las líneas devueltas.
+    private readonly stock: StockService,
   ) {}
 
   /**
@@ -121,11 +124,9 @@ export class ReturnsService {
       // 4. total = Σ lineTotal.
       const total = round2(returnLines.reduce((acc, l) => acc + l.lineTotal, 0));
 
-      // TODO: stock semana 3 — restaurar el stock de las líneas devueltas (no-op por ahora).
-
       // 5. Crea el Return + sus ReturnLines (nested create), con organizationId
       //    en ambos. storeId/userId se toman de la venta y del usuario actual.
-      return tx.return.create({
+      const created = await tx.return.create({
         data: {
           organizationId: tenant.organizationId,
           storeId: sale.storeId,
@@ -137,6 +138,22 @@ export class ReturnsService {
         },
         include: { lines: true },
       });
+
+      // 6. Repone el stock de cada línea devuelta (entrada tipo RETURN, positivo)
+      //    dentro de la misma tx. referenceId = returnId para trazabilidad.
+      for (const l of returnLines) {
+        await this.stock.applyMovement(tx, {
+          organizationId: tenant.organizationId,
+          productId: l.productId,
+          storeId: sale.storeId,
+          type: 'RETURN',
+          quantity: l.qty,
+          referenceId: created.id,
+          userId,
+        });
+      }
+
+      return created;
     });
   }
 

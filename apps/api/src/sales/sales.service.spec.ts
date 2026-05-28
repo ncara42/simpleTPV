@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, NotFoundException } from '@nest
 import { describe, expect, it, vi } from 'vitest';
 
 import { tenantStorage } from '../prisma/tenant-context.js';
+import { StockService } from '../stock/stock.service.js';
 import {
   assertDiscountWithinRoleLimit,
   buildTaxBreakdown,
@@ -260,6 +261,8 @@ describe('computeChange', () => {
 function makePrisma() {
   return {
     sale: {
+      // voidSale ahora carga la venta con include:{lines}. Por defecto sin líneas
+      // (los tests que prueban la reposición las añaden en su findFirst).
       findFirst: vi.fn(async (_a?: unknown): Promise<unknown> => null),
       findMany: vi.fn(async (_a?: unknown): Promise<unknown[]> => []),
       count: vi.fn(async (_a?: unknown): Promise<number> => 0),
@@ -286,14 +289,26 @@ function makePrisma() {
         async (_a?: unknown): Promise<unknown> => ({ id: 'cash-1', status: 'OPEN' }),
       ),
     },
+    // Stock: usado por applyMovement dentro de la tx (venta y voidSale).
+    stock: {
+      upsert: vi.fn(async (_a?: unknown): Promise<unknown> => ({ quantity: 0 })),
+    },
+    stockMovement: {
+      create: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'mov-1' })),
+    },
+    // voidSale corre dentro de withTenantTx → el tx hace SELECT set_config.
+    $executeRaw: vi.fn(async (): Promise<number> => 1),
   };
 }
 
-// Construye el servicio con el mismo mock como cliente extendido y base. Para
-// los métodos bajo test (voidSale/getTicket) solo se usa el extendido; el base
-// solo lo necesita create (que mockeamos su $transaction aparte).
+// Construye el servicio con el mismo mock como cliente extendido y base. voidSale
+// abre withTenantTx(base): para que el callback opere sobre los mismos mocks,
+// envolvemos el prisma mock en un base con $transaction que lo reutiliza como tx.
 function makeService(prisma: ReturnType<typeof makePrisma>, base?: unknown) {
-  return new SalesService(prisma as never, (base ?? prisma) as never);
+  const resolvedBase = base ?? {
+    $transaction: vi.fn(async (fn: (t: typeof prisma) => Promise<unknown>) => fn(prisma)),
+  };
+  return new SalesService(prisma as never, resolvedBase as never, new StockService());
 }
 
 describe('SalesService.voidSale', () => {
@@ -332,7 +347,12 @@ describe('SalesService.voidSale', () => {
 
   it('anula la venta: updateMany con count 1 → devuelve la venta VOIDED', async () => {
     const prisma = makePrisma();
-    prisma.sale.findFirst = vi.fn(async () => ({ id: 'sale-1', status: 'COMPLETED' }));
+    prisma.sale.findFirst = vi.fn(async () => ({
+      id: 'sale-1',
+      status: 'COMPLETED',
+      storeId: 'store-1',
+      lines: [{ productId: 'p1', qty: 2 }],
+    }));
     prisma.sale.updateMany = vi.fn(async () => ({ count: 1 }));
     prisma.sale.findFirstOrThrow = vi.fn(async () => ({ id: 'sale-1', status: 'VOIDED' }));
     const service = makeService(prisma);
@@ -502,6 +522,13 @@ describe('SalesService.create', () => {
           id: 'new-sale',
           ...data,
         })),
+      },
+      // applyMovement (tras sale.create) hace upsert de Stock + create de movimiento.
+      stock: {
+        upsert: vi.fn(async () => ({ quantity: 98 })),
+      },
+      stockMovement: {
+        create: vi.fn(async () => ({ id: 'mov-1' })),
       },
     };
     return {
