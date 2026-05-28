@@ -74,12 +74,18 @@ function makeBase(
         lines: (data.lines as { create: unknown[] }).create,
       })),
     },
-    // applyMovement (tras return.create) repone el stock de cada línea devuelta.
+    // applyMovement (tras return.create) repone el stock de cada línea devuelta
+    // y reevalúa la alerta (#29).
     stock: {
-      upsert: vi.fn(async () => ({ quantity: 102 })),
+      upsert: vi.fn(async () => ({ quantity: 102, minStock: 0 })),
     },
     stockMovement: {
       create: vi.fn(async () => ({ id: 'mov-1' })),
+    },
+    stockAlert: {
+      findFirst: vi.fn(async () => null),
+      create: vi.fn(async () => ({ id: 'alert-1' })),
+      update: vi.fn(async () => ({ id: 'alert-1' })),
     },
   };
   return {
@@ -92,7 +98,7 @@ function makeService(prisma: ReturnType<typeof makePrisma>, base: unknown) {
   return new ReturnsService(
     prisma as never,
     base as never,
-    new StockService({} as never, new MemoryCache()),
+    new StockService({} as never, new MemoryCache(), {} as never),
   );
 }
 
