@@ -100,6 +100,9 @@ export interface Sale {
   paymentMethod: string;
   cashGiven: string | null;
   cashChange: string | null;
+  status: string;
+  voidedAt: string | null;
+  voidedBy: string | null;
   createdAt: string;
   lines: SaleLine[];
 }

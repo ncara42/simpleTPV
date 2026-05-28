@@ -143,6 +143,9 @@ model Sale {
   paymentMethod  PaymentMethod
   cashGiven      Decimal?      @db.Decimal(12, 2)
   cashChange     Decimal?      @db.Decimal(12, 2)
+  status         SaleStatus    @default(COMPLETED)
+  voidedAt       DateTime?
+  voidedBy       String?       @db.Uuid
   createdAt      DateTime      @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id])
@@ -186,6 +189,11 @@ enum SaleUnit {
 enum PaymentMethod {
   CASH
   CARD
+}
+
+enum SaleStatus {
+  COMPLETED
+  VOIDED
 }
 
 enum UserRole {
