@@ -12,6 +12,7 @@ import type { PrismaClient } from '@simpletpv/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { MemoryCache } from '../src/cache/memory-cache.js';
+import { InMemoryEventBus } from '../src/events/in-memory-event-bus.js';
 import { applyTenantExtension, PrismaService } from '../src/prisma/prisma.service.js';
 import { tenantStorage } from '../src/prisma/tenant-context.js';
 import { ReturnsService } from '../src/returns/returns.service.js';
@@ -55,8 +56,18 @@ describe('Stock — integración', () => {
     await base.onModuleInit();
     prisma = applyTenantExtension(base);
     cache = new MemoryCache();
-    stockService = new StockService(prisma as unknown as PrismaService, cache, base);
-    sales = new SalesService(prisma as unknown as PrismaService, base, stockService);
+    stockService = new StockService(
+      prisma as unknown as PrismaService,
+      cache,
+      base,
+      new InMemoryEventBus(),
+    );
+    sales = new SalesService(
+      prisma as unknown as PrismaService,
+      base,
+      stockService,
+      new InMemoryEventBus(),
+    );
     returns = new ReturnsService(prisma as unknown as PrismaService, base, stockService);
 
     const adminUrl = process.env.DATABASE_URL;
@@ -271,5 +282,30 @@ describe('Stock — integración', () => {
     expect(res.quantity).toBeCloseTo(42, 3);
     expect(await readQuantity(product1Id, store1Id)).toBeCloseTo(42, 3);
     expect(await countMovements(product1Id, store1Id, 'ADJUSTMENT')).toBe(adjustBefore + 1);
+  });
+
+  it('movements: devuelve el historial filtrado por producto y tienda, aislado por tenant', async () => {
+    // Genera un movimiento conocido con un ajuste.
+    await tenantStorage.run({ organizationId: org1Id }, async () =>
+      stockService.adjust({
+        productId: product1Id,
+        storeId: store1Id,
+        newQuantity: 33,
+        reason: 'recuento para historial',
+        userId: user1Id,
+      }),
+    );
+
+    const res = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      stockService.movements({ productId: product1Id, storeId: store1Id }),
+    );
+    expect(res.totalItems).toBeGreaterThan(0);
+    expect(res.items.every((m) => m.productId === product1Id && m.storeId === store1Id)).toBe(true);
+
+    // Desde org2 no se ve el historial de org1 (RLS).
+    const fromOrg2 = await tenantStorage.run({ organizationId: org2Id }, async () =>
+      stockService.movements({ productId: product1Id, storeId: store1Id }),
+    );
+    expect(fromOrg2.totalItems).toBe(0);
   });
 });

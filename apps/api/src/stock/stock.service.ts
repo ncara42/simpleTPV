@@ -2,10 +2,11 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { AlertType, MovementType } from '@simpletpv/db';
 
 import { CACHE, type Cache } from '../cache/cache.interface.js';
+import { EVENT_BUS, type EventBus } from '../events/event-bus.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
-import { withTenantTx } from '../prisma/with-tenant-tx.js';
+import { type AfterCommit, withTenantTx } from '../prisma/with-tenant-tx.js';
 
 // Clave de cache del stock de un par producto+tienda dentro de un tenant.
 export function stockCacheKey(organizationId: string, storeId: string, productId: string): string {
@@ -77,6 +78,8 @@ export class StockService {
     @Inject(CACHE) private readonly cache: Cache,
     // Base: para withTenantTx (escrituras multi-tabla atómicas, p.ej. setMin).
     @Inject(PRISMA_BASE) private readonly base: PrismaService,
+    // Bus de eventos para emitir stock.changed / alert.created tras commit (#32).
+    @Inject(EVENT_BUS) private readonly events: EventBus,
   ) {}
 
   /**
@@ -88,7 +91,11 @@ export class StockService {
    * Devuelve la cantidad resultante en Stock tras el movimiento (útil para emitir
    * eventos / reevaluar alertas en issues posteriores).
    */
-  async applyMovement(tx: TxClient, input: ApplyMovementInput): Promise<number> {
+  async applyMovement(
+    tx: TxClient,
+    input: ApplyMovementInput,
+    afterCommit?: AfterCommit,
+  ): Promise<number> {
     const { organizationId, productId, storeId, type, quantity, referenceId, reason, userId } =
       input;
 
@@ -115,8 +122,9 @@ export class StockService {
 
     // Reevalúa la alerta de stock mínimo dentro de la MISMA tx (#29): si el
     // movimiento cruza el mínimo dispara/actualiza alerta; si repone por encima,
-    // la resuelve. Consistencia inmediata (no hay job programado).
-    await this.reevaluateAlert(
+    // la resuelve. Devuelve el tipo de alerta CREADA (nueva) para emitir el
+    // evento alert.created tras commit, o null si no se creó ninguna.
+    const createdAlert = await this.reevaluateAlert(
       tx,
       organizationId,
       productId,
@@ -129,6 +137,24 @@ export class StockService {
     // falla no rompe el movimiento (la implementación no lanza). Postgres sigue
     // siendo la fuente de verdad; el cache solo acelera las lecturas (#28).
     await this.cache.set(stockCacheKey(organizationId, storeId, productId), String(resulting));
+
+    // Eventos en tiempo real (#32) TRAS commit: stock.changed siempre, y
+    // alert.created si se generó una alerta nueva. afterCommit garantiza que no
+    // se emiten si la tx hace rollback.
+    if (afterCommit) {
+      afterCommit(async () => {
+        await this.events.publish(organizationId, {
+          type: 'stock.changed',
+          data: { productId, storeId, quantity: resulting },
+        });
+        if (createdAlert) {
+          await this.events.publish(organizationId, {
+            type: 'alert.created',
+            data: { productId, storeId, alertType: createdAlert },
+          });
+        }
+      });
+    }
 
     return resulting;
   }
@@ -146,7 +172,7 @@ export class StockService {
     storeId: string,
     quantity: number,
     minStock: number,
-  ): Promise<void> {
+  ): Promise<AlertType | null> {
     const wanted = alertTypeFor(quantity, minStock);
     const active = await tx.stockAlert.findFirst({
       where: { productId, storeId, organizationId, resolved: false },
@@ -160,22 +186,25 @@ export class StockService {
           data: { resolved: true, resolvedAt: new Date() },
         });
       }
-      return;
+      return null;
     }
 
     if (!active) {
-      // No hay alerta activa: crear una del tipo correspondiente.
+      // No hay alerta activa: crear una del tipo correspondiente. Se devuelve el
+      // tipo para que el llamante emita alert.created tras commit (#32).
       await tx.stockAlert.create({
         data: { organizationId, productId, storeId, alertType: wanted },
       });
-      return;
+      return wanted;
     }
 
     // Ya hay alerta activa: si cambió el tipo (p.ej. LOW_STOCK → OUT_OF_STOCK al
-    // agotarse), actualizarlo; si no, no-op (evita duplicar y churn).
+    // agotarse), actualizarlo; si no, no-op (evita duplicar y churn). No es una
+    // alerta NUEVA, así que no se emite alert.created.
     if (active.alertType !== wanted) {
       await tx.stockAlert.update({ where: { id: active.id }, data: { alertType: wanted } });
     }
+    return null;
   }
 
   /**
@@ -358,14 +387,30 @@ export class StockService {
    */
   async setMin(productId: string, storeId: string, minStock: number) {
     const tenant = requireTenant();
-    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+    return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
       const stock = await tx.stock.upsert({
         where: { productId_storeId: { productId, storeId } },
         update: { minStock },
         create: { organizationId: tenant.organizationId, productId, storeId, minStock },
       });
       const quantity = Number(stock.quantity);
-      await this.reevaluateAlert(tx, tenant.organizationId, productId, storeId, quantity, minStock);
+      const createdAlert = await this.reevaluateAlert(
+        tx,
+        tenant.organizationId,
+        productId,
+        storeId,
+        quantity,
+        minStock,
+      );
+      // Si cambiar el mínimo disparó una alerta nueva, emítela tras commit (#32).
+      if (createdAlert) {
+        afterCommit(async () => {
+          await this.events.publish(tenant.organizationId, {
+            type: 'alert.created',
+            data: { productId, storeId, alertType: createdAlert },
+          });
+        });
+      }
       return {
         productId,
         storeId,
@@ -393,7 +438,7 @@ export class StockService {
   }) {
     const { productId, storeId, newQuantity, reason, userId } = input;
     const tenant = requireTenant();
-    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+    return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
       // Lock pesimista de la fila de Stock del par para serializar ajustes
       // concurrentes: dos ajustes simultáneos leerían el mismo "actual" y el
       // segundo pisaría al primero. Con FOR UPDATE el segundo espera y lee el
@@ -406,15 +451,19 @@ export class StockService {
       const current = rows.length > 0 ? Number(rows[0]!.quantity) : 0;
       const delta = newQuantity - current;
 
-      const resulting = await this.applyMovement(tx, {
-        organizationId: tenant.organizationId,
-        productId,
-        storeId,
-        type: 'ADJUSTMENT',
-        quantity: delta,
-        reason,
-        userId,
-      });
+      const resulting = await this.applyMovement(
+        tx,
+        {
+          organizationId: tenant.organizationId,
+          productId,
+          storeId,
+          type: 'ADJUSTMENT',
+          quantity: delta,
+          reason,
+          userId,
+        },
+        afterCommit,
+      );
 
       const updated = await tx.stock.findFirstOrThrow({
         where: { productId, storeId, organizationId: tenant.organizationId },
@@ -428,5 +477,49 @@ export class StockService {
         level: stockLevel(resulting, minStock),
       };
     });
+  }
+
+  /**
+   * Historial de movimientos de stock del tenant (#32), filtrable por producto,
+   * tienda y rango de fechas, paginado. Orden por createdAt descendente (lo más
+   * reciente primero). Para la trazabilidad/timeline del backoffice. RLS +
+   * organizationId explícito.
+   */
+  async movements({
+    productId,
+    storeId,
+    from,
+    to,
+    page = 1,
+    pageSize = 50,
+  }: {
+    productId?: string;
+    storeId?: string;
+    from?: Date;
+    to?: Date;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const tenant = requireTenant();
+    const createdAt =
+      from || to ? { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } : undefined;
+    const where = {
+      organizationId: tenant.organizationId,
+      ...(productId ? { productId } : {}),
+      ...(storeId ? { storeId } : {}),
+      ...(createdAt ? { createdAt } : {}),
+    };
+
+    const [items, totalItems] = await Promise.all([
+      this.prisma.stockMovement.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.stockMovement.count({ where }),
+    ]);
+
+    return { items, page, pageSize, totalItems };
   }
 }

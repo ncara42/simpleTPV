@@ -56,7 +56,7 @@ export class ReturnsService {
   async create(dto: CreateReturnDto, userId: string) {
     const tenant = requireTenant();
 
-    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+    return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
       // 0. Lock pesimista de la fila de la venta ANTES de leer las devoluciones
       //    previas. Serializa las devoluciones concurrentes de la MISMA venta:
       //    en READ COMMITTED (default) dos devoluciones simultáneas podrían leer
@@ -142,15 +142,19 @@ export class ReturnsService {
       // 6. Repone el stock de cada línea devuelta (entrada tipo RETURN, positivo)
       //    dentro de la misma tx. referenceId = returnId para trazabilidad.
       for (const l of returnLines) {
-        await this.stock.applyMovement(tx, {
-          organizationId: tenant.organizationId,
-          productId: l.productId,
-          storeId: sale.storeId,
-          type: 'RETURN',
-          quantity: l.qty,
-          referenceId: created.id,
-          userId,
-        });
+        await this.stock.applyMovement(
+          tx,
+          {
+            organizationId: tenant.organizationId,
+            productId: l.productId,
+            storeId: sale.storeId,
+            type: 'RETURN',
+            quantity: l.qty,
+            referenceId: created.id,
+            userId,
+          },
+          afterCommit,
+        );
       }
 
       return created;

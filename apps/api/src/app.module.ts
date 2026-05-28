@@ -8,6 +8,7 @@ import { RolesGuard } from './auth/roles.guard.js';
 import { TenantContextInterceptor } from './auth/tenant-context.interceptor.js';
 import { CacheModule } from './cache/cache.module.js';
 import { CashSessionsModule } from './cash-sessions/cash-sessions.module.js';
+import { EventsModule } from './events/events.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MeModule } from './me/me.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
@@ -24,6 +25,7 @@ import { UsersModule } from './users/users.module.js';
   imports: [
     PrismaModule,
     CacheModule,
+    EventsModule,
     AuthModule,
     HealthModule,
     ProductsModule,

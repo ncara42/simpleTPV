@@ -76,7 +76,7 @@ export class TransfersService {
    */
   async send(id: string, userId: string) {
     const tenant = requireTenant();
-    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+    return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
       const transfer = await tx.transfer.findFirst({
         where: { id, organizationId: tenant.organizationId },
         include: { lines: true },
@@ -98,15 +98,19 @@ export class TransfersService {
 
       // Decrementa el stock del origen por lo enviado (TRANSFER_OUT, negativo).
       for (const line of transfer.lines) {
-        await this.stock.applyMovement(tx, {
-          organizationId: tenant.organizationId,
-          productId: line.productId,
-          storeId: transfer.originStoreId,
-          type: 'TRANSFER_OUT',
-          quantity: -Number(line.quantitySent),
-          referenceId: transfer.id,
-          userId,
-        });
+        await this.stock.applyMovement(
+          tx,
+          {
+            organizationId: tenant.organizationId,
+            productId: line.productId,
+            storeId: transfer.originStoreId,
+            type: 'TRANSFER_OUT',
+            quantity: -Number(line.quantitySent),
+            referenceId: transfer.id,
+            userId,
+          },
+          afterCommit,
+        );
       }
 
       return tx.transfer.findFirstOrThrow({
@@ -124,7 +128,7 @@ export class TransfersService {
    */
   async receive(id: string, dto: ReceiveTransferDto, userId: string) {
     const tenant = requireTenant();
-    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+    return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
       const transfer = await tx.transfer.findFirst({
         where: { id, organizationId: tenant.organizationId },
         include: { lines: true },
@@ -165,15 +169,19 @@ export class TransfersService {
         });
         // Incrementa el stock del destino por lo RECIBIDO (no por lo enviado).
         if (r.quantityReceived > 0) {
-          await this.stock.applyMovement(tx, {
-            organizationId: tenant.organizationId,
-            productId: line.productId,
-            storeId: transfer.destStoreId,
-            type: 'TRANSFER_IN',
-            quantity: r.quantityReceived,
-            referenceId: transfer.id,
-            userId,
-          });
+          await this.stock.applyMovement(
+            tx,
+            {
+              organizationId: tenant.organizationId,
+              productId: line.productId,
+              storeId: transfer.destStoreId,
+              type: 'TRANSFER_IN',
+              quantity: r.quantityReceived,
+              referenceId: transfer.id,
+              userId,
+            },
+            afterCommit,
+          );
         }
       }
 
