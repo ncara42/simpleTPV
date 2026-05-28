@@ -17,6 +17,7 @@ import { ReturnsModule } from './returns/returns.module.js';
 import { SalesModule } from './sales/sales.module.js';
 import { StockModule } from './stock/stock.module.js';
 import { StoresModule } from './stores/stores.module.js';
+import { TransfersModule } from './transfers/transfers.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -32,6 +33,7 @@ import { UsersModule } from './users/users.module.js';
     SalesModule,
     StockModule,
     ReturnsModule,
+    TransfersModule,
     CashSessionsModule,
     MeModule,
   ],
