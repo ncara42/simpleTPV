@@ -29,6 +29,8 @@ model Organization {
   stock           Stock[]
   stockMovements  StockMovement[]
   stockAlerts     StockAlert[]
+  transfers       Transfer[]
+  transferLines   TransferLine[]
 }
 
 model Store {
@@ -49,6 +51,8 @@ model Store {
   stock          Stock[]
   stockMovements StockMovement[]
   stockAlerts    StockAlert[]
+  transfersOut   Transfer[]      @relation("TransferOrigin")
+  transfersIn    Transfer[]      @relation("TransferDest")
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -110,6 +114,7 @@ model Product {
   stock          Stock[]
   stockMovements StockMovement[]
   stockAlerts    StockAlert[]
+  transferLines  TransferLine[]
 
   @@index([organizationId, active])
   @@index([organizationId, barcode])
@@ -307,6 +312,50 @@ model StockAlert {
   @@index([organizationId, resolved, createdAt])
 }
 
+// Traspaso de mercancía entre dos tiendas del tenant (#31). Flujo de estados
+// DRAFT → SENT (decrementa origen) → RECEIVED (incrementa destino) → CLOSED.
+// RLS por tenant. originStoreId != destStoreId (validado en el servicio).
+model Transfer {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @db.Uuid
+  originStoreId  String         @db.Uuid
+  destStoreId    String         @db.Uuid
+  status         TransferStatus @default(DRAFT)
+  notes          String?
+  createdBy      String         @db.Uuid
+  createdAt      DateTime       @default(now())
+  sentAt         DateTime?
+  receivedAt     DateTime?
+  closedAt       DateTime?
+
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  originStore  Store          @relation("TransferOrigin", fields: [originStoreId], references: [id])
+  destStore    Store          @relation("TransferDest", fields: [destStoreId], references: [id])
+  lines        TransferLine[]
+
+  @@index([organizationId, status, createdAt])
+}
+
+// Línea de un traspaso: cantidad enviada y, tras la recepción, cantidad recibida
+// y discrepancia (recibido - enviado, puede ser negativa por merma en tránsito).
+// RLS propia (organizationId con policy, igual que SaleLine/ReturnLine).
+model TransferLine {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @db.Uuid
+  transferId       String   @db.Uuid
+  productId        String   @db.Uuid
+  quantitySent     Decimal  @db.Decimal(12, 3)
+  quantityReceived Decimal? @db.Decimal(12, 3)
+  discrepancy      Decimal? @db.Decimal(12, 3)
+  discrepancyNote  String?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  transfer     Transfer     @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id])
+
+  @@index([transferId])
+}
+
 model CashSession {
   id             String            @id @default(uuid()) @db.Uuid
   organizationId String            @db.Uuid
@@ -369,4 +418,11 @@ enum MovementType {
 enum AlertType {
   LOW_STOCK
   OUT_OF_STOCK
+}
+
+enum TransferStatus {
+  DRAFT
+  SENT
+  RECEIVED
+  CLOSED
 }
