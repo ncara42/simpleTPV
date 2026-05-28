@@ -356,4 +356,35 @@ export class SalesService {
       taxBreakdown,
     };
   }
+
+  /**
+   * Anula una venta del tenant (rol MANAGER/ADMIN, validado en el controller por
+   * el RolesGuard global). Marca status=VOIDED, voidedAt=now y voidedBy=userId.
+   *
+   * Defensa en profundidad: además de RLS, filtramos explícitamente por
+   * organizationId (mismo patrón que getTicket) para evitar IDOR entre tenants
+   * con un id de otra organización → findFirst null → NotFound.
+   *
+   * Una venta anulada no debe contar en totales/historial (#14): cualquier
+   * agregado DEBE filtrar status = COMPLETED.
+   */
+  async voidSale(id: string, userId: string) {
+    const tenant = requireTenant();
+    const sale = await this.prisma.sale.findFirst({
+      where: { id, organizationId: tenant.organizationId },
+    });
+    if (!sale) {
+      throw new NotFoundException(`Venta ${id} no encontrada`);
+    }
+    if (sale.status === 'VOIDED') {
+      throw new BadRequestException('La venta ya está anulada');
+    }
+
+    // TODO: stock semana 3 — restaurar el stock de las líneas al anular (no-op por ahora).
+
+    return this.prisma.sale.update({
+      where: { id },
+      data: { status: 'VOIDED', voidedAt: new Date(), voidedBy: userId },
+    });
+  }
 }
