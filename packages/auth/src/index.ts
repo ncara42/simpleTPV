@@ -1,9 +1,13 @@
 export { type ApiClient, ApiError, createApiClient, type QueryParams } from './api-client.js';
 export type {
+  CashSession,
+  CashSessionStatus,
+  CloseCashSessionInput,
   CreateSaleInput,
   FamilyInput,
   FamilyNode,
   NewUser,
+  OpenCashSessionInput,
   Product,
   ProductInput,
   Sale,
