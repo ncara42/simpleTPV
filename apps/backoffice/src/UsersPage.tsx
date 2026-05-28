@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { type NewUser, usersApi } from './lib/admin.js';
+import { createUser, deleteUser, listUsers, type NewUser } from './lib/admin.js';
 
 const EMPTY: NewUser = { email: '', name: '', password: '', role: 'CLERK' };
 
@@ -9,18 +9,18 @@ export function UsersPage() {
   const qc = useQueryClient();
   const [form, setForm] = useState<NewUser | null>(null);
 
-  const { data: users = [], isLoading } = useQuery({ queryKey: ['users'], queryFn: usersApi.list });
+  const { data: users = [], isLoading } = useQuery({ queryKey: ['users'], queryFn: listUsers });
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['users'] });
 
   const createMut = useMutation({
-    mutationFn: (u: NewUser) => usersApi.create(u),
+    mutationFn: (u: NewUser) => createUser(u),
     onSuccess: () => {
       setForm(null);
       invalidate();
     },
   });
   const delMut = useMutation({
-    mutationFn: (id: string) => usersApi.remove(id),
+    mutationFn: (id: string) => deleteUser(id),
     onSuccess: invalidate,
   });
 

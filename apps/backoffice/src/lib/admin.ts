@@ -1,62 +1,29 @@
+import type { NewUser, Store, StoreInput, User } from '@simpletpv/auth';
+
 import { api } from './auth.js';
 
-export interface UserRow {
-  id: string;
-  email: string;
-  name: string;
-  role: 'ADMIN' | 'MANAGER' | 'CLERK';
-  active: boolean;
+export type { NewUser, Store, StoreInput, User };
+
+export function listUsers(): Promise<User[]> {
+  return api.get<User[]>('/users');
 }
 
-export interface NewUser {
-  email: string;
-  name: string;
-  password: string;
-  role: 'ADMIN' | 'MANAGER' | 'CLERK';
+export function createUser(input: NewUser): Promise<User> {
+  return api.post<User>('/users', input);
 }
 
-export interface StoreRow {
-  id: string;
-  name: string;
-  address: string | null;
-  active: boolean;
+export function deleteUser(id: string): Promise<void> {
+  return api.del(`/users/${id}`);
 }
 
-async function json<T>(res: Response, action: string): Promise<T> {
-  if (!res.ok) throw new Error(`Error ${res.status} ${action}`);
-  return (await res.json()) as T;
+export function listStores(): Promise<Store[]> {
+  return api.get<Store[]>('/stores');
 }
 
-export const usersApi = {
-  list: async (): Promise<UserRow[]> => json(await api.fetch('/users'), 'listando usuarios'),
-  create: async (u: NewUser): Promise<UserRow> =>
-    json(
-      await api.fetch('/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(u),
-      }),
-      'creando usuario',
-    ),
-  remove: async (id: string): Promise<void> => {
-    const res = await api.fetch(`/users/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error(`Error ${res.status} borrando usuario`);
-  },
-};
+export function createStore(input: StoreInput): Promise<Store> {
+  return api.post<Store>('/stores', input);
+}
 
-export const storesApi = {
-  list: async (): Promise<StoreRow[]> => json(await api.fetch('/stores'), 'listando tiendas'),
-  create: async (s: { name: string; address?: string }): Promise<StoreRow> =>
-    json(
-      await api.fetch('/stores', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(s),
-      }),
-      'creando tienda',
-    ),
-  remove: async (id: string): Promise<void> => {
-    const res = await api.fetch(`/stores/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error(`Error ${res.status} borrando tienda`);
-  },
-};
+export function deleteStore(id: string): Promise<void> {
+  return api.del(`/stores/${id}`);
+}
