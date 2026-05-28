@@ -13,6 +13,7 @@ function makePrisma() {
       findFirst: vi.fn(async (_args?: unknown): Promise<unknown> => null),
       update: vi.fn(async ({ data }: { data: unknown }) => ({ id: 'p1', ...(data as object) })),
       delete: vi.fn(async () => ({ id: 'p1' })),
+      createMany: vi.fn(async (_a?: unknown): Promise<unknown> => ({ count: 0 })),
     },
   };
 }
@@ -114,5 +115,72 @@ describe('ProductsService.update / remove', () => {
     const service = new ProductsService(prisma as never);
     await service.remove('p1');
     expect(prisma.product.delete).toHaveBeenCalledOnce();
+  });
+});
+
+describe('ProductsService.findByBarcode', () => {
+  it('devuelve el producto si existe el barcode', async () => {
+    const prisma = makePrisma();
+    prisma.product.findFirst = vi.fn(async () => ({ id: 'p1', barcode: '8410' }));
+    const service = new ProductsService(prisma as never);
+    const result = await service.findByBarcode('8410');
+    const arg = prisma.product.findFirst.mock.calls[0]![0] as { where: { barcode: string } };
+    expect(arg.where.barcode).toBe('8410');
+    expect(result).toMatchObject({ id: 'p1' });
+  });
+
+  it('lanza 404 si no existe el barcode', async () => {
+    const prisma = makePrisma();
+    prisma.product.findFirst = vi.fn(async () => null);
+    const service = new ProductsService(prisma as never);
+    await expect(service.findByBarcode('nope')).rejects.toThrow();
+  });
+});
+
+describe('ProductsService.importCsv', () => {
+  const ORG2 = '11111111-1111-1111-1111-111111111111';
+
+  it('inserta filas válidas y devuelve resumen', async () => {
+    const prisma = makePrisma();
+    prisma.product.createMany = vi.fn(async (_a?: unknown): Promise<unknown> => ({ count: 2 }));
+    const service = new ProductsService(prisma as never);
+    const csv = 'name,salePrice,sku,barcode\nCafé,1.50,SKU1,8410\nTé,2.00,SKU2,8411\n';
+    const result = (await tenantStorage.run({ organizationId: ORG2 }, () =>
+      service.importCsv(csv),
+    )) as { inserted: number; errors: Array<{ row: number; message: string }> };
+    expect(result.inserted).toBe(2);
+    expect(result.errors).toHaveLength(0);
+    const arg = prisma.product.createMany.mock.calls[0]![0] as {
+      data: Array<{ organizationId: string }>;
+    };
+    expect(arg.data).toHaveLength(2);
+    expect(arg.data[0]!.organizationId).toBe(ORG2);
+  });
+
+  it('reporta errores por fila sin abortar las válidas', async () => {
+    const prisma = makePrisma();
+    prisma.product.createMany = vi.fn(
+      async (a?: unknown): Promise<unknown> => ({
+        count: (a as { data: unknown[] }).data.length,
+      }),
+    );
+    const service = new ProductsService(prisma as never);
+    // fila 2 sin precio numérico, fila 3 sin nombre → ambas inválidas; fila 1 válida
+    const csv = 'name,salePrice\nCafé,1.50\nTé,abc\n,3.00\n';
+    const result = (await tenantStorage.run({ organizationId: ORG2 }, () =>
+      service.importCsv(csv),
+    )) as { inserted: number; errors: Array<{ row: number; message: string }> };
+    expect(result.inserted).toBe(1);
+    expect(result.errors).toHaveLength(2);
+    expect(result.errors.map((e) => e.row).sort()).toEqual([3, 4]); // filas de datos (1-indexed + cabecera)
+  });
+
+  it('CSV vacío o solo cabecera no inserta nada', async () => {
+    const prisma = makePrisma();
+    const service = new ProductsService(prisma as never);
+    const result = (await tenantStorage.run({ organizationId: ORG2 }, () =>
+      service.importCsv('name,salePrice\n'),
+    )) as { inserted: number; errors: unknown[] };
+    expect(result.inserted).toBe(0);
   });
 });

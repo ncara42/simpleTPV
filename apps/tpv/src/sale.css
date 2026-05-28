@@ -98,3 +98,28 @@
   color: #6b7d7a;
   padding: 2rem 0;
 }
+
+.scan-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.8rem 1.1rem;
+  border-radius: 0.7rem;
+  background: rgba(20, 184, 166, 0.12);
+  border: 1.5px solid var(--tpv-teal-500, #14b8a6);
+  font-size: 1rem;
+  cursor: pointer;
+}
+.scan-banner .scan-miss {
+  color: #c0392b;
+}
+.scan-close {
+  border: none;
+  background: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b7d7a;
+}

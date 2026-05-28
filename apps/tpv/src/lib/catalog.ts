@@ -30,3 +30,10 @@ export async function listFamilies(): Promise<FamilyNode[]> {
   if (!res.ok) throw new Error(`Error ${res.status} listando familias`);
   return (await res.json()) as FamilyNode[];
 }
+
+export async function findByBarcode(code: string): Promise<Product | null> {
+  const res = await api.fetch(`/products/barcode/${encodeURIComponent(code)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Error ${res.status} buscando por código`);
+  return (await res.json()) as Product;
+}

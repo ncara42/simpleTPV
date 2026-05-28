@@ -70,4 +70,84 @@ export class ProductsService {
     await this.findOne(id);
     await this.prisma.product.delete({ where: { id } });
   }
+
+  async findByBarcode(code: string): Promise<unknown> {
+    const product = await this.prisma.product.findFirst({ where: { barcode: code } });
+    if (!product) {
+      throw new NotFoundException(`Producto con código ${code} no encontrado`);
+    }
+    return product;
+  }
+
+  // Importación masiva desde CSV. Parsea, valida fila a fila, inserta las
+  // válidas en bulk y devuelve un reporte de errores (no aborta por una mala).
+  async importCsv(csv: string): Promise<{
+    inserted: number;
+    errors: Array<{ row: number; message: string }>;
+  }> {
+    const tenant = getCurrentTenant();
+    if (!tenant) {
+      throw new InternalServerErrorException('Sin contexto de tenant');
+    }
+
+    const rows = parseCsv(csv);
+    const valid: Array<{
+      organizationId: string;
+      name: string;
+      salePrice: number;
+      sku: string | null;
+      barcode: string | null;
+    }> = [];
+    const errors: Array<{ row: number; message: string }> = [];
+
+    rows.forEach((cells, idx) => {
+      const rowNumber = idx + 2; // +1 por cabecera, +1 porque humano cuenta desde 1
+      const name = (cells.name ?? '').trim();
+      const priceRaw = (cells.salePrice ?? '').trim();
+      const price = Number(priceRaw);
+      if (!name) {
+        errors.push({ row: rowNumber, message: 'Falta el nombre' });
+        return;
+      }
+      if (!priceRaw || Number.isNaN(price)) {
+        errors.push({ row: rowNumber, message: 'Precio inválido' });
+        return;
+      }
+      valid.push({
+        organizationId: tenant.organizationId,
+        name,
+        salePrice: price,
+        sku: cells.sku?.trim() || null,
+        barcode: cells.barcode?.trim() || null,
+      });
+    });
+
+    let inserted = 0;
+    if (valid.length > 0) {
+      const res = (await this.prisma.product.createMany({ data: valid })) as { count: number };
+      inserted = res.count;
+    }
+    return { inserted, errors };
+  }
+}
+
+// Parser CSV mínimo: primera línea = cabecera, resto = filas. Separador coma,
+// sin soporte de comillas/escapes (el catálogo importado es de formato simple).
+function parseCsv(csv: string): Array<Record<string, string>> {
+  const lines = csv
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  if (lines.length < 2) {
+    return [];
+  }
+  const header = lines[0]!.split(',').map((h) => h.trim());
+  return lines.slice(1).map((line) => {
+    const cells = line.split(',');
+    const obj: Record<string, string> = {};
+    header.forEach((h, i) => {
+      obj[h] = (cells[i] ?? '').trim();
+    });
+    return obj;
+  });
 }

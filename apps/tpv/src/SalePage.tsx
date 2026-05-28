@@ -1,7 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { type FamilyNode, listFamilies, type Product, searchProducts } from './lib/catalog.js';
+import {
+  type FamilyNode,
+  findByBarcode,
+  listFamilies,
+  type Product,
+  searchProducts,
+} from './lib/catalog.js';
+import { useBarcodeScanner } from './lib/useBarcodeScanner.js';
 import { useDebounce } from './lib/useDebounce.js';
 
 function flattenRoots(tree: FamilyNode[]): FamilyNode[] {
@@ -12,6 +19,7 @@ function flattenRoots(tree: FamilyNode[]): FamilyNode[] {
 export function SalePage() {
   const [search, setSearch] = useState('');
   const [familyId, setFamilyId] = useState<string | null>(null);
+  const [scanned, setScanned] = useState<{ product: Product | null; code: string } | null>(null);
   const debouncedSearch = useDebounce(search, 200);
 
   const { data: families = [] } = useQuery({
@@ -22,6 +30,11 @@ export function SalePage() {
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['sale-products', debouncedSearch, familyId],
     queryFn: () => searchProducts(debouncedSearch, familyId),
+  });
+
+  // Escáner USB: al leer un código, busca el producto y lo destaca.
+  useBarcodeScanner((code) => {
+    void findByBarcode(code).then((product) => setScanned({ product, code }));
   });
 
   const roots = flattenRoots(families);
@@ -59,6 +72,24 @@ export function SalePage() {
           </button>
         ))}
       </div>
+
+      {scanned && (
+        <div className="scan-banner" data-testid="scan-banner" onClick={() => setScanned(null)}>
+          {scanned.product ? (
+            <span>
+              Escaneado: <strong>{scanned.product.name}</strong> ·{' '}
+              {Number(scanned.product.salePrice).toFixed(2)} €
+            </span>
+          ) : (
+            <span className="scan-miss">
+              Código <strong>{scanned.code}</strong> sin producto asociado
+            </span>
+          )}
+          <button className="scan-close" aria-label="Cerrar">
+            ×
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
         <p className="sale-empty">Cargando…</p>
