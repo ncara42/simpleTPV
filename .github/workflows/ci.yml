@@ -218,6 +218,18 @@ jobs:
       - name: Apply Prisma migrations
         run: pnpm --filter @simpletpv/db exec prisma migrate deploy
 
+      # Bootstrap dev: da login al rol `app` con password de desarrollo.
+      # NO es una migración Prisma para evitar que `prisma migrate deploy`
+      # lo aplique en producción (donde el password real lo pone Dokploy
+      # via ALTER ROLE manual una vez tras el primer despliegue).
+      # Ver packages/db/scripts/README.md.
+      - name: Bootstrap dev rol app
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5432 -U postgres -d simpletpv \
+            -f packages/db/scripts/dev-bootstrap.sql
+
       - name: Seed multi-tenant fixtures
         run: pnpm --filter @simpletpv/db exec prisma db seed
 
