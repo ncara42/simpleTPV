@@ -24,6 +24,8 @@ model Organization {
   sales           Sale[]
   saleLines       SaleLine[]
   cashSessions    CashSession[]
+  returns         Return[]
+  returnLines     ReturnLine[]
 }
 
 model Store {
@@ -40,6 +42,7 @@ model Store {
   users        UserStore[]
   sales        Sale[]
   cashSessions CashSession[]
+  returns      Return[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -60,6 +63,7 @@ model User {
   stores       UserStore[]
   sales        Sale[]
   cashSessions CashSession[]
+  returns      Return[]
 
   @@index([organizationId])
 }
@@ -95,6 +99,7 @@ model Product {
   organization Organization   @relation(fields: [organizationId], references: [id])
   family       ProductFamily? @relation(fields: [familyId], references: [id])
   saleLines    SaleLine[]
+  returnLines  ReturnLine[]
 
   @@index([organizationId, active])
   @@index([organizationId, barcode])
@@ -155,6 +160,7 @@ model Sale {
   store        Store        @relation(fields: [storeId], references: [id])
   user         User         @relation(fields: [userId], references: [id])
   lines        SaleLine[]
+  returns      Return[]
 
   @@unique([organizationId, ticketNumber])
   @@index([organizationId, storeId, createdAt])
@@ -178,8 +184,51 @@ model SaleLine {
   organization Organization @relation(fields: [organizationId], references: [id])
   sale         Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product      Product      @relation(fields: [productId], references: [id])
+  returnLines  ReturnLine[]
 
   @@index([saleId])
+}
+
+// Devolución parcial contra un ticket de venta (#15). Cada devolución agrupa
+// una o varias líneas (ReturnLine) devueltas de una misma venta. El motivo es
+// obligatorio (auditoría). El total se congela en el momento de la devolución.
+model Return {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  storeId        String   @db.Uuid
+  userId         String   @db.Uuid
+  saleId         String   @db.Uuid // venta contra la que se devuelve
+  reason         String // motivo obligatorio
+  total          Decimal  @db.Decimal(12, 2)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  store        Store        @relation(fields: [storeId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+  sale         Sale         @relation(fields: [saleId], references: [id])
+  lines        ReturnLine[]
+
+  @@index([organizationId, saleId])
+}
+
+// Línea de una devolución: referencia la SaleLine devuelta y la cantidad. Lleva
+// su propio organizationId con RLS propia (mismo patrón que SaleLine). El
+// lineTotal es la parte proporcional del neto de la SaleLine, congelada.
+model ReturnLine {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid // RLS propia (como SaleLine)
+  returnId       String  @db.Uuid
+  saleLineId     String  @db.Uuid // línea de venta devuelta
+  productId      String  @db.Uuid
+  qty            Decimal @db.Decimal(10, 3)
+  lineTotal      Decimal @db.Decimal(12, 2)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  return       Return       @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  saleLine     SaleLine     @relation(fields: [saleLineId], references: [id])
+  product      Product      @relation(fields: [productId], references: [id])
+
+  @@index([returnId])
 }
 
 model CashSession {
