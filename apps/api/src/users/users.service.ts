@@ -1,4 +1,9 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -88,9 +93,23 @@ export class UsersService {
 
   async assignStores(id: string, storeIds: string[]): Promise<void> {
     await this.requireExists(id);
+    // UserStore no tiene RLS propia: validamos que cada storeId pertenezca al
+    // tenant actual a través del modelo Store (sí protegido por RLS) antes de
+    // insertar. Sin esto, un ADMIN podría enlazar su usuario con tiendas de otra
+    // organización (rotura de aislamiento multi-tenant).
+    const uniqueStoreIds = [...new Set(storeIds)];
+    if (uniqueStoreIds.length > 0) {
+      const owned = await this.prisma.store.findMany({
+        where: { id: { in: uniqueStoreIds } },
+        select: { id: true },
+      });
+      if (owned.length !== uniqueStoreIds.length) {
+        throw new BadRequestException('Alguna tienda no existe o no pertenece a la organización');
+      }
+    }
     await this.prisma.userStore.deleteMany({ where: { userId: id } });
     await this.prisma.userStore.createMany({
-      data: storeIds.map((storeId) => ({ userId: id, storeId })),
+      data: uniqueStoreIds.map((storeId) => ({ userId: id, storeId })),
     });
   }
 }
