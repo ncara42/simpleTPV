@@ -469,3 +469,127 @@
 .sale-store-row {
   margin-bottom: 0.75rem;
 }
+
+/* Panel de caja (apertura/cierre con cuadre) */
+.cash-panel {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1.5px solid var(--tpv-line, #e4e2db);
+  border-radius: 0.7rem;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.cash-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.cash-badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.15rem 0.6rem;
+  border-radius: 0.4rem;
+}
+.cash-badge-open {
+  background: rgba(20, 184, 166, 0.15);
+  color: var(--tpv-teal-700, #0f766e);
+}
+.cash-badge-closed {
+  background: #f0efe9;
+  color: #6b7d7a;
+}
+.cash-opening {
+  font-size: 0.9rem;
+  color: #555;
+  font-variant-numeric: tabular-nums;
+}
+.cash-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.cash-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.cash-field input {
+  height: 2.8rem;
+  border: 2px solid var(--tpv-line, #e4e2db);
+  border-radius: 0.6rem;
+  padding: 0 0.9rem;
+  font-size: 1.1rem;
+}
+.cash-field input:focus {
+  outline: none;
+  border-color: var(--tpv-teal-500, #14b8a6);
+}
+.cash-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+.cash-btn-open,
+.cash-btn-close,
+.cash-btn-cancel {
+  flex: 1;
+  min-height: 2.8rem;
+  border-radius: 0.6rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+.cash-btn-open {
+  background: var(--tpv-teal-700, #0f766e);
+  color: #fff;
+}
+.cash-btn-close {
+  background: #c0392b;
+  color: #fff;
+}
+.cash-btn-cancel {
+  background: #f0efe9;
+  color: #444;
+}
+.cash-btn-open:disabled,
+.cash-btn-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cash-reconciliation {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.6rem 0.7rem;
+  background: #faf9f5;
+  border-radius: 0.5rem;
+}
+.cash-recon-row {
+  display: flex;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+}
+.cash-diff {
+  font-weight: 700;
+  border-top: 1px dashed var(--tpv-line, #c9c6bd);
+  padding-top: 0.3rem;
+  margin-top: 0.1rem;
+}
+.cash-diff-positive {
+  color: #0f766e;
+}
+.cash-diff-negative {
+  color: #c0392b;
+}
+.cash-diff-zero {
+  color: #555;
+}
+.cash-error {
+  font-size: 0.9rem;
+  color: #c0392b;
+  margin: 0;
+}
