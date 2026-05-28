@@ -21,6 +21,7 @@ model Organization {
   products        Product[]
   productFamilies ProductFamily[]
   auditLogs       AuditLog[]
+  sales           Sale[]
 }
 
 model Store {
@@ -29,11 +30,15 @@ model Store {
   name           String
   address        String?
   active         Boolean  @default(true)
+  code           String
+  ticketCounter  Int      @default(0)
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id])
   users        UserStore[]
+  sales        Sale[]
 
+  @@unique([organizationId, code])
   @@index([organizationId])
 }
 
@@ -50,6 +55,7 @@ model User {
 
   organization Organization @relation(fields: [organizationId], references: [id])
   stores       UserStore[]
+  sales        Sale[]
 
   @@index([organizationId])
 }
@@ -84,6 +90,7 @@ model Product {
 
   organization Organization   @relation(fields: [organizationId], references: [id])
   family       ProductFamily? @relation(fields: [familyId], references: [id])
+  saleLines    SaleLine[]
 
   @@index([organizationId, active])
   @@index([organizationId, barcode])
@@ -121,6 +128,40 @@ model AuditLog {
   organization Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId, createdAt])
+}
+
+model Sale {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  storeId        String   @db.Uuid
+  userId         String   @db.Uuid
+  ticketNumber   String
+  subtotal       Decimal  @db.Decimal(12, 2)
+  total          Decimal  @db.Decimal(12, 2)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  store        Store        @relation(fields: [storeId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+  lines        SaleLine[]
+
+  @@unique([organizationId, ticketNumber])
+  @@index([organizationId, storeId, createdAt])
+}
+
+model SaleLine {
+  id        String  @id @default(uuid()) @db.Uuid
+  saleId    String  @db.Uuid
+  productId String  @db.Uuid
+  name      String
+  unitPrice Decimal @db.Decimal(10, 4)
+  qty       Decimal @db.Decimal(10, 3)
+  lineTotal Decimal @db.Decimal(12, 2)
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([saleId])
 }
 
 enum SaleUnit {
