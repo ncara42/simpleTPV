@@ -1,9 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { MovementType } from '@simpletpv/db';
+import type { AlertType, MovementType } from '@simpletpv/db';
 
 import { CACHE, type Cache } from '../cache/cache.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
+import { withTenantTx } from '../prisma/with-tenant-tx.js';
 
 // Clave de cache del stock de un par producto+tienda dentro de un tenant.
 export function stockCacheKey(organizationId: string, storeId: string, productId: string): string {
@@ -26,6 +28,27 @@ export function stockLevel(quantity: number, minStock: number): StockLevel {
   }
   return 'green';
 }
+
+// Tipo de alerta que CORRESPONDE a un nivel de stock, o null si no hay alerta:
+//   - OUT_OF_STOCK si quantity <= 0 (agotado).
+//   - LOW_STOCK    si 0 < quantity <= minStock (bajo mínimo).
+//   - null         si quantity > minStock (sin alerta).
+// Función pura, testeable. Espeja stockLevel: red→OUT_OF_STOCK, yellow→LOW_STOCK.
+export function alertTypeFor(quantity: number, minStock: number): AlertType | null {
+  if (quantity <= 0) {
+    return 'OUT_OF_STOCK';
+  }
+  if (quantity <= minStock) {
+    return 'LOW_STOCK';
+  }
+  return null;
+}
+
+// Orden de urgencia para listar alertas: OUT_OF_STOCK antes que LOW_STOCK.
+export const ALERT_URGENCY: Record<AlertType, number> = {
+  OUT_OF_STOCK: 0,
+  LOW_STOCK: 1,
+};
 
 // Cliente transaccional de Prisma (lo que recibe el callback de $transaction),
 // idéntico al tipo usado en with-tenant-tx. applyMovement opera SIEMPRE sobre un
@@ -52,6 +75,8 @@ export class StockService {
     // Extendido: lecturas con RLS por-operación (las consultas de stock).
     private readonly prisma: PrismaService,
     @Inject(CACHE) private readonly cache: Cache,
+    // Base: para withTenantTx (escrituras multi-tabla atómicas, p.ej. setMin).
+    @Inject(PRISMA_BASE) private readonly base: PrismaService,
   ) {}
 
   /**
@@ -88,12 +113,69 @@ export class StockService {
 
     const resulting = Number(stock.quantity);
 
+    // Reevalúa la alerta de stock mínimo dentro de la MISMA tx (#29): si el
+    // movimiento cruza el mínimo dispara/actualiza alerta; si repone por encima,
+    // la resuelve. Consistencia inmediata (no hay job programado).
+    await this.reevaluateAlert(
+      tx,
+      organizationId,
+      productId,
+      storeId,
+      resulting,
+      Number(stock.minStock),
+    );
+
     // Actualiza el cache con la cantidad resultante. Best-effort: si el cache
     // falla no rompe el movimiento (la implementación no lanza). Postgres sigue
     // siendo la fuente de verdad; el cache solo acelera las lecturas (#28).
     await this.cache.set(stockCacheKey(organizationId, storeId, productId), String(resulting));
 
     return resulting;
+  }
+
+  /**
+   * Dispara, actualiza o resuelve la alerta de stock de un par producto+tienda
+   * según la cantidad resultante vs su mínimo. Idempotente y seguro frente al
+   * índice único parcial (una activa por par): usa updateMany condicional para no
+   * duplicar. Corre dentro de la tx del movimiento (#29) o del ajuste de mínimo.
+   */
+  async reevaluateAlert(
+    tx: TxClient,
+    organizationId: string,
+    productId: string,
+    storeId: string,
+    quantity: number,
+    minStock: number,
+  ): Promise<void> {
+    const wanted = alertTypeFor(quantity, minStock);
+    const active = await tx.stockAlert.findFirst({
+      where: { productId, storeId, organizationId, resolved: false },
+    });
+
+    if (wanted === null) {
+      // Stock por encima del mínimo: resolver la alerta activa si existe.
+      if (active) {
+        await tx.stockAlert.update({
+          where: { id: active.id },
+          data: { resolved: true, resolvedAt: new Date() },
+        });
+      }
+      return;
+    }
+
+    if (!active) {
+      // No hay alerta activa: crear una del tipo correspondiente.
+      await tx.stockAlert.create({
+        data: { organizationId, productId, storeId, alertType: wanted },
+      });
+      return;
+    }
+
+    // Ya hay alerta activa: si cambió el tipo (p.ej. LOW_STOCK → OUT_OF_STOCK al
+    // agotarse), actualizarlo; si no, no-op (evita duplicar y churn).
+    if (active.alertType !== wanted) {
+      await tx.stockAlert.update({ where: { id: active.id }, data: { alertType: wanted } });
+    }
   }
 
   /**
@@ -230,5 +312,67 @@ export class StockService {
     }
     await this.cache.set(key, String(fromDb));
     return fromDb;
+  }
+
+  /**
+   * Alertas de stock del tenant (#29). Filtra por tienda y por estado (por
+   * defecto solo activas, resolved=false). Ordenadas por urgencia (OUT_OF_STOCK
+   * antes que LOW_STOCK) y luego por antigüedad (más antiguas primero). RLS +
+   * organizationId explícito.
+   */
+  async alerts({ storeId, resolved = false }: { storeId?: string; resolved?: boolean }) {
+    const tenant = requireTenant();
+    const rows = await this.prisma.stockAlert.findMany({
+      where: {
+        organizationId: tenant.organizationId,
+        resolved,
+        ...(storeId ? { storeId } : {}),
+      },
+      include: { product: { select: { name: true } }, store: { select: { name: true } } },
+    });
+    // Orden por urgencia y antigüedad. Lo hacemos en memoria porque el orden por
+    // urgencia depende de un mapa (no de una columna), y el volumen de alertas
+    // activas es pequeño.
+    return rows
+      .map((r) => ({
+        id: r.id,
+        productId: r.productId,
+        productName: r.product.name,
+        storeId: r.storeId,
+        storeName: r.store.name,
+        alertType: r.alertType,
+        resolved: r.resolved,
+        createdAt: r.createdAt,
+      }))
+      .sort((a, b) => {
+        const byUrgency = ALERT_URGENCY[a.alertType] - ALERT_URGENCY[b.alertType];
+        return byUrgency !== 0 ? byUrgency : a.createdAt.getTime() - b.createdAt.getTime();
+      });
+  }
+
+  /**
+   * Configura el stock mínimo de un producto en una tienda (#29). Actualiza
+   * Stock.minStock y reevalúa la alerta (cambiar el mínimo puede disparar o
+   * resolver), todo en una tx atómica. Si no existe la fila Stock del par, la
+   * crea con quantity 0. RLS + organizationId explícito.
+   */
+  async setMin(productId: string, storeId: string, minStock: number) {
+    const tenant = requireTenant();
+    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+      const stock = await tx.stock.upsert({
+        where: { productId_storeId: { productId, storeId } },
+        update: { minStock },
+        create: { organizationId: tenant.organizationId, productId, storeId, minStock },
+      });
+      const quantity = Number(stock.quantity);
+      await this.reevaluateAlert(tx, tenant.organizationId, productId, storeId, quantity, minStock);
+      return {
+        productId,
+        storeId,
+        quantity,
+        minStock: Number(stock.minStock),
+        level: stockLevel(quantity, minStock),
+      };
+    });
   }
 }
