@@ -20,6 +20,10 @@
 - No mocks de BD en tests de integración — usar Postgres efímero.
 - ESLint flat config raíz aplica a todo el monorepo; cada workspace puede sobreescribir.
 - `tsconfig.base.json` en raíz; cada workspace extiende.
+- `apps/api/tsconfig.json` sobrescribe `module` a `node16` (NestJS 11 más estable en CJS/Node resolution clásica). El resto del monorepo usa `ESNext`/`Bundler`. Override documentado en `docs/superpowers/specs/2026-05-28-f3-api-nestjs-design.md` F3-D2.
+- Multi-tenancy: cada request HTTP DEBE pasar `X-Org-Id` (UUID v4) salvo `/health`. `TenantMiddleware` lo valida (regex UUID estricto) y pobla `AsyncLocalStorage`. `PrismaService` con `$extends` ejecuta `set_config('app.current_organization_id', ...)` parametrizado en una `$transaction` y re-emite la operación sobre `tx[model][operation]` → RLS aplicada en DB.
+- Sin contexto → query devuelve 0 filas (fail-safe). Nunca filtra entre tenants. Verificado en `apps/api/test/rls.integration.spec.ts`.
+- Puertos por defecto en local: API `:3001` (no 3000 — evita colisión con otros dev servers). Postgres docker mapeado a `:5434` host (no 5432).
 
 ## Scripts raíz
 

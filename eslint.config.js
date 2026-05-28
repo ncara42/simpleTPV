@@ -11,12 +11,12 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   {
     ignores: [
-      'node_modules',
-      'dist',
-      'build',
-      'coverage',
-      '.next',
-      '.turbo',
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/build/**',
+      '**/coverage/**',
+      '**/.next/**',
+      '**/.turbo/**',
       '**/generated/**',
       '**/*.generated.*',
     ],

@@ -2,6 +2,7 @@ packages:
   - 'apps/*'
   - 'packages/*'
 onlyBuiltDependencies:
+  - '@nestjs/core'
   - '@prisma/client'
   - '@prisma/engines'
   - esbuild
