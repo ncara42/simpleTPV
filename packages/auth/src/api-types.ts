@@ -195,3 +195,31 @@ export interface OpenCashSessionInput {
 export interface CloseCashSessionInput {
   countedAmount: number;
 }
+
+// Devolución parcial contra un ticket (#15). Los Decimal de Prisma viajan como
+// string sobre HTTP, igual que en Sale/SaleLine.
+export interface ReturnLine {
+  id: string;
+  returnId: string;
+  saleLineId: string;
+  productId: string;
+  qty: string;
+  lineTotal: string;
+}
+
+export interface Return {
+  id: string;
+  storeId: string;
+  userId: string;
+  saleId: string;
+  reason: string;
+  total: string;
+  createdAt: string;
+  lines: ReturnLine[];
+}
+
+export interface CreateReturnInput {
+  saleId: string;
+  reason: string;
+  lines: Array<{ saleLineId: string; qty: number }>;
+}

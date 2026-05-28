@@ -375,6 +375,23 @@ export class SalesService {
   }
 
   /**
+   * Localiza una venta del tenant por su número de ticket, con sus líneas. Sirve
+   * al flujo de devolución del TPV (buscar el ticket por su nº impreso). RLS +
+   * filtro por organizationId explícito; si no existe en el tenant → 404.
+   */
+  async findByTicket(ticketNumber: string) {
+    const tenant = requireTenant();
+    const sale = await this.prisma.sale.findFirst({
+      where: { ticketNumber, organizationId: tenant.organizationId },
+      include: { lines: true },
+    });
+    if (!sale) {
+      throw new NotFoundException(`Ticket ${ticketNumber} no encontrado`);
+    }
+    return sale;
+  }
+
+  /**
    * Anula una venta del tenant (rol MANAGER/ADMIN, validado en el controller por
    * el RolesGuard global). Marca status=VOIDED, voidedAt=now y voidedBy=userId.
    *
@@ -395,6 +412,16 @@ export class SalesService {
     }
     if (sale.status === 'VOIDED') {
       throw new BadRequestException('La venta ya está anulada');
+    }
+
+    // No se puede anular una venta que ya tiene devoluciones: dejaría un Return
+    // colgando contra una venta anulada, un estado incoherente. El count usa el
+    // cliente extendido (RLS) + organizationId explícito (defensa en profundidad).
+    const returns = await this.prisma.return.count({
+      where: { saleId: id, organizationId: tenant.organizationId },
+    });
+    if (returns > 0) {
+      throw new BadRequestException('No se puede anular una venta con devoluciones');
     }
 
     // TODO: stock semana 3 — restaurar el stock de las líneas al anular (no-op por ahora).

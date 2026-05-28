@@ -34,6 +34,14 @@ export class SalesController {
     return this.sales.findSales(query);
   }
 
+  // Busca una venta por su nº de ticket (flujo de devolución del TPV). Path
+  // fijo distinto de ':id/...' → no colisiona con las rutas por id.
+  @Get('by-ticket/:ticketNumber')
+  @Roles('ADMIN', 'MANAGER', 'CLERK')
+  findByTicket(@Param('ticketNumber') ticketNumber: string) {
+    return this.sales.findByTicket(ticketNumber);
+  }
+
   // Ticket-resumen para impresión (datos formateados + IVA desglosado).
   @Get(':id/ticket')
   @Roles('ADMIN', 'MANAGER', 'CLERK')

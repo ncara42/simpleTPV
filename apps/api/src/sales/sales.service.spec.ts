@@ -275,6 +275,9 @@ function makePrisma() {
     product: {
       findMany: vi.fn(async (_a?: unknown): Promise<unknown[]> => []),
     },
+    return: {
+      count: vi.fn(async (_a?: unknown): Promise<number> => 0),
+    },
   };
 }
 
@@ -304,6 +307,19 @@ describe('SalesService.voidSale', () => {
     await expect(
       tenantStorage.run({ organizationId: ORG }, () => service.voidSale('sale-1', 'user-1')),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('lanza 400 si la venta tiene devoluciones (no se puede anular)', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findFirst = vi.fn(async () => ({ id: 'sale-1', status: 'COMPLETED' }));
+    prisma.return.count = vi.fn(async () => 1);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.voidSale('sale-1', 'user-1')),
+    ).rejects.toThrow(/devoluciones/);
+    // No debe intentar el updateMany si hay devoluciones.
+    expect(prisma.sale.updateMany).not.toHaveBeenCalled();
   });
 
   it('anula la venta: updateMany con count 1 → devuelve la venta VOIDED', async () => {
@@ -428,6 +444,39 @@ describe('SalesService.getTicket', () => {
     );
     const sum = result.taxBreakdown.reduce((acc, t) => acc + t.base + t.cuota, 0);
     expect(sum).toBeCloseTo(207.9, 2);
+  });
+});
+
+describe('SalesService.findByTicket', () => {
+  it('lanza 404 si el ticket no existe en el tenant', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findFirst = vi.fn(async () => null);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.findByTicket('T01-999999')),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('devuelve la venta con líneas filtrando por ticketNumber y organizationId', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findFirst = vi.fn(async () => ({
+      id: 'sale-1',
+      ticketNumber: 'T01-000001',
+      lines: [{ id: 'sl-1' }],
+    }));
+    const service = makeService(prisma);
+
+    const res = (await tenantStorage.run({ organizationId: ORG }, () =>
+      service.findByTicket('T01-000001'),
+    )) as { id: string };
+
+    const arg = prisma.sale.findFirst.mock.calls[0]![0] as {
+      where: { ticketNumber: string; organizationId: string };
+    };
+    expect(arg.where.ticketNumber).toBe('T01-000001');
+    expect(arg.where.organizationId).toBe(ORG);
+    expect(res.id).toBe('sale-1');
   });
 });
 
