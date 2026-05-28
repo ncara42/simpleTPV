@@ -24,6 +24,7 @@
 - Multi-tenancy: cada request HTTP DEBE pasar `X-Org-Id` (UUID v4) salvo `/health`. `TenantMiddleware` lo valida (regex UUID estricto) y pobla `AsyncLocalStorage`. `PrismaService` con `$extends` ejecuta `set_config('app.current_organization_id', ...)` parametrizado en una `$transaction` y re-emite la operación sobre `tx[model][operation]` → RLS aplicada en DB.
 - Sin contexto → query devuelve 0 filas (fail-safe). Nunca filtra entre tenants. Verificado en `apps/api/test/rls.integration.spec.ts`.
 - Puertos por defecto en local: API `:3001` (no 3000 — evita colisión con otros dev servers). Postgres docker mapeado a `:5434` host (no 5432).
+- Password del rol `app` NO está en migraciones Prisma (se eliminó tras finding de seguridad MEDIUM). Vive en `packages/db/scripts/dev-bootstrap.sql` y se aplica con `pnpm --filter @simpletpv/db db:bootstrap-dev` UNA VEZ tras `prisma migrate deploy`. En producción Dokploy ejecuta `ALTER ROLE app LOGIN PASSWORD '<secret-real>'` manualmente. Ver `packages/db/scripts/README.md`.
 
 ## Scripts raíz
 

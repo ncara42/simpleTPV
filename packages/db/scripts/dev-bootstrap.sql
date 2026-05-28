@@ -1,0 +1,21 @@
+-- Bootstrap del rol `app` para DESARROLLO y CI.
+--
+-- USO:
+--   En local (con docker-compose arriba):
+--     docker compose exec -T postgres psql -U postgres -d simpletpv -f /scripts/dev-bootstrap.sql
+--   o vía el script de package.json:
+--     pnpm --filter @simpletpv/db db:bootstrap-dev
+--
+--   En CI (job E2E): se invoca tras `prisma migrate deploy` y antes del seed.
+--
+-- NUNCA EJECUTAR EN PRODUCCIÓN:
+--   En prod, el operador ejecuta UNA VEZ manualmente (o desde script de despliegue
+--   inicial que lee el secret de Dokploy):
+--
+--     ALTER ROLE app LOGIN PASSWORD '<secret-real-de-dokploy>';
+--
+--   El password de dev 'app_dev_password' aquí es público intencionadamente
+--   (vive en el repo) — solo da acceso a Postgres en localhost y servicios
+--   con el rol `app` (RLS aplicada, requiere SET app.current_organization_id).
+
+ALTER ROLE app LOGIN PASSWORD 'app_dev_password';
