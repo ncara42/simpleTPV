@@ -38,8 +38,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 // subsiguiente — RLS bloquearía todo. Re-emitir sobre `tx` garantiza misma
 // conexión y misma transacción.
 //
-// UUID validado por TenantMiddleware antes de entrar al storage; además
-// usamos $executeRaw parametrizado como defensa en profundidad.
+// organizationId proviene del JWT (TenantContextInterceptor) y entra al storage;
+// además usamos $executeRaw parametrizado como defensa en profundidad.
 // Sin contexto → query corre sin tx ni set_config → RLS devuelve 0 filas
 // (fail-safe), siempre que la policy SQL use NULLIF para tratar '' como NULL.
 export function applyTenantExtension(client: PrismaService) {

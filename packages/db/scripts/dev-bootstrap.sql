@@ -1,4 +1,4 @@
--- Bootstrap del rol `app` para DESARROLLO y CI.
+-- Bootstrap de los roles `app` y `app_admin` para DESARROLLO y CI.
 --
 -- USO:
 --   En local (con docker-compose arriba):
@@ -10,12 +10,16 @@
 --
 -- NUNCA EJECUTAR EN PRODUCCIÓN:
 --   En prod, el operador ejecuta UNA VEZ manualmente (o desde script de despliegue
---   inicial que lee el secret de Dokploy):
+--   inicial que lee los secrets de Dokploy):
 --
---     ALTER ROLE app LOGIN PASSWORD '<secret-real-de-dokploy>';
+--     ALTER ROLE app       LOGIN PASSWORD '<secret-app-de-dokploy>';
+--     ALTER ROLE app_admin LOGIN PASSWORD '<secret-app-admin-de-dokploy>';
 --
---   El password de dev 'app_dev_password' aquí es público intencionadamente
---   (vive en el repo) — solo da acceso a Postgres en localhost y servicios
---   con el rol `app` (RLS aplicada, requiere SET app.current_organization_id).
+--   Los passwords de dev aquí son públicos intencionadamente (viven en el repo)
+--   — solo dan acceso a Postgres en localhost.
+--   - `app`       : RLS aplicada (requiere SET app.current_organization_id). Runtime del API.
+--   - `app_admin` : BYPASSRLS. Lo usa SOLO el lookup de login del AuthService
+--                   (buscar usuario por email antes de conocer su tenant) y el seed.
 
-ALTER ROLE app LOGIN PASSWORD 'app_dev_password';
+ALTER ROLE app       LOGIN PASSWORD 'app_dev_password';
+ALTER ROLE app_admin LOGIN PASSWORD 'app_admin_dev_password';

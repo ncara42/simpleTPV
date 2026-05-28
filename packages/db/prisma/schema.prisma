@@ -16,9 +16,11 @@ model Organization {
   currency  String   @default("EUR")
   createdAt DateTime @default(now())
 
-  stores   Store[]
-  users    User[]
-  products Product[]
+  stores          Store[]
+  users           User[]
+  products        Product[]
+  productFamilies ProductFamily[]
+  auditLogs       AuditLog[]
 }
 
 model Store {
@@ -41,6 +43,7 @@ model User {
   email          String   @unique
   name           String
   passwordHash   String
+  pinHash        String?
   role           UserRole
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
@@ -64,15 +67,67 @@ model UserStore {
 model Product {
   id             String   @id @default(uuid()) @db.Uuid
   organizationId String   @db.Uuid
+  familyId       String?  @db.Uuid
   name           String
+  description    String?
+  barcode        String?
+  sku            String?
+  saleUnit       SaleUnit @default(UNIT)
+  unitSymbol     String   @default("ud")
   salePrice      Decimal  @db.Decimal(10, 4)
+  costPrice      Decimal  @default(0) @db.Decimal(10, 4)
+  taxRate        Decimal  @default(21) @db.Decimal(5, 2)
+  imageUrl       String?
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  family       ProductFamily? @relation(fields: [familyId], references: [id])
 
   @@index([organizationId, active])
+  @@index([organizationId, barcode])
+  @@index([organizationId, familyId])
+}
+
+model ProductFamily {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  parentId       String?  @db.Uuid
+  name           String
+  color          String?
+  icon           String?
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  parent       ProductFamily?  @relation("FamilyHierarchy", fields: [parentId], references: [id])
+  children     ProductFamily[] @relation("FamilyHierarchy")
+  products     Product[]
+
+  @@index([organizationId, parentId])
+}
+
+model AuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  userId         String?  @db.Uuid
+  action         String
+  entity         String
+  entityId       String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, createdAt])
+}
+
+enum SaleUnit {
+  UNIT
+  WEIGHT
+  VOLUME
+  LENGTH
 }
 
 enum UserRole {

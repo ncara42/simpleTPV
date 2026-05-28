@@ -197,6 +197,12 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/simpletpv?schema=public
       DATABASE_URL_APP: postgresql://app:app_dev_password@localhost:5432/simpletpv?schema=public
+      DATABASE_URL_AUTH: postgresql://app_admin:app_admin_dev_password@localhost:5432/simpletpv?schema=public
+      # Secretos JWT de test: la API exige JWT_SECRET/JWT_REFRESH_SECRET al
+      # arrancar (sin defaults hardcodeados, por seguridad). Valores de CI, no de
+      # producción (en prod los inyecta Dokploy).
+      JWT_SECRET: ci-e2e-access-secret
+      JWT_REFRESH_SECRET: ci-e2e-refresh-secret
       NODE_ENV: test
       PORT: '3001'
 

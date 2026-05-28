@@ -1,0 +1,59 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Put,
+} from '@nestjs/common';
+
+import { Roles } from '../auth/roles.decorator.js';
+import { AssignStoresDto, CreateUserDto, SetPinDto, UpdateUserDto } from './users.dto.js';
+import { type PublicUser, UsersService } from './users.service.js';
+
+// Gestión de usuarios: solo ADMIN.
+@Controller('users')
+@Roles('ADMIN')
+export class UsersController {
+  constructor(private readonly users: UsersService) {}
+
+  @Get()
+  findAll(): Promise<PublicUser[]> {
+    return this.users.findAll();
+  }
+
+  @Post()
+  create(@Body() body: CreateUserDto): Promise<PublicUser> {
+    return this.users.create(body);
+  }
+
+  @Patch(':id')
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateUserDto): Promise<PublicUser> {
+    return this.users.update(id, body);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    return this.users.remove(id);
+  }
+
+  @Put(':id/pin')
+  @HttpCode(204)
+  setPin(@Param('id', ParseUUIDPipe) id: string, @Body() body: SetPinDto): Promise<void> {
+    return this.users.setPin(id, body.pin);
+  }
+
+  @Put(':id/stores')
+  @HttpCode(204)
+  assignStores(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: AssignStoresDto,
+  ): Promise<void> {
+    return this.users.assignStores(id, body.storeIds);
+  }
+}

@@ -1,28 +1,30 @@
-import { Button } from '@simpletpv/ui';
-import { useQuery } from '@tanstack/react-query';
+import '@simpletpv/ui/login.css';
+import './sale.css';
 
-import { pingHealth } from './lib/api.js';
+import { Button, LoginForm } from '@simpletpv/ui';
 
-export default function App() {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['health'],
-    queryFn: pingHealth,
-    retry: false,
-  });
+import { api, useAuthStore } from './lib/auth.js';
+import { SalePage } from './SalePage.js';
 
+function Home() {
+  const logout = useAuthStore((s) => s.clear);
   return (
-    <main className="min-h-screen p-8">
-      <h1 className="text-2xl font-semibold">simpleTPV</h1>
-      <p className="mt-2 text-sm text-gray-600">Punto de venta — scaffolding</p>
-      <section className="mt-6">
-        <h2 className="text-lg font-medium">API status</h2>
-        <p data-testid="api-status" className="mt-1 text-sm">
-          {isLoading && 'Cargando...'}
-          {isError && 'Sin conexión con API'}
-          {data && `${data.status} · uptime ${Math.round(data.uptime)}s`}
-        </p>
-        <Button className="mt-3">Botón placeholder</Button>
-      </section>
+    <main className="min-h-screen p-6">
+      <div className="mx-auto mb-5 flex max-w-[64rem] items-center justify-between">
+        <h1 className="text-2xl font-semibold">simpleTPV</h1>
+        <Button variant="ghost" onClick={logout} data-testid="logout">
+          Cerrar sesión
+        </Button>
+      </div>
+      <SalePage />
     </main>
   );
+}
+
+export default function App() {
+  const isAuthed = useAuthStore((s) => s.accessToken !== null);
+  if (!isAuthed) {
+    return <LoginForm onSubmit={api.login} subtitle="Punto de venta" />;
+  }
+  return <Home />;
 }

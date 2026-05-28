@@ -1,9 +1,13 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignore": ["**/postcss.config.js"],
   "workspaces": {
     ".": {},
+    "apps/api": {
+      "ignoreDependencies": ["@prisma/client", "pg"]
+    },
     "packages/db": {
-      "ignoreDependencies": ["@prisma/client"]
+      "ignoreDependencies": ["@prisma/client", "@prisma/client-runtime-utils", "pg", "@types/pg"]
     },
     "apps/tpv": {
       "playwright": {
