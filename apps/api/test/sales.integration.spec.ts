@@ -259,6 +259,79 @@ describe('Ventas — integración', () => {
     expect(Number(sale.total)).toBeCloseTo(lineNet - ticketDisc, 2);
   });
 
+  it('getTicket devuelve el ticket completo con IVA desglosado coherente', async () => {
+    const sale = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.create(
+        {
+          storeId: store1Id,
+          lines: [{ productId: product1Id, qty: 3 }],
+          paymentMethod: 'CASH',
+          cashGiven: 1000,
+        },
+        user1Id,
+        'ADMIN',
+      );
+    });
+
+    const ticket = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.getTicket(sale.id);
+    });
+
+    // Cabecera y metadatos.
+    expect(ticket.ticketNumber).toBe(sale.ticketNumber);
+    expect(ticket.organization.name).toBeTruthy();
+    expect(ticket.store.code).toMatch(/^\d{2}$/);
+    expect(ticket.lines).toHaveLength(1);
+    expect(Number(ticket.total)).toBeCloseTo(Number(sale.total), 2);
+    expect(ticket.paymentMethod).toBe('CASH');
+
+    // El desglose de IVA agrupa por tipo y cuadra: Σ(base+cuota) = total (neto IVA incl.).
+    expect(ticket.taxBreakdown.length).toBeGreaterThan(0);
+    const sumBaseCuota = ticket.taxBreakdown.reduce(
+      (acc, t) => acc + Number(t.base) + Number(t.cuota),
+      0,
+    );
+    expect(sumBaseCuota).toBeCloseTo(Number(ticket.total), 2);
+    for (const t of ticket.taxBreakdown) {
+      expect(Number(t.base) + Number(t.cuota)).toBeGreaterThan(0);
+      // base = neto/(1+t/100): para t>0 la base es menor que base+cuota.
+      if (Number(t.taxRate) > 0) {
+        expect(Number(t.base)).toBeLessThan(Number(t.base) + Number(t.cuota));
+      }
+    }
+  });
+
+  it('getTicket de un id inexistente lanza NotFound', async () => {
+    await expect(
+      tenantStorage.run({ organizationId: org1Id }, async () => {
+        return service.getTicket('00000000-0000-0000-0000-000000000000');
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('aísla por tenant: org2 no puede leer el ticket de una venta de org1', async () => {
+    const sale = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.create(
+        { storeId: store1Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
+        user1Id,
+        'ADMIN',
+      );
+    });
+
+    // Bajo el contexto de org2, RLS no ve la venta → findFirst null → NotFound.
+    await expect(
+      tenantStorage.run({ organizationId: org2Id }, async () => {
+        return service.getTicket(sale.id);
+      }),
+    ).rejects.toThrow();
+
+    // Sanity: bajo su propio tenant el ticket SÍ se obtiene (descarta falso negativo).
+    const own = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.getTicket(sale.id);
+    });
+    expect(own.ticketNumber).toBe(sale.ticketNumber);
+  });
+
   it('rechaza con 403 a un CLERK con descuento por encima de su límite (10%)', async () => {
     await expect(
       tenantStorage.run({ organizationId: org1Id }, async () => {
