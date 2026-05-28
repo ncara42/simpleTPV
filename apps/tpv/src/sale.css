@@ -224,6 +224,24 @@
 .cart-msg {
   font-size: 0.9rem;
 }
+/* Anulación de venta (botón en la pantalla de confirmación) */
+.cart-void {
+  padding: 0.6rem;
+  font-weight: 600;
+  border: 2px solid #c0392b;
+  border-radius: 0.6rem;
+  background: #fff;
+  color: #c0392b;
+  cursor: pointer;
+}
+.cart-void:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.sale-voided-msg {
+  font-weight: 600;
+  color: #c0392b;
+}
 
 /* Modal de cobro */
 .pay-overlay {

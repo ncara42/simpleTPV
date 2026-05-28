@@ -2,8 +2,9 @@ import { ApiError, type SaleTicket } from '@simpletpv/auth';
 import { useState } from 'react';
 
 import { DiscountModal } from './DiscountModal.js';
+import { useAuthStore } from './lib/auth.js';
 import { useCart } from './lib/cart.js';
-import { createSale, getTicket } from './lib/sales.js';
+import { createSale, getTicket, voidSale } from './lib/sales.js';
 import { type PaymentData, PaymentModal } from './PaymentModal.js';
 import { TicketView } from './TicketView.js';
 
@@ -29,6 +30,20 @@ export function CartPanel({ storeId }: { storeId: string | null }) {
   const [confirmed, setConfirmed] = useState(false);
   const [ticket, setTicket] = useState<SaleTicket | null>(null);
   const [ticketError, setTicketError] = useState<string | null>(null);
+  // id de la venta cobrada: necesario para anularla desde la confirmación.
+  const [saleId, setSaleId] = useState<string | null>(null);
+  const [voided, setVoided] = useState(false);
+  const [voiding, setVoiding] = useState(false);
+  const [voidError, setVoidError] = useState<string | null>(null);
+
+  // Rol solo-UI: decide si se PINTA el botón de anular. El backend es la
+  // autoridad real (RolesGuard). Suscrito a accessToken para reaccionar a
+  // login/logout, igual que el backoffice.
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const getRole = useAuthStore((s) => s.getRole);
+  void accessToken;
+  const role = getRole();
+  const canVoid = role === 'ADMIN' || role === 'MANAGER';
 
   function openCheckout() {
     if (!storeId || items.length === 0) return;
@@ -55,6 +70,7 @@ export function CartPanel({ storeId }: { storeId: string | null }) {
       });
       setModalOpen(false);
       setConfirmed(true);
+      setSaleId(sale.id);
       // Pedimos el ticket-resumen completo (con IVA desglosado) por su id.
       try {
         const t = await getTicket(sale.id);
@@ -82,6 +98,30 @@ export function CartPanel({ storeId }: { storeId: string | null }) {
     setTicket(null);
     setTicketError(null);
     setError(null);
+    setSaleId(null);
+    setVoided(false);
+    setVoiding(false);
+    setVoidError(null);
+  }
+
+  async function onVoid() {
+    if (!saleId) return;
+    setVoiding(true);
+    setVoidError(null);
+    try {
+      await voidSale(saleId);
+      setVoided(true);
+    } catch (e) {
+      // 403 (rol insuficiente) o 400 (ya anulada): mostramos el mensaje del
+      // servidor cuando lo hay. El backend es la autoridad real.
+      if (e instanceof ApiError && (e.status === 403 || e.status === 400)) {
+        setVoidError(e.body ?? 'No se pudo anular la venta.');
+      } else {
+        setVoidError('Error al anular la venta. Inténtalo de nuevo.');
+      }
+    } finally {
+      setVoiding(false);
+    }
   }
 
   // Pantalla de confirmación post-venta: ticket-resumen + "Nueva venta".
@@ -99,6 +139,28 @@ export function CartPanel({ storeId }: { storeId: string | null }) {
           ) : (
             <p className="cart-msg" data-testid="ticket-loading">
               Cargando ticket…
+            </p>
+          )}
+          {voided ? (
+            <p className="cart-msg sale-voided-msg" data-testid="sale-voided">
+              Venta anulada
+            </p>
+          ) : (
+            canVoid &&
+            saleId && (
+              <button
+                className="cart-void"
+                onClick={onVoid}
+                disabled={voiding}
+                data-testid="void-sale"
+              >
+                {voiding ? 'Anulando…' : 'Anular venta'}
+              </button>
+            )
+          )}
+          {voidError && (
+            <p className="cart-msg" data-testid="void-error">
+              {voidError}
             </p>
           )}
           <button className="cart-create" onClick={newSale} data-testid="new-sale">

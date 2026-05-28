@@ -17,3 +17,7 @@ export function createSale(input: CreateSaleInput): Promise<Sale> {
 export function getTicket(id: string): Promise<SaleTicket> {
   return api.get<SaleTicket>(`/sales/${id}/ticket`);
 }
+
+export function voidSale(id: string): Promise<Sale> {
+  return api.post<Sale>(`/sales/${id}/void`);
+}
