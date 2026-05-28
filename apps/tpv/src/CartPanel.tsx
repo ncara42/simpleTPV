@@ -15,6 +15,7 @@ export function CartPanel({ storeId }: { storeId: string | null }) {
   const ticketDiscountPct = useCart((s) => s.ticketDiscountPct);
   const ticketDiscountAmt = useCart((s) => s.ticketDiscountAmt);
   const clear = useCart((s) => s.clear);
+  const lineNet = useCart((s) => s.lineNet);
   const subtotal = useCart((s) => s.subtotal());
   const ticketDiscount = useCart((s) => s.ticketDiscount());
   const total = useCart((s) => s.total());
@@ -112,8 +113,7 @@ export function CartPanel({ storeId }: { storeId: string | null }) {
       ) : (
         <ul className="cart-lines">
           {items.map((i) => {
-            const gross = i.unitPrice * i.qty;
-            const net = gross * (1 - i.discountPct / 100);
+            const net = lineNet(i);
             return (
               <li key={i.productId} className="cart-line" data-testid="cart-line">
                 <span className="cart-line-name">
