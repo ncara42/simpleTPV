@@ -5,6 +5,7 @@ import { createStore, deleteStore, listStores } from './lib/admin.js';
 
 interface StoreForm {
   name: string;
+  code: string;
   address: string;
 }
 
@@ -20,7 +21,11 @@ export function StoresPage() {
 
   const createMut = useMutation({
     mutationFn: (s: StoreForm) =>
-      createStore(s.address ? { name: s.name, address: s.address } : { name: s.name }),
+      createStore(
+        s.address
+          ? { name: s.name, code: s.code, address: s.address }
+          : { name: s.name, code: s.code },
+      ),
     onSuccess: () => {
       setForm(null);
       invalidate();
@@ -37,7 +42,7 @@ export function StoresPage() {
         <h2>Tiendas</h2>
         <button
           className="btn-primary"
-          onClick={() => setForm({ name: '', address: '' })}
+          onClick={() => setForm({ name: '', code: '', address: '' })}
           data-testid="new-store"
         >
           Nueva tienda
@@ -97,6 +102,15 @@ export function StoresPage() {
               />
             </label>
             <label>
+              Código (p.ej. &quot;01&quot;)
+              <input
+                required
+                value={form.code}
+                onChange={(e) => setForm({ ...form, code: e.target.value })}
+                data-testid="store-code"
+              />
+            </label>
+            <label>
               Dirección
               <input
                 value={form.address}
@@ -111,7 +125,7 @@ export function StoresPage() {
               <button
                 type="submit"
                 className="btn-primary"
-                disabled={createMut.isPending}
+                disabled={createMut.isPending || !form.name.trim() || !form.code.trim()}
                 data-testid="store-save"
               >
                 {createMut.isPending ? 'Guardando…' : 'Crear'}

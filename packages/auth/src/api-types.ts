@@ -73,6 +73,7 @@ export interface Store {
 
 export interface StoreInput {
   name: string;
+  code: string;
   address?: string | null;
 }
 
