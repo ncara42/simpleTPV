@@ -189,3 +189,15 @@
 .cart-msg {
   font-size: 0.9rem;
 }
+
+.sale-layout {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+.sale-layout .sale {
+  flex: 1;
+}
+.sale-store-row {
+  margin-bottom: 0.75rem;
+}
