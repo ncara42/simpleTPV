@@ -88,9 +88,25 @@ describe('Ventas — integración', () => {
       SELECT id::text FROM "Product" WHERE "organizationId" = ${org1Id}::uuid LIMIT 1
     `;
     product1Id = products[0]!.id;
+
+    // Caja obligatoria (spec 2026-05-28-caja-obligatoria-design.md): create exige
+    // una CashSession OPEN para la tienda. Estos tests crean ventas en store1 y
+    // store2, así que abrimos una caja OPEN en ambas. Lo hacemos con el cliente
+    // admin (superuser, bypassa RLS) para no depender del servicio bajo test.
+    // Primero limpiamos OPEN de runs previos (la BD persiste entre ejecuciones)
+    // para no chocar con el índice único parcial "una OPEN por tienda".
+    await admin.$executeRaw`DELETE FROM "CashSession" WHERE "organizationId" = ${org1Id}::uuid AND status = 'OPEN'`;
+    for (const storeId of [store1Id, store2Id]) {
+      await admin.$executeRaw`
+        INSERT INTO "CashSession" ("id", "organizationId", "storeId", "userId", "openingAmount", "status", "openedAt")
+        VALUES (gen_random_uuid(), ${org1Id}::uuid, ${storeId}::uuid, ${user1Id}::uuid, 0, 'OPEN', now())
+      `;
+    }
   });
 
   afterAll(async () => {
+    // Cerramos las cajas que abrimos para no dejar OPEN colgando entre runs.
+    await admin.$executeRaw`DELETE FROM "CashSession" WHERE "organizationId" = ${org1Id}::uuid AND status = 'OPEN'`;
     await admin.$disconnect();
     await base.onModuleDestroy();
   });
@@ -456,6 +472,33 @@ describe('Ventas — integración', () => {
       return prisma.sale.findUnique({ where: { id: sale.id } });
     });
     expect(own?.status).toBe('COMPLETED');
+  });
+
+  it('rechaza con 409 crear una venta sin caja abierta en la tienda', async () => {
+    // Cerramos temporalmente la caja OPEN de store2 para probar el rechazo, y la
+    // reabrimos al final para no afectar a otros tests (este corre tras los demás
+    // del bloque, pero lo dejamos consistente por idempotencia).
+    await admin.$executeRaw`UPDATE "CashSession" SET status = 'CLOSED', "closedAt" = now() WHERE "organizationId" = ${org1Id}::uuid AND "storeId" = ${store2Id}::uuid AND status = 'OPEN'`;
+    try {
+      await expect(
+        tenantStorage.run({ organizationId: org1Id }, async () => {
+          return service.create(
+            {
+              storeId: store2Id,
+              lines: [{ productId: product1Id, qty: 1 }],
+              paymentMethod: 'CARD',
+            },
+            user1Id,
+            'ADMIN',
+          );
+        }),
+      ).rejects.toThrow(/No hay caja abierta/);
+    } finally {
+      await admin.$executeRaw`
+        INSERT INTO "CashSession" ("id", "organizationId", "storeId", "userId", "openingAmount", "status", "openedAt")
+        VALUES (gen_random_uuid(), ${org1Id}::uuid, ${store2Id}::uuid, ${user1Id}::uuid, 0, 'OPEN', now())
+      `;
+    }
   });
 
   // Helper: crea una venta con createdAt forzado a una fecha concreta usando el

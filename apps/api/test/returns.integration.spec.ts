@@ -71,9 +71,20 @@ describe('Devoluciones — integración', () => {
       SELECT id::text FROM "Product" WHERE "organizationId" = ${org1Id}::uuid LIMIT 1
     `;
     product1Id = products[0]!.id;
+
+    // Caja obligatoria (spec 2026-05-28-caja-obligatoria-design.md): cada venta de
+    // este test (todas en store1) necesita una CashSession OPEN. La abrimos con el
+    // cliente admin (bypassa RLS). Limpiamos OPEN previas para no chocar con el
+    // índice único parcial "una OPEN por tienda".
+    await admin.$executeRaw`DELETE FROM "CashSession" WHERE "organizationId" = ${org1Id}::uuid AND "storeId" = ${store1Id}::uuid AND status = 'OPEN'`;
+    await admin.$executeRaw`
+      INSERT INTO "CashSession" ("id", "organizationId", "storeId", "userId", "openingAmount", "status", "openedAt")
+      VALUES (gen_random_uuid(), ${org1Id}::uuid, ${store1Id}::uuid, ${user1Id}::uuid, 0, 'OPEN', now())
+    `;
   });
 
   afterAll(async () => {
+    await admin.$executeRaw`DELETE FROM "CashSession" WHERE "organizationId" = ${org1Id}::uuid AND "storeId" = ${store1Id}::uuid AND status = 'OPEN'`;
     await admin.$disconnect();
     await base.onModuleDestroy();
   });

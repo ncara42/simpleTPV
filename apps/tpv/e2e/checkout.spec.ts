@@ -19,9 +19,29 @@ test('cobro en efectivo: del carrito a la confirmación con cambio', async ({ pa
   await login(page);
   await page.getByTestId('sale-grid').waitFor({ timeout: 10000 });
 
+  // Caja obligatoria: hay que abrir la caja antes de poder cobrar. Si ya está
+  // abierta de un run anterior (la BD conserva datos), el formulario de apertura
+  // no aparece y mostramos directamente "Caja abierta".
+  // Esperamos a que el panel de caja resuelva su carga (badge abierta o cerrada),
+  // así no rellenamos el formulario en un render transitorio que lo limpiaría.
+  await page.getByTestId('cash-status').first().waitFor({ timeout: 10000 });
+  const openAmount = page.getByTestId('cash-opening-amount');
+  if (await openAmount.isVisible().catch(() => false)) {
+    await openAmount.fill('100');
+    const openBtn = page.getByTestId('cash-open');
+    await expect(openBtn).toBeEnabled();
+    await openBtn.click();
+  }
+  // El badge de caja abierta lleva la clase .cash-badge-open; esperamos a ese
+  // estado concreto (la apertura es asíncrona: POST /cash-sessions/open + refetch).
+  await expect(page.locator('.cash-badge-open')).toBeVisible({ timeout: 10000 });
+
   // Añadir un producto al carrito.
   await page.getByTestId('prod-card').first().click();
   await expect(page.getByTestId('cart-line')).toHaveCount(1);
+
+  // Con caja abierta, el botón "Cobrar" está habilitado.
+  await expect(page.getByTestId('cart-checkout')).toBeEnabled();
 
   const totalText = (await page.getByTestId('cart-total').textContent()) ?? '';
   const total = Number(totalText.replace('€', '').replace(',', '.').trim());

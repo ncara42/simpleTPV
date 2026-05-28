@@ -11,9 +11,11 @@
 
 Control de caja del turno: abrir caja con efectivo inicial, cerrar calculando el esperado (inicial + ventas en efectivo del turno) y comparándolo con lo contado (cuadre/descuadre). Aislado por tenant.
 
-## 2. Decisión: caja opcional
+## 2. Decisión: caja obligatoria (CAMBIADA el 2026-05-28)
 
-La caja NO es obligatoria para vender (decisión tomada). `POST /sales` no exige sesión abierta. El cuadre al cerrar suma las ventas en efectivo de la **misma tienda** en la ventana temporal del turno (`openedAt..closedAt`), filtrando ventas `COMPLETED` con `paymentMethod = CASH`. Se documenta; se puede endurecer en el futuro (ligar venta a sesión).
+> **CAMBIO (2026-05-28):** esta decisión se REVIRTIÓ. La caja pasó de **opcional** a **OBLIGATORIA** para cobrar: `POST /sales` ahora exige una `CashSession` con `status=OPEN` para la tienda y devuelve `409 ConflictException` ("No hay caja abierta en esta tienda") si no la hay. Fuente de verdad del nuevo comportamiento: `docs/superpowers/specs/2026-05-28-caja-obligatoria-design.md`. La venta **no** se liga a la sesión (no se añade `Sale.cashSessionId`); el cuadre sigue calculándose por la ventana temporal del turno (sin cambios en cash-sessions).
+
+Decisión original (histórica, ya no vigente): la caja NO era obligatoria para vender. `POST /sales` no exigía sesión abierta. El cuadre al cerrar suma las ventas en efectivo de la **misma tienda** en la ventana temporal del turno (`openedAt..closedAt`), filtrando ventas `COMPLETED` con `paymentMethod = CASH`.
 
 ## 3. Datos
 
@@ -61,7 +63,7 @@ Funciones puras testeables: `computeExpected(opening, cashSales)` y `computeDiff
 
 - `lib/cash.ts`: `openCashSession({storeId, openingAmount})`, `closeCashSession(id, countedAmount)`, `currentCashSession(storeId)`.
 - Tipos `CashSession` en `@simpletpv/auth`.
-- UI mínima de caja (componente `CashSessionPanel` o sección en SalePage): si no hay caja abierta para la tienda activa, botón "Abrir caja" (pide efectivo inicial). Si hay caja abierta, indicador + botón "Cerrar caja" que pide el efectivo contado y muestra el cuadre (esperado vs contado, diferencia con color según signo). NO bloquea la venta (caja opcional).
+- UI mínima de caja (componente `CashSessionPanel` o sección en SalePage): si no hay caja abierta para la tienda activa, botón "Abrir caja" (pide efectivo inicial). Si hay caja abierta, indicador + botón "Cerrar caja" que pide el efectivo contado y muestra el cuadre (esperado vs contado, diferencia con color según signo). **CAMBIO 2026-05-28:** la caja BLOQUEA la venta (ahora es obligatoria, ver §2): el botón "Cobrar" del TPV se deshabilita sin caja abierta.
 
 ## 6. Tests
 

@@ -8,7 +8,15 @@ import { createSale, getTicket, voidSale } from './lib/sales.js';
 import { type PaymentData, PaymentModal } from './PaymentModal.js';
 import { TicketView } from './TicketView.js';
 
-export function CartPanel({ storeId }: { storeId: string | null }) {
+export function CartPanel({
+  storeId,
+  cashOpen,
+}: {
+  storeId: string | null;
+  // Caja obligatoria: sin una sesión de caja abierta no se puede cobrar (el
+  // backend lo exige con 409). El botón "Cobrar" se bloquea y se avisa al usuario.
+  cashOpen: boolean;
+}) {
   const items = useCart((s) => s.items);
   const setQty = useCart((s) => s.setQty);
   const removeItem = useCart((s) => s.removeItem);
@@ -84,6 +92,11 @@ export function CartPanel({ storeId }: { storeId: string | null }) {
       if (e instanceof ApiError && e.status === 403) {
         setModalOpen(false);
         setError(e.body ?? 'No tienes permiso para aplicar este descuento.');
+      } else if (e instanceof ApiError && e.status === 409) {
+        // Caja obligatoria: la caja se cerró entre la comprobación y el cobro
+        // (carrera). Mostramos el mensaje del servidor sin perder el carrito.
+        setModalOpen(false);
+        setError(e.body ?? 'No hay caja abierta en esta tienda.');
       } else {
         setError('Error al cobrar la venta. Inténtalo de nuevo.');
       }
@@ -240,11 +253,16 @@ export function CartPanel({ storeId }: { storeId: string | null }) {
         <button
           className="cart-create"
           onClick={openCheckout}
-          disabled={items.length === 0 || !storeId}
+          disabled={items.length === 0 || !storeId || !cashOpen}
           data-testid="cart-checkout"
         >
           Cobrar
         </button>
+        {!cashOpen && items.length > 0 && (
+          <p className="cart-msg cart-cash-warning" data-testid="cart-cash-warning">
+            Abre la caja para poder cobrar
+          </p>
+        )}
         {error && (
           <p className="cart-msg" data-testid="cart-msg">
             {error}

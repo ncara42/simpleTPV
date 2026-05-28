@@ -6,8 +6,9 @@ import { closeCashSession, currentCashSession, openCashSession } from './lib/cas
 
 // Panel de caja del turno: muestra el estado (abierta/cerrada) de la tienda
 // activa y permite abrir (con efectivo inicial) o cerrar (con efectivo contado,
-// mostrando el cuadre que devuelve el servidor). La caja es OPCIONAL: no
-// bloquea la venta.
+// mostrando el cuadre que devuelve el servidor). La caja es OBLIGATORIA para
+// cobrar (spec 2026-05-28-caja-obligatoria-design.md): sin una sesión OPEN el
+// CartPanel bloquea el botón "Cobrar" y el backend rechaza la venta con 409.
 export function CashPanel({ storeId }: { storeId: string | null }) {
   const queryClient = useQueryClient();
   const [openingAmount, setOpeningAmount] = useState('');
