@@ -11,6 +11,7 @@
 import type { PrismaClient } from '@simpletpv/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { MemoryCache } from '../src/cache/memory-cache.js';
 import { applyTenantExtension, PrismaService } from '../src/prisma/prisma.service.js';
 import { tenantStorage } from '../src/prisma/tenant-context.js';
 import { ReturnsService } from '../src/returns/returns.service.js';
@@ -33,7 +34,7 @@ describe('Devoluciones — integración', () => {
     base = new PrismaService();
     await base.onModuleInit();
     prisma = applyTenantExtension(base);
-    const stock = new StockService();
+    const stock = new StockService(prisma as unknown as PrismaService, new MemoryCache());
     sales = new SalesService(prisma as unknown as PrismaService, base, stock);
     returns = new ReturnsService(prisma as unknown as PrismaService, base, stock);
 

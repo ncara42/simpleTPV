@@ -14,6 +14,7 @@
 import type { PrismaClient } from '@simpletpv/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { MemoryCache } from '../src/cache/memory-cache.js';
 import { CashSessionsService } from '../src/cash-sessions/cash-sessions.service.js';
 import { applyTenantExtension, PrismaService } from '../src/prisma/prisma.service.js';
 import { tenantStorage } from '../src/prisma/tenant-context.js';
@@ -39,7 +40,11 @@ describe('Sesiones de caja — integración', () => {
     prisma = applyTenantExtension(base);
     service = new CashSessionsService(prisma as unknown as PrismaService);
     // SalesService crea las ventas del turno (mismo patrón de dos clientes).
-    sales = new SalesService(prisma as unknown as PrismaService, base, new StockService());
+    sales = new SalesService(
+      prisma as unknown as PrismaService,
+      base,
+      new StockService(prisma as unknown as PrismaService, new MemoryCache()),
+    );
 
     const adminUrl = process.env.DATABASE_URL;
     if (!adminUrl) {

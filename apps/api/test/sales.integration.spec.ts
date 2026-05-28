@@ -15,6 +15,7 @@
 import type { PrismaClient } from '@simpletpv/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { MemoryCache } from '../src/cache/memory-cache.js';
 import { applyTenantExtension, PrismaService } from '../src/prisma/prisma.service.js';
 import { tenantStorage } from '../src/prisma/tenant-context.js';
 import { SalesService } from '../src/sales/sales.service.js';
@@ -50,7 +51,11 @@ describe('Ventas — integración', () => {
     //   - PRIMERO: el cliente extendido (RLS por-operación, p.ej. findMany de productos).
     //   - SEGUNDO: el cliente BASE (el mismo que abrió la conexión), que usa
     //     withTenantTx para abrir UNA transacción atómica. Así la atomicidad es real.
-    service = new SalesService(prisma as unknown as PrismaService, base, new StockService());
+    service = new SalesService(
+      prisma as unknown as PrismaService,
+      base,
+      new StockService(prisma as unknown as PrismaService, new MemoryCache()),
+    );
 
     const adminUrl = process.env.DATABASE_URL;
     if (!adminUrl) {

@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
+import { MemoryCache } from '../cache/memory-cache.js';
 import { tenantStorage } from '../prisma/tenant-context.js';
 import { StockService } from '../stock/stock.service.js';
 import {
@@ -308,7 +309,11 @@ function makeService(prisma: ReturnType<typeof makePrisma>, base?: unknown) {
   const resolvedBase = base ?? {
     $transaction: vi.fn(async (fn: (t: typeof prisma) => Promise<unknown>) => fn(prisma)),
   };
-  return new SalesService(prisma as never, resolvedBase as never, new StockService());
+  return new SalesService(
+    prisma as never,
+    resolvedBase as never,
+    new StockService({} as never, new MemoryCache()),
+  );
 }
 
 describe('SalesService.voidSale', () => {
