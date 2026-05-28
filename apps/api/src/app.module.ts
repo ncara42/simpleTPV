@@ -12,6 +12,7 @@ import { MeModule } from './me/me.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProductFamiliesModule } from './product-families/product-families.module.js';
 import { ProductsModule } from './products/products.module.js';
+import { ReturnsModule } from './returns/returns.module.js';
 import { SalesModule } from './sales/sales.module.js';
 import { StoresModule } from './stores/stores.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -26,6 +27,7 @@ import { UsersModule } from './users/users.module.js';
     UsersModule,
     StoresModule,
     SalesModule,
+    ReturnsModule,
     CashSessionsModule,
     MeModule,
   ],
