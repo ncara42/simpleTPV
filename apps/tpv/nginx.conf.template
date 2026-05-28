@@ -1,5 +1,5 @@
 server {
-    listen 80;
+    listen 8080;
     server_name _;
     root /usr/share/nginx/html;
     index index.html;
@@ -15,7 +15,8 @@ server {
         resolver 127.0.0.11 valid=10s ipv6=off;
         set $upstream ${API_URL};
         proxy_pass $upstream/$1$is_args$args;
-        proxy_set_header Host $host;
+        # Host del upstream (no el Host del cliente, que es manipulable).
+        proxy_set_header Host $proxy_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;

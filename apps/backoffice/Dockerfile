@@ -23,8 +23,12 @@ FROM deps AS builder
 COPY . .
 RUN pnpm --filter @simpletpv/backoffice run build
 
-FROM nginx:1.27-alpine AS runner
+# Imagen unprivileged: corre como usuario `nginx` (no root) y escucha en 8080.
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS runner
 ENV API_URL=http://simpletpv-api:3001
 COPY --from=builder /repo/apps/backoffice/dist /usr/share/nginx/html
 COPY apps/backoffice/nginx.conf.template /etc/nginx/templates/default.conf.template
-EXPOSE 80
+# La imagen base ya corre como `nginx`; lo declaramos explícito para el análisis
+# estático (Trivy DS-0002 no resuelve el USER de la imagen base).
+USER nginx
+EXPOSE 8080

@@ -22,7 +22,7 @@ describe('StoresService', () => {
     const prisma = makePrisma();
     const service = new StoresService(prisma as never);
     await tenantStorage.run({ organizationId: ORG }, () =>
-      service.create({ name: 'Tienda Centro' }),
+      service.create({ name: 'Tienda Centro', code: '01' }),
     );
     const arg = prisma.store.create.mock.calls[0]![0] as { data: { organizationId: string } };
     expect(arg.data.organizationId).toBe(ORG);

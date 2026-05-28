@@ -123,3 +123,81 @@
   cursor: pointer;
   color: #6b7d7a;
 }
+
+.cart {
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 18rem;
+}
+.cart-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+.cart-empty {
+  color: #888;
+  font-size: 0.9rem;
+}
+.cart-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.cart-line {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+.cart-line-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.cart-line-controls button {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+.cart-line-total {
+  font-variant-numeric: tabular-nums;
+}
+.cart-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.cart-totals {
+  display: flex;
+  justify-content: space-between;
+}
+.cart-total {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+.cart-create {
+  padding: 0.6rem;
+  font-weight: 600;
+}
+.cart-msg {
+  font-size: 0.9rem;
+}
+
+.sale-layout {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+.sale-layout .sale {
+  flex: 1;
+}
+.sale-store-row {
+  margin-bottom: 0.75rem;
+}

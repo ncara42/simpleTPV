@@ -50,12 +50,34 @@ function Home() {
   );
 }
 
+function AccessDenied() {
+  const logout = useAuthStore((s) => s.clear);
+  return (
+    <main className="min-h-screen p-8">
+      <div className="mx-auto max-w-[40rem] text-center" data-testid="access-denied">
+        <h1 className="mb-2 text-2xl font-semibold">Acceso restringido</h1>
+        <p className="mb-6 opacity-70">
+          El backoffice es solo para administradores. Inicia sesión con una cuenta ADMIN.
+        </p>
+        <Button variant="ghost" onClick={logout} data-testid="logout">
+          Cerrar sesión
+        </Button>
+      </div>
+    </main>
+  );
+}
+
 export default function App() {
-  const isAuthed = useAuthStore((s) => s.accessToken !== null);
-  if (!isAuthed) {
+  // Suscrito a accessToken: getRole() lo deriva, así reacciona a login/logout.
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const getRole = useAuthStore((s) => s.getRole);
+  if (accessToken === null) {
     return (
       <LoginForm onSubmit={api.login} title="simpleTPV Backoffice" subtitle="Administración" />
     );
+  }
+  if (getRole() !== 'ADMIN') {
+    return <AccessDenied />;
   }
   return <Home />;
 }

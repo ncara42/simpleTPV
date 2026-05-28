@@ -5,6 +5,11 @@ export class CreateStoreDto {
   @MinLength(1)
   name!: string;
 
+  // Código de tienda (p.ej. "01"), parte del nº de ticket secuencial.
+  @IsString()
+  @MinLength(1)
+  code!: string;
+
   @IsOptional()
   @IsString()
   address?: string | null;
@@ -19,6 +24,11 @@ export class UpdateStoreDto {
   @IsString()
   @MinLength(1)
   name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  code?: string;
 
   @IsOptional()
   @IsString()
