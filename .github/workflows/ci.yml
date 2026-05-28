@@ -312,14 +312,19 @@ jobs:
             echo "::warning::DOKPLOY_WEBHOOK_URL no configurado — saltando deploy"
             exit 0
           fi
+          # Los webhooks de redeploy de Dokploy son POST. Seguimos redirecciones
+          # por si el panel fuerza http→https.
           read -r code redirects <<<"$(curl -sS -L \
             --proto-redir =http,https \
             --max-redirs 10 \
             -o /dev/null \
             -w "%{http_code} %{num_redirects}" \
-            -X GET "$DOKPLOY_WEBHOOK_URL")"
+            -X POST "$DOKPLOY_WEBHOOK_URL")"
           echo "Webhook HTTP $code tras $redirects redirección(es)"
+          # Un fallo del webhook (URL desactualizada, panel caído, etc.) NO debe
+          # tumbar el CI de main: el código ya pasó quality+e2e. Se avisa y se sale
+          # OK; revisa el secret DOKPLOY_WEBHOOK_URL si el deploy no se dispara.
           case "$code" in
             2*) echo "Redeploy disparado." ;;
-            *) echo "::error::El webhook de Dokploy devolvió $code (esperado 2xx)"; exit 1 ;;
+            *) echo "::warning::El webhook de Dokploy devolvió $code (esperado 2xx) — deploy no disparado, revisa DOKPLOY_WEBHOOK_URL" ;;
           esac
