@@ -85,6 +85,7 @@ export interface SaleLine {
   qty: string;
   discountPct: string;
   discountAmt: string;
+  taxRate: string;
   lineTotal: string;
 }
 
@@ -101,6 +102,37 @@ export interface Sale {
   cashChange: string | null;
   createdAt: string;
   lines: SaleLine[];
+}
+
+// Ticket-resumen para impresión que devuelve GET /sales/:id/ticket.
+// Los Decimal de Prisma viajan como string sobre HTTP, igual que en Sale/SaleLine.
+export interface TicketLine {
+  name: string;
+  qty: string;
+  unitPrice: string;
+  discountPct: string;
+  lineTotal: string;
+}
+
+export interface TaxBreakdownRow {
+  taxRate: string;
+  base: string;
+  cuota: string;
+}
+
+export interface SaleTicket {
+  organization: { name: string; nif: string | null };
+  store: { name: string; code: string };
+  ticketNumber: string;
+  createdAt: string;
+  lines: TicketLine[];
+  subtotal: string;
+  discountTotal: string;
+  total: string;
+  paymentMethod: string;
+  cashGiven: string | null;
+  cashChange: string | null;
+  taxBreakdown: TaxBreakdownRow[];
 }
 
 export interface CreateSaleInput {
