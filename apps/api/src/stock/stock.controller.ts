@@ -61,6 +61,27 @@ export class StockController {
     });
   }
 
+  // Historial de movimientos de stock (#32), filtrable y paginado. Trazabilidad.
+  @Get('movements')
+  @Roles('ADMIN', 'MANAGER', 'CLERK')
+  movements(
+    @Query('productId') productId?: string,
+    @Query('storeId') storeId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.stock.movements({
+      ...(productId ? { productId } : {}),
+      ...(storeId ? { storeId } : {}),
+      ...(from ? { from: new Date(from) } : {}),
+      ...(to ? { to: new Date(to) } : {}),
+      ...(page ? { page: Number(page) } : {}),
+      ...(pageSize ? { pageSize: Number(pageSize) } : {}),
+    });
+  }
+
   // Stock de un producto en todas las tiendas del tenant.
   @Get('product/:productId')
   @Roles('ADMIN', 'MANAGER', 'CLERK')

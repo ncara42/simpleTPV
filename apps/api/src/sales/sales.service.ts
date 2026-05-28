@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import type { PaymentMethod } from '@simpletpv/db';
 
+import { EVENT_BUS, type EventBus } from '../events/event-bus.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
@@ -240,6 +241,8 @@ export class SalesService {
     @Inject(PRISMA_BASE) private readonly base: PrismaService,
     // Servicio interno de stock: aplica movimientos dentro de la tx de la venta.
     private readonly stock: StockService,
+    // Bus de eventos para emitir sale.completed tras commit (#32).
+    @Inject(EVENT_BUS) private readonly events: EventBus,
   ) {}
 
   async create(dto: CreateSaleDto, userId: string, role: SaleRole) {
@@ -294,7 +297,7 @@ export class SalesService {
     // de la venta (tx.sale.create) corren en la MISMA tx con el set_config LOCAL
     // aplicado. Pasar el extendido anidaría transacciones y rompería la
     // atomicidad (contador incrementado aunque la venta falle).
-    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+    return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
       const updated = await tx.$queryRaw<Array<{ code: string; ticketCounter: number }>>`
         UPDATE "Store" SET "ticketCounter" = "ticketCounter" + 1
         WHERE id = ${dto.storeId}::uuid
@@ -338,17 +341,35 @@ export class SalesService {
       // Decrementa el stock de cada línea (salida tipo SALE, quantity negativo),
       // dentro de la MISMA transacción de la venta → atómico. referenceId = saleId
       // para trazar el movimiento. El stock puede quedar negativo (no bloquea).
+      // afterCommit propaga la emisión de stock.changed/alert.created tras commit.
       for (const l of lines) {
-        await this.stock.applyMovement(tx, {
-          organizationId: tenant.organizationId,
-          productId: l.productId,
-          storeId: dto.storeId,
-          type: 'SALE',
-          quantity: -l.qty,
-          referenceId: sale.id,
-          userId,
-        });
+        await this.stock.applyMovement(
+          tx,
+          {
+            organizationId: tenant.organizationId,
+            productId: l.productId,
+            storeId: dto.storeId,
+            type: 'SALE',
+            quantity: -l.qty,
+            referenceId: sale.id,
+            userId,
+          },
+          afterCommit,
+        );
       }
+
+      // Evento sale.completed tras commit (#32): payload mínimo de la venta.
+      afterCommit(async () => {
+        await this.events.publish(tenant.organizationId, {
+          type: 'sale.completed',
+          data: {
+            saleId: sale.id,
+            storeId: dto.storeId,
+            ticketNumber,
+            total: Number(total),
+          },
+        });
+      });
 
       return sale;
     });
@@ -438,7 +459,7 @@ export class SalesService {
     // Todo en una sola transacción atómica (cliente base): la transición de
     // estado y la reposición de stock de las líneas deben aplicarse juntas o no
     // aplicarse — si la reposición fallara, la anulación no debe quedar a medias.
-    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+    return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
       const sale = await tx.sale.findFirst({
         where: { id, organizationId: tenant.organizationId },
         include: { lines: true },
@@ -474,15 +495,19 @@ export class SalesService {
       // Repone el stock de cada línea (entrada tipo RETURN, quantity positivo),
       // dentro de la misma tx que la anulación. referenceId = saleId.
       for (const l of sale.lines) {
-        await this.stock.applyMovement(tx, {
-          organizationId: tenant.organizationId,
-          productId: l.productId,
-          storeId: sale.storeId,
-          type: 'RETURN',
-          quantity: Number(l.qty),
-          referenceId: sale.id,
-          userId,
-        });
+        await this.stock.applyMovement(
+          tx,
+          {
+            organizationId: tenant.organizationId,
+            productId: l.productId,
+            storeId: sale.storeId,
+            type: 'RETURN',
+            quantity: Number(l.qty),
+            referenceId: sale.id,
+            userId,
+          },
+          afterCommit,
+        );
       }
 
       // La venta existe y la acabamos de anular en esta misma tx → no es null.
