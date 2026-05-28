@@ -22,7 +22,7 @@ const prisma = new PrismaClient({ adapter });
 interface OrgSeed {
   nif: string;
   name: string;
-  stores: Array<{ id: string; name: string }>;
+  stores: Array<{ id: string; name: string; code: string }>;
   users: Array<{ email: string; name: string; role: UserRole }>;
   products: Array<{ name: string; salePrice: number }>;
 }
@@ -31,8 +31,8 @@ const ORG1: OrgSeed = {
   nif: 'B11111111',
   name: 'Cadena CBD Norte',
   stores: [
-    { id: '11111111-1111-1111-1111-111111111111', name: 'Tienda Madrid Centro' },
-    { id: '11111111-1111-1111-1111-111111111112', name: 'Almacén Central Madrid' },
+    { id: '11111111-1111-1111-1111-111111111111', name: 'Tienda Madrid Centro', code: '01' },
+    { id: '11111111-1111-1111-1111-111111111112', name: 'Almacén Central Madrid', code: '02' },
   ],
   users: [
     { email: 'admin@org1.test', name: 'Admin Org1', role: UserRole.ADMIN },
@@ -52,8 +52,8 @@ const ORG2: OrgSeed = {
   nif: 'B22222222',
   name: 'Distribuidora Sur',
   stores: [
-    { id: '22222222-2222-2222-2222-222222222221', name: 'Tienda Sevilla' },
-    { id: '22222222-2222-2222-2222-222222222222', name: 'Tienda Málaga' },
+    { id: '22222222-2222-2222-2222-222222222221', name: 'Tienda Sevilla', code: '01' },
+    { id: '22222222-2222-2222-2222-222222222222', name: 'Tienda Málaga', code: '02' },
   ],
   users: [
     { email: 'admin@org2.test', name: 'Admin Org2', role: UserRole.ADMIN },
@@ -79,8 +79,8 @@ async function seedOrg(spec: OrgSeed, passwordHash: string): Promise<void> {
   for (const store of spec.stores) {
     await prisma.store.upsert({
       where: { id: store.id },
-      update: {},
-      create: { id: store.id, organizationId: org.id, name: store.name },
+      update: { code: store.code },
+      create: { id: store.id, organizationId: org.id, name: store.name, code: store.code },
     });
   }
 
