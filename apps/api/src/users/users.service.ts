@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma, UserRole } from '@simpletpv/db';
 import bcrypt from 'bcryptjs';
 
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -13,12 +14,12 @@ export interface CreateUserInput {
   email: string;
   name: string;
   password: string;
-  role: 'ADMIN' | 'MANAGER' | 'CLERK';
+  role: UserRole;
 }
 
 export interface UpdateUserInput {
   name?: string;
-  role?: 'ADMIN' | 'MANAGER' | 'CLERK';
+  role?: UserRole;
   active?: boolean;
   password?: string;
 }
@@ -33,13 +34,17 @@ const PUBLIC_SELECT = {
   role: true,
   active: true,
   createdAt: true,
-} as const;
+} satisfies Prisma.UserSelect;
+
+// Tipo de usuario público derivado del select: garantiza en compilación que la
+// respuesta nunca incluye passwordHash/pinHash.
+export type PublicUser = Prisma.UserGetPayload<{ select: typeof PUBLIC_SELECT }>;
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(input: CreateUserInput): Promise<unknown> {
+  async create(input: CreateUserInput): Promise<PublicUser> {
     const tenant = getCurrentTenant();
     if (!tenant) {
       throw new InternalServerErrorException('Sin contexto de tenant');
@@ -55,7 +60,7 @@ export class UsersService {
     });
   }
 
-  async findAll(): Promise<unknown[]> {
+  async findAll(): Promise<PublicUser[]> {
     return this.prisma.user.findMany({ orderBy: { name: 'asc' }, select: PUBLIC_SELECT });
   }
 
@@ -68,10 +73,10 @@ export class UsersService {
     }
   }
 
-  async update(id: string, input: UpdateUserInput): Promise<unknown> {
+  async update(id: string, input: UpdateUserInput): Promise<PublicUser> {
     await this.requireExists(id);
     const { password, ...rest } = input;
-    const data: Record<string, unknown> = { ...rest };
+    const data: Prisma.UserUpdateInput = { ...rest };
     if (password) {
       data.passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
     }

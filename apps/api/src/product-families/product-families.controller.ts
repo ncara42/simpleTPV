@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
+import type { ProductFamily } from '@simpletpv/db';
 
 import { Roles } from '../auth/roles.decorator.js';
 import {
@@ -20,13 +21,13 @@ export class ProductFamiliesController {
 
   @Post()
   @Roles('ADMIN')
-  create(@Body() body: CreateFamilyInput): Promise<unknown> {
+  create(@Body() body: CreateFamilyInput): Promise<ProductFamily> {
     return this.families.create(body);
   }
 
   @Patch(':id')
   @Roles('ADMIN')
-  update(@Param('id') id: string, @Body() body: UpdateFamilyInput): Promise<unknown> {
+  update(@Param('id') id: string, @Body() body: UpdateFamilyInput): Promise<ProductFamily> {
     return this.families.update(id, body);
   }
 

@@ -1,8 +1,10 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import type { Product } from '@simpletpv/db';
 
 import { Roles } from '../auth/roles.decorator.js';
 import {
   type CreateProductInput,
+  type ImportResult,
   ProductsService,
   type UpdateProductInput,
 } from './products.service.js';
@@ -17,38 +19,36 @@ export class ProductsController {
   findAll(
     @Query('search') search?: string,
     @Query('familyId') familyId?: string,
-  ): Promise<unknown[]> {
+  ): Promise<Product[]> {
     return this.products.findAll(search, familyId);
   }
 
   // Debe declararse ANTES de @Get(':id') para que "barcode" no se tome como :id.
   @Get('barcode/:code')
-  findByBarcode(@Param('code') code: string): Promise<unknown> {
+  findByBarcode(@Param('code') code: string): Promise<Product> {
     return this.products.findByBarcode(code);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string): Promise<unknown> {
+  findOne(@Param('id') id: string): Promise<Product> {
     return this.products.findOne(id);
   }
 
   @Post()
   @Roles('ADMIN', 'MANAGER')
-  create(@Body() body: CreateProductInput): Promise<unknown> {
+  create(@Body() body: CreateProductInput): Promise<Product> {
     return this.products.create(body);
   }
 
   @Post('import')
   @Roles('ADMIN', 'MANAGER')
-  importCsv(
-    @Body() body: { csv: string },
-  ): Promise<{ inserted: number; errors: Array<{ row: number; message: string }> }> {
+  importCsv(@Body() body: { csv: string }): Promise<ImportResult> {
     return this.products.importCsv(body.csv ?? '');
   }
 
   @Patch(':id')
   @Roles('ADMIN', 'MANAGER')
-  update(@Param('id') id: string, @Body() body: UpdateProductInput): Promise<unknown> {
+  update(@Param('id') id: string, @Body() body: UpdateProductInput): Promise<Product> {
     return this.products.update(id, body);
   }
 

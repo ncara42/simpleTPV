@@ -1,7 +1,13 @@
 import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Prisma, type Product } from '@simpletpv/db';
 
 import { PrismaService } from '../prisma/prisma.service.js';
 import { getCurrentTenant } from '../prisma/tenant-context.js';
+
+export interface ImportResult {
+  inserted: number;
+  errors: Array<{ row: number; message: string }>;
+}
 
 export interface CreateProductInput {
   name: string;
@@ -23,7 +29,7 @@ export type UpdateProductInput = Partial<CreateProductInput>;
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(input: CreateProductInput): Promise<unknown> {
+  async create(input: CreateProductInput): Promise<Product> {
     // RLS filtra lectura/escritura por la policy, pero el INSERT necesita el
     // organizationId explícito (lo toma del contexto de tenant del JWT).
     const tenant = getCurrentTenant();
@@ -35,25 +41,26 @@ export class ProductsService {
     });
   }
 
-  async findAll(search?: string, familyId?: string): Promise<unknown[]> {
-    const where: Record<string, unknown> = {};
+  async findAll(search?: string, familyId?: string): Promise<Product[]> {
+    const where: Prisma.ProductWhereInput = {};
     if (search && search.trim()) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' as const } },
-        { sku: { contains: search, mode: 'insensitive' as const } },
-        { barcode: { contains: search, mode: 'insensitive' as const } },
+        { name: { contains: search, mode: 'insensitive' } },
+        { sku: { contains: search, mode: 'insensitive' } },
+        { barcode: { contains: search, mode: 'insensitive' } },
       ];
     }
     if (familyId) {
       where.familyId = familyId;
     }
+    const hasFilter = Object.keys(where).length > 0;
     return this.prisma.product.findMany({
-      ...(Object.keys(where).length ? { where } : {}),
+      ...(hasFilter ? { where } : {}),
       orderBy: { name: 'asc' },
     });
   }
 
-  async findOne(id: string): Promise<unknown> {
+  async findOne(id: string): Promise<Product> {
     const product = await this.prisma.product.findFirst({ where: { id } });
     if (!product) {
       throw new NotFoundException(`Producto ${id} no encontrado`);
@@ -61,7 +68,7 @@ export class ProductsService {
     return product;
   }
 
-  async update(id: string, input: UpdateProductInput): Promise<unknown> {
+  async update(id: string, input: UpdateProductInput): Promise<Product> {
     await this.findOne(id);
     return this.prisma.product.update({ where: { id }, data: input });
   }
@@ -71,7 +78,7 @@ export class ProductsService {
     await this.prisma.product.delete({ where: { id } });
   }
 
-  async findByBarcode(code: string): Promise<unknown> {
+  async findByBarcode(code: string): Promise<Product> {
     const product = await this.prisma.product.findFirst({ where: { barcode: code } });
     if (!product) {
       throw new NotFoundException(`Producto con código ${code} no encontrado`);
@@ -81,24 +88,15 @@ export class ProductsService {
 
   // Importación masiva desde CSV. Parsea, valida fila a fila, inserta las
   // válidas en bulk y devuelve un reporte de errores (no aborta por una mala).
-  async importCsv(csv: string): Promise<{
-    inserted: number;
-    errors: Array<{ row: number; message: string }>;
-  }> {
+  async importCsv(csv: string): Promise<ImportResult> {
     const tenant = getCurrentTenant();
     if (!tenant) {
       throw new InternalServerErrorException('Sin contexto de tenant');
     }
 
     const rows = parseCsv(csv);
-    const valid: Array<{
-      organizationId: string;
-      name: string;
-      salePrice: number;
-      sku: string | null;
-      barcode: string | null;
-    }> = [];
-    const errors: Array<{ row: number; message: string }> = [];
+    const valid: Prisma.ProductCreateManyInput[] = [];
+    const errors: ImportResult['errors'] = [];
 
     rows.forEach((cells, idx) => {
       const rowNumber = idx + 2; // +1 por cabecera, +1 porque humano cuenta desde 1
@@ -124,7 +122,7 @@ export class ProductsService {
 
     let inserted = 0;
     if (valid.length > 0) {
-      const res = (await this.prisma.product.createMany({ data: valid })) as { count: number };
+      const res = await this.prisma.product.createMany({ data: valid });
       inserted = res.count;
     }
     return { inserted, errors };

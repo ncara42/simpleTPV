@@ -2,7 +2,7 @@ import { Injectable, type OnModuleDestroy } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@simpletpv/db';
 
-import type { AuthUser, UserLookup } from './auth.service.js';
+import type { UserLookup } from './auth.service.js';
 
 // Conexión dedicada al lookup de login. Usa el rol `app_admin` (BYPASSRLS) vía
 // DATABASE_URL_AUTH, porque el login busca al usuario por email antes de conocer
@@ -21,9 +21,8 @@ export class AuthLookupService implements UserLookup, OnModuleDestroy {
 
   get user(): UserLookup['user'] {
     return {
-      findUnique: (args) =>
-        this.client.user.findUnique(args) as unknown as Promise<AuthUser | null>,
-      findFirst: (args) => this.client.user.findFirst(args) as unknown as Promise<AuthUser | null>,
+      findUnique: (args) => this.client.user.findUnique(args),
+      findFirst: (args) => this.client.user.findFirst(args),
     };
   }
 

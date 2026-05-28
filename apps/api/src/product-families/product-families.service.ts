@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import type { ProductFamily } from '@simpletpv/db';
 
 import { PrismaService } from '../prisma/prisma.service.js';
 import { getCurrentTenant } from '../prisma/tenant-context.js';
@@ -18,21 +19,14 @@ export interface CreateFamilyInput {
 
 export type UpdateFamilyInput = Partial<CreateFamilyInput>;
 
-export interface FamilyNode {
-  id: string;
-  parentId: string | null;
-  name: string;
-  color: string | null;
-  icon: string | null;
-  sortOrder: number;
-  children: FamilyNode[];
-}
+// Nodo del árbol: el modelo Prisma más sus hijos resueltos en memoria.
+export type FamilyNode = ProductFamily & { children: FamilyNode[] };
 
 @Injectable()
 export class ProductFamiliesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(input: CreateFamilyInput): Promise<unknown> {
+  async create(input: CreateFamilyInput): Promise<ProductFamily> {
     const tenant = getCurrentTenant();
     if (!tenant) {
       throw new InternalServerErrorException('Sin contexto de tenant');
@@ -46,9 +40,9 @@ export class ProductFamiliesService {
   }
 
   async findTree(): Promise<FamilyNode[]> {
-    const rows = (await this.prisma.productFamily.findMany({
+    const rows = await this.prisma.productFamily.findMany({
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    })) as Array<Omit<FamilyNode, 'children'>>;
+    });
 
     const byId = new Map<string, FamilyNode>();
     for (const r of rows) {
@@ -65,7 +59,7 @@ export class ProductFamiliesService {
     return roots;
   }
 
-  async update(id: string, input: UpdateFamilyInput): Promise<unknown> {
+  async update(id: string, input: UpdateFamilyInput): Promise<ProductFamily> {
     await this.requireExists(id);
     if (input.parentId !== undefined && input.parentId !== null) {
       if (input.parentId === id) {
@@ -100,11 +94,8 @@ export class ProductFamiliesService {
     }
   }
 
-  private async requireExists(id: string): Promise<{ id: string; parentId: string | null }> {
-    const family = (await this.prisma.productFamily.findFirst({ where: { id } })) as {
-      id: string;
-      parentId: string | null;
-    } | null;
+  private async requireExists(id: string): Promise<ProductFamily> {
+    const family = await this.prisma.productFamily.findFirst({ where: { id } });
     if (!family) {
       throw new NotFoundException(`Familia ${id} no encontrada`);
     }

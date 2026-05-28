@@ -1,7 +1,12 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put } from '@nestjs/common';
 
 import { Roles } from '../auth/roles.decorator.js';
-import { type CreateUserInput, type UpdateUserInput, UsersService } from './users.service.js';
+import {
+  type CreateUserInput,
+  type PublicUser,
+  type UpdateUserInput,
+  UsersService,
+} from './users.service.js';
 
 interface PinDto {
   pin: string;
@@ -17,17 +22,17 @@ export class UsersController {
   constructor(private readonly users: UsersService) {}
 
   @Get()
-  findAll(): Promise<unknown[]> {
+  findAll(): Promise<PublicUser[]> {
     return this.users.findAll();
   }
 
   @Post()
-  create(@Body() body: CreateUserInput): Promise<unknown> {
+  create(@Body() body: CreateUserInput): Promise<PublicUser> {
     return this.users.create(body);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: UpdateUserInput): Promise<unknown> {
+  update(@Param('id') id: string, @Body() body: UpdateUserInput): Promise<PublicUser> {
     return this.users.update(id, body);
   }
 
