@@ -5,5 +5,11 @@ onlyBuiltDependencies:
   - '@nestjs/core'
   - '@prisma/client'
   - '@prisma/engines'
+  - '@swc/core'
   - esbuild
   - prisma
+peerDependencyRules:
+  ignoreMissing:
+    - eslint
+  allowedVersions:
+    eslint: '10'

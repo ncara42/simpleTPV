@@ -1,0 +1,10 @@
+{
+  "extends": "../../packages/web-config/tsconfig.frontend.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["node_modules", "dist", "e2e"]
+}
