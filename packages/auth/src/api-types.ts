@@ -83,6 +83,8 @@ export interface SaleLine {
   name: string;
   unitPrice: string;
   qty: string;
+  discountPct: string;
+  discountAmt: string;
   lineTotal: string;
 }
 
@@ -92,6 +94,7 @@ export interface Sale {
   userId: string;
   ticketNumber: string;
   subtotal: string;
+  discountTotal: string;
   total: string;
   paymentMethod: string;
   cashGiven: string | null;
@@ -102,7 +105,9 @@ export interface Sale {
 
 export interface CreateSaleInput {
   storeId: string;
-  lines: Array<{ productId: string; qty: number }>;
+  lines: Array<{ productId: string; qty: number; discountPct?: number }>;
   paymentMethod: 'CASH' | 'CARD';
   cashGiven?: number;
+  ticketDiscountPct?: number;
+  ticketDiscountAmt?: number;
 }
