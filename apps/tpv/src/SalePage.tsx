@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { CartPanel } from './CartPanel.js';
 import { CashPanel } from './CashPanel.js';
 import { useCart } from './lib/cart.js';
+import { currentCashSession } from './lib/cash.js';
 import { findByBarcode, listFamilies, type Product, searchProducts } from './lib/catalog.js';
 import { listStores } from './lib/sales.js';
 import { useBarcodeScanner } from './lib/useBarcodeScanner.js';
@@ -19,6 +20,16 @@ export function SalePage() {
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
   const [storeId, setStoreId] = useState<string | null>(null);
   const activeStore = storeId ?? stores[0]?.id ?? null;
+
+  // Estado de la caja de la tienda activa. Misma queryKey que CashPanel, así
+  // react-query deduplica la petición y ambos comparten el resultado. Caja
+  // obligatoria: si no hay sesión OPEN, el CartPanel bloquea el cobro.
+  const { data: cashSession } = useQuery({
+    queryKey: ['cash-session', activeStore],
+    queryFn: () => currentCashSession(activeStore as string),
+    enabled: activeStore !== null,
+  });
+  const cashOpen = cashSession != null;
 
   const { data: families = [] } = useQuery({
     queryKey: ['families'],
@@ -138,7 +149,7 @@ export function SalePage() {
           </div>
         )}
       </div>
-      <CartPanel storeId={activeStore} />
+      <CartPanel storeId={activeStore} cashOpen={cashOpen} />
     </div>
   );
 }
