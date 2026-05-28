@@ -20,13 +20,16 @@ peerDependencyRules:
   allowedVersions:
     eslint: '10'
 
-# Override de esbuild: vite 8 acepta 0.25 sin problema, pero por defecto
-# pnpm puede resolver 0.28 que tiene breaking change con target ES2020
-# (transform fails en destructuring). Pinneamos a ~0.25 (versión fixed
-# para el CVE GHSA-67mh-4wv8-2f99 que OSV detectó como transitivo).
+# Overrides:
+# - esbuild: vite 8 acepta 0.25 sin problema, pero por defecto pnpm puede
+#   resolver 0.28 que tiene breaking change con target ES2020 (transform fails
+#   en destructuring). Pinneamos a ~0.25 (versión fixed para el CVE
+#   GHSA-67mh-4wv8-2f99 que OSV detectó como transitivo).
+# - @hono/node-server: OSV detectó GHSA-92pp-h63x-v22m (CVSS 5.3) en versiones
+#   <1.19.13, arrastrado por prisma 7 (su HTTP server interno usa hono).
 overrides:
   esbuild: ~0.25.0
+  '@hono/node-server': '>=1.19.13'
 
 allowBuilds:
-  '@prisma/engines': set this to true or false
   prisma: set this to true or false
