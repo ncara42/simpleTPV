@@ -2,10 +2,8 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
-# pnpm 11 trata `ERR_PNPM_IGNORED_BUILDS` como fatal (default). En CI con
-# --frozen-lockfile el error aparece aunque listemos los paquetes en
-# onlyBuiltDependencies, porque las versiones transitivas (esbuild@0.21,
-# 0.25, 0.28) se reportan por separado. Desactivamos el modo strict.
+# pnpm 11 trata `ERR_PNPM_IGNORED_BUILDS` como fatal (default). Lo desactivamos
+# para no bloquear install cuando subdependencias transitivas tienen scripts.
 strictDepBuilds: false
 
 onlyBuiltDependencies:
@@ -15,8 +13,21 @@ onlyBuiltDependencies:
   - '@swc/core'
   - esbuild
   - prisma
+
 peerDependencyRules:
   ignoreMissing:
     - eslint
   allowedVersions:
     eslint: '10'
+
+# Overrides para forzar versiones mínimas seguras de deps transitivas.
+# OSV detectó:
+#   - esbuild < 0.25.0 (GHSA-67mh-4wv8-2f99, CVSS 5.3) → arrastrado por vitest 2
+#   - vite < 6.4.2 (GHSA-4w7w-66w2-5vf9, CVSS 6.3) → arrastrado por vitest 2
+# vitest 2 → 4 (PR #10 Dependabot) lo arregla en origen, pero hasta entonces:
+overrides:
+  # esbuild 0.28 introduce breaking change con target ES2020 (transform fails
+  # en destructuring). Pinneamos a 0.25.x que es la versión fixed para el
+  # CVE GHSA-67mh-4wv8-2f99 y aún compatible con vite 6.
+  esbuild: ~0.25.0
+  vite: '>=6.4.2'
