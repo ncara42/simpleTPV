@@ -33,6 +33,7 @@ CREATE TABLE "Sale" (
 -- CreateTable
 CREATE TABLE "SaleLine" (
     "id" UUID NOT NULL,
+    "organizationId" UUID NOT NULL,
     "saleId" UUID NOT NULL,
     "productId" UUID NOT NULL,
     "name" TEXT NOT NULL,
@@ -65,6 +66,9 @@ ALTER TABLE "Sale" ADD CONSTRAINT "Sale_storeId_fkey" FOREIGN KEY ("storeId") RE
 ALTER TABLE "Sale" ADD CONSTRAINT "Sale_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "SaleLine" ADD CONSTRAINT "SaleLine_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "SaleLine" ADD CONSTRAINT "SaleLine_saleId_fkey" FOREIGN KEY ("saleId") REFERENCES "Sale"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -79,8 +83,13 @@ ALTER TABLE "Sale" FORCE  ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation ON "Sale";
 CREATE POLICY tenant_isolation ON "Sale"
-  USING ("organizationId" = current_setting('app.current_organization_id', true)::uuid);
+  USING ("organizationId" = NULLIF(current_setting('app.current_organization_id', true), '')::uuid);
 
--- SaleLine no tiene organizationId: se aísla vía la venta padre (JOIN con Sale).
--- Necesita GRANT para que el rol app pueda escribir/leer las líneas de sus ventas.
+-- RLS para SaleLine (mismo patrón directo que el resto de tablas: organizationId + policy).
+-- Sin contexto de tenant → NULLIF(...) = NULL → 0 filas (fail-safe).
 GRANT ALL ON "SaleLine" TO app, app_admin;
+ALTER TABLE "SaleLine" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SaleLine" FORCE  ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "SaleLine";
+CREATE POLICY tenant_isolation ON "SaleLine"
+  USING ("organizationId" = NULLIF(current_setting('app.current_organization_id', true), '')::uuid);

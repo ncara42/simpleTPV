@@ -22,6 +22,7 @@ model Organization {
   productFamilies ProductFamily[]
   auditLogs       AuditLog[]
   sales           Sale[]
+  saleLines       SaleLine[]
 }
 
 model Store {
@@ -150,16 +151,18 @@ model Sale {
 }
 
 model SaleLine {
-  id        String  @id @default(uuid()) @db.Uuid
-  saleId    String  @db.Uuid
-  productId String  @db.Uuid
-  name      String
-  unitPrice Decimal @db.Decimal(10, 4)
-  qty       Decimal @db.Decimal(10, 3)
-  lineTotal Decimal @db.Decimal(12, 2)
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  saleId         String  @db.Uuid
+  productId      String  @db.Uuid
+  name           String
+  unitPrice      Decimal @db.Decimal(10, 4)
+  qty            Decimal @db.Decimal(10, 3)
+  lineTotal      Decimal @db.Decimal(12, 2)
 
-  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  sale         Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id])
 
   @@index([saleId])
 }
