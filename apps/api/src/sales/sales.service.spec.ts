@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeChange, computeTotals, formatTicket } from './sales.service.js';
+import {
+  assertDiscountWithinRoleLimit,
+  computeChange,
+  computeTotals,
+  formatTicket,
+} from './sales.service.js';
 
 describe('formatTicket', () => {
   it('formatea code + contador con padding a 6', () => {
@@ -19,6 +24,95 @@ describe('computeTotals', () => {
     expect(result.lines[1]!.lineTotal).toBeCloseTo(5, 2);
     expect(result.subtotal).toBeCloseTo(30, 2);
     expect(result.total).toBeCloseTo(30, 2);
+    expect(result.discountTotal).toBeCloseTo(0, 2);
+    expect(result.lines[0]!.gross).toBeCloseTo(25, 2);
+    expect(result.lines[0]!.discountAmt).toBeCloseTo(0, 2);
+  });
+
+  it('aplica descuento por línea (gross/discountAmt/lineTotal neto)', () => {
+    const result = computeTotals([
+      { productId: 'p1', name: 'A', unitPrice: 10, qty: 2, discountPct: 10 },
+    ]);
+    expect(result.lines[0]!.gross).toBeCloseTo(20, 2);
+    expect(result.lines[0]!.discountAmt).toBeCloseTo(2, 2);
+    expect(result.lines[0]!.lineTotal).toBeCloseTo(18, 2);
+    expect(result.subtotal).toBeCloseTo(18, 2);
+    expect(result.discountTotal).toBeCloseTo(2, 2);
+    expect(result.total).toBeCloseTo(18, 2);
+  });
+
+  it('aplica descuento de ticket por porcentaje sobre el subtotal neto', () => {
+    const result = computeTotals([{ productId: 'p1', name: 'A', unitPrice: 100, qty: 1 }], {
+      ticketDiscountPct: 25,
+    });
+    expect(result.subtotal).toBeCloseTo(100, 2);
+    expect(result.ticketDiscount).toBeCloseTo(25, 2);
+    expect(result.discountTotal).toBeCloseTo(25, 2);
+    expect(result.total).toBeCloseTo(75, 2);
+  });
+
+  it('aplica descuento de ticket por importe fijo', () => {
+    const result = computeTotals([{ productId: 'p1', name: 'A', unitPrice: 100, qty: 1 }], {
+      ticketDiscountAmt: 30,
+    });
+    expect(result.ticketDiscount).toBeCloseTo(30, 2);
+    expect(result.total).toBeCloseTo(70, 2);
+  });
+
+  it('capa el importe de ticket al subtotal (no negativos)', () => {
+    const result = computeTotals([{ productId: 'p1', name: 'A', unitPrice: 50, qty: 1 }], {
+      ticketDiscountAmt: 999,
+    });
+    expect(result.ticketDiscount).toBeCloseTo(50, 2);
+    expect(result.total).toBeCloseTo(0, 2);
+  });
+
+  it('si vienen pct y amt de ticket, el importe tiene precedencia', () => {
+    const result = computeTotals([{ productId: 'p1', name: 'A', unitPrice: 100, qty: 1 }], {
+      ticketDiscountPct: 50,
+      ticketDiscountAmt: 10,
+    });
+    expect(result.ticketDiscount).toBeCloseTo(10, 2);
+    expect(result.total).toBeCloseTo(90, 2);
+  });
+
+  it('combina descuento de línea y de ticket', () => {
+    const result = computeTotals(
+      [
+        { productId: 'p1', name: 'A', unitPrice: 100, qty: 1, discountPct: 10 },
+        { productId: 'p2', name: 'B', unitPrice: 50, qty: 2 },
+      ],
+      { ticketDiscountPct: 10 },
+    );
+    // línea1: gross 100, disc 10, neto 90. línea2: 100. subtotal 190.
+    expect(result.subtotal).toBeCloseTo(190, 2);
+    // ticket 10% de 190 = 19. discountTotal = 10 (línea) + 19 (ticket) = 29.
+    expect(result.ticketDiscount).toBeCloseTo(19, 2);
+    expect(result.discountTotal).toBeCloseTo(29, 2);
+    expect(result.total).toBeCloseTo(171, 2);
+  });
+});
+
+describe('assertDiscountWithinRoleLimit', () => {
+  // grossTotal de 100; discountTotal sobre ese gross.
+  it('ADMIN: sin límite (80% pasa)', () => {
+    expect(() => assertDiscountWithinRoleLimit('ADMIN', 80, 100)).not.toThrow();
+  });
+
+  it('MANAGER: 11% pasa (límite 50%)', () => {
+    expect(() => assertDiscountWithinRoleLimit('MANAGER', 11, 100)).not.toThrow();
+  });
+
+  it('CLERK: 10% justo pasa', () => {
+    expect(() => assertDiscountWithinRoleLimit('CLERK', 10, 100)).not.toThrow();
+  });
+
+  it('CLERK: 11% supera el límite y lanza 403', () => {
+    expect(() => assertDiscountWithinRoleLimit('CLERK', 11, 100)).toThrow(/límite del rol CLERK/);
+  });
+
+  it('grossTotal 0 no divide por cero ni lanza', () => {
+    expect(() => assertDiscountWithinRoleLimit('CLERK', 0, 0)).not.toThrow();
   });
 });
 
