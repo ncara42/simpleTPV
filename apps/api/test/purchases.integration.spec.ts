@@ -6,9 +6,12 @@
 import type { PrismaClient } from '@simpletpv/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { MemoryCache } from '../src/cache/memory-cache.js';
+import { InMemoryEventBus } from '../src/events/in-memory-event-bus.js';
 import { applyTenantExtension, PrismaService } from '../src/prisma/prisma.service.js';
 import { tenantStorage } from '../src/prisma/tenant-context.js';
 import { PurchasesService } from '../src/purchases/purchases.service.js';
+import { StockService } from '../src/stock/stock.service.js';
 import { SuppliersService } from '../src/suppliers/suppliers.service.js';
 
 describe('Compras — integración', () => {
@@ -28,7 +31,13 @@ describe('Compras — integración', () => {
     await base.onModuleInit();
     prisma = applyTenantExtension(base);
     suppliers = new SuppliersService(prisma as unknown as PrismaService);
-    purchases = new PurchasesService(prisma as unknown as PrismaService, base);
+    const stock = new StockService(
+      prisma as unknown as PrismaService,
+      new MemoryCache(),
+      base,
+      new InMemoryEventBus(),
+    );
+    purchases = new PurchasesService(prisma as unknown as PrismaService, base, stock);
 
     const adminUrl = process.env.DATABASE_URL;
     if (!adminUrl) {
@@ -156,5 +165,47 @@ describe('Compras — integración', () => {
     expect(line.cantidadSugerida).toBeCloseTo(22, 3);
 
     await admin.$executeRaw`DELETE FROM "StockMovement" WHERE "productId" = ${productId}::uuid AND "storeId" = ${storeId}::uuid AND type = 'SALE'`;
+  });
+
+  it('recepción completa incrementa el stock destino y pasa a RECEIVED con KPIs', async () => {
+    // Stock conocido del destino.
+    await admin.$executeRaw`
+      INSERT INTO "Stock" ("id", "organizationId", "productId", "storeId", "quantity", "minStock", "updatedAt")
+      VALUES (gen_random_uuid(), ${org1Id}::uuid, ${productId}::uuid, ${storeId}::uuid, 10, 0, now())
+      ON CONFLICT ("productId", "storeId") DO UPDATE SET quantity = 10, "minStock" = 0
+    `;
+    const before = await admin.$queryRaw<Array<{ quantity: string }>>`
+      SELECT quantity::text FROM "Stock" WHERE "productId" = ${productId}::uuid AND "storeId" = ${storeId}::uuid
+    `;
+    const qtyBefore = Number(before[0]!.quantity);
+
+    const supplier = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      suppliers.create({ name: 'Prov Recep' }),
+    );
+    const order = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      purchases.create(
+        { supplierId: supplier.id, storeId, lines: [{ productId, quantityOrdered: 15 }] },
+        user1Id,
+      ),
+    );
+    await tenantStorage.run({ organizationId: org1Id }, async () => purchases.confirm(order.id));
+
+    const lineId = order.lines[0]!.id;
+    const received = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      purchases.receive(order.id, { lines: [{ lineId, quantityReceived: 15 }] }, user1Id),
+    );
+    expect(received.status).toBe('RECEIVED');
+
+    const after = await admin.$queryRaw<Array<{ quantity: string }>>`
+      SELECT quantity::text FROM "Stock" WHERE "productId" = ${productId}::uuid AND "storeId" = ${storeId}::uuid
+    `;
+    expect(Number(after[0]!.quantity)).toBeCloseTo(qtyBefore + 15, 3);
+
+    // KPIs: fill rate 1 (recibido todo), lead time definido.
+    const detail = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      purchases.get(order.id),
+    );
+    expect(detail.kpis.fillRate).toBe(1);
+    expect(detail.kpis.leadTimeDays).not.toBeNull();
   });
 });

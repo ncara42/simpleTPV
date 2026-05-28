@@ -2,7 +2,11 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req } from '@
 
 import type { JwtPayload } from '../auth/jwt-payload.js';
 import { Roles } from '../auth/roles.decorator.js';
-import { CreatePurchaseOrderDto, SuggestPurchaseOrderDto } from './purchases.dto.js';
+import {
+  CreatePurchaseOrderDto,
+  ReceivePurchaseOrderDto,
+  SuggestPurchaseOrderDto,
+} from './purchases.dto.js';
 import { PurchasesService } from './purchases.service.js';
 
 // Pedidos a proveedor. Crear/confirmar = ADMIN/MANAGER; lectura cualquier rol.
@@ -40,5 +44,16 @@ export class PurchasesController {
   @Roles('ADMIN', 'MANAGER')
   confirm(@Param('id', ParseUUIDPipe) id: string) {
     return this.purchases.confirm(id);
+  }
+
+  // Recepción de pedido (parcial o completa) (#46). Incrementa el stock destino.
+  @Post(':id/receive')
+  @Roles('ADMIN', 'MANAGER')
+  receive(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ReceivePurchaseOrderDto,
+    @Req() req: { user: JwtPayload },
+  ) {
+    return this.purchases.receive(id, body, req.user.sub);
   }
 }
