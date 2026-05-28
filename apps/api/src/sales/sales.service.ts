@@ -18,13 +18,20 @@ export function formatTicket(code: string, counter: number): string {
   return `T${code}-${String(counter).padStart(6, '0')}`;
 }
 
+// Redondeo a 2 decimales (céntimos) para que el cálculo coincida con la columna
+// DECIMAL(12,2) y con el total que el TPV muestra al cobrar. Sin esto, el float
+// de unitPrice*qty puede arrastrar imprecisión y divergir del cambio mostrado.
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
 export function computeTotals(lines: PricedLine[]): {
   lines: Array<PricedLine & { lineTotal: number }>;
   subtotal: number;
   total: number;
 } {
-  const priced = lines.map((l) => ({ ...l, lineTotal: l.unitPrice * l.qty }));
-  const subtotal = priced.reduce((acc, l) => acc + l.lineTotal, 0);
+  const priced = lines.map((l) => ({ ...l, lineTotal: round2(l.unitPrice * l.qty) }));
+  const subtotal = round2(priced.reduce((acc, l) => acc + l.lineTotal, 0));
   return { lines: priced, subtotal, total: subtotal };
 }
 
@@ -44,7 +51,7 @@ export function computeChange(
   if (cashGiven < total) {
     throw new BadRequestException('Efectivo insuficiente');
   }
-  const cashChange = Math.round((cashGiven - total) * 100) / 100;
+  const cashChange = round2(cashGiven - total);
   return { cashGiven, cashChange };
 }
 
