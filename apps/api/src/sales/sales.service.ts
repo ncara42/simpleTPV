@@ -270,8 +270,12 @@ export class SalesService {
    * al vuelo desde el taxRate congelado de cada línea.
    */
   async getTicket(id: string) {
+    // Defensa en profundidad: además de RLS (que ya filtra por tenant), filtramos
+    // explícitamente por organizationId. El id es un UUID del cliente, así que no
+    // dependemos solo de la policy para evitar IDOR entre tenants.
+    const tenant = requireTenant();
     const sale = await this.prisma.sale.findFirst({
-      where: { id },
+      where: { id, organizationId: tenant.organizationId },
       include: { lines: true, store: true, organization: true },
     });
     if (!sale) {
