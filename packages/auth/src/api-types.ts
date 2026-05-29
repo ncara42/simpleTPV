@@ -418,6 +418,24 @@ export interface SuggestPurchaseInput {
   daysCoverage?: number;
 }
 
+// VeriFactu: estado de los registros para el panel de salud (#51).
+export type VerifactuStatus = 'PENDING' | 'SENT' | 'FAILED';
+
+export interface VerifactuRecord {
+  id: string;
+  saleId: string | null;
+  returnId: string | null;
+  type: 'INVOICE' | 'RECTIFICATION';
+  status: VerifactuStatus;
+  hash: string;
+  previousHash: string | null;
+  qrData: string | null;
+  attempts: number;
+  lastError: string | null;
+  sentAt: string | null;
+  createdAt: string;
+}
+
 // Línea de la propuesta de pedido con datos de contexto (#45).
 export interface SuggestionRow {
   productId: string;
