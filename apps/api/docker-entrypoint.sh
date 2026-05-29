@@ -27,5 +27,11 @@ echo "[entrypoint] Aplicando migraciones de base de datos…"
   node "$PRISMA_CLI" migrate deploy
 )
 
+# La API NO debe heredar la credencial DDL. Sin esto, DATABASE_URL (rol owner)
+# quedaría en el entorno del proceso node y serviría de fallback peligroso en
+# prisma.service.ts / auth-lookup.service.ts (que usan DATABASE_URL_APP/_AUTH y
+# caen a DATABASE_URL si faltan). El runtime usa solo sus variables dedicadas.
+unset DATABASE_URL
+
 echo "[entrypoint] Migraciones aplicadas. Arrancando la API…"
 exec "$@"

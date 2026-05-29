@@ -14,16 +14,24 @@
 
 ## Variables de entorno de migración
 
-| Variable               | Rol                      | Uso                                       |
-| ---------------------- | ------------------------ | ----------------------------------------- |
-| `DATABASE_URL_MIGRATE` | owner / superuser (DDL)  | Solo el entrypoint, para `migrate deploy` |
-| `DATABASE_URL_APP`     | rol `app` (RLS, sin DDL) | Runtime de la API                         |
+| Variable               | Rol                         | Uso                                                                   |
+| ---------------------- | --------------------------- | --------------------------------------------------------------------- |
+| `DATABASE_URL_MIGRATE` | owner / superuser (DDL)     | Solo el entrypoint, para `migrate deploy`                             |
+| `DATABASE_URL_APP`     | rol `app` (RLS, sin DDL)    | Runtime de la API                                                     |
+| `DATABASE_URL_AUTH`    | rol `app_admin` (BYPASSRLS) | Lookup de login (buscar usuario por email antes de conocer su tenant) |
 
 `DATABASE_URL_MIGRATE` se separa a propósito: el rol potente que aplica DDL solo
 existe durante la migración, no en el proceso que sirve peticiones. El entrypoint
 exporta su valor como `DATABASE_URL` antes de invocar el CLI de Prisma (que lee la
 URL de `prisma.config.ts`); `dotenv/config` no sobreescribe variables ya presentes,
-así que el valor de producción manda.
+así que el valor de producción manda. Tras migrar, el entrypoint hace `unset
+DATABASE_URL` para que la API **no** herede la credencial DDL.
+
+> **Obligatorio en Dokploy:** `DATABASE_URL_APP` (runtime del API) y
+> `DATABASE_URL_AUTH` (lookup de login) DEBEN estar definidas. Si faltaran, el
+> código cae a `DATABASE_URL` como fallback — y la API arrancaría con el rol owner
+> saltándose RLS, sin error. El `unset` del entrypoint evita que ese fallback use
+> la credencial de migración, pero configura siempre las dos variables de runtime.
 
 ## Si una migración falla en producción
 
