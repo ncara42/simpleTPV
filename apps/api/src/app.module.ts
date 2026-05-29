@@ -8,6 +8,7 @@ import { RolesGuard } from './auth/roles.guard.js';
 import { TenantContextInterceptor } from './auth/tenant-context.interceptor.js';
 import { CacheModule } from './cache/cache.module.js';
 import { CashSessionsModule } from './cash-sessions/cash-sessions.module.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
 import { EventsModule } from './events/events.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MeModule } from './me/me.module.js';
@@ -43,6 +44,7 @@ import { VerifactuModule } from './verifactu/verifactu.module.js';
     PurchasesModule,
     VerifactuModule,
     CashSessionsModule,
+    DashboardModule,
     MeModule,
   ],
   // Orden de guards: AuthGuard primero (popula request.user desde el JWT),
