@@ -15,13 +15,13 @@ fi
 export DATABASE_URL="$DATABASE_URL_MIGRATE"
 
 echo "[entrypoint] Aplicando migraciones de base de datos…"
-# prisma.config.ts vive junto al paquete db dentro de node_modules; el CLI necesita
-# ese CWD para encontrar la config y la carpeta prisma/migrations.
-# Con --legacy deploy, pnpm no aplana prisma a node_modules/ raíz; el wrapper .bin
-# generado por pnpm apunta a la ruta correcta dentro de .pnpm/.
+# El CLI de Prisma se resuelve desde el paquete @simpletpv/db (donde es dependencia).
+# Usamos require.resolve para no depender de la ruta interna de pnpm (.pnpm/<hash>),
+# que es frágil. El CWD debe ser el del paquete db para que el CLI encuentre
+# prisma.config.ts y la carpeta prisma/migrations.
 cd /app/node_modules/@simpletpv/db
-/app/node_modules/@simpletpv/db/node_modules/.bin/prisma migrate deploy
-cd /app
+PRISMA_CLI=$(node -e "console.log(require.resolve('prisma/build/index.js'))")
+node "$PRISMA_CLI" migrate deploy
 
 echo "[entrypoint] Migraciones aplicadas. Arrancando la API…"
 exec "$@"

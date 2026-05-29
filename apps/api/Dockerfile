@@ -43,6 +43,13 @@ COPY --from=builder /repo/packages/db/prisma/schema.prisma ./node_modules/@simpl
 COPY --from=builder /repo/packages/db/prisma/migrations ./node_modules/@simpletpv/db/prisma/migrations
 COPY --from=builder /repo/apps/api/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
+# Prisma necesita libssl y poder leer/escribir el binario del schema-engine.
+# node:22-slim no trae libssl; y node_modules es root:root mientras el runtime
+# corre como `node`. Instalamos libssl3 y damos al usuario node el dir de engines.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libssl3 \
+    && rm -rf /var/lib/apt/lists/* \
+    && chown -R node:node /app/node_modules/.pnpm
 # Corre como el usuario `node` (no root) que ya trae la imagen oficial.
 USER node
 EXPOSE 3001
