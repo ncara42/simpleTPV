@@ -1,0 +1,87 @@
+/* Layout del dashboard: rejilla de KPI cards + paneles de gráficas. */
+
+.dash-period {
+  margin-right: 0.5rem;
+}
+
+.dash-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.dash-card,
+.dash-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgb(0 0 0 / 0.08);
+  border-radius: 0.6rem;
+  background: rgb(255 255 255 / 0.6);
+}
+
+.dash-card-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.6;
+}
+
+.dash-card-value {
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.dash-card-delta {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.dash-delta-up {
+  color: #16a34a;
+}
+
+.dash-delta-down {
+  color: #dc2626;
+}
+
+.dash-delta-flat {
+  opacity: 0.5;
+}
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 1rem;
+}
+
+.dash-panel {
+  padding: 1rem;
+  border: 1px solid rgb(0 0 0 / 0.08);
+  border-radius: 0.6rem;
+  background: rgb(255 255 255 / 0.6);
+}
+
+.dash-panel h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.dash-stockout-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.dash-stat-warn {
+  border-color: #f59e0b;
+  background: rgb(245 158 11 / 0.08);
+}
+
+.dash-rank-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
