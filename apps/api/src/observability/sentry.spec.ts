@@ -41,7 +41,7 @@ describe('initSentry (API)', () => {
     process.env.SENTRY_ENVIRONMENT = 'production';
     expect(initSentry()).toBe(true);
     expect(initMock).toHaveBeenCalledTimes(1);
-    const opts = initMock.mock.calls[0][0] as Record<string, unknown>;
+    const opts = initMock.mock.calls[0]![0] as Record<string, unknown>;
     expect(opts.dsn).toBe('https://abc@o1.ingest.sentry.io/1');
     expect(opts.environment).toBe('production');
     expect(opts.tracesSampleRate).toBe(0);
@@ -53,7 +53,7 @@ describe('initSentry (API)', () => {
     process.env.NODE_ENV = 'production';
     process.env.SENTRY_DSN = 'https://abc@o1.ingest.sentry.io/1';
     initSentry();
-    const opts = initMock.mock.calls[0][0] as {
+    const opts = initMock.mock.calls[0]![0] as {
       beforeSend: (e: Record<string, unknown>) => Record<string, unknown>;
     };
     const scrubbed = opts.beforeSend({

@@ -33,7 +33,7 @@ export function initSentry(): boolean {
  * eliminar cabeceras sensibles como defensa en profundidad, por si el SDK las
  * adjuntara.
  */
-function scrubSensitive<T extends Record<string, unknown>>(event: T): T {
+function scrubSensitive(event: Sentry.ErrorEvent): Sentry.ErrorEvent {
   const request = event.request as { headers?: Record<string, unknown> } | undefined;
   if (request?.headers) {
     delete request.headers.authorization;
