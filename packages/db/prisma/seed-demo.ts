@@ -9,7 +9,14 @@ import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcryptjs';
 
-import { PrismaClient, UserRole } from '../generated/client/index.js';
+import {
+  CashSessionStatus,
+  MovementType,
+  PaymentMethod,
+  PrismaClient,
+  SaleStatus,
+  UserRole,
+} from '../generated/client/index.js';
 
 const DEMO_NIF = 'B99999999';
 const DEMO_PASSWORD = 'demo1234';
@@ -391,6 +398,172 @@ async function seedUsers(orgId: string, passwordHash: string): Promise<void> {
   }
 }
 
+/** PRNG determinista (mulberry32). Mismo seed → misma secuencia. */
+function seededRandom(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Devuelve la fecha de hace `daysAgo` días, a la hora `hour:minute`. */
+function dateDaysAgo(daysAgo: number, hour: number, minute: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  d.setHours(hour, minute, 0, 0);
+  return d;
+}
+
+function yyyymmdd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}${m}${day}`;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Genera histórico de ~HISTORY_DAYS días: ventas (con líneas), movimientos de
+ * stock y sesiones de caja. Determinista e idempotente: ticketNumber es clave
+ * natural; si una venta ya existe, se salta. Ajusta el stock final restando lo
+ * vendido.
+ */
+async function seedHistory(
+  orgId: string,
+  stores: Array<{ id: string; code: string }>,
+  products: Array<{ id: string; name: string; salePrice: number; taxRate: number }>,
+  userId: string,
+): Promise<void> {
+  const rand = seededRandom(99999);
+  const soldByKey = new Map<string, number>();
+
+  for (let daysAgo = HISTORY_DAYS; daysAgo >= 0; daysAgo--) {
+    for (const store of stores) {
+      const opened = dateDaysAgo(daysAgo, 9, 0);
+      const isToday = daysAgo === 0;
+      const numSales = 5 + Math.floor(rand() * 11);
+      let cashTotal = 0;
+
+      for (let i = 1; i <= numSales; i++) {
+        const ticketNumber = `${store.code}-${yyyymmdd(opened)}-${String(i).padStart(3, '0')}`;
+        const existing = await prisma.sale.findUnique({
+          where: { organizationId_ticketNumber: { organizationId: orgId, ticketNumber } },
+        });
+        if (existing) continue;
+
+        const numLines = 1 + Math.floor(rand() * 3);
+        const lines: Array<{
+          productId: string;
+          name: string;
+          unitPrice: number;
+          qty: number;
+          taxRate: number;
+          lineTotal: number;
+        }> = [];
+        let subtotal = 0;
+        for (let l = 0; l < numLines; l++) {
+          const p = products[Math.floor(rand() * products.length)]!;
+          const qty = 1 + Math.floor(rand() * 3);
+          const unitPrice = Number(p.salePrice);
+          const lineTotal = round2(unitPrice * qty);
+          subtotal = round2(subtotal + lineTotal);
+          lines.push({
+            productId: p.id,
+            name: p.name,
+            unitPrice,
+            qty,
+            taxRate: Number(p.taxRate),
+            lineTotal,
+          });
+          soldByKey.set(`${p.id}|${store.id}`, (soldByKey.get(`${p.id}|${store.id}`) ?? 0) + qty);
+        }
+        const total = subtotal;
+        const payment = rand() < 0.6 ? PaymentMethod.CASH : PaymentMethod.CARD;
+        if (payment === PaymentMethod.CASH) cashTotal = round2(cashTotal + total);
+        const hour = 9 + Math.floor(rand() * 11);
+        const minute = Math.floor(rand() * 60);
+        const createdAt = dateDaysAgo(daysAgo, hour, minute);
+
+        await prisma.sale.create({
+          data: {
+            organizationId: orgId,
+            storeId: store.id,
+            userId,
+            ticketNumber,
+            subtotal,
+            total,
+            paymentMethod: payment,
+            status: SaleStatus.COMPLETED,
+            createdAt,
+            lines: {
+              create: lines.map((ln) => ({
+                organizationId: orgId,
+                productId: ln.productId,
+                name: ln.name,
+                unitPrice: ln.unitPrice,
+                qty: ln.qty,
+                taxRate: ln.taxRate,
+                lineTotal: ln.lineTotal,
+              })),
+            },
+          },
+        });
+      }
+
+      const sessionExists = await prisma.cashSession.findFirst({
+        where: { organizationId: orgId, storeId: store.id, openedAt: opened },
+      });
+      if (!sessionExists) {
+        await prisma.cashSession.create({
+          data: {
+            organizationId: orgId,
+            storeId: store.id,
+            userId,
+            openingAmount: 100,
+            closingAmount: isToday ? null : round2(100 + cashTotal),
+            expectedAmount: isToday ? null : round2(100 + cashTotal),
+            difference: isToday ? null : 0,
+            status: isToday ? CashSessionStatus.OPEN : CashSessionStatus.CLOSED,
+            openedAt: opened,
+            closedAt: isToday ? null : dateDaysAgo(daysAgo, 21, 0),
+          },
+        });
+      }
+    }
+  }
+
+  for (const [key, sold] of soldByKey) {
+    const [productId, storeId] = key.split('|') as [string, string];
+    const stock = await prisma.stock.findUnique({
+      where: { productId_storeId: { productId, storeId } },
+    });
+    if (!stock) continue;
+    const newQty = Math.max(0, Number(stock.quantity) - sold);
+    await prisma.stock.update({
+      where: { productId_storeId: { productId, storeId } },
+      data: { quantity: newQty },
+    });
+    await prisma.stockMovement.create({
+      data: {
+        organizationId: orgId,
+        productId,
+        storeId,
+        userId,
+        type: MovementType.SALE,
+        quantity: -sold,
+        reason: 'Histórico demo de ventas',
+      },
+    });
+  }
+}
+
 async function main(): Promise<void> {
   assertNotProduction();
 
@@ -405,9 +578,31 @@ async function main(): Promise<void> {
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
   await seedUsers(org.id, passwordHash);
 
-  console.log(
-    `Seed demo: organización ${org.nif} con catálogo, stock y usuarios lista (${org.id}).`,
+  const stores = await prisma.store.findMany({
+    where: { organizationId: org.id },
+    select: { id: true, code: true },
+  });
+  const products = await prisma.product.findMany({
+    where: { organizationId: org.id },
+    select: { id: true, name: true, salePrice: true, taxRate: true },
+  });
+  const clerk = await prisma.user.findFirstOrThrow({
+    where: { organizationId: org.id, role: UserRole.CLERK },
+    select: { id: true },
+  });
+  await seedHistory(
+    org.id,
+    stores,
+    products.map((p) => ({
+      id: p.id,
+      name: p.name,
+      salePrice: Number(p.salePrice),
+      taxRate: Number(p.taxRate),
+    })),
+    clerk.id,
   );
+
+  console.log(`Seed demo completado: organización ${org.nif} con catálogo, usuarios e histórico.`);
 }
 
 main()
