@@ -14,5 +14,6 @@ export function initSentry(): void {
     dsn,
     environment: import.meta.env.VITE_SENTRY_ENVIRONMENT ?? 'production',
     tracesSampleRate: 0, // solo errores (#79)
+    sendDefaultPii: false,
   });
 }

@@ -116,7 +116,7 @@ conforme a la convención de infraestructura del proyecto.
 
 ## Testing y verificación
 
-- **Unitario (API):** `apps/api/test/sentry.spec.ts`
+- **Unitario (API):** `apps/api/src/observability/sentry.spec.ts`
   - Sin `SENTRY_DSN` → `initSentry()` devuelve `false`, no llama a `Sentry.init`.
   - `NODE_ENV=test` con DSN → no inicializa (guard de producción).
   - `NODE_ENV=production` con DSN (mock de `@sentry/nestjs`) → llama a `Sentry.init`
