@@ -453,11 +453,11 @@ async function seedHistory(
 
       for (let i = 1; i <= numSales; i++) {
         const ticketNumber = `${store.code}-${yyyymmdd(opened)}-${String(i).padStart(3, '0')}`;
-        const existing = await prisma.sale.findUnique({
-          where: { organizationId_ticketNumber: { organizationId: orgId, ticketNumber } },
-        });
-        if (existing) continue;
 
+        // Generamos TODO el aleatorio de esta venta ANTES de decidir si ya existe,
+        // para que el PRNG avance igual exista o no la venta. Si el `continue` fuera
+        // antes de consumir estos rand(), una re-ejecución desincronizaría el PRNG
+        // (los días saltados consumirían distinto) y dejaría de ser idempotente.
         const numLines = 1 + Math.floor(rand() * 3);
         const lines: Array<{
           productId: string;
@@ -482,14 +482,28 @@ async function seedHistory(
             taxRate: p.taxRate,
             lineTotal,
           });
-          soldByKey.set(`${p.id}|${store.id}`, (soldByKey.get(`${p.id}|${store.id}`) ?? 0) + qty);
         }
         const total = subtotal;
         const payment = rand() < 0.6 ? PaymentMethod.CASH : PaymentMethod.CARD;
-        if (payment === PaymentMethod.CASH) cashTotal = round2(cashTotal + total);
         const hour = 9 + Math.floor(rand() * 11);
         const minute = Math.floor(rand() * 60);
         const createdAt = dateDaysAgo(daysAgo, hour, minute);
+
+        // Ya consumido todo el aleatorio de esta venta: ahora sí decidimos si
+        // insertarla. Si ya existe (re-ejecución), saltamos sin tocar la caja ni
+        // el stock — el PRNG ya avanzó igual que en la primera ejecución.
+        const existing = await prisma.sale.findUnique({
+          where: { organizationId_ticketNumber: { organizationId: orgId, ticketNumber } },
+        });
+        if (existing) continue;
+
+        if (payment === PaymentMethod.CASH) cashTotal = round2(cashTotal + total);
+        for (const ln of lines) {
+          soldByKey.set(
+            `${ln.productId}|${store.id}`,
+            (soldByKey.get(`${ln.productId}|${store.id}`) ?? 0) + ln.qty,
+          );
+        }
 
         await prisma.sale.create({
           data: {
