@@ -30,6 +30,329 @@ if (!databaseUrl) {
 const adapter = new PrismaPg({ connectionString: databaseUrl });
 const prisma = new PrismaClient({ adapter });
 
+interface FamilySeed {
+  key: string;
+  name: string;
+  color: string;
+  icon: string;
+  sortOrder: number;
+}
+
+const FAMILIES: FamilySeed[] = [
+  { key: 'flores', name: 'Flores CBD', color: '#4CAF50', icon: '🌿', sortOrder: 1 },
+  { key: 'aceites', name: 'Aceites', color: '#FFC107', icon: '💧', sortOrder: 2 },
+  { key: 'cosmetica', name: 'Cosmética', color: '#E91E63', icon: '🧴', sortOrder: 3 },
+  { key: 'accesorios', name: 'Accesorios', color: '#607D8B', icon: '🛍️', sortOrder: 4 },
+];
+
+interface ProductSeed {
+  family: string;
+  name: string;
+  barcode: string;
+  salePrice: number;
+  costPrice: number;
+  minStock: number;
+  initialStock: number;
+}
+
+const PRODUCTS: ProductSeed[] = [
+  {
+    family: 'flores',
+    name: 'Flor CBD Lemon Haze 20%',
+    barcode: '8400000000011',
+    salePrice: 12.5,
+    costPrice: 5.0,
+    minStock: 10,
+    initialStock: 40,
+  },
+  {
+    family: 'flores',
+    name: 'Flor CBD Amnesia 18%',
+    barcode: '8400000000028',
+    salePrice: 11.0,
+    costPrice: 4.5,
+    minStock: 10,
+    initialStock: 8,
+  },
+  {
+    family: 'flores',
+    name: 'Flor CBD OG Kush 22%',
+    barcode: '8400000000035',
+    salePrice: 13.5,
+    costPrice: 5.5,
+    minStock: 10,
+    initialStock: 30,
+  },
+  {
+    family: 'flores',
+    name: 'Flor CBD Gorilla 15%',
+    barcode: '8400000000042',
+    salePrice: 9.9,
+    costPrice: 4.0,
+    minStock: 10,
+    initialStock: 0,
+  },
+  {
+    family: 'flores',
+    name: 'Hash CBD Maroc',
+    barcode: '8400000000059',
+    salePrice: 15.0,
+    costPrice: 6.5,
+    minStock: 8,
+    initialStock: 25,
+  },
+  {
+    family: 'flores',
+    name: 'Pre-roll CBD x3',
+    barcode: '8400000000066',
+    salePrice: 8.5,
+    costPrice: 3.2,
+    minStock: 12,
+    initialStock: 50,
+  },
+  {
+    family: 'aceites',
+    name: 'Aceite CBD 5%',
+    barcode: '8400000000110',
+    salePrice: 24.9,
+    costPrice: 10.0,
+    minStock: 6,
+    initialStock: 20,
+  },
+  {
+    family: 'aceites',
+    name: 'Aceite CBD 10%',
+    barcode: '8400000000127',
+    salePrice: 39.9,
+    costPrice: 16.0,
+    minStock: 6,
+    initialStock: 15,
+  },
+  {
+    family: 'aceites',
+    name: 'Aceite CBD 20%',
+    barcode: '8400000000134',
+    salePrice: 59.9,
+    costPrice: 24.0,
+    minStock: 4,
+    initialStock: 3,
+  },
+  {
+    family: 'aceites',
+    name: 'Aceite CBD + Melatonina',
+    barcode: '8400000000141',
+    salePrice: 29.9,
+    costPrice: 12.0,
+    minStock: 6,
+    initialStock: 18,
+  },
+  {
+    family: 'aceites',
+    name: 'Cápsulas CBD 30u',
+    barcode: '8400000000158',
+    salePrice: 27.5,
+    costPrice: 11.0,
+    minStock: 6,
+    initialStock: 22,
+  },
+  {
+    family: 'cosmetica',
+    name: 'Crema CBD facial',
+    barcode: '8400000000219',
+    salePrice: 19.95,
+    costPrice: 8.0,
+    minStock: 5,
+    initialStock: 16,
+  },
+  {
+    family: 'cosmetica',
+    name: 'Crema CBD muscular',
+    barcode: '8400000000226',
+    salePrice: 22.0,
+    costPrice: 9.0,
+    minStock: 5,
+    initialStock: 4,
+  },
+  {
+    family: 'cosmetica',
+    name: 'Bálsamo labial CBD',
+    barcode: '8400000000233',
+    salePrice: 6.5,
+    costPrice: 2.2,
+    minStock: 10,
+    initialStock: 35,
+  },
+  {
+    family: 'cosmetica',
+    name: 'Champú CBD',
+    barcode: '8400000000240',
+    salePrice: 14.0,
+    costPrice: 5.5,
+    minStock: 6,
+    initialStock: 12,
+  },
+  {
+    family: 'cosmetica',
+    name: 'Sérum CBD',
+    barcode: '8400000000257',
+    salePrice: 34.0,
+    costPrice: 14.0,
+    minStock: 4,
+    initialStock: 10,
+  },
+  {
+    family: 'accesorios',
+    name: 'Grinder metálico',
+    barcode: '8400000000318',
+    salePrice: 9.0,
+    costPrice: 3.0,
+    minStock: 8,
+    initialStock: 28,
+  },
+  {
+    family: 'accesorios',
+    name: 'Papel de liar x5',
+    barcode: '8400000000325',
+    salePrice: 3.5,
+    costPrice: 1.0,
+    minStock: 20,
+    initialStock: 80,
+  },
+  {
+    family: 'accesorios',
+    name: 'Filtros x100',
+    barcode: '8400000000332',
+    salePrice: 4.0,
+    costPrice: 1.2,
+    minStock: 20,
+    initialStock: 60,
+  },
+  {
+    family: 'accesorios',
+    name: 'Bolsa hermética',
+    barcode: '8400000000349',
+    salePrice: 2.5,
+    costPrice: 0.6,
+    minStock: 25,
+    initialStock: 5,
+  },
+  {
+    family: 'accesorios',
+    name: 'Bote cristal UV',
+    barcode: '8400000000356',
+    salePrice: 7.0,
+    costPrice: 2.5,
+    minStock: 10,
+    initialStock: 24,
+  },
+  {
+    family: 'accesorios',
+    name: 'Mechero recargable',
+    barcode: '8400000000363',
+    salePrice: 5.5,
+    costPrice: 1.8,
+    minStock: 15,
+    initialStock: 40,
+  },
+  {
+    family: 'accesorios',
+    name: 'Bandeja liar',
+    barcode: '8400000000370',
+    salePrice: 11.0,
+    costPrice: 4.0,
+    minStock: 8,
+    initialStock: 14,
+  },
+  {
+    family: 'accesorios',
+    name: 'Camiseta marca',
+    barcode: '8400000000387',
+    salePrice: 18.0,
+    costPrice: 7.0,
+    minStock: 5,
+    initialStock: 9,
+  },
+  {
+    family: 'accesorios',
+    name: 'Vaporizador portátil',
+    barcode: '8400000000394',
+    salePrice: 49.0,
+    costPrice: 22.0,
+    minStock: 3,
+    initialStock: 6,
+  },
+];
+
+const STORES = [
+  { code: '01', name: 'Tienda Demo Centro' },
+  { code: '02', name: 'Tienda Demo Norte' },
+];
+
+/** Crea tiendas, familias, productos y stock inicial variado. Idempotente. */
+async function seedCatalog(orgId: string): Promise<void> {
+  for (const s of STORES) {
+    await prisma.store.upsert({
+      where: { organizationId_code: { organizationId: orgId, code: s.code } },
+      update: { name: s.name },
+      create: { organizationId: orgId, code: s.code, name: s.name },
+    });
+  }
+
+  const familyIdByKey = new Map<string, string>();
+  for (const f of FAMILIES) {
+    const existing = await prisma.productFamily.findFirst({
+      where: { organizationId: orgId, name: f.name },
+    });
+    const fam = existing
+      ? await prisma.productFamily.update({
+          where: { id: existing.id },
+          data: { color: f.color, icon: f.icon, sortOrder: f.sortOrder },
+        })
+      : await prisma.productFamily.create({
+          data: {
+            organizationId: orgId,
+            name: f.name,
+            color: f.color,
+            icon: f.icon,
+            sortOrder: f.sortOrder,
+          },
+        });
+    familyIdByKey.set(f.key, fam.id);
+  }
+
+  const stores = await prisma.store.findMany({ where: { organizationId: orgId } });
+  for (const p of PRODUCTS) {
+    let product = await prisma.product.findFirst({
+      where: { organizationId: orgId, name: p.name },
+    });
+    if (!product) {
+      product = await prisma.product.create({
+        data: {
+          organizationId: orgId,
+          familyId: familyIdByKey.get(p.family) ?? null,
+          name: p.name,
+          barcode: p.barcode,
+          salePrice: p.salePrice,
+          costPrice: p.costPrice,
+        },
+      });
+    }
+    for (const store of stores) {
+      await prisma.stock.upsert({
+        where: { productId_storeId: { productId: product.id, storeId: store.id } },
+        update: {},
+        create: {
+          organizationId: orgId,
+          productId: product.id,
+          storeId: store.id,
+          quantity: p.initialStock,
+          minStock: p.minStock,
+        },
+      });
+    }
+  }
+}
+
 async function main(): Promise<void> {
   assertNotProduction();
 
@@ -39,7 +362,9 @@ async function main(): Promise<void> {
     create: { name: 'Tienda Demo Formación', nif: DEMO_NIF },
   });
 
-  console.log(`Seed demo: organización ${org.nif} lista (${org.id}).`);
+  await seedCatalog(org.id);
+
+  console.log(`Seed demo: organización ${org.nif} con catálogo y stock lista (${org.id}).`);
 }
 
 main()
