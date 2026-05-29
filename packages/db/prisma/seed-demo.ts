@@ -7,8 +7,9 @@
 import 'dotenv/config';
 
 import { PrismaPg } from '@prisma/adapter-pg';
+import bcrypt from 'bcryptjs';
 
-import { PrismaClient } from '../generated/client/index.js';
+import { PrismaClient, UserRole } from '../generated/client/index.js';
 
 const DEMO_NIF = 'B99999999';
 const DEMO_PASSWORD = 'demo1234';
@@ -353,6 +354,43 @@ async function seedCatalog(orgId: string): Promise<void> {
   }
 }
 
+interface UserSeed {
+  email: string;
+  name: string;
+  role: UserRole;
+}
+
+const USERS: UserSeed[] = [
+  { email: 'admin@demo.simpletpv', name: 'Admin Demo', role: UserRole.ADMIN },
+  { email: 'manager@demo.simpletpv', name: 'Encargada Demo', role: UserRole.MANAGER },
+  { email: 'clerk@demo.simpletpv', name: 'Dependiente Demo', role: UserRole.CLERK },
+];
+
+/** Crea usuarios demo y los asigna a TODAS las tiendas de la org. Idempotente. */
+async function seedUsers(orgId: string, passwordHash: string): Promise<void> {
+  const stores = await prisma.store.findMany({ where: { organizationId: orgId } });
+  for (const u of USERS) {
+    const user = await prisma.user.upsert({
+      where: { email: u.email },
+      update: {},
+      create: {
+        organizationId: orgId,
+        email: u.email,
+        name: u.name,
+        passwordHash,
+        role: u.role,
+      },
+    });
+    for (const store of stores) {
+      await prisma.userStore.upsert({
+        where: { userId_storeId: { userId: user.id, storeId: store.id } },
+        update: {},
+        create: { userId: user.id, storeId: store.id },
+      });
+    }
+  }
+}
+
 async function main(): Promise<void> {
   assertNotProduction();
 
@@ -364,7 +402,12 @@ async function main(): Promise<void> {
 
   await seedCatalog(org.id);
 
-  console.log(`Seed demo: organización ${org.nif} con catálogo y stock lista (${org.id}).`);
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  await seedUsers(org.id, passwordHash);
+
+  console.log(
+    `Seed demo: organización ${org.nif} con catálogo, stock y usuarios lista (${org.id}).`,
+  );
 }
 
 main()
