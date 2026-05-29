@@ -59,11 +59,11 @@ que no colisiona con las orgs de tests.
 - **Stock por tienda**: la mayoría con cantidad normal; **algunos por debajo de
   `minStock`** (y alguno a 0) para que se generen alertas de stock bajo / agotado
   visibles en los dashboards.
-- **Histórico de ~45 días**: ventas (`Sale` + `SaleLine`, mezcla CASH/CARD), unas
-  pocas devoluciones (`Return` + `ReturnLine`), `StockMovement` coherentes, y
-  `CashSession` abiertas/cerradas. Volumen moderado (~5-15 ventas/día/tienda) para
-  que los KPIs (ventas hoy, por familia, márgenes, rankings, agotados) tengan
-  datos sin inflar la BD.
+- **Histórico de ~45 días**: ventas (`Sale` + `SaleLine`, mezcla CASH/CARD),
+  `StockMovement` coherentes, y `CashSession` abiertas/cerradas. Volumen moderado
+  (~5-15 ventas/día/tienda) para que los KPIs (ventas hoy, por familia, márgenes,
+  rankings, agotados) tengan datos sin inflar la BD.
+  (Las devoluciones NO se pre-cargan en el histórico — ver «Fuera de alcance».)
 
 ## Generación determinista del histórico
 
@@ -140,6 +140,10 @@ Verificación con Postgres efímero (Docker disponible), no unit tests al uso:
   añade complejidad de encadenamiento de hash). Se omite.
 - Traspasos y compras en el histórico (los dashboards de la Semana 5 no dependen
   de ellos; el foco es venta/stock/caja/márgenes). Se pueden añadir luego.
+- Devoluciones (`Return`/`ReturnLine`) pre-cargadas en el histórico: los dashboards
+  de la Semana 5 no dependen de ellas y el personal puede practicar devoluciones
+  en vivo durante la formación. Se omiten para no inflar el seed. Se pueden añadir
+  luego si la formación lo requiere.
 - Anonimización de datos reales: el seed genera datos **ficticios** desde cero, no
   anonimiza datos reales.
 
