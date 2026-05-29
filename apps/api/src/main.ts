@@ -3,13 +3,29 @@ import 'reflect-metadata';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 
 import { AppModule } from './app.module.js';
+import { parseCorsOrigins } from './config/security.js';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
     logger: ['warn', 'error', 'log'],
   });
+
+  // Cabeceras de seguridad (helmet). CSP desactivada: la API sirve JSON + la UI de
+  // Swagger en /docs, y una CSP estricta por defecto rompería esa UI. El resto de
+  // protecciones (nosniff, HSTS, frameguard, etc.) quedan activas.
+  app.use(helmet({ contentSecurityPolicy: false }));
+
+  // CORS por allowlist (env CORS_ORIGINS, CSV). En dev, orígenes de los frontends.
+  app.enableCors({
+    origin: parseCorsOrigins(process.env.CORS_ORIGINS),
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // descarta propiedades no declaradas en el DTO

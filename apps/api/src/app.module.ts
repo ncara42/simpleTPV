@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AuditInterceptor } from './audit/audit.interceptor.js';
 import { AuthGuard } from './auth/auth.guard.js';
@@ -8,6 +9,7 @@ import { RolesGuard } from './auth/roles.guard.js';
 import { TenantContextInterceptor } from './auth/tenant-context.interceptor.js';
 import { CacheModule } from './cache/cache.module.js';
 import { CashSessionsModule } from './cash-sessions/cash-sessions.module.js';
+import { throttleConfig } from './config/security.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
 import { EventsModule } from './events/events.module.js';
 import { HealthModule } from './health/health.module.js';
@@ -25,8 +27,13 @@ import { TransfersModule } from './transfers/transfers.module.js';
 import { UsersModule } from './users/users.module.js';
 import { VerifactuModule } from './verifactu/verifactu.module.js';
 
+const throttle = throttleConfig(process.env);
+
 @Module({
   imports: [
+    // Rate limiting global por IP (#72). Límite holgado para el TPV; corta abuso y
+    // fuerza bruta. El login lo restringe más con @Throttle a nivel de ruta.
+    ThrottlerModule.forRoot([{ ttl: throttle.ttl, limit: throttle.limit }]),
     PrismaModule,
     CacheModule,
     EventsModule,
@@ -55,6 +62,9 @@ import { VerifactuModule } from './verifactu/verifactu.module.js';
   providers: [
     { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
+    // ThrottlerGuard primero: corta el exceso de peticiones antes de gastar trabajo
+    // en validar el JWT. Luego Auth (popula request.user) y Roles (valida el rol).
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],

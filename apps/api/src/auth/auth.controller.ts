@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Req, UnauthorizedException } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 
 import { AuthService } from './auth.service.js';
 import type { JwtPayload } from './jwt-payload.js';
@@ -17,8 +18,11 @@ interface RefreshDto {
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  // Login endurecido contra fuerza bruta: 5 intentos por minuto y por IP. El resto
+  // de la API usa el límite global más holgado del ThrottlerModule.
   @Post('login')
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async login(@Body() dto: LoginDto): Promise<{ accessToken: string; refreshToken: string }> {
     const user = await this.auth.validateUser(dto.email, dto.password);
     if (!user) {
