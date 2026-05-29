@@ -34,5 +34,9 @@ test-results/
 # Prisma generated client (packages/db)
 packages/db/generated/
 
+# Backups de BD (dumps locales, nunca al repo)
+backups/
+*.dump
+
 # Misc
 *.tsbuildinfo

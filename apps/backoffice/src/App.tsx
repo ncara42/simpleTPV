@@ -5,6 +5,7 @@ import { Button, LoginForm } from '@simpletpv/ui';
 import { useState } from 'react';
 
 import { CatalogPage } from './CatalogPage.js';
+import { DashboardPage } from './DashboardPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { PurchasesPage } from './PurchasesPage.js';
@@ -15,6 +16,7 @@ import { UsersPage } from './UsersPage.js';
 import { VerifactuPage } from './VerifactuPage.js';
 
 type Tab =
+  | 'dashboard'
   | 'catalog'
   | 'families'
   | 'users'
@@ -25,6 +27,7 @@ type Tab =
   | 'verifactu';
 
 const TABS: Array<{ id: Tab; label: string }> = [
+  { id: 'dashboard', label: 'Dashboard' },
   { id: 'catalog', label: 'Catálogo' },
   { id: 'families', label: 'Familias' },
   { id: 'users', label: 'Usuarios' },
@@ -37,7 +40,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
 
 function Home() {
   const logout = useAuthStore((s) => s.clear);
-  const [tab, setTab] = useState<Tab>('catalog');
+  const [tab, setTab] = useState<Tab>('dashboard');
   return (
     <main className="min-h-screen p-8">
       <div className="mx-auto mb-6 flex max-w-[60rem] items-center justify-between">
@@ -58,6 +61,7 @@ function Home() {
           </button>
         ))}
       </nav>
+      {tab === 'dashboard' && <DashboardPage />}
       {tab === 'catalog' && <CatalogPage />}
       {tab === 'families' && <FamiliesPage />}
       {tab === 'users' && <UsersPage />}

@@ -1,0 +1,458 @@
+import { Inject, Injectable } from '@nestjs/common';
+import { Prisma } from '@simpletpv/db';
+
+import type { PrismaService } from '../prisma/prisma.service.js';
+import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
+import { requireTenant } from '../prisma/tenant-context.js';
+import { withTenantTx } from '../prisma/with-tenant-tx.js';
+import type { DashboardPeriodQueryDto, ProductRankingsQueryDto } from './dashboard.dto.js';
+import { type DateRange, deltaPct, previousRange, resolvePeriod } from './period.js';
+
+// Fragmento SQL vacío para componer el filtro opcional de tienda sin condicionar
+// la query (Prisma.empty se interpola a "nada").
+const EMPTY = Prisma.empty;
+
+// Los Decimal de Postgres llegan como string por el driver pg. `num` los castea
+// a number tolerando null/undefined → 0. Centralizado para no repetir Number(x ?? 0).
+function num(v: unknown): number {
+  if (v === null || v === undefined) {
+    return 0;
+  }
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+@Injectable()
+export class DashboardService {
+  constructor(@Inject(PRISMA_BASE) private readonly base: PrismaService) {}
+
+  // `now` se inyecta como `new Date()` aquí (frontera con el reloj). El resto de
+  // la cadena de cálculo es pura y testeable.
+  private now(): Date {
+    return new Date();
+  }
+
+  // Resuelve el rango del periodo a partir del DTO. Centraliza la validación de custom.
+  private rangeFor(q: DashboardPeriodQueryDto): DateRange {
+    return resolvePeriod(q.period ?? 'today', this.now(), { from: q.from, to: q.to });
+  }
+
+  // Ventas de hoy vs ayer por tienda + total org, con delta %. No usa el selector
+  // de periodo: siempre compara el día de hoy con el de ayer (rango horario completo).
+  async salesToday(storeId?: string): Promise<{
+    today: { total: number; count: number };
+    yesterday: { total: number; count: number };
+    deltaPct: number | null;
+    byStore: Array<{
+      storeId: string;
+      storeName: string;
+      today: number;
+      yesterday: number;
+      deltaPct: number | null;
+    }>;
+  }> {
+    const { organizationId } = requireTenant();
+    const today = resolvePeriod('today', this.now());
+    const yesterday = previousRange(today);
+
+    return withTenantTx(this.base, organizationId, async (tx) => {
+      const rows = await tx.$queryRaw<
+        Array<{
+          storeId: string;
+          storeName: string;
+          bucket: 'today' | 'yesterday';
+          total: string;
+          count: bigint;
+        }>
+      >`
+        SELECT s.id::text AS "storeId",
+               s.name AS "storeName",
+               CASE WHEN sa."createdAt" >= ${today.from} THEN 'today' ELSE 'yesterday' END AS bucket,
+               COALESCE(SUM(sa.total), 0) AS total,
+               COUNT(sa.id) AS count
+        FROM "Store" s
+        LEFT JOIN "Sale" sa
+          ON sa."storeId" = s.id
+         AND sa."organizationId" = ${organizationId}::uuid
+         AND sa.status = 'COMPLETED'
+         AND sa."createdAt" >= ${yesterday.from}
+         AND sa."createdAt" < ${today.to}
+        WHERE s."organizationId" = ${organizationId}::uuid
+          AND s.active = true
+          ${storeId ? this.eqStore('s.id', storeId) : EMPTY}
+        GROUP BY s.id, s.name, bucket
+      `;
+
+      const byStoreMap = new Map<
+        string,
+        { storeId: string; storeName: string; today: number; yesterday: number }
+      >();
+      for (const r of rows) {
+        const entry = byStoreMap.get(r.storeId) ?? {
+          storeId: r.storeId,
+          storeName: r.storeName,
+          today: 0,
+          yesterday: 0,
+        };
+        if (r.bucket === 'today') {
+          entry.today += num(r.total);
+        } else {
+          entry.yesterday += num(r.total);
+        }
+        byStoreMap.set(r.storeId, entry);
+      }
+
+      const byStore = [...byStoreMap.values()].map((e) => ({
+        ...e,
+        deltaPct: deltaPct(e.today, e.yesterday),
+      }));
+
+      // Totales y conteos org: los contamos por separado (el LEFT JOIN duplicaría
+      // si sumáramos counts del agregado por bucket, así que reusamos los buckets).
+      const todayTotal = byStore.reduce((acc, s) => acc + s.today, 0);
+      const yesterdayTotal = byStore.reduce((acc, s) => acc + s.yesterday, 0);
+      const counts = await tx.$queryRaw<Array<{ bucket: 'today' | 'yesterday'; count: bigint }>>`
+        SELECT CASE WHEN "createdAt" >= ${today.from} THEN 'today' ELSE 'yesterday' END AS bucket,
+               COUNT(*) AS count
+        FROM "Sale"
+        WHERE "organizationId" = ${organizationId}::uuid
+          AND status = 'COMPLETED'
+          AND "createdAt" >= ${yesterday.from}
+          AND "createdAt" < ${today.to}
+          ${storeId ? this.eqStore('"storeId"', storeId) : EMPTY}
+        GROUP BY bucket
+      `;
+      const todayCount = num(counts.find((c) => c.bucket === 'today')?.count);
+      const yesterdayCount = num(counts.find((c) => c.bucket === 'yesterday')?.count);
+
+      return {
+        today: { total: todayTotal, count: todayCount },
+        yesterday: { total: yesterdayTotal, count: yesterdayCount },
+        deltaPct: deltaPct(todayTotal, yesterdayTotal),
+        byStore,
+      };
+    });
+  }
+
+  // Ventas netas agrupadas por familia de producto en el periodo. Líneas de
+  // productos sin familia se agrupan bajo "Sin familia".
+  async salesByFamily(
+    q: DashboardPeriodQueryDto,
+  ): Promise<
+    Array<{ familyId: string | null; familyName: string; color: string | null; total: number }>
+  > {
+    const { organizationId } = requireTenant();
+    const range = this.rangeFor(q);
+    const { storeId } = q;
+
+    return withTenantTx(this.base, organizationId, async (tx) => {
+      const rows = await tx.$queryRaw<
+        Array<{
+          familyId: string | null;
+          familyName: string | null;
+          color: string | null;
+          total: string;
+        }>
+      >`
+        SELECT pf.id::text AS "familyId",
+               pf.name AS "familyName",
+               pf.color AS color,
+               COALESCE(SUM(sl."lineTotal"), 0) AS total
+        FROM "SaleLine" sl
+        JOIN "Sale" sa ON sa.id = sl."saleId"
+        JOIN "Product" p ON p.id = sl."productId"
+        LEFT JOIN "ProductFamily" pf ON pf.id = p."familyId"
+        WHERE sa."organizationId" = ${organizationId}::uuid
+          AND sa.status = 'COMPLETED'
+          AND sa."createdAt" >= ${range.from}
+          AND sa."createdAt" < ${range.to}
+          ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+        GROUP BY pf.id, pf.name, pf.color
+        ORDER BY total DESC
+      `;
+      return rows.map((r) => ({
+        familyId: r.familyId,
+        familyName: r.familyName ?? 'Sin familia',
+        color: r.color,
+        total: num(r.total),
+      }));
+    });
+  }
+
+  // KPIs de venta: ticket medio, UPT, tasa de descuento, tasa de devolución.
+  async salesKpis(q: DashboardPeriodQueryDto): Promise<{
+    salesCount: number;
+    revenue: number;
+    avgTicket: number;
+    upt: number;
+    discountRate: number;
+    returnRate: number;
+  }> {
+    const { organizationId } = requireTenant();
+    const range = this.rangeFor(q);
+    const { storeId } = q;
+
+    return withTenantTx(this.base, organizationId, async (tx) => {
+      const [agg] = await tx.$queryRaw<
+        Array<{
+          sales_count: bigint;
+          revenue: string;
+          subtotal: string;
+          discount: string;
+          units: string;
+        }>
+      >`
+        SELECT COUNT(sa.id) AS sales_count,
+               COALESCE(SUM(sa.total), 0) AS revenue,
+               COALESCE(SUM(sa.subtotal), 0) AS subtotal,
+               COALESCE(SUM(sa."discountTotal"), 0) AS discount,
+               COALESCE((
+                 SELECT SUM(sl.qty)
+                 FROM "SaleLine" sl
+                 JOIN "Sale" s2 ON s2.id = sl."saleId"
+                 WHERE s2."organizationId" = ${organizationId}::uuid
+                   AND s2.status = 'COMPLETED'
+                   AND s2."createdAt" >= ${range.from}
+                   AND s2."createdAt" < ${range.to}
+                   ${storeId ? this.eqStore('s2."storeId"', storeId) : EMPTY}
+               ), 0) AS units
+        FROM "Sale" sa
+        WHERE sa."organizationId" = ${organizationId}::uuid
+          AND sa.status = 'COMPLETED'
+          AND sa."createdAt" >= ${range.from}
+          AND sa."createdAt" < ${range.to}
+          ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+      `;
+
+      const [ret] = await tx.$queryRaw<Array<{ returns_total: string }>>`
+        SELECT COALESCE(SUM(total), 0) AS returns_total
+        FROM "Return"
+        WHERE "organizationId" = ${organizationId}::uuid
+          AND "createdAt" >= ${range.from}
+          AND "createdAt" < ${range.to}
+          ${storeId ? this.eqStore('"storeId"', storeId) : EMPTY}
+      `;
+
+      const salesCount = num(agg?.sales_count);
+      const revenue = num(agg?.revenue);
+      const subtotal = num(agg?.subtotal);
+      const discount = num(agg?.discount);
+      const units = num(agg?.units);
+      const returnsTotal = num(ret?.returns_total);
+
+      return {
+        salesCount,
+        revenue,
+        avgTicket: salesCount > 0 ? revenue / salesCount : 0,
+        upt: salesCount > 0 ? units / salesCount : 0,
+        // subtotal aquí es el neto de líneas (post descuento de línea); discountTotal
+        // incluye línea + ticket. La tasa relaciona descuento con la base bruta
+        // (subtotal + discount ≈ importe a precio de tarifa).
+        discountRate: subtotal + discount > 0 ? discount / (subtotal + discount) : 0,
+        returnRate: revenue > 0 ? returnsTotal / revenue : 0,
+      };
+    });
+  }
+
+  // KPIs de margen: bruto (sin descuentos), real (tras descuentos) y % margen.
+  async marginKpis(q: DashboardPeriodQueryDto): Promise<{
+    grossMargin: number;
+    realMargin: number;
+    marginPct: number;
+    revenue: number;
+  }> {
+    const { organizationId } = requireTenant();
+    const range = this.rangeFor(q);
+    const { storeId } = q;
+
+    return withTenantTx(this.base, organizationId, async (tx) => {
+      const [r] = await tx.$queryRaw<Array<{ gross: string; real: string; revenue: string }>>`
+        SELECT
+          COALESCE(SUM((sl."unitPrice" - p."costPrice") * sl.qty), 0) AS gross,
+          COALESCE(SUM(sl."lineTotal" - p."costPrice" * sl.qty), 0) AS real,
+          COALESCE(SUM(sl."lineTotal"), 0) AS revenue
+        FROM "SaleLine" sl
+        JOIN "Sale" sa ON sa.id = sl."saleId"
+        JOIN "Product" p ON p.id = sl."productId"
+        WHERE sa."organizationId" = ${organizationId}::uuid
+          AND sa.status = 'COMPLETED'
+          AND sa."createdAt" >= ${range.from}
+          AND sa."createdAt" < ${range.to}
+          ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+      `;
+      const grossMargin = num(r?.gross);
+      const realMargin = num(r?.real);
+      const revenue = num(r?.revenue);
+      return {
+        grossMargin,
+        realMargin,
+        marginPct: revenue > 0 ? realMargin / revenue : 0,
+        revenue,
+      };
+    });
+  }
+
+  // KPIs de rotura de stock sobre StockAlert OUT_OF_STOCK en el periodo.
+  async stockoutKpis(q: DashboardPeriodQueryDto): Promise<{
+    events: number;
+    resolved: number;
+    open: number;
+    avgDurationHours: number | null;
+    rate: number;
+    estimatedLostSales: number;
+  }> {
+    const { organizationId } = requireTenant();
+    const range = this.rangeFor(q);
+    const { storeId } = q;
+
+    return withTenantTx(this.base, organizationId, async (tx) => {
+      const [agg] = await tx.$queryRaw<
+        Array<{ events: bigint; resolved: bigint; open: bigint; avg_seconds: string | null }>
+      >`
+        SELECT COUNT(*) AS events,
+               COUNT(*) FILTER (WHERE resolved = true) AS resolved,
+               COUNT(*) FILTER (WHERE resolved = false) AS open,
+               AVG(EXTRACT(EPOCH FROM ("resolvedAt" - "createdAt"))) FILTER (WHERE resolved = true) AS avg_seconds
+        FROM "StockAlert"
+        WHERE "organizationId" = ${organizationId}::uuid
+          AND "alertType" = 'OUT_OF_STOCK'
+          AND "createdAt" >= ${range.from}
+          AND "createdAt" < ${range.to}
+          ${storeId ? this.eqStore('"storeId"', storeId) : EMPTY}
+      `;
+
+      const [prod] = await tx.$queryRaw<Array<{ active_products: bigint }>>`
+        SELECT COUNT(*) AS active_products
+        FROM "Product"
+        WHERE "organizationId" = ${organizationId}::uuid AND active = true
+      `;
+
+      // Venta perdida estimada (proxy MVP): salePrice de cada producto agotado con
+      // alerta abierta. Documentado como aproximación grosera (refinar en Semana 7).
+      const [lost] = await tx.$queryRaw<Array<{ estimated: string }>>`
+        SELECT COALESCE(SUM(p."salePrice"), 0) AS estimated
+        FROM "StockAlert" al
+        JOIN "Product" p ON p.id = al."productId"
+        WHERE al."organizationId" = ${organizationId}::uuid
+          AND al."alertType" = 'OUT_OF_STOCK'
+          AND al.resolved = false
+          AND al."createdAt" >= ${range.from}
+          AND al."createdAt" < ${range.to}
+          ${storeId ? this.eqStore('al."storeId"', storeId) : EMPTY}
+      `;
+
+      const events = num(agg?.events);
+      const activeProducts = num(prod?.active_products);
+      const avgSeconds = agg?.avg_seconds == null ? null : num(agg.avg_seconds);
+
+      return {
+        events,
+        resolved: num(agg?.resolved),
+        open: num(agg?.open),
+        avgDurationHours: avgSeconds == null ? null : avgSeconds / 3600,
+        rate: activeProducts > 0 ? events / activeProducts : 0,
+        estimatedLostSales: num(lost?.estimated),
+      };
+    });
+  }
+
+  // Rankings de producto: top ventas (€), top margen real, peor rotación (uds).
+  async productRankings(q: ProductRankingsQueryDto): Promise<{
+    topSales: Array<{ productId: string; name: string; total: number; units: number }>;
+    topMargin: Array<{ productId: string; name: string; margin: number }>;
+    worstRotation: Array<{ productId: string; name: string; units: number }>;
+  }> {
+    const { organizationId } = requireTenant();
+    const range = this.rangeFor(q);
+    const { storeId } = q;
+    const limit = q.limit ?? 10;
+
+    return withTenantTx(this.base, organizationId, async (tx) => {
+      const topSales = await tx.$queryRaw<
+        Array<{ productId: string; name: string; total: string; units: string }>
+      >`
+        SELECT p.id::text AS "productId", p.name AS name,
+               COALESCE(SUM(sl."lineTotal"), 0) AS total,
+               COALESCE(SUM(sl.qty), 0) AS units
+        FROM "SaleLine" sl
+        JOIN "Sale" sa ON sa.id = sl."saleId"
+        JOIN "Product" p ON p.id = sl."productId"
+        WHERE sa."organizationId" = ${organizationId}::uuid
+          AND sa.status = 'COMPLETED'
+          AND sa."createdAt" >= ${range.from}
+          AND sa."createdAt" < ${range.to}
+          ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+        GROUP BY p.id, p.name
+        ORDER BY total DESC
+        LIMIT ${limit}
+      `;
+
+      const topMargin = await tx.$queryRaw<
+        Array<{ productId: string; name: string; margin: string }>
+      >`
+        SELECT p.id::text AS "productId", p.name AS name,
+               COALESCE(SUM(sl."lineTotal" - p."costPrice" * sl.qty), 0) AS margin
+        FROM "SaleLine" sl
+        JOIN "Sale" sa ON sa.id = sl."saleId"
+        JOIN "Product" p ON p.id = sl."productId"
+        WHERE sa."organizationId" = ${organizationId}::uuid
+          AND sa.status = 'COMPLETED'
+          AND sa."createdAt" >= ${range.from}
+          AND sa."createdAt" < ${range.to}
+          ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+        GROUP BY p.id, p.name
+        ORDER BY margin DESC
+        LIMIT ${limit}
+      `;
+
+      // Peor rotación: productos activos con menos unidades vendidas en el periodo
+      // (incluye los de 0 ventas vía LEFT JOIN). Útil para detectar stock muerto.
+      const worstRotation = await tx.$queryRaw<
+        Array<{ productId: string; name: string; units: string }>
+      >`
+        SELECT p.id::text AS "productId", p.name AS name,
+               COALESCE(SUM(sl.qty), 0) AS units
+        FROM "Product" p
+        LEFT JOIN "SaleLine" sl ON sl."productId" = p.id
+        LEFT JOIN "Sale" sa
+          ON sa.id = sl."saleId"
+         AND sa.status = 'COMPLETED'
+         AND sa."createdAt" >= ${range.from}
+         AND sa."createdAt" < ${range.to}
+         ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+        WHERE p."organizationId" = ${organizationId}::uuid
+          AND p.active = true
+        GROUP BY p.id, p.name
+        ORDER BY units ASC, p.name ASC
+        LIMIT ${limit}
+      `;
+
+      return {
+        topSales: topSales.map((r) => ({
+          productId: r.productId,
+          name: r.name,
+          total: num(r.total),
+          units: num(r.units),
+        })),
+        topMargin: topMargin.map((r) => ({
+          productId: r.productId,
+          name: r.name,
+          margin: num(r.margin),
+        })),
+        worstRotation: worstRotation.map((r) => ({
+          productId: r.productId,
+          name: r.name,
+          units: num(r.units),
+        })),
+      };
+    });
+  }
+
+  // Fragmento parametrizado `AND <col> = $storeId::uuid` para inyectar el filtro
+  // opcional de tienda sin concatenar strings. `column` proviene SIEMPRE de
+  // literales del propio código (nunca de input del usuario), por eso es seguro
+  // usar Prisma.raw para el nombre de columna; el valor sí va parametrizado.
+  private eqStore(column: string, storeId: string): Prisma.Sql {
+    return Prisma.sql`AND ${Prisma.raw(column)} = ${storeId}::uuid`;
+  }
+}

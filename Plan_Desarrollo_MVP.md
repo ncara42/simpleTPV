@@ -1197,12 +1197,16 @@ model AuditLog {
 
 #### Criterios de completitud Semana 5 — HITO A: V1 VENDIBLE
 
-- [ ] Dashboard muestra ventas hoy vs ayer por tienda en tiempo real
-- [ ] KPIs de rotura, ventas, margen calculados y visibles
-- [ ] Ventas por familia con gráficas
-- [ ] Permisos RBAC verificados en todos los endpoints
-- [ ] Backups automatizados
-- [ ] Documentación de usuario básica lista
+- [x] Dashboard muestra ventas hoy vs ayer por tienda en tiempo real (#70 API + #71 backoffice)
+- [x] KPIs de rotura, ventas, margen calculados y visibles (#70)
+- [x] Ventas por familia con gráficas (Recharts PieChart, #71)
+- [x] Permisos RBAC verificados en todos los endpoints (matriz documentada en spec #72)
+- [x] Backups automatizados (#73: `infra/scripts/backup-db.sh` + cron 6h) + rate limit/helmet/CORS (#72)
+- [ ] Documentación de usuario básica lista (manual/checklist — pendiente, Semana 6)
+
+> Implementado el 2026-05-29. Specs en `docs/superpowers/specs/2026-05-29-issue70..73-*.md`.
+> Pendiente menor: apertura de la vista MANAGER del dashboard (hoy el backoffice es
+> admin-only) y el manual de usuario quedan para la Semana 6.
 
 ---
 
