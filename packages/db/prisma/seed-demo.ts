@@ -479,7 +479,7 @@ async function seedHistory(
             name: p.name,
             unitPrice,
             qty,
-            taxRate: Number(p.taxRate),
+            taxRate: p.taxRate,
             lineTotal,
           });
           soldByKey.set(`${p.id}|${store.id}`, (soldByKey.get(`${p.id}|${store.id}`) ?? 0) + qty);
@@ -514,6 +514,23 @@ async function seedHistory(
               })),
             },
           },
+        });
+      }
+
+      // Si re-ejecutamos en un día distinto, la sesión que antes era "hoy" (OPEN)
+      // ahora pertenece al pasado: ciérrala antes de crear la del día en curso, o
+      // chocaría con el índice único de una sola sesión OPEN por tienda.
+      // Filtramos por openedAt <= opened (el día en curso del bucle) para no tocar
+      // la sesión de hoy si ya existe (isToday impide que este bloque corra para hoy).
+      if (!isToday) {
+        await prisma.cashSession.updateMany({
+          where: {
+            organizationId: orgId,
+            storeId: store.id,
+            status: CashSessionStatus.OPEN,
+            openedAt: { lte: opened },
+          },
+          data: { status: CashSessionStatus.CLOSED, closedAt: dateDaysAgo(daysAgo, 21, 0) },
         });
       }
 
@@ -581,10 +598,12 @@ async function main(): Promise<void> {
   const stores = await prisma.store.findMany({
     where: { organizationId: org.id },
     select: { id: true, code: true },
+    orderBy: { code: 'asc' },
   });
   const products = await prisma.product.findMany({
     where: { organizationId: org.id },
     select: { id: true, name: true, salePrice: true, taxRate: true },
+    orderBy: { name: 'asc' },
   });
   const clerk = await prisma.user.findFirstOrThrow({
     where: { organizationId: org.id, role: UserRole.CLERK },
