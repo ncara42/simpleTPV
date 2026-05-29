@@ -2,7 +2,7 @@ import { Body, Controller, Get, ParseUUIDPipe, Post, Query, Req } from '@nestjs/
 
 import type { JwtPayload } from '../auth/jwt-payload.js';
 import { Roles } from '../auth/roles.decorator.js';
-import { CreateReturnDto } from './returns.dto.js';
+import { CreateBlindReturnDto, CreateReturnDto } from './returns.dto.js';
 import { ReturnsService } from './returns.service.js';
 
 @Controller('returns')
@@ -15,6 +15,14 @@ export class ReturnsController {
   @Roles('ADMIN', 'MANAGER', 'CLERK')
   create(@Body() body: CreateReturnDto, @Req() req: { user: JwtPayload }) {
     return this.returns.create(body, req.user.sub);
+  }
+
+  // Devolución SIN ticket (#59): el operario (incluido CLERK) la inicia, pero
+  // requiere el PIN de un MANAGER/ADMIN para autorizarla (validado en el servicio).
+  @Post('blind')
+  @Roles('ADMIN', 'MANAGER', 'CLERK')
+  createBlind(@Body() body: CreateBlindReturnDto, @Req() req: { user: JwtPayload }) {
+    return this.returns.createBlind(body, req.user.sub);
   }
 
   // Devoluciones de una venta (para mostrar lo ya devuelto). El saleId se valida

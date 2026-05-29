@@ -218,7 +218,10 @@ model Return {
   organizationId String   @db.Uuid
   storeId        String   @db.Uuid
   userId         String   @db.Uuid
-  saleId         String   @db.Uuid // venta contra la que se devuelve
+  // Venta contra la que se devuelve. NULL en devoluciones SIN ticket (#59),
+  // que requieren autorización por PIN de un MANAGER/ADMIN (authorizedBy).
+  saleId         String?  @db.Uuid
+  authorizedBy   String?  @db.Uuid // MANAGER/ADMIN que autorizó (devolución sin ticket)
   reason         String // motivo obligatorio
   total          Decimal  @db.Decimal(12, 2)
   createdAt      DateTime @default(now())
@@ -226,7 +229,7 @@ model Return {
   organization Organization @relation(fields: [organizationId], references: [id])
   store        Store        @relation(fields: [storeId], references: [id])
   user         User         @relation(fields: [userId], references: [id])
-  sale         Sale         @relation(fields: [saleId], references: [id])
+  sale         Sale?        @relation(fields: [saleId], references: [id])
   lines        ReturnLine[]
 
   @@index([organizationId, saleId])
@@ -239,14 +242,16 @@ model ReturnLine {
   id             String  @id @default(uuid()) @db.Uuid
   organizationId String  @db.Uuid // RLS propia (como SaleLine)
   returnId       String  @db.Uuid
-  saleLineId     String  @db.Uuid // línea de venta devuelta
+  // Línea de venta devuelta. NULL en devoluciones SIN ticket (#59): no hay
+  // SaleLine de referencia; el importe se calcula del precio actual del producto.
+  saleLineId     String? @db.Uuid
   productId      String  @db.Uuid
   qty            Decimal @db.Decimal(10, 3)
   lineTotal      Decimal @db.Decimal(12, 2)
 
   organization Organization @relation(fields: [organizationId], references: [id])
   return       Return       @relation(fields: [returnId], references: [id], onDelete: Cascade)
-  saleLine     SaleLine     @relation(fields: [saleLineId], references: [id])
+  saleLine     SaleLine?    @relation(fields: [saleLineId], references: [id])
   product      Product      @relation(fields: [productId], references: [id])
 
   @@index([returnId])
