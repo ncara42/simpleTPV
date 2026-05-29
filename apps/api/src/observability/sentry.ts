@@ -29,8 +29,9 @@ export function initSentry(): boolean {
 }
 
 /**
- * Defensa en profundidad: elimina cabeceras sensibles del evento por si el SDK
- * las adjuntara. No mutamos el objeto original más allá de sus headers.
+ * beforeSend de Sentry: muta el evento in-place (válido para beforeSend) para
+ * eliminar cabeceras sensibles como defensa en profundidad, por si el SDK las
+ * adjuntara.
  */
 function scrubSensitive<T extends Record<string, unknown>>(event: T): T {
   const request = event.request as { headers?: Record<string, unknown> } | undefined;
