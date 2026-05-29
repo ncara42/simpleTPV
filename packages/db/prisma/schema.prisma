@@ -31,6 +31,9 @@ model Organization {
   stockAlerts     StockAlert[]
   transfers       Transfer[]
   transferLines   TransferLine[]
+  suppliers          Supplier[]
+  purchaseOrders     PurchaseOrder[]
+  purchaseOrderLines PurchaseOrderLine[]
 }
 
 model Store {
@@ -53,6 +56,7 @@ model Store {
   stockAlerts    StockAlert[]
   transfersOut   Transfer[]      @relation("TransferOrigin")
   transfersIn    Transfer[]      @relation("TransferDest")
+  purchaseOrders PurchaseOrder[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -115,6 +119,7 @@ model Product {
   stockMovements StockMovement[]
   stockAlerts    StockAlert[]
   transferLines  TransferLine[]
+  purchaseOrderLines PurchaseOrderLine[]
 
   @@index([organizationId, active])
   @@index([organizationId, barcode])
@@ -356,6 +361,65 @@ model TransferLine {
   @@index([transferId])
 }
 
+// Proveedor de mercancía (#44). leadTimeDays es el plazo de entrega estimado,
+// usado de base para los KPIs y la propuesta de pedido. RLS por tenant.
+model Supplier {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  name           String
+  nif            String?
+  email          String?
+  phone          String?
+  leadTimeDays   Int      @default(7)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  purchaseOrders PurchaseOrder[]
+
+  @@index([organizationId, active])
+}
+
+// Pedido a proveedor (#44). Flujo de estados DRAFT → CONFIRMED →
+// PARTIALLY_RECEIVED → RECEIVED. storeId es el destino (tienda/almacén). RLS.
+model PurchaseOrder {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @db.Uuid
+  supplierId     String              @db.Uuid
+  storeId        String              @db.Uuid
+  status         PurchaseOrderStatus @default(DRAFT)
+  notes          String?
+  createdBy      String              @db.Uuid
+  createdAt      DateTime            @default(now())
+  confirmedAt    DateTime?
+  receivedAt     DateTime?
+
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  supplier     Supplier            @relation(fields: [supplierId], references: [id])
+  store        Store               @relation(fields: [storeId], references: [id])
+  lines        PurchaseOrderLine[]
+
+  @@index([organizationId, status, createdAt])
+}
+
+// Línea de un pedido: cantidad pedida, recibida (acumulada en recepciones
+// sucesivas) y coste unitario. RLS propia (organizationId con policy).
+model PurchaseOrderLine {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @db.Uuid
+  purchaseOrderId  String   @db.Uuid
+  productId        String   @db.Uuid
+  quantityOrdered  Decimal  @db.Decimal(12, 3)
+  quantityReceived Decimal  @default(0) @db.Decimal(12, 3)
+  unitCost         Decimal? @db.Decimal(10, 4)
+
+  organization  Organization  @relation(fields: [organizationId], references: [id])
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+
+  @@index([purchaseOrderId])
+}
+
 model CashSession {
   id             String            @id @default(uuid()) @db.Uuid
   organizationId String            @db.Uuid
@@ -425,4 +489,11 @@ enum TransferStatus {
   SENT
   RECEIVED
   CLOSED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  CONFIRMED
+  PARTIALLY_RECEIVED
+  RECEIVED
 }

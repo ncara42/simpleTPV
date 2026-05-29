@@ -1,0 +1,49 @@
+import { describe, expect, it, vi } from 'vitest';
+
+import type { JwtPayload } from '../auth/jwt-payload.js';
+import { PurchasesController } from './purchases.controller.js';
+import type { PurchasesService } from './purchases.service.js';
+
+const ID = '44444444-4444-4444-4444-444444444444';
+
+function makeController() {
+  const service = {
+    create: vi.fn(async (_dto: unknown, _u: string) => ({ id: ID, status: 'DRAFT' })),
+    list: vi.fn(async (_s?: string) => [{ id: ID }]),
+    get: vi.fn(async (_id: string) => ({ id: ID })),
+    confirm: vi.fn(async (_id: string) => ({ id: ID, status: 'CONFIRMED' })),
+  } as unknown as PurchasesService;
+  return { controller: new PurchasesController(service), service };
+}
+
+function req(): { user: JwtPayload } {
+  return { user: { sub: 'user-1', organizationId: 'org-1', role: 'MANAGER' } as JwtPayload };
+}
+
+describe('PurchasesController', () => {
+  it('POST /purchase-orders delega con el sub del usuario', async () => {
+    const { controller, service } = makeController();
+    const dto = { supplierId: 's', storeId: 't', lines: [] };
+    await controller.create(dto as never, req());
+    expect(service.create).toHaveBeenCalledWith(dto, 'user-1');
+  });
+
+  it('GET /purchase-orders pasa el filtro de estado', async () => {
+    const { controller, service } = makeController();
+    await controller.list('DRAFT');
+    expect(service.list).toHaveBeenCalledWith('DRAFT');
+  });
+
+  it('GET /purchase-orders/:id delega en get', async () => {
+    const { controller, service } = makeController();
+    await controller.get(ID);
+    expect(service.get).toHaveBeenCalledWith(ID);
+  });
+
+  it('POST /purchase-orders/:id/confirm delega en confirm', async () => {
+    const { controller, service } = makeController();
+    const res = (await controller.confirm(ID)) as { status: string };
+    expect(service.confirm).toHaveBeenCalledWith(ID);
+    expect(res.status).toBe('CONFIRMED');
+  });
+});
