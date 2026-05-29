@@ -15,6 +15,9 @@ const queryClient = new QueryClient();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+    {/* ErrorBoundary siempre activo: ante un crash de render muestra ErrorScreen
+        en vez de pantalla en blanco. Solo reporta a Sentry si initSentry() inicializó
+        el SDK (producción con DSN); en dev/test actúa como boundary normal. */}
     <Sentry.ErrorBoundary fallback={<ErrorScreen />}>
       <QueryClientProvider client={queryClient}>
         <App />
