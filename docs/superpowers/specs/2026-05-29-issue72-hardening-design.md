@@ -26,8 +26,11 @@ sin ticket exige PIN de MANAGER/ADMIN en el service. **Sin cambios de código en
 
 - `ThrottlerModule.forRoot` con un límite global por defecto: **120 req / 60 s por IP**
   (holgado para el uso del TPV: ventas, búsquedas rápidas; corta abuso/fuerza bruta).
-- `ThrottlerGuard` como `APP_GUARD` (se añade DESPUÉS de Auth/Roles en el array, pero
-  el orden de throttling es independiente; cuenta por IP+ruta).
+- `TestAwareThrottlerGuard` (subclase de `ThrottlerGuard`) como `APP_GUARD`, primero
+  en el array. Sobreescribe `shouldSkip()` para **desactivarse cuando `NODE_ENV=test`**:
+  los e2e (Playwright) y los tests hacen muchos logins seguidos desde la misma IP y el
+  rate limiting real los cortaría con 429, rompiendo el setup. En dev y producción el
+  throttling está plenamente activo. Cuenta por IP+ruta.
 - **Login endurecido**: `POST /auth/login` con `@Throttle({ default: { limit: 5, ttl: 60000 } })`
   — 5 intentos/min para frenar fuerza bruta de credenciales.
 - Tests no deben dispararlo: el `ThrottlerModule` se configura con un límite alto y

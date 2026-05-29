@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 import { AuditInterceptor } from './audit/audit.interceptor.js';
 import { AuthGuard } from './auth/auth.guard.js';
@@ -10,6 +10,7 @@ import { TenantContextInterceptor } from './auth/tenant-context.interceptor.js';
 import { CacheModule } from './cache/cache.module.js';
 import { CashSessionsModule } from './cash-sessions/cash-sessions.module.js';
 import { throttleConfig } from './config/security.js';
+import { TestAwareThrottlerGuard } from './config/test-aware-throttler.guard.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
 import { EventsModule } from './events/events.module.js';
 import { HealthModule } from './health/health.module.js';
@@ -64,7 +65,8 @@ const throttle = throttleConfig(process.env);
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
     // ThrottlerGuard primero: corta el exceso de peticiones antes de gastar trabajo
     // en validar el JWT. Luego Auth (popula request.user) y Roles (valida el rol).
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Variante test-aware: se desactiva con NODE_ENV=test para no romper los e2e.
+    { provide: APP_GUARD, useClass: TestAwareThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
