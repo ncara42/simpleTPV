@@ -6,6 +6,12 @@ vi.mock('@sentry/nestjs', () => ({
   init: (opts: unknown) => initMock(opts),
 }));
 
+// Mock del contexto de tenant para aislar los tests.
+let currentTenant: { organizationId: string } | undefined;
+vi.mock('../prisma/tenant-context.js', () => ({
+  getCurrentTenant: () => currentTenant,
+}));
+
 import { initSentry } from './sentry.js';
 
 describe('initSentry (API)', () => {
@@ -13,6 +19,7 @@ describe('initSentry (API)', () => {
 
   beforeEach(() => {
     initMock.mockClear();
+    currentTenant = undefined;
     delete process.env.SENTRY_DSN;
     delete process.env.SENTRY_ENVIRONMENT;
     delete process.env.SENTRY_RELEASE;
@@ -62,5 +69,30 @@ describe('initSentry (API)', () => {
     expect(scrubbed.request.headers.authorization).toBeUndefined();
     expect(scrubbed.request.headers.cookie).toBeUndefined();
     expect(scrubbed.request.headers['x-org-id']).toBe('keep');
+  });
+
+  it('beforeSend añade organization_id como tag cuando hay tenant', () => {
+    currentTenant = { organizationId: 'org-123' };
+    process.env.NODE_ENV = 'production';
+    process.env.SENTRY_DSN = 'https://abc@o1.ingest.sentry.io/1';
+    initSentry();
+    const opts = initMock.mock.calls[0]![0] as {
+      beforeSend: (e: Record<string, unknown>) => Record<string, unknown>;
+    };
+    const out = opts.beforeSend({}) as { tags?: Record<string, string> };
+    expect(out.tags?.organization_id).toBe('org-123');
+    currentTenant = undefined;
+  });
+
+  it('beforeSend no añade tag si no hay tenant', () => {
+    currentTenant = undefined;
+    process.env.NODE_ENV = 'production';
+    process.env.SENTRY_DSN = 'https://abc@o1.ingest.sentry.io/1';
+    initSentry();
+    const opts = initMock.mock.calls[0]![0] as {
+      beforeSend: (e: Record<string, unknown>) => Record<string, unknown>;
+    };
+    const out = opts.beforeSend({}) as { tags?: Record<string, string> };
+    expect(out.tags?.organization_id).toBeUndefined();
   });
 });
