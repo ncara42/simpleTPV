@@ -36,7 +36,15 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /repo/apps/api/dist ./dist
 COPY --from=builder /repo/packages/db/generated ./node_modules/@simpletpv/db/generated
+# Migraciones en el arranque (#78): el entrypoint corre `prisma migrate deploy`.
+# El CLI necesita la config y las migraciones junto al paquete db en node_modules.
+COPY --from=builder /repo/packages/db/prisma.config.ts ./node_modules/@simpletpv/db/prisma.config.ts
+COPY --from=builder /repo/packages/db/prisma/schema.prisma ./node_modules/@simpletpv/db/prisma/schema.prisma
+COPY --from=builder /repo/packages/db/prisma/migrations ./node_modules/@simpletpv/db/prisma/migrations
+COPY --from=builder /repo/apps/api/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
 # Corre como el usuario `node` (no root) que ya trae la imagen oficial.
 USER node
 EXPOSE 3001
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "dist/main.js"]
