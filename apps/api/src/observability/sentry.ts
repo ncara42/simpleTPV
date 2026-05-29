@@ -34,10 +34,10 @@ export function initSentry(): boolean {
  * adjuntara.
  */
 function scrubSensitive(event: Sentry.ErrorEvent): Sentry.ErrorEvent {
-  const request = event.request as { headers?: Record<string, unknown> } | undefined;
-  if (request?.headers) {
-    delete request.headers.authorization;
-    delete request.headers.cookie;
+  const headers = event.request?.headers;
+  if (headers) {
+    delete headers.authorization;
+    delete headers.cookie;
   }
   return event;
 }
