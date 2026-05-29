@@ -180,6 +180,15 @@ export function CartPanel({
               {voidError}
             </p>
           )}
+          {ticket && (
+            <button
+              className="cart-print"
+              onClick={() => window.print()}
+              data-testid="print-ticket"
+            >
+              Imprimir ticket
+            </button>
+          )}
           <button className="cart-create" onClick={newSale} data-testid="new-sale">
             Nueva venta
           </button>

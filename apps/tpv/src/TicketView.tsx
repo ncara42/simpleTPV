@@ -1,5 +1,7 @@
 import type { SaleTicket } from '@simpletpv/auth';
 
+import { buildQrData } from './lib/escpos.js';
+
 // Renderiza el ticket-resumen de una venta en formato monoespaciado tipo recibo:
 // cabecera de organización/tienda, líneas, totales, desglose de IVA y pago.
 
@@ -107,6 +109,21 @@ export function TicketView({ ticket }: { ticket: SaleTicket }) {
             <span data-testid="ticket-change">{eur(ticket.cashChange)}</span>
           </div>
         )}
+      </div>
+
+      <hr className="ticket-sep" />
+
+      {/* QR / enlace de cotejo VeriFactu (#50). En impresora térmica se imprime
+          como QR (comando ESC/POS); en pantalla mostramos el enlace de cotejo. */}
+      <div className="ticket-verifactu" data-testid="ticket-verifactu">
+        <span className="ticket-vf-label">VeriFactu · cotejo AEAT</span>
+        <a
+          className="ticket-vf-link"
+          href={buildQrData(ticket.organization.nif, ticket.ticketNumber, ticket.total)}
+          data-testid="ticket-qr"
+        >
+          {buildQrData(ticket.organization.nif, ticket.ticketNumber, ticket.total)}
+        </a>
       </div>
     </div>
   );
