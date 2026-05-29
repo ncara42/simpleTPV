@@ -21,6 +21,7 @@ import { applyTenantExtension, PrismaService } from '../src/prisma/prisma.servic
 import { tenantStorage } from '../src/prisma/tenant-context.js';
 import { SalesService } from '../src/sales/sales.service.js';
 import { StockService } from '../src/stock/stock.service.js';
+import { stubVerifactu } from './helpers/stub-verifactu.js';
 
 describe('Ventas — integración', () => {
   let base: PrismaService;
@@ -62,6 +63,7 @@ describe('Ventas — integración', () => {
         new InMemoryEventBus(),
       ),
       new InMemoryEventBus(),
+      stubVerifactu(),
     );
 
     const adminUrl = process.env.DATABASE_URL;

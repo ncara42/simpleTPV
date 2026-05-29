@@ -22,6 +22,7 @@ import { StoresModule } from './stores/stores.module.js';
 import { SuppliersModule } from './suppliers/suppliers.module.js';
 import { TransfersModule } from './transfers/transfers.module.js';
 import { UsersModule } from './users/users.module.js';
+import { VerifactuModule } from './verifactu/verifactu.module.js';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { UsersModule } from './users/users.module.js';
     TransfersModule,
     SuppliersModule,
     PurchasesModule,
+    VerifactuModule,
     CashSessionsModule,
     MeModule,
   ],

@@ -18,6 +18,7 @@ import { tenantStorage } from '../src/prisma/tenant-context.js';
 import { ReturnsService } from '../src/returns/returns.service.js';
 import { SalesService } from '../src/sales/sales.service.js';
 import { StockService } from '../src/stock/stock.service.js';
+import { stubVerifactu } from './helpers/stub-verifactu.js';
 
 describe('Stock — integración', () => {
   let base: PrismaService;
@@ -67,6 +68,7 @@ describe('Stock — integración', () => {
       base,
       stockService,
       new InMemoryEventBus(),
+      stubVerifactu(),
     );
     returns = new ReturnsService(prisma as unknown as PrismaService, base, stockService);
 

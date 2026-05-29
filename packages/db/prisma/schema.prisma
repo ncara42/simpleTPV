@@ -34,6 +34,7 @@ model Organization {
   suppliers          Supplier[]
   purchaseOrders     PurchaseOrder[]
   purchaseOrderLines PurchaseOrderLine[]
+  verifactuRecords   VerifactuRecord[]
 }
 
 model Store {
@@ -420,6 +421,32 @@ model PurchaseOrderLine {
   @@index([purchaseOrderId])
 }
 
+// Registro de facturación VeriFactu (#47). Uno por venta/devolución. Los
+// registros del mismo tenant forman una cadena inalterable vía previousHash →
+// hash. Se envía a la AEAT (vía proveedor certificado) por una cola con
+// reintentos; status refleja el resultado. RLS por tenant.
+model VerifactuRecord {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  saleId         String?          @db.Uuid
+  returnId       String?          @db.Uuid
+  type           VerifactuType
+  status         VerifactuStatus  @default(PENDING)
+  hash           String // huella SHA-256 de este registro
+  previousHash   String? // huella del registro anterior del tenant (encadenamiento)
+  qrData         String? // URL de cotejo AEAT para el ticket
+  payload        Json // datos del registro (importe, fecha, nif...)
+  attempts       Int              @default(0)
+  lastError      String?
+  sentAt         DateTime?
+  createdAt      DateTime         @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, createdAt])
+}
+
 model CashSession {
   id             String            @id @default(uuid()) @db.Uuid
   organizationId String            @db.Uuid
@@ -496,4 +523,15 @@ enum PurchaseOrderStatus {
   CONFIRMED
   PARTIALLY_RECEIVED
   RECEIVED
+}
+
+enum VerifactuType {
+  INVOICE
+  RECTIFICATION
+}
+
+enum VerifactuStatus {
+  PENDING
+  SENT
+  FAILED
 }
