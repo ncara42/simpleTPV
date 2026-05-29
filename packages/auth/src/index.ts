@@ -7,6 +7,7 @@ export type {
   CashSession,
   CashSessionStatus,
   CloseCashSessionInput,
+  CreateBlindReturnInput,
   CreatePurchaseOrderInput,
   CreateReturnInput,
   CreateSaleInput,

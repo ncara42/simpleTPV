@@ -224,6 +224,15 @@ export interface CreateReturnInput {
   lines: Array<{ saleLineId: string; qty: number }>;
 }
 
+// Devolución SIN ticket (#59): producto + cantidad + motivo + PIN de un
+// MANAGER/ADMIN que autoriza. El importe lo calcula el servidor (precio actual).
+export interface CreateBlindReturnInput {
+  storeId: string;
+  reason: string;
+  managerPin: string;
+  lines: Array<{ productId: string; qty: number }>;
+}
+
 // Stock en tiempo real (semana 3). Los Decimal viajan como number en estas
 // respuestas (el servicio ya los convierte con Number()). level es el semáforo.
 export type StockLevel = 'red' | 'yellow' | 'green';
