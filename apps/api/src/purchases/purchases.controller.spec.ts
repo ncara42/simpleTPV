@@ -17,6 +17,7 @@ function makeController() {
       id: ID,
       status: 'RECEIVED',
     })),
+    exportCsv: vi.fn(async (_id: string) => 'producto,cantidad_pedida\nCafé,10'),
   } as unknown as PurchasesService;
   return { controller: new PurchasesController(service), service };
 }
@@ -65,5 +66,12 @@ describe('PurchasesController', () => {
     const body = { lines: [{ lineId: 'l1', quantityReceived: 5 }] };
     await controller.receive(ID, body as never, req());
     expect(service.receive).toHaveBeenCalledWith(ID, body, 'user-1');
+  });
+
+  it('GET /purchase-orders/:id/export delega en exportCsv y devuelve CSV', async () => {
+    const { controller, service } = makeController();
+    const csv = await controller.exportCsv(ID);
+    expect(service.exportCsv).toHaveBeenCalledWith(ID);
+    expect(csv.startsWith('producto,')).toBe(true);
   });
 });

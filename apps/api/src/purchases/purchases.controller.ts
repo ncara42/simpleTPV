@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 
 import type { JwtPayload } from '../auth/jwt-payload.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -38,6 +48,14 @@ export class PurchasesController {
   @Roles('ADMIN', 'MANAGER', 'CLERK')
   get(@Param('id', ParseUUIDPipe) id: string) {
     return this.purchases.get(id);
+  }
+
+  // Exportación del pedido a CSV (#48). format=csv (por ahora el único formato).
+  @Get(':id/export')
+  @Roles('ADMIN', 'MANAGER')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  exportCsv(@Param('id', ParseUUIDPipe) id: string): Promise<string> {
+    return this.purchases.exportCsv(id);
   }
 
   @Post(':id/confirm')

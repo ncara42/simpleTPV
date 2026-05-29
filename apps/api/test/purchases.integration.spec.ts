@@ -208,4 +208,27 @@ describe('Compras — integración', () => {
     expect(detail.kpis.fillRate).toBe(1);
     expect(detail.kpis.leadTimeDays).not.toBeNull();
   });
+
+  it('exportCsv genera el CSV del pedido con nombre de producto real', async () => {
+    const supplier = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      suppliers.create({ name: 'Prov CSV' }),
+    );
+    const order = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      purchases.create(
+        {
+          supplierId: supplier.id,
+          storeId,
+          lines: [{ productId, quantityOrdered: 7, unitCost: 1.2 }],
+        },
+        user1Id,
+      ),
+    );
+    const csv = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      purchases.exportCsv(order.id),
+    );
+    const rows = csv.split('\n');
+    expect(rows[0]).toBe('producto,cantidad_pedida,cantidad_recibida,coste_unitario');
+    expect(rows[1]).toContain('7');
+    expect(rows[1]).toContain('1.2');
+  });
 });

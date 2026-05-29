@@ -266,6 +266,39 @@ describe('KPIs de proveedor', () => {
   });
 });
 
+describe('PurchasesService.exportCsv', () => {
+  it('genera CSV con cabecera y una fila por línea, escapando comas', async () => {
+    const prisma = {
+      purchaseOrder: {
+        findFirst: vi.fn(async () => ({
+          id: 'po1',
+          status: 'CONFIRMED',
+          confirmedAt: null,
+          receivedAt: null,
+          lines: [
+            { productId: 'p1', quantityOrdered: 10, quantityReceived: 4, unitCost: '2.5' },
+            { productId: 'p2', quantityOrdered: 5, quantityReceived: 0, unitCost: null },
+          ],
+        })),
+      },
+      product: {
+        findMany: vi.fn(async () => [
+          { id: 'p1', name: 'Café, molido' },
+          { id: 'p2', name: 'Té' },
+        ]),
+      },
+    };
+    const service = new PurchasesService(prisma as never, {} as never, {} as never);
+    const csv = await tenantStorage.run({ organizationId: ORG }, () => service.exportCsv('po1'));
+
+    const lines = csv.split('\n');
+    expect(lines[0]).toBe('producto,cantidad_pedida,cantidad_recibida,coste_unitario');
+    // "Café, molido" lleva coma → se entrecomilla.
+    expect(lines[1]).toBe('"Café, molido",10,4,2.5');
+    expect(lines[2]).toBe('Té,5,0,');
+  });
+});
+
 describe('PurchasesService.receive', () => {
   // tx con purchaseOrder + purchaseOrderLine; stock mockeado.
   function makeReceiveSetup(order: unknown, freshLines: unknown[]) {

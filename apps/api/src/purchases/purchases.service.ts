@@ -237,6 +237,31 @@ export class PurchasesService {
   }
 
   /**
+   * Exporta un pedido a CSV (#48): cabecera + una fila por línea (producto,
+   * pedido, recibido, coste). RLS vía get(). Escapa comillas/comas básicas.
+   */
+  async exportCsv(id: string): Promise<string> {
+    const order = await this.get(id);
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: order.lines.map((l) => l.productId) } },
+      select: { id: true, name: true },
+    });
+    const nameById = new Map(products.map((p) => [p.id, p.name]));
+    const esc = (v: string): string => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+
+    const header = 'producto,cantidad_pedida,cantidad_recibida,coste_unitario';
+    const rows = order.lines.map((l) =>
+      [
+        esc(nameById.get(l.productId) ?? l.productId),
+        String(l.quantityOrdered),
+        String(l.quantityReceived),
+        l.unitCost != null ? String(l.unitCost) : '',
+      ].join(','),
+    );
+    return [header, ...rows].join('\n');
+  }
+
+  /**
    * Recibe un pedido (#46): registra la cantidad recibida por línea (acumulada),
    * incrementa el stock del destino con applyMovement tipo PURCHASE_RECEIPT, y
    * actualiza el estado: RECEIVED si todas las líneas alcanzan lo pedido,
