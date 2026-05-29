@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { SentryGlobalFilter } from '@sentry/nestjs/setup';
 
 import { AuditInterceptor } from './audit/audit.interceptor.js';
 import { AuthGuard } from './auth/auth.guard.js';
@@ -61,6 +62,9 @@ const throttle = throttleConfig(process.env);
   // Interceptores: TenantContext primero (abre el AsyncLocalStorage del tenant),
   // luego Audit (su insert corre dentro de ese contexto → RLS aplicada).
   providers: [
+    // Captura en Sentry las excepciones no manejadas (#79). Reenvía la excepción
+    // tras registrarla: no altera la respuesta HTTP estándar de Nest.
+    { provide: APP_FILTER, useClass: SentryGlobalFilter },
     { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
     // ThrottlerGuard primero: corta el exceso de peticiones antes de gastar trabajo

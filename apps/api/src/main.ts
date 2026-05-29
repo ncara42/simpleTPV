@@ -7,8 +7,13 @@ import helmet from 'helmet';
 
 import { AppModule } from './app.module.js';
 import { parseCorsOrigins } from './config/security.js';
+import { initSentry } from './observability/sentry.js';
 
 async function bootstrap(): Promise<void> {
+  // Sentry debe instrumentar el runtime antes de crear la app (#79).
+  // No-op si no hay SENTRY_DSN o no estamos en producción.
+  initSentry();
+
   const app = await NestFactory.create(AppModule, {
     logger: ['warn', 'error', 'log'],
   });

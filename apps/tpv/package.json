@@ -12,6 +12,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@sentry/react": "^10.55.0",
     "@simpletpv/auth": "workspace:*",
     "@simpletpv/ui": "workspace:*",
     "@tanstack/react-query": "^5.0.0",
