@@ -321,6 +321,7 @@ function makeService(prisma: ReturnType<typeof makePrisma>, base?: unknown) {
     resolvedBase as never,
     new StockService({} as never, new MemoryCache(), {} as never, new InMemoryEventBus()),
     new InMemoryEventBus(),
+    { recordFor: vi.fn(async () => ({ id: 'vf', hash: 'h', qrData: 'q' })) } as never,
   );
 }
 
