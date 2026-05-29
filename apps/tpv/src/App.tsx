@@ -4,10 +4,37 @@ import './sale.css';
 import { Button, LoginForm } from '@simpletpv/ui';
 import { useState } from 'react';
 
+import { BlindReturnPanel } from './BlindReturnPanel.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { ReturnPanel } from './ReturnPanel.js';
 import { SalePage } from './SalePage.js';
 import { TransferReceivePanel } from './TransferReceivePanel.js';
+
+// Vista de devoluciones: alterna entre devolución contra ticket y sin ticket (#59).
+function ReturnsView() {
+  const [mode, setMode] = useState<'ticket' | 'blind'>('ticket');
+  return (
+    <div>
+      <div className="tpv-nav" style={{ marginBottom: '1rem' }}>
+        <button
+          className={`tpv-tab ${mode === 'ticket' ? 'active' : ''}`}
+          onClick={() => setMode('ticket')}
+          data-testid="return-mode-ticket"
+        >
+          Con ticket
+        </button>
+        <button
+          className={`tpv-tab ${mode === 'blind' ? 'active' : ''}`}
+          onClick={() => setMode('blind')}
+          data-testid="return-mode-blind"
+        >
+          Sin ticket
+        </button>
+      </div>
+      {mode === 'ticket' ? <ReturnPanel /> : <BlindReturnPanel />}
+    </div>
+  );
+}
 
 function Home() {
   const logout = useAuthStore((s) => s.clear);
@@ -46,7 +73,7 @@ function Home() {
         </div>
       </div>
       {view === 'sale' && <SalePage />}
-      {view === 'return' && <ReturnPanel />}
+      {view === 'return' && <ReturnsView />}
       {view === 'transfers' && <TransferReceivePanel />}
     </main>
   );

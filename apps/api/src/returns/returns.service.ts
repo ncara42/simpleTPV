@@ -1,11 +1,18 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import bcrypt from 'bcryptjs';
 
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import { withTenantTx } from '../prisma/with-tenant-tx.js';
 import { StockService } from '../stock/stock.service.js';
-import type { CreateReturnDto } from './returns.dto.js';
+import type { CreateBlindReturnDto, CreateReturnDto } from './returns.dto.js';
 
 // Redondeo a 2 decimales (céntimos), idéntico al de ventas, para que el cálculo
 // coincida con la columna DECIMAL(12,2).
@@ -91,6 +98,11 @@ export class ReturnsService {
       });
       const returnedBySaleLine = new Map<string, number>();
       for (const rl of previous) {
+        // saleLineId no es null aquí: el filtro `in` solo trae líneas con
+        // saleLineId de esta venta (las devoluciones sin ticket no lo tienen).
+        if (rl.saleLineId === null) {
+          continue;
+        }
         returnedBySaleLine.set(
           rl.saleLineId,
           (returnedBySaleLine.get(rl.saleLineId) ?? 0) + Number(rl.qty),
@@ -148,6 +160,98 @@ export class ReturnsService {
             organizationId: tenant.organizationId,
             productId: l.productId,
             storeId: sale.storeId,
+            type: 'RETURN',
+            quantity: l.qty,
+            referenceId: created.id,
+            userId,
+          },
+          afterCommit,
+        );
+      }
+
+      return created;
+    });
+  }
+
+  /**
+   * Valida el PIN de un MANAGER/ADMIN del tenant. Devuelve el id del usuario que
+   * autoriza si el PIN coincide con el de algún MANAGER/ADMIN; si no, lanza 403.
+   * Compara contra todos los pinHash (bcrypt) de los autorizadores del tenant —
+   * el volumen de MANAGER/ADMIN por tienda es pequeño.
+   */
+  private async resolveAuthorizer(managerPin: string): Promise<string> {
+    const tenant = requireTenant();
+    const authorizers = await this.prisma.user.findMany({
+      where: {
+        organizationId: tenant.organizationId,
+        role: { in: ['MANAGER', 'ADMIN'] },
+        active: true,
+        pinHash: { not: null },
+      },
+      select: { id: true, pinHash: true },
+    });
+    for (const u of authorizers) {
+      if (u.pinHash && (await bcrypt.compare(managerPin, u.pinHash))) {
+        return u.id;
+      }
+    }
+    throw new ForbiddenException('PIN de autorización inválido');
+  }
+
+  /**
+   * Devolución SIN ticket (#59): no hay venta de referencia. Requiere el PIN de
+   * un MANAGER/ADMIN que autoriza, motivo obligatorio, y repone el stock del
+   * producto (movimiento RETURN). El importe de cada línea se calcula del precio
+   * de venta ACTUAL del producto (salePrice) × qty. Todo en una tx atómica.
+   */
+  async createBlind(dto: CreateBlindReturnDto, userId: string) {
+    const tenant = requireTenant();
+    // Autorización por PIN ANTES de abrir la tx (si falla, no toca nada).
+    const authorizedBy = await this.resolveAuthorizer(dto.managerPin);
+
+    // Precios actuales de los productos del tenant (fuente del importe).
+    const productIds = dto.lines.map((l) => l.productId);
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds }, organizationId: tenant.organizationId },
+      select: { id: true, salePrice: true },
+    });
+    const priceById = new Map(products.map((p) => [p.id, Number(p.salePrice)]));
+    for (const l of dto.lines) {
+      if (!priceById.has(l.productId)) {
+        throw new BadRequestException(`Producto ${l.productId} no encontrado en la organización`);
+      }
+    }
+
+    const returnLines = dto.lines.map((l) => ({
+      organizationId: tenant.organizationId,
+      productId: l.productId,
+      qty: l.qty,
+      lineTotal: round2(priceById.get(l.productId)! * l.qty),
+    }));
+    const total = round2(returnLines.reduce((acc, l) => acc + l.lineTotal, 0));
+
+    return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
+      const created = await tx.return.create({
+        data: {
+          organizationId: tenant.organizationId,
+          storeId: dto.storeId,
+          userId,
+          authorizedBy,
+          reason: dto.reason,
+          total,
+          lines: { create: returnLines },
+        },
+        include: { lines: true },
+      });
+
+      // Repone el stock de cada producto devuelto (RETURN, positivo).
+      for (const l of returnLines) {
+        await this.stock.applyMovement(
+          tx,
+          {
+            organizationId: tenant.organizationId,
+            productId: l.productId,
+            storeId: dto.storeId,
             type: 'RETURN',
             quantity: l.qty,
             referenceId: created.id,

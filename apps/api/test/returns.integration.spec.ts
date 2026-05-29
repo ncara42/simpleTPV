@@ -257,4 +257,64 @@ describe('Devoluciones — integración', () => {
     );
     expect(seenByOrg2).toHaveLength(0);
   });
+
+  it('devolución sin ticket: PIN de MANAGER válido repone stock; PIN inválido → 403', async () => {
+    const { default: bcrypt } = await import('bcryptjs');
+    // Damos un PIN al MANAGER de org1.
+    const pinHash = await bcrypt.hash('4321', 10);
+    await admin.$executeRaw`UPDATE "User" SET "pinHash" = ${pinHash} WHERE email = 'manager@org1.test'`;
+
+    // Stock conocido del producto en la tienda.
+    await admin.$executeRaw`
+      INSERT INTO "Stock" ("id", "organizationId", "productId", "storeId", "quantity", "minStock", "updatedAt")
+      VALUES (gen_random_uuid(), ${org1Id}::uuid, ${product1Id}::uuid, ${store1Id}::uuid, 50, 0, now())
+      ON CONFLICT ("productId", "storeId") DO UPDATE SET quantity = 50, "minStock" = 0
+    `;
+    const qtyBefore = Number(
+      (
+        await admin.$queryRaw<Array<{ q: string }>>`
+          SELECT quantity::text AS q FROM "Stock" WHERE "productId" = ${product1Id}::uuid AND "storeId" = ${store1Id}::uuid
+        `
+      )[0]!.q,
+    );
+
+    // PIN inválido → 403.
+    await expect(
+      tenantStorage.run({ organizationId: org1Id }, async () =>
+        returns.createBlind(
+          {
+            storeId: store1Id,
+            reason: 'sin ticket',
+            managerPin: '0000',
+            lines: [{ productId: product1Id, qty: 3 }],
+          },
+          user1Id,
+        ),
+      ),
+    ).rejects.toThrow(/PIN/);
+
+    // PIN válido → crea la devolución y repone stock.
+    const ret = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      returns.createBlind(
+        {
+          storeId: store1Id,
+          reason: 'sin ticket',
+          managerPin: '4321',
+          lines: [{ productId: product1Id, qty: 3 }],
+        },
+        user1Id,
+      ),
+    );
+    expect(ret.lines).toHaveLength(1);
+    expect(Number(ret.total)).toBeGreaterThan(0);
+
+    const qtyAfter = Number(
+      (
+        await admin.$queryRaw<Array<{ q: string }>>`
+          SELECT quantity::text AS q FROM "Stock" WHERE "productId" = ${product1Id}::uuid AND "storeId" = ${store1Id}::uuid
+        `
+      )[0]!.q,
+    );
+    expect(qtyAfter).toBeCloseTo(qtyBefore + 3, 3);
+  });
 });

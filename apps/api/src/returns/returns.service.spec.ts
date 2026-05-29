@@ -1,4 +1,5 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import bcrypt from 'bcryptjs';
 import { describe, expect, it, vi } from 'vitest';
 
 import { MemoryCache } from '../cache/memory-cache.js';
@@ -264,5 +265,114 @@ describe('ReturnsService.list', () => {
   it('lanza si no hay contexto de tenant', async () => {
     const service = makeService(makePrisma(), makeBase());
     await expect(service.list('sale-1')).rejects.toThrow();
+  });
+});
+
+describe('ReturnsService.createBlind', () => {
+  const STORE = '22222222-2222-2222-2222-222222222222';
+  const PROD = '33333333-3333-3333-3333-333333333333';
+
+  // prisma con user (PIN) y product (precio). `pinHash` es el hash del PIN dado.
+  function makeBlindPrisma(opts: { pinHash?: string | null; price?: number | null }) {
+    return {
+      user: {
+        findMany: vi.fn(async () =>
+          opts.pinHash === undefined
+            ? [{ id: 'mgr-1', pinHash: null }]
+            : [{ id: 'mgr-1', pinHash: opts.pinHash }],
+        ),
+      },
+      product: {
+        findMany: vi.fn(async () =>
+          opts.price == null ? [] : [{ id: PROD, salePrice: String(opts.price) }],
+        ),
+      },
+    };
+  }
+
+  function makeBlindBase() {
+    const tx = {
+      $executeRaw: vi.fn(async () => 1),
+      return: {
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+          id: 'blind-1',
+          ...data,
+          lines: (data.lines as { create: unknown[] }).create,
+        })),
+      },
+      stock: { upsert: vi.fn(async (_a?: unknown) => ({ quantity: 5, minStock: 0 })) },
+      stockMovement: { create: vi.fn(async (_a?: unknown) => ({ id: 'mov-1' })) },
+      stockAlert: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async (_a?: unknown) => ({ id: 'a' })),
+        update: vi.fn(async (_a?: unknown) => ({})),
+      },
+    };
+    return {
+      $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
+      __tx: tx,
+    };
+  }
+
+  function service(prisma: unknown, base: unknown) {
+    return new ReturnsService(
+      prisma as never,
+      base as never,
+      new StockService(prisma as never, new MemoryCache(), base as never, new InMemoryEventBus()),
+    );
+  }
+
+  const dto = {
+    storeId: STORE,
+    reason: 'producto defectuoso',
+    managerPin: '4321',
+    lines: [{ productId: PROD, qty: 2 }],
+  };
+
+  it('403 si el PIN no coincide con ningún MANAGER/ADMIN', async () => {
+    const otherHash = await bcrypt.hash('9999', 10);
+    const svc = service(makeBlindPrisma({ pinHash: otherHash, price: 10 }), makeBlindBase());
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1')),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('PIN válido: crea la devolución con importe = precio actual × qty y autorizador', async () => {
+    const pinHash = await bcrypt.hash('4321', 10);
+    const base = makeBlindBase();
+    const svc = service(makeBlindPrisma({ pinHash, price: 10 }), base);
+
+    const res = (await tenantStorage.run({ organizationId: ORG }, () =>
+      svc.createBlind(dto, 'clerk-1'),
+    )) as unknown as { authorizedBy: string; total: number; saleId?: string | null };
+
+    // precio 10 × qty 2 = 20.
+    expect(res.total).toBeCloseTo(20, 2);
+    expect(res.authorizedBy).toBe('mgr-1');
+    const createArg = base.__tx.return.create.mock.calls[0]![0] as {
+      data: { saleId?: string; userId: string };
+    };
+    expect(createArg.data.saleId).toBeUndefined(); // sin ticket
+    expect(createArg.data.userId).toBe('clerk-1'); // operario que la inició
+  });
+
+  it('400 si un producto no pertenece al tenant', async () => {
+    const pinHash = await bcrypt.hash('4321', 10);
+    const svc = service(makeBlindPrisma({ pinHash, price: null }), makeBlindBase());
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1')),
+    ).rejects.toThrow(/no encontrado/);
+  });
+
+  it('repone el stock del producto (movimiento RETURN)', async () => {
+    const pinHash = await bcrypt.hash('4321', 10);
+    const base = makeBlindBase();
+    const svc = service(makeBlindPrisma({ pinHash, price: 10 }), base);
+    await tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1'));
+    const mv = base.__tx.stockMovement.create.mock.calls[0]![0] as {
+      data: { type: string; quantity: number };
+    };
+    expect(mv.data.type).toBe('RETURN');
+    expect(mv.data.quantity).toBe(2);
   });
 });

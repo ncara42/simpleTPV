@@ -10,6 +10,7 @@ const SALE = '22222222-2222-2222-2222-222222222222';
 function makeController() {
   const service = {
     create: vi.fn(async (_dto: unknown, _userId: string) => ({ id: 'return-1', total: 20 })),
+    createBlind: vi.fn(async (_dto: unknown, _userId: string) => ({ id: 'blind-1', total: 20 })),
     list: vi.fn(async (_saleId: string) => [{ id: 'return-1' }]),
   } as unknown as ReturnsService;
   return { controller: new ReturnsController(service), service };
@@ -28,6 +29,19 @@ describe('ReturnsController', () => {
 
     expect(service.create).toHaveBeenCalledWith(dto, 'user-1');
     expect(res.id).toBe('return-1');
+  });
+
+  it('POST /returns/blind delega en createBlind con el sub del usuario', async () => {
+    const { controller, service } = makeController();
+    const dto = {
+      storeId: SALE,
+      reason: 'sin ticket',
+      managerPin: '1234',
+      lines: [{ productId: 'p1', qty: 1 }],
+    };
+    const res = (await controller.createBlind(dto as never, req('CLERK'))) as { id: string };
+    expect(service.createBlind).toHaveBeenCalledWith(dto, 'user-1');
+    expect(res.id).toBe('blind-1');
   });
 
   it('GET /returns delega el saleId en list', async () => {

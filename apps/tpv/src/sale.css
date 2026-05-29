@@ -905,3 +905,46 @@
     box-shadow: none;
   }
 }
+
+/* Devolución sin ticket (#59) */
+.blind-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.7rem;
+  font-size: 0.9rem;
+  color: #475569;
+}
+.blind-field input {
+  padding: 0.5rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+}
+.blind-results {
+  list-style: none;
+  margin: 0.4rem 0;
+  padding: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.blind-picked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.8rem;
+  background: rgba(20, 184, 166, 0.08);
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--tpv-teal-700, #0f766e);
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0.2rem 0;
+  text-align: left;
+}
