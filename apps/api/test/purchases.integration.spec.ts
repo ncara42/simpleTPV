@@ -129,4 +129,32 @@ describe('Compras — integración', () => {
     ).rejects.toThrow(/Proveedor no encontrado/);
     await admin.$executeRaw`DELETE FROM "Supplier" WHERE "organizationId" = ${org2Id}::uuid`;
   });
+
+  it('suggest: propone cantidad con contexto a partir de stock y ventas reales', async () => {
+    // Fijamos stock bajo el mínimo y registramos ventas SALE recientes.
+    await admin.$executeRaw`
+      INSERT INTO "Stock" ("id", "organizationId", "productId", "storeId", "quantity", "minStock", "updatedAt")
+      VALUES (gen_random_uuid(), ${org1Id}::uuid, ${productId}::uuid, ${storeId}::uuid, 2, 10, now())
+      ON CONFLICT ("productId", "storeId") DO UPDATE SET quantity = 2, "minStock" = 10
+    `;
+    await admin.$executeRaw`DELETE FROM "StockMovement" WHERE "productId" = ${productId}::uuid AND "storeId" = ${storeId}::uuid AND type = 'SALE'`;
+    // 30 unidades vendidas en los últimos días (1/día de media).
+    await admin.$executeRaw`
+      INSERT INTO "StockMovement" ("id", "organizationId", "productId", "storeId", "type", "quantity", "createdAt")
+      VALUES (gen_random_uuid(), ${org1Id}::uuid, ${productId}::uuid, ${storeId}::uuid, 'SALE', -30, now() - interval '5 days')
+    `;
+
+    const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      purchases.suggest({ storeId, daysCoverage: 14 }),
+    );
+    const line = rows.find((r) => r.productId === productId)!;
+    expect(line).toBeDefined();
+    expect(line.minStock).toBe(10);
+    expect(line.stockActual).toBe(2);
+    expect(line.ventaMedia30d).toBe(30);
+    // min 10 - stock 2 + (30/30)*14 = 22.
+    expect(line.cantidadSugerida).toBeCloseTo(22, 3);
+
+    await admin.$executeRaw`DELETE FROM "StockMovement" WHERE "productId" = ${productId}::uuid AND "storeId" = ${storeId}::uuid AND type = 'SALE'`;
+  });
 });
