@@ -130,6 +130,9 @@ importers:
 
   apps/backoffice:
     dependencies:
+      '@sentry/react':
+        specifier: ^10.55.0
+        version: 10.55.0(react@19.2.6)
       '@simpletpv/auth':
         specifier: workspace:*
         version: link:../../packages/auth
