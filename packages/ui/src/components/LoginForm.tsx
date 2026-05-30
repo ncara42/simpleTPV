@@ -1,6 +1,6 @@
-import * as React from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 
-import { cn } from '../lib/cn.js';
+import { StarField } from './StarField.js';
 
 export interface LoginFormProps {
   onSubmit: (email: string, password: string) => Promise<void>;
@@ -9,12 +9,20 @@ export interface LoginFormProps {
 }
 
 export function LoginForm({ onSubmit, title = 'simpleTPV', subtitle }: LoginFormProps) {
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [error, setError] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const mountedRef = useRef(true);
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+    },
+    [],
+  );
 
-  async function handleSubmit(e: React.FormEvent): Promise<void> {
+  async function handleSubmit(e: FormEvent): Promise<void> {
+    if (loading) return;
     e.preventDefault();
     setError(null);
     setLoading(true);
@@ -23,65 +31,102 @@ export function LoginForm({ onSubmit, title = 'simpleTPV', subtitle }: LoginForm
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }
 
   return (
     <div className="login-shell">
-      <div className="login-card" data-testid="login-card">
-        <div className="login-brand">
-          <span className="login-mark" aria-hidden>
-            ◆
-          </span>
-          <h1 className="login-title">{title}</h1>
-          {subtitle && <p className="login-subtitle">{subtitle}</p>}
+      {/* Panel izquierdo — rejilla animada */}
+      <div className="login-left">
+        <div className="login-left-glow" />
+        <StarField />
+      </div>
+
+      {/* Panel derecho — formulario */}
+      <div className="login-right">
+        <div className="login-right-vignette" />
+        <div className="login-form-wrap">
+          <form onSubmit={handleSubmit} className="login-form" noValidate data-testid="login-card">
+            <div className="login-heading">
+              <h1 className="login-title">{title}</h1>
+              {subtitle && <p className="login-subtitle">{subtitle}</p>}
+            </div>
+
+            <div className="login-fields">
+              <label className="login-field">
+                <span className="login-label">Correo electrónico</span>
+                <input
+                  type="email"
+                  autoComplete="username"
+                  required
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setError(null);
+                  }}
+                  className={`login-input${error ? ' login-input--error' : ''}`}
+                  placeholder="tu@correo.com"
+                  data-testid="login-email"
+                  disabled={loading}
+                />
+              </label>
+
+              <label className="login-field">
+                <span className="login-label">Contraseña</span>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError(null);
+                  }}
+                  className="login-input"
+                  placeholder="••••••••"
+                  data-testid="login-password"
+                  disabled={loading}
+                />
+              </label>
+            </div>
+
+            {error && (
+              <p className="login-error" role="alert" data-testid="login-error">
+                {error}
+              </p>
+            )}
+
+            <div className="login-actions">
+              <button
+                type="submit"
+                disabled={loading}
+                className="login-submit"
+                data-testid="login-submit"
+              >
+                {loading ? (
+                  <>
+                    <span className="login-spinner" aria-hidden="true" />
+                    <span
+                      style={{
+                        position: 'absolute',
+                        width: '1px',
+                        height: '1px',
+                        overflow: 'hidden',
+                        clip: 'rect(0,0,0,0)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Entrando…
+                    </span>
+                  </>
+                ) : (
+                  'Entrar'
+                )}
+              </button>
+            </div>
+          </form>
         </div>
-
-        <form onSubmit={handleSubmit} className="login-form" noValidate>
-          <label className="login-field">
-            <span className="login-label">Correo</span>
-            <input
-              type="email"
-              autoComplete="username"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="login-input"
-              placeholder="tu@correo.com"
-              data-testid="login-email"
-            />
-          </label>
-
-          <label className="login-field">
-            <span className="login-label">Contraseña</span>
-            <input
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="login-input"
-              placeholder="••••••••"
-              data-testid="login-password"
-            />
-          </label>
-
-          {error && (
-            <p className="login-error" role="alert" data-testid="login-error">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className={cn('login-submit', loading && 'is-loading')}
-            data-testid="login-submit"
-          >
-            {loading ? 'Entrando…' : 'Entrar'}
-          </button>
-        </form>
       </div>
     </div>
   );
