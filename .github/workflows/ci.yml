@@ -307,7 +307,12 @@ jobs:
 
   # -----------------------------------------------------------------------
   # Deploy a producción — solo en push a main, tras pasar quality + e2e.
-  # Llama al webhook de Dokploy que redespliega la imagen Docker.
+  # Usa la API autenticada de Dokploy (application.deploy) en lugar del webhook
+  # de rama /api/deploy/<token>: ese webhook espera el payload de push de GitHub
+  # para validar la rama y, llamado con un POST «pelado», devuelve 301
+  # "Branch Not Match" y no despliega. La API con x-api-key dispara el redeploy
+  # directamente. Requiere los secrets DOKPLOY_API_URL, DOKPLOY_API_KEY y
+  # DOKPLOY_API_APP_ID (applicationId de la app `api` en Dokploy).
   # -----------------------------------------------------------------------
   deploy:
     name: Deploy a producción (Dokploy)
@@ -319,25 +324,28 @@ jobs:
     steps:
       - name: Trigger redeploy
         env:
-          DOKPLOY_WEBHOOK_URL: ${{ secrets.DOKPLOY_WEBHOOK_URL }}
+          DOKPLOY_API_URL: ${{ secrets.DOKPLOY_API_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_API_APP_ID: ${{ secrets.DOKPLOY_API_APP_ID }}
         run: |
-          if [ -z "$DOKPLOY_WEBHOOK_URL" ]; then
-            echo "::warning::DOKPLOY_WEBHOOK_URL no configurado — saltando deploy"
+          if [ -z "$DOKPLOY_API_URL" ] || [ -z "$DOKPLOY_API_KEY" ] || [ -z "$DOKPLOY_API_APP_ID" ]; then
+            echo "::warning::Faltan secrets de Dokploy (DOKPLOY_API_URL / DOKPLOY_API_KEY / DOKPLOY_API_APP_ID) — saltando deploy"
             exit 0
           fi
-          # Los webhooks de redeploy de Dokploy son POST. Seguimos redirecciones
-          # por si el panel fuerza http→https.
-          read -r code redirects <<<"$(curl -sS -L \
-            --proto-redir =http,https \
-            --max-redirs 10 \
+          # application.deploy: POST autenticado con x-api-key. Dokploy responde 2xx
+          # al aceptar la orden de redeploy (no espera a que termine el build).
+          code=$(curl -sS \
             -o /dev/null \
-            -w "%{http_code} %{num_redirects}" \
-            -X POST "$DOKPLOY_WEBHOOK_URL")"
-          echo "Webhook HTTP $code tras $redirects redirección(es)"
-          # Un fallo del webhook (URL desactualizada, panel caído, etc.) NO debe
-          # tumbar el CI de main: el código ya pasó quality+e2e. Se avisa y se sale
-          # OK; revisa el secret DOKPLOY_WEBHOOK_URL si el deploy no se dispara.
+            -w "%{http_code}" \
+            -X POST \
+            -H "x-api-key: $DOKPLOY_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"applicationId\":\"$DOKPLOY_API_APP_ID\"}" \
+            "${DOKPLOY_API_URL%/}/api/application.deploy")
+          echo "Dokploy application.deploy HTTP $code"
+          # Un fallo del deploy NO debe tumbar el CI de main: el código ya pasó
+          # quality+e2e. Se avisa y se sale OK; revisa los secrets si no se dispara.
           case "$code" in
             2*) echo "Redeploy disparado." ;;
-            *) echo "::warning::El webhook de Dokploy devolvió $code (esperado 2xx) — deploy no disparado, revisa DOKPLOY_WEBHOOK_URL" ;;
+            *) echo "::warning::Dokploy application.deploy devolvió $code (esperado 2xx) — deploy no disparado, revisa los secrets DOKPLOY_API_*" ;;
           esac
