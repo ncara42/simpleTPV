@@ -1,0 +1,62 @@
+:root {
+  --ui-bg: #fafafa;
+  --ui-surface: #ffffff;
+  --ui-surface-subtle: #f5f5f5;
+  --ui-border: #e5e5e5;
+  --ui-border-strong: #d4d4d4;
+  --ui-text: #171717;
+  --ui-text-muted: #737373;
+  --ui-text-soft: #a3a3a3;
+  --ui-primary: #000000;
+  --ui-primary-fg: #ffffff;
+  --ui-danger: #dc2626;
+  --ui-danger-soft: #fef2f2;
+  --ui-warning: #d97706;
+  --ui-warning-soft: #fffbeb;
+  --ui-success: #16a34a;
+  --ui-success-soft: #f0fdf4;
+  --ui-focus: 0 0 0 3px rgb(0 0 0 / 0.08);
+  --ui-radius: 8px;
+  --ui-radius-sm: 6px;
+  --ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
+  --ui-shadow-panel: 0 1px 3px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04);
+
+  /* Sidebar */
+  --sidebar-bg: #f5f5f5;
+  --sidebar-width-rail: 56px;
+  --sidebar-width-expanded: 220px;
+  --sidebar-current-width: 56px;
+  --sidebar-item-active-bg: #e5e5e5;
+  --sidebar-item-hover-bg: #ebebeb;
+  --sidebar-text: #737373;
+  --sidebar-text-active: #171717;
+  --sidebar-group-label-color: #a3a3a3;
+  --sidebar-border: #e5e5e5;
+  --content-bg: #ffffff;
+}
+
+html {
+  background: var(--ui-bg);
+}
+
+body {
+  margin: 0;
+  color: var(--ui-text);
+  background: var(--ui-bg);
+  font-family: Geist, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
