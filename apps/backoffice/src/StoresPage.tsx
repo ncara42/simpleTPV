@@ -21,11 +21,7 @@ export function StoresPage() {
 
   const createMut = useMutation({
     mutationFn: (s: StoreForm) =>
-      createStore(
-        s.address
-          ? { name: s.name, code: s.code, address: s.address }
-          : { name: s.name, code: s.code },
-      ),
+      createStore({ name: s.name, code: s.code, address: s.address || null }),
     onSuccess: () => {
       setForm(null);
       invalidate();
