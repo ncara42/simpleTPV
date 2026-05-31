@@ -198,27 +198,6 @@
   color: #c0392b;
 }
 
-/* Pestañas de navegación del backoffice */
-.bo-tabs {
-  display: flex;
-  gap: 0.5rem;
-  max-width: 60rem;
-  margin: 0 auto 1.5rem;
-}
-.bo-tab {
-  border: none;
-  background: none;
-  cursor: pointer;
-  padding: 0.5rem 0.9rem;
-  border-radius: 0.5rem;
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: #6b7d7a;
-}
-.bo-tab.active {
-  background: var(--tpv-teal-700, #0f766e);
-  color: #fff;
-}
 
 .modal select {
   height: 2.6rem;
