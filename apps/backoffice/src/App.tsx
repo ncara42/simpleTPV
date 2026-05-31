@@ -1,52 +1,88 @@
 import '@simpletpv/ui/login.css';
 import './catalog.css';
+import './styles.css';
 
-import { Button, LoginForm } from '@simpletpv/ui';
+import { LoginForm, type NavGroup, type NavItem, Sidebar } from '@simpletpv/ui';
+import {
+  BarChart2,
+  CheckSquare,
+  LayoutDashboard,
+  Package,
+  Receipt,
+  ShoppingCart,
+  Store,
+  Tag,
+  Users,
+} from 'lucide-react';
 import { useState } from 'react';
 
 import { CatalogPage } from './CatalogPage.js';
+import { DashboardPage } from './DashboardPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { api, useAuthStore } from './lib/auth.js';
+import { PurchasesPage } from './PurchasesPage.js';
+import { SalesHistoryPage } from './SalesHistoryPage.js';
+import { StockPage } from './StockPage.js';
 import { StoresPage } from './StoresPage.js';
 import { UsersPage } from './UsersPage.js';
+import { VerifactuPage } from './VerifactuPage.js';
 
-type Tab = 'catalog' | 'families' | 'users' | 'stores';
+type Tab =
+  | 'dashboard'
+  | 'catalog'
+  | 'families'
+  | 'stock'
+  | 'users'
+  | 'stores'
+  | 'sales'
+  | 'purchases'
+  | 'verifactu';
 
-const TABS: Array<{ id: Tab; label: string }> = [
-  { id: 'catalog', label: 'Catálogo' },
-  { id: 'families', label: 'Familias' },
-  { id: 'users', label: 'Usuarios' },
-  { id: 'stores', label: 'Tiendas' },
+const GROUPS: NavGroup[] = [
+  { id: 'tienda', label: 'Tienda' },
+  { id: 'gestion', label: 'Gestión' },
+  { id: 'ventas', label: 'Ventas' },
+];
+
+const NAV: NavItem[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+  { id: 'catalog', label: 'Catálogo', icon: <Package size={18} />, group: 'tienda' },
+  { id: 'families', label: 'Familias', icon: <Tag size={18} />, group: 'tienda' },
+  { id: 'stock', label: 'Stock', icon: <BarChart2 size={18} />, group: 'tienda' },
+  { id: 'users', label: 'Usuarios', icon: <Users size={18} />, group: 'gestion' },
+  { id: 'stores', label: 'Tiendas', icon: <Store size={18} />, group: 'gestion' },
+  { id: 'sales', label: 'Ventas', icon: <Receipt size={18} />, group: 'ventas' },
+  { id: 'purchases', label: 'Compras', icon: <ShoppingCart size={18} />, group: 'ventas' },
+  { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'ventas' },
 ];
 
 function Home() {
   const logout = useAuthStore((s) => s.clear);
-  const [tab, setTab] = useState<Tab>('catalog');
+  const [tab, setTab] = useState<Tab>('dashboard');
+
   return (
-    <main className="min-h-screen p-8">
-      <div className="mx-auto mb-6 flex max-w-[60rem] items-center justify-between">
-        <h1 className="text-2xl font-semibold">simpleTPV Backoffice</h1>
-        <Button variant="ghost" onClick={logout} data-testid="logout">
-          Cerrar sesión
-        </Button>
+    <div className="app-shell">
+      <Sidebar
+        items={NAV}
+        groups={GROUPS}
+        activeItem={tab}
+        onSelect={(id) => setTab(id as Tab)}
+        onLogout={logout}
+      />
+      <div className="app-content">
+        <main className="p-6">
+          {tab === 'dashboard' && <DashboardPage />}
+          {tab === 'catalog' && <CatalogPage />}
+          {tab === 'families' && <FamiliesPage />}
+          {tab === 'stock' && <StockPage />}
+          {tab === 'users' && <UsersPage />}
+          {tab === 'stores' && <StoresPage />}
+          {tab === 'sales' && <SalesHistoryPage />}
+          {tab === 'purchases' && <PurchasesPage />}
+          {tab === 'verifactu' && <VerifactuPage />}
+        </main>
       </div>
-      <nav className="bo-tabs">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            className={`bo-tab ${tab === t.id ? 'active' : ''}`}
-            onClick={() => setTab(t.id)}
-            data-testid={`tab-${t.id}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
-      {tab === 'catalog' && <CatalogPage />}
-      {tab === 'families' && <FamiliesPage />}
-      {tab === 'users' && <UsersPage />}
-      {tab === 'stores' && <StoresPage />}
-    </main>
+    </div>
   );
 }
 
@@ -59,16 +95,15 @@ function AccessDenied() {
         <p className="mb-6 opacity-70">
           El backoffice es solo para administradores. Inicia sesión con una cuenta ADMIN.
         </p>
-        <Button variant="ghost" onClick={logout} data-testid="logout">
+        <button onClick={logout} data-testid="logout" className="text-sm underline">
           Cerrar sesión
-        </Button>
+        </button>
       </div>
     </main>
   );
 }
 
 export default function App() {
-  // Suscrito a accessToken: getRole() lo deriva, así reacciona a login/logout.
   const accessToken = useAuthStore((s) => s.accessToken);
   const getRole = useAuthStore((s) => s.getRole);
   if (accessToken === null) {
