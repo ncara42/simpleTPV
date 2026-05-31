@@ -32,9 +32,11 @@ test('cobro en efectivo: del carrito a la confirmación con cambio', async ({ pa
     await expect(openBtn).toBeEnabled();
     await openBtn.click();
   }
-  // El badge de caja abierta lleva la clase .cash-badge-open; esperamos a ese
-  // estado concreto (la apertura es asíncrona: POST /cash-sessions/open + refetch).
-  await expect(page.locator('.cash-badge-open')).toBeVisible({ timeout: 10000 });
+  // Tras el rediseño con sidebar, el estado de caja se identifica por el badge
+  // data-testid="cash-status" con el texto "Caja abierta" (antes la clase
+  // .cash-badge-open). Esperamos a ese estado concreto (la apertura es asíncrona:
+  // POST /cash-sessions/open + refetch).
+  await expect(page.getByTestId('cash-status')).toContainText('Caja abierta', { timeout: 10000 });
 
   // Añadir un producto al carrito.
   await page.getByTestId('prod-card').first().click();
