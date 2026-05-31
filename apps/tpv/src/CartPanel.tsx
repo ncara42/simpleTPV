@@ -1,4 +1,6 @@
 import { ApiError, type SaleTicket } from '@simpletpv/auth';
+import { Button } from '@simpletpv/ui';
+import { Printer, RotateCcw, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { DiscountModal } from './DiscountModal.js';
@@ -14,11 +16,7 @@ export function CartPanel({
   apiHealthy = true,
 }: {
   storeId: string | null;
-  // Caja obligatoria: sin una sesión de caja abierta no se puede cobrar (el
-  // backend lo exige con 409). El botón "Cobrar" se bloquea y se avisa al usuario.
   cashOpen: boolean;
-  // Estado degradado (#34): si la API no responde, se bloquea el cobro para no
-  // cobrar a ciegas. Se suma al bloqueo por caja cerrada.
   apiHealthy?: boolean;
 }) {
   const items = useCart((s) => s.items);
@@ -33,24 +31,19 @@ export function CartPanel({
   const subtotal = useCart((s) => s.subtotal());
   const ticketDiscount = useCart((s) => s.ticketDiscount());
   const total = useCart((s) => s.total());
+
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [discountOpen, setDiscountOpen] = useState(false);
-  // Tras cobrar pasamos a la pantalla de confirmación; mientras pedimos el
-  // ticket al servidor mostramos un estado de carga, y luego el ticket-resumen.
   const [confirmed, setConfirmed] = useState(false);
   const [ticket, setTicket] = useState<SaleTicket | null>(null);
   const [ticketError, setTicketError] = useState<string | null>(null);
-  // id de la venta cobrada: necesario para anularla desde la confirmación.
   const [saleId, setSaleId] = useState<string | null>(null);
   const [voided, setVoided] = useState(false);
   const [voiding, setVoiding] = useState(false);
   const [voidError, setVoidError] = useState<string | null>(null);
 
-  // Rol solo-UI: decide si se PINTA el botón de anular. El backend es la
-  // autoridad real (RolesGuard). Suscrito a accessToken para reaccionar a
-  // login/logout, igual que el backoffice.
   const accessToken = useAuthStore((s) => s.accessToken);
   const getRole = useAuthStore((s) => s.getRole);
   void accessToken;
@@ -83,7 +76,6 @@ export function CartPanel({
       setModalOpen(false);
       setConfirmed(true);
       setSaleId(sale.id);
-      // Pedimos el ticket-resumen completo (con IVA desglosado) por su id.
       try {
         const t = await getTicket(sale.id);
         setTicket(t);
@@ -91,14 +83,10 @@ export function CartPanel({
         setTicketError('No se pudo cargar el ticket. La venta se registró correctamente.');
       }
     } catch (e) {
-      // Error → mensaje, sin limpiar el carrito ni cerrar (el operario reintenta).
-      // Un 403 es el límite de descuento por rol: mostramos el mensaje del servidor.
       if (e instanceof ApiError && e.status === 403) {
         setModalOpen(false);
         setError(e.body ?? 'No tienes permiso para aplicar este descuento.');
       } else if (e instanceof ApiError && e.status === 409) {
-        // Caja obligatoria: la caja se cerró entre la comprobación y el cobro
-        // (carrera). Mostramos el mensaje del servidor sin perder el carrito.
         setModalOpen(false);
         setError(e.body ?? 'No hay caja abierta en esta tienda.');
       } else {
@@ -129,8 +117,6 @@ export function CartPanel({
       await voidSale(saleId);
       setVoided(true);
     } catch (e) {
-      // 403 (rol insuficiente) o 400 (ya anulada): mostramos el mensaje del
-      // servidor cuando lo hay. El backend es la autoridad real.
       if (e instanceof ApiError && (e.status === 403 || e.status === 400)) {
         setVoidError(e.body ?? 'No se pudo anular la venta.');
       } else {
@@ -141,148 +127,223 @@ export function CartPanel({
     }
   }
 
-  // Pantalla de confirmación post-venta: ticket-resumen + "Nueva venta".
+  const canCheckout = items.length > 0 && !!storeId && cashOpen && apiHealthy;
+
+  // Pantalla de confirmación post-venta
   if (confirmed) {
     return (
-      <aside className="cart" data-testid="cart">
-        <div className="sale-confirmation" data-testid="sale-confirmation">
-          <h2 className="cart-title">Venta confirmada</h2>
+      <aside
+        className="w-80 shrink-0 rounded-xl border border-[var(--ui-border)] bg-white p-4 shadow-sm"
+        data-testid="cart"
+      >
+        <div className="space-y-3" data-testid="sale-confirmation">
+          <div className="flex items-center gap-2 pb-1">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-600">
+              ✓
+            </span>
+            <h2 className="text-sm font-semibold text-neutral-900">Venta confirmada</h2>
+          </div>
+
           {ticket ? (
             <TicketView ticket={ticket} />
           ) : ticketError ? (
-            <p className="cart-msg" data-testid="ticket-error">
+            <p className="text-sm text-neutral-500" data-testid="ticket-error">
               {ticketError}
             </p>
           ) : (
-            <p className="cart-msg" data-testid="ticket-loading">
+            <p className="text-sm text-neutral-400" data-testid="ticket-loading">
               Cargando ticket…
             </p>
           )}
+
           {voided ? (
-            <p className="cart-msg sale-voided-msg" data-testid="sale-voided">
+            <p className="text-sm font-semibold text-red-600" data-testid="sale-voided">
               Venta anulada
             </p>
           ) : (
             canVoid &&
             saleId && (
-              <button
-                className="cart-void"
+              <Button
+                variant="danger"
+                size="sm"
+                className="w-full"
                 onClick={onVoid}
                 disabled={voiding}
                 data-testid="void-sale"
               >
+                <Trash2 className="h-3.5 w-3.5" />
                 {voiding ? 'Anulando…' : 'Anular venta'}
-              </button>
+              </Button>
             )
           )}
+
           {voidError && (
-            <p className="cart-msg" data-testid="void-error">
+            <p className="text-xs text-red-600" data-testid="void-error">
               {voidError}
             </p>
           )}
+
           {ticket && (
-            <button
-              className="cart-print"
+            <Button
+              variant="secondary"
+              size="sm"
+              className="w-full"
               onClick={() => window.print()}
               data-testid="print-ticket"
             >
+              <Printer className="h-3.5 w-3.5" />
               Imprimir ticket
-            </button>
+            </Button>
           )}
-          <button className="cart-create" onClick={newSale} data-testid="new-sale">
+
+          <Button className="w-full" size="md" onClick={newSale} data-testid="new-sale">
+            <RotateCcw className="h-4 w-4" />
             Nueva venta
-          </button>
+          </Button>
         </div>
       </aside>
     );
   }
 
   return (
-    <aside className="cart" data-testid="cart">
-      <h2 className="cart-title">Carrito</h2>
-      {items.length === 0 ? (
-        <p className="cart-empty" data-testid="cart-empty">
-          Vacío. Pulsa un producto para añadirlo.
-        </p>
-      ) : (
-        <ul className="cart-lines">
-          {items.map((i) => {
-            const net = lineNet(i);
-            return (
-              <li key={i.productId} className="cart-line" data-testid="cart-line">
-                <span className="cart-line-name">
-                  {i.name}
-                  {i.discountPct > 0 && (
-                    <span className="cart-line-disc" data-testid="cart-line-disc">
-                      −{i.discountPct}%
-                    </span>
-                  )}
-                </span>
-                <span className="cart-line-controls">
-                  <button onClick={() => setQty(i.productId, i.qty - 1)} aria-label="Quitar uno">
-                    −
-                  </button>
-                  <span className="cart-line-qty">{i.qty}</span>
-                  <button onClick={() => setQty(i.productId, i.qty + 1)} aria-label="Añadir uno">
-                    +
-                  </button>
-                </span>
-                <span className="cart-line-total">{net.toFixed(2)} €</span>
-                <button
-                  className="cart-line-remove"
-                  onClick={() => removeItem(i.productId)}
-                  aria-label="Eliminar línea"
+    <aside
+      className="flex w-80 shrink-0 flex-col rounded-xl border border-[var(--ui-border)] bg-white shadow-sm"
+      data-testid="cart"
+    >
+      {/* Cabecera carrito */}
+      <div className="border-b border-[var(--ui-border)] px-4 py-3">
+        <h2 className="text-sm font-semibold text-neutral-900">Carrito</h2>
+      </div>
+
+      {/* Líneas */}
+      <div className="flex-1 overflow-y-auto px-4">
+        {items.length === 0 ? (
+          <p className="py-8 text-center text-sm text-neutral-400" data-testid="cart-empty">
+            Vacío. Pulsa un producto para añadirlo.
+          </p>
+        ) : (
+          <ul className="divide-y divide-[var(--ui-border)]" data-testid="cart-lines">
+            {items.map((i) => {
+              const net = lineNet(i);
+              return (
+                <li
+                  key={i.productId}
+                  className="flex items-center gap-2 py-2.5"
+                  data-testid="cart-line"
                 >
-                  ×
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      <div className="cart-foot">
-        <div className="cart-totals">
+                  <div className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-neutral-900">
+                      {i.name}
+                    </span>
+                    {i.discountPct > 0 && (
+                      <span
+                        className="text-xs font-semibold text-red-600"
+                        data-testid="cart-line-disc"
+                      >
+                        −{i.discountPct}%
+                      </span>
+                    )}
+                  </div>
+                  <span className="flex items-center gap-1">
+                    <button
+                      onClick={() => setQty(i.productId, i.qty - 1)}
+                      aria-label="Quitar uno"
+                      className="flex h-6 w-6 items-center justify-center rounded border border-[var(--ui-border)] text-sm text-neutral-500 hover:bg-neutral-50"
+                    >
+                      −
+                    </button>
+                    <span className="w-5 text-center text-sm tabular-nums">{i.qty}</span>
+                    <button
+                      onClick={() => setQty(i.productId, i.qty + 1)}
+                      aria-label="Añadir uno"
+                      className="flex h-6 w-6 items-center justify-center rounded border border-[var(--ui-border)] text-sm text-neutral-500 hover:bg-neutral-50"
+                    >
+                      +
+                    </button>
+                  </span>
+                  <span
+                    className="w-14 text-right text-sm font-semibold tabular-nums text-neutral-900"
+                    data-testid="cart-line-total"
+                  >
+                    {net.toFixed(2)} €
+                  </span>
+                  <button
+                    onClick={() => removeItem(i.productId)}
+                    aria-label="Eliminar línea"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-neutral-300 hover:bg-neutral-100 hover:text-neutral-600"
+                    data-testid="cart-line-remove"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      {/* Pie */}
+      <div className="space-y-2 border-t border-[var(--ui-border)] p-4">
+        <div className="flex justify-between text-sm text-neutral-500">
           <span>Subtotal</span>
-          <span data-testid="cart-subtotal">{subtotal.toFixed(2)} €</span>
+          <span className="tabular-nums" data-testid="cart-subtotal">
+            {subtotal.toFixed(2)} €
+          </span>
         </div>
         {ticketDiscount > 0 && (
-          <div className="cart-totals cart-discount-row">
+          <div className="flex justify-between text-sm font-semibold text-red-600">
             <span>Descuento</span>
-            <span data-testid="cart-ticket-discount">−{ticketDiscount.toFixed(2)} €</span>
+            <span className="tabular-nums" data-testid="cart-ticket-discount">
+              −{ticketDiscount.toFixed(2)} €
+            </span>
           </div>
         )}
-        <div className="cart-totals cart-total">
+        <div className="flex justify-between text-base font-bold text-neutral-900">
           <span>Total</span>
-          <span data-testid="cart-total">{total.toFixed(2)} €</span>
+          <span className="tabular-nums" data-testid="cart-total">
+            {total.toFixed(2)} €
+          </span>
         </div>
-        <button
-          className="cart-discount"
+
+        <Button
+          variant="secondary"
+          size="sm"
+          className="w-full"
           onClick={() => setDiscountOpen(true)}
           disabled={items.length === 0}
           data-testid="cart-discount"
         >
-          Descuento
-        </button>
-        <button
-          className="cart-create"
+          Aplicar descuento
+        </Button>
+
+        <Button
+          size="lg"
+          className="w-full text-base"
           onClick={openCheckout}
-          disabled={items.length === 0 || !storeId || !cashOpen || !apiHealthy}
+          disabled={!canCheckout}
           data-testid="cart-checkout"
         >
-          Cobrar
-        </button>
+          {items.length > 0 ? `Cobrar · ${total.toFixed(2)} €` : 'Cobrar'}
+        </Button>
+
         {!cashOpen && items.length > 0 && (
-          <p className="cart-msg cart-cash-warning" data-testid="cart-cash-warning">
+          <p
+            className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700"
+            data-testid="cart-cash-warning"
+          >
             Abre la caja para poder cobrar
           </p>
         )}
         {!apiHealthy && items.length > 0 && (
-          <p className="cart-msg cart-api-warning" data-testid="cart-api-warning">
-            Servidor no disponible. No se puede cobrar hasta recuperar la conexión.
+          <p
+            className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+            data-testid="cart-api-warning"
+          >
+            Servidor no disponible
           </p>
         )}
         {error && (
-          <p className="cart-msg" data-testid="cart-msg">
+          <p className="text-xs text-red-600" data-testid="cart-msg">
             {error}
           </p>
         )}
@@ -296,7 +357,6 @@ export function CartPanel({
           busy={busy}
         />
       )}
-
       {discountOpen && (
         <DiscountModal
           items={items}

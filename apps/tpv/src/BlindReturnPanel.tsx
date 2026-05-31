@@ -1,4 +1,5 @@
 import { ApiError } from '@simpletpv/auth';
+import { Button } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -7,8 +8,6 @@ import { createBlindReturn } from './lib/returns.js';
 import { listStores } from './lib/sales.js';
 import { useDebounce } from './lib/useDebounce.js';
 
-// Devolución SIN ticket (#59): buscar producto, cantidad, motivo obligatorio, y
-// autorización por PIN de un MANAGER/ADMIN. El importe lo calcula el servidor.
 export function BlindReturnPanel() {
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
   const [storeId, setStoreId] = useState<string | null>(null);
@@ -75,123 +74,153 @@ export function BlindReturnPanel() {
 
   if (done) {
     return (
-      <div className="return-panel" data-testid="blind-return-panel">
-        <h2 className="cart-title">Devolución sin ticket registrada</h2>
-        <p className="return-done" data-testid="blind-return-done">
-          Total devuelto: <strong>{done.total.toFixed(2)} €</strong>
-        </p>
-        <button className="cart-create" onClick={reset} data-testid="blind-return-new">
+      <div className="mx-auto max-w-xl space-y-4" data-testid="blind-return-panel">
+        <div className="rounded-xl border border-green-200 bg-green-50 p-5">
+          <p className="text-sm font-semibold text-green-700">Devolución sin ticket registrada</p>
+          <p
+            className="mt-1 text-2xl font-bold tabular-nums text-green-800"
+            data-testid="blind-return-done"
+          >
+            {done.total.toFixed(2)} € devueltos
+          </p>
+        </div>
+        <Button
+          variant="secondary"
+          className="w-full"
+          onClick={reset}
+          data-testid="blind-return-new"
+        >
           Nueva devolución
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="return-panel" data-testid="blind-return-panel">
-      <h2 className="cart-title">Devolución sin ticket</h2>
+    <div className="mx-auto max-w-xl space-y-4" data-testid="blind-return-panel">
+      <h2 className="text-sm font-semibold text-neutral-700">Devolución sin ticket</h2>
 
       {stores.length > 1 && (
-        <div className="sale-store-row">
-          <label>
-            Tienda:{' '}
-            <select
-              value={activeStore ?? ''}
-              onChange={(e) => setStoreId(e.target.value)}
-              data-testid="blind-store-select"
-            >
-              {stores.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.code} · {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="flex items-center gap-2 text-sm">
+          <label className="text-neutral-500 font-medium shrink-0">Tienda</label>
+          <select
+            value={activeStore ?? ''}
+            onChange={(e) => setStoreId(e.target.value)}
+            data-testid="blind-store-select"
+            className="h-8 flex-1 rounded-md border border-[var(--ui-border)] bg-white px-2 text-sm outline-none focus:border-neutral-400"
+          >
+            {stores.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
+      {/* Selección de producto */}
       {picked ? (
-        <div className="blind-picked" data-testid="blind-picked">
-          <span>
-            Producto: <strong>{picked.name}</strong>
-          </span>
-          <button className="link-btn" onClick={() => setPicked(null)} data-testid="blind-change">
+        <div
+          className="flex items-center justify-between rounded-lg border border-[var(--ui-border)] bg-neutral-50 px-4 py-3"
+          data-testid="blind-picked"
+        >
+          <div>
+            <p className="text-xs text-neutral-400">Producto seleccionado</p>
+            <p className="text-sm font-semibold text-neutral-900">{picked.name}</p>
+          </div>
+          <button
+            className="text-xs font-medium text-neutral-500 hover:text-neutral-800 underline"
+            onClick={() => setPicked(null)}
+            data-testid="blind-change"
+          >
             Cambiar
           </button>
         </div>
       ) : (
-        <>
+        <div className="space-y-2">
           <input
-            className="sale-search"
+            className="h-9 w-full rounded-lg border border-[var(--ui-border)] bg-white px-3 text-sm outline-none placeholder:text-neutral-400 focus:border-neutral-400"
             placeholder="Buscar producto a devolver…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             data-testid="blind-search"
           />
           {products.length > 0 && (
-            <ul className="blind-results" data-testid="blind-results">
+            <ul
+              className="rounded-lg border border-[var(--ui-border)] bg-white divide-y divide-[var(--ui-border)]"
+              data-testid="blind-results"
+            >
               {products.map((p) => (
                 <li key={p.id}>
                   <button
-                    className="link-btn"
+                    className="w-full px-4 py-2.5 text-left text-sm text-neutral-800 hover:bg-neutral-50"
                     onClick={() => setPicked(p)}
                     data-testid="blind-result"
                   >
-                    {p.name} · {Number(p.salePrice).toFixed(2)} €
+                    <span className="font-medium">{p.name}</span>
+                    <span className="ml-2 tabular-nums text-neutral-400">
+                      {Number(p.salePrice).toFixed(2)} €
+                    </span>
                   </button>
                 </li>
               ))}
             </ul>
           )}
-        </>
+        </div>
       )}
 
-      <label className="blind-field">
-        Cantidad
-        <input
-          type="number"
-          min={1}
-          value={qty}
-          onChange={(e) => setQty(e.target.value)}
-          data-testid="blind-qty"
-        />
-      </label>
-
-      <label className="blind-field">
-        Motivo (obligatorio)
-        <input
-          type="text"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          data-testid="blind-reason"
-        />
-      </label>
-
-      <label className="blind-field">
-        PIN de autorización (MANAGER/ADMIN)
-        <input
-          type="password"
-          inputMode="numeric"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          data-testid="blind-pin"
-        />
-      </label>
+      {/* Campos */}
+      <div className="space-y-3 rounded-xl border border-[var(--ui-border)] bg-white p-4">
+        <label className="block space-y-1.5">
+          <span className="text-xs font-medium text-neutral-500">Cantidad</span>
+          <input
+            type="number"
+            min={1}
+            value={qty}
+            onChange={(e) => setQty(e.target.value)}
+            data-testid="blind-qty"
+            className="h-9 w-full rounded-lg border border-[var(--ui-border)] bg-white px-3 text-sm outline-none focus:border-neutral-400"
+          />
+        </label>
+        <label className="block space-y-1.5">
+          <span className="text-xs font-medium text-neutral-500">Motivo (obligatorio)</span>
+          <input
+            type="text"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            data-testid="blind-reason"
+            className="h-9 w-full rounded-lg border border-[var(--ui-border)] bg-white px-3 text-sm outline-none focus:border-neutral-400"
+          />
+        </label>
+        <label className="block space-y-1.5">
+          <span className="text-xs font-medium text-neutral-500">
+            PIN de autorización (MANAGER/ADMIN)
+          </span>
+          <input
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            data-testid="blind-pin"
+            className="h-9 w-full rounded-lg border border-[var(--ui-border)] bg-white px-3 text-sm outline-none focus:border-neutral-400"
+          />
+        </label>
+      </div>
 
       {error && (
-        <p className="cart-msg" data-testid="blind-error">
+        <p className="text-sm text-red-600" data-testid="blind-error">
           {error}
         </p>
       )}
 
-      <button
-        className="cart-create"
+      <Button
+        className="w-full"
         disabled={!canConfirm}
         onClick={onConfirm}
         data-testid="blind-confirm"
       >
         {busy ? 'Registrando…' : 'Registrar devolución'}
-      </button>
+      </Button>
     </div>
   );
 }

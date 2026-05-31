@@ -36,125 +36,132 @@ export function DiscountModal({ items, onApplyLine, onApplyTicket, onCancel }: D
   }
 
   return (
-    <div className="pay-overlay" role="dialog" aria-modal="true" data-testid="discount-modal">
-      <div className="pay-modal">
-        <h2 className="pay-title">Descuento</h2>
-
-        <div className="pay-methods">
-          <button
-            type="button"
-            className={`pay-method ${mode === 'line' ? 'active' : ''}`}
-            onClick={() => setMode('line')}
-            data-testid="disc-line"
-          >
-            Por línea
-          </button>
-          <button
-            type="button"
-            className={`pay-method ${mode === 'ticket' ? 'active' : ''}`}
-            onClick={() => setMode('ticket')}
-            data-testid="disc-ticket"
-          >
-            Por ticket
-          </button>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      data-testid="discount-modal"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-sm rounded-xl border border-[var(--ui-border)] bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="border-b border-[var(--ui-border)] px-5 py-4">
+          <h2 className="text-base font-semibold text-neutral-900">Descuento</h2>
         </div>
 
-        {mode === 'line' ? (
-          <div className="disc-fields">
-            <label className="pay-field">
-              Línea
-              <select
-                value={productId}
-                onChange={(e) => setProductId(e.target.value)}
-                data-testid="disc-item"
+        <div className="space-y-4 p-5">
+          {/* Tipo: por línea o por ticket */}
+          <div className="grid grid-cols-2 gap-2">
+            {(['line', 'ticket'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                data-testid={m === 'line' ? 'disc-line' : 'disc-ticket'}
+                className={[
+                  'h-9 rounded-lg border text-sm font-medium transition-colors',
+                  mode === m
+                    ? 'border-neutral-900 bg-neutral-900 text-white'
+                    : 'border-[var(--ui-border)] bg-white text-neutral-600 hover:bg-neutral-50',
+                ].join(' ')}
               >
-                {items.map((i) => (
-                  <option key={i.productId} value={i.productId}>
-                    {i.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="pay-field">
-              Descuento (%)
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={100}
-                step="1"
-                value={pct}
-                onChange={(e) => setPct(e.target.value)}
-                data-testid="disc-pct"
-                autoFocus
-              />
-            </label>
+                {m === 'line' ? 'Por línea' : 'Por ticket'}
+              </button>
+            ))}
           </div>
-        ) : (
-          <div className="disc-fields">
-            <div className="pay-methods">
-              <button
-                type="button"
-                className={`pay-method ${ticketKind === 'pct' ? 'active' : ''}`}
-                onClick={() => setTicketKind('pct')}
-                data-testid="disc-ticket-pct"
-              >
-                %
-              </button>
-              <button
-                type="button"
-                className={`pay-method ${ticketKind === 'amt' ? 'active' : ''}`}
-                onClick={() => setTicketKind('amt')}
-                data-testid="disc-ticket-amt"
-              >
-                Importe
-              </button>
-            </div>
-            {ticketKind === 'pct' ? (
-              <label className="pay-field">
-                Descuento (%)
+
+          {mode === 'line' ? (
+            <div className="space-y-3">
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium text-neutral-500">Línea</span>
+                <select
+                  value={productId}
+                  onChange={(e) => setProductId(e.target.value)}
+                  data-testid="disc-item"
+                  className="h-9 w-full rounded-lg border border-[var(--ui-border)] bg-white px-3 text-sm outline-none focus:border-neutral-400"
+                >
+                  {items.map((i) => (
+                    <option key={i.productId} value={i.productId}>
+                      {i.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium text-neutral-500">Descuento (%)</span>
                 <input
                   type="number"
                   inputMode="decimal"
                   min={0}
                   max={100}
                   step="1"
-                  value={ticketValue}
-                  onChange={(e) => setTicketValue(e.target.value)}
+                  value={pct}
+                  onChange={(e) => setPct(e.target.value)}
                   data-testid="disc-pct"
                   autoFocus
+                  className="h-9 w-full rounded-lg border border-[var(--ui-border)] bg-white px-3 text-sm outline-none focus:border-neutral-400"
                 />
               </label>
-            ) : (
-              <label className="pay-field">
-                Descuento (€)
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                {(['pct', 'amt'] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setTicketKind(k)}
+                    data-testid={k === 'pct' ? 'disc-ticket-pct' : 'disc-ticket-amt'}
+                    className={[
+                      'h-9 rounded-lg border text-sm font-medium transition-colors',
+                      ticketKind === k
+                        ? 'border-neutral-900 bg-neutral-900 text-white'
+                        : 'border-[var(--ui-border)] bg-white text-neutral-600 hover:bg-neutral-50',
+                    ].join(' ')}
+                  >
+                    {k === 'pct' ? 'Porcentaje %' : 'Importe €'}
+                  </button>
+                ))}
+              </div>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium text-neutral-500">
+                  {ticketKind === 'pct' ? 'Descuento (%)' : 'Descuento (€)'}
+                </span>
                 <input
                   type="number"
                   inputMode="decimal"
                   min={0}
-                  step="0.01"
+                  step={ticketKind === 'pct' ? '1' : '0.01'}
                   value={ticketValue}
                   onChange={(e) => setTicketValue(e.target.value)}
-                  data-testid="disc-amt"
+                  data-testid={ticketKind === 'pct' ? 'disc-pct' : 'disc-amt'}
                   autoFocus
+                  className="h-9 w-full rounded-lg border border-[var(--ui-border)] bg-white px-3 text-sm outline-none focus:border-neutral-400"
                 />
               </label>
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
-        <div className="pay-actions">
-          <button type="button" className="pay-cancel" onClick={onCancel} data-testid="disc-cancel">
-            Cancelar
-          </button>
-          <button
-            type="button"
-            className="pay-confirm"
-            onClick={handleApply}
-            data-testid="disc-apply"
-          >
-            Aplicar
-          </button>
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onCancel}
+              data-testid="disc-cancel"
+              className="h-10 flex-1 rounded-lg border border-[var(--ui-border)] bg-white text-sm font-medium text-neutral-600 hover:bg-neutral-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleApply}
+              data-testid="disc-apply"
+              className="h-10 flex-1 rounded-lg border border-neutral-900 bg-neutral-900 text-sm font-semibold text-white hover:bg-neutral-800"
+            >
+              Aplicar
+            </button>
+          </div>
         </div>
       </div>
     </div>

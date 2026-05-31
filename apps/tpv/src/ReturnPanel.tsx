@@ -1,10 +1,10 @@
 import { ApiError, type Return, type Sale } from '@simpletpv/auth';
+import { Button } from '@simpletpv/ui';
 import { useState } from 'react';
 
 import { createReturn, listReturns } from './lib/returns.js';
 import { findSaleByTicket } from './lib/sales.js';
 
-// Suma lo ya devuelto por saleLineId a partir de las devoluciones previas.
 function returnedBySaleLine(returns: Return[]): Map<string, number> {
   const map = new Map<string, number>();
   for (const r of returns) {
@@ -19,17 +19,14 @@ export function ReturnPanel() {
   const [ticketNumber, setTicketNumber] = useState('');
   const [sale, setSale] = useState<Sale | null>(null);
   const [returned, setReturned] = useState<Map<string, number>>(new Map());
-  // qty a devolver por saleLineId (0 = no devolver esa línea).
   const [qtys, setQtys] = useState<Record<string, number>>({});
   const [reason, setReason] = useState('');
   const [searchError, setSearchError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [busy, setBusy] = useState(false);
-  // Total devuelto tras confirmar (pantalla de confirmación).
   const [done, setDone] = useState<{ total: number } | null>(null);
 
-  // Disponible por línea = qty vendida − ya devuelta.
   function available(line: Sale['lines'][number]): number {
     return Math.max(0, Number(line.qty) - (returned.get(line.id) ?? 0));
   }
@@ -65,7 +62,6 @@ export function ReturnPanel() {
     setQtys((prev) => ({ ...prev, [saleLineId]: clamped }));
   }
 
-  // Líneas seleccionadas para devolver (qty > 0).
   const selected = sale
     ? sale.lines.map((l) => ({ saleLineId: l.id, qty: qtys[l.id] ?? 0 })).filter((l) => l.qty > 0)
     : [];
@@ -108,102 +104,126 @@ export function ReturnPanel() {
 
   if (done) {
     return (
-      <div className="return-panel" data-testid="return-panel">
-        <h2 className="cart-title">Devolución registrada</h2>
-        <p className="return-done" data-testid="return-done">
-          Total devuelto: <strong>{done.total.toFixed(2)} €</strong>
-        </p>
-        <button className="cart-create" onClick={reset} data-testid="return-new">
+      <div className="mx-auto max-w-xl space-y-4" data-testid="return-panel">
+        <div className="rounded-xl border border-green-200 bg-green-50 p-5">
+          <p className="text-sm font-semibold text-green-700">Devolución registrada</p>
+          <p
+            className="mt-1 text-2xl font-bold tabular-nums text-green-800"
+            data-testid="return-done"
+          >
+            {done.total.toFixed(2)} € devueltos
+          </p>
+        </div>
+        <Button variant="secondary" className="w-full" onClick={reset} data-testid="return-new">
           Nueva devolución
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="return-panel" data-testid="return-panel">
-      <h2 className="cart-title">Devolución contra ticket</h2>
+    <div className="mx-auto max-w-xl space-y-4" data-testid="return-panel">
+      <h2 className="text-sm font-semibold text-neutral-700">Devolución contra ticket</h2>
 
-      <div className="return-search">
+      {/* Búsqueda */}
+      <div className="flex gap-2">
         <input
-          className="sale-search"
+          className="h-9 flex-1 rounded-lg border border-[var(--ui-border)] bg-white px-3 text-sm outline-none placeholder:text-neutral-400 focus:border-neutral-400"
           placeholder="Nº de ticket (p.ej. T01-000001)"
           value={ticketNumber}
           onChange={(e) => setTicketNumber(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onSearch()}
           data-testid="return-ticket-input"
         />
-        <button
-          className="cart-create"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={onSearch}
           disabled={searching || ticketNumber.trim().length === 0}
           data-testid="return-search"
         >
           {searching ? 'Buscando…' : 'Buscar'}
-        </button>
+        </Button>
       </div>
+
       {searchError && (
-        <p className="cart-msg" data-testid="return-search-error">
+        <p className="text-sm text-red-600" data-testid="return-search-error">
           {searchError}
         </p>
       )}
 
       {sale && (
         <>
-          <ul className="return-lines" data-testid="return-lines">
+          <ul
+            className="divide-y divide-[var(--ui-border)] rounded-xl border border-[var(--ui-border)] bg-white"
+            data-testid="return-lines"
+          >
             {sale.lines.map((l) => {
               const max = available(l);
               const alreadyReturned = returned.get(l.id) ?? 0;
               return (
-                <li key={l.id} className="return-line" data-testid="return-line">
-                  <span className="return-line-name">{l.name}</span>
-                  <span className="return-line-info">
-                    Vendido: {Number(l.qty)} · Devuelto: {alreadyReturned} · Disponible: {max}
-                  </span>
-                  <span className="return-line-controls">
+                <li
+                  key={l.id}
+                  className="flex items-center gap-3 px-4 py-3"
+                  data-testid="return-line"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-neutral-900">{l.name}</p>
+                    <p className="text-xs text-neutral-400">
+                      Vendido: {Number(l.qty)} · Devuelto: {alreadyReturned} · Disponible: {max}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       onClick={() => setQty(l.id, (qtys[l.id] ?? 0) - 1, max)}
-                      disabled={max === 0}
+                      disabled={max === 0 || (qtys[l.id] ?? 0) === 0}
                       aria-label="Quitar uno"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--ui-border)] text-sm text-neutral-500 hover:bg-neutral-50 disabled:opacity-30"
                     >
                       −
                     </button>
-                    <span className="return-line-qty" data-testid="return-line-qty">
+                    <span
+                      className="w-6 text-center text-sm font-semibold tabular-nums"
+                      data-testid="return-line-qty"
+                    >
                       {qtys[l.id] ?? 0}
                     </span>
                     <button
                       onClick={() => setQty(l.id, (qtys[l.id] ?? 0) + 1, max)}
                       disabled={max === 0 || (qtys[l.id] ?? 0) >= max}
                       aria-label="Añadir uno"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--ui-border)] text-sm text-neutral-500 hover:bg-neutral-50 disabled:opacity-30"
                     >
                       +
                     </button>
-                  </span>
+                  </div>
                 </li>
               );
             })}
           </ul>
 
-          <label className="return-reason-field">
-            Motivo (obligatorio)
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-neutral-500">Motivo (obligatorio)</span>
             <textarea
-              className="return-reason"
+              className="min-h-[4rem] w-full resize-y rounded-lg border border-[var(--ui-border)] bg-white px-3 py-2 text-sm outline-none placeholder:text-neutral-400 focus:border-neutral-400"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Motivo de la devolución"
+              placeholder="Motivo de la devolución…"
               data-testid="return-reason"
             />
           </label>
 
-          <button
-            className="cart-create"
+          <Button
+            className="w-full"
             onClick={onConfirm}
             disabled={!canConfirm}
             data-testid="return-confirm"
           >
             {busy ? 'Registrando…' : 'Confirmar devolución'}
-          </button>
+          </Button>
+
           {error && (
-            <p className="cart-msg" data-testid="return-error">
+            <p className="text-sm text-red-600" data-testid="return-error">
               {error}
             </p>
           )}

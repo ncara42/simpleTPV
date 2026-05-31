@@ -1,175 +1,214 @@
-/* Identidad visual de simpleTPV — login.
-   Comercio cálido y confiable: teal profundo + acento ámbar, tipografía
-   display con carácter. Deliberadamente lejos del card gris genérico. */
-
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Geist:wght@400;500;600&display=swap');
-
-:root {
-  --tpv-teal-900: #0a3f3a;
-  --tpv-teal-700: #0f766e;
-  --tpv-teal-500: #14b8a6;
-  --tpv-amber: #f59e0b;
-  --tpv-amber-dark: #d97706;
-  --tpv-ink: #0c1413;
-  --tpv-paper: #fbfaf7;
-  --tpv-muted: #6b7d7a;
-  --tpv-line: #e4e2db;
-  --tpv-danger: #c0392b;
+/* ─── Shell ──────────────────────────────────────────────── */
+.login-shell {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+  background: #080808;
+  font-family: ui-monospace, 'Geist Mono', 'Cascadia Code', monospace;
+  -webkit-font-smoothing: antialiased;
 }
 
-.login-shell {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 1.5rem;
-  font-family: 'Geist', system-ui, sans-serif;
-  color: var(--tpv-ink);
-  background:
-    radial-gradient(120% 90% at 15% 0%, rgba(20, 184, 166, 0.22), transparent 55%),
-    radial-gradient(110% 80% at 100% 100%, rgba(245, 158, 11, 0.16), transparent 50%),
-    linear-gradient(160deg, var(--tpv-teal-900) 0%, #06201d 100%);
+@media (max-width: 767px) {
+  .login-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Panel izquierdo ─────────────────────────────────────── */
+.login-left {
   position: relative;
   overflow: hidden;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-/* Grano sutil para dar textura al fondo, sin imágenes externas. */
-.login-shell::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+@media (max-width: 767px) {
+  .login-left {
+    display: none;
+  }
+}
+
+/* Gradiente vertical sobre el borde divisor — efecto brillo central */
+.login-left-glow {
   pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255, 255, 255, 0.14) 50%,
+    transparent 100%
+  );
 }
 
-.login-card {
+/* ─── Panel derecho ───────────────────────────────────────── */
+.login-right {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1.5rem 3.5rem;
+  background: #0d0d0d;
+}
+
+/* Vignette lateral izquierda — suaviza transición con el panel izq */
+.login-right-vignette {
+  pointer-events: none;
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 6rem;
+  background: linear-gradient(to right, rgba(8, 8, 8, 0.4), transparent);
+}
+
+.login-form-wrap {
   position: relative;
   width: 100%;
-  max-width: 25rem;
-  background: var(--tpv-paper);
-  border-radius: 1.25rem;
-  padding: 2.5rem 2.25rem;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.4) inset,
-    0 24px 60px -20px rgba(0, 0, 0, 0.5);
-  animation: login-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 340px;
 }
 
-@keyframes login-rise {
-  from {
-    opacity: 0;
-    transform: translateY(14px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.login-brand {
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.login-mark {
-  display: inline-grid;
-  place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 0.75rem;
-  background: linear-gradient(135deg, var(--tpv-teal-700), var(--tpv-teal-500));
-  color: #fff;
-  font-size: 1.1rem;
-  margin-bottom: 1rem;
-  box-shadow: 0 8px 20px -8px rgba(15, 118, 110, 0.7);
+/* ─── Cabecera del formulario ─────────────────────────────── */
+.login-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1.75rem;
 }
 
 .login-title {
-  font-family: 'Fraunces', Georgia, serif;
-  font-weight: 600;
-  font-size: 1.85rem;
+  font-size: 1.5rem;
+  font-weight: 300;
   letter-spacing: -0.02em;
-  line-height: 1;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.2;
 }
 
 .login-subtitle {
-  margin-top: 0.4rem;
-  font-size: 0.85rem;
-  color: var(--tpv-muted);
-  letter-spacing: 0.01em;
+  font-family: ui-monospace, 'Geist Mono', monospace;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: rgba(255, 255, 255, 0.35);
+  margin: 0;
 }
 
+/* ─── Formulario ──────────────────────────────────────────── */
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
+  gap: 1.75rem;
+  animation: login-rise 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes login-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.login-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 }
 
 .login-field {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 
 .login-label {
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-family: ui-monospace, 'Geist Mono', monospace;
+  font-size: 0.625rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--tpv-muted);
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .login-input {
-  height: 3rem;
-  border: 1.5px solid var(--tpv-line);
-  border-radius: 0.7rem;
-  padding: 0 0.95rem;
-  font-size: 1rem;
-  background: #fff;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0;
+  padding-bottom: 0.625rem;
+  font-family: ui-monospace, 'Geist Mono', monospace;
+  font-size: 0.875rem;
+  color: #ffffff;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+
+.login-input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
 }
 
 .login-input:focus {
-  outline: none;
-  border-color: var(--tpv-teal-500);
-  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
+  border-bottom-color: rgba(255, 255, 255, 0.7);
 }
 
+.login-input--error {
+  border-bottom-color: rgba(239, 68, 68, 0.6);
+}
+
+/* ─── Error ───────────────────────────────────────────────── */
 .login-error {
-  font-size: 0.85rem;
-  color: var(--tpv-danger);
-  background: rgba(192, 57, 43, 0.08);
-  border-radius: 0.5rem;
-  padding: 0.55rem 0.75rem;
+  font-family: ui-monospace, 'Geist Mono', monospace;
+  font-size: 0.625rem;
+  color: rgba(248, 113, 113, 0.8);
+  margin: 0;
+  animation: login-rise 0.15s ease both;
+}
+
+/* ─── Botón ───────────────────────────────────────────────── */
+.login-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .login-submit {
-  height: 3.1rem;
-  margin-top: 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.75rem;
+  background: #ffffff;
+  color: #000000;
   border: none;
-  border-radius: 0.7rem;
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: #fff;
+  border-radius: 0;
+  font-family: ui-monospace, 'Geist Mono', monospace;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
   cursor: pointer;
-  background: linear-gradient(135deg, var(--tpv-amber), var(--tpv-amber-dark));
-  box-shadow: 0 10px 24px -10px rgba(217, 119, 6, 0.8);
-  transition:
-    transform 0.1s,
-    filter 0.15s;
+  transition: background-color 0.2s;
 }
 
 .login-submit:hover:not(:disabled) {
-  filter: brightness(1.05);
-}
-
-.login-submit:active:not(:disabled) {
-  transform: translateY(1px);
+  background: #f59e0b;
 }
 
 .login-submit:disabled {
-  opacity: 0.7;
-  cursor: progress;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Spinner para estado loading */
+.login-spinner {
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 1.5px solid rgba(0, 0, 0, 0.3);
+  border-top-color: #000000;
+  border-radius: 50%;
+  animation: login-spin 0.6s linear infinite;
+}
+
+@keyframes login-spin {
+  to { transform: rotate(360deg); }
 }
