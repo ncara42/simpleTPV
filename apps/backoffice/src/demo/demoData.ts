@@ -52,63 +52,69 @@ export const DEMO_STORE_SALES: Record<string, Record<StoreSalesPeriod, number>> 
   's-almacen': { today: 0, week: 0, month: 0 },
 };
 
-// ─── Familias (con contador de productos para el mockup) ─────
+// ─── Familias y subfamilias (jerarquía de 2 niveles para el mockup) ──────
 // `productCount` es un campo demo extra (FamilyNode no lo trae); FamiliesPage lo lee opcional.
+// Las subfamilias solo existen dentro de su familia padre (parentId apunta a ella).
 export interface DemoFamily extends FamilyNode {
   productCount: number;
+  children: DemoFamily[];
+}
+function fam(
+  id: string,
+  name: string,
+  color: string,
+  sortOrder: number,
+  productCount: number,
+  children: DemoFamily[] = [],
+): DemoFamily {
+  return { id, parentId: null, name, color, icon: null, sortOrder, productCount, children };
+}
+function subfam(
+  parentId: string,
+  id: string,
+  name: string,
+  color: string,
+  sortOrder: number,
+  productCount: number,
+): DemoFamily {
+  return { id, parentId, name, color, icon: null, sortOrder, productCount, children: [] };
 }
 export const DEMO_FAMILIES: DemoFamily[] = [
-  {
-    id: 'fam-flores',
-    parentId: null,
-    name: 'Flores CBD',
-    color: '#16734f',
-    icon: null,
-    sortOrder: 1,
-    children: [],
-    productCount: 24,
-  },
-  {
-    id: 'fam-aceites',
-    parentId: null,
-    name: 'Aceites',
-    color: '#b45309',
-    icon: null,
-    sortOrder: 2,
-    children: [],
-    productCount: 12,
-  },
-  {
-    id: 'fam-cosmetica',
-    parentId: null,
-    name: 'Cosmética',
-    color: '#7c3aed',
-    icon: null,
-    sortOrder: 3,
-    children: [],
-    productCount: 18,
-  },
-  {
-    id: 'fam-vapeo',
-    parentId: null,
-    name: 'Vapeo',
-    color: '#2563eb',
-    icon: null,
-    sortOrder: 4,
-    children: [],
-    productCount: 9,
-  },
-  {
-    id: 'fam-infusiones',
-    parentId: null,
-    name: 'Infusiones',
-    color: '#0e7c6b',
-    icon: null,
-    sortOrder: 5,
-    children: [],
-    productCount: 7,
-  },
+  fam('fam-flores', 'Flores CBD', '#16734f', 1, 24, [
+    subfam('fam-flores', 'fam-flores-indica', 'Índica', '#16734f', 1, 14),
+    subfam('fam-flores', 'fam-flores-sativa', 'Sativa', '#16734f', 2, 10),
+  ]),
+  fam('fam-aceites', 'Aceites', '#b45309', 2, 12, [
+    subfam('fam-aceites', 'fam-aceites-suave', 'Suaves (≤5%)', '#b45309', 1, 5),
+    subfam('fam-aceites', 'fam-aceites-fuerte', 'Fuertes (≥10%)', '#b45309', 2, 7),
+  ]),
+  fam('fam-cosmetica', 'Cosmética', '#7c3aed', 3, 18, [
+    subfam('fam-cosmetica', 'fam-cosmetica-facial', 'Facial', '#7c3aed', 1, 10),
+    subfam('fam-cosmetica', 'fam-cosmetica-corporal', 'Corporal', '#7c3aed', 2, 8),
+  ]),
+  fam('fam-vapeo', 'Vapeo', '#2563eb', 4, 9),
+  fam('fam-infusiones', 'Infusiones', '#0e7c6b', 5, 7),
 ];
+
+// Localiza familia y (opcional) subfamilia por id; útil para mostrar la ruta jerárquica.
+export function findFamily(id: string | null): {
+  family: DemoFamily | null;
+  sub: DemoFamily | null;
+} {
+  if (!id) return { family: null, sub: null };
+  for (const root of DEMO_FAMILIES) {
+    if (root.id === id) return { family: root, sub: null };
+    const sub = root.children.find((c) => c.id === id);
+    if (sub) return { family: root, sub };
+  }
+  return { family: null, sub: null };
+}
+// Etiqueta "Familia › Subfamilia" (o solo familia). "—" si no se encuentra.
+export function familyPathLabel(id: string | null): string {
+  const { family, sub } = findFamily(id);
+  if (!family) return '—';
+  return sub ? `${family.name} › ${sub.name}` : family.name;
+}
 
 // ─── Productos (12, con SKU/IVA del mockup de Catálogo) ──────
 function product(
@@ -135,25 +141,32 @@ function product(
   };
 }
 export const DEMO_PRODUCTS: Product[] = [
-  product('p-aceite-cbd-10', 'Aceite CBD 10%', 'ACE-010', '24.90', '21', 'fam-aceites'),
-  product('p-flor-lemon-haze', 'Flor Lemon Haze 2g', 'FLO-LH2', '14.50', '21', 'fam-flores'),
+  product('p-aceite-cbd-10', 'Aceite CBD 10%', 'ACE-010', '24.90', '21', 'fam-aceites-fuerte'),
+  product('p-flor-lemon-haze', 'Flor Lemon Haze 2g', 'FLO-LH2', '14.50', '21', 'fam-flores-sativa'),
   product(
     'p-crema-regeneradora',
     'Crema regeneradora 50ml',
     'COS-R50',
     '19.90',
     '21',
-    'fam-cosmetica',
+    'fam-cosmetica-facial',
   ),
   product('p-vapeador-pro', 'Vapeador Pro', 'VAP-PRO', '39.00', '21', 'fam-vapeo'),
-  product('p-resina-premium', 'Resina Premium 1g', 'FLO-RP1', '22.00', '21', 'fam-flores'),
+  product('p-resina-premium', 'Resina Premium 1g', 'FLO-RP1', '22.00', '21', 'fam-flores-indica'),
   product('p-infusion-relax', 'Infusión relax 20u', 'INF-R20', '8.90', '10', 'fam-infusiones'),
-  product('p-aceite-cbd-5', 'Aceite CBD 5%', 'ACE-005', '16.90', '21', 'fam-aceites'),
-  product('p-flor-premium', 'Flor Premium 3,5g', 'FLO-PR3', '29.90', '21', 'fam-flores'),
-  product('p-balsamo-muscular', 'Bálsamo muscular', 'COS-BAL', '12.50', '21', 'fam-cosmetica'),
+  product('p-aceite-cbd-5', 'Aceite CBD 5%', 'ACE-005', '16.90', '21', 'fam-aceites-suave'),
+  product('p-flor-premium', 'Flor Premium 3,5g', 'FLO-PR3', '29.90', '21', 'fam-flores-indica'),
+  product(
+    'p-balsamo-muscular',
+    'Bálsamo muscular',
+    'COS-BAL',
+    '12.50',
+    '21',
+    'fam-cosmetica-corporal',
+  ),
   product('p-liquido-vape', 'Líquido vape 10ml', 'VAP-L10', '9.90', '21', 'fam-vapeo'),
   product('p-infusion-noche', 'Infusión noche 15u', 'INF-N15', '7.50', '10', 'fam-infusiones'),
-  product('p-aceite-full', 'Aceite full spectrum', 'ACE-FUL', '34.00', '21', 'fam-aceites'),
+  product('p-aceite-full', 'Aceite full spectrum', 'ACE-FUL', '34.00', '21', 'fam-aceites-fuerte'),
 ];
 
 // Stock total por producto (para la columna STOCK del Catálogo). Calcado al mockup.

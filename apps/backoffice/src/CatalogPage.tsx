@@ -1,7 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { DEMO_PRODUCT_STOCK, stockLevel } from './demo/demoData.js';
+import {
+  DEMO_FAMILIES,
+  DEMO_PRODUCT_STOCK,
+  familyPathLabel,
+  findFamily,
+  stockLevel,
+} from './demo/demoData.js';
 import {
   createProduct,
   deleteProduct,
@@ -11,8 +17,16 @@ import {
   updateProduct,
 } from './lib/products.js';
 
-interface FormState extends ProductInput {
+interface FormState {
   id?: string;
+  name: string;
+  salePrice: number;
+  sku: string | null;
+  barcode: string | null;
+  costPrice: number;
+  taxRate: number;
+  familyId: string | null; // familia raíz seleccionada
+  subfamilyId: string | null; // subfamilia seleccionada (opcional, dentro de la familia)
 }
 
 const EMPTY: FormState = {
@@ -22,6 +36,8 @@ const EMPTY: FormState = {
   barcode: '',
   costPrice: 0,
   taxRate: 21,
+  familyId: null,
+  subfamilyId: null,
 };
 
 export function CatalogPage() {
@@ -45,6 +61,8 @@ export function CatalogPage() {
         barcode: f.barcode || null,
         costPrice: Number(f.costPrice ?? 0),
         taxRate: Number(f.taxRate ?? 21),
+        // La familia efectiva del producto es la subfamilia si se eligió; si no, la familia raíz.
+        familyId: f.subfamilyId ?? f.familyId,
       };
       return f.id ? updateProduct(f.id, payload) : createProduct(payload);
     },
@@ -58,6 +76,26 @@ export function CatalogPage() {
     mutationFn: (id: string) => deleteProduct(id),
     onSuccess: invalidate,
   });
+
+  const openEdit = (p: Product): void => {
+    const { family, sub } = findFamily(p.familyId);
+    setForm({
+      id: p.id,
+      name: p.name,
+      salePrice: Number(p.salePrice),
+      sku: p.sku,
+      barcode: p.barcode,
+      costPrice: Number(p.costPrice),
+      taxRate: Number(p.taxRate),
+      familyId: family?.id ?? null,
+      subfamilyId: sub?.id ?? null,
+    });
+  };
+
+  // Subfamilias disponibles para la familia raíz elegida (selector dependiente).
+  const subfamilies = form?.familyId
+    ? (DEMO_FAMILIES.find((fam) => fam.id === form.familyId)?.children ?? [])
+    : [];
 
   return (
     <section className="catalog">
@@ -97,6 +135,7 @@ export function CatalogPage() {
           <thead>
             <tr>
               <th>Nombre</th>
+              <th>Familia</th>
               <th>SKU</th>
               <th>Precio</th>
               <th>IVA</th>
@@ -108,6 +147,9 @@ export function CatalogPage() {
             {products.map((p: Product) => (
               <tr key={p.id}>
                 <td>{p.name}</td>
+                <td className="muted" data-testid="catalog-family">
+                  {familyPathLabel(p.familyId)}
+                </td>
                 <td className="muted">{p.sku ?? '—'}</td>
                 <td>{Number(p.salePrice).toFixed(2).replace('.', ',')} €</td>
                 <td className="muted">{Number(p.taxRate).toFixed(0)}%</td>
@@ -125,21 +167,7 @@ export function CatalogPage() {
                   })()}
                 </td>
                 <td className="row-actions">
-                  <button
-                    onClick={() =>
-                      setForm({
-                        id: p.id,
-                        name: p.name,
-                        salePrice: Number(p.salePrice),
-                        sku: p.sku,
-                        barcode: p.barcode,
-                        costPrice: Number(p.costPrice),
-                        taxRate: Number(p.taxRate),
-                      })
-                    }
-                  >
-                    Editar
-                  </button>
+                  <button onClick={() => openEdit(p)}>Editar</button>
                   <button className="danger" onClick={() => delMut.mutate(p.id)}>
                     Borrar
                   </button>
@@ -171,6 +199,43 @@ export function CatalogPage() {
                 data-testid="form-name"
               />
             </label>
+            <div className="modal-row">
+              <label>
+                Familia
+                <select
+                  value={form.familyId ?? ''}
+                  onChange={(e) =>
+                    setForm({ ...form, familyId: e.target.value || null, subfamilyId: null })
+                  }
+                  data-testid="form-family"
+                >
+                  <option value="">— Sin familia —</option>
+                  {DEMO_FAMILIES.map((fam) => (
+                    <option key={fam.id} value={fam.id}>
+                      {fam.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Subfamilia
+                <select
+                  value={form.subfamilyId ?? ''}
+                  disabled={subfamilies.length === 0}
+                  onChange={(e) => setForm({ ...form, subfamilyId: e.target.value || null })}
+                  data-testid="form-subfamily"
+                >
+                  <option value="">
+                    {subfamilies.length === 0 ? '— Sin subfamilias —' : '— Toda la familia —'}
+                  </option>
+                  {subfamilies.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <div className="modal-row">
               <label>
                 Precio venta (€)

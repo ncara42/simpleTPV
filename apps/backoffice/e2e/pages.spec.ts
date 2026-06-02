@@ -17,6 +17,18 @@ test('Catálogo muestra los 12 productos demo', async ({ page }) => {
   await expect(page.getByTestId('catalog-table')).toBeVisible();
 });
 
+test('Catálogo: ruta de familia y selector dependiente de subfamilia (#97)', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-catalog').click();
+  // La tabla muestra la ruta jerárquica Familia › Subfamilia.
+  await expect(page.getByTestId('catalog-family').first()).toContainText('›');
+  // El modal tiene selector dependiente familia → subfamilia.
+  await page.getByTestId('new-product').click();
+  await page.getByTestId('form-family').selectOption('fam-flores');
+  await expect(page.getByTestId('form-subfamily')).toBeEnabled();
+  await page.getByTestId('form-subfamily').selectOption('fam-flores-indica');
+});
+
 test('Tiendas muestra el grid de 6 ubicaciones', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-stores').click();
@@ -76,9 +88,11 @@ test('Compras y VeriFactu están retiradas del menú (#106)', async ({ page }) =
   await expect(page.getByTestId('nav-verifactu')).toHaveCount(0);
 });
 
-test('Familias muestra las 5 familias con contador', async ({ page }) => {
+test('Familias muestra las 5 raíz con subfamilias anidadas (#97)', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-families').click();
-  await expect(page.getByTestId('fam-row')).toHaveCount(5);
+  // 5 familias raíz + 6 subfamilias (flores, aceites y cosmética con 2 cada una) = 11 filas.
+  await expect(page.getByTestId('fam-row')).toHaveCount(11);
+  await expect(page.getByText('Índica')).toBeVisible();
   await expect(page.getByTestId('fam-count').first()).toContainText('productos');
 });
