@@ -4,19 +4,21 @@ import { describe, expect, it } from 'vitest';
 import { Button } from './Button.js';
 
 describe('Button', () => {
-  it('renderiza children', () => {
-    render(<Button>Hola</Button>);
-    expect(screen.getByRole('button', { name: 'Hola' })).toBeInTheDocument();
+  it('renders a primary button by default', () => {
+    render(<Button>Guardar</Button>);
+    expect(screen.getByRole('button', { name: 'Guardar' })).toHaveClass('bg-[var(--ui-primary)]');
   });
 
-  it('aplica clases del variant ghost', () => {
-    render(<Button variant="ghost">x</Button>);
-    expect(screen.getByRole('button')).toHaveClass('bg-transparent');
-  });
-
-  it('aplica className adicional sin sobrescribir base', () => {
-    render(<Button className="extra-class">x</Button>);
-    expect(screen.getByRole('button')).toHaveClass('extra-class');
-    expect(screen.getByRole('button')).toHaveClass('inline-flex');
+  it('renders secondary and danger variants', () => {
+    render(
+      <>
+        <Button variant="secondary">Cancelar</Button>
+        <Button variant="danger">Eliminar</Button>
+      </>,
+    );
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toHaveClass(
+      'border-[var(--ui-border)]',
+    );
+    expect(screen.getByRole('button', { name: 'Eliminar' })).toHaveClass('bg-[var(--ui-danger)]');
   });
 });
