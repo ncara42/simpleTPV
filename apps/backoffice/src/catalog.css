@@ -34,6 +34,87 @@
   color: var(--ui-success);
 }
 
+/* ─── Usuarios: estado, permisos por rol y asignación de tiendas (#104) ─── */
+.user-state {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.user-state.on {
+  color: var(--ui-success);
+}
+.user-state.off {
+  color: var(--ui-text-muted);
+}
+.role-perms {
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border);
+  border-radius: 0.6rem;
+  padding: 0.7rem 0.85rem;
+}
+.role-perms-title {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-muted);
+}
+.role-perms ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.role-perms li {
+  font-size: 0.85rem;
+  color: var(--ui-text-soft);
+}
+.user-stores-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.user-stores-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-muted);
+}
+.user-stores {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: 0.4rem 0.8rem;
+}
+.user-stores-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ui-text-soft);
+}
+/* Checkboxes nativos dentro de modales (rol/tiendas/activo): no heredar el alto de input de texto. */
+.modal input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  accent-color: var(--ui-primary, #111);
+  cursor: pointer;
+}
+.modal--form .user-store-check,
+.modal--form .user-active-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--ui-text);
+}
+
 /* ─── Tiendas (grid de cards) ─── */
 .store-grid {
   display: grid;

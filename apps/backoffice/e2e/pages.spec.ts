@@ -44,6 +44,17 @@ test('Usuarios muestra 4 usuarios con badge de rol', async ({ page }) => {
   await expect(page.getByTestId('user-role-badge').first()).toBeVisible();
 });
 
+test('Usuarios: editar precarga datos y muestra permisos por rol (#104)', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-users').click();
+  await page.getByTestId('user-edit').first().click();
+  await expect(page.getByTestId('user-name')).toHaveValue('Ana Caravaca');
+  await expect(page.getByTestId('role-permissions')).toBeVisible();
+  await page.getByTestId('user-name').fill('Ana C. Editado');
+  await page.getByTestId('user-save').click();
+  await expect(page.getByTestId('users-table')).toContainText('Ana C. Editado');
+});
+
 test('Stock global muestra la tabla con badges por tienda', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-stock').click();

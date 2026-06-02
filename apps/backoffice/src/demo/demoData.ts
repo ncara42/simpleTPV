@@ -177,10 +177,11 @@ export function stockLevel(qty: number): 'red' | 'yellow' | 'green' {
   return 'green';
 }
 
-// ─── Usuarios (4, con tienda para el mockup) ─────────────────
-// `storeName` es un campo demo extra (User no lo trae); UsersPage lo lee opcional.
+// ─── Usuarios (4, con tiendas asignadas para el mockup) ──────
+// `storeIds` es un campo demo extra (User no lo trae); UsersPage lo lee opcional.
+// Los ADMIN tienen acceso a todas las tiendas → storeIds vacío (regla por rol).
 export interface DemoUser extends User {
-  storeName: string;
+  storeIds: string[];
 }
 export const DEMO_USERS: DemoUser[] = [
   {
@@ -189,7 +190,7 @@ export const DEMO_USERS: DemoUser[] = [
     email: 'admin@org1.test',
     role: 'ADMIN',
     active: true,
-    storeName: 'Central',
+    storeIds: [],
   },
   {
     id: 'u-luis',
@@ -197,7 +198,7 @@ export const DEMO_USERS: DemoUser[] = [
     email: 'luis@org1.test',
     role: 'MANAGER',
     active: true,
-    storeName: 'Centro',
+    storeIds: ['s-centro'],
   },
   {
     id: 'u-marta',
@@ -205,7 +206,7 @@ export const DEMO_USERS: DemoUser[] = [
     email: 'marta@org1.test',
     role: 'CLERK',
     active: true,
-    storeName: 'Norte',
+    storeIds: ['s-norte'],
   },
   {
     id: 'u-jon',
@@ -213,7 +214,7 @@ export const DEMO_USERS: DemoUser[] = [
     email: 'jon@org1.test',
     role: 'CLERK',
     active: true,
-    storeName: 'Sur',
+    storeIds: ['s-sur'],
   },
 ];
 // Etiqueta de rol en castellano para el badge.
