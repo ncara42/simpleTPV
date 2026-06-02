@@ -1,21 +1,27 @@
 import type { FamilyInput, FamilyNode } from '@simpletpv/auth';
 
-import { api } from './auth.js';
+import { DEMO_FAMILIES } from '../demo/demoData.js';
 
 export type { FamilyInput, FamilyNode };
 
 export function listFamilies(): Promise<FamilyNode[]> {
-  return api.get<FamilyNode[]>('/product-families');
+  return Promise.resolve(DEMO_FAMILIES);
 }
-
 export function createFamily(input: FamilyInput): Promise<FamilyNode> {
-  return api.post<FamilyNode>('/product-families', input);
+  return Promise.resolve({
+    id: `fam-${input.name}`,
+    parentId: input.parentId ?? null,
+    name: input.name,
+    color: input.color ?? null,
+    icon: input.icon ?? null,
+    sortOrder: input.sortOrder ?? 0,
+    children: [],
+  });
 }
-
 export function updateFamily(id: string, input: Partial<FamilyInput>): Promise<FamilyNode> {
-  return api.patch<FamilyNode>(`/product-families/${id}`, input);
+  const base = DEMO_FAMILIES.find((f) => f.id === id) ?? DEMO_FAMILIES[0]!;
+  return Promise.resolve({ ...base, ...(input.name ? { name: input.name } : {}) });
 }
-
-export function deleteFamily(id: string): Promise<void> {
-  return api.del(`/product-families/${id}`);
+export function deleteFamily(_id: string): Promise<void> {
+  return Promise.resolve();
 }
