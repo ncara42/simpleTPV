@@ -11,6 +11,7 @@ import { CashView } from './CashPanel.js';
 import { DEMO_CART_LINES, DEMO_USER } from './demo/demoData.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { useCart } from './lib/cart.js';
+import { switchApp } from './lib/nav.js';
 import { ReturnsView } from './ReturnPanel.js';
 import { SalePage } from './SalePage.js';
 import { TransferReceivePanel } from './TransferReceivePanel.js';
@@ -60,7 +61,13 @@ function Home() {
         user={{ name: DEMO_USER.name, subtitle: 'Centro · Dependiente' }}
       />
       <div className="app-content">
-        <TopBar eyebrow={eyebrow} title={title} activeApp="tpv" onLogout={logout} />
+        <TopBar
+          eyebrow={eyebrow}
+          title={title}
+          activeApp="tpv"
+          onSwitchApp={switchApp}
+          onLogout={logout}
+        />
         <main className="app-main">
           {view === 'sale' && <SalePage />}
           {view === 'return' && <ReturnsView />}

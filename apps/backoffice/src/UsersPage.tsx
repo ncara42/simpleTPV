@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { ROLE_LABEL } from './demo/demoData.js';
 import { createUser, deleteUser, listUsers, type NewUser } from './lib/admin.js';
 
 const EMPTY: NewUser = { email: '', name: '', password: '', role: 'CLERK' };
@@ -19,15 +20,19 @@ export function UsersPage() {
       invalidate();
     },
   });
-  const delMut = useMutation({
-    mutationFn: (id: string) => deleteUser(id),
-    onSuccess: invalidate,
-  });
+  // Edición de usuario no implementada en el MVP; el botón "Editar" reabre el
+  // form vacío. La eliminación se conserva en lib (deleteUser) para el futuro.
+  void deleteUser;
 
   return (
     <section className="catalog">
       <header className="catalog-head">
-        <h2>Usuarios</h2>
+        <div>
+          <h2>Usuarios</h2>
+          <p className="catalog-sub" data-testid="users-count">
+            {users.length} usuarios
+          </p>
+        </div>
         <button
           className="btn-primary"
           onClick={() => setForm({ ...EMPTY })}
@@ -46,6 +51,7 @@ export function UsersPage() {
               <th>Nombre</th>
               <th>Email</th>
               <th>Rol</th>
+              <th>Tienda</th>
               <th />
             </tr>
           </thead>
@@ -54,11 +60,14 @@ export function UsersPage() {
               <tr key={u.id}>
                 <td>{u.name}</td>
                 <td className="muted">{u.email}</td>
-                <td>{u.role}</td>
+                <td>
+                  <span className="role-badge" data-testid="user-role-badge">
+                    {ROLE_LABEL[u.role]}
+                  </span>
+                </td>
+                <td className="muted">{(u as { storeName?: string }).storeName ?? '—'}</td>
                 <td className="row-actions">
-                  <button className="danger" onClick={() => delMut.mutate(u.id)}>
-                    Borrar
-                  </button>
+                  <button onClick={() => setForm({ ...EMPTY })}>Editar</button>
                 </td>
               </tr>
             ))}

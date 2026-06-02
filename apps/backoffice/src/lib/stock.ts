@@ -7,41 +7,28 @@ import type {
   Transfer,
 } from '@simpletpv/auth';
 
-import { api } from './auth.js';
+import { DEMO_ALERTS, DEMO_STOCK_GLOBAL } from '../demo/demoData.js';
 
 export type { StockAlert, StockGlobalRow, Transfer };
 
-// Stock global agregado por producto (todas las tiendas + total). Para la vista
-// central del backoffice (#33).
 export function getGlobalStock(): Promise<StockGlobalRow[]> {
-  return api.get<StockGlobalRow[]>('/stock/global');
+  return Promise.resolve(DEMO_STOCK_GLOBAL);
 }
-
-// Alertas activas (por defecto resolved=false), opcionalmente por tienda.
-export function listAlerts(storeId?: string): Promise<StockAlert[]> {
-  return api.get<StockAlert[]>('/stock/alerts', {
-    resolved: 'false',
-    storeId: storeId || undefined,
-  });
+export function listAlerts(_storeId?: string): Promise<StockAlert[]> {
+  return Promise.resolve(DEMO_ALERTS);
 }
-
-export function setMinStock(input: SetMinStockInput): Promise<unknown> {
-  return api.put('/stock/min', input);
+export function setMinStock(_input: SetMinStockInput): Promise<unknown> {
+  return Promise.resolve({ ok: true });
 }
-
-export function listMovements(productId: string): Promise<StockMovementsPage> {
-  return api.get<StockMovementsPage>('/stock/movements', { productId });
+export function listMovements(_productId: string): Promise<StockMovementsPage> {
+  return Promise.resolve({ items: [], page: 1, pageSize: 20, totalItems: 0 });
 }
-
-// Traspasos: listado (con filtro de estado), crear y enviar.
-export function listTransfers(status?: string): Promise<Transfer[]> {
-  return api.get<Transfer[]>('/transfers', { status: status || undefined });
+export function listTransfers(_status?: string): Promise<Transfer[]> {
+  return Promise.resolve([]);
 }
-
-export function createTransfer(input: CreateTransferInput): Promise<Transfer> {
-  return api.post<Transfer>('/transfers', input);
+export function createTransfer(_input: CreateTransferInput): Promise<Transfer> {
+  return Promise.reject(new Error('no disponible en demo'));
 }
-
-export function sendTransfer(id: string): Promise<Transfer> {
-  return api.post<Transfer>(`/transfers/${id}/send`);
+export function sendTransfer(_id: string): Promise<Transfer> {
+  return Promise.reject(new Error('no disponible en demo'));
 }
