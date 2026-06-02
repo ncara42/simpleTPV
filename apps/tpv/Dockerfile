@@ -20,6 +20,11 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
 FROM deps AS builder
+# URL del backoffice para el toggle Backoffice/TPV. Vite la inyecta en build, así
+# que debe llegar como build arg (Dokploy → "Build args"); sin ella, el toggle
+# cae al default de localhost de apps/tpv/src/lib/nav.ts.
+ARG VITE_BACKOFFICE_URL
+ENV VITE_BACKOFFICE_URL=$VITE_BACKOFFICE_URL
 COPY . .
 RUN pnpm --filter @simpletpv/tpv run build
 
