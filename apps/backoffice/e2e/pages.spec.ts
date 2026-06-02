@@ -46,18 +46,10 @@ test('Ventas muestra el historial con una venta anulada', async ({ page }) => {
   await expect(page.getByText('Anulada')).toBeVisible();
 });
 
-test('Compras muestra el estado vacío', async ({ page }) => {
+test('Compras y VeriFactu están retiradas del menú (#106)', async ({ page }) => {
   await login(page);
-  await page.getByTestId('nav-purchases').click();
-  await expect(page.getByTestId('orders-empty')).toBeVisible();
-  await expect(page.getByText('Sin pedidos abiertos')).toBeVisible();
-});
-
-test('VeriFactu muestra las cards de estado y el conector', async ({ page }) => {
-  await login(page);
-  await page.getByTestId('nav-verifactu').click();
-  await expect(page.getByTestId('vf-sent-card')).toContainText('128');
-  await expect(page.getByTestId('vf-connector')).toContainText('Operativo');
+  await expect(page.getByTestId('nav-purchases')).toHaveCount(0);
+  await expect(page.getByTestId('nav-verifactu')).toHaveCount(0);
 });
 
 test('Familias muestra las 5 familias con contador', async ({ page }) => {

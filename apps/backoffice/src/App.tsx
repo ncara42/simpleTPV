@@ -47,7 +47,7 @@ const GROUPS: NavGroup[] = [
   { id: 'ventas', label: 'Ventas' },
 ];
 
-const NAV: NavItem[] = [
+const ALL_NAV: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
   { id: 'catalog', label: 'Catálogo', icon: <Package size={18} />, group: 'tienda' },
   { id: 'families', label: 'Familias', icon: <Tag size={18} />, group: 'tienda' },
@@ -58,6 +58,12 @@ const NAV: NavItem[] = [
   { id: 'purchases', label: 'Compras', icon: <ShoppingCart size={18} />, group: 'ventas' },
   { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'ventas' },
 ];
+
+// #106: Compras y VeriFactu se retiran del menú (decisión informe UX 2026-06-02).
+// El código (páginas, lib y datos demo) se conserva para una posible reactivación
+// futura: basta con quitar el id de este set para que vuelvan a aparecer.
+const HIDDEN_TABS = new Set<Tab>(['purchases', 'verifactu']);
+const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab));
 
 const TAB_LABELS: Record<Tab, string> = {
   dashboard: 'Dashboard',
