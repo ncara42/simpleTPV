@@ -1669,3 +1669,119 @@
 .cash-card-close:hover {
   filter: brightness(0.94);
 }
+
+/* ─── Vista de Traspasos (tabla, mockup) ───────────────────── */
+.transfer-view {
+  max-width: 46rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.transfer-view-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.transfer-view-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ui-text);
+}
+
+.transfer-view-sub {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--ui-text-muted);
+}
+
+.transfer-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.transfer-table thead th {
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+  background: var(--ui-surface-subtle);
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.transfer-table th.num,
+.transfer-table td.num {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.transfer-table tbody td {
+  padding: 0.85rem 1rem;
+  font-size: 0.9rem;
+  color: var(--ui-text);
+  border-bottom: 1px solid var(--ui-border);
+  vertical-align: middle;
+}
+
+.transfer-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.transfer-table td.action {
+  text-align: right;
+}
+
+.transfer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 24px;
+  padding: 0 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.transfer-badge.pending {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+  border: 1px solid var(--ui-border);
+}
+
+.transfer-badge.received {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+
+.transfer-receive-link {
+  border: none;
+  background: none;
+  color: var(--ui-text);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.3rem 0.4rem;
+  border-radius: 7px;
+}
+
+.transfer-receive-link:hover {
+  background: var(--ui-surface-subtle);
+}
+
+.transfer-empty {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface);
+}
