@@ -2,18 +2,6 @@ import './dashboard.css';
 
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import {
-  Bar,
-  BarChart,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 
 import { DEMO_STOCKOUT_KPIS, DEMO_STOCKOUTS } from './demo/demoData.js';
 import { listStores } from './lib/admin.js';
@@ -129,55 +117,74 @@ export function DashboardPage() {
       </div>
 
       <div className="dash-grid">
-        {/* Ventas hoy vs ayer por tienda */}
+        {/* Ventas hoy vs ayer por tienda (barras CSS verticales) */}
         <div className="dash-panel" data-testid="dash-bars">
-          <h3>Ventas hoy vs ayer por tienda</h3>
-          {salesToday.isLoading ? (
-            <p className="catalog-empty">Cargando…</p>
-          ) : (salesToday.data?.byStore.length ?? 0) === 0 ? (
-            <p className="catalog-empty">Sin ventas.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={salesToday.data?.byStore ?? []}>
-                <XAxis dataKey="storeName" fontSize={12} />
-                <YAxis fontSize={12} />
-                <Tooltip formatter={(v) => fmtEur(Number(v))} />
-                <Legend />
-                <Bar dataKey="yesterday" name="Ayer" fill="#94a3b8" />
-                <Bar dataKey="today" name="Hoy" fill="#2563eb" />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+          <h3>Ventas hoy vs ayer</h3>
+          <p className="dash-panel-sub">Facturación neta por tienda</p>
+          {(() => {
+            const stores = salesToday.data?.byStore ?? [];
+            const max = Math.max(1, ...stores.flatMap((s) => [s.today, s.yesterday]));
+            return (
+              <>
+                <div className="dash-bars-chart">
+                  {stores.map((s) => (
+                    <div className="dash-bars-group" key={s.storeId}>
+                      <div className="dash-bars-pair">
+                        <span
+                          className="dash-bar dash-bar-prev"
+                          style={{ height: `${(s.yesterday / max) * 100}%` }}
+                          title={`Ayer: ${fmtEur(s.yesterday)}`}
+                        />
+                        <span
+                          className="dash-bar dash-bar-now"
+                          style={{ height: `${(s.today / max) * 100}%` }}
+                          title={`Hoy: ${fmtEur(s.today)}`}
+                        />
+                      </div>
+                      <span className="dash-bars-label">{s.storeName}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="dash-bars-legend">
+                  <span>
+                    <span className="dash-legend-dot dash-bar-prev" /> Ayer
+                  </span>
+                  <span>
+                    <span className="dash-legend-dot dash-bar-now" /> Hoy
+                  </span>
+                </div>
+              </>
+            );
+          })()}
         </div>
 
-        {/* Ventas por familia */}
+        {/* Ventas por familia (barras CSS horizontales) */}
         <div className="dash-panel" data-testid="dash-family">
           <h3>Ventas por familia</h3>
-          {byFamily.isLoading ? (
-            <p className="catalog-empty">Cargando…</p>
-          ) : (byFamily.data?.length ?? 0) === 0 ? (
-            <p className="catalog-empty">Sin datos en el periodo.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie
-                  data={byFamily.data ?? []}
-                  dataKey="total"
-                  nameKey="familyName"
-                  outerRadius={90}
-                  label={(e: { name?: unknown }) => String(e.name ?? '')}
-                >
-                  {(byFamily.data ?? []).map((f, i) => (
-                    <Cell
-                      key={f.familyId ?? `none-${i}`}
-                      fill={f.color ?? PIE_FALLBACK[i % PIE_FALLBACK.length] ?? '#2563eb'}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v) => fmtEur(Number(v))} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
+          <p className="dash-panel-sub">Periodo actual</p>
+          {(() => {
+            const fams = byFamily.data ?? [];
+            const max = Math.max(1, ...fams.map((f) => f.total));
+            return (
+              <ul className="dash-family-list">
+                {fams.map((f, i) => (
+                  <li key={f.familyId ?? `none-${i}`}>
+                    <span className="dash-family-name">{f.familyName}</span>
+                    <span className="dash-family-track">
+                      <span
+                        className="dash-family-fill"
+                        style={{
+                          width: `${(f.total / max) * 100}%`,
+                          background: f.color ?? PIE_FALLBACK[i % PIE_FALLBACK.length] ?? '#16734f',
+                        }}
+                      />
+                    </span>
+                    <span className="dash-family-value">{fmtEur(f.total)}</span>
+                  </li>
+                ))}
+              </ul>
+            );
+          })()}
         </div>
 
         {/* Panel de roturas */}

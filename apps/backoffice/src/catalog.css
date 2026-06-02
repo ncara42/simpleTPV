@@ -90,7 +90,37 @@
   color: var(--ui-text-muted);
 }
 
-/* ─── Stock: badges por tienda ─── */
+/* ─── Toggle segmentado (periodos del dashboard, subtabs de stock/compras) ─── */
+.bo-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border-radius: 9px;
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border);
+  width: fit-content;
+}
+.bo-tab {
+  height: 30px;
+  padding: 0 0.85rem;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.bo-tab.active {
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg);
+}
+
+/* ─── Stock: badges por tienda (fondo suave + dot de color) ─── */
 .stock-badges {
   display: inline-flex;
   flex-wrap: wrap;
@@ -100,13 +130,13 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.15rem 0.55rem;
+  padding: 0.18rem 0.6rem;
   border-radius: 999px;
   font-size: 0.8rem;
   font-weight: 600;
-  background: var(--ui-surface-subtle);
-  color: var(--ui-text);
-  border: none;
+  background: var(--ui-surface-subtle) !important;
+  color: var(--ui-text) !important;
+  border: 1px solid var(--ui-border);
   cursor: pointer;
 }
 .subtab-badge {
@@ -156,9 +186,11 @@
   flex-wrap: wrap;
 }
 .catalog-head h2 {
-  font-family: 'Fraunces', Georgia, serif;
   font-size: 1.5rem;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ui-text);
+  margin: 0;
 }
 .catalog-actions {
   display: flex;
@@ -179,17 +211,26 @@
   box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
 }
 .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   height: 2.5rem;
-  padding: 0 1rem;
-  border: none;
+  padding: 0 1.1rem;
+  border: 1px solid var(--ui-primary);
   border-radius: 0.6rem;
   font-weight: 600;
-  color: #fff;
+  font-size: 0.9rem;
+  color: var(--ui-primary-fg);
   cursor: pointer;
-  background: linear-gradient(135deg, var(--tpv-amber, #f59e0b), var(--tpv-amber-dark, #d97706));
+  background: var(--ui-primary);
+  transition: background 0.12s;
+}
+.btn-primary:hover {
+  background: #000;
 }
 .btn-primary:disabled {
-  opacity: 0.7;
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .catalog-empty {
   color: #6b7d7a;
@@ -249,8 +290,8 @@
   box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.5);
 }
 .modal h3 {
-  font-family: 'Fraunces', Georgia, serif;
   font-size: 1.25rem;
+  font-weight: 700;
   margin-bottom: 1.1rem;
 }
 .modal label {
