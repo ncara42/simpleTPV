@@ -153,7 +153,7 @@ export function CatalogPage() {
       {form && (
         <div className="modal-backdrop" onClick={() => setForm(null)}>
           <form
-            className="modal"
+            className="modal modal--form"
             onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => {
               e.preventDefault();
