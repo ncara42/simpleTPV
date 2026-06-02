@@ -74,12 +74,24 @@ test('Stock global muestra la tabla con badges por tienda', async ({ page }) => 
   await expect(page.getByTestId('stock-row')).toHaveCount(5);
 });
 
-test('Ventas muestra el historial con una venta anulada', async ({ page }) => {
+test('Ventas: scroll infinito, filtros y vistas guardadas (#95)', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-sales').click();
   await expect(page.getByTestId('sales-table')).toBeVisible();
-  await expect(page.getByTestId('sales-row')).toHaveCount(5);
-  await expect(page.getByText('Anulada')).toBeVisible();
+  // Primer bloque del scroll infinito (20 de 60).
+  await expect(page.getByTestId('sales-row')).toHaveCount(20);
+  // Filtrar por la vendedora Marta → sus 15 tickets (caben en un bloque).
+  await page.getByTestId('sales-seller').selectOption('u-marta');
+  const rows = page.getByTestId('sales-row');
+  await expect(rows).toHaveCount(15);
+  await expect(rows.first()).toContainText('Marta');
+  // Guardar la vista actual y verla como chip reutilizable.
+  await page.getByTestId('sales-save-view').click();
+  await expect(page.getByTestId('sales-views')).toContainText('Marta');
+  // Limpiar vuelve a mostrar todo, con alguna venta anulada.
+  await page.getByTestId('sales-clear').click();
+  await expect(page.getByTestId('sales-row')).toHaveCount(20);
+  await expect(page.getByText('Anulada').first()).toBeVisible();
 });
 
 test('Compras y VeriFactu están retiradas del menú (#106)', async ({ page }) => {

@@ -1,36 +1,45 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { listSales, listStores } from './lib/admin.js';
+import { DEMO_FAMILIES, DEMO_SALES, type DemoSaleRow, SALE_SELLERS } from './demo/demoData.js';
+import { fmtEur } from './lib/format.js';
 
-// Fecha de hoy en formato YYYY-MM-DD (hora local) para el valor por defecto del
-// filtro. Coincide con el formato que valida el DTO de la API.
-function today(): string {
-  const d = new Date();
-  const tz = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - tz).toISOString().slice(0, 10);
+const hour = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
+const PAYMENT_LABEL: Record<string, string> = { CASH: 'Efectivo', CARD: 'Tarjeta' };
+const PAGE = 20; // tamaño de bloque del scroll infinito
+
+interface Filters {
+  storeId: string;
+  sellerId: string;
+  familyId: string;
+}
+const NO_FILTERS: Filters = { storeId: '', sellerId: '', familyId: '' };
+
+interface SavedView extends Filters {
+  name: string;
+}
+const VIEWS_KEY = 'bo.sales.views';
+
+function loadViews(): SavedView[] {
+  try {
+    const raw = localStorage.getItem(VIEWS_KEY);
+    return raw ? (JSON.parse(raw) as SavedView[]) : [];
+  } catch {
+    return [];
+  }
 }
 
-const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
-const hour = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
+// Tiendas/vendedores/familias presentes en las ventas, para poblar los selectores.
+const STORE_OPTIONS = Array.from(new Map(DEMO_SALES.map((s) => [s.storeId, s.storeName])));
 
-const PAYMENT_LABEL: Record<string, string> = { CASH: 'Efectivo', CARD: 'Tarjeta' };
-
-function exportCsv(
-  items: Array<{
-    ticketNumber: string;
-    createdAt: string;
-    total: string | number;
-    paymentMethod: string;
-    status: string;
-  }>,
-  date: string,
-) {
-  const header = 'Nº ticket,Hora,Importe (€),Método,Estado';
+function exportCsv(items: DemoSaleRow[]) {
+  const header = 'Nº ticket,Hora,Tienda,Vendedor,Familia,Importe (€),Método,Estado';
   const rows = items.map((s) =>
     [
       s.ticketNumber,
       hour.format(new Date(s.createdAt)),
+      s.storeName,
+      s.sellerName,
+      s.familyName,
       Number(s.total).toFixed(2),
       PAYMENT_LABEL[s.paymentMethod] ?? s.paymentMethod,
       s.status === 'VOIDED' ? 'Anulada' : 'Completada',
@@ -41,140 +50,239 @@ function exportCsv(
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `ventas_${date}.csv`;
+  a.download = 'ventas.csv';
   a.click();
   URL.revokeObjectURL(url);
 }
 
 export function SalesHistoryPage() {
-  const [storeId, setStoreId] = useState('');
-  const [date, setDate] = useState(today());
-  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [visible, setVisible] = useState(PAGE);
+  const [views, setViews] = useState<SavedView[]>(() => loadViews());
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
+  const setFilter = (patch: Partial<Filters>): void => setFilters((f) => ({ ...f, ...patch }));
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['sales', storeId, date, page],
-    queryFn: () =>
-      listSales({
-        ...(storeId ? { storeId } : {}),
-        ...(date ? { date } : {}),
-        page,
-      }),
-    placeholderData: keepPreviousData,
-  });
+  // Conjunto filtrado completo (sin paginar): por tienda, vendedor y familia.
+  const filtered = useMemo(
+    () =>
+      DEMO_SALES.filter(
+        (s) =>
+          (!filters.storeId || s.storeId === filters.storeId) &&
+          (!filters.sellerId || s.sellerId === filters.sellerId) &&
+          (!filters.familyId || s.familyId === filters.familyId),
+      ),
+    [filters],
+  );
+  const filteredRef = useRef(filtered);
+  filteredRef.current = filtered;
 
-  const totalPages = data ? Math.max(1, Math.ceil(data.totalItems / data.pageSize)) : 1;
+  // Reinicia el scroll al cambiar los filtros.
+  useEffect(() => setVisible(PAGE), [filters]);
+
+  const shown = filtered.slice(0, visible);
+  const hasMore = visible < filtered.length;
+
+  // Scroll infinito: cuando el centinela entra en viewport, carga otro bloque.
+  useEffect(() => {
+    if (!hasMore) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) {
+        setVisible((v) => Math.min(filteredRef.current.length, v + PAGE));
+      }
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [hasMore]);
+
+  // Totales del conjunto filtrado (solo COMPLETED suman importe).
+  const totals = useMemo(() => {
+    const completed = filtered.filter((s) => s.status !== 'VOIDED');
+    return {
+      count: filtered.length,
+      amount: completed.reduce((acc, s) => acc + Number(s.total), 0),
+    };
+  }, [filtered]);
+
+  const persistViews = (next: SavedView[]): void => {
+    setViews(next);
+    try {
+      localStorage.setItem(VIEWS_KEY, JSON.stringify(next));
+    } catch {
+      /* almacenamiento no disponible: la vista solo vive en memoria */
+    }
+  };
+  const saveView = (): void => {
+    if (!filters.storeId && !filters.sellerId && !filters.familyId) return;
+    const name =
+      [
+        STORE_OPTIONS.find(([id]) => id === filters.storeId)?.[1],
+        SALE_SELLERS.find((s) => s.id === filters.sellerId)?.name,
+        DEMO_FAMILIES.find((f) => f.id === filters.familyId)?.name,
+      ]
+        .filter(Boolean)
+        .join(' · ') || 'Todas';
+    if (views.some((v) => v.name === name)) return;
+    persistViews([...views, { name, ...filters }]);
+  };
+  const removeView = (name: string): void => persistViews(views.filter((v) => v.name !== name));
+
+  const hasFilters = Boolean(filters.storeId || filters.sellerId || filters.familyId);
 
   return (
     <section className="catalog">
       <header className="catalog-head">
         <div>
           <h2>Ventas</h2>
-          <p className="catalog-sub">Historial de tickets · hoy</p>
+          <p className="catalog-sub">Historial de tickets · scroll infinito</p>
         </div>
         <div className="catalog-actions">
-          <select
-            className="catalog-search"
-            value={storeId}
-            onChange={(e) => {
-              setStoreId(e.target.value);
-              setPage(1);
-            }}
-            data-testid="sales-store"
-          >
-            <option value="">Todas las tiendas</option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="date"
-            className="catalog-search"
-            value={date}
-            onChange={(e) => {
-              setDate(e.target.value);
-              setPage(1);
-            }}
-            data-testid="sales-date"
-          />
-          {data && data.items.length > 0 && (
-            <button onClick={() => exportCsv(data.items, date)} data-testid="sales-export-csv">
-              Exportar CSV
-            </button>
-          )}
+          <button onClick={() => exportCsv(filtered)} data-testid="sales-export-csv">
+            Exportar CSV
+          </button>
         </div>
       </header>
 
-      {isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : !data || data.items.length === 0 ? (
+      <div className="sales-filters">
+        <select
+          className="catalog-search"
+          value={filters.storeId}
+          onChange={(e) => setFilter({ storeId: e.target.value })}
+          data-testid="sales-store"
+        >
+          <option value="">Todas las tiendas</option>
+          {STORE_OPTIONS.map(([id, name]) => (
+            <option key={id} value={id}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <select
+          className="catalog-search"
+          value={filters.sellerId}
+          onChange={(e) => setFilter({ sellerId: e.target.value })}
+          data-testid="sales-seller"
+        >
+          <option value="">Todos los vendedores</option>
+          {SALE_SELLERS.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className="catalog-search"
+          value={filters.familyId}
+          onChange={(e) => setFilter({ familyId: e.target.value })}
+          data-testid="sales-family"
+        >
+          <option value="">Todas las familias</option>
+          {DEMO_FAMILIES.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
+          ))}
+        </select>
+        {hasFilters && (
+          <button
+            className="link-btn"
+            onClick={() => setFilters(NO_FILTERS)}
+            data-testid="sales-clear"
+          >
+            Limpiar
+          </button>
+        )}
+        <button className="link-btn" onClick={saveView} data-testid="sales-save-view">
+          Guardar vista
+        </button>
+      </div>
+
+      {views.length > 0 && (
+        <div className="sales-views" data-testid="sales-views">
+          {views.map((v) => (
+            <span key={v.name} className="sales-view-chip">
+              <button
+                className="sales-view-apply"
+                onClick={() =>
+                  setFilters({ storeId: v.storeId, sellerId: v.sellerId, familyId: v.familyId })
+                }
+                data-testid="sales-view-apply"
+              >
+                {v.name}
+              </button>
+              <button
+                className="sales-view-remove"
+                onClick={() => removeView(v.name)}
+                aria-label={`Eliminar vista ${v.name}`}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
         <p className="catalog-empty" data-testid="sales-empty">
           Sin ventas para los filtros seleccionados.
         </p>
       ) : (
-        <table className="catalog-table" data-testid="sales-table">
-          <thead>
-            <tr>
-              <th>Ticket</th>
-              <th>Tienda</th>
-              <th>Líneas</th>
-              <th>Pago</th>
-              <th>Total</th>
-              <th>Hora</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.items.map((sale) => (
-              <tr
-                key={sale.id}
-                className={sale.status === 'VOIDED' ? 'sale-voided' : undefined}
-                data-testid="sales-row"
-              >
-                <td>
-                  {sale.ticketNumber}
-                  {sale.status === 'VOIDED' && <span className="sale-tag-voided">Anulada</span>}
-                </td>
-                <td className="muted">{(sale as { storeName?: string }).storeName ?? '—'}</td>
-                <td>{(sale as { lines?: number }).lines ?? '—'}</td>
-                <td className="muted">{PAYMENT_LABEL[sale.paymentMethod] ?? sale.paymentMethod}</td>
-                <td>{eur.format(Number(sale.total))}</td>
-                <td className="muted">{hour.format(new Date(sale.createdAt))}</td>
+        <>
+          <table className="catalog-table" data-testid="sales-table">
+            <thead>
+              <tr>
+                <th>Ticket</th>
+                <th>Tienda</th>
+                <th>Vendedor</th>
+                <th>Familia</th>
+                <th>Pago</th>
+                <th>Total</th>
+                <th>Hora</th>
               </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr data-testid="sales-totals">
-              <td colSpan={3}>{data.totals.count} tickets</td>
-              <td colSpan={3}>Total del día: {eur.format(Number(data.totals.totalAmount))}</td>
-            </tr>
-          </tfoot>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {shown.map((sale) => (
+                <tr
+                  key={sale.id}
+                  className={sale.status === 'VOIDED' ? 'sale-voided' : undefined}
+                  data-testid="sales-row"
+                >
+                  <td>
+                    {sale.ticketNumber}
+                    {sale.status === 'VOIDED' && <span className="sale-tag-voided">Anulada</span>}
+                  </td>
+                  <td className="muted">{sale.storeName}</td>
+                  <td className="muted">{sale.sellerName}</td>
+                  <td className="muted">{sale.familyName}</td>
+                  <td className="muted">
+                    {PAYMENT_LABEL[sale.paymentMethod] ?? sale.paymentMethod}
+                  </td>
+                  <td>{fmtEur(Number(sale.total))}</td>
+                  <td className="muted">{hour.format(new Date(sale.createdAt))}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr data-testid="sales-totals">
+                <td colSpan={4}>{totals.count} tickets</td>
+                <td colSpan={3}>Total (completadas): {fmtEur(totals.amount)}</td>
+              </tr>
+            </tfoot>
+          </table>
 
-      <div className="sales-pager" data-testid="sales-pager">
-        <button
-          type="button"
-          disabled={page <= 1}
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          data-testid="sales-prev"
-        >
-          Anterior
-        </button>
-        <span className="muted">
-          Página {data?.page ?? page} de {totalPages}
-        </span>
-        <button
-          type="button"
-          disabled={page >= totalPages}
-          onClick={() => setPage((p) => p + 1)}
-          data-testid="sales-next"
-        >
-          Siguiente
-        </button>
-      </div>
+          {hasMore ? (
+            <div ref={sentinelRef} className="sales-sentinel" data-testid="sales-sentinel">
+              Cargando más…
+            </div>
+          ) : (
+            <p className="sales-end muted" data-testid="sales-end">
+              Mostrando {shown.length} de {filtered.length} tickets
+            </p>
+          )}
+        </>
+      )}
     </section>
   );
 }

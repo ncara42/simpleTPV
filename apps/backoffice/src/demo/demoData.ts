@@ -386,6 +386,46 @@ export const DEMO_SALES_PAGE: SalesPage = {
   totals: { count: 4, totalAmount: '174.40' },
 };
 
+// ─── Ventas: dataset enriquecido para el historial con scroll infinito y filtros (#95) ───
+// Cada venta lleva vendedor y familia (raíz) dominante para poder filtrar por ambos.
+export interface DemoSaleRow extends SaleSummary {
+  storeName: string;
+  sellerId: string;
+  sellerName: string;
+  familyId: string;
+  familyName: string;
+  lines: number;
+}
+export const SALE_SELLERS = [
+  { id: 'u-ana', name: 'Ana Caravaca' },
+  { id: 'u-luis', name: 'Luis Pérez' },
+  { id: 'u-marta', name: 'Marta Ruiz' },
+  { id: 'u-jon', name: 'Jon Aguirre' },
+];
+const SALE_STORES = DEMO_STORES.filter((s) => s.id !== 's-almacen'); // 5 tiendas con venta
+const SALE_BASE_MS = Date.parse('2026-06-02T13:00:00.000Z');
+export const DEMO_SALES: DemoSaleRow[] = Array.from({ length: 60 }, (_, i) => {
+  const store = SALE_STORES[i % SALE_STORES.length]!;
+  const seller = SALE_SELLERS[i % SALE_SELLERS.length]!;
+  const family = DEMO_FAMILIES[(i * 3) % DEMO_FAMILIES.length]!;
+  const ticket = 1042 - i;
+  return {
+    id: `v-${ticket}`,
+    ticketNumber: `#A-${ticket}`,
+    createdAt: new Date(SALE_BASE_MS - i * 11 * 60000).toISOString(),
+    total: (8 + ((i * 7) % 80) + (i % 4) * 0.25).toFixed(2),
+    paymentMethod: i % 3 === 0 ? 'CARD' : 'CASH',
+    status: i % 17 === 0 ? 'VOIDED' : 'COMPLETED',
+    storeId: store.id,
+    storeName: store.name,
+    sellerId: seller.id,
+    sellerName: seller.name,
+    familyId: family.id,
+    familyName: family.name,
+    lines: 1 + (i % 5),
+  };
+});
+
 // ─── VeriFactu (128 enviados / 0 cola / 0 fallidos) ──────────
 // Lista demo de registros SENT para que el contador de enviados tenga sentido.
 export const DEMO_VERIFACTU: VerifactuRecord[] = Array.from({ length: 6 }, (_, i) => ({
