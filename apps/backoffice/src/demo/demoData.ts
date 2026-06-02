@@ -39,6 +39,19 @@ export const DEMO_STORES: Store[] = [
   { id: 's-almacen', name: 'Almacén', address: 'Pol. Ind. 7', code: 'ALMACEN', active: false },
 ];
 
+// Ventas (€) por tienda y periodo — demo para ordenar el listado por rendimiento
+// y mostrar la métrica principal en cada card (#103). Los valores de `today`
+// coinciden con DEMO_SALES_TODAY.byStore. Clave: id de tienda.
+export type StoreSalesPeriod = 'today' | 'week' | 'month';
+export const DEMO_STORE_SALES: Record<string, Record<StoreSalesPeriod, number>> = {
+  's-centro': { today: 310, week: 2010, month: 8450 },
+  's-norte': { today: 240, week: 1680, month: 7120 },
+  's-sur': { today: 220, week: 1490, month: 6240 },
+  's-granvia': { today: 360, week: 2360, month: 9810 },
+  's-online': { today: 154, week: 1120, month: 4980 },
+  's-almacen': { today: 0, week: 0, month: 0 },
+};
+
 // ─── Familias (con contador de productos para el mockup) ─────
 // `productCount` es un campo demo extra (FamilyNode no lo trae); FamiliesPage lo lee opcional.
 export interface DemoFamily extends FamilyNode {

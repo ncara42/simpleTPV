@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
-import { createStore, deleteStore, listStores } from './lib/admin.js';
+import { DEMO_STORE_SALES, type StoreSalesPeriod } from './demo/demoData.js';
+import { createStore, deleteStore, listStores, type Store } from './lib/admin.js';
+import { fmtEur } from './lib/format.js';
 
 interface StoreForm {
   name: string;
@@ -9,9 +11,31 @@ interface StoreForm {
   address: string;
 }
 
+type StatusFilter = 'all' | 'activa' | 'dormida';
+
+const PERIODS: { id: StoreSalesPeriod; label: string }[] = [
+  { id: 'today', label: 'Hoy' },
+  { id: 'week', label: '7 días' },
+  { id: 'month', label: 'Mes' },
+];
+
+const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
+  { id: 'all', label: 'Todas' },
+  { id: 'activa', label: 'Activas' },
+  { id: 'dormida', label: 'Dormidas' },
+];
+
+function salesOf(storeId: string, period: StoreSalesPeriod): number {
+  return DEMO_STORE_SALES[storeId]?.[period] ?? 0;
+}
+
 export function StoresPage() {
   const qc = useQueryClient();
   const [form, setForm] = useState<StoreForm | null>(null);
+  const [period, setPeriod] = useState<StoreSalesPeriod>('today');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  // Override local del estado activa/dormida (demo: no hay backend que persista).
+  const [activeOverrides, setActiveOverrides] = useState<Record<string, boolean>>({});
 
   const { data: stores = [], isLoading } = useQuery({
     queryKey: ['stores'],
@@ -35,6 +59,24 @@ export function StoresPage() {
   // Tiendas no muestra el botón Borrar en las cards.
   void deleteStore;
 
+  const isActive = (s: Store): boolean => activeOverrides[s.id] ?? s.active;
+  const toggleActive = (s: Store): void =>
+    setActiveOverrides((prev) => ({ ...prev, [s.id]: !(prev[s.id] ?? s.active) }));
+
+  const periodLabel = PERIODS.find((p) => p.id === period)?.label ?? '';
+
+  // Orden por ventas del periodo (desc) + filtro por estado administrativo (#101, #103).
+  const visibleStores = useMemo(() => {
+    return [...stores]
+      .filter((s) => {
+        const active = activeOverrides[s.id] ?? s.active;
+        if (statusFilter === 'activa') return active;
+        if (statusFilter === 'dormida') return !active;
+        return true;
+      })
+      .sort((a, b) => salesOf(b.id, period) - salesOf(a.id, period));
+  }, [stores, statusFilter, period, activeOverrides]);
+
   return (
     <section className="catalog">
       <header className="catalog-head">
@@ -51,48 +93,106 @@ export function StoresPage() {
         </button>
       </header>
 
+      <div className="stores-toolbar">
+        <div className="bo-tabs" role="tablist" aria-label="Filtrar por estado">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              className={`bo-tab ${statusFilter === f.id ? 'active' : ''}`}
+              onClick={() => setStatusFilter(f.id)}
+              data-testid={`store-filter-${f.id}`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="stores-period">
+          <span className="stores-period-label">Orden por ventas ·</span>
+          <div className="bo-tabs" role="tablist" aria-label="Periodo de ventas">
+            {PERIODS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`bo-tab ${period === p.id ? 'active' : ''}`}
+                onClick={() => setPeriod(p.id)}
+                data-testid={`store-period-${p.id}`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {isLoading ? (
         <p className="catalog-empty">Cargando…</p>
       ) : stores.length === 0 ? (
         <p className="catalog-empty" data-testid="stores-empty">
           Sin tiendas. Crea la primera.
         </p>
+      ) : visibleStores.length === 0 ? (
+        <p className="catalog-empty" data-testid="stores-filter-empty">
+          Ninguna tienda con ese estado.
+        </p>
       ) : (
         <div className="store-grid" data-testid="stores-grid">
-          {stores.map((s) => (
-            <div className="store-card" key={s.id} data-testid="store-card">
-              <span className="store-card-icon" aria-hidden="true">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M3 9l1-5h16l1 5" />
-                  <path d="M4 9v11h16V9" />
-                  <path d="M9 20v-6h6v6" />
-                </svg>
-              </span>
-              <span className="store-card-text">
-                <span className="store-card-name">{s.name}</span>
-                <span className="store-card-addr">{s.address ?? '—'}</span>
-              </span>
-              <span className={`store-badge ${s.active ? 'active' : 'muted'}`}>
-                {s.active ? 'Activa' : 'Almacén'}
-              </span>
-            </div>
-          ))}
+          {visibleStores.map((s) => {
+            const active = isActive(s);
+            return (
+              <div className="store-card" key={s.id} data-testid="store-card">
+                <div className="store-card-top">
+                  <span className="store-card-icon" aria-hidden="true">
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M3 9l1-5h16l1 5" />
+                      <path d="M4 9v11h16V9" />
+                      <path d="M9 20v-6h6v6" />
+                    </svg>
+                  </span>
+                  <span className="store-card-text">
+                    <span className="store-card-name">{s.name}</span>
+                    <span className="store-card-addr">{s.address ?? '—'}</span>
+                  </span>
+                  <span
+                    className={`store-badge ${active ? 'active' : 'muted'}`}
+                    data-testid="store-status"
+                  >
+                    {active ? 'Activa' : 'Dormida'}
+                  </span>
+                </div>
+                <div className="store-card-foot">
+                  <span className="store-card-sales" data-testid="store-sales">
+                    <strong>{fmtEur(salesOf(s.id, period))}</strong>
+                    <span className="store-card-sales-label">ventas · {periodLabel}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="link-btn store-toggle"
+                    onClick={() => toggleActive(s)}
+                    data-testid="store-toggle"
+                  >
+                    {active ? 'Dormir' : 'Activar'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
       {form && (
         <div className="modal-backdrop" onClick={() => setForm(null)}>
           <form
-            className="modal"
+            className="modal modal--form"
             onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => {
               e.preventDefault();
@@ -124,6 +224,7 @@ export function StoresPage() {
               <input
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
+                data-testid="store-address"
               />
             </label>
             {createMut.isError && <p className="form-error">No se pudo crear.</p>}

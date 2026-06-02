@@ -24,6 +24,19 @@ test('Tiendas muestra el grid de 6 ubicaciones', async ({ page }) => {
   await expect(page.getByTestId('store-card')).toHaveCount(6);
 });
 
+test('Tiendas: orden por ventas y filtro de estado (#101, #103)', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-stores').click();
+  // Métrica de ventas visible en las cards.
+  await expect(page.getByTestId('store-sales').first()).toBeVisible();
+  // Orden por defecto = ventas de hoy desc → Gran Vía (360 €) primera.
+  await expect(page.getByTestId('store-card').first()).toContainText('Gran Vía');
+  // Filtro "Dormidas" → solo el Almacén (active: false).
+  await page.getByTestId('store-filter-dormida').click();
+  await expect(page.getByTestId('store-card')).toHaveCount(1);
+  await expect(page.getByTestId('store-card')).toContainText('Almacén');
+});
+
 test('Usuarios muestra 4 usuarios con badge de rol', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-users').click();
