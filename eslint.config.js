@@ -17,6 +17,8 @@ export default tseslint.config(
       '**/coverage/**',
       '**/.next/**',
       '**/.turbo/**',
+      '**/.claude/**',
+      '**/.worktrees/**',
       '**/generated/**',
       '**/*.generated.*',
     ],

@@ -39,5 +39,6 @@ backups/
 *.dump
 
 # Misc
+.claude/
 .worktrees/
 *.tsbuildinfo
