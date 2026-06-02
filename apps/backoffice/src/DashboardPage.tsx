@@ -15,6 +15,7 @@ import {
   YAxis,
 } from 'recharts';
 
+import { DEMO_STOCKOUT_KPIS, DEMO_STOCKOUTS } from './demo/demoData.js';
 import { listStores } from './lib/admin.js';
 import {
   type DashboardPeriod,
@@ -23,9 +24,8 @@ import {
   getSalesByFamily,
   getSalesKpis,
   getSalesToday,
-  getStockoutKpis,
 } from './lib/dashboard.js';
-import { deltaTone, fmtDelta, fmtEur, fmtHours, fmtNum, fmtRate } from './lib/format.js';
+import { deltaTone, fmtDelta, fmtEur, fmtNum, fmtRate } from './lib/format.js';
 
 const PERIODS: Array<{ id: DashboardPeriod; label: string }> = [
   { id: 'today', label: 'Hoy' },
@@ -60,10 +60,6 @@ export function DashboardPage() {
     queryKey: ['dash-family', period, store],
     queryFn: () => getSalesByFamily(period, store),
   });
-  const stockout = useQuery({
-    queryKey: ['dash-stockout', period, store],
-    queryFn: () => getStockoutKpis(period, store),
-  });
   const rankings = useQuery({
     queryKey: ['dash-rankings', period, store],
     queryFn: () => getProductRankings(period, store),
@@ -72,7 +68,10 @@ export function DashboardPage() {
   return (
     <section className="catalog" data-testid="dashboard">
       <header className="catalog-head">
-        <h2>Dashboard</h2>
+        <div>
+          <h2>Resumen de hoy</h2>
+          <p className="catalog-sub">Última actualización hace 2 min</p>
+        </div>
         <div className="catalog-actions">
           <nav className="bo-tabs dash-period" data-testid="dash-period">
             {PERIODS.map((p) => (
@@ -184,25 +183,22 @@ export function DashboardPage() {
         {/* Panel de roturas */}
         <div className="dash-panel" data-testid="dash-stockout">
           <h3>Roturas de stock</h3>
-          {stockout.isLoading ? (
-            <p className="catalog-empty">Cargando…</p>
-          ) : (
-            <div className="dash-stockout-grid">
-              <Stat label="Eventos" value={String(stockout.data?.events ?? 0)} />
-              <Stat
-                label="Abiertas"
-                value={String(stockout.data?.open ?? 0)}
-                tone={(stockout.data?.open ?? 0) > 0 ? 'warn' : 'ok'}
-                testid="stockout-open"
-              />
-              <Stat label="Duración media" value={fmtHours(stockout.data?.avgDurationHours)} />
-              <Stat
-                label="Venta perdida est."
-                value={fmtEur(stockout.data?.estimatedLostSales)}
-                tone={(stockout.data?.estimatedLostSales ?? 0) > 0 ? 'warn' : 'ok'}
-              />
-            </div>
-          )}
+          <p className="dash-panel-sub">Productos en alerta ahora</p>
+          <ul className="dash-stockout-list">
+            {DEMO_STOCKOUTS.map((s) => (
+              <li key={`${s.name}-${s.store}`}>
+                <span className={`stock-dot stock-${s.level}`} />
+                <span className="dash-stockout-name">{s.name}</span>
+                <span className="dash-stockout-store">
+                  {s.store} · {s.qty} ud
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="dash-stockout-foot">
+            <span>Venta perdida est.</span>
+            <strong className="dash-lost">{fmtEur(DEMO_STOCKOUT_KPIS.estimatedLostSales)}</strong>
+          </div>
         </div>
 
         {/* Rankings */}
@@ -223,18 +219,6 @@ function KpiCard(props: { label: string; value: string; delta?: number | null; t
       {props.delta !== undefined && (
         <span className={`dash-card-delta dash-delta-${tone}`}>{fmtDelta(props.delta)}</span>
       )}
-    </div>
-  );
-}
-
-function Stat(props: { label: string; value: string; tone?: 'ok' | 'warn'; testid?: string }) {
-  return (
-    <div
-      className={`dash-stat ${props.tone === 'warn' ? 'dash-stat-warn' : ''}`}
-      data-testid={props.testid}
-    >
-      <span className="dash-card-label">{props.label}</span>
-      <span className="dash-card-value">{props.value}</span>
     </div>
   );
 }
