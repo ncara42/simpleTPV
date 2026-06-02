@@ -1,38 +1,55 @@
 :root {
-  --ui-bg: #fafafa;
+  /* ─── Superficies (neutro cálido) ─────────────────────── */
+  --ui-bg: #f6f6f4;
   --ui-surface: #ffffff;
-  --ui-surface-subtle: #f5f5f5;
-  --ui-border: #e5e5e5;
-  --ui-border-strong: #d4d4d4;
-  --ui-text: #171717;
-  --ui-text-muted: #737373;
-  --ui-text-soft: #a3a3a3;
-  --ui-primary: #000000;
+  --ui-surface-subtle: #f4f4f2;
+  --ui-border: #e6e5e0;
+  --ui-border-strong: #d8d6cf;
+
+  /* ─── Texto ───────────────────────────────────────────── */
+  --ui-text: #18181a;
+  --ui-text-muted: #6b6b66;
+  --ui-text-soft: #8d897f;
+
+  /* ─── Acción primaria (tinta) ─────────────────────────── */
+  --ui-primary: #171717;
+  --ui-primary-hover: #000000;
   --ui-primary-fg: #ffffff;
-  --ui-danger: #dc2626;
-  --ui-danger-soft: #fef2f2;
-  --ui-warning: #d97706;
-  --ui-warning-soft: #fffbeb;
-  --ui-success: #16a34a;
-  --ui-success-soft: #f0fdf4;
-  --ui-focus: 0 0 0 3px rgb(0 0 0 / 0.08);
-  --ui-radius: 8px;
-  --ui-radius-sm: 6px;
-  --ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
+
+  /* ─── Señal de marca (teal) ───────────────────────────── */
+  --ui-brand: #0e7c6b;
+  --ui-brand-ink: #0a5447;
+  --ui-brand-soft: #0e7c6b14;
+  --ui-brand-soft-2: #0e7c6b22;
+
+  /* ─── Semántica ───────────────────────────────────────── */
+  --ui-danger: #c0392b;
+  --ui-danger-soft: #fbeae7;
+  --ui-warning: #b45309;
+  --ui-warning-soft: #fdf4e6;
+  --ui-success: #16734f;
+  --ui-success-soft: #e8f3ec;
+
+  /* ─── Forma / elevación / foco ────────────────────────── */
+  --ui-focus: 0 0 0 3px var(--ui-brand-soft-2);
+  --ui-radius: 10px;
+  --ui-radius-sm: 7px;
+  --ui-radius-lg: 14px;
+  --ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.045);
   --ui-shadow-panel: 0 1px 3px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04);
 
-  /* Sidebar */
-  --sidebar-bg: #f5f5f5;
+  /* ─── Sidebar ─────────────────────────────────────────── */
+  --sidebar-bg: #ffffff;
   --sidebar-width-rail: 56px;
-  --sidebar-width-expanded: 220px;
-  --sidebar-current-width: 56px;
-  --sidebar-item-active-bg: #e5e5e5;
-  --sidebar-item-hover-bg: #ebebeb;
-  --sidebar-text: #737373;
-  --sidebar-text-active: #171717;
-  --sidebar-group-label-color: #a3a3a3;
-  --sidebar-border: #e5e5e5;
-  --content-bg: #ffffff;
+  --sidebar-width-expanded: 212px;
+  --sidebar-current-width: var(--sidebar-width-expanded);
+  --sidebar-item-active-bg: var(--ui-brand-soft);
+  --sidebar-item-hover-bg: var(--ui-surface-subtle);
+  --sidebar-text: #6b6b66;
+  --sidebar-text-active: var(--ui-brand-ink);
+  --sidebar-group-label-color: #8d897f;
+  --sidebar-border: var(--ui-border);
+  --content-bg: var(--ui-bg);
 }
 
 html {
@@ -43,8 +60,9 @@ body {
   margin: 0;
   color: var(--ui-text);
   background: var(--ui-bg);
-  font-family: Geist, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', sans-serif;
+  font-family: Geist, Inter, ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
 

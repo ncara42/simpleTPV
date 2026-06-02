@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 export interface NavItem {
   id: string;
@@ -17,54 +17,19 @@ export interface SidebarProps {
   groups?: NavGroup[];
   activeItem: string;
   onSelect: (id: string) => void;
-  user?: { name: string; email: string };
-  onLogout?: () => void;
+  user?: { name: string; subtitle?: string };
   logo?: React.ReactNode;
-  statusBadge?: React.ReactNode;
+  brand?: { title: string; subtitle?: string };
 }
 
-const PINNED_KEY = 'simpletpv-sidebar-pinned';
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'U';
+}
 
-export function Sidebar({
-  items,
-  groups,
-  activeItem,
-  onSelect,
-  user,
-  onLogout,
-  logo,
-  statusBadge,
-}: SidebarProps) {
-  const [pinned, setPinned] = useState(() => {
-    try {
-      return localStorage.getItem(PINNED_KEY) === 'true';
-    } catch {
-      return false;
-    }
-  });
-  const [hovered, setHovered] = useState(false);
+export function Sidebar({ items, groups, activeItem, onSelect, user, logo, brand }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
-
-  const expanded = pinned || hovered;
-
-  // Notificar al shell el ancho actual
-  useEffect(() => {
-    const width = expanded ? 'var(--sidebar-width-expanded)' : 'var(--sidebar-width-rail)';
-    document.documentElement.style.setProperty('--sidebar-current-width', width);
-  }, [expanded]);
-
-  const togglePin = useCallback(() => {
-    setPinned((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(PINNED_KEY, String(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
-  }, []);
 
   const toggleGroup = useCallback((groupId: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
@@ -95,44 +60,31 @@ export function Sidebar({
         </li>
       ));
 
-  const sidebarClass = ['sidebar', expanded ? 'expanded' : '', mobileOpen ? 'mobile-open' : '']
-    .filter(Boolean)
-    .join(' ');
-
   return (
     <>
-      {/* Overlay móvil */}
       <div
         className={`sidebar-overlay${mobileOpen ? ' visible' : ''}`}
         onClick={() => setMobileOpen(false)}
         aria-hidden="true"
       />
 
-      <aside
-        className={sidebarClass}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-      >
-        {/* Header */}
+      <aside className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
+        {/* Header: logo + marca */}
         <div className="sidebar-header">
-          <button
-            className="sidebar-logo-btn"
-            onClick={togglePin}
-            title={pinned ? 'Colapsar sidebar' : 'Fijar sidebar'}
-            aria-label={pinned ? 'Colapsar sidebar' : 'Fijar sidebar'}
-          >
-            {logo ?? 'S'}
-          </button>
+          <span className="sidebar-logo">{logo ?? 'S'}</span>
+          {brand && (
+            <span className="sidebar-brand">
+              <span className="sidebar-brand-title">{brand.title}</span>
+              {brand.subtitle && <span className="sidebar-brand-sub">{brand.subtitle}</span>}
+            </span>
+          )}
         </div>
 
         {/* Nav */}
         <nav className="sidebar-nav">
           {groups && groups.length > 0 ? (
             <>
-              {/* Items sin grupo (ej: Dashboard) */}
               <ul className="sidebar-group-items">{renderItems(undefined)}</ul>
-
-              {/* Grupos */}
               {groups.map((group) => {
                 const isCollapsed = !!collapsedGroups[group.id];
                 return (
@@ -157,57 +109,18 @@ export function Sidebar({
           )}
         </nav>
 
-        {/* Footer */}
-        <div className="sidebar-footer">
-          {statusBadge}
-          {user && (
-            <button
-              className="sidebar-item"
-              disabled
-              style={{ cursor: 'default', opacity: 0.7 }}
-              title={user.email}
-            >
-              <span className="sidebar-item-icon" aria-hidden="true">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <circle cx="12" cy="8" r="4" />
-                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-                </svg>
+        {/* Footer: bloque de usuario */}
+        {user && (
+          <div className="sidebar-footer">
+            <div className="sidebar-user" data-testid="sidebar-user">
+              <span className="sidebar-avatar">{initials(user.name)}</span>
+              <span className="sidebar-user-text">
+                <span className="sidebar-user-name">{user.name}</span>
+                {user.subtitle && <span className="sidebar-user-sub">{user.subtitle}</span>}
               </span>
-              <span className="sidebar-item-label">{user.name || user.email}</span>
-            </button>
-          )}
-          {onLogout && (
-            <button
-              className="sidebar-item"
-              onClick={onLogout}
-              title="Cerrar sesión"
-              data-testid="logout"
-            >
-              <span className="sidebar-item-icon" aria-hidden="true">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-              </span>
-              <span className="sidebar-item-label">Cerrar sesión</span>
-            </button>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </aside>
     </>
   );

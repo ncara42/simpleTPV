@@ -56,21 +56,36 @@ const NAV: NavItem[] = [
   { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'ventas' },
 ];
 
+const TAB_LABELS: Record<Tab, string> = {
+  dashboard: 'Dashboard',
+  catalog: 'Catálogo',
+  families: 'Familias',
+  stock: 'Stock',
+  users: 'Usuarios',
+  stores: 'Tiendas',
+  sales: 'Ventas',
+  purchases: 'Compras',
+  verifactu: 'VeriFactu',
+};
+
 function Home() {
   const logout = useAuthStore((s) => s.clear);
   const [tab, setTab] = useState<Tab>('dashboard');
 
   return (
     <div className="app-shell">
-      <Sidebar
-        items={NAV}
-        groups={GROUPS}
-        activeItem={tab}
-        onSelect={(id) => setTab(id as Tab)}
-        onLogout={logout}
-      />
+      <Sidebar items={NAV} groups={GROUPS} activeItem={tab} onSelect={(id) => setTab(id as Tab)} />
       <div className="app-content">
-        <main className="p-6">
+        <header className="bo-topbar">
+          <div>
+            <p className="bo-topbar-eyebrow">Administración</p>
+            <h1 className="bo-topbar-title">{TAB_LABELS[tab]}</h1>
+          </div>
+          <button type="button" className="bo-topbar-logout" onClick={logout} data-testid="logout">
+            Salir
+          </button>
+        </header>
+        <main className="bo-main">
           {tab === 'dashboard' && <DashboardPage />}
           {tab === 'catalog' && <CatalogPage />}
           {tab === 'families' && <FamiliesPage />}

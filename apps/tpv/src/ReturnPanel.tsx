@@ -2,6 +2,7 @@ import { ApiError, type Return, type Sale } from '@simpletpv/auth';
 import { Button } from '@simpletpv/ui';
 import { useState } from 'react';
 
+import { BlindReturnPanel } from './BlindReturnPanel.js';
 import { createReturn, listReturns } from './lib/returns.js';
 import { findSaleByTicket } from './lib/sales.js';
 
@@ -228,6 +229,89 @@ export function ReturnPanel() {
             </p>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+// Vista de Devolución calcada al mockup: toggle + buscador + estado vacío.
+export function ReturnsView() {
+  const [mode, setMode] = useState<'ticket' | 'blind'>('ticket');
+  const [query, setQuery] = useState('');
+
+  return (
+    <div className="return-view" data-testid="return-view">
+      <div className="return-view-head">
+        <h2 className="return-view-title">Devolución</h2>
+        <p className="return-view-sub">Reintegro con o sin ticket</p>
+      </div>
+
+      <div className="return-toggle">
+        <button
+          className={`return-toggle-btn${mode === 'ticket' ? ' active' : ''}`}
+          onClick={() => setMode('ticket')}
+          data-testid="return-mode-ticket"
+        >
+          Con ticket
+        </button>
+        <button
+          className={`return-toggle-btn${mode === 'blind' ? ' active' : ''}`}
+          onClick={() => setMode('blind')}
+          data-testid="return-mode-blind"
+        >
+          Sin ticket
+        </button>
+      </div>
+
+      {mode === 'ticket' ? (
+        <>
+          <div className="return-view-search">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+            <input
+              className="return-view-input"
+              placeholder="Nº de ticket, fecha o producto…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              data-testid="return-ticket-search"
+            />
+          </div>
+          <div className="return-empty" data-testid="return-empty">
+            <span className="return-empty-icon" aria-hidden="true">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 12a9 9 0 1 1-6.2-8.6" />
+                <path d="M21 3v6h-6" />
+              </svg>
+            </span>
+            <p className="return-empty-title">Busca el ticket original</p>
+            <p className="return-empty-text">
+              Escanea el QR del ticket o introduce su número para empezar la devolución.
+            </p>
+          </div>
+        </>
+      ) : (
+        <BlindReturnPanel />
       )}
     </div>
   );

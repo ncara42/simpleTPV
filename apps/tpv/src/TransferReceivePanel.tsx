@@ -14,8 +14,7 @@ interface LineInput {
 export function TransferReceivePanel() {
   const qc = useQueryClient();
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
-  const [storeId, setStoreId] = useState<string | null>(null);
-  const activeStore = storeId ?? stores[0]?.id ?? null;
+  const activeStore = stores[0]?.id ?? null;
 
   const [selected, setSelected] = useState<Transfer | null>(null);
   const [lines, setLines] = useState<Record<string, LineInput>>({});
@@ -179,65 +178,77 @@ export function TransferReceivePanel() {
     );
   }
 
+  // Formatea createdAt/sentAt como "31/05 08:30". Usa la hora UTC para mostrar
+  // las marcas demo tal cual (sin desfase por la zona local del navegador).
+  function fmt(iso: string | null): string {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const hh = String(d.getUTCHours()).padStart(2, '0');
+    const min = String(d.getUTCMinutes()).padStart(2, '0');
+    return `${dd}/${mm} ${hh}:${min}`;
+  }
+
   return (
-    <div className="mx-auto max-w-xl space-y-4" data-testid="transfer-receive">
-      {stores.length > 1 && (
-        <div className="flex items-center gap-2 text-sm">
-          <label className="text-neutral-500 font-medium shrink-0">Tienda</label>
-          <select
-            value={activeStore ?? ''}
-            onChange={(e) => setStoreId(e.target.value)}
-            data-testid="transfer-store-select"
-            className="h-8 flex-1 rounded-md border border-[var(--ui-border)] bg-white px-2 text-sm outline-none focus:border-neutral-400"
-          >
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+    <div className="transfer-view" data-testid="transfer-receive">
+      <div className="transfer-view-head">
+        <h2 className="transfer-view-title">Recepción de traspasos</h2>
+        <p className="transfer-view-sub">Mercancía enviada desde central</p>
+      </div>
 
       {isLoading ? (
         <p className="py-8 text-center text-sm text-neutral-400">Cargando…</p>
       ) : transfers.length === 0 ? (
-        <div
-          className="rounded-xl border border-[var(--ui-border)] bg-white px-6 py-10 text-center"
-          data-testid="transfer-empty"
-        >
+        <div className="transfer-empty" data-testid="transfer-empty">
           <p className="text-sm text-neutral-400">No hay traspasos pendientes de recibir.</p>
         </div>
       ) : (
-        <ul
-          className="divide-y divide-[var(--ui-border)] rounded-xl border border-[var(--ui-border)] bg-white"
-          data-testid="transfer-list"
-        >
-          {transfers.map((t) => (
-            <li
-              key={t.id}
-              className="flex items-center justify-between px-4 py-3.5"
-              data-testid="transfer-item"
-            >
-              <div>
-                <p className="text-sm font-medium text-neutral-900">
-                  {t.lines.length} {t.lines.length === 1 ? 'línea' : 'líneas'}
-                </p>
-                <p className="text-xs text-neutral-400">
-                  Enviado: {t.sentAt ? new Date(t.sentAt).toLocaleString('es-ES') : '—'}
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => openTransfer(t)}
-                data-testid="transfer-open"
-              >
-                Recibir
-              </Button>
-            </li>
-          ))}
-        </ul>
+        <table className="transfer-table" data-testid="transfer-list">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Origen</th>
+              <th className="num">Líneas</th>
+              <th>Estado</th>
+              <th aria-label="Acción" />
+            </tr>
+          </thead>
+          <tbody>
+            {transfers.map((t) => {
+              const received = t.status === 'RECEIVED';
+              return (
+                <tr key={t.id} data-testid="transfer-item">
+                  <td>{fmt(t.sentAt ?? t.createdAt)}</td>
+                  <td>Central</td>
+                  <td className="num">{t.lines.length}</td>
+                  <td>
+                    {received ? (
+                      <span className="transfer-badge received" data-testid="transfer-status">
+                        <span className="cash-dot" /> Recibido
+                      </span>
+                    ) : (
+                      <span className="transfer-badge pending" data-testid="transfer-status">
+                        Pendiente
+                      </span>
+                    )}
+                  </td>
+                  <td className="action">
+                    {!received && (
+                      <button
+                        className="transfer-receive-link"
+                        onClick={() => openTransfer(t)}
+                        data-testid="transfer-open"
+                      >
+                        Recibir
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       )}
     </div>
   );
