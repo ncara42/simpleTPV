@@ -9,6 +9,7 @@ import {
   DEMO_STORE_ID,
 } from './demo/demoData.js';
 import { closeCashSession, currentCashSession, openCashSession } from './lib/cash.js';
+import { eur } from './lib/format.js';
 
 export function CashPanel({ storeId }: { storeId: string | null }) {
   const queryClient = useQueryClient();
@@ -132,14 +133,14 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
           <div className="cash-stat">
             <span className="cash-stat-label">Apertura</span>
             <span className="cash-stat-value" data-testid="cash-opening">
-              {opening.toFixed(2)} €
+              {eur(opening)} €
             </span>
           </div>
           <span className="cash-div" />
           <div className="cash-stat">
             <span className="cash-stat-label">Esperado en caja</span>
             <span className="cash-stat-value" data-testid="cash-expected-bar">
-              {Number(session.expectedAmount ?? 0).toFixed(2)} €
+              {eur(Number(session.expectedAmount ?? 0))} €
             </span>
           </div>
           <span className="cash-spacer" />
@@ -290,15 +291,15 @@ export function CashView() {
         <dl className="cash-card-rows">
           <div className="cash-card-row">
             <dt>Apertura</dt>
-            <dd>{DEMO_CASH_OPENING.toFixed(2)} €</dd>
+            <dd>{eur(DEMO_CASH_OPENING)} €</dd>
           </div>
           <div className="cash-card-row">
             <dt>Ventas efectivo</dt>
-            <dd>+ {DEMO_CASH_SALES.toFixed(2)} €</dd>
+            <dd>+ {eur(DEMO_CASH_SALES)} €</dd>
           </div>
           <div className="cash-card-row">
             <dt>Esperado en caja</dt>
-            <dd>{DEMO_CASH_EXPECTED.toFixed(2)} €</dd>
+            <dd>{eur(DEMO_CASH_EXPECTED)} €</dd>
           </div>
         </dl>
         <button

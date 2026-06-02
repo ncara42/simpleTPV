@@ -8,6 +8,7 @@ import { api } from './lib/auth.js';
 import { useCart } from './lib/cart.js';
 import { currentCashSession } from './lib/cash.js';
 import { findByBarcode, listFamilies, type Product, searchProducts } from './lib/catalog.js';
+import { eur } from './lib/format.js';
 import { useHealthCheck } from './lib/health.js';
 import { listStores } from './lib/sales.js';
 import { getProductStock, getStoreStock, type StockRow } from './lib/stock.js';
@@ -211,7 +212,7 @@ export function SalePage() {
             {scanned.product ? (
               <span>
                 Escaneado: <strong>{scanned.product.name}</strong> ·{' '}
-                {Number(scanned.product.salePrice).toFixed(2)} €
+                {eur(Number(scanned.product.salePrice))} €
               </span>
             ) : (
               <span className="scan-miss">
@@ -243,7 +244,7 @@ export function SalePage() {
                 >
                   <span className="prod-name">{p.name}</span>
                   <span className="prod-meta">
-                    <span className="prod-price">{Number(p.salePrice).toFixed(2)} €</span>
+                    <span className="prod-price">{eur(Number(p.salePrice))} €</span>
                     {/* Stock vivo (#34): cantidad + semáforo. Click abre el detalle
                         sin añadir al carrito (stopPropagation). */}
                     {stock ? (

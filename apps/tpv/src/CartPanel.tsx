@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import { useAuthStore } from './lib/auth.js';
 import { useCart } from './lib/cart.js';
+import { eur } from './lib/format.js';
 import { createSale, getTicket, voidSale } from './lib/sales.js';
 import { type PaymentData, PaymentModal } from './PaymentModal.js';
 import { TicketView } from './TicketView.js';
@@ -237,15 +238,13 @@ export function CartPanel({
                       <span className="block truncate text-sm font-medium text-neutral-900">
                         {i.name}
                       </span>
-                      <span className="text-xs text-neutral-400">
-                        {i.unitPrice.toFixed(2)} € / ud
-                      </span>
+                      <span className="text-xs text-neutral-400">{eur(i.unitPrice)} € / ud</span>
                     </div>
                     <span
                       className="shrink-0 text-sm font-semibold tabular-nums text-neutral-900"
                       data-testid="cart-line-total"
                     >
-                      {net.toFixed(2)} €
+                      {eur(net)} €
                     </span>
                   </div>
                   <div className="mt-2 flex items-center gap-1.5">
@@ -277,13 +276,13 @@ export function CartPanel({
         <div className="flex justify-between text-sm text-neutral-500">
           <span>Base imponible</span>
           <span className="tabular-nums" data-testid="cart-base">
-            {base.toFixed(2)} €
+            {eur(base)} €
           </span>
         </div>
         <div className="flex justify-between text-sm text-neutral-500">
           <span>IVA (21%)</span>
           <span className="tabular-nums" data-testid="cart-iva">
-            {iva.toFixed(2)} €
+            {eur(iva)} €
           </span>
         </div>
         <div className="flex items-baseline justify-between pt-1">
@@ -292,7 +291,7 @@ export function CartPanel({
             className="text-2xl font-bold tracking-tight tabular-nums text-neutral-900"
             data-testid="cart-total"
           >
-            {total.toFixed(2)} €
+            {eur(total)} €
           </span>
         </div>
 
@@ -303,7 +302,7 @@ export function CartPanel({
           disabled={!canCheckout}
           data-testid="cart-checkout"
         >
-          {items.length > 0 ? `Cobrar · ${total.toFixed(2)} €` : 'Cobrar'}
+          {items.length > 0 ? `Cobrar · ${eur(total)} €` : 'Cobrar'}
         </Button>
 
         {!cashOpen && items.length > 0 && (
