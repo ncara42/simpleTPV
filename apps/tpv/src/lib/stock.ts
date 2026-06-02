@@ -1,17 +1,24 @@
 import type { StockByProductRow, StockRow } from '@simpletpv/auth';
 
-import { api } from './auth.js';
+import { DEMO_STOCK_ROWS, DEMO_STORE_ID, DEMO_STORE_LABEL } from '../demo/demoData.js';
 
 export type { StockByProductRow, StockRow };
 
-// Stock de todos los productos de una tienda (#34). El TPV lo usa para mostrar
-// la cantidad y el nivel (semáforo) en cada tarjeta de producto de la venta.
-export function getStoreStock(storeId: string): Promise<StockRow[]> {
-  return api.get<StockRow[]>('/stock', { storeId });
+export function getStoreStock(_storeId: string): Promise<StockRow[]> {
+  return Promise.resolve(DEMO_STOCK_ROWS);
 }
 
-// Stock de un producto en todas las tiendas del tenant. Para la consulta puntual
-// desde la venta (modal de detalle de un producto).
 export function getProductStock(productId: string): Promise<StockByProductRow[]> {
-  return api.get<StockByProductRow[]>(`/stock/product/${productId}`);
+  const row = DEMO_STOCK_ROWS.find((r) => r.productId === productId);
+  if (!row) return Promise.resolve([]);
+  return Promise.resolve([
+    {
+      productId,
+      storeId: DEMO_STORE_ID,
+      storeName: DEMO_STORE_LABEL,
+      quantity: row.quantity,
+      minStock: row.minStock,
+      level: row.level,
+    },
+  ]);
 }

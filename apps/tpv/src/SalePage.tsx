@@ -1,12 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { CartPanel } from './CartPanel.js';
 import { CashPanel } from './CashPanel.js';
+import { DEMO_FAMILY_COUNTS, DEMO_TOTAL_COUNT } from './demo/demoData.js';
 import { api } from './lib/auth.js';
 import { useCart } from './lib/cart.js';
 import { currentCashSession } from './lib/cash.js';
 import { findByBarcode, listFamilies, type Product, searchProducts } from './lib/catalog.js';
+import { eur } from './lib/format.js';
 import { useHealthCheck } from './lib/health.js';
 import { listStores } from './lib/sales.js';
 import { getProductStock, getStoreStock, type StockRow } from './lib/stock.js';
@@ -16,6 +18,7 @@ import { useDebounce } from './lib/useDebounce.js';
 export function SalePage() {
   const [search, setSearch] = useState('');
   const [familyId, setFamilyId] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [scanned, setScanned] = useState<{ product: Product | null; code: string } | null>(null);
   const [stockDetail, setStockDetail] = useState<Product | null>(null);
   const debouncedSearch = useDebounce(search, 200);
@@ -50,6 +53,9 @@ export function SalePage() {
     queryFn: () => searchProducts(debouncedSearch, familyId),
   });
 
+  // Contadores de los chips (modo demo): el total y el número por familia son
+  // fijos para calcar el mockup (DEMO_TOTAL_COUNT / DEMO_FAMILY_COUNTS).
+
   // Stock de la tienda activa: para mostrar la cantidad/nivel en cada tarjeta.
   const { data: stockRows = [] } = useQuery({
     queryKey: ['store-stock', activeStore],
@@ -74,6 +80,19 @@ export function SalePage() {
     });
     return unsubscribe;
   }, [qc, activeStore]);
+
+  // Atajo F3: enfoca el buscador para teclear o escanear un código. Replica el
+  // botón "Escanear · F3" del buscador (el escáner USB físico se escucha aparte).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'F3') {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Escáner USB: al leer un código, busca el producto, lo destaca y lo añade al carrito.
   useBarcodeScanner((code) => {
@@ -117,14 +136,54 @@ export function SalePage() {
         <CashPanel storeId={activeStore} />
 
         <div className="sale-search-row">
-          <input
-            className="sale-search"
-            placeholder="Buscar producto…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            data-testid="sale-search"
-            autoFocus
-          />
+          <div className="sale-search-wrap">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+            <input
+              ref={searchRef}
+              className="sale-search"
+              placeholder="Buscar producto por nombre o SKU…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              data-testid="sale-search"
+              autoFocus
+            />
+            <button
+              type="button"
+              className="scan-btn"
+              onClick={() => searchRef.current?.focus()}
+              data-testid="scan-btn"
+              title="Escanear un código de barras (F3)"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" />
+                <path d="M7 8v8M10.5 8v8M14 8v8M17 8v8" strokeWidth="1.6" />
+              </svg>
+              Escanear <span className="kbd">F3</span>
+            </button>
+          </div>
         </div>
 
         <div className="sale-families" data-testid="sale-families">
@@ -133,17 +192,17 @@ export function SalePage() {
             onClick={() => setFamilyId(null)}
             data-testid="fam-chip-all"
           >
-            Todas
+            Todas <span className="chip-count">{DEMO_TOTAL_COUNT}</span>
           </button>
           {families.map((f) => (
             <button
               key={f.id}
               className={`fam-chip ${familyId === f.id ? 'active' : ''}`}
-              style={f.color ? { borderColor: f.color } : undefined}
               onClick={() => setFamilyId(f.id)}
               data-testid="fam-chip"
             >
-              {f.name}
+              <span className="chip-dot" style={{ background: f.color ?? 'var(--ui-text-soft)' }} />
+              {f.name} <span className="chip-count">{DEMO_FAMILY_COUNTS[f.id] ?? 0}</span>
             </button>
           ))}
         </div>
@@ -153,7 +212,7 @@ export function SalePage() {
             {scanned.product ? (
               <span>
                 Escaneado: <strong>{scanned.product.name}</strong> ·{' '}
-                {Number(scanned.product.salePrice).toFixed(2)} €
+                {eur(Number(scanned.product.salePrice))} €
               </span>
             ) : (
               <span className="scan-miss">
@@ -185,23 +244,29 @@ export function SalePage() {
                 >
                   <span className="prod-name">{p.name}</span>
                   <span className="prod-meta">
-                    <span className="prod-price">{Number(p.salePrice).toFixed(2)} €</span>
+                    <span className="prod-price">{eur(Number(p.salePrice))} €</span>
                     {/* Stock vivo (#34): cantidad + semáforo. Click abre el detalle
                         sin añadir al carrito (stopPropagation). */}
                     {stock ? (
-                      <span
-                        className={`prod-stock stock-${stock.level}`}
-                        data-testid="prod-stock"
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setStockDetail(p);
-                        }}
-                        title="Ver stock por tienda"
-                      >
-                        {stock.quantity}
-                      </span>
+                      stock.quantity === 0 ? (
+                        <span className="prod-stock sold-out" data-testid="prod-stock">
+                          Agotado
+                        </span>
+                      ) : (
+                        <span
+                          className={`prod-stock stock-${stock.level}`}
+                          data-testid="prod-stock"
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setStockDetail(p);
+                          }}
+                          title="Ver stock por tienda"
+                        >
+                          {stock.quantity}
+                        </span>
+                      )
                     ) : (
                       <span className="prod-stock neutral" data-testid="prod-stock">
                         —
