@@ -89,6 +89,64 @@
   background: var(--ui-surface-subtle);
   color: var(--ui-text-muted);
 }
+
+/* ─── Stock: badges por tienda ─── */
+.stock-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.store-stock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  border: none;
+  cursor: pointer;
+}
+.subtab-badge {
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+}
+
+/* ─── Compras: estado vacío ─── */
+.purchases-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  padding: 3rem 1.5rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: var(--ui-surface);
+}
+.purchases-empty-icon {
+  color: var(--ui-text-soft);
+  margin-bottom: 0.25rem;
+}
+.purchases-empty-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ui-text);
+}
+.purchases-empty-text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ui-text-muted);
+  max-width: 28rem;
+}
 .catalog-head {
   display: flex;
   align-items: center;

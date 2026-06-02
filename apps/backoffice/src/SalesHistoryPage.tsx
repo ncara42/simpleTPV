@@ -39,7 +39,10 @@ export function SalesHistoryPage() {
   return (
     <section className="catalog">
       <header className="catalog-head">
-        <h2>Ventas del día</h2>
+        <div>
+          <h2>Ventas</h2>
+          <p className="catalog-sub">Historial de tickets · hoy</p>
+        </div>
         <div className="catalog-actions">
           <select
             className="catalog-search"
@@ -80,11 +83,12 @@ export function SalesHistoryPage() {
         <table className="catalog-table" data-testid="sales-table">
           <thead>
             <tr>
-              <th>Nº ticket</th>
+              <th>Ticket</th>
+              <th>Tienda</th>
+              <th>Líneas</th>
+              <th>Pago</th>
+              <th>Total</th>
               <th>Hora</th>
-              <th>Importe</th>
-              <th>Método</th>
-              <th>Estado</th>
             </tr>
           </thead>
           <tbody>
@@ -94,23 +98,21 @@ export function SalesHistoryPage() {
                 className={sale.status === 'VOIDED' ? 'sale-voided' : undefined}
                 data-testid="sales-row"
               >
-                <td>{sale.ticketNumber}</td>
-                <td className="muted">{hour.format(new Date(sale.createdAt))}</td>
-                <td>{eur.format(Number(sale.total))}</td>
-                <td className="muted">{PAYMENT_LABEL[sale.paymentMethod] ?? sale.paymentMethod}</td>
                 <td>
-                  {sale.status === 'VOIDED' ? (
-                    <span className="sale-tag-voided">Anulada</span>
-                  ) : (
-                    <span className="muted">Completada</span>
-                  )}
+                  {sale.ticketNumber}
+                  {sale.status === 'VOIDED' && <span className="sale-tag-voided">Anulada</span>}
                 </td>
+                <td className="muted">{(sale as { storeName?: string }).storeName ?? '—'}</td>
+                <td>{(sale as { lines?: number }).lines ?? '—'}</td>
+                <td className="muted">{PAYMENT_LABEL[sale.paymentMethod] ?? sale.paymentMethod}</td>
+                <td>{eur.format(Number(sale.total))}</td>
+                <td className="muted">{hour.format(new Date(sale.createdAt))}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr data-testid="sales-totals">
-              <td colSpan={2}>{data.totals.count} tickets</td>
+              <td colSpan={3}>{data.totals.count} tickets</td>
               <td colSpan={3}>Total del día: {eur.format(Number(data.totals.totalAmount))}</td>
             </tr>
           </tfoot>
