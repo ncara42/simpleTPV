@@ -1,4 +1,11 @@
-import { api } from './auth.js';
+import {
+  DEMO_MARGIN_KPIS,
+  DEMO_RANKINGS,
+  DEMO_SALES_BY_FAMILY,
+  DEMO_SALES_KPIS,
+  DEMO_SALES_TODAY,
+  DEMO_STOCKOUT_KPIS,
+} from '../demo/demoData.js';
 
 // Tipos espejo de las respuestas de la API de dashboards (#70). Se definen aquí
 // (no en @simpletpv/auth) porque solo los consume el backoffice.
@@ -55,41 +62,36 @@ export interface ProductRankings {
   worstRotation: Array<{ productId: string; name: string; units: number }>;
 }
 
-// Query común: periodo + tienda opcional. La API acepta también from/to (custom),
-// no expuestos en la UI del MVP.
-function periodQuery(
-  period: DashboardPeriod,
-  storeId?: string,
-): Record<string, string | undefined> {
-  return { period, storeId: storeId || undefined };
-}
-
-export function getSalesToday(storeId?: string): Promise<SalesTodayResponse> {
-  return api.get<SalesTodayResponse>('/dashboard/sales-today', { storeId: storeId || undefined });
+// Modo demo: las funciones devuelven datos hardcodeados calcados a los mockups.
+export function getSalesToday(_storeId?: string): Promise<SalesTodayResponse> {
+  return Promise.resolve(DEMO_SALES_TODAY);
 }
 
 export function getSalesByFamily(
-  period: DashboardPeriod,
-  storeId?: string,
+  _period: DashboardPeriod,
+  _storeId?: string,
 ): Promise<FamilySales[]> {
-  return api.get<FamilySales[]>('/dashboard/sales-by-family', periodQuery(period, storeId));
+  return Promise.resolve(DEMO_SALES_BY_FAMILY);
 }
 
-export function getSalesKpis(period: DashboardPeriod, storeId?: string): Promise<SalesKpis> {
-  return api.get<SalesKpis>('/dashboard/sales-kpis', periodQuery(period, storeId));
+export function getSalesKpis(_period: DashboardPeriod, _storeId?: string): Promise<SalesKpis> {
+  return Promise.resolve(DEMO_SALES_KPIS);
 }
 
-export function getMarginKpis(period: DashboardPeriod, storeId?: string): Promise<MarginKpis> {
-  return api.get<MarginKpis>('/dashboard/margin-kpis', periodQuery(period, storeId));
+export function getMarginKpis(_period: DashboardPeriod, _storeId?: string): Promise<MarginKpis> {
+  return Promise.resolve(DEMO_MARGIN_KPIS);
 }
 
-export function getStockoutKpis(period: DashboardPeriod, storeId?: string): Promise<StockoutKpis> {
-  return api.get<StockoutKpis>('/dashboard/stockout-kpis', periodQuery(period, storeId));
+export function getStockoutKpis(
+  _period: DashboardPeriod,
+  _storeId?: string,
+): Promise<StockoutKpis> {
+  return Promise.resolve(DEMO_STOCKOUT_KPIS);
 }
 
 export function getProductRankings(
-  period: DashboardPeriod,
-  storeId?: string,
+  _period: DashboardPeriod,
+  _storeId?: string,
 ): Promise<ProductRankings> {
-  return api.get<ProductRankings>('/dashboard/product-rankings', periodQuery(period, storeId));
+  return Promise.resolve(DEMO_RANKINGS);
 }
