@@ -36,7 +36,15 @@ function FamilyRow({
         data-testid="fam-row"
       >
         <span className="fam-name">
-          {depth > 0 && <span className="fam-bullet">└</span>} {node.name}
+          {depth > 0 && <span className="fam-bullet">└</span>}
+          <span
+            className="fam-color-dot"
+            style={{ background: node.color ?? 'var(--ui-text-soft)' }}
+          />
+          {node.name}
+        </span>
+        <span className="fam-count" data-testid="fam-count">
+          {(node as { productCount?: number }).productCount ?? 0} productos
         </span>
         <span className="fam-actions">
           <button onClick={() => onAddChild(node.id)}>+ Hija</button>
@@ -90,13 +98,16 @@ export function FamiliesPage() {
   return (
     <section className="catalog">
       <header className="catalog-head">
-        <h2>Familias</h2>
+        <div>
+          <h2>Familias</h2>
+          <p className="catalog-sub">Estructura de catálogo · 2 niveles</p>
+        </div>
         <button
           className="btn-primary"
           onClick={() => setForm({ name: '', parentId: null })}
           data-testid="new-family"
         >
-          Nueva familia raíz
+          Nueva familia
         </button>
       </header>
 

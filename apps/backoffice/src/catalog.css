@@ -2,6 +2,37 @@
   max-width: 60rem;
   margin: 0 auto;
 }
+
+.catalog-sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.88rem;
+  color: var(--ui-text-muted);
+}
+
+.fam-color-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+
+.fam-count {
+  color: var(--ui-text-muted);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.role-badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
 .catalog-head {
   display: flex;
   align-items: center;
@@ -169,10 +200,17 @@
 .fam-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid #f0efe9;
+  gap: 1rem;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--ui-border);
   font-size: 0.92rem;
+}
+.fam-name {
+  display: inline-flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
 }
 .fam-row:last-child {
   border-bottom: none;
