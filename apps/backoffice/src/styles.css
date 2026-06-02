@@ -10,8 +10,15 @@
 .app-content {
   margin-left: var(--sidebar-current-width);
   flex: 1;
+  display: flex;
+  flex-direction: column;
   background: var(--content-bg);
-  transition: margin-left 150ms ease;
+  min-width: 0;
+}
+
+.bo-main {
+  flex: 1;
+  padding: 1.5rem 2rem;
   min-width: 0;
 }
 
@@ -19,50 +26,4 @@
   .app-content {
     margin-left: 0;
   }
-}
-
-/* Cabecera del backoffice (rediseño pendiente; estilos mínimos para que el
-   logout quede accesible tras mover onLogout fuera del Sidebar). */
-.bo-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 76px;
-  padding: 0 1.5rem;
-  background: var(--ui-surface);
-  border-bottom: 1px solid var(--ui-border);
-}
-
-.bo-topbar-eyebrow {
-  margin: 0;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ui-text-soft);
-}
-
-.bo-topbar-title {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--ui-text);
-}
-
-.bo-topbar-logout {
-  height: 36px;
-  padding: 0 0.9rem;
-  border-radius: 9px;
-  border: 1px solid var(--ui-border-strong);
-  background: var(--ui-surface);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--ui-text);
-  cursor: pointer;
-  transition: background 0.12s;
-}
-
-.bo-topbar-logout:hover {
-  background: var(--ui-surface-subtle);
 }
