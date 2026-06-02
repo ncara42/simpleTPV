@@ -208,6 +208,7 @@ model SaleLine {
   returnLines  ReturnLine[]
 
   @@index([saleId])
+  @@index([organizationId, productId])
 }
 
 // Devolución parcial contra un ticket de venta (#15). Cada devolución agrupa
@@ -300,6 +301,7 @@ model StockMovement {
 
   @@index([organizationId, productId, createdAt])
   @@index([organizationId, storeId, createdAt])
+  @@index([organizationId, storeId, type, createdAt])
 }
 
 // Alerta de stock bajo/agotado de un producto en una tienda. Se genera/resuelve

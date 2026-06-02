@@ -8,6 +8,7 @@ import type {
 } from '@simpletpv/auth';
 
 import { DEMO_ALERTS, DEMO_STOCK_GLOBAL } from '../demo/demoData.js';
+import { api } from './auth.js';
 
 export type { StockAlert, StockGlobalRow, Transfer };
 
@@ -31,4 +32,15 @@ export function createTransfer(_input: CreateTransferInput): Promise<Transfer> {
 }
 export function sendTransfer(_id: string): Promise<Transfer> {
   return Promise.reject(new Error('no disponible en demo'));
+}
+
+export interface AdjustStockInput {
+  productId: string;
+  storeId: string;
+  newQuantity: number;
+  reason: string;
+}
+
+export function adjustStock(input: AdjustStockInput): Promise<unknown> {
+  return api.post('/stock/adjust', input);
 }

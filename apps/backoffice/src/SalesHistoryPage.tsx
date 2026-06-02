@@ -16,6 +16,36 @@ const hour = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digi
 
 const PAYMENT_LABEL: Record<string, string> = { CASH: 'Efectivo', CARD: 'Tarjeta' };
 
+function exportCsv(
+  items: Array<{
+    ticketNumber: string;
+    createdAt: string;
+    total: string | number;
+    paymentMethod: string;
+    status: string;
+  }>,
+  date: string,
+) {
+  const header = 'Nº ticket,Hora,Importe (€),Método,Estado';
+  const rows = items.map((s) =>
+    [
+      s.ticketNumber,
+      hour.format(new Date(s.createdAt)),
+      Number(s.total).toFixed(2),
+      PAYMENT_LABEL[s.paymentMethod] ?? s.paymentMethod,
+      s.status === 'VOIDED' ? 'Anulada' : 'Completada',
+    ].join(','),
+  );
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ventas_${date}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function SalesHistoryPage() {
   const [storeId, setStoreId] = useState('');
   const [date, setDate] = useState(today());
@@ -70,6 +100,11 @@ export function SalesHistoryPage() {
             }}
             data-testid="sales-date"
           />
+          {data && data.items.length > 0 && (
+            <button onClick={() => exportCsv(data.items, date)} data-testid="sales-export-csv">
+              Exportar CSV
+            </button>
+          )}
         </div>
       </header>
 

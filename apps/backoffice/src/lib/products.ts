@@ -1,6 +1,7 @@
 import type { Product, ProductInput } from '@simpletpv/auth';
 
 import { DEMO_PRODUCTS } from '../demo/demoData.js';
+import { api } from './auth.js';
 
 export type { Product, ProductInput };
 
@@ -40,4 +41,13 @@ export function updateProduct(id: string, input: Partial<ProductInput>): Promise
 }
 export function deleteProduct(_id: string): Promise<void> {
   return Promise.resolve();
+}
+
+export interface ImportResult {
+  inserted: number;
+  errors: Array<{ row: number; message: string }>;
+}
+
+export function importProductsCsv(csv: string): Promise<ImportResult> {
+  return api.post<ImportResult>('/products/import', { csv });
 }
