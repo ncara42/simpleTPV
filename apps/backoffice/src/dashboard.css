@@ -4,6 +4,221 @@
   margin-right: 0.5rem;
 }
 
+/* ─── VeriFactu: cards de estado + conector ─── */
+.vf-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.8rem;
+  margin-bottom: 0.8rem;
+}
+@media (max-width: 900px) {
+  .vf-cards {
+    grid-template-columns: 1fr;
+  }
+}
+.vf-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+}
+.vf-card-label {
+  font-size: 0.82rem;
+  color: var(--ui-text-muted);
+}
+.vf-card-value {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.vf-card-foot {
+  font-size: 0.8rem;
+  color: var(--ui-text-soft);
+}
+.vf-card-foot.vf-up {
+  color: var(--ui-success);
+}
+.vf-connector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.2rem 1.3rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+}
+.vf-connector-title {
+  margin: 0;
+  font-weight: 700;
+  color: var(--ui-text);
+}
+.vf-connector-sub {
+  margin: 0.1rem 0 0;
+  font-size: 0.85rem;
+  color: var(--ui-text-muted);
+}
+.vf-connector-status {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.vf-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* ─── Dashboard: lista de roturas de stock ─── */
+.dash-stockout-list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.dash-stockout-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.dash-stockout-name {
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.dash-stockout-store {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--ui-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.dash-stockout-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-top: 1px solid var(--ui-border);
+  margin-top: 0.7rem;
+  padding-top: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--ui-text-muted);
+}
+.dash-lost {
+  color: var(--ui-danger);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Dashboard: barras CSS (ventas hoy vs ayer) ─── */
+.dash-bars-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 0.5rem;
+  height: 200px;
+  padding: 0.5rem 0 0;
+}
+.dash-bars-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+  height: 100%;
+}
+.dash-bars-pair {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.25rem;
+  flex: 1;
+  width: 100%;
+}
+.dash-bar {
+  width: 22px;
+  border-radius: 4px 4px 0 0;
+  min-height: 2px;
+}
+.dash-bar-prev {
+  background: #d4d4cf;
+}
+.dash-bar-now {
+  background: var(--ui-brand, #0e7c6b);
+}
+.dash-bars-label {
+  font-size: 0.78rem;
+  color: var(--ui-text-muted);
+}
+.dash-bars-legend {
+  display: flex;
+  justify-content: center;
+  gap: 1.2rem;
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--ui-text-muted);
+}
+.dash-bars-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.dash-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+/* ─── Dashboard: barras CSS horizontales (ventas por familia) ─── */
+.dash-family-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.dash-family-list li {
+  display: grid;
+  grid-template-columns: 7rem 1fr auto;
+  align-items: center;
+  gap: 0.7rem;
+}
+.dash-family-name {
+  font-size: 0.85rem;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-family-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--ui-surface-subtle);
+  overflow: hidden;
+}
+.dash-family-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+.dash-family-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+
 .dash-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));

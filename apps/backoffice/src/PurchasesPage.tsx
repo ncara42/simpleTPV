@@ -29,6 +29,12 @@ export function PurchasesPage() {
   const [section, setSection] = useState<Section>('orders');
   return (
     <section className="catalog" data-testid="purchases-page">
+      <header className="catalog-head">
+        <div>
+          <h2>Compras</h2>
+          <p className="catalog-sub">Propuestas y pedidos a proveedor</p>
+        </div>
+      </header>
       <nav className="bo-tabs" data-testid="purchases-subtabs">
         <button
           className={`bo-tab ${section === 'orders' ? 'active' : ''}`}
@@ -172,9 +178,27 @@ function OrdersSection() {
   return (
     <>
       {orders.length === 0 ? (
-        <p className="catalog-empty" data-testid="orders-empty">
-          Sin pedidos. Crea uno desde la pestaña Propuesta.
-        </p>
+        <div className="purchases-empty" data-testid="orders-empty">
+          <span className="purchases-empty-icon" aria-hidden="true">
+            <svg
+              width="26"
+              height="26"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+              <path d="M3.27 6.96 12 12.01l8.73-5.05" />
+            </svg>
+          </span>
+          <p className="purchases-empty-title">Sin pedidos abiertos</p>
+          <p className="purchases-empty-text">
+            Genera una propuesta automática a partir de ventas, rotación y mínimos.
+          </p>
+        </div>
       ) : (
         <table className="catalog-table" data-testid="orders-table">
           <thead>

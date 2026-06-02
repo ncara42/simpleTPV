@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { DEMO_PRODUCT_STOCK, stockLevel } from './demo/demoData.js';
 import {
   createProduct,
   deleteProduct,
@@ -61,7 +62,12 @@ export function CatalogPage() {
   return (
     <section className="catalog">
       <header className="catalog-head">
-        <h2>Catálogo</h2>
+        <div>
+          <h2>Catálogo</h2>
+          <p className="catalog-sub" data-testid="catalog-count">
+            {products.length} productos activos
+          </p>
+        </div>
         <div className="catalog-actions">
           <input
             className="catalog-search"
@@ -94,6 +100,7 @@ export function CatalogPage() {
               <th>SKU</th>
               <th>Precio</th>
               <th>IVA</th>
+              <th>Stock</th>
               <th />
             </tr>
           </thead>
@@ -102,8 +109,21 @@ export function CatalogPage() {
               <tr key={p.id}>
                 <td>{p.name}</td>
                 <td className="muted">{p.sku ?? '—'}</td>
-                <td>{Number(p.salePrice).toFixed(2)} €</td>
+                <td>{Number(p.salePrice).toFixed(2).replace('.', ',')} €</td>
                 <td className="muted">{Number(p.taxRate).toFixed(0)}%</td>
+                <td>
+                  {(() => {
+                    const qty = DEMO_PRODUCT_STOCK[p.id] ?? 0;
+                    return (
+                      <span
+                        className={`stock-tag stock-${stockLevel(qty)}`}
+                        data-testid="catalog-stock"
+                      >
+                        {qty}
+                      </span>
+                    );
+                  })()}
+                </td>
                 <td className="row-actions">
                   <button
                     onClick={() =>

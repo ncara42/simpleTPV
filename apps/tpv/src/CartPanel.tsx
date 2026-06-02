@@ -1,11 +1,11 @@
 import { ApiError, type SaleTicket } from '@simpletpv/auth';
 import { Button } from '@simpletpv/ui';
-import { Printer, RotateCcw, Trash2, X } from 'lucide-react';
+import { Printer, RotateCcw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
-import { DiscountModal } from './DiscountModal.js';
 import { useAuthStore } from './lib/auth.js';
 import { useCart } from './lib/cart.js';
+import { eur } from './lib/format.js';
 import { createSale, getTicket, voidSale } from './lib/sales.js';
 import { type PaymentData, PaymentModal } from './PaymentModal.js';
 import { TicketView } from './TicketView.js';
@@ -21,21 +21,15 @@ export function CartPanel({
 }) {
   const items = useCart((s) => s.items);
   const setQty = useCart((s) => s.setQty);
-  const removeItem = useCart((s) => s.removeItem);
-  const setLineDiscount = useCart((s) => s.setLineDiscount);
-  const setTicketDiscount = useCart((s) => s.setTicketDiscount);
   const ticketDiscountPct = useCart((s) => s.ticketDiscountPct);
   const ticketDiscountAmt = useCart((s) => s.ticketDiscountAmt);
   const clear = useCart((s) => s.clear);
   const lineNet = useCart((s) => s.lineNet);
-  const subtotal = useCart((s) => s.subtotal());
-  const ticketDiscount = useCart((s) => s.ticketDiscount());
   const total = useCart((s) => s.total());
 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [discountOpen, setDiscountOpen] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [ticket, setTicket] = useState<SaleTicket | null>(null);
   const [ticketError, setTicketError] = useState<string | null>(null);
@@ -205,14 +199,26 @@ export function CartPanel({
     );
   }
 
+  // Desglose de IVA (21%) desde el total, calculado en cliente para el mockup.
+  const base = total > 0 ? total / 1.21 : 0;
+  const iva = total - base;
+
   return (
     <aside
       className="flex w-80 shrink-0 flex-col rounded-xl border border-[var(--ui-border)] bg-white shadow-sm"
       data-testid="cart"
     >
-      {/* Cabecera carrito */}
-      <div className="border-b border-[var(--ui-border)] px-4 py-3">
-        <h2 className="text-sm font-semibold text-neutral-900">Carrito</h2>
+      {/* Cabecera: Ticket actual + Vaciar */}
+      <div className="flex items-center justify-between border-b border-[var(--ui-border)] px-4 py-3">
+        <h2 className="text-sm font-semibold text-neutral-900">Ticket actual</h2>
+        <button
+          className="text-sm font-medium text-neutral-400 hover:text-neutral-700"
+          onClick={clear}
+          disabled={items.length === 0}
+          data-testid="cart-clear"
+        >
+          Vaciar
+        </button>
       </div>
 
       {/* Líneas */}
@@ -226,55 +232,38 @@ export function CartPanel({
             {items.map((i) => {
               const net = lineNet(i);
               return (
-                <li
-                  key={i.productId}
-                  className="flex items-center gap-2 py-2.5"
-                  data-testid="cart-line"
-                >
-                  <div className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-neutral-900">
-                      {i.name}
-                    </span>
-                    {i.discountPct > 0 && (
-                      <span
-                        className="text-xs font-semibold text-red-600"
-                        data-testid="cart-line-disc"
-                      >
-                        −{i.discountPct}%
+                <li key={i.productId} className="py-3" data-testid="cart-line">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-neutral-900">
+                        {i.name}
                       </span>
-                    )}
+                      <span className="text-xs text-neutral-400">{eur(i.unitPrice)} € / ud</span>
+                    </div>
+                    <span
+                      className="shrink-0 text-sm font-semibold tabular-nums text-neutral-900"
+                      data-testid="cart-line-total"
+                    >
+                      {eur(net)} €
+                    </span>
                   </div>
-                  <span className="flex items-center gap-1">
+                  <div className="mt-2 flex items-center gap-1.5">
                     <button
                       onClick={() => setQty(i.productId, i.qty - 1)}
                       aria-label="Quitar uno"
-                      className="flex h-6 w-6 items-center justify-center rounded border border-[var(--ui-border)] text-sm text-neutral-500 hover:bg-neutral-50"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--ui-border)] text-sm text-neutral-500 hover:bg-neutral-50"
                     >
                       −
                     </button>
-                    <span className="w-5 text-center text-sm tabular-nums">{i.qty}</span>
+                    <span className="w-6 text-center text-sm tabular-nums">{i.qty}</span>
                     <button
                       onClick={() => setQty(i.productId, i.qty + 1)}
                       aria-label="Añadir uno"
-                      className="flex h-6 w-6 items-center justify-center rounded border border-[var(--ui-border)] text-sm text-neutral-500 hover:bg-neutral-50"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--ui-border)] text-sm text-neutral-500 hover:bg-neutral-50"
                     >
                       +
                     </button>
-                  </span>
-                  <span
-                    className="w-14 text-right text-sm font-semibold tabular-nums text-neutral-900"
-                    data-testid="cart-line-total"
-                  >
-                    {net.toFixed(2)} €
-                  </span>
-                  <button
-                    onClick={() => removeItem(i.productId)}
-                    aria-label="Eliminar línea"
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-neutral-300 hover:bg-neutral-100 hover:text-neutral-600"
-                    data-testid="cart-line-remove"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+                  </div>
                 </li>
               );
             })}
@@ -282,39 +271,29 @@ export function CartPanel({
         )}
       </div>
 
-      {/* Pie */}
+      {/* Pie: base imponible + IVA + total + cobrar */}
       <div className="space-y-2 border-t border-[var(--ui-border)] p-4">
         <div className="flex justify-between text-sm text-neutral-500">
-          <span>Subtotal</span>
-          <span className="tabular-nums" data-testid="cart-subtotal">
-            {subtotal.toFixed(2)} €
+          <span>Base imponible</span>
+          <span className="tabular-nums" data-testid="cart-base">
+            {eur(base)} €
           </span>
         </div>
-        {ticketDiscount > 0 && (
-          <div className="flex justify-between text-sm font-semibold text-red-600">
-            <span>Descuento</span>
-            <span className="tabular-nums" data-testid="cart-ticket-discount">
-              −{ticketDiscount.toFixed(2)} €
-            </span>
-          </div>
-        )}
-        <div className="flex justify-between text-base font-bold text-neutral-900">
-          <span>Total</span>
-          <span className="tabular-nums" data-testid="cart-total">
-            {total.toFixed(2)} €
+        <div className="flex justify-between text-sm text-neutral-500">
+          <span>IVA (21%)</span>
+          <span className="tabular-nums" data-testid="cart-iva">
+            {eur(iva)} €
           </span>
         </div>
-
-        <Button
-          variant="secondary"
-          size="sm"
-          className="w-full"
-          onClick={() => setDiscountOpen(true)}
-          disabled={items.length === 0}
-          data-testid="cart-discount"
-        >
-          Aplicar descuento
-        </Button>
+        <div className="flex items-baseline justify-between pt-1">
+          <span className="text-base font-bold text-neutral-900">Total</span>
+          <span
+            className="text-2xl font-bold tracking-tight tabular-nums text-neutral-900"
+            data-testid="cart-total"
+          >
+            {eur(total)} €
+          </span>
+        </div>
 
         <Button
           size="lg"
@@ -323,7 +302,7 @@ export function CartPanel({
           disabled={!canCheckout}
           data-testid="cart-checkout"
         >
-          {items.length > 0 ? `Cobrar · ${total.toFixed(2)} €` : 'Cobrar'}
+          {items.length > 0 ? `Cobrar · ${eur(total)} €` : 'Cobrar'}
         </Button>
 
         {!cashOpen && items.length > 0 && (
@@ -355,20 +334,6 @@ export function CartPanel({
           onConfirm={onConfirmPayment}
           onCancel={() => setModalOpen(false)}
           busy={busy}
-        />
-      )}
-      {discountOpen && (
-        <DiscountModal
-          items={items}
-          onApplyLine={(productId, pct) => {
-            setLineDiscount(productId, pct);
-            setDiscountOpen(false);
-          }}
-          onApplyTicket={(d) => {
-            setTicketDiscount(d);
-            setDiscountOpen(false);
-          }}
-          onCancel={() => setDiscountOpen(false)}
         />
       )}
     </aside>

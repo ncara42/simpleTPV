@@ -1,8 +1,9 @@
 import '@simpletpv/ui/login.css';
+import '@simpletpv/ui/topbar.css';
 import './catalog.css';
 import './styles.css';
 
-import { LoginForm, type NavGroup, type NavItem, Sidebar } from '@simpletpv/ui';
+import { LoginForm, type NavGroup, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
 import {
   BarChart2,
   CheckSquare,
@@ -18,8 +19,10 @@ import { useState } from 'react';
 
 import { CatalogPage } from './CatalogPage.js';
 import { DashboardPage } from './DashboardPage.js';
+import { DEMO_USER } from './demo/demoData.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { api, useAuthStore } from './lib/auth.js';
+import { switchApp } from './lib/nav.js';
 import { PurchasesPage } from './PurchasesPage.js';
 import { SalesHistoryPage } from './SalesHistoryPage.js';
 import { StockPage } from './StockPage.js';
@@ -56,6 +59,18 @@ const NAV: NavItem[] = [
   { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'ventas' },
 ];
 
+const TAB_LABELS: Record<Tab, string> = {
+  dashboard: 'Dashboard',
+  catalog: 'Catálogo',
+  families: 'Familias',
+  stock: 'Stock',
+  users: 'Usuarios',
+  stores: 'Tiendas',
+  sales: 'Ventas',
+  purchases: 'Compras',
+  verifactu: 'VeriFactu',
+};
+
 function Home() {
   const logout = useAuthStore((s) => s.clear);
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -67,10 +82,18 @@ function Home() {
         groups={GROUPS}
         activeItem={tab}
         onSelect={(id) => setTab(id as Tab)}
-        onLogout={logout}
+        brand={{ title: 'SimpleTPV', subtitle: 'Backoffice' }}
+        user={{ name: DEMO_USER.name, subtitle: 'Central · Admin' }}
       />
       <div className="app-content">
-        <main className="p-6">
+        <TopBar
+          eyebrow="Administración"
+          title={TAB_LABELS[tab]}
+          activeApp="backoffice"
+          onSwitchApp={switchApp}
+          onLogout={logout}
+        />
+        <main className="bo-main">
           {tab === 'dashboard' && <DashboardPage />}
           {tab === 'catalog' && <CatalogPage />}
           {tab === 'families' && <FamiliesPage />}

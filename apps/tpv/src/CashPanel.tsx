@@ -2,7 +2,14 @@ import { ApiError, type CashSession } from '@simpletpv/auth';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import {
+  DEMO_CASH_EXPECTED,
+  DEMO_CASH_OPENING,
+  DEMO_CASH_SALES,
+  DEMO_STORE_ID,
+} from './demo/demoData.js';
 import { closeCashSession, currentCashSession, openCashSession } from './lib/cash.js';
+import { eur } from './lib/format.js';
 
 export function CashPanel({ storeId }: { storeId: string | null }) {
   const queryClient = useQueryClient();
@@ -65,49 +72,44 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
       difference > 0 ? 'text-green-700' : difference < 0 ? 'text-red-600' : 'text-neutral-600';
 
     return (
-      <section
-        className="rounded-lg border border-[var(--ui-border)] bg-white p-3.5"
-        data-testid="cash-panel"
-      >
-        <div className="flex items-center gap-2 mb-3">
-          <span
-            className="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600"
-            data-testid="cash-status"
+      <section className="cash-panel closed" data-testid="cash-panel">
+        <div className="cash-bar">
+          <div className="cash-status">
+            <span className="cash-dot" />
+            <span className="cash-badge" data-testid="cash-status">
+              Caja cerrada
+            </span>
+          </div>
+        </div>
+        <div className="cash-form" style={{ paddingTop: 0 }}>
+          <div className="cash-reconciliation" data-testid="cash-summary">
+            <div className="cash-recon-row">
+              <span style={{ color: 'var(--ui-text-muted)' }}>Esperado</span>
+              <span data-testid="cash-expected">{expected.toFixed(2)} €</span>
+            </div>
+            <div className="cash-recon-row">
+              <span style={{ color: 'var(--ui-text-muted)' }}>Contado</span>
+              <span data-testid="cash-counted-result">{counted.toFixed(2)} €</span>
+            </div>
+            <div
+              className={`cash-recon-row cash-diff ${diffColor === 'text-green-700' ? 'cash-diff-positive' : diffColor === 'text-red-600' ? 'cash-diff-negative' : 'cash-diff-zero'}`}
+            >
+              <span>Diferencia</span>
+              <span data-testid="cash-difference">
+                {difference > 0 ? '+' : ''}
+                {difference.toFixed(2)} €
+              </span>
+            </div>
+          </div>
+          <button
+            className="cash-btn-cancel"
+            onClick={() => setClosed(null)}
+            data-testid="cash-dismiss"
+            style={{ width: '100%' }}
           >
-            Caja cerrada
-          </span>
+            Aceptar
+          </button>
         </div>
-        <div
-          className="rounded-md border border-[var(--ui-border)] bg-[var(--ui-surface-subtle)] divide-y divide-[var(--ui-border)]"
-          data-testid="cash-summary"
-        >
-          <div className="flex justify-between px-3 py-2 text-sm">
-            <span className="text-neutral-500">Esperado</span>
-            <span className="tabular-nums font-medium" data-testid="cash-expected">
-              {expected.toFixed(2)} €
-            </span>
-          </div>
-          <div className="flex justify-between px-3 py-2 text-sm">
-            <span className="text-neutral-500">Contado</span>
-            <span className="tabular-nums font-medium" data-testid="cash-counted-result">
-              {counted.toFixed(2)} €
-            </span>
-          </div>
-          <div className={`flex justify-between px-3 py-2 text-sm font-bold ${diffColor}`}>
-            <span>Diferencia</span>
-            <span className="tabular-nums" data-testid="cash-difference">
-              {difference > 0 ? '+' : ''}
-              {difference.toFixed(2)} €
-            </span>
-          </div>
-        </div>
-        <button
-          className="mt-3 h-8 w-full rounded-md border border-[var(--ui-border)] bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
-          onClick={() => setClosed(null)}
-          data-testid="cash-dismiss"
-        >
-          Aceptar
-        </button>
       </section>
     );
   }
@@ -119,27 +121,32 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
     const hasCounted = countedAmount !== '' && !Number.isNaN(counted) && counted >= 0;
 
     return (
-      <section
-        className="rounded-lg border border-[var(--ui-border)] bg-white p-3.5"
-        data-testid="cash-panel"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700"
-              data-testid="cash-status"
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+      <section className="cash-panel" data-testid="cash-panel">
+        <div className="cash-bar">
+          <div className="cash-status">
+            <span className="cash-dot" />
+            <span className="cash-badge" data-testid="cash-status">
               Caja abierta
             </span>
-            <span className="text-xs tabular-nums text-neutral-500" data-testid="cash-opening">
-              Inicial: {opening.toFixed(2)} €
+          </div>
+          <span className="cash-div" />
+          <div className="cash-stat">
+            <span className="cash-stat-label">Apertura</span>
+            <span className="cash-stat-value" data-testid="cash-opening">
+              {eur(opening)} €
             </span>
           </div>
-
+          <span className="cash-div" />
+          <div className="cash-stat">
+            <span className="cash-stat-label">Esperado en caja</span>
+            <span className="cash-stat-value" data-testid="cash-expected-bar">
+              {eur(Number(session.expectedAmount ?? 0))} €
+            </span>
+          </div>
+          <span className="cash-spacer" />
           {!closing && (
             <button
-              className="h-7 rounded-md border border-red-200 bg-red-50 px-2.5 text-xs font-medium text-red-600 hover:bg-red-100 transition-colors"
+              className="cash-action"
               onClick={() => setClosing(true)}
               data-testid="cash-close"
             >
@@ -150,14 +157,14 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
 
         {closing && (
           <form
-            className="mt-3 flex items-end gap-2"
+            className="cash-form"
             onSubmit={(e) => {
               e.preventDefault();
               if (hasCounted) closeMutation.mutate(counted);
             }}
           >
-            <label className="flex-1 space-y-1">
-              <span className="text-xs font-medium text-neutral-500">Efectivo contado</span>
+            <label className="cash-field">
+              <span>Efectivo contado (€)</span>
               <input
                 type="number"
                 min="0"
@@ -166,33 +173,34 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
                 onChange={(e) => setCountedAmount(e.target.value)}
                 data-testid="cash-counted"
                 autoFocus
-                className="h-9 w-full rounded-md border border-[var(--ui-border)] bg-white px-3 text-sm tabular-nums outline-none focus:border-neutral-400"
               />
             </label>
-            <button
-              type="button"
-              className="h-9 rounded-md border border-[var(--ui-border)] bg-white px-3 text-sm font-medium text-neutral-600 hover:bg-neutral-50"
-              onClick={() => {
-                setClosing(false);
-                setCountedAmount('');
-                setError(null);
-              }}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={!hasCounted || closeMutation.isPending}
-              data-testid="cash-close-confirm"
-              className="h-9 rounded-md border border-red-200 bg-red-600 px-3 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {closeMutation.isPending ? 'Cerrando…' : 'Confirmar'}
-            </button>
+            <div className="cash-actions">
+              <button
+                type="button"
+                className="cash-btn-cancel"
+                onClick={() => {
+                  setClosing(false);
+                  setCountedAmount('');
+                  setError(null);
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={!hasCounted || closeMutation.isPending}
+                data-testid="cash-close-confirm"
+                className="cash-btn-close"
+              >
+                {closeMutation.isPending ? 'Cerrando…' : 'Confirmar cierre'}
+              </button>
+            </div>
           </form>
         )}
 
         {error && (
-          <p className="mt-2 text-xs text-red-600" data-testid="cash-error">
+          <p className="cash-error" data-testid="cash-error">
             {error}
           </p>
         )}
@@ -205,29 +213,25 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
   const hasOpening = openingAmount !== '' && !Number.isNaN(opening) && opening >= 0;
 
   return (
-    <section
-      className="rounded-lg border border-amber-200 bg-amber-50 p-3.5"
-      data-testid="cash-panel"
-    >
-      <div className="flex items-center justify-between">
-        <span
-          className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700"
-          data-testid="cash-status"
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-          Caja cerrada
-        </span>
-        <span className="text-xs text-amber-600">Abre la caja para cobrar</span>
+    <section className="cash-panel closed" data-testid="cash-panel">
+      <div className="cash-bar">
+        <div className="cash-status">
+          <span className="cash-dot" />
+          <span className="cash-badge" data-testid="cash-status">
+            Caja cerrada
+          </span>
+        </div>
+        <span className="cash-msg">Ábrela para empezar a cobrar este turno.</span>
       </div>
       <form
-        className="mt-3 flex items-end gap-2"
+        className="cash-form"
         onSubmit={(e) => {
           e.preventDefault();
           if (hasOpening) openMutation.mutate(opening);
         }}
       >
-        <label className="flex-1 space-y-1">
-          <span className="text-xs font-medium text-amber-700">Efectivo inicial</span>
+        <label className="cash-field">
+          <span>Efectivo inicial (€)</span>
           <input
             type="number"
             min="0"
@@ -235,23 +239,77 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
             value={openingAmount}
             onChange={(e) => setOpeningAmount(e.target.value)}
             data-testid="cash-opening-amount"
-            className="h-9 w-full rounded-md border border-amber-200 bg-white px-3 text-sm tabular-nums outline-none focus:border-amber-400"
           />
         </label>
-        <button
-          type="submit"
-          disabled={!hasOpening || openMutation.isPending}
-          data-testid="cash-open"
-          className="h-9 rounded-md border border-neutral-900 bg-neutral-900 px-4 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {openMutation.isPending ? 'Abriendo…' : 'Abrir caja'}
-        </button>
+        <div className="cash-actions">
+          <button
+            type="submit"
+            disabled={!hasOpening || openMutation.isPending}
+            data-testid="cash-open"
+            className="cash-btn-open"
+          >
+            {openMutation.isPending ? 'Abriendo…' : 'Abrir caja'}
+          </button>
+        </div>
       </form>
       {error && (
-        <p className="mt-2 text-xs text-red-600" data-testid="cash-error">
+        <p className="cash-error" data-testid="cash-error">
           {error}
         </p>
       )}
     </section>
+  );
+}
+
+// Vista de Caja calcada al mockup: tarjeta con estado + cifras + cerrar caja.
+export function CashView() {
+  const [closing, setClosing] = useState(false);
+
+  if (closing) {
+    // Reutiliza el panel-barra existente (incluye el formulario de cierre real).
+    return (
+      <div className="cash-view">
+        <CashPanel storeId={DEMO_STORE_ID} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="cash-view" data-testid="cash-view">
+      <div className="cash-view-head">
+        <h2 className="cash-view-title">Sesión de caja</h2>
+        <p className="cash-view-sub">Tienda Centro · turno de mañana</p>
+      </div>
+
+      <div className="cash-card">
+        <div className="cash-card-head">
+          <span className="cash-card-title">Estado</span>
+          <span className="cash-card-badge" data-testid="cash-state">
+            <span className="cash-dot" /> Abierta
+          </span>
+        </div>
+        <dl className="cash-card-rows">
+          <div className="cash-card-row">
+            <dt>Apertura</dt>
+            <dd>{eur(DEMO_CASH_OPENING)} €</dd>
+          </div>
+          <div className="cash-card-row">
+            <dt>Ventas efectivo</dt>
+            <dd>+ {eur(DEMO_CASH_SALES)} €</dd>
+          </div>
+          <div className="cash-card-row">
+            <dt>Esperado en caja</dt>
+            <dd>{eur(DEMO_CASH_EXPECTED)} €</dd>
+          </div>
+        </dl>
+        <button
+          className="cash-card-close"
+          onClick={() => setClosing(true)}
+          data-testid="cash-view-close"
+        >
+          Cerrar caja
+        </button>
+      </div>
+    </div>
   );
 }

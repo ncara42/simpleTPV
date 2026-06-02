@@ -49,6 +49,12 @@ export function StockPage() {
   const qc = useQueryClient();
   const [section, setSection] = useState<Section>('global');
 
+  // Contador del subtab "Alertas" (badge). Comparte queryKey con AlertsSection.
+  const { data: alertCount = [] } = useQuery({
+    queryKey: ['stock-alerts'],
+    queryFn: () => listAlerts(),
+  });
+
   // Tiempo real (#33): el SSE invalida las queries de stock/alertas al recibir
   // los eventos, así el panel se actualiza sin recargar.
   useEffect(() => {
@@ -65,6 +71,12 @@ export function StockPage() {
 
   return (
     <section className="catalog" data-testid="stock-page">
+      <header className="catalog-head">
+        <div>
+          <h2>Stock</h2>
+          <p className="catalog-sub">Stock por tienda en tiempo real</p>
+        </div>
+      </header>
       <nav className="bo-tabs" data-testid="stock-subtabs">
         <button
           className={`bo-tab ${section === 'global' ? 'active' : ''}`}
@@ -79,6 +91,7 @@ export function StockPage() {
           data-testid="stock-tab-alerts"
         >
           Alertas
+          {alertCount.length > 0 && <span className="subtab-badge">{alertCount.length}</span>}
         </button>
         <button
           className={`bo-tab ${section === 'transfers' ? 'active' : ''}`}
@@ -146,29 +159,27 @@ function GlobalStockSection() {
             <tr key={row.productId} data-testid="stock-row">
               <td>{row.productName}</td>
               <td>
-                <ul className="stock-stores">
+                <span className="stock-badges">
                   {row.stores.map((st) => (
-                    <li key={st.storeId} data-testid="stock-store-cell">
-                      <LevelDot level={st.level} />
-                      <span>{st.storeName}:</span> <strong>{st.quantity}</strong>
-                      <span className="muted"> (mín {st.minStock})</span>
-                      <button
-                        type="button"
-                        className="link-btn"
-                        onClick={() =>
-                          setEditing({
-                            productId: row.productId,
-                            storeId: st.storeId,
-                            min: String(st.minStock),
-                          })
-                        }
-                        data-testid="stock-edit-min"
-                      >
-                        Editar mín.
-                      </button>
-                    </li>
+                    <button
+                      type="button"
+                      key={st.storeId}
+                      className={`store-stock-badge stock-${st.level}`}
+                      onClick={() =>
+                        setEditing({
+                          productId: row.productId,
+                          storeId: st.storeId,
+                          min: String(st.minStock),
+                        })
+                      }
+                      data-testid="stock-store-cell"
+                      title={`${LEVEL_LABEL[st.level]} · mín ${st.minStock} · clic para editar`}
+                    >
+                      <span className={`stock-dot stock-${st.level}`} />
+                      {st.storeName} : {st.quantity}
+                    </button>
                   ))}
-                </ul>
+                </span>
               </td>
               <td>
                 <strong>{row.total}</strong>

@@ -10,8 +10,15 @@
 .app-content {
   margin-left: var(--sidebar-current-width);
   flex: 1;
+  display: flex;
+  flex-direction: column;
   background: var(--content-bg);
-  transition: margin-left 150ms ease;
+  min-width: 0;
+}
+
+.bo-main {
+  flex: 1;
+  padding: 1.5rem 2rem;
   min-width: 0;
 }
 

@@ -31,15 +31,17 @@ export function StoresPage() {
       invalidate();
     },
   });
-  const delMut = useMutation({
-    mutationFn: (id: string) => deleteStore(id),
-    onSuccess: invalidate,
-  });
+  // La eliminación se conserva en lib (deleteStore) para el futuro; el mockup de
+  // Tiendas no muestra el botón Borrar en las cards.
+  void deleteStore;
 
   return (
     <section className="catalog">
       <header className="catalog-head">
-        <h2>Tiendas</h2>
+        <div>
+          <h2>Tiendas</h2>
+          <p className="catalog-sub">{stores.length} ubicaciones</p>
+        </div>
         <button
           className="btn-primary"
           onClick={() => setForm({ name: '', code: '', address: '' })}
@@ -56,28 +58,35 @@ export function StoresPage() {
           Sin tiendas. Crea la primera.
         </p>
       ) : (
-        <table className="catalog-table" data-testid="stores-table">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Dirección</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {stores.map((s) => (
-              <tr key={s.id}>
-                <td>{s.name}</td>
-                <td className="muted">{s.address ?? '—'}</td>
-                <td className="row-actions">
-                  <button className="danger" onClick={() => delMut.mutate(s.id)}>
-                    Borrar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="store-grid" data-testid="stores-grid">
+          {stores.map((s) => (
+            <div className="store-card" key={s.id} data-testid="store-card">
+              <span className="store-card-icon" aria-hidden="true">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M3 9l1-5h16l1 5" />
+                  <path d="M4 9v11h16V9" />
+                  <path d="M9 20v-6h6v6" />
+                </svg>
+              </span>
+              <span className="store-card-text">
+                <span className="store-card-name">{s.name}</span>
+                <span className="store-card-addr">{s.address ?? '—'}</span>
+              </span>
+              <span className={`store-badge ${s.active ? 'active' : 'muted'}`}>
+                {s.active ? 'Activa' : 'Almacén'}
+              </span>
+            </div>
+          ))}
+        </div>
       )}
 
       {form && (

@@ -8,7 +8,8 @@
     ".": "./src/index.ts",
     "./login.css": "./src/styles/login.css",
     "./sidebar.css": "./src/styles/sidebar.css",
-    "./theme.css": "./src/styles/theme.css"
+    "./theme.css": "./src/styles/theme.css",
+    "./topbar.css": "./src/styles/topbar.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

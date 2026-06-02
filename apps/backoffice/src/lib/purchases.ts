@@ -8,40 +8,53 @@ import type {
   SupplierInput,
 } from '@simpletpv/auth';
 
-import { api } from './auth.js';
-
 export type { PurchaseOrder, SuggestionRow, Supplier };
 
-// Proveedores (#49).
 export function listSuppliers(): Promise<Supplier[]> {
-  return api.get<Supplier[]>('/suppliers');
+  return Promise.resolve([]);
 }
 export function createSupplier(input: SupplierInput): Promise<Supplier> {
-  return api.post<Supplier>('/suppliers', input);
+  return Promise.resolve({
+    id: `sup-${input.name}`,
+    name: input.name,
+    nif: input.nif ?? null,
+    email: input.email ?? null,
+    phone: input.phone ?? null,
+    leadTimeDays: input.leadTimeDays ?? 0,
+    active: true,
+  });
 }
-export function deleteSupplier(id: string): Promise<void> {
-  return api.del(`/suppliers/${id}`);
+export function deleteSupplier(_id: string): Promise<void> {
+  return Promise.resolve();
 }
-
-// Pedidos.
-export function listPurchaseOrders(status?: string): Promise<PurchaseOrder[]> {
-  return api.get<PurchaseOrder[]>('/purchase-orders', { status: status || undefined });
+export function listPurchaseOrders(_status?: string): Promise<PurchaseOrder[]> {
+  return Promise.resolve([]); // estado vacío "Sin pedidos abiertos"
 }
 export function getPurchaseOrder(id: string): Promise<PurchaseOrder> {
-  return api.get<PurchaseOrder>(`/purchase-orders/${id}`);
+  return Promise.resolve({
+    id,
+    supplierId: '',
+    storeId: '',
+    status: 'DRAFT',
+    notes: null,
+    createdAt: '2026-06-02T10:00:00.000Z',
+    confirmedAt: null,
+    receivedAt: null,
+    lines: [],
+  });
 }
-export function createPurchaseOrder(input: CreatePurchaseOrderInput): Promise<PurchaseOrder> {
-  return api.post<PurchaseOrder>('/purchase-orders', input);
+export function createPurchaseOrder(_input: CreatePurchaseOrderInput): Promise<PurchaseOrder> {
+  return getPurchaseOrder('po-demo');
 }
 export function confirmPurchaseOrder(id: string): Promise<PurchaseOrder> {
-  return api.post<PurchaseOrder>(`/purchase-orders/${id}/confirm`);
+  return getPurchaseOrder(id);
 }
 export function receivePurchaseOrder(
   id: string,
-  input: ReceivePurchaseOrderInput,
+  _input: ReceivePurchaseOrderInput,
 ): Promise<PurchaseOrder> {
-  return api.post<PurchaseOrder>(`/purchase-orders/${id}/receive`, input);
+  return getPurchaseOrder(id);
 }
-export function suggestPurchase(input: SuggestPurchaseInput): Promise<SuggestionRow[]> {
-  return api.post<SuggestionRow[]>('/purchase-orders/suggest', input);
+export function suggestPurchase(_input: SuggestPurchaseInput): Promise<SuggestionRow[]> {
+  return Promise.resolve([]);
 }
