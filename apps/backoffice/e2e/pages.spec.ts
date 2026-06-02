@@ -96,3 +96,14 @@ test('Familias muestra las 5 raíz con subfamilias anidadas (#97)', async ({ pag
   await expect(page.getByText('Índica')).toBeVisible();
   await expect(page.getByTestId('fam-count').first()).toContainText('productos');
 });
+
+test('Familias: reordenar familias raíz (#98)', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-families').click();
+  const rows = page.getByTestId('fam-row');
+  await expect(rows.first()).toContainText('Flores CBD');
+  // Fila 3 (0-based) = "Aceites" raíz (DFS: Flores, Índica, Sativa, Aceites…).
+  // Subirla la coloca por encima de "Flores CBD".
+  await rows.nth(3).getByTestId('fam-up').click();
+  await expect(rows.first()).toContainText('Aceites');
+});

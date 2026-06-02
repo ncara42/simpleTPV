@@ -550,6 +550,43 @@
   color: #c0392b;
 }
 
+/* ─── Familias: reorganización (reordenar + mover a) (#98) ─── */
+.fam-reorder {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+.fam-arrow {
+  width: 1.4rem;
+  height: 1rem;
+  padding: 0;
+  line-height: 1;
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+  background: var(--ui-surface);
+  font-size: 0.7rem;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+}
+.fam-arrow:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.fam-arrow:not(:disabled):hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+.fam-move-select {
+  max-width: 12rem;
+  height: 1.9rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 0.45rem;
+  background: #fff;
+  font-size: 0.8rem;
+  color: var(--ui-text-soft);
+}
+
 /* Historial de ventas (#14) */
 .catalog-table tfoot td {
   font-weight: 600;
