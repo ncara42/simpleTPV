@@ -130,3 +130,19 @@ test('Familias: reordenar familias raíz (#98)', async ({ page }) => {
   await rows.nth(3).getByTestId('fam-up').click();
   await expect(rows.first()).toContainText('Aceites');
 });
+
+test('Promociones: lista por estado y constructor de reglas (#99)', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-promotions').click();
+  // 4 promociones demo (activa, programada, expirada, pausada).
+  await expect(page.getByTestId('promo-card')).toHaveCount(4);
+  // Filtro "Activas" → solo la promo vigente.
+  await page.getByTestId('promo-filter-activa').click();
+  await expect(page.getByTestId('promo-card')).toHaveCount(1);
+  // Constructor con previsualización del impacto.
+  await page.getByTestId('new-promo').click();
+  await expect(page.getByTestId('promo-preview')).toBeVisible();
+  await page.getByTestId('promo-name').fill('Test 3x2');
+  await page.getByTestId('promo-save').click();
+  await expect(page.getByTestId('promo-list')).toContainText('Test 3x2');
+});

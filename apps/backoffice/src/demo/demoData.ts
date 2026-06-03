@@ -208,6 +208,77 @@ export function productRootFamily(productId: string): { id: string; name: string
   return family ? { id: family.id, name: family.name } : null;
 }
 
+// ─── Promociones (constructor de reglas: condición + acción) (#99) ───
+// Mock de panel de descuentos programables. Fecha de referencia fija para que el
+// estado (activa/programada/expirada) sea determinista en la demo y los tests.
+export const DEMO_TODAY = '2026-06-03';
+export type PromoConditionType = 'min_qty' | 'min_ticket';
+export type PromoDiscountType = 'percent' | 'amount';
+export type PromoStatus = 'activa' | 'programada' | 'expirada' | 'pausada';
+export interface DemoPromotion {
+  id: string;
+  name: string;
+  conditionType: PromoConditionType;
+  threshold: number; // nº de productos o € de ticket
+  discountType: PromoDiscountType;
+  discountValue: number;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;
+  active: boolean; // activación manual
+}
+export const DEMO_PROMOTIONS: DemoPromotion[] = [
+  {
+    id: 'promo-2x',
+    name: '2 productos → 15%',
+    conditionType: 'min_qty',
+    threshold: 2,
+    discountType: 'percent',
+    discountValue: 15,
+    startDate: '2026-05-20',
+    endDate: '2026-06-30',
+    active: true,
+  },
+  {
+    id: 'promo-100',
+    name: 'Ticket > 100 € → 10 €',
+    conditionType: 'min_ticket',
+    threshold: 100,
+    discountType: 'amount',
+    discountValue: 10,
+    startDate: '2026-06-10',
+    endDate: '2026-07-10',
+    active: true,
+  },
+  {
+    id: 'promo-finde',
+    name: 'Finde de mayo → 20%',
+    conditionType: 'min_qty',
+    threshold: 3,
+    discountType: 'percent',
+    discountValue: 20,
+    startDate: '2026-05-01',
+    endDate: '2026-05-31',
+    active: true,
+  },
+  {
+    id: 'promo-cosmetica',
+    name: 'Cosmética → 5 €',
+    conditionType: 'min_ticket',
+    threshold: 30,
+    discountType: 'amount',
+    discountValue: 5,
+    startDate: '2026-05-25',
+    endDate: '2026-06-25',
+    active: false,
+  },
+];
+// Estado de una promoción según sus fechas (vs DEMO_TODAY) y su activación manual.
+export function promoStatus(p: DemoPromotion, today: string = DEMO_TODAY): PromoStatus {
+  if (today < p.startDate) return 'programada';
+  if (today > p.endDate) return 'expirada';
+  return p.active ? 'activa' : 'pausada';
+}
+
 // ─── Usuarios (4, con tiendas asignadas para el mockup) ──────
 // `storeIds` es un campo demo extra (User no lo trae); UsersPage lo lee opcional.
 // Los ADMIN tienen acceso a todas las tiendas → storeIds vacío (regla por rol).

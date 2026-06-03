@@ -785,6 +785,90 @@
   background: #fee2e2;
   color: #991b1b;
 }
+
+/* ─── Promociones: tarjetas de reglas y previsualización (#99) ─── */
+.promo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.promo-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+}
+.promo-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.3rem;
+}
+.promo-name {
+  font-weight: 700;
+  color: var(--ui-text);
+}
+.promo-rule {
+  margin: 0 0 0.2rem;
+  font-size: 0.9rem;
+  color: var(--ui-text-soft);
+}
+.promo-dates {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ui-text-muted);
+}
+.promo-card-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.5rem;
+}
+.promo-badge {
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.promo-activa {
+  background: #dcfce7;
+  color: #166534;
+}
+.promo-programada {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.promo-expirada {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.promo-pausada {
+  background: #fef3c7;
+  color: #92400e;
+}
+.promo-preview {
+  padding: 0.75rem 0.85rem;
+  border: 1px dashed var(--ui-border);
+  border-radius: 0.6rem;
+  background: var(--ui-surface-subtle);
+}
+.promo-preview-title {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-muted);
+}
+.promo-preview p {
+  margin: 0.15rem 0;
+  font-size: 0.9rem;
+}
 .stock-stores {
   list-style: none;
   margin: 0;

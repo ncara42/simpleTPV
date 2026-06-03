@@ -9,6 +9,7 @@ import {
   CheckSquare,
   LayoutDashboard,
   Package,
+  Percent,
   Receipt,
   ShoppingCart,
   Store,
@@ -23,6 +24,7 @@ import { DEMO_USER } from './demo/demoData.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { switchApp } from './lib/nav.js';
+import { PromotionsPage } from './PromotionsPage.js';
 import { PurchasesPage } from './PurchasesPage.js';
 import { SalesHistoryPage } from './SalesHistoryPage.js';
 import { StockPage } from './StockPage.js';
@@ -35,6 +37,7 @@ type Tab =
   | 'catalog'
   | 'families'
   | 'stock'
+  | 'promotions'
   | 'users'
   | 'stores'
   | 'sales'
@@ -52,6 +55,7 @@ const ALL_NAV: NavItem[] = [
   { id: 'catalog', label: 'Catálogo', icon: <Package size={18} />, group: 'tienda' },
   { id: 'families', label: 'Familias', icon: <Tag size={18} />, group: 'tienda' },
   { id: 'stock', label: 'Stock', icon: <BarChart2 size={18} />, group: 'tienda' },
+  { id: 'promotions', label: 'Promociones', icon: <Percent size={18} />, group: 'tienda' },
   { id: 'users', label: 'Usuarios', icon: <Users size={18} />, group: 'gestion' },
   { id: 'stores', label: 'Tiendas', icon: <Store size={18} />, group: 'gestion' },
   { id: 'sales', label: 'Ventas', icon: <Receipt size={18} />, group: 'ventas' },
@@ -70,6 +74,7 @@ const TAB_LABELS: Record<Tab, string> = {
   catalog: 'Catálogo',
   families: 'Familias',
   stock: 'Stock',
+  promotions: 'Promociones',
   users: 'Usuarios',
   stores: 'Tiendas',
   sales: 'Ventas',
@@ -104,6 +109,7 @@ function Home() {
           {tab === 'catalog' && <CatalogPage />}
           {tab === 'families' && <FamiliesPage />}
           {tab === 'stock' && <StockPage />}
+          {tab === 'promotions' && <PromotionsPage />}
           {tab === 'users' && <UsersPage />}
           {tab === 'stores' && <StoresPage />}
           {tab === 'sales' && <SalesHistoryPage />}
