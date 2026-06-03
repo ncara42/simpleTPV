@@ -17,11 +17,17 @@ function round2(n: number): number {
 }
 
 /**
- * Efectivo esperado en el cajón al cerrar: inicial + ventas en efectivo del
- * turno. Función pura para poder probar el cuadre sin tocar la DB.
+ * Efectivo esperado en el cajón al cerrar: inicial + ventas en efectivo + neto de
+ * movimientos manuales − reembolsos en efectivo del turno (SEC-11). Función pura
+ * para poder probar el cuadre sin tocar la DB.
  */
-export function computeExpected(opening: number, cashSales: number, movementNet = 0): number {
-  return round2(opening + cashSales + movementNet);
+export function computeExpected(
+  opening: number,
+  cashSales: number,
+  movementNet = 0,
+  cashRefunds = 0,
+): number {
+  return round2(opening + cashSales + movementNet - cashRefunds);
 }
 
 /**
@@ -114,7 +120,29 @@ export class CashSessionsService {
       return acc + (row.type === 'IN' ? amount : -amount);
     }, 0);
 
-    const expected = computeExpected(Number(session.openingAmount), cashSales, movementNet);
+    // Reembolsos en efectivo del turno (SEC-11): salen del cajón y deben restarse
+    // del esperado. Heurística (sin nuevo campo en el modelo): se considera que un
+    // reembolso es en efectivo si la venta original se pagó en efectivo, y las
+    // devoluciones SIN ticket (saleId null) se asumen en efectivo. Misma tienda y
+    // ventana del turno que las ventas. Si el negocio reembolsa ventas con tarjeta
+    // en efectivo (u otro criterio), conviene modelar el método de pago del Return.
+    const refundAgg = await this.prisma.return.aggregate({
+      _sum: { total: true },
+      where: {
+        organizationId: tenant.organizationId,
+        storeId: session.storeId,
+        createdAt: { gte: session.openedAt },
+        OR: [{ saleId: null }, { sale: { paymentMethod: 'CASH' } }],
+      },
+    });
+    const cashRefunds = Number(refundAgg._sum.total ?? 0);
+
+    const expected = computeExpected(
+      Number(session.openingAmount),
+      cashSales,
+      movementNet,
+      cashRefunds,
+    );
     const difference = computeDifference(dto.countedAmount, expected);
 
     // Transición atómica: la condición status=OPEN viaja al WHERE, así dos

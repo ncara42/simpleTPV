@@ -23,6 +23,11 @@ describe('computeExpected', () => {
   it('redondea a 2 decimales', () => {
     expect(computeExpected(10.1, 0.2)).toBeCloseTo(10.3, 2);
   });
+
+  it('SEC-11: resta los reembolsos en efectivo del turno', () => {
+    // inicial 100 + ventas 250 + neto movimientos 0 − reembolsos 50 = 300.
+    expect(computeExpected(100, 250, 0, 50)).toBeCloseTo(300, 2);
+  });
 });
 
 describe('computeDifference', () => {
@@ -54,6 +59,13 @@ function makePrisma() {
       findFirstOrThrow: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'cs-1' })),
     },
     sale: {
+      aggregate: vi.fn(
+        async (_a?: unknown): Promise<{ _sum: { total: number | null } }> => ({
+          _sum: { total: 0 },
+        }),
+      ),
+    },
+    return: {
       aggregate: vi.fn(
         async (_a?: unknown): Promise<{ _sum: { total: number | null } }> => ({
           _sum: { total: 0 },
@@ -248,6 +260,43 @@ describe('CashSessionsService.close', () => {
       data: { expectedAmount: number };
     };
     expect(arg.data.expectedAmount).toBeCloseTo(165, 2);
+  });
+
+  it('SEC-11: resta los reembolsos en efectivo del esperado', async () => {
+    const prisma = makePrisma();
+    prisma.cashSession.findFirst = vi.fn(async () => ({
+      id: 'cs-1',
+      status: 'OPEN',
+      storeId: STORE,
+      openingAmount: 100,
+      openedAt: new Date('2026-05-28T08:00:00Z'),
+    }));
+    prisma.sale.aggregate = vi.fn(async () => ({ _sum: { total: 250 } }));
+    // 30€ devueltos en efectivo en el turno → salen del cajón.
+    prisma.return.aggregate = vi.fn(async () => ({ _sum: { total: 30 } }));
+    prisma.cashSession.updateMany = vi.fn(async () => ({ count: 1 }));
+    prisma.cashSession.findFirstOrThrow = vi.fn(async () => ({ id: 'cs-1', status: 'CLOSED' }));
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.close('cs-1', { countedAmount: 320 }, 'user-1', 'ADMIN'),
+    );
+
+    // El filtro de reembolsos acota a la tienda, ventana del turno y efectivo
+    // (venta original CASH o devolución sin ticket).
+    const refundArg = prisma.return.aggregate.mock.calls[0]![0] as {
+      where: { storeId: string; createdAt: { gte: Date }; OR: unknown[] };
+    };
+    expect(refundArg.where.storeId).toBe(STORE);
+    expect(refundArg.where.createdAt.gte).toBeInstanceOf(Date);
+    expect(Array.isArray(refundArg.where.OR)).toBe(true);
+
+    const arg = prisma.cashSession.updateMany.mock.calls[0]![0] as {
+      data: { expectedAmount: number; difference: number };
+    };
+    // 100 + 250 − 30 = 320 → cuadre exacto con 320 contados.
+    expect(arg.data.expectedAmount).toBeCloseTo(320, 2);
+    expect(arg.data.difference).toBeCloseTo(0, 2);
   });
 
   it('lanza 400 si updateMany afecta 0 filas (carrera concurrente)', async () => {
