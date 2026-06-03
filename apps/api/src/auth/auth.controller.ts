@@ -1,18 +1,10 @@
 import { Body, Controller, Get, Post, Req, UnauthorizedException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
+import { LoginDto, RefreshDto } from './auth.dto.js';
 import { AuthService } from './auth.service.js';
 import type { JwtPayload } from './jwt-payload.js';
 import { Public } from './public.decorator.js';
-
-interface LoginDto {
-  email: string;
-  password: string;
-}
-
-interface RefreshDto {
-  refreshToken: string;
-}
 
 @Controller('auth')
 export class AuthController {

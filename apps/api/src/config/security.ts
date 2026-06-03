@@ -21,6 +21,19 @@ export function parseCorsOrigins(env: string | undefined): string[] {
     .filter((o) => o.length > 0);
 }
 
+// Resuelve los orígenes CORS para el arranque. En PRODUCCIÓN, CORS_ORIGINS es
+// OBLIGATORIA: si falta, falla el arranque en vez de caer a los orígenes de
+// desarrollo (localhost), evitando un fail-open de configuración (SEC-18). Fuera
+// de producción mantiene el default de dev cómodo.
+export function resolveCorsOrigins(env: NodeJS.ProcessEnv): string[] {
+  if (env.NODE_ENV === 'production' && !env.CORS_ORIGINS?.trim()) {
+    throw new Error(
+      'CORS_ORIGINS es obligatoria en producción: no se permite el fallback a orígenes de desarrollo',
+    );
+  }
+  return parseCorsOrigins(env.CORS_ORIGINS);
+}
+
 // Config de rate limiting desde env (con defaults holgados para el TPV).
 export function throttleConfig(env: NodeJS.ProcessEnv): { ttl: number; limit: number } {
   const ttl = Number(env.THROTTLE_TTL ?? 60000);

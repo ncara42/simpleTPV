@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_DEV_ORIGINS,
   parseCorsOrigins,
+  resolveCorsOrigins,
   sseMaxConnectionsPerUser,
   throttleConfig,
   trustProxyHops,
@@ -27,6 +28,26 @@ describe('parseCorsOrigins', () => {
     expect(parseCorsOrigins('https://backoffice.example.com')).toEqual([
       'https://backoffice.example.com',
     ]);
+  });
+});
+
+describe('resolveCorsOrigins', () => {
+  it('fuera de producción sin CORS_ORIGINS cae a los orígenes de dev', () => {
+    expect(resolveCorsOrigins({})).toEqual(DEFAULT_DEV_ORIGINS);
+    expect(resolveCorsOrigins({ NODE_ENV: 'development' })).toEqual(DEFAULT_DEV_ORIGINS);
+  });
+
+  it('en producción sin CORS_ORIGINS falla (no fail-open a localhost)', () => {
+    expect(() => resolveCorsOrigins({ NODE_ENV: 'production' })).toThrow(/CORS_ORIGINS/);
+    expect(() => resolveCorsOrigins({ NODE_ENV: 'production', CORS_ORIGINS: '   ' })).toThrow(
+      /CORS_ORIGINS/,
+    );
+  });
+
+  it('en producción con CORS_ORIGINS definida la usa', () => {
+    expect(
+      resolveCorsOrigins({ NODE_ENV: 'production', CORS_ORIGINS: 'https://tpv.example.com' }),
+    ).toEqual(['https://tpv.example.com']);
   });
 });
 

@@ -19,6 +19,12 @@ export interface UserLookup {
 
 type ExpiresIn = NonNullable<JwtSignOptions['expiresIn']>;
 
+// Hash bcrypt de una contraseña-señuelo (no es una credencial). Se usa para
+// ejecutar SIEMPRE un bcrypt.compare aunque el usuario no exista/esté inactivo,
+// igualando el tiempo de respuesta y evitando la enumeración de cuentas por
+// timing (SEC-14). Se computa una vez al cargar el módulo.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('timing-equalizer-not-a-credential', 10);
+
 export interface AuthConfig {
   accessSecret: string;
   refreshSecret: string;
@@ -37,6 +43,8 @@ export class AuthService {
   async validateUser(email: string, password: string): Promise<AuthUser | null> {
     const user = await this.lookup.user.findUnique({ where: { email } });
     if (!user || !user.active) {
+      // Comparación señuelo para no revelar por timing si el email existe (SEC-14).
+      await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
       return null;
     }
     const ok = await bcrypt.compare(password, user.passwordHash);

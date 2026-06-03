@@ -7,7 +7,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 
 import { AppModule } from './app.module.js';
-import { parseCorsOrigins, trustProxyHops } from './config/security.js';
+import { resolveCorsOrigins, trustProxyHops } from './config/security.js';
 import { initSentry } from './observability/sentry.js';
 
 async function bootstrap(): Promise<void> {
@@ -36,7 +36,7 @@ async function bootstrap(): Promise<void> {
 
   // CORS por allowlist (env CORS_ORIGINS, CSV). En dev, orígenes de los frontends.
   app.enableCors({
-    origin: parseCorsOrigins(process.env.CORS_ORIGINS),
+    origin: resolveCorsOrigins(process.env),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -50,20 +50,26 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // Swagger/OpenAPI (#48). UI servida en `docs` (tras el proxy de los frontends
-  // queda accesible en /api/docs). Auth Bearer documentada para probar endpoints.
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('simpleTPV API')
-    .setDescription('API multi-tienda: ventas, stock, traspasos, compras, VeriFactu.')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document);
+  // Swagger/OpenAPI (#48). Solo FUERA de producción: publicar el contrato completo
+  // (rutas, DTOs, validaciones) en prod facilita el reconocimiento a un atacante
+  // (SEC-17). En dev/staging queda servido en `docs` (tras el proxy, /api/docs).
+  const swaggerEnabled = process.env.NODE_ENV !== 'production';
+  if (swaggerEnabled) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('simpleTPV API')
+      .setDescription('API multi-tienda: ventas, stock, traspasos, compras, VeriFactu.')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('docs', app, document);
+  }
 
   const port = Number(process.env.PORT ?? 3001);
   await app.listen(port);
-  console.log(`API escuchando en :${port} (Swagger en /docs)`);
+  console.log(
+    `API escuchando en :${port}${swaggerEnabled ? ' (Swagger en /docs)' : ' (Swagger desactivado en producción)'}`,
+  );
 }
 
 bootstrap().catch((err) => {

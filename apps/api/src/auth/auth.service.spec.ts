@@ -1,6 +1,6 @@
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AuthService } from './auth.service.js';
 
@@ -74,6 +74,16 @@ describe('AuthService.validateUser', () => {
     const svc = makeService(makeUser({ active: false }));
     const user = await svc.validateUser('admin@org1.test', 'password123');
     expect(user).toBeNull();
+  });
+
+  it('SEC-14: ejecuta bcrypt.compare aunque el email no exista (anti-enumeración por timing)', async () => {
+    const spy = vi.spyOn(bcrypt, 'compare');
+    const svc = makeService(null);
+    const user = await svc.validateUser('nadie@org1.test', 'cualquiera');
+    expect(user).toBeNull();
+    // Se hace una comparación señuelo: no se retorna antes de gastar el bcrypt.
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
   });
 });
 
