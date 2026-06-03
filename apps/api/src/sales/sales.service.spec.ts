@@ -12,8 +12,8 @@ import {
   computeTotals,
   dayRange,
   formatTicket,
-  SalesService,
-} from './sales.service.js';
+} from './sales.domain.js';
+import { SalesService } from './sales.service.js';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 
