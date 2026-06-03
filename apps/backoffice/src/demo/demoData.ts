@@ -190,6 +190,24 @@ export function stockLevel(qty: number): 'red' | 'yellow' | 'green' {
   return 'green';
 }
 
+// Rotación demo por producto, para filtrar y mostrar en Stock (#96).
+export type Rotation = 'alta' | 'media' | 'baja';
+export const DEMO_PRODUCT_ROTATION: Record<string, Rotation> = {
+  'p-aceite-cbd-10': 'alta',
+  'p-flor-lemon-haze': 'alta',
+  'p-vapeador-pro': 'baja',
+  'p-crema-regeneradora': 'media',
+  'p-infusion-relax': 'media',
+};
+// Unidades en tránsito (traspasos enviados sin recibir) — demo para el KPI de Stock (#96).
+export const DEMO_STOCK_IN_TRANSIT = 14;
+// Familia raíz de un producto (para el filtro por familia del Stock).
+export function productRootFamily(productId: string): { id: string; name: string } | null {
+  const p = DEMO_PRODUCTS.find((x) => x.id === productId);
+  const { family } = findFamily(p?.familyId ?? null);
+  return family ? { id: family.id, name: family.name } : null;
+}
+
 // ─── Usuarios (4, con tiendas asignadas para el mockup) ──────
 // `storeIds` es un campo demo extra (User no lo trae); UsersPage lo lee opcional.
 // Los ADMIN tienen acceso a todas las tiendas → storeIds vacío (regla por rol).

@@ -74,6 +74,17 @@ test('Stock global muestra la tabla con badges por tienda', async ({ page }) => 
   await expect(page.getByTestId('stock-row')).toHaveCount(5);
 });
 
+test('Stock: KPIs de resumen y filtro por rotación (#96)', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-stock').click();
+  await expect(page.getByTestId('stock-kpis')).toBeVisible();
+  await expect(page.getByTestId('stock-row')).toHaveCount(5);
+  // Rotación baja → solo el Vapeador Pro.
+  await page.getByTestId('stock-rotation').selectOption('baja');
+  await expect(page.getByTestId('stock-row')).toHaveCount(1);
+  await expect(page.getByTestId('stock-table')).toContainText('Vapeador Pro');
+});
+
 test('Ventas: scroll infinito, filtros y vistas guardadas (#95)', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-sales').click();
