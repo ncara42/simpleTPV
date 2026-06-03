@@ -9,6 +9,7 @@ import {
   CheckSquare,
   LayoutDashboard,
   Package,
+  Percent,
   Receipt,
   ShoppingCart,
   Store,
@@ -23,6 +24,7 @@ import { DEMO_USER } from './demo/demoData.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { switchApp } from './lib/nav.js';
+import { PromotionsPage } from './PromotionsPage.js';
 import { PurchasesPage } from './PurchasesPage.js';
 import { SalesHistoryPage } from './SalesHistoryPage.js';
 import { StockPage } from './StockPage.js';
@@ -35,6 +37,7 @@ type Tab =
   | 'catalog'
   | 'families'
   | 'stock'
+  | 'promotions'
   | 'users'
   | 'stores'
   | 'sales'
@@ -47,11 +50,12 @@ const GROUPS: NavGroup[] = [
   { id: 'ventas', label: 'Ventas' },
 ];
 
-const NAV: NavItem[] = [
+const ALL_NAV: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
   { id: 'catalog', label: 'Catálogo', icon: <Package size={18} />, group: 'tienda' },
   { id: 'families', label: 'Familias', icon: <Tag size={18} />, group: 'tienda' },
   { id: 'stock', label: 'Stock', icon: <BarChart2 size={18} />, group: 'tienda' },
+  { id: 'promotions', label: 'Promociones', icon: <Percent size={18} />, group: 'tienda' },
   { id: 'users', label: 'Usuarios', icon: <Users size={18} />, group: 'gestion' },
   { id: 'stores', label: 'Tiendas', icon: <Store size={18} />, group: 'gestion' },
   { id: 'sales', label: 'Ventas', icon: <Receipt size={18} />, group: 'ventas' },
@@ -59,11 +63,18 @@ const NAV: NavItem[] = [
   { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'ventas' },
 ];
 
+// #106: Compras y VeriFactu se retiran del menú (decisión informe UX 2026-06-02).
+// El código (páginas, lib y datos demo) se conserva para una posible reactivación
+// futura: basta con quitar el id de este set para que vuelvan a aparecer.
+const HIDDEN_TABS = new Set<Tab>(['purchases', 'verifactu']);
+const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab));
+
 const TAB_LABELS: Record<Tab, string> = {
   dashboard: 'Dashboard',
   catalog: 'Catálogo',
   families: 'Familias',
   stock: 'Stock',
+  promotions: 'Promociones',
   users: 'Usuarios',
   stores: 'Tiendas',
   sales: 'Ventas',
@@ -98,6 +109,7 @@ function Home() {
           {tab === 'catalog' && <CatalogPage />}
           {tab === 'families' && <FamiliesPage />}
           {tab === 'stock' && <StockPage />}
+          {tab === 'promotions' && <PromotionsPage />}
           {tab === 'users' && <UsersPage />}
           {tab === 'stores' && <StoresPage />}
           {tab === 'sales' && <SalesHistoryPage />}

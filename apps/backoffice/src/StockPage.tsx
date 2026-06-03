@@ -2,6 +2,13 @@ import type { StockLevel } from '@simpletpv/auth';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
+import {
+  DEMO_FAMILIES,
+  DEMO_PRODUCT_ROTATION,
+  DEMO_STOCK_IN_TRANSIT,
+  productRootFamily,
+  type Rotation,
+} from './demo/demoData.js';
 import { listStores } from './lib/admin.js';
 import { api } from './lib/auth.js';
 import {
@@ -13,6 +20,14 @@ import {
   sendTransfer,
   setMinStock,
 } from './lib/stock.js';
+
+const ROTATION_LABEL: Record<Rotation, string> = { alta: 'Alta', media: 'Media', baja: 'Baja' };
+
+function levelOf(quantity: number, minStock: number): StockLevel {
+  if (quantity <= 0) return 'red';
+  if (quantity <= minStock) return 'yellow';
+  return 'green';
+}
 
 const LEVEL_LABEL: Record<StockLevel, string> = { red: 'Sin stock', yellow: 'Bajo', green: 'OK' };
 const ALERT_LABEL: Record<string, string> = { OUT_OF_STOCK: 'Sin stock', LOW_STOCK: 'Stock bajo' };
@@ -109,132 +124,271 @@ export function StockPage() {
   );
 }
 
-function GlobalStockSection() {
-  const [editing, setEditing] = useState<{
-    productId: string;
-    storeId: string;
-    min: string;
-  } | null>(null);
-  const [movementsFor, setMovementsFor] = useState<string | null>(null);
-  const qc = useQueryClient();
+interface AdjustState {
+  productId: string;
+  productName: string;
+  storeId: string;
+  storeName: string;
+  quantity: string;
+  min: string;
+}
 
-  const { data: rows = [], isLoading } = useQuery({
+function GlobalStockSection() {
+  const qc = useQueryClient();
+  const [search, setSearch] = useState('');
+  const [familyId, setFamilyId] = useState('');
+  const [storeId, setStoreId] = useState('');
+  const [rotation, setRotation] = useState('');
+  const [adjusting, setAdjusting] = useState<AdjustState | null>(null);
+  const [movementsFor, setMovementsFor] = useState<string | null>(null);
+  // Overlay local de existencias ajustadas (demo: sin backend que persista).
+  const [qtyOverlay, setQtyOverlay] = useState<Record<string, number>>({});
+
+  const { data: rawRows = [], isLoading } = useQuery({
     queryKey: ['stock-global'],
     queryFn: getGlobalStock,
   });
 
   const minMutation = useMutation({
     mutationFn: setMinStock,
-    onSuccess: () => {
-      setEditing(null);
-      void qc.invalidateQueries({ queryKey: ['stock-global'] });
-      void qc.invalidateQueries({ queryKey: ['stock-alerts'] });
-    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['stock-alerts'] }),
   });
+
+  // Aplica los ajustes locales y recalcula nivel/total.
+  const rows = rawRows.map((row) => {
+    const stores = row.stores.map((st) => {
+      const q = qtyOverlay[`${row.productId}:${st.storeId}`] ?? st.quantity;
+      return { ...st, quantity: q, level: levelOf(q, st.minStock) };
+    });
+    return { ...row, stores, total: stores.reduce((acc, s) => acc + s.quantity, 0) };
+  });
+
+  const storeOptions = rows[0]?.stores.map((s) => ({ id: s.storeId, name: s.storeName })) ?? [];
+
+  const filtered = rows.filter((row) => {
+    if (search && !row.productName.toLowerCase().includes(search.toLowerCase())) return false;
+    if (familyId && productRootFamily(row.productId)?.id !== familyId) return false;
+    if (rotation && (DEMO_PRODUCT_ROTATION[row.productId] ?? 'media') !== rotation) return false;
+    if (storeId && !row.stores.some((s) => s.storeId === storeId)) return false;
+    return true;
+  });
+
+  // KPIs del conjunto filtrado (respetan el filtro de tienda).
+  const cells = filtered.flatMap((r) => r.stores.filter((s) => !storeId || s.storeId === storeId));
+  const kpis = {
+    units: cells.reduce((acc, s) => acc + s.quantity, 0),
+    out: cells.filter((s) => s.level === 'red').length,
+    low: cells.filter((s) => s.level === 'yellow').length,
+    inTransit: DEMO_STOCK_IN_TRANSIT,
+  };
+
+  const saveAdjust = (): void => {
+    if (!adjusting) return;
+    setQtyOverlay((prev) => ({
+      ...prev,
+      [`${adjusting.productId}:${adjusting.storeId}`]: Number(adjusting.quantity),
+    }));
+    minMutation.mutate({
+      productId: adjusting.productId,
+      storeId: adjusting.storeId,
+      minStock: Number(adjusting.min),
+    });
+    setAdjusting(null);
+  };
 
   if (isLoading) {
     return <p className="catalog-empty">Cargando…</p>;
   }
-  if (rows.length === 0) {
-    return (
-      <p className="catalog-empty" data-testid="stock-empty">
-        Sin productos con stock.
-      </p>
-    );
-  }
 
   return (
     <>
-      <table className="catalog-table" data-testid="stock-table">
-        <thead>
-          <tr>
-            <th>Producto</th>
-            <th>Por tienda</th>
-            <th>Total</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.productId} data-testid="stock-row">
-              <td>{row.productName}</td>
-              <td>
-                <span className="stock-badges">
-                  {row.stores.map((st) => (
+      <div className="stock-kpis" data-testid="stock-kpis">
+        <div className="stock-kpi">
+          <span className="stock-kpi-val">{kpis.units}</span>
+          <span className="stock-kpi-label">Unidades</span>
+        </div>
+        <div className="stock-kpi">
+          <span className="stock-kpi-val red">{kpis.out}</span>
+          <span className="stock-kpi-label">Roturas</span>
+        </div>
+        <div className="stock-kpi">
+          <span className="stock-kpi-val yellow">{kpis.low}</span>
+          <span className="stock-kpi-label">Stock bajo</span>
+        </div>
+        <div className="stock-kpi">
+          <span className="stock-kpi-val">{kpis.inTransit}</span>
+          <span className="stock-kpi-label">En tránsito</span>
+        </div>
+      </div>
+
+      <div className="sales-filters">
+        <input
+          className="catalog-search"
+          placeholder="Buscar producto…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          data-testid="stock-search"
+        />
+        <select
+          className="catalog-search"
+          value={familyId}
+          onChange={(e) => setFamilyId(e.target.value)}
+          data-testid="stock-family"
+        >
+          <option value="">Todas las familias</option>
+          {DEMO_FAMILIES.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className="catalog-search"
+          value={storeId}
+          onChange={(e) => setStoreId(e.target.value)}
+          data-testid="stock-store"
+        >
+          <option value="">Todas las tiendas</option>
+          {storeOptions.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className="catalog-search"
+          value={rotation}
+          onChange={(e) => setRotation(e.target.value)}
+          data-testid="stock-rotation"
+        >
+          <option value="">Toda rotación</option>
+          <option value="alta">Rotación alta</option>
+          <option value="media">Rotación media</option>
+          <option value="baja">Rotación baja</option>
+        </select>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="catalog-empty" data-testid="stock-empty">
+          Sin productos para los filtros seleccionados.
+        </p>
+      ) : (
+        <table className="catalog-table" data-testid="stock-table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Familia</th>
+              <th>Rotación</th>
+              <th>{storeId ? storeOptions.find((s) => s.id === storeId)?.name : 'Por tienda'}</th>
+              <th>Total</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((row) => {
+              const visibleStores = storeId
+                ? row.stores.filter((s) => s.storeId === storeId)
+                : row.stores;
+              const rot = DEMO_PRODUCT_ROTATION[row.productId] ?? 'media';
+              return (
+                <tr key={row.productId} data-testid="stock-row">
+                  <td>{row.productName}</td>
+                  <td className="muted">{productRootFamily(row.productId)?.name ?? '—'}</td>
+                  <td>
+                    <span className={`rotation-tag rotation-${rot}`}>{ROTATION_LABEL[rot]}</span>
+                  </td>
+                  <td>
+                    <span className="stock-badges">
+                      {visibleStores.map((st) => (
+                        <button
+                          type="button"
+                          key={st.storeId}
+                          className={`store-stock-badge stock-${st.level}`}
+                          onClick={() =>
+                            setAdjusting({
+                              productId: row.productId,
+                              productName: row.productName,
+                              storeId: st.storeId,
+                              storeName: st.storeName,
+                              quantity: String(st.quantity),
+                              min: String(st.minStock),
+                            })
+                          }
+                          data-testid="stock-store-cell"
+                          title={`${LEVEL_LABEL[st.level]} · mín ${st.minStock} · clic para ajustar`}
+                        >
+                          <span className={`stock-dot stock-${st.level}`} />
+                          {st.storeName} : {st.quantity}
+                        </button>
+                      ))}
+                    </span>
+                  </td>
+                  <td>
+                    <strong>{storeId ? (visibleStores[0]?.quantity ?? 0) : row.total}</strong>
+                  </td>
+                  <td>
                     <button
                       type="button"
-                      key={st.storeId}
-                      className={`store-stock-badge stock-${st.level}`}
-                      onClick={() =>
-                        setEditing({
-                          productId: row.productId,
-                          storeId: st.storeId,
-                          min: String(st.minStock),
-                        })
-                      }
-                      data-testid="stock-store-cell"
-                      title={`${LEVEL_LABEL[st.level]} · mín ${st.minStock} · clic para editar`}
+                      className="link-btn"
+                      onClick={() => setMovementsFor(row.productId)}
+                      data-testid="stock-history"
                     >
-                      <span className={`stock-dot stock-${st.level}`} />
-                      {st.storeName} : {st.quantity}
+                      Movimientos
                     </button>
-                  ))}
-                </span>
-              </td>
-              <td>
-                <strong>{row.total}</strong>
-              </td>
-              <td>
-                <button
-                  type="button"
-                  className="link-btn"
-                  onClick={() => setMovementsFor(row.productId)}
-                  data-testid="stock-history"
-                >
-                  Movimientos
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
 
-      {editing && (
-        <div className="modal-backdrop" onClick={() => setEditing(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="min-form">
-            <h3>Configurar stock mínimo</h3>
+      {adjusting && (
+        <div className="modal-backdrop" onClick={() => setAdjusting(null)}>
+          <div
+            className="modal modal--form"
+            onClick={(e) => e.stopPropagation()}
+            data-testid="stock-adjust-form"
+          >
+            <h3>Ajustar existencias</h3>
+            <p className="muted">
+              {adjusting.productName} · {adjusting.storeName}
+            </p>
             <div className="modal-row">
-              <label htmlFor="min-input">Mínimo</label>
-              <input
-                id="min-input"
-                type="number"
-                min={0}
-                value={editing.min}
-                onChange={(e) => setEditing({ ...editing, min: e.target.value })}
-                data-testid="min-input"
-              />
+              <label>
+                Existencias
+                <input
+                  type="number"
+                  min={0}
+                  value={adjusting.quantity}
+                  onChange={(e) => setAdjusting({ ...adjusting, quantity: e.target.value })}
+                  data-testid="stock-adjust-qty"
+                />
+              </label>
+              <label>
+                Stock mínimo
+                <input
+                  type="number"
+                  min={0}
+                  value={adjusting.min}
+                  onChange={(e) => setAdjusting({ ...adjusting, min: e.target.value })}
+                  data-testid="stock-adjust-min"
+                />
+              </label>
             </div>
             <div className="modal-foot">
-              <button type="button" onClick={() => setEditing(null)}>
+              <button type="button" onClick={() => setAdjusting(null)}>
                 Cancelar
               </button>
               <button
                 type="button"
                 className="btn-primary"
-                disabled={minMutation.isPending}
-                onClick={() =>
-                  minMutation.mutate({
-                    productId: editing.productId,
-                    storeId: editing.storeId,
-                    minStock: Number(editing.min),
-                  })
-                }
-                data-testid="min-save"
+                onClick={saveAdjust}
+                data-testid="stock-adjust-save"
               >
                 Guardar
               </button>
             </div>
-            {minMutation.isError && <p className="muted">No se pudo guardar el mínimo.</p>}
           </div>
         </div>
       )}

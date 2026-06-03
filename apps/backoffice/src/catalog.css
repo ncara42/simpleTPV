@@ -34,6 +34,87 @@
   color: var(--ui-success);
 }
 
+/* ─── Usuarios: estado, permisos por rol y asignación de tiendas (#104) ─── */
+.user-state {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.user-state.on {
+  color: var(--ui-success);
+}
+.user-state.off {
+  color: var(--ui-text-muted);
+}
+.role-perms {
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border);
+  border-radius: 0.6rem;
+  padding: 0.7rem 0.85rem;
+}
+.role-perms-title {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-muted);
+}
+.role-perms ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.role-perms li {
+  font-size: 0.85rem;
+  color: var(--ui-text-soft);
+}
+.user-stores-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.user-stores-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-muted);
+}
+.user-stores {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: 0.4rem 0.8rem;
+}
+.user-stores-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ui-text-soft);
+}
+/* Checkboxes nativos dentro de modales (rol/tiendas/activo): no heredar el alto de input de texto. */
+.modal input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  accent-color: var(--ui-primary, #111);
+  cursor: pointer;
+}
+.modal--form .user-store-check,
+.modal--form .user-active-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--ui-text);
+}
+
 /* ─── Tiendas (grid de cards) ─── */
 .store-grid {
   display: grid;
@@ -42,13 +123,18 @@
 }
 .store-card {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.7rem;
   padding: 1rem 1.1rem;
   border: 1px solid var(--ui-border);
   border-radius: 12px;
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-sm);
+}
+.store-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 .store-card-icon {
   display: flex;
@@ -88,6 +174,118 @@
 .store-badge.muted {
   background: var(--ui-surface-subtle);
   color: var(--ui-text-muted);
+}
+
+/* ─── Tiendas: toolbar (filtro estado + periodo) y pie de card con ventas (#101, #103) ─── */
+.stores-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.stores-period {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.stores-period-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+}
+.store-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--ui-border);
+}
+.store-card-sales {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.store-card-sales strong {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.store-card-sales-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ui-text-muted);
+}
+.store-toggle {
+  flex-shrink: 0;
+}
+
+/* ─── Tiendas: abierta/cerrada (fichaje) y detalle con dispositivo (#100, #102) ─── */
+.store-card {
+  cursor: pointer;
+}
+.store-card-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+.store-card-badges .store-badge {
+  margin-left: 0;
+}
+.store-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+}
+.store-open-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--ui-text-muted);
+}
+.store-open.on {
+  color: #166534;
+}
+.store-open.on .store-open-dot {
+  background: #16a34a;
+}
+.store-detail-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.store-detail-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-muted);
+}
+.store-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.store-detail-row .store-badge {
+  margin-left: 0;
+}
+.store-device-ok {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #166534;
+}
+.store-device-warn {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #b45309;
 }
 
 /* ─── Toggle segmentado (periodos del dashboard, subtabs de stock/compras) ─── */
@@ -346,6 +544,31 @@
   cursor: pointer;
 }
 
+/* ─── Modal de formulario: ritmo vertical uniforme + jerarquía título/campos/CTA (#105) ─── */
+.modal--form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.05rem;
+}
+.modal--form h3 {
+  margin-bottom: 0;
+}
+.modal--form label {
+  margin-bottom: 0;
+}
+.modal--form .modal-row {
+  gap: 1.05rem;
+  align-items: start;
+}
+.modal--form .form-error {
+  margin-bottom: 0;
+}
+.modal--form .modal-foot {
+  margin-top: 0;
+  padding-top: 1.05rem;
+  border-top: 1px solid var(--ui-border, #e4e2db);
+}
+
 /* Árbol de familias */
 .fam-tree {
   border: 1px solid var(--tpv-line, #e4e2db);
@@ -391,6 +614,42 @@
   color: #c0392b;
 }
 
+/* ─── Familias: reorganización (reordenar + mover a) (#98) ─── */
+.fam-reorder {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+.fam-arrow {
+  width: 1.4rem;
+  height: 1rem;
+  padding: 0;
+  line-height: 1;
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+  background: var(--ui-surface);
+  font-size: 0.7rem;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+}
+.fam-arrow:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.fam-arrow:not(:disabled):hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+.fam-move-select {
+  max-width: 12rem;
+  height: 1.9rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 0.45rem;
+  background: #fff;
+  font-size: 0.8rem;
+  color: var(--ui-text-soft);
+}
 
 /* Historial de ventas (#14) */
 .catalog-table tfoot td {
@@ -433,6 +692,61 @@
 .sales-pager button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* ─── Ventas: filtros, vistas guardadas y scroll infinito (#95) ─── */
+.sales-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.sales-filters .catalog-search {
+  width: auto;
+  min-width: 11rem;
+}
+.sales-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+.sales-view-chip {
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-surface-subtle);
+}
+.sales-view-apply {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0.2rem 0.2rem 0.2rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ui-text-soft);
+}
+.sales-view-remove {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem 0.2rem 0.3rem;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--ui-text-muted);
+}
+.sales-view-remove:hover {
+  color: var(--ui-danger, #c0392b);
+}
+.sales-sentinel,
+.sales-end {
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--ui-text-muted);
 }
 
 .modal select {
@@ -479,6 +793,145 @@
 .stock-tag.stock-yellow {
   background: #fef3c7;
   color: #92400e;
+}
+
+/* ─── Stock: KPIs de resumen y etiqueta de rotación (#96) ─── */
+.stock-kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.stock-kpi {
+  display: flex;
+  flex-direction: column;
+  min-width: 6.5rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+}
+.stock-kpi-val {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.stock-kpi-val.red {
+  color: #dc2626;
+}
+.stock-kpi-val.yellow {
+  color: #d97706;
+}
+.stock-kpi-label {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ui-text-muted);
+}
+.rotation-tag {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.rotation-alta {
+  background: #dcfce7;
+  color: #166534;
+}
+.rotation-media {
+  background: #fef9c3;
+  color: #854d0e;
+}
+.rotation-baja {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ─── Promociones: tarjetas de reglas y previsualización (#99) ─── */
+.promo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.promo-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+}
+.promo-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.3rem;
+}
+.promo-name {
+  font-weight: 700;
+  color: var(--ui-text);
+}
+.promo-rule {
+  margin: 0 0 0.2rem;
+  font-size: 0.9rem;
+  color: var(--ui-text-soft);
+}
+.promo-dates {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ui-text-muted);
+}
+.promo-card-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.5rem;
+}
+.promo-badge {
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.promo-activa {
+  background: #dcfce7;
+  color: #166534;
+}
+.promo-programada {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.promo-expirada {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.promo-pausada {
+  background: #fef3c7;
+  color: #92400e;
+}
+.promo-preview {
+  padding: 0.75rem 0.85rem;
+  border: 1px dashed var(--ui-border);
+  border-radius: 0.6rem;
+  background: var(--ui-surface-subtle);
+}
+.promo-preview-title {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-muted);
+}
+.promo-preview p {
+  margin: 0.15rem 0;
+  font-size: 0.9rem;
 }
 .stock-stores {
   list-style: none;
