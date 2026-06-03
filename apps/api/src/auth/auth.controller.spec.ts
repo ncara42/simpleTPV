@@ -27,19 +27,22 @@ function makeController(opts: { valid?: boolean }): AuthController {
 describe('AuthController', () => {
   it('POST /auth/login con credenciales válidas devuelve tokens', async () => {
     const ctrl = makeController({ valid: true });
-    const res = await ctrl.login({ email: 'admin@org1.test', password: 'password123' });
+    const res = await ctrl.login(
+      { email: 'admin@org1.test', password: 'password123' },
+      '127.0.0.1',
+    );
     expect(res.accessToken).toBe('acc');
     expect(res.refreshToken).toBe('ref');
   });
 
   it('POST /auth/login con credenciales inválidas lanza 401', async () => {
     const ctrl = makeController({ valid: false });
-    await expect(ctrl.login({ email: 'x@x.test', password: 'bad' })).rejects.toThrow();
+    await expect(ctrl.login({ email: 'x@x.test', password: 'bad' }, '127.0.0.1')).rejects.toThrow();
   });
 
   it('POST /auth/refresh devuelve nuevo accessToken', async () => {
     const ctrl = makeController({ valid: true });
-    const res = await ctrl.refresh({ refreshToken: 'ref' });
+    const res = await ctrl.refresh({ refreshToken: 'ref' }, '127.0.0.1');
     expect(res.accessToken).toBe('acc2');
   });
 

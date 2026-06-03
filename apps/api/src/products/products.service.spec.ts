@@ -175,6 +175,22 @@ describe('ProductsService.importCsv', () => {
     expect(result.errors.map((e) => e.row).sort()).toEqual([3, 4]); // filas de datos (1-indexed + cabecera)
   });
 
+  it('SEC-16: rechaza precios negativos y fuera de rango (no son puerta trasera al @Min(0))', async () => {
+    const prisma = makePrisma();
+    prisma.product.createMany = vi.fn(
+      async (a?: unknown): Promise<unknown> => ({ count: (a as { data: unknown[] }).data.length }),
+    );
+    const service = new ProductsService(prisma as never);
+    // fila 1 válida; fila 2 precio negativo; fila 3 precio fuera de rango (Decimal 10,4).
+    const csv = 'name,salePrice\nCafé,1.50\nTé,-5\nAgua,10000000\n';
+    const result = (await tenantStorage.run({ organizationId: ORG2 }, () =>
+      service.importCsv(csv),
+    )) as { inserted: number; errors: Array<{ row: number; message: string }> };
+    expect(result.inserted).toBe(1);
+    expect(result.errors.map((e) => e.row).sort()).toEqual([3, 4]);
+    expect(result.errors.every((e) => /rango/.test(e.message))).toBe(true);
+  });
+
   it('CSV vacío o solo cabecera no inserta nada', async () => {
     const prisma = makePrisma();
     const service = new ProductsService(prisma as never);

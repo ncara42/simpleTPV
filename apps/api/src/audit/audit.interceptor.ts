@@ -2,6 +2,7 @@ import {
   type CallHandler,
   type ExecutionContext,
   Injectable,
+  Logger,
   type NestInterceptor,
 } from '@nestjs/common';
 import { type Observable, tap } from 'rxjs';
@@ -17,6 +18,8 @@ const MUTATIONS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 // que el insert en AuditLog respeta la RLS por organizationId.
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(AuditInterceptor.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -45,7 +48,14 @@ export class AuditInterceptor implements NestInterceptor {
         void tenantStorage.run({ organizationId }, () =>
           this.prisma.auditLog
             .create({ data: { action: req.method, entity, entityId, userId, organizationId } })
-            .catch(() => undefined),
+            // No tumbamos la respuesta (la mutación ya hizo commit), pero un fallo
+            // de auditoría NO debe pasar en silencio: degrada la trazabilidad y hay
+            // que detectarlo (SEC-22).
+            .catch((err: unknown) =>
+              this.logger.error(
+                `Fallo al escribir audit log (${req.method} ${entity} ${entityId ?? ''}): ${String(err)}`,
+              ),
+            ),
         );
       }),
     );

@@ -90,6 +90,13 @@ export class ProductsService {
         errors.push({ row: rowNumber, message: 'Precio inválido' });
         return;
       }
+      // Mismas cotas que CreateProductDto (SEC-16): el import a mano no debe ser una
+      // puerta trasera a precios negativos (que generan ventas/cuadres negativos) ni
+      // a valores que excedan Decimal(10,4).
+      if (price < 0 || price > 999999.9999) {
+        errors.push({ row: rowNumber, message: 'Precio fuera de rango (0–999999.9999)' });
+        return;
+      }
       valid.push({
         organizationId: tenant.organizationId,
         name,
