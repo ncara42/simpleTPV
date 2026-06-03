@@ -26,6 +26,13 @@ export class CreateSaleLineDto {
   @Min(0)
   @Max(100)
   discountPct?: number;
+
+  // Importe fijo de descuento de la línea (>= 0). Opcional. Si llega también
+  // discountPct, el importe tiene precedencia (resuelto en computeTotals, igual
+  // que el descuento de ticket). Se capa al bruto de la línea.
+  @IsOptional()
+  @Min(0)
+  discountAmt?: number;
 }
 
 export class CreateSaleDto {

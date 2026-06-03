@@ -136,6 +136,7 @@ export interface TicketLine {
   qty: string;
   unitPrice: string;
   discountPct: string;
+  discountAmt: string;
   lineTotal: string;
 }
 
@@ -162,7 +163,7 @@ export interface SaleTicket {
 
 export interface CreateSaleInput {
   storeId: string;
-  lines: Array<{ productId: string; qty: number; discountPct?: number }>;
+  lines: Array<{ productId: string; qty: number; discountPct?: number; discountAmt?: number }>;
   paymentMethod: 'CASH' | 'CARD';
   cashGiven?: number;
   ticketDiscountPct?: number;

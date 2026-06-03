@@ -42,7 +42,7 @@ function Home() {
   useEffect(() => {
     if (useCart.getState().items.length === 0) {
       useCart.setState({
-        items: DEMO_CART_LINES.map((l) => ({ ...l, discountPct: 0 })),
+        items: DEMO_CART_LINES.map((l) => ({ ...l, discountPct: 0, discountAmt: 0 })),
         ticketDiscountPct: 0,
         ticketDiscountAmt: 0,
       });

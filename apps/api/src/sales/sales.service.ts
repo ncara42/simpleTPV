@@ -26,6 +26,9 @@ interface PricedLine {
   qty: number;
   // % de descuento de la línea (0–100). Ausente o 0 = sin descuento.
   discountPct?: number;
+  // Importe fijo de descuento de la línea (>= 0). Ausente = sin importe fijo.
+  // Tiene precedencia sobre discountPct y se capa al bruto (ver computeTotals).
+  discountAmt?: number;
   // IVA del producto congelado en el momento de la venta.
   taxRate?: number;
 }
@@ -38,7 +41,8 @@ interface TicketDiscount {
 interface ComputedLine extends PricedLine {
   // Importe bruto de la línea (unitPrice*qty) antes del descuento de línea.
   gross: number;
-  // Importe del descuento de la línea (round2(gross * pct/100)).
+  // Importe EFECTIVO del descuento de la línea, ya resuelto: si vino importe
+  // fijo (discountAmt) se usa ese capado al bruto; si no, round2(gross*pct/100).
   discountAmt: number;
   // Neto tras el descuento de línea (round2(gross - discountAmt)).
   lineTotal: number;
@@ -95,10 +99,14 @@ export function computeTotals(
 } {
   // 1. Por línea: bruto, descuento de línea y neto. Todos los pasos con round2
   //    para que el cálculo coincida con la columna DECIMAL y con el TPV.
+  //    El importe fijo (discountAmt) tiene precedencia sobre el % y se capa al
+  //    bruto, igual que el descuento de ticket → el neto nunca es negativo.
   const priced: ComputedLine[] = lines.map((l) => {
     const gross = round2(l.unitPrice * l.qty);
-    const pct = l.discountPct ?? 0;
-    const discountAmt = round2((gross * pct) / 100);
+    const discountAmt =
+      l.discountAmt !== undefined && l.discountAmt > 0
+        ? round2(Math.min(l.discountAmt, gross))
+        : round2((gross * (l.discountPct ?? 0)) / 100);
     const lineTotal = round2(gross - discountAmt);
     return { ...l, gross, discountAmt, lineTotal };
   });
@@ -278,7 +286,11 @@ export class SalesService {
         name: product.name,
         unitPrice: Number(product.salePrice),
         qty: l.qty,
-        discountPct: l.discountPct ?? 0,
+        // Mutuamente excluyentes: si llega importe fijo (>0) ignoramos el %, para
+        // no persistir un discountPct que no se aplicó (el importe tiene precedencia).
+        ...(l.discountAmt !== undefined && l.discountAmt > 0
+          ? { discountAmt: l.discountAmt }
+          : { discountPct: l.discountPct ?? 0 }),
         taxRate: Number(product.taxRate),
       };
     });
@@ -436,6 +448,7 @@ export class SalesService {
         qty: l.qty,
         unitPrice: l.unitPrice,
         discountPct: l.discountPct,
+        discountAmt: l.discountAmt,
         lineTotal: l.lineTotal,
       })),
       subtotal: sale.subtotal,
