@@ -391,24 +391,28 @@ export class SalesService {
         });
       });
 
-      // Registro VeriFactu de la venta tras commit (#47): encadenado y encolado.
-      // No bloquea la venta si falla (afterCommit es best-effort).
-      afterCommit(async () => {
-        const org = await this.prisma.organization.findFirst({
-          where: { id: tenant.organizationId },
-          select: { nif: true },
-        });
-        await this.verifactu.recordFor({
+      // Registro VeriFactu de la venta DENTRO de la transacción (#47, SEC-02):
+      // atómico con la venta. Si la creación del registro fiscal encadenado falla,
+      // toda la venta hace rollback → nunca queda una factura sin su registro
+      // VeriFactu. Solo el ENVÍO a la AEAT es best-effort: se encola tras commit
+      // (reintentable vía cola/worker), porque el registro ya está persistido.
+      const org = await tx.organization.findFirst({
+        where: { id: tenant.organizationId },
+        select: { nif: true },
+      });
+      const verifactuRecord = await this.verifactu.createRecordInTx(tx, tenant.organizationId, {
+        type: 'INVOICE',
+        saleId: sale.id,
+        payload: {
+          nif: org?.nif ?? null,
+          invoiceNumber: ticketNumber,
+          date: new Date().toISOString(),
+          total: Number(total),
           type: 'INVOICE',
-          saleId: sale.id,
-          payload: {
-            nif: org?.nif ?? null,
-            invoiceNumber: ticketNumber,
-            date: new Date().toISOString(),
-            total: Number(total),
-            type: 'INVOICE',
-          },
-        });
+        },
+      });
+      afterCommit(async () => {
+        await this.verifactu.enqueueSend(verifactuRecord.id, tenant.organizationId);
       });
 
       return sale;
