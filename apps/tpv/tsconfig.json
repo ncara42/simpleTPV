@@ -1,10 +1,11 @@
 {
   "extends": "../../packages/web-config/tsconfig.frontend.json",
   "compilerOptions": {
+    "types": ["vitest/globals", "@testing-library/jest-dom/vitest"],
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
   "exclude": ["node_modules", "dist", "e2e"]
 }
