@@ -6,7 +6,8 @@ import { MemoryCache } from '../cache/memory-cache.js';
 import { InMemoryEventBus } from '../events/in-memory-event-bus.js';
 import { tenantStorage } from '../prisma/tenant-context.js';
 import { StockService } from '../stock/stock.service.js';
-import { computeReturnable, computeReturnLineTotal, ReturnsService } from './returns.service.js';
+import { computeReturnable, computeReturnLineTotal } from './returns.domain.js';
+import { ReturnsService } from './returns.service.js';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 

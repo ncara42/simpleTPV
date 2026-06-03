@@ -9,7 +9,6 @@ import {
 
 import { CartPanel } from './CartPanel.js';
 import { CashPanel } from './CashPanel.js';
-import { DEMO_FAMILY_COUNTS, DEMO_TOTAL_COUNT } from './demo/demoData.js';
 import { api } from './lib/auth.js';
 import { beep } from './lib/beep.js';
 import { useCart } from './lib/cart.js';
@@ -24,9 +23,12 @@ import {
 import { eur } from './lib/format.js';
 import { useHealthCheck } from './lib/health.js';
 import { listStores } from './lib/sales.js';
-import { getProductStock, getStoreStock, type StockRow } from './lib/stock.js';
+import { getStoreStock, type StockRow } from './lib/stock.js';
 import { BARCODE_MIN_LENGTH, useBarcodeScanner } from './lib/useBarcodeScanner.js';
 import { useDebounce } from './lib/useDebounce.js';
+import { FamilyChips } from './sale/FamilyChips.js';
+import { ProductGrid } from './sale/ProductGrid.js';
+import { ProductStockModal } from './sale/ProductStockModal.js';
 
 export function SalePage() {
   const [search, setSearch] = useState('');
@@ -250,83 +252,13 @@ export function SalePage() {
           </div>
         </div>
 
-        <div className="sale-families" data-testid="sale-families">
-          {parentFamily ? (
-            <>
-              {/* Dentro de una familia: volver + "Todo · Familia" + subfamilias. */}
-              <button
-                type="button"
-                className="fam-chip fam-back"
-                onClick={() => {
-                  setParentFamily(null);
-                  setFamilyId(null);
-                }}
-                data-testid="fam-back"
-              >
-                ‹ Volver
-              </button>
-              <button
-                className={`fam-chip ${familyId === parentFamily.id ? 'active' : ''}`}
-                onClick={() => setFamilyId(parentFamily.id)}
-                data-testid="fam-chip-parent"
-              >
-                <span
-                  className="chip-dot"
-                  style={{ background: parentFamily.color ?? 'var(--ui-text-soft)' }}
-                />
-                Todo · {parentFamily.name}{' '}
-                <span className="chip-count">{DEMO_FAMILY_COUNTS[parentFamily.id] ?? 0}</span>
-              </button>
-              {parentFamily.children.map((s) => (
-                <button
-                  key={s.id}
-                  className={`fam-chip ${familyId === s.id ? 'active' : ''}`}
-                  onClick={() => setFamilyId(s.id)}
-                  data-testid="fam-chip"
-                >
-                  <span
-                    className="chip-dot"
-                    style={{ background: s.color ?? 'var(--ui-text-soft)' }}
-                  />
-                  {s.name} <span className="chip-count">{DEMO_FAMILY_COUNTS[s.id] ?? 0}</span>
-                </button>
-              ))}
-            </>
-          ) : (
-            <>
-              <button
-                className={`fam-chip ${familyId === null ? 'active' : ''}`}
-                onClick={() => {
-                  setFamilyId(null);
-                  setParentFamily(null);
-                }}
-                data-testid="fam-chip-all"
-              >
-                Todas <span className="chip-count">{DEMO_TOTAL_COUNT}</span>
-              </button>
-              {families.map((f) => (
-                <button
-                  key={f.id}
-                  className={`fam-chip ${familyId === f.id ? 'active' : ''}`}
-                  // Familia con subfamilias → entra en ella; familia hoja → filtra directo.
-                  onClick={() => {
-                    setFamilyId(f.id);
-                    setParentFamily(f.children.length > 0 ? f : null);
-                  }}
-                  data-testid="fam-chip"
-                >
-                  <span
-                    className="chip-dot"
-                    style={{ background: f.color ?? 'var(--ui-text-soft)' }}
-                  />
-                  {f.name}
-                  {f.children.length > 0 && <span className="fam-chevron"> ›</span>}{' '}
-                  <span className="chip-count">{DEMO_FAMILY_COUNTS[f.id] ?? 0}</span>
-                </button>
-              ))}
-            </>
-          )}
-        </div>
+        <FamilyChips
+          families={families}
+          familyId={familyId}
+          parentFamily={parentFamily}
+          setFamilyId={setFamilyId}
+          setParentFamily={setParentFamily}
+        />
 
         {scanned && (
           <div className="scan-banner" data-testid="scan-banner" onClick={() => setScanned(null)}>
@@ -346,59 +278,13 @@ export function SalePage() {
           </div>
         )}
 
-        {isLoading ? (
-          <p className="sale-empty">Cargando…</p>
-        ) : products.length === 0 ? (
-          <p className="sale-empty" data-testid="sale-empty">
-            Sin resultados.
-          </p>
-        ) : (
-          <div className="sale-grid" data-testid="sale-grid">
-            {products.map((p: Product) => {
-              const stock = stockByProduct.get(p.id);
-              return (
-                <button
-                  key={p.id}
-                  className="prod-card"
-                  data-testid="prod-card"
-                  onClick={() => addToCart(p)}
-                >
-                  <span className="prod-name">{p.name}</span>
-                  <span className="prod-meta">
-                    <span className="prod-price">{eur(Number(p.salePrice))} €</span>
-                    {/* Stock vivo (#34): cantidad + semáforo. Click abre el detalle
-                        sin añadir al carrito (stopPropagation). */}
-                    {stock ? (
-                      stock.quantity === 0 ? (
-                        <span className="prod-stock sold-out" data-testid="prod-stock">
-                          Agotado
-                        </span>
-                      ) : (
-                        <span
-                          className={`prod-stock stock-${stock.level}`}
-                          data-testid="prod-stock"
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setStockDetail(p);
-                          }}
-                          title="Ver stock por tienda"
-                        >
-                          {stock.quantity}
-                        </span>
-                      )
-                    ) : (
-                      <span className="prod-stock neutral" data-testid="prod-stock">
-                        —
-                      </span>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
+        <ProductGrid
+          isLoading={isLoading}
+          products={products}
+          stockByProduct={stockByProduct}
+          onAdd={addToCart}
+          onShowStock={setStockDetail}
+        />
       </div>
       <CartPanel
         storeId={activeStore}
@@ -409,44 +295,6 @@ export function SalePage() {
       {stockDetail && (
         <ProductStockModal product={stockDetail} onClose={() => setStockDetail(null)} />
       )}
-    </div>
-  );
-}
-
-// Modal de consulta de stock de un producto en todas las tiendas (#34). Se abre
-// desde la tarjeta de producto sin salir de la venta.
-function ProductStockModal({ product, onClose }: { product: Product; onClose: () => void }) {
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ['product-stock', product.id],
-    queryFn: () => getProductStock(product.id),
-  });
-
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="product-stock-modal">
-        <h3>Stock · {product.name}</h3>
-        {isLoading ? (
-          <p className="sale-empty">Cargando…</p>
-        ) : rows.length === 0 ? (
-          <p className="sale-empty" data-testid="product-stock-empty">
-            Sin stock registrado.
-          </p>
-        ) : (
-          <ul className="prod-stock-list">
-            {rows.map((r) => (
-              <li key={r.storeId} data-testid="product-stock-row">
-                <span className={`stock-dot stock-${r.level}`} /> {r.storeName}:{' '}
-                <strong>{r.quantity}</strong> <span className="muted">(mín {r.minStock})</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="modal-foot">
-          <button type="button" onClick={onClose} data-testid="product-stock-close">
-            Cerrar
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

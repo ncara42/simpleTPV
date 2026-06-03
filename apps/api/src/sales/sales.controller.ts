@@ -12,8 +12,9 @@ import {
 
 import type { JwtPayload } from '../auth/jwt-payload.js';
 import { Roles } from '../auth/roles.decorator.js';
+import type { SaleRole } from './sales.domain.js';
 import { CreateSaleDto, ListSalesQueryDto } from './sales.dto.js';
-import { type SaleRole, SalesService } from './sales.service.js';
+import { SalesService } from './sales.service.js';
 
 @Controller('sales')
 export class SalesController {

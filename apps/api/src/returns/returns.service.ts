@@ -7,42 +7,14 @@ import {
 } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 
+import { round2 } from '../common/money.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import { withTenantTx } from '../prisma/with-tenant-tx.js';
 import { StockService } from '../stock/stock.service.js';
+import { computeReturnable, computeReturnLineTotal } from './returns.domain.js';
 import type { CreateBlindReturnDto, CreateReturnDto } from './returns.dto.js';
-
-// Redondeo a 2 decimales (céntimos), idéntico al de ventas, para que el cálculo
-// coincida con la columna DECIMAL(12,2).
-function round2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
-}
-
-/**
- * Importe a devolver por una línea: la parte proporcional del neto de la
- * SaleLine. unitario neto = saleLineTotal / saleLineQty (precio ya con
- * descuentos de línea/ticket congelados). Función pura, testeable.
- */
-export function computeReturnLineTotal(
-  saleLineTotal: number,
-  saleLineQty: number,
-  qty: number,
-): number {
-  if (saleLineQty <= 0) {
-    return 0;
-  }
-  return round2((saleLineTotal / saleLineQty) * qty);
-}
-
-/**
- * Cantidad disponible para devolver de una SaleLine: lo vendido menos lo ya
- * devuelto en devoluciones anteriores. Nunca negativa. Función pura, testeable.
- */
-export function computeReturnable(saleLineQty: number, alreadyReturned: number): number {
-  return round2(Math.max(0, saleLineQty - alreadyReturned));
-}
 
 @Injectable()
 export class ReturnsService {

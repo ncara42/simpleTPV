@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
+import { round2 } from '../common/money.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import type {
@@ -7,13 +8,6 @@ import type {
   CreateCashMovementDto,
   OpenCashSessionDto,
 } from './cash-sessions.dto.js';
-
-// Redondeo a 2 decimales (céntimos): el cuadre debe coincidir con la columna
-// DECIMAL(12,2) y con lo que el TPV muestra. Sin esto, sumar floats puede
-// arrastrar imprecisión y divergir del importe esperado.
-function round2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
-}
 
 /**
  * Efectivo esperado en el cajón al cerrar: inicial + ventas en efectivo del

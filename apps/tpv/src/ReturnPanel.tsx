@@ -1,20 +1,12 @@
-import { ApiError, type Return, type Sale } from '@simpletpv/auth';
+import { ApiError, type Sale } from '@simpletpv/auth';
 import { Button } from '@simpletpv/ui';
 import { useState } from 'react';
 
 import { BlindReturnPanel } from './BlindReturnPanel.js';
 import { createReturn, listReturns } from './lib/returns.js';
 import { findSaleByTicket } from './lib/sales.js';
-
-function returnedBySaleLine(returns: Return[]): Map<string, number> {
-  const map = new Map<string, number>();
-  for (const r of returns) {
-    for (const l of r.lines) {
-      map.set(l.saleLineId, (map.get(l.saleLineId) ?? 0) + Number(l.qty));
-    }
-  }
-  return map;
-}
+import { returnedBySaleLine } from './return/aggregate.js';
+import { ReturnLines } from './return/ReturnLines.js';
 
 export function ReturnPanel() {
   const [ticketNumber, setTicketNumber] = useState('');
@@ -27,10 +19,6 @@ export function ReturnPanel() {
   const [searching, setSearching] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ total: number } | null>(null);
-
-  function available(line: Sale['lines'][number]): number {
-    return Math.max(0, Number(line.qty) - (returned.get(line.id) ?? 0));
-  }
 
   async function onSearch() {
     const tn = ticketNumber.trim();
@@ -155,53 +143,7 @@ export function ReturnPanel() {
 
       {sale && (
         <>
-          <ul
-            className="divide-y divide-[var(--ui-border)] rounded-xl border border-[var(--ui-border)] bg-white"
-            data-testid="return-lines"
-          >
-            {sale.lines.map((l) => {
-              const max = available(l);
-              const alreadyReturned = returned.get(l.id) ?? 0;
-              return (
-                <li
-                  key={l.id}
-                  className="flex items-center gap-3 px-4 py-3"
-                  data-testid="return-line"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-neutral-900">{l.name}</p>
-                    <p className="text-xs text-neutral-400">
-                      Vendido: {Number(l.qty)} · Devuelto: {alreadyReturned} · Disponible: {max}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      onClick={() => setQty(l.id, (qtys[l.id] ?? 0) - 1, max)}
-                      disabled={max === 0 || (qtys[l.id] ?? 0) === 0}
-                      aria-label="Quitar uno"
-                      className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--ui-border)] text-sm text-neutral-500 hover:bg-neutral-50 disabled:opacity-30"
-                    >
-                      −
-                    </button>
-                    <span
-                      className="w-6 text-center text-sm font-semibold tabular-nums"
-                      data-testid="return-line-qty"
-                    >
-                      {qtys[l.id] ?? 0}
-                    </span>
-                    <button
-                      onClick={() => setQty(l.id, (qtys[l.id] ?? 0) + 1, max)}
-                      disabled={max === 0 || (qtys[l.id] ?? 0) >= max}
-                      aria-label="Añadir uno"
-                      className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--ui-border)] text-sm text-neutral-500 hover:bg-neutral-50 disabled:opacity-30"
-                    >
-                      +
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <ReturnLines lines={sale.lines} qtys={qtys} returned={returned} onSetQty={setQty} />
 
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-neutral-500">Motivo (obligatorio)</span>

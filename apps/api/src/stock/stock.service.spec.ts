@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { MemoryCache } from '../cache/memory-cache.js';
 import { InMemoryEventBus } from '../events/in-memory-event-bus.js';
 import { tenantStorage } from '../prisma/tenant-context.js';
-import { alertTypeFor, stockCacheKey, stockLevel, StockService } from './stock.service.js';
+import { alertTypeFor, stockCacheKey, stockLevel } from './stock.domain.js';
+import { StockService } from './stock.service.js';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 
