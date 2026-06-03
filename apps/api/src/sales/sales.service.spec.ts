@@ -250,6 +250,11 @@ describe('buildTaxBreakdown', () => {
     const sum = r.reduce((acc, t) => acc + t.base + t.cuota, 0);
     expect(sum).toBeCloseTo(subtotal - ticketDiscount, 2);
   });
+
+  it('sin líneas o con subtotal 0 devuelve un desglose vacío', () => {
+    expect(buildTaxBreakdown([])).toEqual([]);
+    expect(buildTaxBreakdown([{ taxRate: 21, lineTotal: 0 }])).toEqual([]);
+  });
 });
 
 describe('computeChange', () => {
@@ -602,6 +607,37 @@ describe('SalesService.create', () => {
     expect(result.ticketNumber).toBe('T01-000007');
     expect(result.total).toBeCloseTo(3, 2);
     expect(result.organizationId).toBe(ORG);
+  });
+
+  it('descuento de línea por importe fijo (€): persiste discountAmt y discountPct 0', async () => {
+    const prisma = makePrisma();
+    prisma.product.findMany = vi.fn(async () => [
+      { id: 'p1', name: 'Café', salePrice: 10, taxRate: 21 },
+    ]);
+    const base = makeBase();
+    const service = makeService(prisma, base);
+
+    const dto = {
+      storeId: '22222222-2222-2222-2222-222222222222',
+      paymentMethod: 'CASH' as const,
+      cashGiven: 50,
+      lines: [{ productId: 'p1', qty: 2, discountAmt: 5 }], // bruto 20 − 5 = neto 15
+    };
+
+    await tenantStorage.run({ organizationId: ORG }, () => service.create(dto, 'user-1', 'ADMIN'));
+
+    const arg = base.__tx.sale.create.mock.calls[0]![0] as {
+      data: {
+        subtotal: number;
+        total: number;
+        lines: { create: Array<{ discountPct: number; discountAmt: number }> };
+      };
+    };
+    expect(arg.data.subtotal).toBeCloseTo(15, 2);
+    expect(arg.data.total).toBeCloseTo(15, 2);
+    // El importe fijo manda: se persiste discountAmt y discountPct queda en 0.
+    expect(arg.data.lines.create[0]!.discountAmt).toBeCloseTo(5, 2);
+    expect(arg.data.lines.create[0]!.discountPct).toBe(0);
   });
 
   it('lanza 409 si no hay caja abierta en la tienda (caja obligatoria)', async () => {
