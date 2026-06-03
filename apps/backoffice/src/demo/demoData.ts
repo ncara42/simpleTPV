@@ -52,6 +52,68 @@ export const DEMO_STORE_SALES: Record<string, Record<StoreSalesPeriod, number>> 
   's-almacen': { today: 0, week: 0, month: 0 },
 };
 
+// Estado operativo y dispositivo autorizado por tienda — demo para #100 (abierta/
+// cerrada según fichaje de personal) y #102 (dispositivo oficial). Es distinto del
+// estado administrativo `active` (Activa/Dormida).
+export interface StoreOps {
+  open: boolean; // hay alguien con fichaje activo en la tienda
+  openedBy: string | null;
+  openedSince: string | null; // hora de apertura (primer fichaje)
+  deviceType: 'ip' | 'token';
+  deviceValue: string;
+  deviceVerified: boolean;
+}
+export const DEMO_STORE_OPS: Record<string, StoreOps> = {
+  's-centro': {
+    open: true,
+    openedBy: 'Marta Ruiz',
+    openedSince: '09:02',
+    deviceType: 'ip',
+    deviceValue: '83.45.12.7',
+    deviceVerified: true,
+  },
+  's-norte': {
+    open: true,
+    openedBy: 'Jon Aguirre',
+    openedSince: '09:15',
+    deviceType: 'ip',
+    deviceValue: '88.12.4.220',
+    deviceVerified: true,
+  },
+  's-sur': {
+    open: false,
+    openedBy: null,
+    openedSince: null,
+    deviceType: 'ip',
+    deviceValue: '90.33.1.5',
+    deviceVerified: false,
+  },
+  's-granvia': {
+    open: true,
+    openedBy: 'Luis Pérez',
+    openedSince: '10:00',
+    deviceType: 'token',
+    deviceValue: 'TPV-GV-01',
+    deviceVerified: true,
+  },
+  's-online': {
+    open: false,
+    openedBy: null,
+    openedSince: null,
+    deviceType: 'token',
+    deviceValue: 'WEB-API',
+    deviceVerified: true,
+  },
+  's-almacen': {
+    open: false,
+    openedBy: null,
+    openedSince: null,
+    deviceType: 'ip',
+    deviceValue: '',
+    deviceVerified: false,
+  },
+};
+
 // ─── Familias y subfamilias (jerarquía de 2 niveles para el mockup) ──────
 // `productCount` es un campo demo extra (FamilyNode no lo trae); FamiliesPage lo lee opcional.
 // Las subfamilias solo existen dentro de su familia padre (parentId apunta a ella).

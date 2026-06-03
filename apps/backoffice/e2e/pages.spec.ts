@@ -49,6 +49,20 @@ test('Tiendas: orden por ventas y filtro de estado (#101, #103)', async ({ page 
   await expect(page.getByTestId('store-card')).toContainText('Almacén');
 });
 
+test('Tiendas: abierta/cerrada y dispositivo autorizado (#100, #102)', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-stores').click();
+  // Indicador operativo Abierta/Cerrada en las cards.
+  await expect(page.getByTestId('store-open').first()).toBeVisible();
+  // Detalle de "Sur" (dispositivo sin verificar) → operativo + flujo de autorización.
+  await page.getByTestId('store-card').filter({ hasText: 'Sur' }).click();
+  await expect(page.getByTestId('store-detail')).toBeVisible();
+  await expect(page.getByTestId('store-detail-open')).toBeVisible();
+  await expect(page.getByTestId('store-device-warn')).toBeVisible();
+  await page.getByTestId('store-device-authorize').click();
+  await expect(page.getByTestId('store-device-ok')).toBeVisible();
+});
+
 test('Usuarios muestra 4 usuarios con badge de rol', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-users').click();

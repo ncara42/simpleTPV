@@ -1,7 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
-import { DEMO_STORE_SALES, type StoreSalesPeriod } from './demo/demoData.js';
+import {
+  DEMO_STORE_OPS,
+  DEMO_STORE_SALES,
+  type StoreOps,
+  type StoreSalesPeriod,
+} from './demo/demoData.js';
 import { createStore, deleteStore, listStores, type Store } from './lib/admin.js';
 import { fmtEur } from './lib/format.js';
 
@@ -36,6 +41,11 @@ export function StoresPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   // Override local del estado activa/dormida (demo: no hay backend que persista).
   const [activeOverrides, setActiveOverrides] = useState<Record<string, boolean>>({});
+  // Estado operativo (fichaje) y dispositivo por tienda; editable en local (demo).
+  const [ops, setOps] = useState<Record<string, StoreOps>>(() =>
+    Object.fromEntries(Object.entries(DEMO_STORE_OPS).map(([k, v]) => [k, { ...v }])),
+  );
+  const [detail, setDetail] = useState<Store | null>(null);
 
   const { data: stores = [], isLoading } = useQuery({
     queryKey: ['stores'],
@@ -62,6 +72,10 @@ export function StoresPage() {
   const isActive = (s: Store): boolean => activeOverrides[s.id] ?? s.active;
   const toggleActive = (s: Store): void =>
     setActiveOverrides((prev) => ({ ...prev, [s.id]: !(prev[s.id] ?? s.active) }));
+
+  const opsOf = (id: string): StoreOps | undefined => ops[id];
+  const patchOps = (id: string, patch: Partial<StoreOps>): void =>
+    setOps((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
 
   const periodLabel = PERIODS.find((p) => p.id === period)?.label ?? '';
 
@@ -139,8 +153,15 @@ export function StoresPage() {
         <div className="store-grid" data-testid="stores-grid">
           {visibleStores.map((s) => {
             const active = isActive(s);
+            const open = opsOf(s.id)?.open ?? false;
             return (
-              <div className="store-card" key={s.id} data-testid="store-card">
+              <div
+                className="store-card"
+                key={s.id}
+                data-testid="store-card"
+                onClick={() => setDetail(s)}
+                title="Ver detalle de la tienda"
+              >
                 <div className="store-card-top">
                   <span className="store-card-icon" aria-hidden="true">
                     <svg
@@ -162,11 +183,17 @@ export function StoresPage() {
                     <span className="store-card-name">{s.name}</span>
                     <span className="store-card-addr">{s.address ?? '—'}</span>
                   </span>
-                  <span
-                    className={`store-badge ${active ? 'active' : 'muted'}`}
-                    data-testid="store-status"
-                  >
-                    {active ? 'Activa' : 'Dormida'}
+                  <span className="store-card-badges">
+                    <span className={`store-open ${open ? 'on' : 'off'}`} data-testid="store-open">
+                      <span className="store-open-dot" />
+                      {open ? 'Abierta' : 'Cerrada'}
+                    </span>
+                    <span
+                      className={`store-badge ${active ? 'active' : 'muted'}`}
+                      data-testid="store-status"
+                    >
+                      {active ? 'Activa' : 'Dormida'}
+                    </span>
                   </span>
                 </div>
                 <div className="store-card-foot">
@@ -177,7 +204,10 @@ export function StoresPage() {
                   <button
                     type="button"
                     className="link-btn store-toggle"
-                    onClick={() => toggleActive(s)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleActive(s);
+                    }}
                     data-testid="store-toggle"
                   >
                     {active ? 'Dormir' : 'Activar'}
@@ -244,6 +274,110 @@ export function StoresPage() {
           </form>
         </div>
       )}
+
+      {detail &&
+        (() => {
+          const o = opsOf(detail.id);
+          const active = isActive(detail);
+          return (
+            <div className="modal-backdrop" onClick={() => setDetail(null)}>
+              <div
+                className="modal modal--form"
+                onClick={(e) => e.stopPropagation()}
+                data-testid="store-detail"
+              >
+                <h3>{detail.name}</h3>
+                <p className="muted">
+                  {detail.address ?? '—'} · Código {detail.code}
+                </p>
+
+                <div className="store-detail-block">
+                  <span className="store-detail-label">Estado administrativo</span>
+                  <div className="store-detail-row">
+                    <span className={`store-badge ${active ? 'active' : 'muted'}`}>
+                      {active ? 'Activa' : 'Dormida'}
+                    </span>
+                    <button className="link-btn" onClick={() => toggleActive(detail)}>
+                      {active ? 'Dormir' : 'Activar'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="store-detail-block">
+                  <span className="store-detail-label">Estado operativo (fichaje)</span>
+                  <div className="store-detail-row" data-testid="store-detail-open">
+                    <span className={`store-open ${o?.open ? 'on' : 'off'}`}>
+                      <span className="store-open-dot" />
+                      {o?.open ? 'Abierta' : 'Cerrada'}
+                    </span>
+                    <span className="muted">
+                      {o?.open
+                        ? `Abrió ${o.openedBy} a las ${o.openedSince}`
+                        : 'Sin fichajes activos'}
+                    </span>
+                  </div>
+                  <button
+                    className="link-btn"
+                    onClick={() =>
+                      patchOps(
+                        detail.id,
+                        o?.open
+                          ? { open: false, openedBy: null, openedSince: null }
+                          : { open: true, openedBy: 'Tú', openedSince: 'ahora' },
+                      )
+                    }
+                    data-testid="store-open-toggle"
+                  >
+                    {o?.open ? 'Forzar cierre' : 'Marcar abierta'}
+                  </button>
+                </div>
+
+                <div className="store-detail-block" data-testid="store-device">
+                  <span className="store-detail-label">Dispositivo autorizado</span>
+                  <label>
+                    {o?.deviceType === 'ip'
+                      ? 'IP del dispositivo'
+                      : 'Identificador del dispositivo'}
+                    <input
+                      value={o?.deviceValue ?? ''}
+                      placeholder={o?.deviceType === 'ip' ? 'p. ej. 83.45.12.7' : 'p. ej. TPV-01'}
+                      onChange={(e) =>
+                        patchOps(detail.id, { deviceValue: e.target.value, deviceVerified: false })
+                      }
+                      data-testid="store-device-value"
+                    />
+                  </label>
+                  {o?.deviceVerified ? (
+                    <p className="store-device-ok" data-testid="store-device-ok">
+                      ✓ Dispositivo verificado.
+                    </p>
+                  ) : (
+                    <p className="store-device-warn" data-testid="store-device-warn">
+                      ⚠ Dispositivo no verificado: el TPV de esta tienda no podrá operar hasta
+                      autorizarlo.
+                    </p>
+                  )}
+                  {!o?.deviceVerified && (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => patchOps(detail.id, { deviceVerified: true })}
+                      data-testid="store-device-authorize"
+                    >
+                      Autorizar dispositivo
+                    </button>
+                  )}
+                </div>
+
+                <div className="modal-foot">
+                  <button type="button" onClick={() => setDetail(null)}>
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
     </section>
   );
 }

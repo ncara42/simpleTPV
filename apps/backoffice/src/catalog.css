@@ -224,6 +224,70 @@
   flex-shrink: 0;
 }
 
+/* ─── Tiendas: abierta/cerrada (fichaje) y detalle con dispositivo (#100, #102) ─── */
+.store-card {
+  cursor: pointer;
+}
+.store-card-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+.store-card-badges .store-badge {
+  margin-left: 0;
+}
+.store-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+}
+.store-open-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--ui-text-muted);
+}
+.store-open.on {
+  color: #166534;
+}
+.store-open.on .store-open-dot {
+  background: #16a34a;
+}
+.store-detail-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.store-detail-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-muted);
+}
+.store-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.store-detail-row .store-badge {
+  margin-left: 0;
+}
+.store-device-ok {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #166534;
+}
+.store-device-warn {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #b45309;
+}
+
 /* ─── Toggle segmentado (periodos del dashboard, subtabs de stock/compras) ─── */
 .bo-tabs {
   display: inline-flex;
