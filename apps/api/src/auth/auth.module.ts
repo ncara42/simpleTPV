@@ -30,8 +30,10 @@ function authConfig(): AuthConfig {
     AuthLookupService,
     {
       provide: AuthService,
+      // AuthLookupService implementa UserLookup y RefreshTokenStore (misma conexión
+      // app_admin/BYPASSRLS), así que se pasa para ambos puertos.
       useFactory: (lookup: AuthLookupService, jwt: JwtService) =>
-        new AuthService(lookup, jwt, authConfig()),
+        new AuthService(lookup, lookup, jwt, authConfig()),
       inject: [AuthLookupService, JwtService],
     },
     {

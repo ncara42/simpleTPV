@@ -88,8 +88,30 @@ model User {
   returns          Return[]
   stockMovements   StockMovement[]
   timeClockEntries TimeClockEntry[]
+  refreshTokens    RefreshToken[]
 
   @@index([organizationId])
+}
+
+// Sesiones de refresh (SEC-06): un registro por refresh token emitido (id = jti
+// del JWT). La rotación marca usedAt y emite uno nuevo en la misma familia; si se
+// presenta un token ya usado (reuso → robo), se revoca toda la familia. La
+// EXPIRACIÓN la valida el propio JWT (exp); aquí solo vive el estado de rotación.
+// Se accede solo desde el flujo de auth con el rol app_admin (BYPASSRLS), porque
+// login/refresh corren sin contexto de tenant.
+model RefreshToken {
+  id             String    @id @db.Uuid // = jti del refresh JWT
+  organizationId String    @db.Uuid
+  userId         String    @db.Uuid
+  familyId       String    @db.Uuid
+  usedAt         DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([familyId])
+  @@index([userId])
 }
 
 model UserStore {

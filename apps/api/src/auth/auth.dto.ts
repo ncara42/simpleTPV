@@ -1,10 +1,8 @@
 import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
-// DTOs validados de los endpoints públicos de auth. Son CLASES (no interfaces)
-// para que la ValidationPipe global valide y recorte la entrada: es la única
-// superficie no autenticada de la API (SEC-12). Sin esto, email/password/
-// refreshToken podían llegar con cualquier tipo y propiedades extra.
-
+// DTO validado del login (clase, no interfaz) para que la ValidationPipe global
+// valide y recorte la única superficie no autenticada con body (SEC-12). El
+// refresh ya no lleva body: el token viaja en una cookie httpOnly (SEC-20).
 export class LoginDto {
   @IsEmail()
   @MaxLength(254)
@@ -14,11 +12,4 @@ export class LoginDto {
   @IsNotEmpty()
   @MaxLength(128)
   password!: string;
-}
-
-export class RefreshDto {
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(4096)
-  refreshToken!: string;
 }
