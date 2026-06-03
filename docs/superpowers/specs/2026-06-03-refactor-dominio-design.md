@@ -101,8 +101,13 @@ los hallazgos de un barrido automático antes de actuar.
 
 ### Infra / tests
 
-- ESLint: añadir reglas de React (hooks/a11y) para `apps/*` y de NestJS para la
-  API (puede aflorar violaciones existentes: hacerlo en su propia tanda).
+- **React Compiler rules (eslint-plugin-react-hooks v7)**: el preset
+  `recommended` completo añade reglas nuevas (`set-state-in-effect`, `refs`,
+  `purity`, `immutability`…). Medido: solo **5 errores** en 4 ficheros
+  (FamiliesPage, SalesHistoryPage, DiscountModal, useBarcodeScanner), todos
+  patrones idiomáticos (reset de estado por prop, latest-ref). Arreglarlos cambia
+  comportamiento → requiere tests de render primero. Tanda propia.
+- ESLint NestJS: reglas específicas para `apps/api` (puede aflorar violaciones).
 
 ## Cómo continuar
 
