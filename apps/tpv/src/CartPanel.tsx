@@ -1,10 +1,11 @@
 import { ApiError, type SaleTicket } from '@simpletpv/auth';
 import { Button } from '@simpletpv/ui';
-import { Printer, RotateCcw, Trash2 } from 'lucide-react';
+import { Percent, Printer, RotateCcw, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 
+import { DiscountModal } from './DiscountModal.js';
 import { useAuthStore } from './lib/auth.js';
-import { useCart } from './lib/cart.js';
+import { lineDiscountOf, useCart } from './lib/cart.js';
 import { eur } from './lib/format.js';
 import { createSale, getTicket, voidSale } from './lib/sales.js';
 import { type PaymentData, PaymentModal } from './PaymentModal.js';
@@ -23,13 +24,22 @@ export function CartPanel({
   const setQty = useCart((s) => s.setQty);
   const ticketDiscountPct = useCart((s) => s.ticketDiscountPct);
   const ticketDiscountAmt = useCart((s) => s.ticketDiscountAmt);
+  const setLineDiscount = useCart((s) => s.setLineDiscount);
+  const setTicketDiscount = useCart((s) => s.setTicketDiscount);
+  const clearDiscounts = useCart((s) => s.clearDiscounts);
   const clear = useCart((s) => s.clear);
   const lineNet = useCart((s) => s.lineNet);
+  const discountTotal = useCart((s) => s.discountTotal());
   const total = useCart((s) => s.total());
 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  // Descuento manual abierto: null = cerrado. Lleva el modo y, opcionalmente, la
+  // línea concreta a editar (al pulsar el badge de descuento de una línea).
+  const [discount, setDiscount] = useState<{ mode: 'line' | 'ticket'; productId?: string } | null>(
+    null,
+  );
   const [confirmed, setConfirmed] = useState(false);
   const [ticket, setTicket] = useState<SaleTicket | null>(null);
   const [ticketError, setTicketError] = useState<string | null>(null);
@@ -60,7 +70,12 @@ export function CartPanel({
         lines: items.map((i) => ({
           productId: i.productId,
           qty: i.qty,
-          ...(i.discountPct > 0 ? { discountPct: i.discountPct } : {}),
+          // El importe fijo tiene precedencia sobre el % (igual que el servidor).
+          ...(i.discountAmt > 0
+            ? { discountAmt: i.discountAmt }
+            : i.discountPct > 0
+              ? { discountPct: i.discountPct }
+              : {}),
         })),
         paymentMethod: payment.paymentMethod,
         ...(payment.cashGiven !== undefined ? { cashGiven: payment.cashGiven } : {}),
@@ -208,17 +223,28 @@ export function CartPanel({
       className="flex w-80 shrink-0 flex-col rounded-xl border border-[var(--ui-border)] bg-white shadow-sm"
       data-testid="cart"
     >
-      {/* Cabecera: Ticket actual + Vaciar */}
+      {/* Cabecera: Ticket actual + Descuento + Vaciar */}
       <div className="flex items-center justify-between border-b border-[var(--ui-border)] px-4 py-3">
         <h2 className="text-sm font-semibold text-neutral-900">Ticket actual</h2>
-        <button
-          className="text-sm font-medium text-neutral-400 hover:text-neutral-700"
-          onClick={clear}
-          disabled={items.length === 0}
-          data-testid="cart-clear"
-        >
-          Vaciar
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            className="flex items-center gap-1 text-sm font-medium text-neutral-400 hover:text-neutral-700 disabled:opacity-40"
+            onClick={() => setDiscount({ mode: 'line' })}
+            disabled={items.length === 0}
+            data-testid="cart-discount"
+          >
+            <Percent className="h-3.5 w-3.5" />
+            Descuento
+          </button>
+          <button
+            className="text-sm font-medium text-neutral-400 hover:text-neutral-700"
+            onClick={clear}
+            disabled={items.length === 0}
+            data-testid="cart-clear"
+          >
+            Vaciar
+          </button>
+        </div>
       </div>
 
       {/* Líneas */}
@@ -231,6 +257,9 @@ export function CartPanel({
           <ul className="divide-y divide-[var(--ui-border)]" data-testid="cart-lines">
             {items.map((i) => {
               const net = lineNet(i);
+              const disc = lineDiscountOf(i);
+              const discLabel =
+                i.discountAmt > 0 ? `−${eur(i.discountAmt)} €` : `−${i.discountPct}%`;
               return (
                 <li key={i.productId} className="py-3" data-testid="cart-line">
                   <div className="flex items-start justify-between gap-2">
@@ -240,11 +269,21 @@ export function CartPanel({
                       </span>
                       <span className="text-xs text-neutral-400">{eur(i.unitPrice)} € / ud</span>
                     </div>
-                    <span
-                      className="shrink-0 text-sm font-semibold tabular-nums text-neutral-900"
-                      data-testid="cart-line-total"
-                    >
-                      {eur(net)} €
+                    <span className="shrink-0 text-right">
+                      {disc > 0 && (
+                        <span
+                          className="block text-xs tabular-nums text-neutral-400 line-through"
+                          data-testid="cart-line-gross"
+                        >
+                          {eur(i.unitPrice * i.qty)} €
+                        </span>
+                      )}
+                      <span
+                        className="text-sm font-semibold tabular-nums text-neutral-900"
+                        data-testid="cart-line-total"
+                      >
+                        {eur(net)} €
+                      </span>
                     </span>
                   </div>
                   <div className="mt-2 flex items-center gap-1.5">
@@ -263,6 +302,28 @@ export function CartPanel({
                     >
                       +
                     </button>
+                    {disc > 0 && (
+                      <span className="ml-auto flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setDiscount({ mode: 'line', productId: i.productId })}
+                          data-testid="cart-line-discount"
+                          title="Editar descuento"
+                          className="rounded-md bg-green-50 px-1.5 py-0.5 text-xs font-semibold text-green-700 hover:bg-green-100"
+                        >
+                          {discLabel}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLineDiscount(i.productId, { pct: 0 })}
+                          aria-label="Quitar descuento de la línea"
+                          data-testid="cart-line-discount-clear"
+                          className="flex h-6 w-6 items-center justify-center rounded-md border border-[var(--ui-border)] text-neutral-400 hover:bg-neutral-50"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    )}
                   </div>
                 </li>
               );
@@ -271,8 +332,26 @@ export function CartPanel({
         )}
       </div>
 
-      {/* Pie: base imponible + IVA + total + cobrar */}
+      {/* Pie: descuento + base imponible + IVA + total + cobrar */}
       <div className="space-y-2 border-t border-[var(--ui-border)] p-4">
+        {discountTotal > 0 && (
+          <div className="flex items-center justify-between text-sm text-green-700">
+            <span className="flex items-center gap-2">
+              Descuento
+              <button
+                type="button"
+                onClick={clearDiscounts}
+                data-testid="cart-discount-clear"
+                className="text-xs font-medium text-neutral-400 underline hover:text-neutral-700"
+              >
+                Quitar
+              </button>
+            </span>
+            <span className="tabular-nums" data-testid="cart-discount-total">
+              −{eur(discountTotal)} €
+            </span>
+          </div>
+        )}
         <div className="flex justify-between text-sm text-neutral-500">
           <span>Base imponible</span>
           <span className="tabular-nums" data-testid="cart-base">
@@ -334,6 +413,25 @@ export function CartPanel({
           onConfirm={onConfirmPayment}
           onCancel={() => setModalOpen(false)}
           busy={busy}
+        />
+      )}
+
+      {discount && (
+        <DiscountModal
+          items={items}
+          ticketDiscountPct={ticketDiscountPct}
+          ticketDiscountAmt={ticketDiscountAmt}
+          initialMode={discount.mode}
+          {...(discount.productId ? { initialProductId: discount.productId } : {})}
+          onApplyLine={(productId, d) => {
+            setLineDiscount(productId, d);
+            setDiscount(null);
+          }}
+          onApplyTicket={(d) => {
+            setTicketDiscount(d);
+            setDiscount(null);
+          }}
+          onCancel={() => setDiscount(null)}
         />
       )}
     </aside>

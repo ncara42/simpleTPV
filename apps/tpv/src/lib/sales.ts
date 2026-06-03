@@ -41,6 +41,7 @@ export function getTicket(_id: string): Promise<SaleTicket> {
         qty: '1',
         unitPrice: '24.90',
         discountPct: '0',
+        discountAmt: '0',
         lineTotal: '24.90',
       },
       {
@@ -48,6 +49,7 @@ export function getTicket(_id: string): Promise<SaleTicket> {
         qty: '2',
         unitPrice: '14.50',
         discountPct: '0',
+        discountAmt: '0',
         lineTotal: '29.00',
       },
       {
@@ -55,6 +57,7 @@ export function getTicket(_id: string): Promise<SaleTicket> {
         qty: '1',
         unitPrice: '19.90',
         discountPct: '0',
+        discountAmt: '0',
         lineTotal: '19.90',
       },
     ],

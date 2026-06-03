@@ -6,14 +6,27 @@ export interface CartItem {
   name: string;
   unitPrice: number;
   qty: number;
-  // % de descuento de la línea (0–100). 0 = sin descuento.
-  discountPct: number;
+  // Descuento de la línea. El importe fijo (discountAmt) tiene precedencia sobre
+  // el porcentaje (discountPct), igual que el descuento de ticket. Son
+  // mutuamente excluyentes: al fijar uno, el otro vuelve a 0.
+  discountPct: number; // 0–100
+  discountAmt: number; // importe fijo €, capado al bruto
 }
 
 // Redondeo a 2 decimales (céntimos). Misma lógica que el servidor (round2 en
 // sales.service.ts) para que el total mostrado coincida con el calculado en API.
 function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+// Importe efectivo del descuento de una línea: el importe fijo tiene precedencia
+// sobre el % y se capa al bruto (mismo criterio que computeTotals en el backend).
+// Exportado para que CartPanel muestre el descuento sin duplicar la lógica.
+export function lineDiscountOf(item: CartItem): number {
+  const gross = round2(item.unitPrice * item.qty);
+  return item.discountAmt > 0
+    ? round2(Math.min(item.discountAmt, gross))
+    : round2((gross * item.discountPct) / 100);
 }
 
 interface CartState {
@@ -23,8 +36,10 @@ interface CartState {
   ticketDiscountAmt: number;
   addItem: (product: Pick<Product, 'id' | 'name' | 'salePrice'>) => void;
   setQty: (productId: string, qty: number) => void;
-  setLineDiscount: (productId: string, pct: number) => void;
+  setLineDiscount: (productId: string, d: { pct?: number; amt?: number }) => void;
   setTicketDiscount: (d: { pct?: number; amt?: number }) => void;
+  // Quita todos los descuentos (de línea y de ticket) sin vaciar el carrito.
+  clearDiscounts: () => void;
   removeItem: (productId: string) => void;
   clear: () => void;
   lineNet: (item: CartItem) => number;
@@ -57,6 +72,7 @@ export const useCart = create<CartState>((set, get) => ({
             unitPrice: Number(product.salePrice),
             qty: 1,
             discountPct: 0,
+            discountAmt: 0,
           },
         ],
       };
@@ -68,16 +84,20 @@ export const useCart = create<CartState>((set, get) => ({
       }
       return { items: state.items.map((i) => (i.productId === productId ? { ...i, qty } : i)) };
     }),
-  setLineDiscount: (productId, pct) =>
-    set((state) => {
-      // Capamos el % al rango válido [0, 100].
-      const clamped = Math.min(100, Math.max(0, pct));
-      return {
-        items: state.items.map((i) =>
-          i.productId === productId ? { ...i, discountPct: clamped } : i,
-        ),
-      };
-    }),
+  setLineDiscount: (productId, { pct, amt }) =>
+    set((state) => ({
+      items: state.items.map((i) =>
+        i.productId === productId
+          ? {
+              ...i,
+              // Solo uno de los dos: el importe tiene precedencia (como en el ticket).
+              ...(amt !== undefined
+                ? { discountAmt: Math.max(0, amt), discountPct: 0 }
+                : { discountPct: Math.min(100, Math.max(0, pct ?? 0)), discountAmt: 0 }),
+            }
+          : i,
+      ),
+    })),
   setTicketDiscount: ({ pct, amt }) =>
     set(() => ({
       // Solo uno de los dos: el importe tiene precedencia (como en el servidor).
@@ -85,15 +105,17 @@ export const useCart = create<CartState>((set, get) => ({
         ? { ticketDiscountAmt: Math.max(0, amt), ticketDiscountPct: 0 }
         : { ticketDiscountPct: Math.min(100, Math.max(0, pct ?? 0)), ticketDiscountAmt: 0 }),
     })),
+  clearDiscounts: () =>
+    set((state) => ({
+      items: state.items.map((i) => ({ ...i, discountPct: 0, discountAmt: 0 })),
+      ticketDiscountPct: 0,
+      ticketDiscountAmt: 0,
+    })),
   removeItem: (productId) =>
     set((state) => ({ items: state.items.filter((i) => i.productId !== productId) })),
   clear: () => set({ items: [], ticketDiscountPct: 0, ticketDiscountAmt: 0 }),
-  // Neto de una línea: bruto menos su descuento de línea.
-  lineNet: (item) => {
-    const gross = round2(item.unitPrice * item.qty);
-    const discountAmt = round2((gross * item.discountPct) / 100);
-    return round2(gross - discountAmt);
-  },
+  // Neto de una línea: bruto menos su descuento de línea (% o importe fijo).
+  lineNet: (item) => round2(round2(item.unitPrice * item.qty) - lineDiscountOf(item)),
   // subtotal = Σ netos de línea (antes del descuento de ticket).
   subtotal: () => round2(get().items.reduce((acc, i) => acc + get().lineNet(i), 0)),
   // Descuento de ticket: importe (capado al subtotal) con precedencia sobre %.
@@ -110,12 +132,7 @@ export const useCart = create<CartState>((set, get) => ({
   },
   // discountTotal = Σ descuentos de línea + descuento de ticket.
   discountTotal: () => {
-    const lineDiscounts = round2(
-      get().items.reduce((acc, i) => {
-        const gross = round2(i.unitPrice * i.qty);
-        return acc + round2((gross * i.discountPct) / 100);
-      }, 0),
-    );
+    const lineDiscounts = round2(get().items.reduce((acc, i) => acc + lineDiscountOf(i), 0));
     return round2(lineDiscounts + get().ticketDiscount());
   },
   // total = subtotal − descuento de ticket.

@@ -1,38 +1,105 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { CartItem } from './lib/cart.js';
 
+type Mode = 'line' | 'ticket';
+type Kind = 'pct' | 'amt';
+
 interface DiscountModalProps {
   items: CartItem[];
-  onApplyLine: (productId: string, pct: number) => void;
+  // Valores actuales del descuento de ticket, para precargar al editar.
+  ticketDiscountPct: number;
+  ticketDiscountAmt: number;
+  // Punto de entrada opcional: al pulsar el descuento de una línea concreta el
+  // modal abre directamente en esa línea para editarla.
+  initialMode?: Mode;
+  initialProductId?: string;
+  onApplyLine: (productId: string, d: { pct?: number; amt?: number }) => void;
   onApplyTicket: (d: { pct?: number; amt?: number }) => void;
   onCancel: () => void;
 }
 
-type Mode = 'line' | 'ticket';
-type TicketKind = 'pct' | 'amt';
+function parse(v: string): number {
+  const n = Number(v.replace(',', '.'));
+  return Number.isNaN(n) ? 0 : n;
+}
 
-export function DiscountModal({ items, onApplyLine, onApplyTicket, onCancel }: DiscountModalProps) {
-  const [mode, setMode] = useState<Mode>('line');
-  const [productId, setProductId] = useState<string>(items[0]?.productId ?? '');
-  const [pct, setPct] = useState('');
-  const [ticketKind, setTicketKind] = useState<TicketKind>('pct');
-  const [ticketValue, setTicketValue] = useState('');
+// Deriva el tipo (%/€) y el valor a mostrar del descuento actual de una línea.
+function lineFields(item: CartItem | undefined): { kind: Kind; value: string } {
+  if (item && item.discountAmt > 0) return { kind: 'amt', value: String(item.discountAmt) };
+  if (item && item.discountPct > 0) return { kind: 'pct', value: String(item.discountPct) };
+  return { kind: 'pct', value: '' };
+}
 
-  function parse(v: string): number {
-    const n = Number(v.replace(',', '.'));
-    return Number.isNaN(n) ? 0 : n;
-  }
+export function DiscountModal({
+  items,
+  ticketDiscountPct,
+  ticketDiscountAmt,
+  initialMode = 'line',
+  initialProductId,
+  onApplyLine,
+  onApplyTicket,
+  onCancel,
+}: DiscountModalProps) {
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const [productId, setProductId] = useState<string>(initialProductId ?? items[0]?.productId ?? '');
+
+  const [lineKind, setLineKind] = useState<Kind>('pct');
+  const [lineValue, setLineValue] = useState('');
+
+  const ticketInit =
+    ticketDiscountAmt > 0
+      ? { kind: 'amt' as Kind, value: String(ticketDiscountAmt) }
+      : ticketDiscountPct > 0
+        ? { kind: 'pct' as Kind, value: String(ticketDiscountPct) }
+        : { kind: 'pct' as Kind, value: '' };
+  const [ticketKind, setTicketKind] = useState<Kind>(ticketInit.kind);
+  const [ticketValue, setTicketValue] = useState(ticketInit.value);
+
+  // Precarga el descuento de la línea seleccionada (y se resincroniza al cambiar
+  // de línea) para que el modal edite en vez de empezar siempre vacío.
+  useEffect(() => {
+    const item = items.find((i) => i.productId === productId);
+    const f = lineFields(item);
+    setLineKind(f.kind);
+    setLineValue(f.value);
+  }, [productId, items]);
 
   function handleApply() {
     if (mode === 'line') {
       if (!productId) return;
-      onApplyLine(productId, parse(pct));
-    } else if (ticketKind === 'pct') {
-      onApplyTicket({ pct: parse(ticketValue) });
+      onApplyLine(
+        productId,
+        lineKind === 'amt' ? { amt: parse(lineValue) } : { pct: parse(lineValue) },
+      );
     } else {
-      onApplyTicket({ amt: parse(ticketValue) });
+      onApplyTicket(
+        ticketKind === 'amt' ? { amt: parse(ticketValue) } : { pct: parse(ticketValue) },
+      );
     }
+  }
+
+  function kindToggle(kind: Kind, set: (k: Kind) => void, testidPrefix: string) {
+    return (
+      <div className="grid grid-cols-2 gap-2">
+        {(['pct', 'amt'] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => set(k)}
+            data-testid={`${testidPrefix}-${k}`}
+            className={[
+              'h-9 rounded-lg border text-sm font-medium transition-colors',
+              kind === k
+                ? 'border-neutral-900 bg-neutral-900 text-white'
+                : 'border-[var(--ui-border)] bg-white text-neutral-600 hover:bg-neutral-50',
+            ].join(' ')}
+          >
+            {k === 'pct' ? 'Porcentaje %' : 'Importe €'}
+          </button>
+        ))}
+      </div>
+    );
   }
 
   return (
@@ -89,17 +156,20 @@ export function DiscountModal({ items, onApplyLine, onApplyTicket, onCancel }: D
                   ))}
                 </select>
               </label>
+              {kindToggle(lineKind, setLineKind, 'disc-line')}
               <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-neutral-500">Descuento (%)</span>
+                <span className="text-xs font-medium text-neutral-500">
+                  {lineKind === 'pct' ? 'Descuento (%)' : 'Descuento (€)'}
+                </span>
                 <input
                   type="number"
                   inputMode="decimal"
                   min={0}
-                  max={100}
-                  step="1"
-                  value={pct}
-                  onChange={(e) => setPct(e.target.value)}
-                  data-testid="disc-pct"
+                  max={lineKind === 'pct' ? 100 : undefined}
+                  step={lineKind === 'pct' ? '1' : '0.01'}
+                  value={lineValue}
+                  onChange={(e) => setLineValue(e.target.value)}
+                  data-testid="disc-line-value"
                   autoFocus
                   className="h-9 w-full rounded-lg border border-[var(--ui-border)] bg-white px-3 text-sm outline-none focus:border-neutral-400"
                 />
@@ -107,24 +177,7 @@ export function DiscountModal({ items, onApplyLine, onApplyTicket, onCancel }: D
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                {(['pct', 'amt'] as const).map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => setTicketKind(k)}
-                    data-testid={k === 'pct' ? 'disc-ticket-pct' : 'disc-ticket-amt'}
-                    className={[
-                      'h-9 rounded-lg border text-sm font-medium transition-colors',
-                      ticketKind === k
-                        ? 'border-neutral-900 bg-neutral-900 text-white'
-                        : 'border-[var(--ui-border)] bg-white text-neutral-600 hover:bg-neutral-50',
-                    ].join(' ')}
-                  >
-                    {k === 'pct' ? 'Porcentaje %' : 'Importe €'}
-                  </button>
-                ))}
-              </div>
+              {kindToggle(ticketKind, setTicketKind, 'disc-ticket')}
               <label className="block space-y-1.5">
                 <span className="text-xs font-medium text-neutral-500">
                   {ticketKind === 'pct' ? 'Descuento (%)' : 'Descuento (€)'}
@@ -133,10 +186,11 @@ export function DiscountModal({ items, onApplyLine, onApplyTicket, onCancel }: D
                   type="number"
                   inputMode="decimal"
                   min={0}
+                  max={ticketKind === 'pct' ? 100 : undefined}
                   step={ticketKind === 'pct' ? '1' : '0.01'}
                   value={ticketValue}
                   onChange={(e) => setTicketValue(e.target.value)}
-                  data-testid={ticketKind === 'pct' ? 'disc-pct' : 'disc-amt'}
+                  data-testid="disc-ticket-value"
                   autoFocus
                   className="h-9 w-full rounded-lg border border-[var(--ui-border)] bg-white px-3 text-sm outline-none focus:border-neutral-400"
                 />

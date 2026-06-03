@@ -70,6 +70,27 @@ describe('computeTotals', () => {
     expect(result.total).toBeCloseTo(18, 2);
   });
 
+  it('aplica descuento por línea por importe fijo (€) con precedencia sobre el %', () => {
+    const result = computeTotals([
+      // Si llegan ambos, el importe fijo manda (igual que el descuento de ticket).
+      { productId: 'p1', name: 'A', unitPrice: 10, qty: 2, discountPct: 50, discountAmt: 5 },
+    ]);
+    expect(result.lines[0]!.gross).toBeCloseTo(20, 2);
+    expect(result.lines[0]!.discountAmt).toBeCloseTo(5, 2);
+    expect(result.lines[0]!.lineTotal).toBeCloseTo(15, 2);
+    expect(result.subtotal).toBeCloseTo(15, 2);
+    expect(result.discountTotal).toBeCloseTo(5, 2);
+  });
+
+  it('capa el importe fijo de línea al bruto (no negativos)', () => {
+    const result = computeTotals([
+      { productId: 'p1', name: 'A', unitPrice: 10, qty: 1, discountAmt: 999 },
+    ]);
+    expect(result.lines[0]!.discountAmt).toBeCloseTo(10, 2);
+    expect(result.lines[0]!.lineTotal).toBeCloseTo(0, 2);
+    expect(result.total).toBeCloseTo(0, 2);
+  });
+
   it('aplica descuento de ticket por porcentaje sobre el subtotal neto', () => {
     const result = computeTotals([{ productId: 'p1', name: 'A', unitPrice: 100, qty: 1 }], {
       ticketDiscountPct: 25,

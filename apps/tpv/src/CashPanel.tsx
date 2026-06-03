@@ -2,6 +2,7 @@ import { ApiError, type CashSession } from '@simpletpv/auth';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { CashCount } from './CashCount.js';
 import {
   DEMO_CASH_EXPECTED,
   DEMO_CASH_OPENING,
@@ -14,7 +15,8 @@ import { eur } from './lib/format.js';
 export function CashPanel({ storeId }: { storeId: string | null }) {
   const queryClient = useQueryClient();
   const [openingAmount, setOpeningAmount] = useState('');
-  const [countedAmount, setCountedAmount] = useState('');
+  // Total contado, alimentado por el contador de denominaciones (CashCount).
+  const [counted, setCounted] = useState(0);
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [closed, setClosed] = useState<CashSession | null>(null);
@@ -46,7 +48,13 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
   const closeMutation = useMutation({
     mutationFn: (amount: number) => closeCashSession(session!.id, amount),
     onSuccess: (result) => {
-      setCountedAmount('');
+      setCounted(0);
+      // El cierre se confirmó: descartamos el borrador del conteo persistido.
+      try {
+        localStorage.removeItem(`cash-count:${result.id}`);
+      } catch {
+        // localStorage no disponible: nada que limpiar.
+      }
       setClosing(false);
       setError(null);
       setClosed(result);
@@ -85,11 +93,11 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
           <div className="cash-reconciliation" data-testid="cash-summary">
             <div className="cash-recon-row">
               <span style={{ color: 'var(--ui-text-muted)' }}>Esperado</span>
-              <span data-testid="cash-expected">{expected.toFixed(2)} €</span>
+              <span data-testid="cash-expected">{eur(expected)} €</span>
             </div>
             <div className="cash-recon-row">
               <span style={{ color: 'var(--ui-text-muted)' }}>Contado</span>
-              <span data-testid="cash-counted-result">{counted.toFixed(2)} €</span>
+              <span data-testid="cash-counted-result">{eur(counted)} €</span>
             </div>
             <div
               className={`cash-recon-row cash-diff ${diffColor === 'text-green-700' ? 'cash-diff-positive' : diffColor === 'text-red-600' ? 'cash-diff-negative' : 'cash-diff-zero'}`}
@@ -97,7 +105,7 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
               <span>Diferencia</span>
               <span data-testid="cash-difference">
                 {difference > 0 ? '+' : ''}
-                {difference.toFixed(2)} €
+                {eur(difference)} €
               </span>
             </div>
           </div>
@@ -117,8 +125,6 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
   // Caja abierta
   if (session) {
     const opening = Number(session.openingAmount);
-    const counted = Number(countedAmount);
-    const hasCounted = countedAmount !== '' && !Number.isNaN(counted) && counted >= 0;
 
     return (
       <section className="cash-panel" data-testid="cash-panel">
@@ -160,40 +166,35 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
             className="cash-form"
             onSubmit={(e) => {
               e.preventDefault();
-              if (hasCounted) closeMutation.mutate(counted);
+              closeMutation.mutate(counted);
             }}
           >
-            <label className="cash-field">
-              <span>Efectivo contado (€)</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={countedAmount}
-                onChange={(e) => setCountedAmount(e.target.value)}
-                data-testid="cash-counted"
-                autoFocus
-              />
-            </label>
+            {/* Conteo por denominaciones (persiste mientras la caja siga abierta). */}
+            <CashCount
+              expected={Number(session.expectedAmount ?? 0)}
+              storageKey={`cash-count:${session.id}`}
+              onTotalChange={setCounted}
+            />
             <div className="cash-actions">
               <button
                 type="button"
                 className="cash-btn-cancel"
                 onClick={() => {
+                  // No limpiamos el conteo: queda persistido para retomarlo.
                   setClosing(false);
-                  setCountedAmount('');
                   setError(null);
                 }}
+                data-testid="cash-close-cancel"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                disabled={!hasCounted || closeMutation.isPending}
+                disabled={closeMutation.isPending}
                 data-testid="cash-close-confirm"
                 className="cash-btn-close"
               >
-                {closeMutation.isPending ? 'Cerrando…' : 'Confirmar cierre'}
+                {closeMutation.isPending ? 'Cerrando…' : `Confirmar cierre · ${eur(counted)} €`}
               </button>
             </div>
           </form>

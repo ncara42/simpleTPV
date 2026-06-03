@@ -1,23 +1,39 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import { CartPanel } from './CartPanel.js';
 import { CashPanel } from './CashPanel.js';
 import { DEMO_FAMILY_COUNTS, DEMO_TOTAL_COUNT } from './demo/demoData.js';
 import { api } from './lib/auth.js';
+import { beep } from './lib/beep.js';
 import { useCart } from './lib/cart.js';
 import { currentCashSession } from './lib/cash.js';
-import { findByBarcode, listFamilies, type Product, searchProducts } from './lib/catalog.js';
+import {
+  type FamilyNode,
+  findByBarcode,
+  listFamilies,
+  type Product,
+  searchProducts,
+} from './lib/catalog.js';
 import { eur } from './lib/format.js';
 import { useHealthCheck } from './lib/health.js';
 import { listStores } from './lib/sales.js';
 import { getProductStock, getStoreStock, type StockRow } from './lib/stock.js';
-import { useBarcodeScanner } from './lib/useBarcodeScanner.js';
+import { BARCODE_MIN_LENGTH, useBarcodeScanner } from './lib/useBarcodeScanner.js';
 import { useDebounce } from './lib/useDebounce.js';
 
 export function SalePage() {
   const [search, setSearch] = useState('');
   const [familyId, setFamilyId] = useState<string | null>(null);
+  // Navegación en dos pasos: si está dentro de una familia con subfamilias,
+  // `parentFamily` es esa familia y los chips muestran sus subfamilias.
+  const [parentFamily, setParentFamily] = useState<FamilyNode | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [scanned, setScanned] = useState<{ product: Product | null; code: string } | null>(null);
   const [stockDetail, setStockDetail] = useState<Product | null>(null);
@@ -94,13 +110,39 @@ export function SalePage() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // Escáner USB: al leer un código, busca el producto, lo destaca y lo añade al carrito.
+  // Resuelve un código escaneado: destaca el resultado, añade al carrito si hay
+  // producto y emite un beep (ok/error). Lo comparten el escáner USB (listener
+  // global) y el Enter del buscador.
+  function onScanResolved(product: Product | null, code: string): void {
+    setScanned({ product, code });
+    if (product) addToCart(product);
+    beep(product ? 'ok' : 'error');
+  }
+
+  // Escáner USB físico: solo actúa cuando el foco NO está en un campo editable.
+  // Con el buscador enfocado (por defecto), lo gestiona onSearchKeyDown.
   useBarcodeScanner((code) => {
-    void findByBarcode(code).then((product) => {
-      setScanned({ product, code });
-      if (product) addToCart(product);
-    });
+    void findByBarcode(code).then((product) => onScanResolved(product, code));
   });
+
+  // Enter en el buscador: intenta resolver el texto como código de barras. Si hay
+  // producto, lo añade y limpia el campo (campo único dual: código + texto). Si no
+  // hay producto y parece un código (solo dígitos), avisa; un término de texto
+  // normal no dispara aviso (la búsqueda ya filtra el grid).
+  function onSearchKeyDown(e: ReactKeyboardEvent<HTMLInputElement>): void {
+    if (e.key !== 'Enter') return;
+    const code = search.trim();
+    if (code.length < BARCODE_MIN_LENGTH) return;
+    e.preventDefault();
+    void findByBarcode(code).then((product) => {
+      if (product) {
+        onScanResolved(product, code);
+        setSearch('');
+      } else if (/^\d+$/.test(code)) {
+        onScanResolved(null, code);
+      }
+    });
+  }
 
   return (
     <div className="sale-layout">
@@ -157,6 +199,7 @@ export function SalePage() {
               placeholder="Buscar producto por nombre o SKU…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={onSearchKeyDown}
               data-testid="sale-search"
               autoFocus
             />
@@ -187,24 +230,81 @@ export function SalePage() {
         </div>
 
         <div className="sale-families" data-testid="sale-families">
-          <button
-            className={`fam-chip ${familyId === null ? 'active' : ''}`}
-            onClick={() => setFamilyId(null)}
-            data-testid="fam-chip-all"
-          >
-            Todas <span className="chip-count">{DEMO_TOTAL_COUNT}</span>
-          </button>
-          {families.map((f) => (
-            <button
-              key={f.id}
-              className={`fam-chip ${familyId === f.id ? 'active' : ''}`}
-              onClick={() => setFamilyId(f.id)}
-              data-testid="fam-chip"
-            >
-              <span className="chip-dot" style={{ background: f.color ?? 'var(--ui-text-soft)' }} />
-              {f.name} <span className="chip-count">{DEMO_FAMILY_COUNTS[f.id] ?? 0}</span>
-            </button>
-          ))}
+          {parentFamily ? (
+            <>
+              {/* Dentro de una familia: volver + "Todo · Familia" + subfamilias. */}
+              <button
+                type="button"
+                className="fam-chip fam-back"
+                onClick={() => {
+                  setParentFamily(null);
+                  setFamilyId(null);
+                }}
+                data-testid="fam-back"
+              >
+                ‹ Volver
+              </button>
+              <button
+                className={`fam-chip ${familyId === parentFamily.id ? 'active' : ''}`}
+                onClick={() => setFamilyId(parentFamily.id)}
+                data-testid="fam-chip-parent"
+              >
+                <span
+                  className="chip-dot"
+                  style={{ background: parentFamily.color ?? 'var(--ui-text-soft)' }}
+                />
+                Todo · {parentFamily.name}{' '}
+                <span className="chip-count">{DEMO_FAMILY_COUNTS[parentFamily.id] ?? 0}</span>
+              </button>
+              {parentFamily.children.map((s) => (
+                <button
+                  key={s.id}
+                  className={`fam-chip ${familyId === s.id ? 'active' : ''}`}
+                  onClick={() => setFamilyId(s.id)}
+                  data-testid="fam-chip"
+                >
+                  <span
+                    className="chip-dot"
+                    style={{ background: s.color ?? 'var(--ui-text-soft)' }}
+                  />
+                  {s.name} <span className="chip-count">{DEMO_FAMILY_COUNTS[s.id] ?? 0}</span>
+                </button>
+              ))}
+            </>
+          ) : (
+            <>
+              <button
+                className={`fam-chip ${familyId === null ? 'active' : ''}`}
+                onClick={() => {
+                  setFamilyId(null);
+                  setParentFamily(null);
+                }}
+                data-testid="fam-chip-all"
+              >
+                Todas <span className="chip-count">{DEMO_TOTAL_COUNT}</span>
+              </button>
+              {families.map((f) => (
+                <button
+                  key={f.id}
+                  className={`fam-chip ${familyId === f.id ? 'active' : ''}`}
+                  // Familia con subfamilias → entra en ella; familia hoja → filtra directo.
+                  onClick={() => {
+                    setFamilyId(f.id);
+                    setParentFamily(f.children.length > 0 ? f : null);
+                  }}
+                  data-testid="fam-chip"
+                >
+                  <span
+                    className="chip-dot"
+                    style={{ background: f.color ?? 'var(--ui-text-soft)' }}
+                  />
+                  {f.name}
+                  {f.children.length > 0 && <span className="fam-chevron"> ›</span>}{' '}
+                  <span className="chip-count">{DEMO_FAMILY_COUNTS[f.id] ?? 0}</span>
+                </button>
+              ))}
+            </>
+          )}
         </div>
 
         {scanned && (

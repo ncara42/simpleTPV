@@ -42,3 +42,26 @@ test('el producto agotado muestra el badge "Agotado"', async ({ page }) => {
   await page.getByTestId('sale-grid').waitFor({ timeout: 10000 });
   await expect(page.getByText('Agotado')).toBeVisible();
 });
+
+test('navegación Familia → Subfamilia → Producto', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('sale-grid').waitFor({ timeout: 10000 });
+  const families = page.getByTestId('sale-families');
+
+  // Entrar en "Aceites" (tiene subfamilias): muestra sus 3 productos (subárbol)
+  // y revela las subfamilias + "Volver".
+  await families.getByText('Aceites', { exact: false }).click();
+  await expect(page.getByTestId('fam-back')).toBeVisible();
+  await expect(page.getByTestId('fam-chip-parent')).toContainText('Aceites');
+  await expect(page.getByTestId('prod-card')).toHaveCount(3);
+
+  // Elegir la subfamilia "CBD 10%": filtra a su único producto.
+  await families.getByText('CBD 10%', { exact: false }).click();
+  await expect(page.getByTestId('prod-card')).toHaveCount(1);
+  await expect(page.getByTestId('prod-card')).toContainText('Aceite CBD 10%');
+
+  // "Volver" regresa al nivel de familias raíz (todos los productos).
+  await page.getByTestId('fam-back').click();
+  await expect(page.getByTestId('fam-chip-all')).toBeVisible();
+  await expect(page.getByTestId('prod-card')).toHaveCount(12);
+});

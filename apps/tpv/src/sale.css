@@ -142,6 +142,18 @@
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
 }
 
+/* Chevron que indica que una familia tiene subfamilias en las que entrar. */
+.fam-chip .fam-chevron {
+  color: var(--ui-text-soft);
+  font-weight: 600;
+}
+
+/* Botón "‹ Volver" al nivel de familias raíz. */
+.fam-chip.fam-back {
+  font-weight: 600;
+  color: var(--ui-text-soft);
+}
+
 /* ─── Cuadrícula de productos ──────────────────────────── */
 .sale-grid {
   display: grid;
@@ -391,6 +403,17 @@
 }
 
 /* ─── Banner de escáner ────────────────────────────────── */
+@keyframes scan-banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .scan-banner {
   display: flex;
   align-items: center;
@@ -403,6 +426,14 @@
   border: 1.5px solid var(--ui-brand);
   font-size: 1rem;
   cursor: pointer;
+  animation: scan-banner-in 140ms ease-out;
+}
+
+/* Respeta la preferencia de reducir movimiento. */
+@media (prefers-reduced-motion: reduce) {
+  .scan-banner {
+    animation: none;
+  }
 }
 
 .scan-banner .scan-miss {
@@ -1164,6 +1195,104 @@
 }
 
 .cash-diff-zero {
+  color: var(--ui-text-muted);
+}
+
+/* ─── Conteo por denominaciones (cierre de caja) ─────────── */
+.cash-count {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.cash-count-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 0.35rem 0.9rem;
+}
+
+.cash-count-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cash-count-denom {
+  width: 3.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.cash-count-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.cash-count-controls button {
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 0.4rem;
+  background: #fff;
+  color: var(--ui-text-soft);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cash-count-controls button:hover {
+  background: #f5f5f5;
+}
+
+.cash-count-controls input {
+  width: 3rem;
+  height: 1.7rem;
+  text-align: center;
+  border: 1px solid var(--ui-border);
+  border-radius: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.cash-count-sub {
+  margin-left: auto;
+  min-width: 4.5rem;
+  text-align: right;
+  font-size: 0.85rem;
+  color: var(--ui-text-soft);
+}
+
+.cash-count-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid var(--ui-border);
+  padding-top: 0.6rem;
+}
+
+.cash-count-reset {
+  border: 1px solid var(--ui-border);
+  border-radius: 0.4rem;
+  background: #fff;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+  color: var(--ui-text-soft);
+  cursor: pointer;
+}
+
+.cash-count-totals {
+  min-width: 14rem;
+}
+
+.cash-count-total-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.95rem;
+}
+
+.cash-count-total-row span:first-child {
   color: var(--ui-text-muted);
 }
 

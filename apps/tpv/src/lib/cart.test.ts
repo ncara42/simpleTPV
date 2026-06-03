@@ -39,7 +39,7 @@ describe('useCart', () => {
   it('aplica descuento por línea y recalcula neto/subtotal/total', () => {
     useCart.getState().addItem(product); // 12.50
     useCart.getState().setQty('p1', 2); // bruto 25
-    useCart.getState().setLineDiscount('p1', 10); // -2.50 → neto 22.50
+    useCart.getState().setLineDiscount('p1', { pct: 10 }); // -2.50 → neto 22.50
     const item = useCart.getState().items[0]!;
     expect(useCart.getState().lineNet(item)).toBeCloseTo(22.5, 2);
     expect(useCart.getState().subtotal()).toBeCloseTo(22.5, 2);
@@ -75,11 +75,58 @@ describe('useCart', () => {
   it('combina descuento de línea y de ticket (coincide con el servidor)', () => {
     useCart.getState().addItem(product); // 12.50
     useCart.getState().setQty('p1', 8); // 100
-    useCart.getState().setLineDiscount('p1', 10); // neto 90
+    useCart.getState().setLineDiscount('p1', { pct: 10 }); // neto 90
     useCart.getState().setTicketDiscount({ pct: 10 }); // 10% de 90 = 9
     expect(useCart.getState().subtotal()).toBeCloseTo(90, 2);
     expect(useCart.getState().discountTotal()).toBeCloseTo(19, 2); // 10 + 9
     expect(useCart.getState().total()).toBeCloseTo(81, 2);
+  });
+
+  it('aplica descuento por línea por importe fijo (€)', () => {
+    useCart.getState().addItem(product); // 12.50
+    useCart.getState().setQty('p1', 2); // bruto 25
+    useCart.getState().setLineDiscount('p1', { amt: 5 }); // -5 → neto 20
+    const item = useCart.getState().items[0]!;
+    expect(useCart.getState().lineNet(item)).toBeCloseTo(20, 2);
+    expect(useCart.getState().discountTotal()).toBeCloseTo(5, 2);
+    expect(useCart.getState().total()).toBeCloseTo(20, 2);
+  });
+
+  it('descuento de línea: el importe fijo y el % son mutuamente excluyentes', () => {
+    useCart.getState().addItem(product);
+    useCart.getState().setQty('p1', 2); // bruto 25
+    useCart.getState().setLineDiscount('p1', { pct: 10 });
+    useCart.getState().setLineDiscount('p1', { amt: 5 }); // el importe sustituye al %
+    let item = useCart.getState().items[0]!;
+    expect(item.discountPct).toBe(0);
+    expect(item.discountAmt).toBe(5);
+    useCart.getState().setLineDiscount('p1', { pct: 20 }); // el % sustituye al importe
+    item = useCart.getState().items[0]!;
+    expect(item.discountAmt).toBe(0);
+    expect(item.discountPct).toBe(20);
+  });
+
+  it('capa el importe fijo de línea al bruto (no negativos)', () => {
+    useCart.getState().addItem(product); // bruto 12.50
+    useCart.getState().setLineDiscount('p1', { amt: 999 });
+    const item = useCart.getState().items[0]!;
+    expect(useCart.getState().lineNet(item)).toBeCloseTo(0, 2);
+    expect(useCart.getState().discountTotal()).toBeCloseTo(12.5, 2);
+  });
+
+  it('clearDiscounts quita descuentos de línea y de ticket sin vaciar el carrito', () => {
+    useCart.getState().addItem(product);
+    useCart.getState().setQty('p1', 4); // 50
+    useCart.getState().setLineDiscount('p1', { pct: 10 });
+    useCart.getState().setTicketDiscount({ amt: 5 });
+    useCart.getState().clearDiscounts();
+    const item = useCart.getState().items[0]!;
+    expect(item.discountPct).toBe(0);
+    expect(item.discountAmt).toBe(0);
+    expect(useCart.getState().ticketDiscountPct).toBe(0);
+    expect(useCart.getState().ticketDiscountAmt).toBe(0);
+    expect(useCart.getState().items).toHaveLength(1); // no vacía el carrito
+    expect(useCart.getState().discountTotal()).toBeCloseTo(0, 2);
   });
 
   it('clear resetea también los descuentos de ticket', () => {
