@@ -15,17 +15,25 @@ async function login(page: import('@playwright/test').Page): Promise<void> {
 test('la navegación del sidebar muestra cada vista calcada', async ({ page }) => {
   await login(page);
 
-  await page.getByTestId('nav-return').click();
-  await expect(page.getByTestId('return-empty')).toBeVisible();
-  await expect(page.getByText('Busca el ticket original')).toBeVisible();
+  await page.getByTestId('nav-tickets').click();
+  await expect(page.getByTestId('tickets-view')).toBeVisible();
+  await expect(page.getByTestId('ticket-row')).toHaveCount(1);
 
-  await page.getByTestId('nav-transfers').click();
-  await expect(page.getByTestId('transfer-list')).toBeVisible();
-  await expect(page.getByTestId('transfer-item')).toHaveCount(2);
+  await page.getByTestId('nav-orders').click();
+  await expect(page.getByTestId('store-order-list')).toBeVisible();
+  await expect(page.getByTestId('store-order-item')).toHaveCount(2);
+
+  await page.getByTestId('nav-inventory').click();
+  await expect(page.getByTestId('inventory-view')).toBeVisible();
+  await expect(page.getByTestId('inventory-lines')).toBeVisible();
 
   await page.getByTestId('nav-cash').click();
-  await expect(page.getByTestId('cash-view')).toBeVisible();
-  await expect(page.getByTestId('cash-state')).toContainText('Abierta');
+  await expect(page.getByTestId('cash-panel')).toBeVisible();
+  await expect(page.getByTestId('cash-status')).toContainText('Caja abierta');
+
+  await page.getByTestId('nav-clock').click();
+  await expect(page.getByTestId('time-clock-view')).toBeVisible();
+  await expect(page.getByTestId('time-clock-toggle')).toBeVisible();
 
   await page.getByTestId('nav-sale').click();
   await expect(page.getByTestId('sale-grid')).toBeVisible();
