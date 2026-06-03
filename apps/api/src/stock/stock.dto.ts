@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsNotEmpty,
@@ -62,6 +63,7 @@ export class ConfirmInventoryCountDto {
 
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(1000)
   @ValidateNested({ each: true })
   @Type(() => InventoryCountLineDto)
   lines!: InventoryCountLineDto[];

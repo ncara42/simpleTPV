@@ -40,3 +40,13 @@ export function sseMaxConnectionsPerUser(env: NodeJS.ProcessEnv): number {
   const n = Number(env.SSE_MAX_CONNECTIONS_PER_USER ?? 5);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 5;
 }
+
+// Nº de saltos de proxy de confianza para Express `trust proxy`, de modo que
+// req.ip resuelva la IP real del cliente (primer X-Forwarded-For de confianza)
+// tras el proxy/ingress. Imprescindible para que el rate limiting por IP funcione
+// en producción (auditoría SEC-08). Default 1 (un nginx delante); 0 = sin proxy
+// (no confiar en X-Forwarded-For, evita spoofing en despliegues sin proxy).
+export function trustProxyHops(env: NodeJS.ProcessEnv): number {
+  const n = Number(env.TRUST_PROXY_HOPS ?? 1);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 1;
+}

@@ -2,11 +2,12 @@ import 'reflect-metadata';
 
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 
 import { AppModule } from './app.module.js';
-import { parseCorsOrigins } from './config/security.js';
+import { parseCorsOrigins, trustProxyHops } from './config/security.js';
 import { initSentry } from './observability/sentry.js';
 
 async function bootstrap(): Promise<void> {
@@ -14,9 +15,19 @@ async function bootstrap(): Promise<void> {
   // No-op si no hay SENTRY_DSN o no estamos en producción.
   initSentry();
 
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['warn', 'error', 'log'],
   });
+
+  // Detrás del proxy (nginx de los frontends + ingress de Dokploy): confiar en los
+  // saltos de proxy para que req.ip resuelva la IP real del cliente. Sin esto, el
+  // rate limiting por IP (incluido el de login 5/min) agruparía a TODOS los
+  // clientes bajo la IP del proxy, dejándolo inútil (auditoría SEC-08).
+  app.set('trust proxy', trustProxyHops(process.env));
+
+  // Límite explícito del body JSON: backstop de DoS por payloads grandes (los
+  // arrays de líneas además están acotados con @ArrayMaxSize en los DTOs, SEC-10).
+  app.useBodyParser('json', { limit: '512kb' });
 
   // Cabeceras de seguridad (helmet). CSP desactivada: la API sirve JSON + la UI de
   // Swagger en /docs, y una CSP estricta por defecto rompería esa UI. El resto de

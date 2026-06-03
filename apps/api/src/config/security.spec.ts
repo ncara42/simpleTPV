@@ -5,6 +5,7 @@ import {
   parseCorsOrigins,
   sseMaxConnectionsPerUser,
   throttleConfig,
+  trustProxyHops,
 } from './security.js';
 
 describe('parseCorsOrigins', () => {
@@ -63,5 +64,21 @@ describe('sseMaxConnectionsPerUser', () => {
     expect(sseMaxConnectionsPerUser({ SSE_MAX_CONNECTIONS_PER_USER: 'abc' })).toBe(5);
     expect(sseMaxConnectionsPerUser({ SSE_MAX_CONNECTIONS_PER_USER: '0' })).toBe(5);
     expect(sseMaxConnectionsPerUser({ SSE_MAX_CONNECTIONS_PER_USER: '-2' })).toBe(5);
+  });
+});
+
+describe('trustProxyHops', () => {
+  it('default 1 sin env', () => {
+    expect(trustProxyHops({})).toBe(1);
+  });
+
+  it('toma el nº de saltos de la env (incluido 0 = sin proxy)', () => {
+    expect(trustProxyHops({ TRUST_PROXY_HOPS: '2' })).toBe(2);
+    expect(trustProxyHops({ TRUST_PROXY_HOPS: '0' })).toBe(0);
+  });
+
+  it('ignora valores inválidos o negativos y cae al default', () => {
+    expect(trustProxyHops({ TRUST_PROXY_HOPS: 'abc' })).toBe(1);
+    expect(trustProxyHops({ TRUST_PROXY_HOPS: '-1' })).toBe(1);
   });
 });
