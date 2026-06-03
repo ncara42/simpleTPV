@@ -14,6 +14,10 @@ function makeController() {
     alerts: vi.fn(async (_opts: unknown) => [{ id: 'a1', alertType: 'OUT_OF_STOCK' }]),
     setMin: vi.fn(async (_p: string, _s: string, _m: number) => ({ minStock: 5, level: 'yellow' })),
     adjust: vi.fn(async (_input: unknown) => ({ quantity: 50, level: 'green' })),
+    confirmInventoryCount: vi.fn(async (_input: unknown, _userId: string) => ({
+      storeId: STORE,
+      adjusted: [],
+    })),
     movements: vi.fn(async (_opts: unknown) => ({
       items: [],
       totalItems: 0,
@@ -88,6 +92,20 @@ describe('StockController', () => {
       userId: 'user-1',
     });
     expect(res.quantity).toBe(50);
+  });
+
+  it('POST /stock/inventory-count delega el body y el sub del usuario', async () => {
+    const { controller, service } = makeController();
+    const dto = {
+      storeId: STORE,
+      reason: 'Recuento',
+      lines: [{ productId: PRODUCT, countedQuantity: 7 }],
+    };
+
+    const res = (await controller.confirmInventoryCount(dto, req())) as { storeId: string };
+
+    expect(service.confirmInventoryCount).toHaveBeenCalledWith(dto, 'user-1');
+    expect(res.storeId).toBe(STORE);
   });
 
   it('GET /stock/movements convierte fechas y números y delega los filtros', async () => {
