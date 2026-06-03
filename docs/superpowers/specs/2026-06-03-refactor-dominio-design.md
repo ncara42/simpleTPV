@@ -1,7 +1,7 @@
 # Refactor profesional: separación de dominio puro y deuda técnica
 
 **Fecha:** 2026-06-03
-**Estado:** Fases 1 (backend), 2 (infra frontend) y 3 (descomposición StockPage + PurchasesPage) aplicadas · más componentes pendientes
+**Estado:** Fases 1 (backend), 2 (infra frontend) y 3 (descomposición de los 8 componentes grandes) aplicadas
 **Rama:** `worktree-refactor-pro` (desde `main`)
 
 ## Contexto
@@ -88,23 +88,33 @@ Patrón seguro: (1) montar red de tests de render, (2) smoke test del componente
 monolítico que fija el comportamiento observable, (3) mover el código a
 componentes de sección, (4) el mismo smoke test confirma que no cambió nada.
 
-| Commit                                                                | Alcance                                                                                                                    |
-| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `test(backoffice): infra de render-testing + smoke test de StockPage` | @testing-library/react + jest-dom (espejo de packages/ui); smoke test de StockPage.                                        |
-| `refactor(backoffice): descompone StockPage`                          | 695 → 74 líneas. Carpeta `stock/`: labels, GlobalStockSection, AlertsSection, TransfersSection. Elimina `LevelDot` muerto. |
-| `refactor(backoffice): descompone PurchasesPage`                      | 479 → 47 líneas. Carpeta `purchases/`: labels, OrdersSection, SuppliersSection, SuggestSection.                            |
+Se montó infra de render-testing (`@testing-library/react` + jest-dom) en
+backoffice y tpv. Componentes descompuestos (página → orquestador + secciones de
+responsabilidad única, cada una con tests):
 
-Cada página queda como orquestador (pestañas + secciones), con cada sección en su
-propio archivo de responsabilidad única y un smoke test que protege el cableado.
+| Componente                 | Antes → orquestador | Carpeta nueva                                         |
+| -------------------------- | ------------------- | ----------------------------------------------------- |
+| backoffice `StockPage`     | 695 → 74            | `stock/` (Global/Alerts/Transfers + labels)           |
+| backoffice `PurchasesPage` | 479 → 47            | `purchases/` (Orders/Suppliers/Suggest + labels)      |
+| backoffice `FamiliesPage`  | 334 → 184           | `lib/family-tree.ts` (puro) + `family/FamilyRow`      |
+| backoffice `StoresPage`    | 383 → 182           | `stores/` (Card + Form/Detail modals)                 |
+| tpv `SalePage`             | 452 → 300           | `sale/` (FamilyChips, ProductGrid, ProductStockModal) |
+| tpv `CashPanel`            | 420 → 272           | `cash/` (OpenForm, CloseSummary); elimina `CashView`  |
+| tpv `ReturnPanel`          | 318 → 260           | `return/` (aggregate puro + ReturnLines)              |
+| tpv `CartPanel`            | 314 → 176           | `cart/` (CartLines, CartSummary)                      |
+
+Código muerto eliminado en el camino: `LevelDot` (StockPage) y `CashView`
+(CashPanel), ambos exportados/definidos pero sin uso.
+
+## Hallazgo: la UI de devoluciones no está cableada
+
+`ReturnPanel`, `ReturnsView` y `BlindReturnPanel` no se renderizan desde la nav
+del TPV (`apps/tpv/src/App.tsx`: venta, tickets, pedidos, inventario, caja,
+fichaje). La feature de devoluciones existe en backend y en estos componentes,
+pero no hay entrada de menú que la abra. Se descompusieron igualmente, pero queda
+como decisión de producto: **cablear** la vista o **retirar** el código.
 
 ## Roadmap pendiente (priorizado)
-
-### Frontend — más descomposición (mismo patrón)
-
-- backoffice: `StoresPage` (383), `FamiliesPage` (334).
-- tpv: `SalePage` (452), `CashPanel` (420), `ReturnPanel` (318), `CartPanel`
-  (314). Requiere replicar la infra de render-testing en `apps/tpv` (hoy solo
-  tiene tests de lib con mocks).
 
 ### Backend
 
@@ -114,6 +124,7 @@ propio archivo de responsabilidad única y un smoke test que protege el cableado
 
 ### Frontend — otras mejoras
 
+- Decidir el cableado/retirada de la UI de devoluciones (ver hallazgo arriba).
 - Reducir prop drilling de `storeId` con un `StoreProvider`/contexto.
 
 ### Infra / tests
