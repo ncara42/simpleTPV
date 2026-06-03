@@ -30,3 +30,13 @@ export function throttleConfig(env: NodeJS.ProcessEnv): { ttl: number; limit: nu
     limit: Number.isFinite(limit) && limit > 0 ? limit : 120,
   };
 }
+
+// Máximo de conexiones SSE (/events) concurrentes por usuario y réplica. Cada
+// suscripción SSE abre una conexión Redis dedicada (RedisEventBus); sin tope, un
+// usuario autenticado podría abrir cientos y agotar las conexiones de Redis o los
+// sockets del proceso (auditoría SEC-03). Default holgado para uso legítimo
+// (varias pestañas/dispositivos), suficiente para cortar el abuso.
+export function sseMaxConnectionsPerUser(env: NodeJS.ProcessEnv): number {
+  const n = Number(env.SSE_MAX_CONNECTIONS_PER_USER ?? 5);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 5;
+}

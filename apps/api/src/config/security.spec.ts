@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_DEV_ORIGINS, parseCorsOrigins, throttleConfig } from './security.js';
+import {
+  DEFAULT_DEV_ORIGINS,
+  parseCorsOrigins,
+  sseMaxConnectionsPerUser,
+  throttleConfig,
+} from './security.js';
 
 describe('parseCorsOrigins', () => {
   it('sin env devuelve los orígenes de dev por defecto', () => {
@@ -41,5 +46,22 @@ describe('throttleConfig', () => {
       ttl: 60000,
       limit: 120,
     });
+  });
+});
+
+describe('sseMaxConnectionsPerUser', () => {
+  it('default 5 sin env', () => {
+    expect(sseMaxConnectionsPerUser({})).toBe(5);
+  });
+
+  it('toma el valor de la env válida (entero)', () => {
+    expect(sseMaxConnectionsPerUser({ SSE_MAX_CONNECTIONS_PER_USER: '3' })).toBe(3);
+    expect(sseMaxConnectionsPerUser({ SSE_MAX_CONNECTIONS_PER_USER: '10.9' })).toBe(10);
+  });
+
+  it('ignora valores inválidos o no positivos y cae al default', () => {
+    expect(sseMaxConnectionsPerUser({ SSE_MAX_CONNECTIONS_PER_USER: 'abc' })).toBe(5);
+    expect(sseMaxConnectionsPerUser({ SSE_MAX_CONNECTIONS_PER_USER: '0' })).toBe(5);
+    expect(sseMaxConnectionsPerUser({ SSE_MAX_CONNECTIONS_PER_USER: '-2' })).toBe(5);
   });
 });
