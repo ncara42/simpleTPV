@@ -1,7 +1,7 @@
 # Refactor profesional: separación de dominio puro y deuda técnica
 
 **Fecha:** 2026-06-03
-**Estado:** Fase 1 (backend) aplicada · roadmap frontend pendiente
+**Estado:** Fase 1 (backend) + Fase 2 (infra frontend) aplicadas · descomposición de componentes pendiente
 **Rama:** `worktree-refactor-pro` (desde `main`)
 
 ## Contexto
@@ -59,38 +59,50 @@ y `cash-sessions` con comentarios casi idénticos.
 | `refactor(api): separa el dominio puro de ventas/devoluciones y unifica round2` | Nuevo `common/money.ts`; `sales.domain.ts` y `returns.domain.ts`; `sales.service.ts` 671 → 458 líneas. |
 | `refactor(api): extrae el dominio puro de stock`                                | `stock.domain.ts` (stockCacheKey, stockLevel, alertTypeFor, ALERT_URGENCY).                            |
 
-Resultado: typecheck 7/7, lint limpio, 369 specs de la API en verde, sin cambios
-de comportamiento (sólo movimiento de código + dedup + tokens).
+## Cambios aplicados (Fase 2 — frontend / infra)
+
+| Commit                                                                       | Alcance                                                                                                                      |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `test(backoffice): añade vitest y cubre los formatters`                      | vitest (config espejo de tpv) + script `test` + spec de `format.ts`. backoffice pasa a estar cubierto por `pnpm test`.       |
+| `refactor(web): unifica la derivación del nivel de stock en @simpletpv/auth` | `stockLevel()` se mueve a `@simpletpv/auth` (junto al tipo `StockLevel`) con test; `StockPage` deja de duplicar el semáforo. |
+
+Resultado acumulado: typecheck 7/7, lint limpio, **436 tests** en verde
+(api 369, tpv 41, auth 13, backoffice 11, ui 2), sin cambios de comportamiento.
+
+## Hallazgo: "duplicación" frontend mayormente falsa
+
+Una revisión inicial marcó `nav.ts` y `format.ts` como duplicados entre `tpv` y
+`backoffice`. Verificado en detalle, **no lo son**:
+
+- `switchApp` (nav.ts) hace lo OPUESTO en cada app (tpv→backoffice vs
+  backoffice→tpv, distinta env var). Son espejos específicos, no duplicados.
+- `format.ts` expone APIs distintas: `eur()` en tpv (solo número) vs
+  `fmtEur/fmtRate/fmtDelta/…` en backoffice (currency style, manejo de null).
+
+Hoistarlos sería churn con riesgo de regresión y poco valor. Lección: validar
+los hallazgos de un barrido automático antes de actuar.
 
 ## Roadmap pendiente (priorizado)
 
-Lo siguiente queda mapeado pero no ejecutado en esta tanda para mantener los
-diffs revisables y no tocar código con poca cobertura de tests sin antes
-añadirla.
+### Backend
 
-### Backend (riesgo bajo)
-
-- `dashboard.service.ts` (458 líneas): extraer `rangeFor`/cálculo de periodos a
-  un dominio puro con reloj inyectable. El resto son consultas SQL crudas que no
-  se benefician de un split.
+- `dashboard.service.ts`: YA factorizado — su lógica de periodos vive en
+  `period.ts` con `period.spec.ts`. No requiere acción.
 - `purchases.service.ts` (347): valorar extraer el cálculo de recepción.
 
-### Frontend (riesgo medio — requiere tests antes)
+### Frontend (riesgo medio — requiere tests de render antes)
 
 - Componentes >250 líneas a descomponer: `StockPage` (700), `PurchasesPage`
   (479), `SalePage` (452), `CashPanel` (420), `StoresPage`, `FamiliesPage`.
-  Patrón: extraer subcomponentes por sección + hooks de datos.
-- Hoisting a `packages/`: `useStoresList`, `useModal`, constantes de
-  `query-keys`, helpers de formato y `switchApp` (duplicados entre `tpv` y
-  `backoffice`).
+  Patrón recomendado: primero extraer la lógica pura a `lib/` + tests (como se
+  hizo con `stockLevel`), luego partir el JSX por secciones con
+  `@testing-library/react`.
 - Reducir prop drilling de `storeId` con un `StoreProvider`/contexto.
 
 ### Infra / tests
 
-- `backoffice` sin script `test` ni suite: añadir vitest + cobertura mínima de
-  componentes antes de descomponerlos.
 - ESLint: añadir reglas de React (hooks/a11y) para `apps/*` y de NestJS para la
-  API.
+  API (puede aflorar violaciones existentes: hacerlo en su propia tanda).
 
 ## Cómo continuar
 
