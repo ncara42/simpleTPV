@@ -223,6 +223,37 @@ export class ReturnsService {
     });
   }
 
+  // Lockout en memoria (por réplica) contra fuerza bruta del PIN de autorización
+  // (SEC-19): el PIN es de 4-8 dígitos y un acierto vale para CUALQUIER autorizador
+  // del tenant, así que bajo el throttle global sería forzable en horas. Se acota
+  // por usuario iniciador + tenant; tras N fallos se bloquea unos minutos.
+  private readonly pinAttempts = new Map<string, { count: number; lockedUntil: number }>();
+  private static readonly PIN_MAX_ATTEMPTS = 5;
+  private static readonly PIN_LOCKOUT_MS = 5 * 60_000;
+
+  private assertPinNotLocked(key: string): void {
+    const entry = this.pinAttempts.get(key);
+    if (entry && entry.lockedUntil > Date.now()) {
+      throw new ForbiddenException(
+        'Demasiados intentos de PIN incorrectos; inténtalo de nuevo en unos minutos',
+      );
+    }
+  }
+
+  private registerPinFailure(key: string): void {
+    const entry = this.pinAttempts.get(key) ?? { count: 0, lockedUntil: 0 };
+    entry.count += 1;
+    if (entry.count >= ReturnsService.PIN_MAX_ATTEMPTS) {
+      entry.lockedUntil = Date.now() + ReturnsService.PIN_LOCKOUT_MS;
+      entry.count = 0;
+    }
+    this.pinAttempts.set(key, entry);
+  }
+
+  private clearPinFailures(key: string): void {
+    this.pinAttempts.delete(key);
+  }
+
   /**
    * Valida el PIN de un MANAGER/ADMIN del tenant. Devuelve el id del usuario que
    * autoriza si el PIN coincide con el de algún MANAGER/ADMIN; si no, lanza 403.
@@ -259,8 +290,18 @@ export class ReturnsService {
     // Aislamiento por tienda (SEC-01): un CLERK solo hace devoluciones ciegas en
     // sus tiendas. Se comprueba antes que el PIN para fallar cuanto antes.
     await assertStoreAccess(this.prisma, { userId, role, storeId: dto.storeId });
-    // Autorización por PIN ANTES de abrir la tx (si falla, no toca nada).
-    const authorizedBy = await this.resolveAuthorizer(dto.managerPin);
+    // Autorización por PIN ANTES de abrir la tx (si falla, no toca nada), con
+    // lockout anti-fuerza-bruta por usuario iniciador + tenant (SEC-19).
+    const pinKey = `${tenant.organizationId}:${userId}`;
+    this.assertPinNotLocked(pinKey);
+    let authorizedBy: string;
+    try {
+      authorizedBy = await this.resolveAuthorizer(dto.managerPin);
+    } catch (err) {
+      this.registerPinFailure(pinKey);
+      throw err;
+    }
+    this.clearPinFailures(pinKey);
 
     // Precios actuales de los productos del tenant (fuente del importe).
     const productIds = dto.lines.map((l) => l.productId);

@@ -401,6 +401,21 @@ describe('ReturnsService.createBlind', () => {
     ).rejects.toThrow(ForbiddenException);
   });
 
+  it('SEC-19: bloquea (lockout) tras 5 PINs incorrectos del mismo usuario', async () => {
+    const otherHash = await bcrypt.hash('9999', 10);
+    const svc = service(makeBlindPrisma({ pinHash: otherHash, price: 10 }), makeBlindBase());
+    // 5 intentos con PIN incorrecto → rechazo normal por PIN inválido.
+    for (let i = 0; i < 5; i++) {
+      await expect(
+        tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1', 'ADMIN')),
+      ).rejects.toThrow(/PIN de autorización inválido/);
+    }
+    // El 6º queda bloqueado por el lockout (mensaje distinto), antes de comparar PIN.
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1', 'ADMIN')),
+    ).rejects.toThrow(/Demasiados intentos/);
+  });
+
   it('PIN válido: crea la devolución con importe = precio actual × qty y autorizador', async () => {
     const pinHash = await bcrypt.hash('4321', 10);
     const base = makeBlindBase();
