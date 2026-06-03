@@ -20,7 +20,6 @@ describe('auth-store getRole', () => {
     const store = createAuthStore('test-admin');
     store.getState().setTokens({
       accessToken: fakeJwt({ sub: 'u1', organizationId: 'o1', role: 'ADMIN' }),
-      refreshToken: 'r',
     });
     expect(store.getState().getRole()).toBe('ADMIN');
   });
@@ -29,14 +28,13 @@ describe('auth-store getRole', () => {
     const store = createAuthStore('test-clerk');
     store.getState().setTokens({
       accessToken: fakeJwt({ sub: 'u2', organizationId: 'o1', role: 'CLERK' }),
-      refreshToken: 'r',
     });
     expect(store.getState().getRole()).toBe('CLERK');
   });
 
   it('devuelve null ante un token malformado', () => {
     const store = createAuthStore('test-bad');
-    store.getState().setTokens({ accessToken: 'no-es-un-jwt', refreshToken: 'r' });
+    store.getState().setTokens({ accessToken: 'no-es-un-jwt' });
     expect(store.getState().getRole()).toBeNull();
   });
 });
