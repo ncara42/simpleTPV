@@ -49,7 +49,7 @@ describe('Devoluciones — integración', () => {
       new InMemoryEventBus(),
       stubVerifactu(),
     );
-    returns = new ReturnsService(prisma as unknown as PrismaService, base, stock);
+    returns = new ReturnsService(prisma as unknown as PrismaService, base, stock, stubVerifactu());
 
     const adminUrl = process.env.DATABASE_URL;
     if (!adminUrl) {

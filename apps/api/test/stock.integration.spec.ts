@@ -70,7 +70,12 @@ describe('Stock — integración', () => {
       new InMemoryEventBus(),
       stubVerifactu(),
     );
-    returns = new ReturnsService(prisma as unknown as PrismaService, base, stockService);
+    returns = new ReturnsService(
+      prisma as unknown as PrismaService,
+      base,
+      stockService,
+      stubVerifactu(),
+    );
 
     const adminUrl = process.env.DATABASE_URL;
     if (!adminUrl) {

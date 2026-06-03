@@ -11,8 +11,9 @@ import { assertStoreAccess } from '../auth/store-access.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
-import { withTenantTx } from '../prisma/with-tenant-tx.js';
+import { type TxClient, withTenantTx } from '../prisma/with-tenant-tx.js';
 import { StockService } from '../stock/stock.service.js';
+import { VerifactuService } from '../verifactu/verifactu.service.js';
 import type { CreateBlindReturnDto, CreateReturnDto } from './returns.dto.js';
 
 // Redondeo a 2 decimales (céntimos), idéntico al de ventas, para que el cálculo
@@ -54,7 +55,44 @@ export class ReturnsService {
     @Inject(PRISMA_BASE) private readonly base: PrismaService,
     // Servicio interno de stock: repone el stock de las líneas devueltas.
     private readonly stock: StockService,
+    // VeriFactu: registro rectificativo de cada devolución (SEC-07), creado en la
+    // misma tx que la devolución (atómico) y enviado tras commit.
+    private readonly verifactu: VerifactuService,
   ) {}
+
+  /**
+   * Crea el registro VeriFactu RECTIFICATION de una devolución DENTRO de su tx y
+   * encola el envío tras commit (mismo patrón que la venta, SEC-02/SEC-07). El
+   * importe va en negativo (abono). `invoiceNumber` referencia la factura original
+   * (ticket de la venta) o, en devoluciones sin ticket, el id de la devolución.
+   * El formato exacto de factura rectificativa AEAT se afinará al integrar el
+   * proveedor certificado (hoy sandbox, no remite).
+   */
+  private async recordRectification(
+    tx: TxClient,
+    organizationId: string,
+    afterCommit: (fn: () => Promise<void>) => void,
+    params: { returnId: string; invoiceNumber: string; total: number },
+  ): Promise<void> {
+    const org = await tx.organization.findFirst({
+      where: { id: organizationId },
+      select: { nif: true },
+    });
+    const record = await this.verifactu.createRecordInTx(tx, organizationId, {
+      type: 'RECTIFICATION',
+      returnId: params.returnId,
+      payload: {
+        nif: org?.nif ?? null,
+        invoiceNumber: params.invoiceNumber,
+        date: new Date().toISOString(),
+        total: -Math.abs(params.total),
+        type: 'RECTIFICATION',
+      },
+    });
+    afterCommit(async () => {
+      await this.verifactu.enqueueSend(record.id, organizationId);
+    });
+  }
 
   /**
    * Crea una devolución parcial contra un ticket de venta. Todo dentro de
@@ -173,6 +211,14 @@ export class ReturnsService {
         );
       }
 
+      // 7. Registro VeriFactu rectificativo (SEC-07): referencia el ticket de la
+      //    venta original. En la misma tx → atómico con la devolución.
+      await this.recordRectification(tx, tenant.organizationId, afterCommit, {
+        returnId: created.id,
+        invoiceNumber: sale.ticketNumber,
+        total,
+      });
+
       return created;
     });
   }
@@ -267,6 +313,14 @@ export class ReturnsService {
           afterCommit,
         );
       }
+
+      // Registro VeriFactu rectificativo (SEC-07): sin factura original (devolución
+      // sin ticket), referencia el id de la devolución. Atómico con la devolución.
+      await this.recordRectification(tx, tenant.organizationId, afterCommit, {
+        returnId: created.id,
+        invoiceNumber: `BLIND-${created.id}`,
+        total,
+      });
 
       return created;
     });

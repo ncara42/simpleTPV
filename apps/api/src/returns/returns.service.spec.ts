@@ -63,6 +63,10 @@ function makeBase(
 ) {
   const tx = {
     $executeRaw: vi.fn(async () => 1),
+    // El registro VeriFactu rectificativo lee el NIF de la org dentro de la tx (SEC-07).
+    organization: {
+      findFirst: vi.fn(async () => ({ nif: 'B11111111' })),
+    },
     sale: {
       findFirst: vi.fn(async () => opts.sale ?? null),
     },
@@ -96,11 +100,29 @@ function makeBase(
   };
 }
 
-function makeService(prisma: ReturnType<typeof makePrisma>, base: unknown) {
+// Mock de VerifactuService: createRecordInTx (en-tx) + enqueueSend (tras commit).
+// Tipamos los parámetros para poder inspeccionar mock.calls[n][2] (el input).
+function makeVerifactu() {
+  return {
+    createRecordInTx: vi.fn(async (_tx: unknown, _org: string, _input: unknown) => ({
+      id: 'vf',
+      hash: 'h',
+      qrData: 'q',
+    })),
+    enqueueSend: vi.fn(async (_id: string, _org: string) => undefined),
+  };
+}
+
+function makeService(
+  prisma: ReturnType<typeof makePrisma>,
+  base: unknown,
+  verifactu: ReturnType<typeof makeVerifactu> = makeVerifactu(),
+) {
   return new ReturnsService(
     prisma as never,
     base as never,
     new StockService({} as never, new MemoryCache(), {} as never, new InMemoryEventBus()),
+    verifactu as never,
   );
 }
 
@@ -110,6 +132,7 @@ function sampleSale() {
     id: 'sale-1',
     storeId: 'store-1',
     status: 'COMPLETED',
+    ticketNumber: 'T01-000001',
     lines: [
       { id: 'sl-1', productId: 'p1', qty: 3, lineTotal: 30 },
       { id: 'sl-2', productId: 'p2', qty: 2, lineTotal: 18 },
@@ -227,6 +250,35 @@ describe('ReturnsService.create', () => {
     expect(result.lines[0]!.lineTotal).toBeCloseTo(20, 2);
   });
 
+  it('SEC-07: genera un registro VeriFactu RECTIFICATION (abono, importe negativo) en la misma tx', async () => {
+    const base = makeBase({ sale: sampleSale() });
+    const verifactu = makeVerifactu();
+    const service = makeService(makePrisma(), base, verifactu);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.create(
+        { saleId: 'sale-1', reason: 'roto', lines: [{ saleLineId: 'sl-1', qty: 2 }] },
+        'user-1',
+        'ADMIN',
+      ),
+    );
+
+    expect(verifactu.createRecordInTx).toHaveBeenCalledOnce();
+    const input = verifactu.createRecordInTx.mock.calls[0]![2] as {
+      type: string;
+      returnId: string;
+      payload: { invoiceNumber: string; total: number; type: string };
+    };
+    expect(input.type).toBe('RECTIFICATION');
+    expect(input.returnId).toBe('new-return');
+    expect(input.payload.invoiceNumber).toBe('T01-000001'); // referencia el ticket original
+    expect(input.payload.type).toBe('RECTIFICATION');
+    // sl-1: neto 30/3 uds → 10/ud; devolver 2 → 20 → abono -20.
+    expect(input.payload.total).toBeCloseTo(-20, 2);
+    // El envío a la AEAT se encola tras commit (best-effort, reintentable).
+    expect(verifactu.enqueueSend).toHaveBeenCalledWith('vf', ORG);
+  });
+
   it('éxito con devolución previa parcial: permite devolver el resto disponible', async () => {
     // sl-1 vendió 3, ya devueltos 2 → disponible 1. Devolver 1 → OK, total 10.
     const base = makeBase({ sale: sampleSale(), previous: [{ saleLineId: 'sl-1', qty: 2 }] });
@@ -301,6 +353,9 @@ describe('ReturnsService.createBlind', () => {
   function makeBlindBase() {
     const tx = {
       $executeRaw: vi.fn(async () => 1),
+      organization: {
+        findFirst: vi.fn(async () => ({ nif: 'B11111111' })),
+      },
       return: {
         create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
           id: 'blind-1',
@@ -327,6 +382,7 @@ describe('ReturnsService.createBlind', () => {
       prisma as never,
       base as never,
       new StockService(prisma as never, new MemoryCache(), base as never, new InMemoryEventBus()),
+      makeVerifactu() as never,
     );
   }
 
