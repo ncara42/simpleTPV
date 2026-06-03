@@ -1,7 +1,7 @@
 # Refactor profesional: separación de dominio puro y deuda técnica
 
 **Fecha:** 2026-06-03
-**Estado:** Fase 1 (backend) + Fase 2 (infra frontend) aplicadas · descomposición de componentes pendiente
+**Estado:** Fases 1 (backend), 2 (infra frontend) y 3 (descomposición StockPage + PurchasesPage) aplicadas · más componentes pendientes
 **Rama:** `worktree-refactor-pro` (desde `main`)
 
 ## Contexto
@@ -82,21 +82,38 @@ Una revisión inicial marcó `nav.ts` y `format.ts` como duplicados entre `tpv` 
 Hoistarlos sería churn con riesgo de regresión y poco valor. Lección: validar
 los hallazgos de un barrido automático antes de actuar.
 
+## Cambios aplicados (Fase 3 — descomposición de componentes)
+
+Patrón seguro: (1) montar red de tests de render, (2) smoke test del componente
+monolítico que fija el comportamiento observable, (3) mover el código a
+componentes de sección, (4) el mismo smoke test confirma que no cambió nada.
+
+| Commit                                                                | Alcance                                                                                                                    |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `test(backoffice): infra de render-testing + smoke test de StockPage` | @testing-library/react + jest-dom (espejo de packages/ui); smoke test de StockPage.                                        |
+| `refactor(backoffice): descompone StockPage`                          | 695 → 74 líneas. Carpeta `stock/`: labels, GlobalStockSection, AlertsSection, TransfersSection. Elimina `LevelDot` muerto. |
+| `refactor(backoffice): descompone PurchasesPage`                      | 479 → 47 líneas. Carpeta `purchases/`: labels, OrdersSection, SuppliersSection, SuggestSection.                            |
+
+Cada página queda como orquestador (pestañas + secciones), con cada sección en su
+propio archivo de responsabilidad única y un smoke test que protege el cableado.
+
 ## Roadmap pendiente (priorizado)
+
+### Frontend — más descomposición (mismo patrón)
+
+- backoffice: `StoresPage` (383), `FamiliesPage` (334).
+- tpv: `SalePage` (452), `CashPanel` (420), `ReturnPanel` (318), `CartPanel`
+  (314). Requiere replicar la infra de render-testing en `apps/tpv` (hoy solo
+  tiene tests de lib con mocks).
 
 ### Backend
 
-- `dashboard.service.ts`: YA factorizado — su lógica de periodos vive en
-  `period.ts` con `period.spec.ts`. No requiere acción.
-- `purchases.service.ts` (347): valorar extraer el cálculo de recepción.
+- Patrón `*.domain.ts` ya completo (sales, returns, stock, purchases);
+  cash-sessions usa `common/money`; dashboard ya tenía `period.ts`. Sin
+  pendientes de relevancia.
 
-### Frontend (riesgo medio — requiere tests de render antes)
+### Frontend — otras mejoras
 
-- Componentes >250 líneas a descomponer: `StockPage` (700), `PurchasesPage`
-  (479), `SalePage` (452), `CashPanel` (420), `StoresPage`, `FamiliesPage`.
-  Patrón recomendado: primero extraer la lógica pura a `lib/` + tests (como se
-  hizo con `stockLevel`), luego partir el JSX por secciones con
-  `@testing-library/react`.
 - Reducir prop drilling de `storeId` con un `StoreProvider`/contexto.
 
 ### Infra / tests
