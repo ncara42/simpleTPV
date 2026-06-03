@@ -1,0 +1,117 @@
+import { ApiError } from '@simpletpv/auth';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Mockeamos el cliente HTTP real para verificar QUÉ endpoint llama cada lib en
+// modo real, sin backend. isDemo() (api-config) NO se mockea: lee VITE_DEMO_MODE,
+// que stubeamos por test.
+vi.mock('./auth.js', () => ({
+  api: { get: vi.fn(), post: vi.fn() },
+  useAuthStore: { getState: () => ({ setTokens: vi.fn() }) },
+}));
+
+import { api } from './auth.js';
+import * as cash from './cash.js';
+import * as catalog from './catalog.js';
+import * as sales from './sales.js';
+import * as stock from './stock.js';
+import * as transfers from './transfers.js';
+
+const get = vi.mocked(api.get);
+const post = vi.mocked(api.post);
+
+describe('cableado API real (VITE_DEMO_MODE=false)', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_DEMO_MODE', 'false');
+    vi.clearAllMocks();
+    get.mockResolvedValue([] as never);
+    post.mockResolvedValue({} as never);
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('catalog: endpoints correctos', async () => {
+    await catalog.listFamilies();
+    expect(get).toHaveBeenCalledWith('/product-families');
+    await catalog.searchProducts('  cbd ', 'fam-1');
+    expect(get).toHaveBeenCalledWith('/products', { search: 'cbd', familyId: 'fam-1' });
+    await catalog.searchProducts('', null);
+    expect(get).toHaveBeenLastCalledWith('/products', {});
+  });
+
+  it('catalog.findByBarcode devuelve null ante 404', async () => {
+    get.mockResolvedValueOnce({ id: 'p1' } as never);
+    expect(await catalog.findByBarcode('8400000000031')).toEqual({ id: 'p1' });
+    expect(get).toHaveBeenCalledWith('/products/barcode/8400000000031');
+    get.mockRejectedValueOnce(new ApiError(404, 'no encontrado'));
+    expect(await catalog.findByBarcode('0000')).toBeNull();
+  });
+
+  it('stock: endpoints correctos', async () => {
+    await stock.getStoreStock('store-1');
+    expect(get).toHaveBeenCalledWith('/stock', { storeId: 'store-1' });
+    await stock.getProductStock('prod-1');
+    expect(get).toHaveBeenCalledWith('/stock/product/prod-1');
+  });
+
+  it('cash: endpoints correctos + 404 → null', async () => {
+    await cash.openCashSession({ storeId: 'store-1', openingAmount: 100 });
+    expect(post).toHaveBeenCalledWith('/cash-sessions/open', {
+      storeId: 'store-1',
+      openingAmount: 100,
+    });
+    await cash.closeCashSession('cs-1', 250);
+    expect(post).toHaveBeenCalledWith('/cash-sessions/cs-1/close', { countedAmount: 250 });
+    await cash.currentCashSession('store-1');
+    expect(get).toHaveBeenCalledWith('/cash-sessions/current', { storeId: 'store-1' });
+    get.mockRejectedValueOnce(new ApiError(404, 'sin caja'));
+    expect(await cash.currentCashSession('store-1')).toBeNull();
+  });
+
+  it('sales: endpoints correctos', async () => {
+    await sales.listStores();
+    expect(get).toHaveBeenCalledWith('/me/stores');
+    const input = {
+      storeId: 's1',
+      lines: [{ productId: 'p1', qty: 1 }],
+      paymentMethod: 'CASH' as const,
+    };
+    await sales.createSale(input);
+    expect(post).toHaveBeenCalledWith('/sales', input);
+    await sales.getTicket('sale-1');
+    expect(get).toHaveBeenCalledWith('/sales/sale-1/ticket');
+    await sales.voidSale('sale-1');
+    expect(post).toHaveBeenCalledWith('/sales/sale-1/void', {});
+    await sales.findSaleByTicket('T01-000007');
+    expect(get).toHaveBeenCalledWith('/sales/by-ticket/T01-000007');
+  });
+
+  it('transfers: lista SENT filtrando por tienda destino y recibe', async () => {
+    get.mockResolvedValueOnce([
+      { id: 't1', destStoreId: 'store-1' },
+      { id: 't2', destStoreId: 'store-2' },
+    ] as never);
+    const incoming = await transfers.listIncomingTransfers('store-1');
+    expect(get).toHaveBeenCalledWith('/transfers', { status: 'SENT' });
+    expect(incoming.map((t) => t.id)).toEqual(['t1']);
+    await transfers.receiveTransfer('t1', { lines: [] });
+    expect(post).toHaveBeenCalledWith('/transfers/t1/receive', { lines: [] });
+  });
+});
+
+describe('modo demo (default): no llama a la API', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_DEMO_MODE', 'true');
+    vi.clearAllMocks();
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('catalog.listFamilies devuelve demo sin tocar api', async () => {
+    const fams = await catalog.listFamilies();
+    expect(Array.isArray(fams)).toBe(true);
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it('sales.listStores devuelve demo sin tocar api', async () => {
+    await sales.listStores();
+    expect(get).not.toHaveBeenCalled();
+  });
+});

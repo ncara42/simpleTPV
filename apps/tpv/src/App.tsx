@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 
 import { CashView } from './CashPanel.js';
 import { DEMO_CART_LINES, DEMO_USER } from './demo/demoData.js';
+import { isDemo } from './lib/api-config.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { useCart } from './lib/cart.js';
 import { switchApp } from './lib/nav.js';
@@ -40,7 +41,9 @@ function Home() {
   // "Ticket actual" aparezca con las 3 líneas del mockup al entrar. Lee el
   // estado actual de la store directamente para no depender de `items`.
   useEffect(() => {
-    if (useCart.getState().items.length === 0) {
+    // Solo en modo demo: en real el carrito arranca vacío (los productId demo no
+    // existen en el backend y romperían la venta).
+    if (isDemo() && useCart.getState().items.length === 0) {
       useCart.setState({
         items: DEMO_CART_LINES.map((l) => ({ ...l, discountPct: 0, discountAmt: 0 })),
         ticketDiscountPct: 0,
