@@ -25,6 +25,13 @@ FROM deps AS builder
 # cae al default de localhost de apps/tpv/src/lib/nav.ts.
 ARG VITE_BACKOFFICE_URL
 ENV VITE_BACKOFFICE_URL=$VITE_BACKOFFICE_URL
+# Modo REAL por defecto en la imagen de producción (SEC-04). isDemo() considera
+# demo salvo que VITE_DEMO_MODE sea exactamente 'false', así que la imagen DEBE
+# hornearse con 'false'; sin esto, un build de prod sin la var caía en modo demo
+# (login falso que acepta cualquier credencial). `pnpm dev` (fuera de Docker)
+# mantiene el demo por defecto. Override a 'true' solo para una demo estática.
+ARG VITE_DEMO_MODE=false
+ENV VITE_DEMO_MODE=$VITE_DEMO_MODE
 COPY . .
 RUN pnpm --filter @simpletpv/tpv run build
 
