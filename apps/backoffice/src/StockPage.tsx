@@ -1,4 +1,4 @@
-import type { StockLevel } from '@simpletpv/auth';
+import { type StockLevel, stockLevel } from '@simpletpv/auth';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
@@ -22,12 +22,6 @@ import {
 } from './lib/stock.js';
 
 const ROTATION_LABEL: Record<Rotation, string> = { alta: 'Alta', media: 'Media', baja: 'Baja' };
-
-function levelOf(quantity: number, minStock: number): StockLevel {
-  if (quantity <= 0) return 'red';
-  if (quantity <= minStock) return 'yellow';
-  return 'green';
-}
 
 const LEVEL_LABEL: Record<StockLevel, string> = { red: 'Sin stock', yellow: 'Bajo', green: 'OK' };
 const ALERT_LABEL: Record<string, string> = { OUT_OF_STOCK: 'Sin stock', LOW_STOCK: 'Stock bajo' };
@@ -158,7 +152,7 @@ function GlobalStockSection() {
   const rows = rawRows.map((row) => {
     const stores = row.stores.map((st) => {
       const q = qtyOverlay[`${row.productId}:${st.storeId}`] ?? st.quantity;
-      return { ...st, quantity: q, level: levelOf(q, st.minStock) };
+      return { ...st, quantity: q, level: stockLevel(q, st.minStock) };
     });
     return { ...row, stores, total: stores.reduce((acc, s) => acc + s.quantity, 0) };
   });

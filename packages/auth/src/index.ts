@@ -74,3 +74,4 @@ export type {
 } from './api-types.js';
 export { type AuthState, type AuthStore, type AuthTokens, createAuthStore } from './auth-store.js';
 export { type AuthSetup, setupAuth } from './setup.js';
+export { stockLevel } from './stock.js';
