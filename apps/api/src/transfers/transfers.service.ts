@@ -19,6 +19,10 @@ export function computeDiscrepancy(quantitySent: number, quantityReceived: numbe
   return Math.round((quantityReceived - quantitySent) * 1000) / 1000;
 }
 
+function includeLinesWithProduct() {
+  return { lines: { include: { product: { select: { name: true, barcode: true } } } } };
+}
+
 @Injectable()
 export class TransfersService {
   constructor(
@@ -64,7 +68,7 @@ export class TransfersService {
           })),
         },
       },
-      include: { lines: true },
+      include: includeLinesWithProduct(),
     });
   }
 
@@ -79,7 +83,7 @@ export class TransfersService {
     return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
       const transfer = await tx.transfer.findFirst({
         where: { id, organizationId: tenant.organizationId },
-        include: { lines: true },
+        include: includeLinesWithProduct(),
       });
       if (!transfer) {
         throw new NotFoundException(`Traspaso ${id} no encontrado`);
@@ -115,7 +119,7 @@ export class TransfersService {
 
       return tx.transfer.findFirstOrThrow({
         where: { id, organizationId: tenant.organizationId },
-        include: { lines: true },
+        include: includeLinesWithProduct(),
       });
     });
   }
@@ -131,7 +135,7 @@ export class TransfersService {
     return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
       const transfer = await tx.transfer.findFirst({
         where: { id, organizationId: tenant.organizationId },
-        include: { lines: true },
+        include: includeLinesWithProduct(),
       });
       if (!transfer) {
         throw new NotFoundException(`Traspaso ${id} no encontrado`);
@@ -187,7 +191,7 @@ export class TransfersService {
 
       return tx.transfer.findFirstOrThrow({
         where: { id, organizationId: tenant.organizationId },
-        include: { lines: true },
+        include: includeLinesWithProduct(),
       });
     });
   }
@@ -216,7 +220,7 @@ export class TransfersService {
     }
     return this.prisma.transfer.findFirstOrThrow({
       where: { id, organizationId: tenant.organizationId },
-      include: { lines: true },
+      include: includeLinesWithProduct(),
     });
   }
 
@@ -229,7 +233,7 @@ export class TransfersService {
         ...(status ? { status: status as 'DRAFT' | 'SENT' | 'RECEIVED' | 'CLOSED' } : {}),
       },
       orderBy: { createdAt: 'desc' },
-      include: { lines: true },
+      include: includeLinesWithProduct(),
     });
   }
 
@@ -238,7 +242,7 @@ export class TransfersService {
     const tenant = requireTenant();
     const transfer = await this.prisma.transfer.findFirst({
       where: { id, organizationId: tenant.organizationId },
-      include: { lines: true },
+      include: includeLinesWithProduct(),
     });
     if (!transfer) {
       throw new NotFoundException(`Traspaso ${id} no encontrado`);

@@ -1,4 +1,12 @@
-import type { CashSession, FamilyNode, Product, StockRow, Store, Transfer } from '@simpletpv/auth';
+import type {
+  CashSession,
+  FamilyNode,
+  Product,
+  StockRow,
+  Store,
+  StoreOrder,
+  Transfer,
+} from '@simpletpv/auth';
 
 // ─── Identidad demo ──────────────────────────────────────────
 export const DEMO_STORE_ID = 'demo-store-centro';
@@ -174,12 +182,14 @@ export const DEMO_CART_LINES: Array<{
   { productId: 'p-crema-regeneradora', name: 'Crema regeneradora 50ml', unitPrice: 19.9, qty: 1 },
 ];
 
-// ─── Traspasos (tabla de recepción) ──────────────────────────
-function transferLines(n: number): Transfer['lines'] {
+// ─── Pedidos internos (tabla de recepción) ───────────────────
+function storeOrderLines(n: number): StoreOrder['lines'] {
   return Array.from({ length: n }, (_, i) => ({
     id: `tl-${i}`,
-    transferId: 't',
+    storeOrderId: 't',
     productId: DEMO_PRODUCTS[i % DEMO_PRODUCTS.length]!.id,
+    productName: DEMO_PRODUCTS[i % DEMO_PRODUCTS.length]!.name,
+    barcode: DEMO_PRODUCTS[i % DEMO_PRODUCTS.length]!.barcode,
     quantitySent: '1',
     quantityReceived: null,
     discrepancy: null,
@@ -187,9 +197,9 @@ function transferLines(n: number): Transfer['lines'] {
   }));
 }
 
-export const DEMO_TRANSFERS: Transfer[] = [
+export const DEMO_STORE_ORDERS: StoreOrder[] = [
   {
-    id: 'demo-transfer-pending',
+    id: 'demo-store-order-pending',
     originStoreId: 'central',
     destStoreId: DEMO_STORE_ID,
     status: 'SENT',
@@ -199,10 +209,10 @@ export const DEMO_TRANSFERS: Transfer[] = [
     sentAt: '2026-05-31T08:30:00.000Z',
     receivedAt: null,
     closedAt: null,
-    lines: transferLines(7),
+    lines: storeOrderLines(7),
   },
   {
-    id: 'demo-transfer-received',
+    id: 'demo-store-order-received',
     originStoreId: 'central',
     destStoreId: DEMO_STORE_ID,
     status: 'RECEIVED',
@@ -212,6 +222,11 @@ export const DEMO_TRANSFERS: Transfer[] = [
     sentAt: '2026-05-29T16:10:00.000Z',
     receivedAt: '2026-05-29T16:40:00.000Z',
     closedAt: null,
-    lines: transferLines(4),
+    lines: storeOrderLines(4),
   },
 ];
+
+export const DEMO_TRANSFERS: Transfer[] = DEMO_STORE_ORDERS.map((order) => ({
+  ...order,
+  lines: order.lines.map(({ storeOrderId, ...line }) => ({ ...line, transferId: storeOrderId })),
+}));

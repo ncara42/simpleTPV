@@ -37,6 +37,9 @@ export function SalePage() {
   const searchRef = useRef<HTMLInputElement>(null);
   const [scanned, setScanned] = useState<{ product: Product | null; code: string } | null>(null);
   const [stockDetail, setStockDetail] = useState<Product | null>(null);
+  const [saleNotice, setSaleNotice] = useState<{ ticketNumber: string; total: string } | null>(
+    null,
+  );
   const debouncedSearch = useDebounce(search, 200);
   const qc = useQueryClient();
 
@@ -172,6 +175,24 @@ export function SalePage() {
               <strong>Conexión con el servidor degradada.</strong> El cobro está bloqueado hasta
               recuperar la conexión.
             </span>
+          </div>
+        )}
+
+        {saleNotice && (
+          <div className="sale-success-banner" data-testid="sale-success-banner">
+            <span className="sale-success-mark">✓</span>
+            <span>
+              Venta registrada correctamente · <strong>{saleNotice.ticketNumber}</strong> ·{' '}
+              {eur(Number(saleNotice.total))} €
+            </span>
+            <button
+              type="button"
+              className="sale-success-close"
+              onClick={() => setSaleNotice(null)}
+              aria-label="Cerrar confirmación"
+            >
+              ×
+            </button>
           </div>
         )}
 
@@ -379,7 +400,12 @@ export function SalePage() {
           </div>
         )}
       </div>
-      <CartPanel storeId={activeStore} cashOpen={cashOpen} apiHealthy={apiHealthy} />
+      <CartPanel
+        storeId={activeStore}
+        cashOpen={cashOpen}
+        apiHealthy={apiHealthy}
+        onSaleConfirmed={setSaleNotice}
+      />
       {stockDetail && (
         <ProductStockModal product={stockDetail} onClose={() => setStockDetail(null)} />
       )}

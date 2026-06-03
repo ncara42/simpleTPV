@@ -1,4 +1,11 @@
-import type { CreateSaleInput, Sale, SaleTicket, Store } from '@simpletpv/auth';
+import type {
+  CreateSaleInput,
+  Sale,
+  SalesPage,
+  SalesQueryInput,
+  SaleTicket,
+  Store,
+} from '@simpletpv/auth';
 
 import { DEMO_STORES } from '../demo/demoData.js';
 import { isDemo } from './api-config.js';
@@ -35,6 +42,36 @@ export function createSale(input: CreateSaleInput): Promise<Sale> {
     });
   }
   return api.post<Sale>('/sales', input);
+}
+
+export function listSales(query: SalesQueryInput): Promise<SalesPage> {
+  if (isDemo()) {
+    const sale = {
+      id: 'demo-sale',
+      ticketNumber: 'T01-000042',
+      createdAt: '2026-06-02T14:05:00.000Z',
+      total: '73.80',
+      paymentMethod: 'CASH',
+      status: 'COMPLETED',
+      storeId: query.storeId ?? 'demo-store-centro',
+      user: { name: 'Marta Ruiz' },
+      store: { name: 'Tienda Centro', code: 'CENTRO' },
+    };
+    return Promise.resolve({
+      items: [sale],
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 20,
+      totalItems: 1,
+      totals: { count: 1, totalAmount: '73.80' },
+    });
+  }
+  return api.get<SalesPage>('/sales', {
+    ...(query.storeId ? { storeId: query.storeId } : {}),
+    ...(query.date ? { date: query.date } : {}),
+    ...(query.q ? { q: query.q } : {}),
+    ...(query.page ? { page: String(query.page) } : {}),
+    ...(query.pageSize ? { pageSize: String(query.pageSize) } : {}),
+  });
 }
 
 export function getTicket(id: string): Promise<SaleTicket> {

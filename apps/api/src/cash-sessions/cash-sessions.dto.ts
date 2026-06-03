@@ -1,4 +1,5 @@
-import { IsNumber, IsUUID, Min } from 'class-validator';
+import { CashMovementType } from '@simpletpv/db';
+import { IsEnum, IsNumber, IsString, IsUUID, Min, MinLength } from 'class-validator';
 
 export class OpenCashSessionDto {
   @IsUUID()
@@ -15,4 +16,17 @@ export class CloseCashSessionDto {
   @IsNumber()
   @Min(0)
   countedAmount!: number;
+}
+
+export class CreateCashMovementDto {
+  @IsEnum(CashMovementType)
+  type!: CashMovementType;
+
+  @IsNumber()
+  @Min(0.01)
+  amount!: number;
+
+  @IsString()
+  @MinLength(2)
+  reason!: string;
 }

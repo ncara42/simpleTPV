@@ -9,7 +9,14 @@ import {
   DEMO_CASH_SALES,
   DEMO_STORE_ID,
 } from './demo/demoData.js';
-import { closeCashSession, currentCashSession, openCashSession } from './lib/cash.js';
+import { useAuthStore } from './lib/auth.js';
+import {
+  closeCashSession,
+  createCashMovement,
+  currentCashSession,
+  listCashMovements,
+  openCashSession,
+} from './lib/cash.js';
 import { eur } from './lib/format.js';
 
 export function CashPanel({ storeId }: { storeId: string | null }) {
@@ -18,8 +25,13 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
   // Total contado, alimentado por el contador de denominaciones (CashCount).
   const [counted, setCounted] = useState(0);
   const [closing, setClosing] = useState(false);
+  const [movementType, setMovementType] = useState<'IN' | 'OUT'>('OUT');
+  const [movementAmount, setMovementAmount] = useState('');
+  const [movementReason, setMovementReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [closed, setClosed] = useState<CashSession | null>(null);
+  const role = useAuthStore((s) => s.getRole());
+  const canManageMovements = role === 'ADMIN' || role === 'MANAGER';
 
   const queryKey = ['cash-session', storeId];
   const { data: session, isLoading } = useQuery({
@@ -41,6 +53,34 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
         e instanceof ApiError
           ? (e.body ?? 'No se pudo abrir la caja.')
           : 'No se pudo abrir la caja.',
+      );
+    },
+  });
+
+  const movementsQuery = useQuery({
+    queryKey: ['cash-movements', session?.id],
+    queryFn: () => listCashMovements(session!.id),
+    enabled: session !== null && session !== undefined,
+  });
+
+  const movementMutation = useMutation({
+    mutationFn: () =>
+      createCashMovement(session!.id, {
+        type: movementType,
+        amount: Number(movementAmount),
+        reason: movementReason.trim(),
+      }),
+    onSuccess: () => {
+      setMovementAmount('');
+      setMovementReason('');
+      setError(null);
+      void queryClient.invalidateQueries({ queryKey: ['cash-movements', session?.id] });
+    },
+    onError: (e: unknown) => {
+      setError(
+        e instanceof ApiError
+          ? (e.body ?? 'No se pudo registrar el movimiento.')
+          : 'No se pudo registrar el movimiento.',
       );
     },
   });
@@ -198,6 +238,70 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
               </button>
             </div>
           </form>
+        )}
+
+        {!closing && (
+          <div className="cash-form" data-testid="cash-movements">
+            {canManageMovements ? (
+              <div className="cash-movement-form">
+                <select
+                  value={movementType}
+                  onChange={(e) => setMovementType(e.target.value as 'IN' | 'OUT')}
+                  data-testid="cash-movement-type"
+                >
+                  <option value="OUT">Retirada</option>
+                  <option value="IN">Entrada</option>
+                </select>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={movementAmount}
+                  onChange={(e) => setMovementAmount(e.target.value)}
+                  placeholder="Importe"
+                  data-testid="cash-movement-amount"
+                />
+                <input
+                  value={movementReason}
+                  onChange={(e) => setMovementReason(e.target.value)}
+                  placeholder="Motivo"
+                  data-testid="cash-movement-reason"
+                />
+                <button
+                  type="button"
+                  className="cash-btn-open"
+                  disabled={
+                    Number(movementAmount) <= 0 ||
+                    movementReason.trim().length < 2 ||
+                    movementMutation.isPending
+                  }
+                  onClick={() => movementMutation.mutate()}
+                  data-testid="cash-movement-save"
+                >
+                  Registrar
+                </button>
+              </div>
+            ) : (
+              <p className="cash-movement-note">
+                Solo responsables pueden registrar entradas o retiradas.
+              </p>
+            )}
+            {movementsQuery.data && movementsQuery.data.length > 0 && (
+              <ul className="cash-movement-list" data-testid="cash-movement-list">
+                {movementsQuery.data.map((m) => (
+                  <li key={m.id}>
+                    <span>
+                      {m.type === 'IN' ? 'Entrada' : 'Retirada'} · {m.reason}
+                    </span>
+                    <strong className="tabular-nums">
+                      {m.type === 'IN' ? '+' : '-'}
+                      {eur(Number(m.amount))} €
+                    </strong>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
 
         {error && (

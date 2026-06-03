@@ -1,24 +1,24 @@
-import { ApiError, type SaleTicket } from '@simpletpv/auth';
+import { ApiError } from '@simpletpv/auth';
 import { Button } from '@simpletpv/ui';
-import { Percent, Printer, RotateCcw, Trash2, X } from 'lucide-react';
+import { Percent, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { DiscountModal } from './DiscountModal.js';
-import { useAuthStore } from './lib/auth.js';
 import { lineDiscountOf, useCart } from './lib/cart.js';
 import { eur } from './lib/format.js';
-import { createSale, getTicket, voidSale } from './lib/sales.js';
+import { createSale } from './lib/sales.js';
 import { type PaymentData, PaymentModal } from './PaymentModal.js';
-import { TicketView } from './TicketView.js';
 
 export function CartPanel({
   storeId,
   cashOpen,
   apiHealthy = true,
+  onSaleConfirmed,
 }: {
   storeId: string | null;
   cashOpen: boolean;
   apiHealthy?: boolean;
+  onSaleConfirmed?: (sale: { ticketNumber: string; total: string }) => void;
 }) {
   const items = useCart((s) => s.items);
   const setQty = useCart((s) => s.setQty);
@@ -40,19 +40,6 @@ export function CartPanel({
   const [discount, setDiscount] = useState<{ mode: 'line' | 'ticket'; productId?: string } | null>(
     null,
   );
-  const [confirmed, setConfirmed] = useState(false);
-  const [ticket, setTicket] = useState<SaleTicket | null>(null);
-  const [ticketError, setTicketError] = useState<string | null>(null);
-  const [saleId, setSaleId] = useState<string | null>(null);
-  const [voided, setVoided] = useState(false);
-  const [voiding, setVoiding] = useState(false);
-  const [voidError, setVoidError] = useState<string | null>(null);
-
-  const accessToken = useAuthStore((s) => s.accessToken);
-  const getRole = useAuthStore((s) => s.getRole);
-  void accessToken;
-  const role = getRole();
-  const canVoid = role === 'ADMIN' || role === 'MANAGER';
 
   function openCheckout() {
     if (!storeId || items.length === 0) return;
@@ -83,14 +70,8 @@ export function CartPanel({
         ...(ticketDiscountAmt === 0 && ticketDiscountPct > 0 ? { ticketDiscountPct } : {}),
       });
       setModalOpen(false);
-      setConfirmed(true);
-      setSaleId(sale.id);
-      try {
-        const t = await getTicket(sale.id);
-        setTicket(t);
-      } catch {
-        setTicketError('No se pudo cargar el ticket. La venta se registró correctamente.');
-      }
+      clear();
+      onSaleConfirmed?.({ ticketNumber: sale.ticketNumber, total: sale.total });
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) {
         setModalOpen(false);
@@ -106,113 +87,7 @@ export function CartPanel({
     }
   }
 
-  function newSale() {
-    clear();
-    setConfirmed(false);
-    setTicket(null);
-    setTicketError(null);
-    setError(null);
-    setSaleId(null);
-    setVoided(false);
-    setVoiding(false);
-    setVoidError(null);
-  }
-
-  async function onVoid() {
-    if (!saleId) return;
-    setVoiding(true);
-    setVoidError(null);
-    try {
-      await voidSale(saleId);
-      setVoided(true);
-    } catch (e) {
-      if (e instanceof ApiError && (e.status === 403 || e.status === 400)) {
-        setVoidError(e.body ?? 'No se pudo anular la venta.');
-      } else {
-        setVoidError('Error al anular la venta. Inténtalo de nuevo.');
-      }
-    } finally {
-      setVoiding(false);
-    }
-  }
-
   const canCheckout = items.length > 0 && !!storeId && cashOpen && apiHealthy;
-
-  // Pantalla de confirmación post-venta
-  if (confirmed) {
-    return (
-      <aside
-        className="w-80 shrink-0 rounded-xl border border-[var(--ui-border)] bg-white p-4 shadow-sm"
-        data-testid="cart"
-      >
-        <div className="space-y-3" data-testid="sale-confirmation">
-          <div className="flex items-center gap-2 pb-1">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-600">
-              ✓
-            </span>
-            <h2 className="text-sm font-semibold text-neutral-900">Venta confirmada</h2>
-          </div>
-
-          {ticket ? (
-            <TicketView ticket={ticket} />
-          ) : ticketError ? (
-            <p className="text-sm text-neutral-500" data-testid="ticket-error">
-              {ticketError}
-            </p>
-          ) : (
-            <p className="text-sm text-neutral-400" data-testid="ticket-loading">
-              Cargando ticket…
-            </p>
-          )}
-
-          {voided ? (
-            <p className="text-sm font-semibold text-red-600" data-testid="sale-voided">
-              Venta anulada
-            </p>
-          ) : (
-            canVoid &&
-            saleId && (
-              <Button
-                variant="danger"
-                size="sm"
-                className="w-full"
-                onClick={onVoid}
-                disabled={voiding}
-                data-testid="void-sale"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                {voiding ? 'Anulando…' : 'Anular venta'}
-              </Button>
-            )
-          )}
-
-          {voidError && (
-            <p className="text-xs text-red-600" data-testid="void-error">
-              {voidError}
-            </p>
-          )}
-
-          {ticket && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="w-full"
-              onClick={() => window.print()}
-              data-testid="print-ticket"
-            >
-              <Printer className="h-3.5 w-3.5" />
-              Imprimir ticket
-            </Button>
-          )}
-
-          <Button className="w-full" size="md" onClick={newSale} data-testid="new-sale">
-            <RotateCcw className="h-4 w-4" />
-            Nueva venta
-          </Button>
-        </div>
-      </aside>
-    );
-  }
 
   // Desglose de IVA (21%) desde el total, calculado en cliente para el mockup.
   const base = total > 0 ? total / 1.21 : 0;

@@ -12,7 +12,11 @@ import {
 
 import type { JwtPayload } from '../auth/jwt-payload.js';
 import { Roles } from '../auth/roles.decorator.js';
-import { CloseCashSessionDto, OpenCashSessionDto } from './cash-sessions.dto.js';
+import {
+  CloseCashSessionDto,
+  CreateCashMovementDto,
+  OpenCashSessionDto,
+} from './cash-sessions.dto.js';
 import { CashSessionsService } from './cash-sessions.service.js';
 
 @Controller('cash-sessions')
@@ -33,6 +37,22 @@ export class CashSessionsController {
   @HttpCode(200)
   close(@Param('id', ParseUUIDPipe) id: string, @Body() body: CloseCashSessionDto) {
     return this.cashSessions.close(id, body);
+  }
+
+  @Get(':id/movements')
+  @Roles('ADMIN', 'MANAGER', 'CLERK')
+  movements(@Param('id', ParseUUIDPipe) id: string) {
+    return this.cashSessions.movements(id);
+  }
+
+  @Post(':id/movements')
+  @Roles('ADMIN', 'MANAGER')
+  createMovement(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CreateCashMovementDto,
+    @Req() req: { user: JwtPayload },
+  ) {
+    return this.cashSessions.createMovement(id, body, req.user.sub);
   }
 
   // Estado de la caja de una tienda: devuelve la sesión OPEN o null.

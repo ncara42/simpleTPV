@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query, Req } fr
 
 import type { JwtPayload } from '../auth/jwt-payload.js';
 import { Roles } from '../auth/roles.decorator.js';
-import { AdjustStockDto, SetMinStockDto } from './stock.dto.js';
+import { AdjustStockDto, ConfirmInventoryCountDto, SetMinStockDto } from './stock.dto.js';
 import { StockService } from './stock.service.js';
 
 // Consultas de stock (#28) y alertas/mínimos (#29). AuthGuard global exige
@@ -59,6 +59,12 @@ export class StockController {
       reason: body.reason,
       userId: req.user.sub,
     });
+  }
+
+  @Post('inventory-count')
+  @Roles('ADMIN', 'MANAGER')
+  confirmInventoryCount(@Body() body: ConfirmInventoryCountDto, @Req() req: { user: JwtPayload }) {
+    return this.stock.confirmInventoryCount(body, req.user.sub);
   }
 
   // Historial de movimientos de stock (#32), filtrable y paginado. Trazabilidad.

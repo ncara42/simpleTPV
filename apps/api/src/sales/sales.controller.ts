@@ -29,9 +29,9 @@ export class SalesController {
   // ADMIN/MANAGER (no CLERK), coherente con /stores. El @Get() sin path es la
   // raíz del recurso, así que no colisiona con @Get(':id/ticket').
   @Get()
-  @Roles('ADMIN', 'MANAGER')
-  findSales(@Query() query: ListSalesQueryDto) {
-    return this.sales.findSales(query);
+  @Roles('ADMIN', 'MANAGER', 'CLERK')
+  findSales(@Query() query: ListSalesQueryDto, @Req() req: { user: JwtPayload }) {
+    return this.sales.findSales(query, req.user.sub, req.user.role as SaleRole);
   }
 
   // Busca una venta por su nº de ticket (flujo de devolución del TPV). Path

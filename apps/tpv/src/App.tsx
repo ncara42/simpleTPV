@@ -4,38 +4,48 @@ import './sale.css';
 import './styles.css';
 
 import { LoginForm, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
-import { ArrowLeftRight, Banknote, RotateCcw, ShoppingBag } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Banknote, ClipboardCheck, Clock, ReceiptText, ShoppingBag, Truck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { CashView } from './CashPanel.js';
+import { CashPanel } from './CashPanel.js';
 import { DEMO_CART_LINES, DEMO_USER } from './demo/demoData.js';
+import { InventoryPanel } from './InventoryPanel.js';
 import { isDemo } from './lib/api-config.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { useCart } from './lib/cart.js';
 import { switchApp } from './lib/nav.js';
-import { ReturnsView } from './ReturnPanel.js';
+import { listStores } from './lib/sales.js';
 import { SalePage } from './SalePage.js';
-import { TransferReceivePanel } from './TransferReceivePanel.js';
+import { StoreOrderReceivePanel } from './StoreOrderReceivePanel.js';
+import { TicketsPanel } from './TicketsPanel.js';
+import { TimeClockPanel } from './TimeClockPanel.js';
 
-type View = 'sale' | 'return' | 'transfers' | 'cash';
+type View = 'sale' | 'tickets' | 'orders' | 'inventory' | 'cash' | 'clock';
 
 const TPV_NAV: NavItem[] = [
   { id: 'sale', label: 'Venta', icon: <ShoppingBag size={18} /> },
-  { id: 'return', label: 'Devolución', icon: <RotateCcw size={18} /> },
-  { id: 'transfers', label: 'Traspasos', icon: <ArrowLeftRight size={18} /> },
+  { id: 'tickets', label: 'Tickets emitidos', icon: <ReceiptText size={18} /> },
+  { id: 'orders', label: 'Pedidos', icon: <Truck size={18} /> },
+  { id: 'inventory', label: 'Inventario', icon: <ClipboardCheck size={18} /> },
   { id: 'cash', label: 'Caja', icon: <Banknote size={18} /> },
+  { id: 'clock', label: 'Fichaje', icon: <Clock size={18} /> },
 ];
 
 const TITLES: Record<View, { eyebrow: string; title: string }> = {
   sale: { eyebrow: 'Tienda Centro', title: 'Venta' },
-  return: { eyebrow: 'Tienda Centro', title: 'Devolución' },
-  transfers: { eyebrow: 'Tienda Centro', title: 'Recepción de traspasos' },
+  tickets: { eyebrow: 'Tienda Centro', title: 'Tickets emitidos' },
+  orders: { eyebrow: 'Tienda Centro', title: 'Recepción de pedidos' },
+  inventory: { eyebrow: 'Tienda Centro', title: 'Inventario' },
   cash: { eyebrow: 'Tienda Centro', title: 'Caja' },
+  clock: { eyebrow: 'Tienda Centro', title: 'Fichaje' },
 };
 
 function Home() {
   const logout = useAuthStore((s) => s.clear);
   const [view, setView] = useState<View>('sale');
+  const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
+  const activeStore = stores[0]?.id ?? null;
 
   // Precarga del carrito demo: solo la primera vez (al montar) para que
   // "Ticket actual" aparezca con las 3 líneas del mockup al entrar. Lee el
@@ -73,9 +83,11 @@ function Home() {
         />
         <main className="app-main">
           {view === 'sale' && <SalePage />}
-          {view === 'return' && <ReturnsView />}
-          {view === 'transfers' && <TransferReceivePanel />}
-          {view === 'cash' && <CashView />}
+          {view === 'tickets' && <TicketsPanel storeId={activeStore} />}
+          {view === 'orders' && <StoreOrderReceivePanel />}
+          {view === 'inventory' && <InventoryPanel storeId={activeStore} />}
+          {view === 'cash' && <CashPanel storeId={activeStore} />}
+          {view === 'clock' && <TimeClockPanel storeId={activeStore} />}
         </main>
       </div>
     </div>

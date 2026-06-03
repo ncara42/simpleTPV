@@ -81,6 +81,9 @@ export class ListSalesQueryDto {
   date?: string;
 
   @IsOptional()
+  q?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)

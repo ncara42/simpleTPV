@@ -488,6 +488,29 @@ export class StockService {
     });
   }
 
+  async confirmInventoryCount(
+    input: {
+      storeId: string;
+      reason: string;
+      lines: Array<{ productId: string; countedQuantity: number }>;
+    },
+    userId: string,
+  ) {
+    const results = [];
+    for (const line of input.lines) {
+      results.push(
+        await this.adjust({
+          productId: line.productId,
+          storeId: input.storeId,
+          newQuantity: line.countedQuantity,
+          reason: input.reason,
+          userId,
+        }),
+      );
+    }
+    return { storeId: input.storeId, adjusted: results };
+  }
+
   /**
    * Historial de movimientos de stock del tenant (#32), filtrable por producto,
    * tienda y rango de fechas, paginado. Orden por createdAt descendente (lo más

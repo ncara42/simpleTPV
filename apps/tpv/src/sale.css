@@ -19,7 +19,9 @@
   background: var(--ui-surface);
   padding: 0 0.45rem 0 0.85rem;
   box-shadow: var(--ui-shadow-sm);
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 
 .sale-search-wrap:focus-within {
@@ -61,7 +63,10 @@
   font-weight: 600;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
 
 .scan-btn:hover {
@@ -103,7 +108,10 @@
   cursor: pointer;
   box-shadow: var(--ui-shadow-sm);
   white-space: nowrap;
-  transition: border-color 0.12s, background 0.12s, transform 0.06s;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    transform 0.06s;
 }
 
 .fam-chip:hover {
@@ -173,7 +181,10 @@
   background: var(--ui-surface);
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.1s, box-shadow 0.1s, transform 0.06s;
+  transition:
+    border-color 0.1s,
+    box-shadow 0.1s,
+    transform 0.06s;
 }
 
 .prod-card:hover {
@@ -506,7 +517,9 @@
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: border-color 0.1s, color 0.1s;
+  transition:
+    border-color 0.1s,
+    color 0.1s;
 }
 
 .cart-line-controls button:hover {
@@ -606,7 +619,9 @@
   padding: 0 0.9rem;
   font-size: 1.1rem;
   outline: none;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 
 .disc-fields select:focus,
@@ -730,7 +745,10 @@
   font-weight: 600;
   font-size: 0.86rem;
   color: var(--ui-text);
-  transition: border-color 0.12s, background 0.12s, color 0.12s;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    color 0.12s;
 }
 
 .pay-method.active {
@@ -761,7 +779,9 @@
   padding: 0 0.9rem;
   font-size: 1.1rem;
   outline: none;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 
 .pay-field input:focus {
@@ -967,6 +987,48 @@
   margin-bottom: 0.75rem;
 }
 
+.sale-success-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.sale-success-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.sale-success-close {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: #15803d;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sale-success-close:hover {
+  color: #14532d;
+}
+
 /* ─── Panel de caja ────────────────────────────────────── */
 .cash-panel {
   margin-bottom: 1rem;
@@ -1063,7 +1125,9 @@
   font-weight: 600;
   color: var(--ui-text);
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
   white-space: nowrap;
 }
 
@@ -1104,7 +1168,9 @@
   padding: 0 0.9rem;
   font-size: 1.1rem;
   outline: none;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 
 .cash-field input:focus {
@@ -1325,7 +1391,9 @@
   font-weight: 600;
   cursor: pointer;
   color: var(--ui-text-muted);
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
 .tpv-tab.active {
@@ -1408,7 +1476,9 @@
   cursor: pointer;
   display: grid;
   place-items: center;
-  transition: border-color 0.1s, color 0.1s;
+  transition:
+    border-color 0.1s,
+    color 0.1s;
 }
 
 .return-line-controls button:hover {
@@ -1445,7 +1515,9 @@
   font-family: inherit;
   resize: vertical;
   outline: none;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 
 .return-reason:focus {
@@ -1535,7 +1607,9 @@
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-sm);
   outline: none;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 
 .blind-field input:focus {
@@ -1799,7 +1873,7 @@
   filter: brightness(0.94);
 }
 
-/* ─── Vista de Traspasos (tabla, mockup) ───────────────────── */
+/* ─── Vista de Pedidos (tabla, mockup) ───────────────────── */
 .transfer-view {
   max-width: 46rem;
   display: flex;
@@ -1913,4 +1987,235 @@
   border: 1px solid var(--ui-border);
   border-radius: 12px;
   background: var(--ui-surface);
+}
+
+.tickets-view,
+.inventory-view,
+.time-clock-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 62rem;
+}
+
+.tickets-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tickets-head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.tickets-head p {
+  margin: 0.15rem 0 0;
+  color: var(--ui-text-muted);
+  font-size: 0.88rem;
+}
+
+.tickets-search,
+.inventory-results,
+.ticket-detail-card,
+.inventory-table {
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface);
+}
+
+.tickets-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 22rem;
+  padding: 0.55rem 0.75rem;
+}
+
+.tickets-search input,
+.ticket-return textarea,
+.inventory-actions input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+}
+
+.tickets-layout {
+  display: grid;
+  grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.tickets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ticket-row,
+.inventory-results button {
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-surface);
+  cursor: pointer;
+}
+
+.ticket-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.ticket-row.active,
+.ticket-row:hover,
+.inventory-results button:hover {
+  background: var(--ui-brand-soft);
+}
+
+.ticket-row span:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.ticket-row small,
+.inventory-row small {
+  color: var(--ui-text-soft);
+  font-size: 0.75rem;
+}
+
+.ticket-detail-card {
+  padding: 1rem;
+}
+
+.ticket-detail-top,
+.ticket-actions,
+.inventory-actions,
+.cash-movement-form,
+.cash-movement-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ticket-detail-top h3 {
+  margin: 0;
+}
+
+.ticket-detail-top p {
+  margin: 0.1rem 0 0;
+  color: var(--ui-text-muted);
+}
+
+.ticket-detail-lines {
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--ui-border);
+}
+
+.ticket-detail-lines li,
+.ticket-return-line,
+.inventory-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.ticket-return {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--ui-border);
+}
+
+.ticket-return h4 {
+  margin: 0 0 0.75rem;
+}
+
+.ticket-return input,
+.inventory-row input,
+.cash-movement-form input,
+.cash-movement-form select {
+  height: 2.2rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  padding: 0 0.6rem;
+  background: var(--ui-surface);
+}
+
+.ticket-return input,
+.inventory-row input {
+  width: 5rem;
+  text-align: center;
+}
+
+.ticket-return textarea {
+  min-height: 4.5rem;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+}
+
+.inventory-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.6rem;
+}
+
+.inventory-results button {
+  padding: 0.45rem 0.7rem;
+}
+
+.inventory-table {
+  padding: 0 1rem;
+}
+
+.inventory-row > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.inventory-row > div {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.inventory-row button {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface);
+}
+
+.cash-movement-form {
+  align-items: stretch;
+}
+
+.cash-movement-form input {
+  min-width: 0;
+}
+
+.cash-movement-list {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cash-movement-list li {
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--ui-border);
 }

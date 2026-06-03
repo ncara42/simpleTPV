@@ -1,4 +1,10 @@
-import { ApiError, type CashSession, type OpenCashSessionInput } from '@simpletpv/auth';
+import {
+  ApiError,
+  type CashMovement,
+  type CashMovementType,
+  type CashSession,
+  type OpenCashSessionInput,
+} from '@simpletpv/auth';
 
 import { DEMO_CASH_SESSION } from '../demo/demoData.js';
 import { isDemo } from './api-config.js';
@@ -34,4 +40,28 @@ export async function currentCashSession(storeId: string): Promise<CashSession |
     if (e instanceof ApiError && e.status === 404) return null;
     throw e;
   }
+}
+
+export function listCashMovements(cashSessionId: string): Promise<CashMovement[]> {
+  if (isDemo()) return Promise.resolve([]);
+  return api.get<CashMovement[]>(`/cash-sessions/${cashSessionId}/movements`);
+}
+
+export function createCashMovement(
+  cashSessionId: string,
+  input: { type: CashMovementType; amount: number; reason: string },
+): Promise<CashMovement> {
+  if (isDemo()) {
+    return Promise.resolve({
+      id: `demo-cash-movement-${Date.now()}`,
+      cashSessionId,
+      storeId: DEMO_CASH_SESSION.storeId,
+      userId: 'demo',
+      type: input.type,
+      amount: input.amount.toFixed(2),
+      reason: input.reason,
+      createdAt: new Date().toISOString(),
+    });
+  }
+  return api.post<CashMovement>(`/cash-sessions/${cashSessionId}/movements`, input);
 }

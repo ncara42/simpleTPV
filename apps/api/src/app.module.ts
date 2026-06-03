@@ -13,6 +13,7 @@ import { CashSessionsModule } from './cash-sessions/cash-sessions.module.js';
 import { throttleConfig } from './config/security.js';
 import { TestAwareThrottlerGuard } from './config/test-aware-throttler.guard.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
+import { DevicesModule } from './devices/devices.module.js';
 import { EventsModule } from './events/events.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MeModule } from './me/me.module.js';
@@ -23,8 +24,10 @@ import { PurchasesModule } from './purchases/purchases.module.js';
 import { ReturnsModule } from './returns/returns.module.js';
 import { SalesModule } from './sales/sales.module.js';
 import { StockModule } from './stock/stock.module.js';
+import { StoreOrdersModule } from './store-orders/store-orders.module.js';
 import { StoresModule } from './stores/stores.module.js';
 import { SuppliersModule } from './suppliers/suppliers.module.js';
+import { TimeClockModule } from './time-clock/time-clock.module.js';
 import { TransfersModule } from './transfers/transfers.module.js';
 import { UsersModule } from './users/users.module.js';
 import { VerifactuModule } from './verifactu/verifactu.module.js';
@@ -47,6 +50,7 @@ const throttle = throttleConfig(process.env);
     StoresModule,
     SalesModule,
     StockModule,
+    StoreOrdersModule,
     ReturnsModule,
     TransfersModule,
     SuppliersModule,
@@ -55,6 +59,8 @@ const throttle = throttleConfig(process.env);
     CashSessionsModule,
     DashboardModule,
     MeModule,
+    DevicesModule,
+    TimeClockModule,
   ],
   // Orden de guards: AuthGuard primero (popula request.user desde el JWT),
   // luego RolesGuard (lee user.role). Los APP_GUARD corren en orden de registro.

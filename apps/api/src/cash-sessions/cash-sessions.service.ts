@@ -2,7 +2,11 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
-import type { CloseCashSessionDto, OpenCashSessionDto } from './cash-sessions.dto.js';
+import type {
+  CloseCashSessionDto,
+  CreateCashMovementDto,
+  OpenCashSessionDto,
+} from './cash-sessions.dto.js';
 
 // Redondeo a 2 decimales (céntimos): el cuadre debe coincidir con la columna
 // DECIMAL(12,2) y con lo que el TPV muestra. Sin esto, sumar floats puede
@@ -15,8 +19,8 @@ function round2(n: number): number {
  * Efectivo esperado en el cajón al cerrar: inicial + ventas en efectivo del
  * turno. Función pura para poder probar el cuadre sin tocar la DB.
  */
-export function computeExpected(opening: number, cashSales: number): number {
-  return round2(opening + cashSales);
+export function computeExpected(opening: number, cashSales: number, movementNet = 0): number {
+  return round2(opening + cashSales + movementNet);
 }
 
 /**
@@ -91,7 +95,20 @@ export class CashSessionsService {
     });
     const cashSales = Number(agg._sum.total ?? 0);
 
-    const expected = computeExpected(Number(session.openingAmount), cashSales);
+    const movementAgg = await this.prisma.cashMovement.groupBy({
+      by: ['type'],
+      where: {
+        organizationId: tenant.organizationId,
+        cashSessionId: session.id,
+      },
+      _sum: { amount: true },
+    });
+    const movementNet = movementAgg.reduce((acc, row) => {
+      const amount = Number(row._sum.amount ?? 0);
+      return acc + (row.type === 'IN' ? amount : -amount);
+    }, 0);
+
+    const expected = computeExpected(Number(session.openingAmount), cashSales, movementNet);
     const difference = computeDifference(dto.countedAmount, expected);
 
     // Transición atómica: la condición status=OPEN viaja al WHERE, así dos
@@ -126,6 +143,45 @@ export class CashSessionsService {
     const tenant = requireTenant();
     return this.prisma.cashSession.findFirst({
       where: { storeId, organizationId: tenant.organizationId, status: 'OPEN' },
+    });
+  }
+
+  async movements(id: string) {
+    const tenant = requireTenant();
+    const session = await this.prisma.cashSession.findFirst({
+      where: { id, organizationId: tenant.organizationId },
+      select: { id: true },
+    });
+    if (!session) {
+      throw new NotFoundException(`Sesión de caja ${id} no encontrada`);
+    }
+    return this.prisma.cashMovement.findMany({
+      where: { cashSessionId: id, organizationId: tenant.organizationId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createMovement(id: string, dto: CreateCashMovementDto, userId: string) {
+    const tenant = requireTenant();
+    const session = await this.prisma.cashSession.findFirst({
+      where: { id, organizationId: tenant.organizationId },
+    });
+    if (!session) {
+      throw new NotFoundException(`Sesión de caja ${id} no encontrada`);
+    }
+    if (session.status !== 'OPEN') {
+      throw new BadRequestException('La caja ya está cerrada');
+    }
+    return this.prisma.cashMovement.create({
+      data: {
+        organizationId: tenant.organizationId,
+        cashSessionId: id,
+        storeId: session.storeId,
+        userId,
+        type: dto.type,
+        amount: dto.amount,
+        reason: dto.reason.trim(),
+      },
     });
   }
 }

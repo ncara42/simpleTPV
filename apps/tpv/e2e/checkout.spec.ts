@@ -27,10 +27,9 @@ test('el ticket precargado muestra total 73,80 € y permite cobrar', async ({ p
   await page.getByTestId('cash-given').fill('80');
   await page.getByTestId('pay-confirm').click();
 
-  await expect(page.getByTestId('sale-confirmation')).toBeVisible({ timeout: 10000 });
-  await expect(page.getByTestId('ticket-view')).toBeVisible({ timeout: 10000 });
-
-  await page.getByTestId('new-sale').click();
+  await expect(page.getByTestId('sale-success-banner')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByTestId('sale-success-banner')).toContainText('Venta registrada');
+  await expect(page.getByTestId('ticket-view')).toHaveCount(0);
   await expect(page.getByTestId('cart-empty')).toBeVisible();
 });
 

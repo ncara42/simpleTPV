@@ -6,7 +6,7 @@ import { api } from './auth.js';
 
 export type { Transfer };
 
-// Traspasos entrantes a la tienda activa (estado SENT, pendientes de recibir).
+// Legacy: traspasos entrantes a la tienda activa (estado SENT, pendientes de recibir).
 export async function listIncomingTransfers(destStoreId: string): Promise<Transfer[]> {
   if (isDemo()) return DEMO_TRANSFERS;
   const sent = await api.get<Transfer[]>('/transfers', { status: 'SENT' });

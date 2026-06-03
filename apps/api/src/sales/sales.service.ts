@@ -565,23 +565,45 @@ export class SalesService {
    *
    * Defensa en profundidad: además de RLS, el where lleva organizationId explícito.
    */
-  async findSales({
-    storeId,
-    date,
-    page = 1,
-    pageSize = 20,
-  }: {
-    storeId?: string;
-    date?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
+  async findSales(
+    {
+      storeId,
+      date,
+      q,
+      page = 1,
+      pageSize = 20,
+    }: {
+      storeId?: string;
+      date?: string;
+      q?: string;
+      page?: number;
+      pageSize?: number;
+    },
+    userId = '',
+    role: SaleRole = 'ADMIN',
+  ) {
     const tenant = requireTenant();
+    const storeFilter: { in: string[] } | string | undefined = await this.salesStoreFilter(
+      storeId,
+      userId,
+      role,
+    );
+    const term = q?.trim();
 
     const where = {
       organizationId: tenant.organizationId,
-      ...(storeId ? { storeId } : {}),
+      ...(storeFilter ? { storeId: storeFilter } : {}),
       ...(date ? { createdAt: dayRange(date) } : {}),
+      ...(term
+        ? {
+            OR: [
+              { ticketNumber: { contains: term, mode: 'insensitive' as const } },
+              { user: { name: { contains: term, mode: 'insensitive' as const } } },
+              { lines: { some: { name: { contains: term, mode: 'insensitive' as const } } } },
+              ...(Number.isFinite(Number(term)) ? [{ total: Number(term) }] : []),
+            ],
+          }
+        : {}),
     };
 
     const [items, totalItems, totals] = await Promise.all([
@@ -598,6 +620,8 @@ export class SalesService {
           paymentMethod: true,
           status: true,
           storeId: true,
+          user: { select: { name: true } },
+          store: { select: { name: true, code: true } },
         },
       }),
       this.prisma.sale.count({ where }),
@@ -619,5 +643,29 @@ export class SalesService {
         totalAmount: totals._sum.total ?? 0,
       },
     };
+  }
+
+  private async salesStoreFilter(
+    requestedStoreId: string | undefined,
+    userId: string,
+    role: SaleRole,
+  ): Promise<{ in: string[] } | string | undefined> {
+    if (role !== 'CLERK') {
+      return requestedStoreId;
+    }
+    const tenant = requireTenant();
+    const rows = await this.prisma.userStore.findMany({
+      where: {
+        userId,
+        store: { organizationId: tenant.organizationId },
+        ...(requestedStoreId ? { storeId: requestedStoreId } : {}),
+      },
+      select: { storeId: true },
+    });
+    const ids = rows.map((r) => r.storeId);
+    if (requestedStoreId && ids.length === 0) {
+      throw new ForbiddenException('No tienes acceso a esa tienda');
+    }
+    return { in: ids };
   }
 }

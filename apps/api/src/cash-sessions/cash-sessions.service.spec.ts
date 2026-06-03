@@ -60,6 +60,15 @@ function makePrisma() {
         }),
       ),
     },
+    cashMovement: {
+      groupBy: vi.fn(
+        async (
+          _a?: unknown,
+        ): Promise<Array<{ type: 'IN' | 'OUT'; _sum: { amount: number | null } }>> => [],
+      ),
+      findMany: vi.fn(async (_a?: unknown): Promise<unknown[]> => []),
+      create: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'cm-1' })),
+    },
   };
 }
 
