@@ -127,6 +127,7 @@ describe('Traspasos — integración', () => {
         created.id,
         { lines: [{ lineId, quantityReceived: 28, discrepancyNote: 'caja dañada' }] },
         user1Id,
+        'ADMIN',
       ),
     );
     expect(received.status).toBe('RECEIVED');
@@ -154,6 +155,7 @@ describe('Traspasos — integración', () => {
           created.id,
           { lines: [{ lineId: created.lines[0]!.id, quantityReceived: 5 }] },
           user1Id,
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow(/no está en SENT/);

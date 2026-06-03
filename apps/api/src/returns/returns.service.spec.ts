@@ -126,6 +126,7 @@ describe('ReturnsService.create', () => {
         service.create(
           { saleId: 'nope', reason: 'roto', lines: [{ saleLineId: 'sl-1', qty: 1 }] },
           'user-1',
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow(NotFoundException);
@@ -139,6 +140,7 @@ describe('ReturnsService.create', () => {
         service.create(
           { saleId: 'sale-1', reason: 'roto', lines: [{ saleLineId: 'sl-1', qty: 1 }] },
           'user-1',
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow(/anulada/);
@@ -152,6 +154,7 @@ describe('ReturnsService.create', () => {
         service.create(
           { saleId: 'sale-1', reason: 'roto', lines: [{ saleLineId: 'ajena', qty: 1 }] },
           'user-1',
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow(/no pertenece a la venta/);
@@ -166,6 +169,7 @@ describe('ReturnsService.create', () => {
         service.create(
           { saleId: 'sale-1', reason: 'roto', lines: [{ saleLineId: 'sl-1', qty: 4 }] },
           'user-1',
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow(/más de lo vendido/);
@@ -180,6 +184,7 @@ describe('ReturnsService.create', () => {
         service.create(
           { saleId: 'sale-1', reason: 'roto', lines: [{ saleLineId: 'sl-1', qty: 2 }] },
           'user-1',
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow(/más de lo vendido/);
@@ -197,6 +202,7 @@ describe('ReturnsService.create', () => {
           lines: [{ saleLineId: 'sl-1', qty: 2 }],
         },
         'user-1',
+        'ADMIN',
       ),
     )) as unknown as {
       organizationId: string;
@@ -230,6 +236,7 @@ describe('ReturnsService.create', () => {
       service.create(
         { saleId: 'sale-1', reason: 'resto', lines: [{ saleLineId: 'sl-1', qty: 1 }] },
         'user-1',
+        'ADMIN',
       ),
     )) as unknown as { total: number };
     expect(result.total).toBeCloseTo(10, 2);
@@ -241,6 +248,7 @@ describe('ReturnsService.create', () => {
       service.create(
         { saleId: 'sale-1', reason: 'x', lines: [{ saleLineId: 'sl-1', qty: 1 }] },
         'user-1',
+        'ADMIN',
       ),
     ).rejects.toThrow();
   });
@@ -333,7 +341,7 @@ describe('ReturnsService.createBlind', () => {
     const otherHash = await bcrypt.hash('9999', 10);
     const svc = service(makeBlindPrisma({ pinHash: otherHash, price: 10 }), makeBlindBase());
     await expect(
-      tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1')),
+      tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1', 'ADMIN')),
     ).rejects.toThrow(ForbiddenException);
   });
 
@@ -343,7 +351,7 @@ describe('ReturnsService.createBlind', () => {
     const svc = service(makeBlindPrisma({ pinHash, price: 10 }), base);
 
     const res = (await tenantStorage.run({ organizationId: ORG }, () =>
-      svc.createBlind(dto, 'clerk-1'),
+      svc.createBlind(dto, 'clerk-1', 'ADMIN'),
     )) as unknown as { authorizedBy: string; total: number; saleId?: string | null };
 
     // precio 10 × qty 2 = 20.
@@ -360,7 +368,7 @@ describe('ReturnsService.createBlind', () => {
     const pinHash = await bcrypt.hash('4321', 10);
     const svc = service(makeBlindPrisma({ pinHash, price: null }), makeBlindBase());
     await expect(
-      tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1')),
+      tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1', 'ADMIN')),
     ).rejects.toThrow(/no encontrado/);
   });
 
@@ -368,7 +376,9 @@ describe('ReturnsService.createBlind', () => {
     const pinHash = await bcrypt.hash('4321', 10);
     const base = makeBlindBase();
     const svc = service(makeBlindPrisma({ pinHash, price: 10 }), base);
-    await tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1'));
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      svc.createBlind(dto, 'clerk-1', 'ADMIN'),
+    );
     const mv = base.__tx.stockMovement.create.mock.calls[0]![0] as {
       data: { type: string; quantity: number };
     };

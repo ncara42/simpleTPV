@@ -188,7 +188,9 @@ describe('StockService.byStore', () => {
       new InMemoryEventBus(),
     );
 
-    const rows = await tenantStorage.run({ organizationId: ORG }, () => service.byStore('s1'));
+    const rows = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.byStore('s1', 'user-1', 'ADMIN'),
+    );
 
     expect(rows[0]).toMatchObject({ productId: 'p1', level: 'red', quantity: 0 });
     expect(rows[1]).toMatchObject({ productId: 'p2', level: 'green', quantity: 8 });
@@ -214,7 +216,9 @@ describe('StockService.toReorder', () => {
       new InMemoryEventBus(),
     );
 
-    const rows = await tenantStorage.run({ organizationId: ORG }, () => service.toReorder('s1'));
+    const rows = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.toReorder('s1', 'user-1', 'ADMIN'),
+    );
 
     expect(rows.map((r) => r.productId)).toEqual(['p1', 'p2']);
     expect(rows.every((r) => r.level !== 'green')).toBe(true);

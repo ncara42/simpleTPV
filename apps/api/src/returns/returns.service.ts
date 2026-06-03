@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 
+import { assertStoreAccess } from '../auth/store-access.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
@@ -60,7 +61,7 @@ export class ReturnsService {
    * withTenantTx (cliente base) para que la validación y el create compartan UNA
    * transacción atómica con el tenant fijado (RLS aplicada).
    */
-  async create(dto: CreateReturnDto, userId: string) {
+  async create(dto: CreateReturnDto, userId: string, role: string) {
     const tenant = requireTenant();
 
     return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
@@ -88,6 +89,9 @@ export class ReturnsService {
       if (sale.status === 'VOIDED') {
         throw new BadRequestException('No se puede devolver una venta anulada');
       }
+      // Aislamiento por tienda (SEC-01): un CLERK solo devuelve ventas de las
+      // tiendas a las que está asignado. La tienda la fija la venta original.
+      await assertStoreAccess(tx, { userId, role, storeId: sale.storeId });
 
       const linesById = new Map(sale.lines.map((l) => [l.id, l]));
 
@@ -204,8 +208,11 @@ export class ReturnsService {
    * producto (movimiento RETURN). El importe de cada línea se calcula del precio
    * de venta ACTUAL del producto (salePrice) × qty. Todo en una tx atómica.
    */
-  async createBlind(dto: CreateBlindReturnDto, userId: string) {
+  async createBlind(dto: CreateBlindReturnDto, userId: string, role: string) {
     const tenant = requireTenant();
+    // Aislamiento por tienda (SEC-01): un CLERK solo hace devoluciones ciegas en
+    // sus tiendas. Se comprueba antes que el PIN para fallar cuanto antes.
+    await assertStoreAccess(this.prisma, { userId, role, storeId: dto.storeId });
     // Autorización por PIN ANTES de abrir la tx (si falla, no toca nada).
     const authorizedBy = await this.resolveAuthorizer(dto.managerPin);
 

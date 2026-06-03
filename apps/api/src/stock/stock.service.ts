@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { AlertType, MovementType } from '@simpletpv/db';
 
+import { assertStoreAccess } from '../auth/store-access.js';
 import { CACHE, type Cache } from '../cache/cache.interface.js';
 import { EVENT_BUS, type EventBus } from '../events/event-bus.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -213,8 +214,10 @@ export class StockService {
    * Postgres (un único query con join al producto): la lista necesita
    * minStock/nombre que el cache puntual no guarda.
    */
-  async byStore(storeId: string) {
+  async byStore(storeId: string, userId: string, role: string) {
     const tenant = requireTenant();
+    // Aislamiento por tienda (SEC-01): un CLERK solo ve stock de sus tiendas.
+    await assertStoreAccess(this.prisma, { userId, role, storeId });
     const rows = await this.prisma.stock.findMany({
       where: { storeId, organizationId: tenant.organizationId },
       include: { product: { select: { name: true } } },
@@ -238,8 +241,9 @@ export class StockService {
    * Productos "para pedir" de una tienda (#45): los que están por debajo o en el
    * mínimo (nivel amarillo/rojo). Atajo sobre byStore para la vista de reposición.
    */
-  async toReorder(storeId: string) {
-    const rows = await this.byStore(storeId);
+  async toReorder(storeId: string, userId: string, role: string) {
+    // byStore aplica la comprobación de acceso por tienda (SEC-01).
+    const rows = await this.byStore(storeId, userId, role);
     return rows.filter((r) => r.level !== 'green');
   }
 

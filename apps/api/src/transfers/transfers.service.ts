@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { assertStoreAccess } from '../auth/store-access.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
@@ -130,7 +131,7 @@ export class TransfersService {
    * stock del DESTINO por lo realmente RECIBIDO (movimiento TRANSFER_IN). Marca
    * receivedAt. Transición atómica condicional al estado SENT.
    */
-  async receive(id: string, dto: ReceiveTransferDto, userId: string) {
+  async receive(id: string, dto: ReceiveTransferDto, userId: string, role: string) {
     const tenant = requireTenant();
     return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
       const transfer = await tx.transfer.findFirst({
@@ -143,6 +144,9 @@ export class TransfersService {
       if (transfer.status !== 'SENT') {
         throw new ConflictException(`El traspaso no está en SENT (estado: ${transfer.status})`);
       }
+      // Aislamiento por tienda (SEC-01): un CLERK solo recibe traspasos en la
+      // tienda de destino si está asignado a ella.
+      await assertStoreAccess(tx, { userId, role, storeId: transfer.destStoreId });
 
       const linesById = new Map(transfer.lines.map((l) => [l.id, l]));
       // Toda línea del dto debe pertenecer al traspaso.

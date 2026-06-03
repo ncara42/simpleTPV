@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
+import { assertStoreAccess } from '../auth/store-access.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import type {
@@ -40,8 +41,11 @@ export class CashSessionsService {
    * por tienda a la vez (validado aquí, no por constraint, para mantenerlo
    * simple). El cliente extendido aplica RLS por-operación.
    */
-  async open(dto: OpenCashSessionDto, userId: string) {
+  async open(dto: OpenCashSessionDto, userId: string, role: string) {
     const tenant = requireTenant();
+
+    // Aislamiento por tienda (SEC-01): un CLERK solo abre caja en sus tiendas.
+    await assertStoreAccess(this.prisma, { userId, role, storeId: dto.storeId });
 
     // Defensa en profundidad: además de RLS filtramos por organizationId.
     const existing = await this.prisma.cashSession.findFirst({
@@ -68,7 +72,7 @@ export class CashSessionsService {
    * openedAt) y compara con lo contado. La transición a CLOSED es atómica:
    * updateMany condicional (status=OPEN) evita doble cierre concurrente.
    */
-  async close(id: string, dto: CloseCashSessionDto) {
+  async close(id: string, dto: CloseCashSessionDto, userId: string, role: string) {
     const tenant = requireTenant();
 
     const session = await this.prisma.cashSession.findFirst({
@@ -77,6 +81,8 @@ export class CashSessionsService {
     if (!session) {
       throw new NotFoundException(`Sesión de caja ${id} no encontrada`);
     }
+    // Aislamiento por tienda (SEC-01): un CLERK solo cierra cajas de sus tiendas.
+    await assertStoreAccess(this.prisma, { userId, role, storeId: session.storeId });
     if (session.status === 'CLOSED') {
       throw new BadRequestException('La caja ya está cerrada');
     }
@@ -139,22 +145,26 @@ export class CashSessionsService {
    * Devuelve la sesión OPEN de una tienda del tenant, o null si no hay ninguna
    * abierta. Lo usa el TPV para saber el estado de la caja.
    */
-  async current(storeId: string) {
+  async current(storeId: string, userId: string, role: string) {
     const tenant = requireTenant();
+    // Aislamiento por tienda (SEC-01): un CLERK solo consulta cajas de sus tiendas.
+    await assertStoreAccess(this.prisma, { userId, role, storeId });
     return this.prisma.cashSession.findFirst({
       where: { storeId, organizationId: tenant.organizationId, status: 'OPEN' },
     });
   }
 
-  async movements(id: string) {
+  async movements(id: string, userId: string, role: string) {
     const tenant = requireTenant();
     const session = await this.prisma.cashSession.findFirst({
       where: { id, organizationId: tenant.organizationId },
-      select: { id: true },
+      select: { id: true, storeId: true },
     });
     if (!session) {
       throw new NotFoundException(`Sesión de caja ${id} no encontrada`);
     }
+    // Aislamiento por tienda (SEC-01): un CLERK solo ve movimientos de sus tiendas.
+    await assertStoreAccess(this.prisma, { userId, role, storeId: session.storeId });
     return this.prisma.cashMovement.findMany({
       where: { cashSessionId: id, organizationId: tenant.organizationId },
       orderBy: { createdAt: 'desc' },

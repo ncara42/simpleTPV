@@ -128,6 +128,7 @@ describe('Devoluciones — integración', () => {
           lines: [{ saleLineId: saleLine.id, qty: 2 }],
         },
         user1Id,
+        'ADMIN',
       ),
     );
 
@@ -155,6 +156,7 @@ describe('Devoluciones — integración', () => {
         returns.create(
           { saleId: sale.id, reason: 'exceso', lines: [{ saleLineId: saleLine.id, qty: 3 }] },
           user1Id,
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow(/más de lo vendido/);
@@ -169,6 +171,7 @@ describe('Devoluciones — integración', () => {
       returns.create(
         { saleId: sale.id, reason: 'primera', lines: [{ saleLineId: saleLine.id, qty: 2 }] },
         user1Id,
+        'ADMIN',
       ),
     );
 
@@ -178,6 +181,7 @@ describe('Devoluciones — integración', () => {
         returns.create(
           { saleId: sale.id, reason: 'segunda', lines: [{ saleLineId: saleLine.id, qty: 2 }] },
           user1Id,
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow(/más de lo vendido/);
@@ -187,6 +191,7 @@ describe('Devoluciones — integración', () => {
       returns.create(
         { saleId: sale.id, reason: 'resto', lines: [{ saleLineId: saleLine.id, qty: 1 }] },
         user1Id,
+        'ADMIN',
       ),
     );
     expect(ret.lines).toHaveLength(1);
@@ -205,6 +210,7 @@ describe('Devoluciones — integración', () => {
         returns.create(
           { saleId: sale.id, reason: 'anulada', lines: [{ saleLineId: saleLine.id, qty: 1 }] },
           user1Id,
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow(/anulada/);
@@ -219,6 +225,7 @@ describe('Devoluciones — integración', () => {
       returns.create(
         { saleId: sale.id, reason: 'parcial', lines: [{ saleLineId: saleLine.id, qty: 1 }] },
         user1Id,
+        'ADMIN',
       ),
     );
 
@@ -238,6 +245,7 @@ describe('Devoluciones — integración', () => {
         returns.create(
           { saleId: sale.id, reason: 'cruzada', lines: [{ saleLineId: saleLine.id, qty: 1 }] },
           user1Id,
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow();
@@ -247,6 +255,7 @@ describe('Devoluciones — integración', () => {
       returns.create(
         { saleId: sale.id, reason: 'propia', lines: [{ saleLineId: saleLine.id, qty: 1 }] },
         user1Id,
+        'ADMIN',
       ),
     );
     expect(Number(ret.total)).toBeGreaterThan(0);
@@ -289,6 +298,7 @@ describe('Devoluciones — integración', () => {
             lines: [{ productId: product1Id, qty: 3 }],
           },
           user1Id,
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow(/PIN/);
@@ -303,6 +313,7 @@ describe('Devoluciones — integración', () => {
           lines: [{ productId: product1Id, qty: 3 }],
         },
         user1Id,
+        'ADMIN',
       ),
     );
     expect(ret.lines).toHaveLength(1);

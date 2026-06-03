@@ -27,7 +27,7 @@ export class CashSessionsController {
   @Post('open')
   @Roles('ADMIN', 'MANAGER', 'CLERK')
   open(@Body() body: OpenCashSessionDto, @Req() req: { user: JwtPayload }) {
-    return this.cashSessions.open(body, req.user.sub);
+    return this.cashSessions.open(body, req.user.sub, req.user.role);
   }
 
   // Cierre de caja con cuadre. 200 porque es una mutación sobre un recurso
@@ -35,14 +35,18 @@ export class CashSessionsController {
   @Post(':id/close')
   @Roles('ADMIN', 'MANAGER', 'CLERK')
   @HttpCode(200)
-  close(@Param('id', ParseUUIDPipe) id: string, @Body() body: CloseCashSessionDto) {
-    return this.cashSessions.close(id, body);
+  close(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CloseCashSessionDto,
+    @Req() req: { user: JwtPayload },
+  ) {
+    return this.cashSessions.close(id, body, req.user.sub, req.user.role);
   }
 
   @Get(':id/movements')
   @Roles('ADMIN', 'MANAGER', 'CLERK')
-  movements(@Param('id', ParseUUIDPipe) id: string) {
-    return this.cashSessions.movements(id);
+  movements(@Param('id', ParseUUIDPipe) id: string, @Req() req: { user: JwtPayload }) {
+    return this.cashSessions.movements(id, req.user.sub, req.user.role);
   }
 
   @Post(':id/movements')
@@ -58,7 +62,7 @@ export class CashSessionsController {
   // Estado de la caja de una tienda: devuelve la sesión OPEN o null.
   @Get('current')
   @Roles('ADMIN', 'MANAGER', 'CLERK')
-  current(@Query('storeId', ParseUUIDPipe) storeId: string) {
-    return this.cashSessions.current(storeId);
+  current(@Query('storeId', ParseUUIDPipe) storeId: string, @Req() req: { user: JwtPayload }) {
+    return this.cashSessions.current(storeId, req.user.sub, req.user.role);
   }
 }

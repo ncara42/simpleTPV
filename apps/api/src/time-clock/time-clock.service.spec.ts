@@ -50,7 +50,7 @@ describe('TimeClockService', () => {
 
     await expect(
       tenantStorage.run({ organizationId: ORG }, () =>
-        service.create({ storeId: STORE, type: 'CLOCK_IN' }, 'user-1'),
+        service.create({ storeId: STORE, type: 'CLOCK_IN' }, 'user-1', 'ADMIN'),
       ),
     ).rejects.toThrow(ForbiddenException);
   });
@@ -61,7 +61,7 @@ describe('TimeClockService', () => {
 
     await expect(
       tenantStorage.run({ organizationId: ORG }, () =>
-        service.create({ storeId: STORE, deviceId: 'dev-1', type: 'CLOCK_IN' }, 'user-1'),
+        service.create({ storeId: STORE, deviceId: 'dev-1', type: 'CLOCK_IN' }, 'user-1', 'ADMIN'),
       ),
     ).rejects.toThrow(NotFoundException);
   });
@@ -76,7 +76,7 @@ describe('TimeClockService', () => {
     const service = makeService(prisma);
 
     const result = (await tenantStorage.run({ organizationId: ORG }, () =>
-      service.create({ storeId: STORE, deviceId: 'dev-1', type: 'CLOCK_OUT' }, 'user-1'),
+      service.create({ storeId: STORE, deviceId: 'dev-1', type: 'CLOCK_OUT' }, 'user-1', 'ADMIN'),
     )) as Record<string, unknown>;
 
     const arg = prisma.timeClockEntry.create.mock.calls[0]![0] as { data: Record<string, unknown> };

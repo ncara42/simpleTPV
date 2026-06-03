@@ -44,7 +44,7 @@ export class TransfersController {
     @Body() body: ReceiveTransferDto,
     @Req() req: { user: JwtPayload },
   ) {
-    return this.transfers.receive(id, body, req.user.sub);
+    return this.transfers.receive(id, body, req.user.sub, req.user.role);
   }
 
   @Post(':id/close')

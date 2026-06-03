@@ -104,7 +104,7 @@ describe('Sesiones de caja — integración', () => {
 
   it('abre una caja OPEN con el efectivo inicial', async () => {
     const session = await tenantStorage.run({ organizationId: org1Id }, async () => {
-      return service.open({ storeId: store1Id, openingAmount: 100 }, user1Id);
+      return service.open({ storeId: store1Id, openingAmount: 100 }, user1Id, 'ADMIN');
     });
     expect(session.status).toBe('OPEN');
     expect(Number(session.openingAmount)).toBeCloseTo(100, 2);
@@ -112,29 +112,29 @@ describe('Sesiones de caja — integración', () => {
 
     // Limpieza inmediata: cerramos para no dejar la tienda con caja abierta.
     await tenantStorage.run({ organizationId: org1Id }, async () => {
-      return service.close(session.id, { countedAmount: 100 });
+      return service.close(session.id, { countedAmount: 100 }, user1Id, 'ADMIN');
     });
   });
 
   it('no permite abrir dos cajas en la misma tienda a la vez', async () => {
     const session = await tenantStorage.run({ organizationId: org1Id }, async () => {
-      return service.open({ storeId: store2Id, openingAmount: 50 }, user1Id);
+      return service.open({ storeId: store2Id, openingAmount: 50 }, user1Id, 'ADMIN');
     });
 
     await expect(
       tenantStorage.run({ organizationId: org1Id }, async () => {
-        return service.open({ storeId: store2Id, openingAmount: 80 }, user1Id);
+        return service.open({ storeId: store2Id, openingAmount: 80 }, user1Id, 'ADMIN');
       }),
     ).rejects.toThrow(/Ya hay una caja abierta/);
 
     await tenantStorage.run({ organizationId: org1Id }, async () => {
-      return service.close(session.id, { countedAmount: 50 });
+      return service.close(session.id, { countedAmount: 50 }, user1Id, 'ADMIN');
     });
   });
 
   it('al cerrar, expected = inicial + Σ(ventas CASH del turno); CARD no cuenta', async () => {
     const session = await tenantStorage.run({ organizationId: org1Id }, async () => {
-      return service.open({ storeId: store1Id, openingAmount: 200 }, user1Id);
+      return service.open({ storeId: store1Id, openingAmount: 200 }, user1Id, 'ADMIN');
     });
 
     // Una venta en efectivo (cuenta) y una con tarjeta (NO cuenta) en la misma tienda.
@@ -162,7 +162,7 @@ describe('Sesiones de caja — integración', () => {
     const expected = Math.round((200 + cashTotal) * 100) / 100;
 
     const closed = await tenantStorage.run({ organizationId: org1Id }, async () => {
-      return service.close(session.id, { countedAmount: expected });
+      return service.close(session.id, { countedAmount: expected }, user1Id, 'ADMIN');
     });
 
     expect(closed.status).toBe('CLOSED');
@@ -176,16 +176,16 @@ describe('Sesiones de caja — integración', () => {
 
   it('refleja sobrante y faltante en la diferencia', async () => {
     const over = await tenantStorage.run({ organizationId: org1Id }, async () => {
-      const s = await service.open({ storeId: store2Id, openingAmount: 100 }, user1Id);
-      return service.close(s.id, { countedAmount: 110 });
+      const s = await service.open({ storeId: store2Id, openingAmount: 100 }, user1Id, 'ADMIN');
+      return service.close(s.id, { countedAmount: 110 }, user1Id, 'ADMIN');
     });
     // Sin ventas: expected = 100, contado 110 → sobrante +10.
     expect(Number(over.expectedAmount)).toBeCloseTo(100, 2);
     expect(Number(over.difference)).toBeCloseTo(10, 2);
 
     const under = await tenantStorage.run({ organizationId: org1Id }, async () => {
-      const s = await service.open({ storeId: store2Id, openingAmount: 100 }, user1Id);
-      return service.close(s.id, { countedAmount: 90 });
+      const s = await service.open({ storeId: store2Id, openingAmount: 100 }, user1Id, 'ADMIN');
+      return service.close(s.id, { countedAmount: 90 }, user1Id, 'ADMIN');
     });
     // Faltante −10.
     expect(Number(under.difference)).toBeCloseTo(-10, 2);
@@ -193,15 +193,15 @@ describe('Sesiones de caja — integración', () => {
 
   it('no se puede cerrar dos veces la misma caja', async () => {
     const session = await tenantStorage.run({ organizationId: org1Id }, async () => {
-      return service.open({ storeId: store1Id, openingAmount: 0 }, user1Id);
+      return service.open({ storeId: store1Id, openingAmount: 0 }, user1Id, 'ADMIN');
     });
     await tenantStorage.run({ organizationId: org1Id }, async () => {
-      return service.close(session.id, { countedAmount: 0 });
+      return service.close(session.id, { countedAmount: 0 }, user1Id, 'ADMIN');
     });
 
     await expect(
       tenantStorage.run({ organizationId: org1Id }, async () => {
-        return service.close(session.id, { countedAmount: 0 });
+        return service.close(session.id, { countedAmount: 0 }, user1Id, 'ADMIN');
       }),
     ).rejects.toThrow(/ya está cerrada/);
   });
@@ -209,40 +209,45 @@ describe('Sesiones de caja — integración', () => {
   it('cerrar un id inexistente lanza NotFound', async () => {
     await expect(
       tenantStorage.run({ organizationId: org1Id }, async () => {
-        return service.close('00000000-0000-0000-0000-000000000000', { countedAmount: 0 });
+        return service.close(
+          '00000000-0000-0000-0000-000000000000',
+          { countedAmount: 0 },
+          user1Id,
+          'ADMIN',
+        );
       }),
     ).rejects.toThrow();
   });
 
   it('current devuelve la sesión abierta o null', async () => {
     const none = await tenantStorage.run({ organizationId: org1Id }, async () => {
-      return service.current(store1Id);
+      return service.current(store1Id, user1Id, 'ADMIN');
     });
     expect(none).toBeNull();
 
     const session = await tenantStorage.run({ organizationId: org1Id }, async () => {
-      return service.open({ storeId: store1Id, openingAmount: 10 }, user1Id);
+      return service.open({ storeId: store1Id, openingAmount: 10 }, user1Id, 'ADMIN');
     });
     const current = await tenantStorage.run({ organizationId: org1Id }, async () => {
-      return service.current(store1Id);
+      return service.current(store1Id, user1Id, 'ADMIN');
     });
     expect(current?.id).toBe(session.id);
     expect(current?.status).toBe('OPEN');
 
     await tenantStorage.run({ organizationId: org1Id }, async () => {
-      return service.close(session.id, { countedAmount: 10 });
+      return service.close(session.id, { countedAmount: 10 }, user1Id, 'ADMIN');
     });
   });
 
   it('aísla por tenant: org2 no puede cerrar la caja de org1', async () => {
     const session = await tenantStorage.run({ organizationId: org1Id }, async () => {
-      return service.open({ storeId: store1Id, openingAmount: 100 }, user1Id);
+      return service.open({ storeId: store1Id, openingAmount: 100 }, user1Id, 'ADMIN');
     });
 
     // Bajo org2, RLS + el filtro por organizationId no ven la sesión → NotFound.
     await expect(
       tenantStorage.run({ organizationId: org2Id }, async () => {
-        return service.close(session.id, { countedAmount: 100 });
+        return service.close(session.id, { countedAmount: 100 }, user1Id, 'ADMIN');
       }),
     ).rejects.toThrow();
 
@@ -253,7 +258,7 @@ describe('Sesiones de caja — integración', () => {
     expect(own?.status).toBe('OPEN');
 
     await tenantStorage.run({ organizationId: org1Id }, async () => {
-      return service.close(session.id, { countedAmount: 100 });
+      return service.close(session.id, { countedAmount: 100 }, user1Id, 'ADMIN');
     });
   });
 });

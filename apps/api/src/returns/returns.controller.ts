@@ -14,7 +14,7 @@ export class ReturnsController {
   @Post()
   @Roles('ADMIN', 'MANAGER', 'CLERK')
   create(@Body() body: CreateReturnDto, @Req() req: { user: JwtPayload }) {
-    return this.returns.create(body, req.user.sub);
+    return this.returns.create(body, req.user.sub, req.user.role);
   }
 
   // Devolución SIN ticket (#59): el operario (incluido CLERK) la inicia, pero
@@ -22,7 +22,7 @@ export class ReturnsController {
   @Post('blind')
   @Roles('ADMIN', 'MANAGER', 'CLERK')
   createBlind(@Body() body: CreateBlindReturnDto, @Req() req: { user: JwtPayload }) {
-    return this.returns.createBlind(body, req.user.sub);
+    return this.returns.createBlind(body, req.user.sub, req.user.role);
   }
 
   // Devoluciones de una venta (para mostrar lo ya devuelto). El saleId se valida

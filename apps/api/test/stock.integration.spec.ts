@@ -178,6 +178,7 @@ describe('Stock — integración', () => {
           lines: [{ saleLineId: sale.lines[0]!.id, qty: 1 }],
         },
         user1Id,
+        'ADMIN',
       );
     });
 
@@ -219,7 +220,7 @@ describe('Stock — integración', () => {
 
   it('byStore: lista el stock de la tienda con nivel semáforo, aislado por tenant', async () => {
     const rows = await tenantStorage.run({ organizationId: org1Id }, async () => {
-      return stockService.byStore(store1Id);
+      return stockService.byStore(store1Id, user1Id, 'ADMIN');
     });
     expect(rows.length).toBeGreaterThan(0);
     const row = rows.find((r) => r.productId === product1Id)!;
@@ -229,7 +230,7 @@ describe('Stock — integración', () => {
 
     // Desde org2, la tienda de org1 no devuelve filas (RLS).
     const fromOrg2 = await tenantStorage.run({ organizationId: org2Id }, async () => {
-      return stockService.byStore(store1Id);
+      return stockService.byStore(store1Id, user1Id, 'ADMIN');
     });
     expect(fromOrg2).toHaveLength(0);
   });

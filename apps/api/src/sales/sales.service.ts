@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import type { PaymentMethod } from '@simpletpv/db';
 
+import { assertStoreAccess } from '../auth/store-access.js';
 import { EVENT_BUS, type EventBus } from '../events/event-bus.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
@@ -258,6 +259,10 @@ export class SalesService {
 
   async create(dto: CreateSaleDto, userId: string, role: SaleRole) {
     const tenant = requireTenant();
+
+    // Aislamiento por tienda (SEC-01): un CLERK solo puede vender en las tiendas
+    // a las que está asignado (UserStore). RLS aísla por org, no por tienda.
+    await assertStoreAccess(this.prisma, { userId, role, storeId: dto.storeId });
 
     // Caja obligatoria: no se puede cobrar sin una sesión de caja abierta para
     // la tienda. Invierte la decisión "caja opcional" de #13 (ver spec
