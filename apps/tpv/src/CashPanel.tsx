@@ -2,13 +2,9 @@ import { ApiError, type CashSession } from '@simpletpv/auth';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { CashCloseSummary } from './cash/CashCloseSummary.js';
+import { CashOpenForm } from './cash/CashOpenForm.js';
 import { CashCount } from './CashCount.js';
-import {
-  DEMO_CASH_EXPECTED,
-  DEMO_CASH_OPENING,
-  DEMO_CASH_SALES,
-  DEMO_STORE_ID,
-} from './demo/demoData.js';
 import { useAuthStore } from './lib/auth.js';
 import {
   closeCashSession,
@@ -21,7 +17,6 @@ import { eur } from './lib/format.js';
 
 export function CashPanel({ storeId }: { storeId: string | null }) {
   const queryClient = useQueryClient();
-  const [openingAmount, setOpeningAmount] = useState('');
   // Total contado, alimentado por el contador de denominaciones (CashCount).
   const [counted, setCounted] = useState(0);
   const [closing, setClosing] = useState(false);
@@ -44,7 +39,6 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
     mutationFn: (amount: number) =>
       openCashSession({ storeId: storeId as string, openingAmount: amount }),
     onSuccess: () => {
-      setOpeningAmount('');
       setError(null);
       void queryClient.invalidateQueries({ queryKey });
     },
@@ -113,53 +107,7 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
 
   // Resumen de cierre con cuadre
   if (closed) {
-    const expected = Number(closed.expectedAmount ?? 0);
-    const counted = Number(closed.closingAmount ?? 0);
-    const difference = Number(closed.difference ?? 0);
-    const diffColor =
-      difference > 0 ? 'text-green-700' : difference < 0 ? 'text-red-600' : 'text-neutral-600';
-
-    return (
-      <section className="cash-panel closed" data-testid="cash-panel">
-        <div className="cash-bar">
-          <div className="cash-status">
-            <span className="cash-dot" />
-            <span className="cash-badge" data-testid="cash-status">
-              Caja cerrada
-            </span>
-          </div>
-        </div>
-        <div className="cash-form" style={{ paddingTop: 0 }}>
-          <div className="cash-reconciliation" data-testid="cash-summary">
-            <div className="cash-recon-row">
-              <span style={{ color: 'var(--ui-text-muted)' }}>Esperado</span>
-              <span data-testid="cash-expected">{eur(expected)} €</span>
-            </div>
-            <div className="cash-recon-row">
-              <span style={{ color: 'var(--ui-text-muted)' }}>Contado</span>
-              <span data-testid="cash-counted-result">{eur(counted)} €</span>
-            </div>
-            <div
-              className={`cash-recon-row cash-diff ${diffColor === 'text-green-700' ? 'cash-diff-positive' : diffColor === 'text-red-600' ? 'cash-diff-negative' : 'cash-diff-zero'}`}
-            >
-              <span>Diferencia</span>
-              <span data-testid="cash-difference">
-                {difference > 0 ? '+' : ''}
-                {eur(difference)} €
-              </span>
-            </div>
-          </div>
-          <button
-            className="cash-btn-cancel"
-            onClick={() => setClosed(null)}
-            data-testid="cash-dismiss"
-            style={{ width: '100%' }}
-          >
-            Aceptar
-          </button>
-        </div>
-      </section>
-    );
+    return <CashCloseSummary session={closed} onDismiss={() => setClosed(null)} />;
   }
 
   // Caja abierta
@@ -314,107 +262,11 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
   }
 
   // Sin caja abierta — formulario apertura
-  const opening = Number(openingAmount);
-  const hasOpening = openingAmount !== '' && !Number.isNaN(opening) && opening >= 0;
-
   return (
-    <section className="cash-panel closed" data-testid="cash-panel">
-      <div className="cash-bar">
-        <div className="cash-status">
-          <span className="cash-dot" />
-          <span className="cash-badge" data-testid="cash-status">
-            Caja cerrada
-          </span>
-        </div>
-        <span className="cash-msg">Ábrela para empezar a cobrar este turno.</span>
-      </div>
-      <form
-        className="cash-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (hasOpening) openMutation.mutate(opening);
-        }}
-      >
-        <label className="cash-field">
-          <span>Efectivo inicial (€)</span>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={openingAmount}
-            onChange={(e) => setOpeningAmount(e.target.value)}
-            data-testid="cash-opening-amount"
-          />
-        </label>
-        <div className="cash-actions">
-          <button
-            type="submit"
-            disabled={!hasOpening || openMutation.isPending}
-            data-testid="cash-open"
-            className="cash-btn-open"
-          >
-            {openMutation.isPending ? 'Abriendo…' : 'Abrir caja'}
-          </button>
-        </div>
-      </form>
-      {error && (
-        <p className="cash-error" data-testid="cash-error">
-          {error}
-        </p>
-      )}
-    </section>
-  );
-}
-
-// Vista de Caja calcada al mockup: tarjeta con estado + cifras + cerrar caja.
-export function CashView() {
-  const [closing, setClosing] = useState(false);
-
-  if (closing) {
-    // Reutiliza el panel-barra existente (incluye el formulario de cierre real).
-    return (
-      <div className="cash-view">
-        <CashPanel storeId={DEMO_STORE_ID} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="cash-view" data-testid="cash-view">
-      <div className="cash-view-head">
-        <h2 className="cash-view-title">Sesión de caja</h2>
-        <p className="cash-view-sub">Tienda Centro · turno de mañana</p>
-      </div>
-
-      <div className="cash-card">
-        <div className="cash-card-head">
-          <span className="cash-card-title">Estado</span>
-          <span className="cash-card-badge" data-testid="cash-state">
-            <span className="cash-dot" /> Abierta
-          </span>
-        </div>
-        <dl className="cash-card-rows">
-          <div className="cash-card-row">
-            <dt>Apertura</dt>
-            <dd>{eur(DEMO_CASH_OPENING)} €</dd>
-          </div>
-          <div className="cash-card-row">
-            <dt>Ventas efectivo</dt>
-            <dd>+ {eur(DEMO_CASH_SALES)} €</dd>
-          </div>
-          <div className="cash-card-row">
-            <dt>Esperado en caja</dt>
-            <dd>{eur(DEMO_CASH_EXPECTED)} €</dd>
-          </div>
-        </dl>
-        <button
-          className="cash-card-close"
-          onClick={() => setClosing(true)}
-          data-testid="cash-view-close"
-        >
-          Cerrar caja
-        </button>
-      </div>
-    </div>
+    <CashOpenForm
+      onOpen={(amount) => openMutation.mutate(amount)}
+      pending={openMutation.isPending}
+      error={error}
+    />
   );
 }
