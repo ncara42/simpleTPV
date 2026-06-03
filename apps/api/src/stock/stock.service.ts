@@ -9,6 +9,10 @@ import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import { type AfterCommit, withTenantTx } from '../prisma/with-tenant-tx.js';
 
+// Tope del tamaño de página de GET /stock/movements (SEC-09): el cliente controla
+// pageSize, así que lo acotamos para no materializar todo el historial del tenant.
+const MAX_MOVEMENTS_PAGE_SIZE = 100;
+
 // Clave de cache del stock de un par producto+tienda dentro de un tenant.
 export function stockCacheKey(organizationId: string, storeId: string, productId: string): string {
   return `stock:${organizationId}:${storeId}:${productId}`;
@@ -537,6 +541,14 @@ export class StockService {
     pageSize?: number;
   }) {
     const tenant = requireTenant();
+    // Cota defensiva del tamaño de página (SEC-09): pageSize lo controla el cliente
+    // (GET /stock/movements?pageSize=...); sin tope, un valor enorme materializaría
+    // todo el historial de movimientos del tenant. Saneamos page/pageSize ante
+    // valores no finitos, negativos o desproporcionados.
+    const safePageSize = Number.isFinite(pageSize)
+      ? Math.min(Math.max(1, Math.floor(pageSize)), MAX_MOVEMENTS_PAGE_SIZE)
+      : 50;
+    const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
     const createdAt =
       from || to ? { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } : undefined;
     const where = {
@@ -550,12 +562,12 @@ export class StockService {
       this.prisma.stockMovement.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        skip: (safePage - 1) * safePageSize,
+        take: safePageSize,
       }),
       this.prisma.stockMovement.count({ where }),
     ]);
 
-    return { items, page, pageSize, totalItems };
+    return { items, page: safePage, pageSize: safePageSize, totalItems };
   }
 }

@@ -581,6 +581,30 @@ describe('StockService.movements', () => {
     expect(arg.take).toBe(10);
   });
 
+  it('SEC-09: acota pageSize a 100 aunque el cliente pida un valor enorme', async () => {
+    const prisma = {
+      stockMovement: {
+        findMany: vi.fn(async (_a?: unknown) => []),
+        count: vi.fn(async (_a?: unknown) => 0),
+      },
+    };
+    const service = new StockService(
+      prisma as never,
+      new MemoryCache(),
+      {} as never,
+      new InMemoryEventBus(),
+    );
+
+    const res = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.movements({ page: 1, pageSize: 100_000_000 }),
+    );
+
+    expect(res.pageSize).toBe(100);
+    const arg = prisma.stockMovement.findMany.mock.calls[0]![0] as { take: number; skip: number };
+    expect(arg.take).toBe(100);
+    expect(arg.skip).toBe(0);
+  });
+
   it('sin filtros de fecha no incluye createdAt en el where', async () => {
     const prisma = {
       stockMovement: {
