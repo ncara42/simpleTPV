@@ -1805,6 +1805,15 @@
   box-shadow: var(--ui-shadow-sm);
 }
 
+/* Fichaje: estado a la izquierda, acción alineada a la derecha y centradas
+   verticalmente (en vez de la insignia y el botón pegados). */
+.time-clock-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .cash-card-head {
   display: flex;
   align-items: center;
@@ -2180,6 +2189,56 @@
 
 .inventory-table {
   padding: 0 1rem;
+}
+
+/* Fila de acción del inventario: el motivo es un campo real que ocupa el ancho
+   disponible y el botón de confirmar se sitúa justo al lado (no en el extremo). */
+.inventory-actions {
+  justify-content: flex-start;
+}
+
+.inventory-actions input {
+  flex: 1;
+  width: auto;
+  height: 36px;
+  padding: 0 0.8rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+
+.inventory-actions input:focus {
+  border-color: var(--ui-brand);
+  box-shadow: var(--ui-focus);
+}
+
+/* Icono decorativo a la derecha de las cabeceras de sección: acento sutil,
+   alineado arriba con la primera línea del título (no centrado en el bloque). */
+.tickets-head {
+  align-items: flex-start;
+}
+
+.tickets-head > svg {
+  color: var(--ui-text-soft);
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+/* Estado vacío del detalle de ticket: placeholder centrado en su columna en
+   lugar de texto huérfano arriba a la izquierda. */
+.ticket-detail .sale-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 9rem;
+  margin: 0;
+  padding: 1.5rem;
+  text-align: center;
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: 12px;
 }
 
 .inventory-row > span {

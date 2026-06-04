@@ -15,7 +15,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       className={cn(
-        'inline-flex cursor-pointer items-center justify-center gap-2 rounded-[var(--ui-radius-sm)] border text-sm font-medium transition-colors select-none disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex cursor-pointer items-center justify-center gap-2 rounded-[var(--ui-radius-sm)] border text-sm font-medium whitespace-nowrap transition-colors select-none disabled:cursor-not-allowed disabled:opacity-50',
         size === 'sm' && 'h-8 px-3 text-xs',
         size === 'md' && 'h-9 px-4',
         size === 'lg' && 'h-11 px-5 text-base',
