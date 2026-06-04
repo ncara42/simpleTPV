@@ -83,7 +83,7 @@ export function TimeClockPanel({ storeId }: { storeId: string | null }) {
         </div>
         <Clock size={22} />
       </div>
-      <div className="cash-card">
+      <div className="cash-card time-clock-card">
         <span className="cash-card-badge" data-testid="time-clock-state">
           {clockedIn ? 'Fichado' : 'Sin fichaje activo'}
         </span>
