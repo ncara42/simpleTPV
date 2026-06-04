@@ -16,7 +16,7 @@
 }
 
 .topbar-eyebrow {
-  font-size: 0.7rem;
+  font-size: var(--ui-text-xs);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -25,7 +25,7 @@
 
 .topbar-title {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: var(--ui-text-2xl);
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--ui-text);
@@ -42,7 +42,7 @@
   align-items: center;
   gap: 0.15rem;
   padding: 0.2rem;
-  border-radius: 9px;
+  border-radius: var(--ui-radius-sm);
   background: var(--ui-surface-subtle);
   border: 1px solid var(--ui-border);
 }
@@ -51,9 +51,9 @@
   height: 30px;
   padding: 0 0.85rem;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--ui-radius-sm);
   background: none;
-  font-size: 0.82rem;
+  font-size: var(--ui-text-sm);
   font-weight: 600;
   color: var(--ui-text-muted);
   cursor: pointer;
@@ -74,14 +74,14 @@
   gap: 0.4rem;
   height: 36px;
   padding: 0 0.9rem;
-  border-radius: 9px;
+  border-radius: var(--ui-radius-sm);
   border: 1px solid var(--ui-border-strong);
   background: var(--ui-surface);
-  font-size: 0.85rem;
+  font-size: var(--ui-text-base);
   font-weight: 600;
   color: var(--ui-text);
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background var(--ui-motion-fast);
 }
 
 .topbar-logout:hover {

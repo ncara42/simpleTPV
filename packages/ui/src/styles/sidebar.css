@@ -30,7 +30,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 9px;
+  border-radius: var(--ui-radius-sm);
   background: var(--ui-brand);
   color: #fff;
   font-weight: 700;
@@ -46,12 +46,12 @@
 
 .sidebar-brand-title {
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: var(--ui-text-md);
   color: var(--ui-text);
 }
 
 .sidebar-brand-sub {
-  font-size: 0.75rem;
+  font-size: var(--ui-text-xs);
   color: var(--ui-text-soft);
 }
 
@@ -67,7 +67,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.625rem 0.5rem 0.25rem;
-  font-size: 0.625rem;
+  font-size: var(--ui-text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--sidebar-group-label-color);
@@ -93,7 +93,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.55rem 0.6rem;
-  border-radius: var(--ui-radius-sm, 7px);
+  border-radius: var(--ui-radius-sm);
   cursor: pointer;
   color: var(--sidebar-text);
   transition: background 100ms;
@@ -123,7 +123,7 @@
 }
 
 .sidebar-item-label {
-  font-size: 0.9rem;
+  font-size: var(--ui-text-base);
   white-space: nowrap;
   overflow: hidden;
 }
@@ -152,7 +152,7 @@
   background: var(--ui-success-soft);
   color: var(--ui-success);
   font-weight: 700;
-  font-size: 0.75rem;
+  font-size: var(--ui-text-xs);
 }
 
 .sidebar-user-text {
@@ -163,13 +163,13 @@
 }
 
 .sidebar-user-name {
-  font-size: 0.85rem;
+  font-size: var(--ui-text-base);
   font-weight: 600;
   color: var(--ui-text);
 }
 
 .sidebar-user-sub {
-  font-size: 0.72rem;
+  font-size: var(--ui-text-xs);
   color: var(--ui-text-soft);
 }
 
