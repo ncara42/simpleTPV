@@ -4,6 +4,38 @@ export interface LoginFormProps {
   onSubmit: (email: string, password: string) => Promise<void>;
 }
 
+function EyeReveal({ open }: { open: boolean }) {
+  return (
+    <svg
+      key={String(open)}
+      className={`eye-icon${open ? ' eye-icon--open' : ' eye-icon--closed'}`}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <g className="eye-lids">
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+        <circle className="eye-pupil" cx="12" cy="12" r="3" />
+        <circle
+          className="eye-glint"
+          cx="13.4"
+          cy="10.6"
+          r="0.75"
+          fill="currentColor"
+          stroke="none"
+        />
+      </g>
+      <line className="eye-slash" x1="2" y1="2" x2="22" y2="22" />
+    </svg>
+  );
+}
+
 export function LoginForm({ onSubmit }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,6 +70,57 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
       {/* Panel izquierdo — marca */}
       <aside className="login-brand">
         <div className="login-brand-glow" aria-hidden="true" />
+        <div className="login-brand-grid" aria-hidden="true" />
+
+        {/* Constelación de líneas que derivan solas */}
+        <svg
+          className="login-brand-net"
+          viewBox="0 0 600 800"
+          preserveAspectRatio="xMidYMid slice"
+          aria-hidden="true"
+        >
+          <g className="login-brand-net-drift">
+            <polyline
+              className="login-brand-net-line"
+              points="80,120 240,80 420,160 520,300 360,360 180,300 80,120"
+            />
+            <polyline
+              className="login-brand-net-line login-brand-net-line--slow"
+              points="180,300 360,360 300,520 90,460 180,300"
+            />
+            <polyline
+              className="login-brand-net-line login-brand-net-line--fast"
+              points="360,360 520,300 480,540 300,520 360,360"
+            />
+            <polyline
+              className="login-brand-net-line login-brand-net-line--slow"
+              points="300,520 480,540 440,700 220,680 90,460 300,520"
+            />
+            <g className="login-brand-net-nodes">
+              <circle cx="80" cy="120" r="2.5" />
+              <circle cx="240" cy="80" r="2.5" />
+              <circle cx="420" cy="160" r="2.5" />
+              <circle cx="520" cy="300" r="2.5" />
+              <circle cx="360" cy="360" r="3" />
+              <circle cx="180" cy="300" r="2.5" />
+              <circle cx="90" cy="460" r="2.5" />
+              <circle cx="300" cy="520" r="3" />
+              <circle cx="480" cy="540" r="2.5" />
+              <circle cx="220" cy="680" r="2.5" />
+              <circle cx="440" cy="700" r="2.5" />
+            </g>
+          </g>
+        </svg>
+
+        {/* Haces de luz que barren el panel */}
+        <div className="login-brand-beam login-brand-beam--a" aria-hidden="true" />
+        <div className="login-brand-beam login-brand-beam--b" aria-hidden="true" />
+
+        {/* Geometrías que flotan y rotan */}
+        <span className="login-brand-shape login-brand-shape--ring" aria-hidden="true" />
+        <span className="login-brand-shape login-brand-shape--tri" aria-hidden="true" />
+        <span className="login-brand-shape login-brand-shape--square" aria-hidden="true" />
+
         <div className="login-brand-orb" aria-hidden="true" />
 
         <div className="login-brand-logo">
@@ -64,7 +147,7 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
         <form onSubmit={handleSubmit} className="login-form" noValidate data-testid="login-card">
           <div className="login-heading">
             <h1 className="login-title">Bienvenido de nuevo</h1>
-            <p className="login-subtitle">Introduce tus credenciales para continuar.</p>
+            <p className="login-subtitle">Tu negocio al completo, desde aquí.</p>
           </div>
 
           <label className="login-field">
@@ -107,7 +190,7 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
                 tabIndex={-1}
                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
-                {showPassword ? 'Ocultar' : 'Mostrar'}
+                <EyeReveal open={showPassword} />
               </button>
             </div>
           </label>
