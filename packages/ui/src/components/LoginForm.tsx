@@ -1,4 +1,10 @@
-import { type FormEvent, useEffect, useRef, useState } from 'react';
+import {
+  type FormEvent,
+  type MouseEvent as ReactMouseEvent,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 export interface LoginFormProps {
   onSubmit: (email: string, password: string) => Promise<void>;
@@ -51,6 +57,41 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
     [],
   );
 
+  // El halo de marca sigue al puntero (suavizado vía transición CSS).
+  // Se desactiva en táctil y bajo prefers-reduced-motion.
+  const shellRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number | null>(null);
+  const staticBgRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const coarse = window.matchMedia('(pointer: coarse)');
+    const sync = (): void => {
+      staticBgRef.current = reduced.matches || coarse.matches;
+    };
+    sync();
+    reduced.addEventListener('change', sync);
+    coarse.addEventListener('change', sync);
+    return () => {
+      reduced.removeEventListener('change', sync);
+      coarse.removeEventListener('change', sync);
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  function handlePointerMove(e: ReactMouseEvent<HTMLDivElement>): void {
+    if (staticBgRef.current || rafRef.current !== null) return;
+    const el = shellRef.current;
+    if (!el) return;
+    const { clientX, clientY } = e;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      const r = el.getBoundingClientRect();
+      el.style.setProperty('--login-px', ((clientX - r.left) / r.width - 0.5).toFixed(3));
+      el.style.setProperty('--login-py', ((clientY - r.top) / r.height - 0.5).toFixed(3));
+    });
+  }
+
   async function handleSubmit(e: FormEvent): Promise<void> {
     if (loading) return;
     e.preventDefault();
@@ -66,62 +107,14 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
   }
 
   return (
-    <div className="login-shell">
+    <div className="login-shell" ref={shellRef} onMouseMove={handlePointerMove}>
       {/* Panel izquierdo — marca */}
       <aside className="login-brand">
-        <div className="login-brand-glow" aria-hidden="true" />
+        {/* Fondo: precisión, no decoración — rejilla técnica, halo de
+            marca anclado y grano fino. Sin constelaciones ni haces. */}
         <div className="login-brand-grid" aria-hidden="true" />
-
-        {/* Constelación de líneas que derivan solas */}
-        <svg
-          className="login-brand-net"
-          viewBox="0 0 600 800"
-          preserveAspectRatio="xMidYMid slice"
-          aria-hidden="true"
-        >
-          <g className="login-brand-net-drift">
-            <polyline
-              className="login-brand-net-line"
-              points="80,120 240,80 420,160 520,300 360,360 180,300 80,120"
-            />
-            <polyline
-              className="login-brand-net-line login-brand-net-line--slow"
-              points="180,300 360,360 300,520 90,460 180,300"
-            />
-            <polyline
-              className="login-brand-net-line login-brand-net-line--fast"
-              points="360,360 520,300 480,540 300,520 360,360"
-            />
-            <polyline
-              className="login-brand-net-line login-brand-net-line--slow"
-              points="300,520 480,540 440,700 220,680 90,460 300,520"
-            />
-            <g className="login-brand-net-nodes">
-              <circle cx="80" cy="120" r="2.5" />
-              <circle cx="240" cy="80" r="2.5" />
-              <circle cx="420" cy="160" r="2.5" />
-              <circle cx="520" cy="300" r="2.5" />
-              <circle cx="360" cy="360" r="3" />
-              <circle cx="180" cy="300" r="2.5" />
-              <circle cx="90" cy="460" r="2.5" />
-              <circle cx="300" cy="520" r="3" />
-              <circle cx="480" cy="540" r="2.5" />
-              <circle cx="220" cy="680" r="2.5" />
-              <circle cx="440" cy="700" r="2.5" />
-            </g>
-          </g>
-        </svg>
-
-        {/* Haces de luz que barren el panel */}
-        <div className="login-brand-beam login-brand-beam--a" aria-hidden="true" />
-        <div className="login-brand-beam login-brand-beam--b" aria-hidden="true" />
-
-        {/* Geometrías que flotan y rotan */}
-        <span className="login-brand-shape login-brand-shape--ring" aria-hidden="true" />
-        <span className="login-brand-shape login-brand-shape--tri" aria-hidden="true" />
-        <span className="login-brand-shape login-brand-shape--square" aria-hidden="true" />
-
-        <div className="login-brand-orb" aria-hidden="true" />
+        <div className="login-brand-bloom" aria-hidden="true" />
+        <div className="login-brand-grain" aria-hidden="true" />
 
         <div className="login-brand-logo">
           <span className="login-brand-name">qrush</span>

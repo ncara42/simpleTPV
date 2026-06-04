@@ -9,6 +9,7 @@ import {
   type PromoStatus,
   promoStatus,
 } from './demo/demoData.js';
+import { usePageHeader } from './lib/pageHeader.js';
 
 const STATUS_LABEL: Record<PromoStatus, string> = {
   activa: 'Activa',
@@ -32,6 +33,36 @@ function actionText(p: { discountType: PromoDiscountType; discountValue: number 
   return p.discountType === 'percent'
     ? `descuento del ${p.discountValue}%`
     : `descuento de ${p.discountValue} €`;
+}
+
+// Versiones condensadas para las celdas de la tabla (el texto largo se reserva
+// para la previsualización del modal).
+function conditionShort(p: { conditionType: PromoConditionType; threshold: number }): string {
+  return p.conditionType === 'min_qty'
+    ? `≥ ${p.threshold} productos`
+    : `≥ ${p.threshold} € de ticket`;
+}
+function discountShort(p: { discountType: PromoDiscountType; discountValue: number }): string {
+  return p.discountType === 'percent' ? `−${p.discountValue}%` : `−${p.discountValue} €`;
+}
+
+// Vigencia compacta «20 may. – 30 jun. 2026». Las fechas llegan como YYYY-MM-DD;
+// se parsean en horario local para no desplazar el día por zona horaria.
+const fmtDM = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' });
+const fmtDMY = new Intl.DateTimeFormat('es-ES', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
+function parseLocal(d: string): Date {
+  const [y, m, day] = d.split('-').map(Number);
+  return new Date(y ?? 1970, (m ?? 1) - 1, day ?? 1);
+}
+function dateRange(start: string, end: string): string {
+  const s = parseLocal(start);
+  const e = parseLocal(end);
+  const startLabel = s.getFullYear() === e.getFullYear() ? fmtDM.format(s) : fmtDMY.format(s);
+  return `${startLabel} – ${fmtDMY.format(e)}`;
 }
 
 type PromoForm = Omit<DemoPromotion, 'id'> & { id?: string };
@@ -67,83 +98,87 @@ export function PromotionsPage() {
   const toggle = (id: string): void =>
     setPromos((prev) => prev.map((p) => (p.id === id ? { ...p, active: !p.active } : p)));
 
+  usePageHeader('Promociones', 'Descuentos y reglas programables');
+
   return (
     <section className="catalog">
-      <header className="catalog-head">
-        <div>
-          <h2>Promociones</h2>
-          <p className="catalog-sub">Descuentos y reglas programables</p>
+      <div className="table-panel">
+        <div className="table-toolbar">
+          <Select
+            className="promo-filter-select"
+            value={filter}
+            onChange={(value) => setFilter(value as 'all' | PromoStatus)}
+            ariaLabel="Filtrar por estado"
+            data-testid="promo-filters"
+            options={STATUS_FILTERS.map((f) => ({ value: f.id, label: f.label }))}
+          />
+          <button
+            className="btn-primary"
+            onClick={() => setForm({ ...EMPTY })}
+            data-testid="new-promo"
+          >
+            Nueva promoción
+          </button>
         </div>
-      </header>
 
-      <div className="stock-tabs-row">
-        <nav className="bo-tabs" data-testid="promo-filters">
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              className={`bo-tab ${filter === f.id ? 'active' : ''}`}
-              onClick={() => setFilter(f.id)}
-              data-testid={`promo-filter-${f.id}`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </nav>
-        <button
-          className="btn-primary stock-tabs-action"
-          onClick={() => setForm({ ...EMPTY })}
-          data-testid="new-promo"
-        >
-          Nueva promoción
-        </button>
+        {visible.length === 0 ? (
+          <p className="catalog-empty" data-testid="promos-empty">
+            No hay promociones con ese estado.
+          </p>
+        ) : (
+          <table className="catalog-table promo-table" data-testid="promo-list">
+            <thead>
+              <tr>
+                <th>Promoción</th>
+                <th>Condición</th>
+                <th>Descuento</th>
+                <th>Vigencia</th>
+                <th>Estado</th>
+                <th aria-label="Acciones" />
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((p) => {
+                const status = promoStatus(p);
+                const canToggle = status === 'activa' || status === 'pausada';
+                return (
+                  <tr key={p.id} data-testid="promo-card">
+                    <td className="promo-name-cell">{p.name}</td>
+                    <td className="muted">{conditionShort(p)}</td>
+                    <td>
+                      <span className="promo-discount">{discountShort(p)}</span>
+                    </td>
+                    <td className="muted">{dateRange(p.startDate, p.endDate)}</td>
+                    <td>
+                      <span className={`promo-badge promo-${status}`} data-testid="promo-status">
+                        {STATUS_LABEL[status]}
+                      </span>
+                    </td>
+                    <td className="promo-actions-cell">
+                      {canToggle && (
+                        <button
+                          className="link-btn"
+                          onClick={() => toggle(p.id)}
+                          data-testid="promo-toggle"
+                        >
+                          {p.active ? 'Pausar' : 'Activar'}
+                        </button>
+                      )}
+                      <button
+                        className="link-btn"
+                        onClick={() => setForm({ ...p })}
+                        data-testid="promo-edit"
+                      >
+                        Editar
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
-
-      {visible.length === 0 ? (
-        <p className="catalog-empty" data-testid="promos-empty">
-          No hay promociones con ese estado.
-        </p>
-      ) : (
-        <div className="promo-list" data-testid="promo-list">
-          {visible.map((p) => {
-            const status = promoStatus(p);
-            return (
-              <div className="promo-card" key={p.id} data-testid="promo-card">
-                <div className="promo-card-main">
-                  <div className="promo-card-head">
-                    <span className="promo-name">{p.name}</span>
-                    <span className={`promo-badge promo-${status}`} data-testid="promo-status">
-                      {STATUS_LABEL[status]}
-                    </span>
-                  </div>
-                  <p className="promo-rule">
-                    {conditionText(p)} → <strong>{actionText(p)}</strong>.
-                  </p>
-                  <p className="promo-dates">
-                    Del {p.startDate} al {p.endDate}
-                  </p>
-                </div>
-                <div className="promo-card-actions">
-                  <button
-                    className="link-btn"
-                    onClick={() => toggle(p.id)}
-                    data-testid="promo-toggle"
-                  >
-                    {p.active ? 'Pausar' : 'Activar'}
-                  </button>
-                  <button
-                    className="link-btn"
-                    onClick={() => setForm({ ...p })}
-                    data-testid="promo-edit"
-                  >
-                    Editar
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       {form && (
         <PromoModal form={form} onChange={setForm} onClose={() => setForm(null)} onSave={save} />

@@ -29,13 +29,15 @@ export function SuppliersSection() {
       <header className="catalog-head">
         <h2>Proveedores</h2>
         <div className="catalog-actions">
-          <input
-            className="catalog-search"
-            placeholder="Nombre del proveedor"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            data-testid="supplier-name"
-          />
+          <span className="search-field">
+            <input
+              className="catalog-search"
+              placeholder="Nombre del proveedor"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              data-testid="supplier-name"
+            />
+          </span>
           <input
             className="catalog-search"
             type="number"

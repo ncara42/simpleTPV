@@ -1,15 +1,10 @@
 import { DEMO_VERIFACTU_STATS } from './demo/demoData.js';
+import { usePageHeader } from './lib/pageHeader.js';
 
 export function VerifactuPage() {
+  usePageHeader('VeriFactu', 'Cumplimiento y cola de envíos a AEAT');
   return (
     <section className="catalog" data-testid="verifactu-page">
-      <header className="catalog-head">
-        <div>
-          <h2>VeriFactu</h2>
-          <p className="catalog-sub">Cumplimiento y cola de envíos a AEAT</p>
-        </div>
-      </header>
-
       <div className="vf-cards">
         <div className="vf-card" data-testid="vf-sent-card">
           <span className="vf-card-label">Registros enviados hoy</span>

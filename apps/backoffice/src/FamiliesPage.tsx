@@ -10,6 +10,7 @@ import {
   updateFamily,
 } from './lib/families.js';
 import { countDescendants, moveToParent, removeNode } from './lib/family-tree.js';
+import { usePageHeader } from './lib/pageHeader.js';
 
 interface FormState {
   id?: string;
@@ -18,6 +19,14 @@ interface FormState {
 }
 
 type DropPosition = 'before' | 'after';
+
+// Normaliza para buscar sin distinguir mayúsculas ni acentos.
+const norm = (s: string): string =>
+  s
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '');
 
 function reorderSiblings(
   tree: FamilyNode[],
@@ -43,6 +52,8 @@ function reorderSiblings(
 
 interface RowActions {
   roots: FamilyNode[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
   dragId: string | null;
   dropTarget: { id: string; position: DropPosition } | null;
   onDragStart: (node: FamilyNode) => void;
@@ -69,16 +80,26 @@ function FamilyRow({
 }) {
   const dragging = actions.dragId === node.id;
   const drop = actions.dropTarget?.id === node.id ? actions.dropTarget.position : null;
+  const selected = actions.selectedId === node.id;
   return (
     <>
       <div
         className={`fam-row${depth === 0 ? ' fam-row--root' : ''}${
-          dragging ? ' fam-dragging' : ''
-        }${drop ? ` fam-row--drop-${drop}` : ''}`}
+          selected ? ' is-selected' : ''
+        }${dragging ? ' fam-dragging' : ''}${drop ? ` fam-row--drop-${drop}` : ''}`}
         style={{ paddingLeft: `${depth * 1.5 + 0.75}rem` }}
         data-testid="fam-row"
         data-fam-id={node.id}
         draggable
+        tabIndex={0}
+        aria-expanded={selected}
+        onClick={() => actions.onSelect(node.id)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            actions.onSelect(node.id);
+          }
+        }}
         onDragStart={() => actions.onDragStart(node)}
         onDragEnd={() => actions.onDragEnd()}
         onDragOver={(e) => {
@@ -107,27 +128,29 @@ function FamilyRow({
         <span className="fam-count" data-testid="fam-count">
           {(node as { productCount?: number }).productCount ?? 0} productos
         </span>
-        <span className="fam-actions">
-          {depth > 0 && parentId && (
-            <Select
-              className="fam-move-select"
-              value={parentId}
-              onChange={(value) => actions.onMoveTo(node.id, value)}
-              triggerLabel="Mover"
-              options={actions.roots.map((r) => ({
-                value: r.id,
-                label: r.id === parentId ? r.name : `Mover a: ${r.name}`,
-              }))}
-              ariaLabel="Mover a otra familia"
-              data-testid="fam-move-to"
-            />
-          )}
-          {depth === 0 && <button onClick={() => actions.onAddChild(node.id)}>+ Hija</button>}
-          <button onClick={() => actions.onEdit(node)}>Editar</button>
-          <button className="danger" onClick={() => actions.onDelete(node)}>
-            Borrar
-          </button>
-        </span>
+        {selected && (
+          <span className="fam-actions" onClick={(e) => e.stopPropagation()}>
+            {depth > 0 && parentId && (
+              <Select
+                className="fam-move-select"
+                value={parentId}
+                onChange={(value) => actions.onMoveTo(node.id, value)}
+                triggerLabel="Mover"
+                options={actions.roots.map((r) => ({
+                  value: r.id,
+                  label: r.id === parentId ? r.name : `Mover a: ${r.name}`,
+                }))}
+                ariaLabel="Mover a otra familia"
+                data-testid="fam-move-to"
+              />
+            )}
+            {depth === 0 && <button onClick={() => actions.onAddChild(node.id)}>+ Hija</button>}
+            <button onClick={() => actions.onEdit(node)}>Editar</button>
+            <button className="danger" onClick={() => actions.onDelete(node)}>
+              Borrar
+            </button>
+          </span>
+        )}
       </div>
       {node.children.map((c) => (
         <FamilyRow key={c.id} node={c} depth={depth + 1} parentId={node.id} actions={actions} />
@@ -139,6 +162,12 @@ function FamilyRow({
 export function FamiliesPage() {
   const qc = useQueryClient();
   const [form, setForm] = useState<FormState | null>(null);
+  // Toolbar de la tabla: búsqueda por nombre + filtro por familia raíz.
+  const [search, setSearch] = useState('');
+  const [rootFilter, setRootFilter] = useState('');
+  // Fila activa: solo esa muestra sus botones (Mover / Editar / Borrar / + Hija).
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const toggleSelected = (id: string): void => setSelectedId((cur) => (cur === id ? null : id));
 
   const { data: serverTree = [], isLoading } = useQuery({
     queryKey: ['families'],
@@ -152,6 +181,20 @@ export function FamiliesPage() {
     }
   }, [serverTree, tree]);
   const view = tree ?? serverTree;
+
+  // Vista filtrada por la toolbar (no muta el árbol: el reordenado y "Mover a"
+  // siguen operando sobre `view`). Una raíz que coincide se muestra entera; si solo
+  // coinciden hijas, se muestra la raíz con esas hijas. Búsqueda insensible a
+  // mayúsculas y acentos ("indica" encuentra "Índica").
+  const q = norm(search);
+  const filtered = view
+    .filter((root) => !rootFilter || root.id === rootFilter)
+    .map((root) => {
+      if (!q || norm(root.name).includes(q)) return root;
+      const kids = root.children.filter((c) => norm(c.name).includes(q));
+      return kids.length ? { ...root, children: kids } : null;
+    })
+    .filter((n): n is FamilyNode => n != null);
 
   // FLIP: anima el cambio de posición de las filas al reordenar (Web Animations API).
   const treeRef = useRef<HTMLDivElement>(null);
@@ -250,10 +293,13 @@ export function FamiliesPage() {
     }
     delMut.mutate(node.id);
     setTree((prev) => removeNode(prev ?? view, node.id));
+    setSelectedId(null);
   };
 
   const actions: RowActions = {
     roots: view,
+    selectedId,
+    onSelect: toggleSelected,
     dragId: dragNode?.id ?? null,
     dropTarget,
     onDragStart: setDragNode,
@@ -267,35 +313,61 @@ export function FamiliesPage() {
     onDelete,
   };
 
+  usePageHeader('Familias', 'Selecciona las familias e hijas para editar');
+
   return (
     <section className="catalog">
-      <header className="catalog-head">
-        <div>
-          <h2>Familias</h2>
-          <p className="catalog-sub">Estructura de catálogo · reordena y mueve · 2 niveles</p>
+      <div className="table-panel">
+        <div className="table-toolbar">
+          <div className="sales-filters">
+            <span className="search-field">
+              <input
+                className="catalog-search"
+                placeholder="Buscar familia…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                data-testid="fam-search"
+              />
+            </span>
+            <Select
+              className="catalog-search"
+              value={rootFilter}
+              onChange={setRootFilter}
+              ariaLabel="Filtrar por familia"
+              data-testid="fam-filter"
+              options={[
+                { value: '', label: 'Todas las familias' },
+                ...view.map((r) => ({ value: r.id, label: r.name })),
+              ]}
+            />
+          </div>
+          <button
+            className="btn-primary"
+            onClick={() => setForm({ name: '', parentId: null })}
+            data-testid="new-family"
+          >
+            Nueva familia
+          </button>
         </div>
-        <button
-          className="btn-primary"
-          onClick={() => setForm({ name: '', parentId: null })}
-          data-testid="new-family"
-        >
-          Nueva familia
-        </button>
-      </header>
 
-      {isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : view.length === 0 ? (
-        <p className="catalog-empty" data-testid="families-empty">
-          Sin familias. Crea la primera.
-        </p>
-      ) : (
-        <div className="fam-tree" data-testid="fam-tree" ref={treeRef}>
-          {view.map((n) => (
-            <FamilyRow key={n.id} node={n} depth={0} parentId={null} actions={actions} />
-          ))}
-        </div>
-      )}
+        {isLoading ? (
+          <p className="catalog-empty">Cargando…</p>
+        ) : view.length === 0 ? (
+          <p className="catalog-empty" data-testid="families-empty">
+            Sin familias. Crea la primera.
+          </p>
+        ) : filtered.length === 0 ? (
+          <p className="catalog-empty" data-testid="fam-empty">
+            Sin familias para la búsqueda.
+          </p>
+        ) : (
+          <div className="fam-tree" data-testid="fam-tree" ref={treeRef}>
+            {filtered.map((n) => (
+              <FamilyRow key={n.id} node={n} depth={0} parentId={null} actions={actions} />
+            ))}
+          </div>
+        )}
+      </div>
 
       {form && (
         <div className="modal-backdrop" onClick={() => setForm(null)}>

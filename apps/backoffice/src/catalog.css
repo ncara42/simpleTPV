@@ -170,7 +170,9 @@
   width: 1.35rem;
   height: 1.35rem;
   color: var(--ui-text-soft);
-  transition: color 0.35s ease, filter 0.35s ease;
+  transition:
+    color 0.35s ease,
+    filter 0.35s ease;
 }
 .store-open-icon.on {
   color: var(--ui-success);
@@ -182,7 +184,9 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition:
+    opacity 0.3s ease,
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .store-icon-closed {
   opacity: 1;
@@ -202,8 +206,12 @@
   animation: store-door-open 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 @keyframes store-door-open {
-  0% { transform: scale(0.55) rotate(-18deg); }
-  100% { transform: scale(1) rotate(0deg); }
+  0% {
+    transform: scale(0.55) rotate(-18deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .store-icon-closed,
@@ -557,6 +565,11 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
+/* La acción "Nuevo traspaso" se ancla al extremo derecho de la cabecera. */
+.sales-filters > .stock-toolbar-action {
+  margin-left: auto;
+}
+
 /* ─── Stock: badges por tienda (fondo suave + dot de color) ─── */
 .stock-badges {
   display: inline-flex;
@@ -622,6 +635,12 @@
   margin-bottom: 1.5rem;
   flex-wrap: wrap;
 }
+/* El título de la vista vive ahora en la TopBar, así que la cabecera solo conserva
+   su fila de controles (filtros del dashboard, acción «Nueva familia»…). Se alinean
+   a la izquierda, aprovechando el espacio que dejó el título. */
+.catalog-head.is-actions-only {
+  justify-content: flex-start;
+}
 .catalog-head h2 {
   font-size: 1.6rem;
   font-weight: 600;
@@ -656,11 +675,32 @@
   border-color: var(--ap-blue-focus);
   box-shadow: var(--ui-focus);
 }
+/* Búsqueda con desvanecido: si el texto o el placeholder no caben en el input,
+   se difuminan contra el fondo del propio campo en el borde derecho para que no
+   parezcan cortados de golpe. El velo usa --ui-surface, así que es invisible
+   cuando el contenido cabe y solo aparece cuando hay desbordamiento. */
+.search-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.search-field::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: 2.25rem;
+  border-radius: 0 9999px 9999px 0;
+  background: linear-gradient(to right, transparent, var(--ui-surface) 70%);
+  pointer-events: none;
+}
 /* Cuando .catalog-search recae sobre un <Select> propio (filtros), el chrome
    lo aporta .ui-select-trigger; el wrapper solo conserva el ancho. */
 .ui-select.catalog-search {
-  width: auto;
-  min-width: 11rem;
+  /* Las pills de filtro se ciñen a su etiqueta (sin ancho fijo): el disparador
+     mide lo que ocupa la opción seleccionada, acotado por max-width. */
+  width: fit-content;
   max-width: 50vw;
   height: auto;
   padding: 0;
@@ -722,6 +762,11 @@
   color: var(--ui-text-soft);
   padding: 0.55rem 0.85rem;
   border-bottom: 1px solid var(--ui-border-strong);
+}
+/* La fila de cabeceras (Nombre, Email…) lleva un tinte muy sutil para
+   separarla visualmente de las filas de datos en blanco. */
+.catalog-table thead th {
+  background: var(--ui-surface-subtle);
 }
 .catalog-table td {
   padding: 0.8rem 0.85rem;
@@ -1100,14 +1145,22 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.85rem 1.1rem;
+  /* Altura fija: los botones que aparecen al seleccionar (incl. el Select "Mover",
+     más alto que el texto) caben dentro sin agrandar la fila. */
+  min-height: 3.125rem;
+  padding: 0.5rem 1.1rem;
   border-bottom: 1px solid var(--ui-border);
   font-size: 0.9rem;
   letter-spacing: -0.012em;
+  cursor: pointer;
   transition: background 0.1s;
 }
 .fam-row:hover {
   background: var(--ui-surface-subtle);
+}
+.fam-row:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--ap-blue-focus);
 }
 /* Familias raíz: fondo un punto más oscuro para distinguirlas de las hijas. */
 .fam-row--root {
@@ -1115,6 +1168,12 @@
 }
 .fam-row--root:hover {
   background: var(--fam-root-bg-hover, #e2e2ea);
+}
+/* Fila activa: solo un tinte de fondo (sin contorno ni cambio de tamaño del div).
+   Solo esta fila muestra sus botones. */
+.fam-row.is-selected,
+.fam-row.is-selected:hover {
+  background: var(--ap-blue-soft);
 }
 .fam-name {
   display: inline-flex;
@@ -1130,6 +1189,17 @@
   display: flex;
   gap: 0.3rem;
   white-space: nowrap;
+  animation: fam-actions-in 0.13s var(--ui-ease);
+}
+@keyframes fam-actions-in {
+  from {
+    opacity: 0;
+    transform: translateX(0.4rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .fam-actions button {
   display: inline-flex;
@@ -1228,6 +1298,9 @@
     transition: none;
     transform: none;
   }
+  .fam-actions {
+    animation: none;
+  }
 }
 .fam-move-select {
   max-width: 12rem;
@@ -1245,44 +1318,11 @@
   border-bottom: none;
   padding-top: 0.7rem;
 }
+/* Tickets anulados: en vez de una pill, la fila entera se tiñe de rojo flojo y
+   el texto va tachado para dejar claro que la venta no computa en los totales. */
 .sale-voided td {
-  opacity: 0.55;
-}
-.sale-voided .sale-ticket-number,
-.sale-voided td.muted,
-.sale-voided td:not(:first-child) {
+  background: var(--ui-danger-soft);
   text-decoration: line-through;
-}
-.sale-ticket-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-.sale-tag-voided {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.15rem 0.55rem 0.15rem 0.45rem;
-  border-radius: 999px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  line-height: 1.3;
-  color: #c0392b;
-  background: rgba(192, 57, 43, 0.1);
-  border: 1px solid rgba(192, 57, 43, 0.25);
-  text-decoration: none;
-  white-space: nowrap;
-  opacity: 1;
-}
-.sale-tag-voided::before {
-  content: '';
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 50%;
-  background: #c0392b;
-  flex: none;
 }
 .sales-pager {
   display: flex;
@@ -1313,7 +1353,9 @@
   flex-wrap: wrap;
   margin-bottom: 0.75rem;
 }
-.sales-filters .catalog-search {
+/* Solo el input de búsqueda conserva un ancho mínimo; las pills <Select> de la
+   barra se ciñen a su etiqueta (regla .ui-select.catalog-search → fit-content). */
+.sales-filters input.catalog-search {
   width: auto;
   min-width: 11rem;
 }
@@ -1335,6 +1377,35 @@
 }
 .users-toolbar .sales-filters {
   margin-bottom: 0;
+  /* Reclama el espacio libre para que la acción de la derecha (p. ej. "Exportar
+     CSV" en Ventas) quede fijada arriba a la derecha y los filtros, si no caben,
+     bajen de línea dentro de esta zona en vez de empujar el botón. */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Ventas tiene muchos filtros: la toolbar no parte la acción a otra línea. Los
+   filtros se reparten en varias líneas dentro de su zona y "Exportar CSV" queda
+   fijo arriba a la derecha (misma posición que "Nuevo …" en el resto de tablas). */
+.sales-toolbar {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+.sales-toolbar > .btn-primary {
+  flex-shrink: 0;
+}
+
+/* Cabecera genérica de tabla: filtros/búsqueda a la izquierda y acción principal
+   a la derecha (espejo de .users-toolbar, reutilizable en cualquier .table-panel,
+   p. ej. Familias). */
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.table-toolbar .sales-filters {
+  margin-bottom: 0;
 }
 
 /* ── Usuarios: selección múltiple + acciones en lote ──────────────────────
@@ -1353,10 +1424,6 @@
 }
 .users-table tbody tr.is-selected:hover {
   background: var(--ap-blue-soft);
-}
-/* Acento izquierdo: refuerza el cambio de color de la fila marcada. */
-.users-table tbody tr.is-selected td:first-child {
-  box-shadow: inset 3px 0 0 var(--ap-blue);
 }
 
 /* Círculo de selección — mismo gesto que "Recordar sesión" del login. */
@@ -1483,6 +1550,14 @@
   flex-wrap: wrap;
   gap: 0.4rem;
   margin-bottom: 1rem;
+}
+/* Dentro del panel de Ventas las vistas guardadas son una segunda franja de la
+   cabecera: mismo tinte que la toolbar, separada de la tabla por un hairline. */
+.table-panel > .sales-views {
+  margin: 0;
+  padding: 0.6rem 1rem;
+  background: var(--ui-surface-subtle);
+  border-bottom: 1px solid var(--ui-border);
 }
 .sales-view-chip {
   display: inline-flex;
@@ -1643,29 +1718,44 @@
   --metric-soft: var(--ui-success-soft);
 }
 
-/* Panel que enmarca la toolbar de filtros + la tabla (espejo de .dash-panel). */
-.stock-panel {
+/* Panel que enmarca la toolbar de filtros + la tabla (espejo de .dash-panel).
+   Marco común de Stock, Usuarios y Catálogo: superficie blanca, borde fino y
+   esquinas redondeadas (sin doble borde con la tabla interior). */
+.table-panel {
   border: 1px solid var(--ui-border);
   border-radius: 18px;
   background: var(--ui-surface);
   overflow: hidden;
+  box-shadow: var(--ui-shadow-sm);
 }
-.stock-panel .sales-filters {
+/* La barra de filtros/acciones es la cabecera del panel: separada por hairline
+   y con el mismo tinte sutil que la fila de cabeceras de la tabla, para que
+   toda la zona de chrome quede diferenciada de las filas de datos en blanco. */
+.table-panel > .sales-filters,
+.table-panel > .users-toolbar,
+.table-panel > .table-toolbar {
   margin: 0;
   padding: 0.85rem 1rem;
+  background: var(--ui-surface-subtle);
   border-bottom: 1px solid var(--ui-border);
 }
-/* La tabla vive dentro del panel sin doble borde; cabeceras y filas alineadas
-   con el padding de la toolbar (1rem). */
-.stock-panel .catalog-table th,
-.stock-panel .catalog-table td {
+/* El árbol de Familias trae su propio marco (borde, radio, fondo); dentro de un
+   .table-panel lo cede al panel para no duplicarlo. */
+.table-panel > .fam-tree {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+/* Cabeceras y filas alineadas con el padding de la barra (1rem). */
+.table-panel .catalog-table th,
+.table-panel .catalog-table td {
   padding-left: 1rem;
   padding-right: 1rem;
 }
-.stock-panel .catalog-table tbody tr:last-child td {
+.table-panel .catalog-table tbody tr:last-child td {
   border-bottom: none;
 }
-.stock-panel .catalog-empty {
+.table-panel .catalog-empty {
   padding: 2.5rem 1rem;
   text-align: center;
 }
@@ -1690,49 +1780,53 @@
 }
 
 /* ─── Promociones: tarjetas de reglas y previsualización (#99) ─── */
-.promo-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+/* ─── Promociones: tabla compacta de reglas + previsualización en el modal (#99) ───
+   Misma piel que el resto de tablas del backoffice (.catalog-table dentro de un
+   .table-panel); aquí solo se afinan columnas concretas. */
+/* Filtro de estado: se ciñe a su etiqueta en vez del ancho fijo de las pills de
+   búsqueda (.catalog-search → 11rem), para que «Todas» no quede holgado. */
+.promo-filter-select {
+  width: fit-content;
 }
-.promo-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 1.1rem;
-  border: 1px solid var(--ui-border);
-  border-radius: 16px;
-  background: var(--ui-surface);
-  transition: border-color 0.12s;
-}
-.promo-card:hover {
-  border-color: var(--ui-border-strong);
-}
-.promo-card-head {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 0.3rem;
-}
-.promo-name {
-  font-weight: 700;
+.promo-name-cell {
+  font-weight: 600;
   color: var(--ui-text);
 }
-.promo-rule {
-  margin: 0 0 0.2rem;
-  font-size: 0.9rem;
-  color: var(--ui-text-soft);
-}
-.promo-dates {
-  margin: 0;
+/* Chip de descuento: el «qué te llevas» de la regla. Usa el acento de marca para
+   diferenciarse del badge de estado, que aporta su propio color por columna. */
+.promo-discount {
+  display: inline-block;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
   font-size: 0.8rem;
-  color: var(--ui-text-muted);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--ap-blue-soft);
+  color: var(--ui-primary);
 }
-.promo-card-actions {
-  display: flex;
-  flex-shrink: 0;
-  gap: 0.5rem;
+/* Acciones por fila ancladas a la derecha; tenues en reposo y nítidas al pasar el
+   ratón sobre la fila (mismo gesto que los círculos de selección de Usuarios). */
+.promo-actions-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+.promo-actions-cell .link-btn {
+  height: 1.9rem;
+  padding: 0 0.8rem;
+  font-size: 0.82rem;
+}
+.promo-actions-cell .link-btn + .link-btn {
+  margin-left: 0.35rem;
+}
+.promo-table tbody tr .promo-actions-cell .link-btn {
+  opacity: 0.5;
+  transition:
+    opacity 0.12s,
+    background 0.12s;
+}
+.promo-table tbody tr:hover .promo-actions-cell .link-btn,
+.promo-actions-cell .link-btn:focus-visible {
+  opacity: 1;
 }
 .promo-badge {
   padding: 0.12rem 0.55rem;

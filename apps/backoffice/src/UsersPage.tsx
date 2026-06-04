@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import { DEMO_STORES, type DemoUser, ROLE_LABEL } from './demo/demoData.js';
 import { createUser, deleteUser, listUsers, type NewUser } from './lib/admin.js';
+import { usePageHeader } from './lib/pageHeader.js';
 
 type Role = NewUser['role'];
 
@@ -95,6 +96,8 @@ export function UsersPage() {
       }),
     [allUsers, search, storeFilter],
   );
+
+  usePageHeader('Usuarios', `${allUsers.length} usuarios`, 'users-count');
 
   // ─── Selección ─────────────────────────────────────────────────────────
   const selectedSet = useMemo(() => new Set(selected), [selected]);
@@ -228,145 +231,140 @@ export function UsersPage() {
 
   return (
     <section className="catalog">
-      <header className="catalog-head">
-        <div>
-          <h2>Usuarios</h2>
-          <p className="catalog-sub" data-testid="users-count">
-            {allUsers.length} usuarios
-          </p>
-        </div>
-      </header>
-
-      <div className="users-toolbar">
-        <div className="sales-filters">
-          <input
-            className="catalog-search"
-            placeholder="Buscar por nombre…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            data-testid="users-search"
-          />
-          <Select
-            className="catalog-search"
-            value={storeFilter}
-            onChange={setStoreFilter}
-            ariaLabel="Filtrar por tienda"
-            data-testid="users-store"
-            options={[
-              { value: '', label: 'Todas las tiendas' },
-              ...DEMO_STORES.map((s) => ({ value: s.id, label: s.name })),
-            ]}
-          />
-          {selected.length > 0 && (
-            <>
-              {!allFilteredSelected && (
+      <div className="table-panel">
+        <div className="users-toolbar">
+          <div className="sales-filters">
+            <span className="search-field">
+              <input
+                className="catalog-search"
+                placeholder="Buscar por nombre…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                data-testid="users-search"
+              />
+            </span>
+            <Select
+              className="catalog-search"
+              value={storeFilter}
+              onChange={setStoreFilter}
+              ariaLabel="Filtrar por tienda"
+              data-testid="users-store"
+              options={[
+                { value: '', label: 'Todas las tiendas' },
+                ...DEMO_STORES.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+            />
+            {selected.length > 0 && (
+              <>
+                {!allFilteredSelected && (
+                  <button
+                    type="button"
+                    className="users-sel-btn"
+                    onClick={selectAllFiltered}
+                    data-testid="users-select-all"
+                  >
+                    Seleccionar todo
+                  </button>
+                )}
                 <button
                   type="button"
                   className="users-sel-btn"
-                  onClick={selectAllFiltered}
-                  data-testid="users-select-all"
+                  onClick={clearSelection}
+                  data-testid="users-clear"
                 >
-                  Seleccionar todo
+                  Quitar selección
                 </button>
-              )}
+              </>
+            )}
+          </div>
+          {selected.length > 0 ? (
+            <div className="users-toolbar-actions">
               <button
                 type="button"
-                className="users-sel-btn"
-                onClick={clearSelection}
-                data-testid="users-clear"
+                className="users-bulk-edit"
+                onClick={openBulkEdit}
+                data-testid="users-edit"
               >
-                Quitar selección
+                Editar{selected.length > 1 ? ` (${selected.length})` : ''}
               </button>
-            </>
+              <button
+                type="button"
+                className="users-bulk-del"
+                onClick={removeSelected}
+                data-testid="users-delete"
+              >
+                Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
+              </button>
+            </div>
+          ) : (
+            <button className="btn-primary" onClick={openCreate} data-testid="new-user">
+              Nuevo usuario
+            </button>
           )}
         </div>
-        {selected.length > 0 ? (
-          <div className="users-toolbar-actions">
-            <button
-              type="button"
-              className="users-bulk-edit"
-              onClick={openBulkEdit}
-              data-testid="users-edit"
-            >
-              Editar{selected.length > 1 ? ` (${selected.length})` : ''}
-            </button>
-            <button
-              type="button"
-              className="users-bulk-del"
-              onClick={removeSelected}
-              data-testid="users-delete"
-            >
-              Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
-            </button>
-          </div>
+
+        {isLoading ? (
+          <p className="catalog-empty">Cargando…</p>
+        ) : filtered.length === 0 ? (
+          <p className="catalog-empty" data-testid="users-empty">
+            Sin usuarios para los filtros seleccionados.
+          </p>
         ) : (
-          <button className="btn-primary" onClick={openCreate} data-testid="new-user">
-            Nuevo usuario
-          </button>
+          <table
+            className={`catalog-table users-table${selected.length ? ' has-selection' : ''}`}
+            data-testid="users-table"
+          >
+            <thead>
+              <tr>
+                <th className="users-select-col" aria-label="Selección" />
+                <th>Nombre</th>
+                <th>Email</th>
+                <th>Rol</th>
+                <th>Tiendas</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((u) => {
+                const isSel = selectedSet.has(u.id);
+                return (
+                  <tr
+                    key={u.id}
+                    className={isSel ? 'is-selected' : undefined}
+                    aria-selected={isSel}
+                    onClick={() => toggleSelect(u.id)}
+                    data-testid="user-row"
+                  >
+                    <td className="users-select-col" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="user-check"
+                        aria-label={`Seleccionar ${u.name}`}
+                        data-testid="user-select"
+                        checked={isSel}
+                        onChange={() => toggleSelect(u.id)}
+                      />
+                    </td>
+                    <td>{u.name}</td>
+                    <td className="muted">{u.email}</td>
+                    <td>
+                      <span className="role-badge" data-testid="user-role-badge">
+                        {ROLE_LABEL[u.role]}
+                      </span>
+                    </td>
+                    <td className="muted">{storesLabel(u.role, u.storeIds ?? [])}</td>
+                    <td>
+                      <span className={`user-state ${u.active ? 'on' : 'off'}`}>
+                        {u.active ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </div>
-
-      {isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : filtered.length === 0 ? (
-        <p className="catalog-empty" data-testid="users-empty">
-          Sin usuarios para los filtros seleccionados.
-        </p>
-      ) : (
-        <table
-          className={`catalog-table users-table${selected.length ? ' has-selection' : ''}`}
-          data-testid="users-table"
-        >
-          <thead>
-            <tr>
-              <th className="users-select-col" aria-label="Selección" />
-              <th>Nombre</th>
-              <th>Email</th>
-              <th>Rol</th>
-              <th>Tiendas</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((u) => {
-              const isSel = selectedSet.has(u.id);
-              return (
-                <tr
-                  key={u.id}
-                  className={isSel ? 'is-selected' : undefined}
-                  aria-selected={isSel}
-                  onClick={() => toggleSelect(u.id)}
-                  data-testid="user-row"
-                >
-                  <td className="users-select-col" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      className="user-check"
-                      aria-label={`Seleccionar ${u.name}`}
-                      data-testid="user-select"
-                      checked={isSel}
-                      onChange={() => toggleSelect(u.id)}
-                    />
-                  </td>
-                  <td>{u.name}</td>
-                  <td className="muted">{u.email}</td>
-                  <td>
-                    <span className="role-badge" data-testid="user-role-badge">
-                      {ROLE_LABEL[u.role]}
-                    </span>
-                  </td>
-                  <td className="muted">{storesLabel(u.role, u.storeIds ?? [])}</td>
-                  <td>
-                    <span className={`user-state ${u.active ? 'on' : 'off'}`}>
-                      {u.active ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
 
       {form && (
         <div className="modal-backdrop" onClick={closeModal}>

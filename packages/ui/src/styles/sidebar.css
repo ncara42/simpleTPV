@@ -193,6 +193,26 @@
   text-overflow: ellipsis;
 }
 
+/* Badge de contador (p. ej. notificaciones): píldora roja discreta al extremo
+   derecho del item, empujada por margin-left:auto sin desplazar la etiqueta. */
+.sidebar-item-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--ui-danger);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
 /* ─── Foco de teclado (a11y) ──────────────────────────────── */
 .sidebar-item:focus-visible,
 .sidebar-logout:focus-visible,
@@ -274,14 +294,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.sidebar-account-caret {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--sidebar-group-label-color);
 }
 
 /* Menú de cuenta (popover sobre el footer, abre hacia arriba) */

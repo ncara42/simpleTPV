@@ -5,14 +5,9 @@ import { listStores } from '../lib/admin.js';
 import { createTransfer, getGlobalStock, listTransfers, sendTransfer } from '../lib/stock.js';
 import { dt, STATUS_LABEL } from './labels.js';
 
-export function TransfersSection({
-  creating,
-  setCreating,
-}: {
-  creating: boolean;
-  setCreating: (v: boolean) => void;
-}) {
+export function TransfersSection() {
   const qc = useQueryClient();
+  const [creating, setCreating] = useState(false);
 
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ['transfers'],
@@ -30,50 +25,62 @@ export function TransfersSection({
 
   return (
     <>
-      {isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : transfers.length === 0 ? (
-        <p className="catalog-empty" data-testid="transfers-empty">
-          Sin traspasos.
-        </p>
-      ) : (
-        <table className="catalog-table" data-testid="transfers-table">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Líneas</th>
-              <th>Estado</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {transfers.map((t) => (
-              <tr key={t.id} data-testid="transfer-row">
-                <td className="muted">{dt.format(new Date(t.createdAt))}</td>
-                <td>{t.lines.length}</td>
-                <td>
-                  <span className="stock-tag" data-testid="transfer-status">
-                    {STATUS_LABEL[t.status] ?? t.status}
-                  </span>
-                </td>
-                <td>
-                  {t.status === 'DRAFT' && (
-                    <button
-                      type="button"
-                      className="link-btn"
-                      disabled={sendMutation.isPending}
-                      onClick={() => sendMutation.mutate(t.id)}
-                      data-testid="transfer-send"
-                    >
-                      Enviar
-                    </button>
-                  )}
-                </td>
+      <div className="table-panel">
+        <div className="sales-filters">
+          <button
+            type="button"
+            className="btn-primary stock-tabs-action stock-toolbar-action"
+            onClick={() => setCreating(true)}
+            data-testid="new-transfer"
+          >
+            Nuevo traspaso
+          </button>
+        </div>
+        {isLoading ? (
+          <p className="catalog-empty">Cargando…</p>
+        ) : transfers.length === 0 ? (
+          <p className="catalog-empty" data-testid="transfers-empty">
+            Sin traspasos.
+          </p>
+        ) : (
+          <table className="catalog-table" data-testid="transfers-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Líneas</th>
+                <th>Estado</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {transfers.map((t) => (
+                <tr key={t.id} data-testid="transfer-row">
+                  <td className="muted">{dt.format(new Date(t.createdAt))}</td>
+                  <td>{t.lines.length}</td>
+                  <td>
+                    <span className="stock-tag" data-testid="transfer-status">
+                      {STATUS_LABEL[t.status] ?? t.status}
+                    </span>
+                  </td>
+                  <td>
+                    {t.status === 'DRAFT' && (
+                      <button
+                        type="button"
+                        className="link-btn"
+                        disabled={sendMutation.isPending}
+                        onClick={() => sendMutation.mutate(t.id)}
+                        data-testid="transfer-send"
+                      >
+                        Enviar
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       {creating && (
         <CreateTransferModal

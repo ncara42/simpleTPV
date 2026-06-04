@@ -55,8 +55,23 @@
   margin: 0;
   font-size: var(--ui-text-2xl);
   font-weight: 700;
+  line-height: 1.15;
   letter-spacing: -0.02em;
   color: var(--ui-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Descripción de la vista bajo el título: misma jerarquía que un subtítulo de
+   contenido (.catalog-sub) pero compacta para caber en la altura de la barra. */
+.topbar-subtitle {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.012em;
+  color: var(--ui-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -67,6 +82,60 @@
   align-items: center;
   gap: 0.85rem;
   flex-shrink: 0;
+}
+
+/* Campana de notificaciones: botón fantasma con anillo de foco; el badge se
+   ancla a la esquina superior derecha del icono. */
+.topbar-notif {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--ui-radius-pill);
+  background: none;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.topbar-notif:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+
+.topbar-notif.active {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+
+.topbar-notif:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+.topbar-notif-badge {
+  position: absolute;
+  top: 2px;
+  right: 1px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--ui-danger);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+  /* Aro del color de la barra para separar el badge del icono. */
+  box-shadow: 0 0 0 2px var(--ui-surface);
 }
 
 .topbar-switch {
@@ -125,7 +194,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .topbar-switch-btn {
+  .topbar-switch-btn,
+  .topbar-notif {
     transition: none;
   }
 }

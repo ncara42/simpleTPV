@@ -7,6 +7,8 @@ export interface NavItem {
   label: string;
   icon: React.ReactNode;
   group?: string;
+  /** Contador opcional (p. ej. notificaciones sin leer) pintado a la derecha del item. */
+  badge?: number;
 }
 
 export interface NavGroup {
@@ -46,25 +48,6 @@ function LogoutGlyph() {
     >
       <path d="M12 2v10" />
       <path d="M18.4 6.6a9 9 0 1 1-12.8 0" />
-    </svg>
-  );
-}
-
-/** Chevron del disparador de cuenta: apunta hacia arriba (el menú abre hacia arriba). */
-function AccountCaret() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="18 15 12 9 6 15" />
     </svg>
   );
 }
@@ -157,6 +140,11 @@ export function Sidebar({
             >
               <span className="sidebar-item-icon">{item.icon}</span>
               <span className="sidebar-item-label">{item.label}</span>
+              {item.badge != null && item.badge > 0 && (
+                <span className="sidebar-item-badge" data-testid={`nav-${item.id}-badge`}>
+                  {item.badge}
+                </span>
+              )}
             </button>
           </li>
         );
@@ -267,11 +255,6 @@ export function Sidebar({
                   <span className="sidebar-account-sub">{account.subtitle}</span>
                 )}
               </span>
-              {onLogout && (
-                <span className="sidebar-account-caret" aria-hidden="true">
-                  <AccountCaret />
-                </span>
-              )}
             </button>
           </div>
         ) : (
