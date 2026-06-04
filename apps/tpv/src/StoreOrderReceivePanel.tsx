@@ -77,7 +77,7 @@ export function StoreOrderReceivePanel() {
   if (done) {
     return (
       <div className="mx-auto max-w-xl space-y-4" data-testid="store-order-received">
-        <div className="rounded-xl border border-green-200 bg-green-50 p-5">
+        <div className="rounded-lg border border-green-200 bg-green-50 p-5">
           <p className="text-sm font-semibold text-green-700">Pedido recibido</p>
           <p className="mt-1 text-sm text-green-600">El stock se ha actualizado correctamente.</p>
         </div>
@@ -121,7 +121,7 @@ export function StoreOrderReceivePanel() {
           </button>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-[var(--ui-border)] bg-white">
+        <div className="overflow-hidden rounded-lg border border-[var(--ui-border)] bg-white">
           <table className="w-full text-sm" data-testid="store-order-lines">
             <thead>
               <tr className="border-b border-[var(--ui-border)] bg-neutral-50">

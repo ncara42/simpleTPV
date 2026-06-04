@@ -94,7 +94,7 @@ export function ReturnPanel() {
   if (done) {
     return (
       <div className="mx-auto max-w-xl space-y-4" data-testid="return-panel">
-        <div className="rounded-xl border border-green-200 bg-green-50 p-5">
+        <div className="rounded-lg border border-green-200 bg-green-50 p-5">
           <p className="text-sm font-semibold text-green-700">Devolución registrada</p>
           <p
             className="mt-1 text-2xl font-bold tabular-nums text-green-800"

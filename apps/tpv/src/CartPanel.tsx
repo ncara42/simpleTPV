@@ -95,7 +95,7 @@ export function CartPanel({
 
   return (
     <aside
-      className="flex w-80 shrink-0 flex-col rounded-xl border border-[var(--ui-border)] bg-white shadow-sm"
+      className="flex w-80 shrink-0 flex-col rounded-lg border border-[var(--ui-border)] bg-white shadow-sm"
       data-testid="cart"
     >
       {/* Cabecera: Ticket actual + Descuento + Vaciar */}

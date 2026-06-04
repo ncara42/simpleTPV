@@ -16,7 +16,7 @@ export function ReturnLines({
 }) {
   return (
     <ul
-      className="divide-y divide-[var(--ui-border)] rounded-xl border border-[var(--ui-border)] bg-white"
+      className="divide-y divide-[var(--ui-border)] rounded-lg border border-[var(--ui-border)] bg-white"
       data-testid="return-lines"
     >
       {lines.map((l) => {
