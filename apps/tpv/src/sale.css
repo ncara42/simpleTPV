@@ -15,11 +15,13 @@
   height: 46px;
   width: 100%;
   border: 1.5px solid var(--ui-border-strong);
-  border-radius: 12px;
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
   padding: 0 0.45rem 0 0.85rem;
   box-shadow: var(--ui-shadow-sm);
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 
 .sale-search-wrap:focus-within {
@@ -39,7 +41,7 @@
   border: none;
   background: transparent;
   outline: none;
-  font-size: 0.92rem;
+  font-size: var(--ui-text-base);
   color: var(--ui-text);
 }
 
@@ -53,15 +55,18 @@
   gap: 0.4rem;
   height: 32px;
   padding: 0 0.7rem;
-  border-radius: 8px;
+  border-radius: var(--ui-radius-sm);
   border: 1px solid var(--ui-border);
   background: var(--ui-surface-subtle);
   color: var(--ui-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--ui-text-sm);
   font-weight: 600;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
 
 .scan-btn:hover {
@@ -72,10 +77,10 @@
 
 .scan-btn .kbd {
   font-family: ui-monospace, monospace;
-  font-size: 0.62rem;
+  font-size: var(--ui-text-2xs);
   padding: 0.05rem 0.28rem;
   border: 1px solid var(--ui-border);
-  border-radius: 4px;
+  border-radius: var(--ui-radius-xs);
   background: var(--ui-surface);
   color: var(--ui-text-soft);
 }
@@ -94,16 +99,19 @@
   gap: 0.4rem;
   height: 34px;
   padding: 0 0.7rem;
-  border-radius: 9px;
+  border-radius: var(--ui-radius-sm);
   border: 1px solid var(--ui-border);
   background: var(--ui-surface);
-  font-size: 0.8rem;
+  font-size: var(--ui-text-sm);
   font-weight: 600;
   color: var(--ui-text);
   cursor: pointer;
   box-shadow: var(--ui-shadow-sm);
   white-space: nowrap;
-  transition: border-color 0.12s, background 0.12s, transform 0.06s;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    transform 0.06s;
 }
 
 .fam-chip:hover {
@@ -122,7 +130,7 @@
 }
 
 .fam-chip .chip-count {
-  font-size: 0.7rem;
+  font-size: var(--ui-text-xs);
   font-weight: 600;
   color: var(--ui-text-soft);
   font-variant-numeric: tabular-nums;
@@ -142,6 +150,18 @@
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
 }
 
+/* Chevron que indica que una familia tiene subfamilias en las que entrar. */
+.fam-chip .fam-chevron {
+  color: var(--ui-text-soft);
+  font-weight: 600;
+}
+
+/* Botón "‹ Volver" al nivel de familias raíz. */
+.fam-chip.fam-back {
+  font-weight: 600;
+  color: var(--ui-text-soft);
+}
+
 /* ─── Cuadrícula de productos ──────────────────────────── */
 .sale-grid {
   display: grid;
@@ -157,11 +177,14 @@
   min-height: 96px;
   padding: 0.85rem;
   border: 1.5px solid var(--ui-border);
-  border-radius: 12px;
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.1s, box-shadow 0.1s, transform 0.06s;
+  transition:
+    border-color 0.1s,
+    box-shadow 0.1s,
+    transform 0.06s;
 }
 
 .prod-card:hover {
@@ -179,7 +202,7 @@
 }
 
 .prod-name {
-  font-size: 0.92rem;
+  font-size: var(--ui-text-base);
   font-weight: 600;
   line-height: 1.25;
 }
@@ -192,7 +215,7 @@
 }
 
 .prod-price {
-  font-size: 1.12rem;
+  font-size: var(--ui-text-lg);
   font-weight: 600;
   color: var(--ui-text);
   font-variant-numeric: tabular-nums;
@@ -201,10 +224,10 @@
 }
 
 .prod-stock {
-  font-size: 0.74rem;
+  font-size: var(--ui-text-xs);
   font-weight: 700;
   padding: 0.12rem 0.45rem;
-  border-radius: 6px;
+  border-radius: var(--ui-radius-xs);
 }
 
 .prod-stock.neutral {
@@ -295,7 +318,7 @@
 .modal {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg, 14px);
+  border-radius: var(--ui-radius-xl);
   padding: 0;
   min-width: 22rem;
   max-width: 32rem;
@@ -371,9 +394,9 @@
   padding: 0 1rem;
   height: 36px;
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: var(--ui-text-base);
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background var(--ui-motion-fast);
 }
 
 .btn-primary:hover {
@@ -385,12 +408,52 @@
   cursor: not-allowed;
 }
 
+/* Micro-interacción común: todos los botones de acción se "hunden" levemente al
+   pulsar (mismo gesto que .prod-card y .fam-chip), salvo si están deshabilitados. */
+.btn-primary:active,
+.cart-create:active,
+.cart-discount:active,
+.cart-void:active,
+.cart-print:active,
+.pay-confirm:active,
+.pay-cancel:active,
+.cash-action:active,
+.cash-btn-open:active,
+.cash-btn-close:active,
+.cash-btn-cancel:active,
+.tpv-tab:active,
+.scan-btn:active,
+.cash-card-close:active,
+.return-toggle-btn:active {
+  transform: translateY(0.5px);
+}
+
+.btn-primary:disabled:active,
+.pay-confirm:disabled:active,
+.cash-btn-open:disabled:active,
+.cash-btn-close:disabled:active,
+.cart-discount:disabled:active,
+.cart-void:disabled:active {
+  transform: none;
+}
+
 .sale-empty {
   color: var(--ui-text-muted);
   padding: 2rem 0;
 }
 
 /* ─── Banner de escáner ────────────────────────────────── */
+@keyframes scan-banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .scan-banner {
   display: flex;
   align-items: center;
@@ -403,6 +466,14 @@
   border: 1.5px solid var(--ui-brand);
   font-size: 1rem;
   cursor: pointer;
+  animation: scan-banner-in 140ms ease-out;
+}
+
+/* Respeta la preferencia de reducir movimiento. */
+@media (prefers-reduced-motion: reduce) {
+  .scan-banner {
+    animation: none;
+  }
 }
 
 .scan-banner .scan-miss {
@@ -412,7 +483,7 @@
 .scan-close {
   border: none;
   background: none;
-  font-size: 1.3rem;
+  font-size: var(--ui-text-xl);
   line-height: 1;
   cursor: pointer;
   color: var(--ui-text-muted);
@@ -432,14 +503,14 @@
 }
 
 .cart-title {
-  font-size: 1.05rem;
+  font-size: var(--ui-text-lg);
   font-weight: 700;
   margin: 0;
 }
 
 .cart-empty {
   color: var(--ui-text-soft);
-  font-size: 0.88rem;
+  font-size: var(--ui-text-base);
 }
 
 .cart-lines {
@@ -467,7 +538,7 @@
 .cart-line-controls button {
   width: 28px;
   height: 28px;
-  border-radius: 7px;
+  border-radius: var(--ui-radius-sm);
   border: 1.5px solid var(--ui-border-strong);
   background: var(--ui-surface);
   font-size: 1rem;
@@ -475,7 +546,9 @@
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: border-color 0.1s, color 0.1s;
+  transition:
+    border-color 0.1s,
+    color 0.1s;
 }
 
 .cart-line-controls button:hover {
@@ -500,7 +573,7 @@
 .cart-totals {
   display: flex;
   justify-content: space-between;
-  font-size: 0.86rem;
+  font-size: var(--ui-text-base);
   color: var(--ui-text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -517,7 +590,7 @@
 }
 
 .cart-total strong {
-  font-size: 1.7rem;
+  font-size: var(--ui-text-3xl);
   font-weight: 700;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
@@ -536,8 +609,8 @@
   border-radius: var(--ui-radius-sm);
   background: var(--ui-surface);
   cursor: pointer;
-  font-size: 0.88rem;
-  transition: background 0.12s;
+  font-size: var(--ui-text-base);
+  transition: background var(--ui-motion-fast);
 }
 
 .cart-discount:hover {
@@ -556,7 +629,7 @@
 
 .cart-line-disc {
   margin-left: 0.4rem;
-  font-size: 0.8rem;
+  font-size: var(--ui-text-sm);
   font-weight: 600;
   color: var(--ui-danger);
 }
@@ -573,9 +646,11 @@
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-sm);
   padding: 0 0.9rem;
-  font-size: 1.1rem;
+  font-size: var(--ui-text-lg);
   outline: none;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 
 .disc-fields select:focus,
@@ -584,8 +659,14 @@
   box-shadow: var(--ui-focus);
 }
 
+/* El <Select> propio dentro de los descuentos iguala el alto/tipografía de los inputs */
+.disc-fields .ui-select-trigger {
+  height: 44px;
+  font-size: 1.1rem;
+}
+
 .cart-msg {
-  font-size: 0.9rem;
+  font-size: var(--ui-text-base);
 }
 
 /* Advertencia de caja cerrada en el carrito */
@@ -597,7 +678,7 @@
   border-radius: var(--ui-radius-sm);
   background: var(--ui-warning-soft);
   color: var(--ui-warning);
-  font-size: 0.82rem;
+  font-size: var(--ui-text-sm);
   border: 1px solid #f1d9ad;
   margin-bottom: 0.2rem;
 }
@@ -611,7 +692,7 @@
   background: var(--ui-surface);
   color: var(--ui-danger);
   cursor: pointer;
-  font-size: 0.88rem;
+  font-size: var(--ui-text-base);
 }
 
 .cart-void:disabled {
@@ -638,7 +719,7 @@
 .pay-modal {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg, 14px);
+  border-radius: var(--ui-radius-xl);
   padding: 0;
   width: min(24rem, 92vw);
   display: flex;
@@ -650,7 +731,7 @@
 
 .pay-title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: var(--ui-text-lg);
   font-weight: 600;
   padding: 1.2rem 1.4rem;
   border-bottom: 1px solid var(--ui-border);
@@ -668,12 +749,12 @@
 }
 
 .pay-total-label {
-  font-size: 0.78rem;
+  font-size: var(--ui-text-sm);
   color: var(--ui-text-muted);
 }
 
 .pay-total-amount {
-  font-size: 2rem;
+  font-size: var(--ui-text-4xl);
   font-weight: 700;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
@@ -697,9 +778,12 @@
   gap: 0.2rem;
   cursor: pointer;
   font-weight: 600;
-  font-size: 0.86rem;
+  font-size: var(--ui-text-base);
   color: var(--ui-text);
-  transition: border-color 0.12s, background 0.12s, color 0.12s;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    color 0.12s;
 }
 
 .pay-method.active {
@@ -719,7 +803,7 @@
   flex-direction: column;
   gap: 0.35rem;
   font-weight: 600;
-  font-size: 0.78rem;
+  font-size: var(--ui-text-sm);
   color: var(--ui-text-muted);
 }
 
@@ -728,9 +812,11 @@
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-sm);
   padding: 0 0.9rem;
-  font-size: 1.1rem;
+  font-size: var(--ui-text-lg);
   outline: none;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 
 .pay-field input:focus {
@@ -741,7 +827,7 @@
 .pay-change {
   display: flex;
   justify-content: space-between;
-  font-size: 1.05rem;
+  font-size: var(--ui-text-lg);
   font-weight: 600;
   padding: 0.6rem 0.8rem;
   background: var(--ui-surface-subtle);
@@ -766,7 +852,7 @@
   min-height: 38px;
   border-radius: var(--ui-radius-sm);
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: var(--ui-text-base);
   cursor: pointer;
   border: none;
 }
@@ -810,13 +896,13 @@
 
 .conf-change strong {
   color: var(--ui-brand-ink);
-  font-size: 1.2rem;
+  font-size: var(--ui-text-xl);
 }
 
 /* ─── Ticket ───────────────────────────────────────────── */
 .ticket {
   font-family: 'Courier New', ui-monospace, monospace;
-  font-size: 0.85rem;
+  font-size: var(--ui-text-base);
   line-height: 1.4;
   background: var(--ui-surface);
   border: 1px dashed var(--ui-border-strong);
@@ -885,7 +971,7 @@
 .ticket-line-calc {
   grid-column: 1 / 2;
   color: var(--ui-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--ui-text-sm);
 }
 
 .ticket-line-disc {
@@ -904,11 +990,11 @@
 
 .ticket-taxes {
   color: var(--ui-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--ui-text-sm);
 }
 
 .ticket-total {
-  font-size: 1.15rem;
+  font-size: var(--ui-text-lg);
   font-weight: 700;
 }
 
@@ -936,11 +1022,53 @@
   margin-bottom: 0.75rem;
 }
 
+.sale-success-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--ui-radius-lg);
+  background: #f0fdf4;
+  color: #166534;
+  font-size: var(--ui-text-base);
+  font-weight: 500;
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.sale-success-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--ui-radius-pill);
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.sale-success-close {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: #15803d;
+  font-size: var(--ui-text-lg);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sale-success-close:hover {
+  color: #14532d;
+}
+
 /* ─── Panel de caja ────────────────────────────────────── */
 .cash-panel {
   margin-bottom: 1rem;
   border: 1px solid var(--ui-border);
-  border-radius: 14px;
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-sm);
   overflow: hidden;
@@ -980,7 +1108,7 @@
 
 .cash-badge {
   font-weight: 600;
-  font-size: 0.92rem;
+  font-size: var(--ui-text-base);
   letter-spacing: -0.01em;
 }
 
@@ -998,14 +1126,14 @@
 }
 
 .cash-stat-label {
-  font-size: 0.8rem;
+  font-size: var(--ui-text-sm);
   color: var(--ui-text-muted);
   line-height: 1;
   white-space: nowrap;
 }
 
 .cash-stat-value {
-  font-size: 0.92rem;
+  font-size: var(--ui-text-base);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
@@ -1014,7 +1142,7 @@
 }
 
 .cash-msg {
-  font-size: 0.86rem;
+  font-size: var(--ui-text-base);
   color: var(--ui-warning);
 }
 
@@ -1025,14 +1153,16 @@
 .cash-action {
   height: 34px;
   padding: 0 0.95rem;
-  border-radius: 9px;
+  border-radius: var(--ui-radius-sm);
   border: 1px solid var(--ui-border-strong);
   background: var(--ui-surface);
-  font-size: 0.84rem;
+  font-size: var(--ui-text-base);
   font-weight: 600;
   color: var(--ui-text);
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
   white-space: nowrap;
 }
 
@@ -1063,7 +1193,7 @@
   flex-direction: column;
   gap: 0.3rem;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: var(--ui-text-base);
 }
 
 .cash-field input {
@@ -1071,9 +1201,11 @@
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-sm);
   padding: 0 0.9rem;
-  font-size: 1.1rem;
+  font-size: var(--ui-text-lg);
   outline: none;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 
 .cash-field input:focus {
@@ -1095,7 +1227,7 @@
   font-weight: 700;
   cursor: pointer;
   border: none;
-  font-size: 0.88rem;
+  font-size: var(--ui-text-base);
 }
 
 .cash-btn-open {
@@ -1145,7 +1277,7 @@
   display: flex;
   justify-content: space-between;
   font-variant-numeric: tabular-nums;
-  font-size: 0.95rem;
+  font-size: var(--ui-text-md);
 }
 
 .cash-diff {
@@ -1167,14 +1299,112 @@
   color: var(--ui-text-muted);
 }
 
+/* ─── Conteo por denominaciones (cierre de caja) ─────────── */
+.cash-count {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.cash-count-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 0.35rem 0.9rem;
+}
+
+.cash-count-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cash-count-denom {
+  width: 3.6rem;
+  font-size: var(--ui-text-base);
+  font-weight: 600;
+}
+
+.cash-count-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.cash-count-controls button {
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xs);
+  background: #fff;
+  color: var(--ui-text-soft);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cash-count-controls button:hover {
+  background: #f5f5f5;
+}
+
+.cash-count-controls input {
+  width: 3rem;
+  height: 1.7rem;
+  text-align: center;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.cash-count-sub {
+  margin-left: auto;
+  min-width: 4.5rem;
+  text-align: right;
+  font-size: var(--ui-text-base);
+  color: var(--ui-text-soft);
+}
+
+.cash-count-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid var(--ui-border);
+  padding-top: 0.6rem;
+}
+
+.cash-count-reset {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xs);
+  background: #fff;
+  padding: 0.35rem 0.7rem;
+  font-size: var(--ui-text-base);
+  color: var(--ui-text-soft);
+  cursor: pointer;
+}
+
+.cash-count-totals {
+  min-width: 14rem;
+}
+
+.cash-count-total-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: var(--ui-text-md);
+}
+
+.cash-count-total-row span:first-child {
+  color: var(--ui-text-muted);
+}
+
 .cash-error {
-  font-size: 0.9rem;
+  font-size: var(--ui-text-base);
   color: var(--ui-danger);
   margin: 0;
 }
 
 .cash-opening {
-  font-size: 0.9rem;
+  font-size: var(--ui-text-base);
   color: var(--ui-text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -1192,11 +1422,13 @@
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-sm);
   background: var(--ui-surface);
-  font-size: 0.88rem;
+  font-size: var(--ui-text-base);
   font-weight: 600;
   cursor: pointer;
   color: var(--ui-text-muted);
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
 .tpv-tab.active {
@@ -1256,7 +1488,7 @@
 .return-line-info {
   grid-column: 1 / 2;
   grid-row: 2;
-  font-size: 0.85rem;
+  font-size: var(--ui-text-base);
   color: var(--ui-text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -1272,14 +1504,16 @@
 .return-line-controls button {
   width: 28px;
   height: 28px;
-  border-radius: 7px;
+  border-radius: var(--ui-radius-sm);
   border: 1.5px solid var(--ui-border-strong);
   background: var(--ui-surface);
   font-size: 1rem;
   cursor: pointer;
   display: grid;
   place-items: center;
-  transition: border-color 0.1s, color 0.1s;
+  transition:
+    border-color 0.1s,
+    color 0.1s;
 }
 
 .return-line-controls button:hover {
@@ -1304,7 +1538,7 @@
   flex-direction: column;
   gap: 0.35rem;
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: var(--ui-text-base);
 }
 
 .return-reason {
@@ -1316,7 +1550,9 @@
   font-family: inherit;
   resize: vertical;
   outline: none;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 
 .return-reason:focus {
@@ -1325,7 +1561,7 @@
 }
 
 .return-done {
-  font-size: 1.1rem;
+  font-size: var(--ui-text-lg);
 }
 
 .return-done strong {
@@ -1343,12 +1579,12 @@
 }
 
 .ticket-vf-label {
-  font-size: 0.7rem;
+  font-size: var(--ui-text-xs);
   color: var(--ui-text-muted);
 }
 
 .ticket-vf-link {
-  font-size: 0.6rem;
+  font-size: var(--ui-text-2xs);
   word-break: break-all;
   color: var(--ui-brand-ink);
 }
@@ -1363,8 +1599,8 @@
   color: var(--ui-brand-ink);
   font-weight: 600;
   cursor: pointer;
-  font-size: 0.88rem;
-  transition: background 0.12s;
+  font-size: var(--ui-text-base);
+  transition: background var(--ui-motion-fast);
 }
 
 .cart-print:hover {
@@ -1397,7 +1633,7 @@
   flex-direction: column;
   gap: 0.3rem;
   margin-top: 0.7rem;
-  font-size: 0.9rem;
+  font-size: var(--ui-text-base);
   color: var(--ui-text-muted);
 }
 
@@ -1406,7 +1642,9 @@
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-sm);
   outline: none;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 
 .blind-field input:focus {
@@ -1443,7 +1681,7 @@
   text-decoration: underline;
   padding: 0.2rem 0;
   text-align: left;
-  font-size: 0.85rem;
+  font-size: var(--ui-text-base);
   font-weight: 500;
 }
 
@@ -1463,14 +1701,14 @@
 
 .return-view-title {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: var(--ui-text-lg);
   font-weight: 700;
   color: var(--ui-text);
 }
 
 .return-view-sub {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: var(--ui-text-base);
   color: var(--ui-text-muted);
 }
 
@@ -1479,7 +1717,7 @@
   align-items: center;
   gap: 0.2rem;
   padding: 0.25rem;
-  border-radius: 9px;
+  border-radius: var(--ui-radius-sm);
   background: var(--ui-surface-subtle);
   border: 1px solid var(--ui-border);
   width: fit-content;
@@ -1489,9 +1727,9 @@
   height: 32px;
   padding: 0 0.9rem;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--ui-radius-sm);
   background: none;
-  font-size: 0.85rem;
+  font-size: var(--ui-text-base);
   font-weight: 600;
   color: var(--ui-text-muted);
   cursor: pointer;
@@ -1508,7 +1746,7 @@
   gap: 0.5rem;
   height: 46px;
   border: 1px solid var(--ui-border-strong);
-  border-radius: 12px;
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
   padding: 0 0.9rem;
 }
@@ -1524,7 +1762,7 @@
   border: none;
   outline: none;
   background: transparent;
-  font-size: 0.92rem;
+  font-size: var(--ui-text-base);
   color: var(--ui-text);
 }
 
@@ -1536,7 +1774,7 @@
   gap: 0.5rem;
   padding: 3rem 1.5rem;
   border: 1px solid var(--ui-border);
-  border-radius: 14px;
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-sm);
 }
@@ -1562,7 +1800,7 @@
 
 .return-empty-text {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: var(--ui-text-base);
   color: var(--ui-text-muted);
   max-width: 22rem;
 }
@@ -1583,23 +1821,32 @@
 
 .cash-view-title {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: var(--ui-text-lg);
   font-weight: 700;
   color: var(--ui-text);
 }
 
 .cash-view-sub {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: var(--ui-text-base);
   color: var(--ui-text-muted);
 }
 
 .cash-card {
   border: 1px solid var(--ui-border);
-  border-radius: 14px;
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
   padding: 1.3rem 1.4rem;
   box-shadow: var(--ui-shadow-sm);
+}
+
+/* Fichaje: estado a la izquierda, acción alineada a la derecha y centradas
+   verticalmente (en vez de la insignia y el botón pegados). */
+.time-clock-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .cash-card-head {
@@ -1621,10 +1868,10 @@
   gap: 0.4rem;
   height: 26px;
   padding: 0 0.6rem;
-  border-radius: 999px;
+  border-radius: var(--ui-radius-pill);
   background: var(--ui-success-soft);
   color: var(--ui-success);
-  font-size: 0.8rem;
+  font-size: var(--ui-text-sm);
   font-weight: 600;
 }
 
@@ -1643,7 +1890,7 @@
 
 .cash-card-row dt {
   color: var(--ui-text-muted);
-  font-size: 0.92rem;
+  font-size: var(--ui-text-base);
 }
 
 .cash-card-row dd {
@@ -1657,20 +1904,20 @@
   width: 100%;
   height: 46px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--ui-radius-md);
   background: var(--ui-danger);
   color: #fff;
-  font-size: 0.95rem;
+  font-size: var(--ui-text-md);
   font-weight: 700;
   cursor: pointer;
-  transition: filter 0.12s;
+  transition: filter var(--ui-motion-fast);
 }
 
 .cash-card-close:hover {
   filter: brightness(0.94);
 }
 
-/* ─── Vista de Traspasos (tabla, mockup) ───────────────────── */
+/* ─── Vista de Pedidos (tabla, mockup) ───────────────────── */
 .transfer-view {
   max-width: 46rem;
   display: flex;
@@ -1686,14 +1933,14 @@
 
 .transfer-view-title {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: var(--ui-text-lg);
   font-weight: 700;
   color: var(--ui-text);
 }
 
 .transfer-view-sub {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: var(--ui-text-base);
   color: var(--ui-text-muted);
 }
 
@@ -1701,7 +1948,7 @@
   width: 100%;
   border-collapse: collapse;
   border: 1px solid var(--ui-border);
-  border-radius: 12px;
+  border-radius: var(--ui-radius-lg);
   overflow: hidden;
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-sm);
@@ -1709,7 +1956,7 @@
 
 .transfer-table thead th {
   text-align: left;
-  font-size: 0.7rem;
+  font-size: var(--ui-text-xs);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1727,7 +1974,7 @@
 
 .transfer-table tbody td {
   padding: 0.85rem 1rem;
-  font-size: 0.9rem;
+  font-size: var(--ui-text-base);
   color: var(--ui-text);
   border-bottom: 1px solid var(--ui-border);
   vertical-align: middle;
@@ -1747,8 +1994,8 @@
   gap: 0.4rem;
   height: 24px;
   padding: 0 0.6rem;
-  border-radius: 999px;
-  font-size: 0.78rem;
+  border-radius: var(--ui-radius-pill);
+  font-size: var(--ui-text-sm);
   font-weight: 600;
 }
 
@@ -1767,11 +2014,11 @@
   border: none;
   background: none;
   color: var(--ui-text);
-  font-size: 0.88rem;
+  font-size: var(--ui-text-base);
   font-weight: 600;
   cursor: pointer;
   padding: 0.3rem 0.4rem;
-  border-radius: 7px;
+  border-radius: var(--ui-radius-sm);
 }
 
 .transfer-receive-link:hover {
@@ -1782,6 +2029,291 @@
   padding: 2.5rem 1.5rem;
   text-align: center;
   border: 1px solid var(--ui-border);
-  border-radius: 12px;
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
+}
+
+.tickets-view,
+.inventory-view,
+.time-clock-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 62rem;
+}
+
+.tickets-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tickets-head h2 {
+  margin: 0;
+  font-size: var(--ui-text-lg);
+  font-weight: 700;
+}
+
+.tickets-head p {
+  margin: 0.15rem 0 0;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-base);
+}
+
+.tickets-search,
+.inventory-results,
+.ticket-detail-card,
+.inventory-table {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+}
+
+.tickets-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 22rem;
+  padding: 0.55rem 0.75rem;
+}
+
+.tickets-search input,
+.ticket-return textarea,
+.inventory-actions input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+}
+
+.tickets-layout {
+  display: grid;
+  grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.tickets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ticket-row,
+.inventory-results button {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  cursor: pointer;
+}
+
+.ticket-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.ticket-row.active,
+.ticket-row:hover,
+.inventory-results button:hover {
+  background: var(--ui-brand-soft);
+}
+
+.ticket-row span:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.ticket-row small,
+.inventory-row small {
+  color: var(--ui-text-soft);
+  font-size: var(--ui-text-xs);
+}
+
+.ticket-detail-card {
+  padding: 1rem;
+}
+
+.ticket-detail-top,
+.ticket-actions,
+.inventory-actions,
+.cash-movement-form,
+.cash-movement-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ticket-detail-top h3 {
+  margin: 0;
+}
+
+.ticket-detail-top p {
+  margin: 0.1rem 0 0;
+  color: var(--ui-text-muted);
+}
+
+.ticket-detail-lines {
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--ui-border);
+}
+
+.ticket-detail-lines li,
+.ticket-return-line,
+.inventory-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.ticket-return {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--ui-border);
+}
+
+.ticket-return h4 {
+  margin: 0 0 0.75rem;
+}
+
+.ticket-return input,
+.inventory-row input,
+.cash-movement-form input,
+.cash-movement-form select {
+  height: 2.2rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  padding: 0 0.6rem;
+  background: var(--ui-surface);
+}
+.cash-movement-form .ui-select-trigger {
+  height: 2.2rem;
+  border-radius: 8px;
+}
+
+.ticket-return input,
+.inventory-row input {
+  width: 5rem;
+  text-align: center;
+}
+
+.ticket-return textarea {
+  min-height: 4.5rem;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+}
+
+.inventory-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.6rem;
+}
+
+.inventory-results button {
+  padding: 0.45rem 0.7rem;
+}
+
+.inventory-table {
+  padding: 0 1rem;
+}
+
+/* Fila de acción del inventario: el motivo es un campo real que ocupa el ancho
+   disponible y el botón de confirmar se sitúa justo al lado (no en el extremo). */
+.inventory-actions {
+  justify-content: flex-start;
+}
+
+.inventory-actions input {
+  flex: 1;
+  width: auto;
+  height: 36px;
+  padding: 0 0.8rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+
+.inventory-actions input:focus {
+  border-color: var(--ui-brand);
+  box-shadow: var(--ui-focus);
+}
+
+/* Icono decorativo a la derecha de las cabeceras de sección: acento sutil,
+   alineado arriba con la primera línea del título (no centrado en el bloque). */
+.tickets-head {
+  align-items: flex-start;
+}
+
+.tickets-head > svg {
+  color: var(--ui-text-soft);
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+/* Estado vacío del detalle de ticket: placeholder centrado en su columna en
+   lugar de texto huérfano arriba a la izquierda. */
+.ticket-detail .sale-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 9rem;
+  margin: 0;
+  padding: 1.5rem;
+  text-align: center;
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-lg);
+}
+
+.inventory-row > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.inventory-row > div {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.inventory-row button {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+}
+
+.cash-movement-form {
+  align-items: stretch;
+}
+
+.cash-movement-form input {
+  min-width: 0;
+}
+
+.cash-movement-list {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cash-movement-list li {
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--ui-border);
 }

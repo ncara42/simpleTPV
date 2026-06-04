@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { assertStoreAccess } from '../auth/store-access.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
@@ -17,6 +18,10 @@ import type { CreateTransferDto, ReceiveTransferDto } from './transfers.dto.js';
 // (recibido menos de lo enviado), positiva = exceso. Función pura, testeable.
 export function computeDiscrepancy(quantitySent: number, quantityReceived: number): number {
   return Math.round((quantityReceived - quantitySent) * 1000) / 1000;
+}
+
+function includeLinesWithProduct() {
+  return { lines: { include: { product: { select: { name: true, barcode: true } } } } };
 }
 
 @Injectable()
@@ -64,7 +69,7 @@ export class TransfersService {
           })),
         },
       },
-      include: { lines: true },
+      include: includeLinesWithProduct(),
     });
   }
 
@@ -79,7 +84,7 @@ export class TransfersService {
     return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
       const transfer = await tx.transfer.findFirst({
         where: { id, organizationId: tenant.organizationId },
-        include: { lines: true },
+        include: includeLinesWithProduct(),
       });
       if (!transfer) {
         throw new NotFoundException(`Traspaso ${id} no encontrado`);
@@ -115,7 +120,7 @@ export class TransfersService {
 
       return tx.transfer.findFirstOrThrow({
         where: { id, organizationId: tenant.organizationId },
-        include: { lines: true },
+        include: includeLinesWithProduct(),
       });
     });
   }
@@ -126,12 +131,12 @@ export class TransfersService {
    * stock del DESTINO por lo realmente RECIBIDO (movimiento TRANSFER_IN). Marca
    * receivedAt. Transición atómica condicional al estado SENT.
    */
-  async receive(id: string, dto: ReceiveTransferDto, userId: string) {
+  async receive(id: string, dto: ReceiveTransferDto, userId: string, role: string) {
     const tenant = requireTenant();
     return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
       const transfer = await tx.transfer.findFirst({
         where: { id, organizationId: tenant.organizationId },
-        include: { lines: true },
+        include: includeLinesWithProduct(),
       });
       if (!transfer) {
         throw new NotFoundException(`Traspaso ${id} no encontrado`);
@@ -139,6 +144,9 @@ export class TransfersService {
       if (transfer.status !== 'SENT') {
         throw new ConflictException(`El traspaso no está en SENT (estado: ${transfer.status})`);
       }
+      // Aislamiento por tienda (SEC-01): un CLERK solo recibe traspasos en la
+      // tienda de destino si está asignado a ella.
+      await assertStoreAccess(tx, { userId, role, storeId: transfer.destStoreId });
 
       const linesById = new Map(transfer.lines.map((l) => [l.id, l]));
       // Toda línea del dto debe pertenecer al traspaso.
@@ -187,7 +195,7 @@ export class TransfersService {
 
       return tx.transfer.findFirstOrThrow({
         where: { id, organizationId: tenant.organizationId },
-        include: { lines: true },
+        include: includeLinesWithProduct(),
       });
     });
   }
@@ -216,7 +224,7 @@ export class TransfersService {
     }
     return this.prisma.transfer.findFirstOrThrow({
       where: { id, organizationId: tenant.organizationId },
-      include: { lines: true },
+      include: includeLinesWithProduct(),
     });
   }
 
@@ -229,7 +237,7 @@ export class TransfersService {
         ...(status ? { status: status as 'DRAFT' | 'SENT' | 'RECEIVED' | 'CLOSED' } : {}),
       },
       orderBy: { createdAt: 'desc' },
-      include: { lines: true },
+      include: includeLinesWithProduct(),
     });
   }
 
@@ -238,7 +246,7 @@ export class TransfersService {
     const tenant = requireTenant();
     const transfer = await this.prisma.transfer.findFirst({
       where: { id, organizationId: tenant.organizationId },
-      include: { lines: true },
+      include: includeLinesWithProduct(),
     });
     if (!transfer) {
       throw new NotFoundException(`Traspaso ${id} no encontrado`);

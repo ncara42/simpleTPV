@@ -192,7 +192,7 @@ describe('TransfersService.receive', () => {
     const service = withBase(tx, makeStock());
     await expect(
       tenantStorage.run({ organizationId: ORG }, () =>
-        service.receive('t1', { lines: [{ lineId: 'l1', quantityReceived: 30 }] }, 'u'),
+        service.receive('t1', { lines: [{ lineId: 'l1', quantityReceived: 30 }] }, 'u', 'ADMIN'),
       ),
     ).rejects.toThrow(ConflictException);
   });
@@ -202,7 +202,7 @@ describe('TransfersService.receive', () => {
     const service = withBase(tx, makeStock());
     await expect(
       tenantStorage.run({ organizationId: ORG }, () =>
-        service.receive('t1', { lines: [{ lineId: 'ajena', quantityReceived: 30 }] }, 'u'),
+        service.receive('t1', { lines: [{ lineId: 'ajena', quantityReceived: 30 }] }, 'u', 'ADMIN'),
       ),
     ).rejects.toThrow(/no pertenece/);
   });
@@ -213,7 +213,7 @@ describe('TransfersService.receive', () => {
     const service = withBase(tx, stock);
 
     await tenantStorage.run({ organizationId: ORG }, () =>
-      service.receive('t1', { lines: [{ lineId: 'l1', quantityReceived: 28 }] }, 'u'),
+      service.receive('t1', { lines: [{ lineId: 'l1', quantityReceived: 28 }] }, 'u', 'ADMIN'),
     );
 
     // La línea se actualiza con discrepancy -2 (28 - 30).
@@ -238,7 +238,7 @@ describe('TransfersService.receive', () => {
     const stock = makeStock();
     const service = withBase(tx, stock);
     await tenantStorage.run({ organizationId: ORG }, () =>
-      service.receive('t1', { lines: [{ lineId: 'l1', quantityReceived: 0 }] }, 'u'),
+      service.receive('t1', { lines: [{ lineId: 'l1', quantityReceived: 0 }] }, 'u', 'ADMIN'),
     );
     expect(stock.applyMovement).not.toHaveBeenCalled();
   });

@@ -1,26 +1,48 @@
+import { Select } from '@simpletpv/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import { CartPanel } from './CartPanel.js';
 import { CashPanel } from './CashPanel.js';
-import { DEMO_FAMILY_COUNTS, DEMO_TOTAL_COUNT } from './demo/demoData.js';
 import { api } from './lib/auth.js';
+import { beep } from './lib/beep.js';
 import { useCart } from './lib/cart.js';
 import { currentCashSession } from './lib/cash.js';
-import { findByBarcode, listFamilies, type Product, searchProducts } from './lib/catalog.js';
+import {
+  type FamilyNode,
+  findByBarcode,
+  listFamilies,
+  type Product,
+  searchProducts,
+} from './lib/catalog.js';
 import { eur } from './lib/format.js';
 import { useHealthCheck } from './lib/health.js';
 import { listStores } from './lib/sales.js';
-import { getProductStock, getStoreStock, type StockRow } from './lib/stock.js';
-import { useBarcodeScanner } from './lib/useBarcodeScanner.js';
+import { getStoreStock, type StockRow } from './lib/stock.js';
+import { BARCODE_MIN_LENGTH, useBarcodeScanner } from './lib/useBarcodeScanner.js';
 import { useDebounce } from './lib/useDebounce.js';
+import { FamilyChips } from './sale/FamilyChips.js';
+import { ProductGrid } from './sale/ProductGrid.js';
+import { ProductStockModal } from './sale/ProductStockModal.js';
 
 export function SalePage() {
   const [search, setSearch] = useState('');
   const [familyId, setFamilyId] = useState<string | null>(null);
+  // Navegación en dos pasos: si está dentro de una familia con subfamilias,
+  // `parentFamily` es esa familia y los chips muestran sus subfamilias.
+  const [parentFamily, setParentFamily] = useState<FamilyNode | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [scanned, setScanned] = useState<{ product: Product | null; code: string } | null>(null);
   const [stockDetail, setStockDetail] = useState<Product | null>(null);
+  const [saleNotice, setSaleNotice] = useState<{ ticketNumber: string; total: string } | null>(
+    null,
+  );
   const debouncedSearch = useDebounce(search, 200);
   const qc = useQueryClient();
 
@@ -94,13 +116,39 @@ export function SalePage() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // Escáner USB: al leer un código, busca el producto, lo destaca y lo añade al carrito.
+  // Resuelve un código escaneado: destaca el resultado, añade al carrito si hay
+  // producto y emite un beep (ok/error). Lo comparten el escáner USB (listener
+  // global) y el Enter del buscador.
+  function onScanResolved(product: Product | null, code: string): void {
+    setScanned({ product, code });
+    if (product) addToCart(product);
+    beep(product ? 'ok' : 'error');
+  }
+
+  // Escáner USB físico: solo actúa cuando el foco NO está en un campo editable.
+  // Con el buscador enfocado (por defecto), lo gestiona onSearchKeyDown.
   useBarcodeScanner((code) => {
-    void findByBarcode(code).then((product) => {
-      setScanned({ product, code });
-      if (product) addToCart(product);
-    });
+    void findByBarcode(code).then((product) => onScanResolved(product, code));
   });
+
+  // Enter en el buscador: intenta resolver el texto como código de barras. Si hay
+  // producto, lo añade y limpia el campo (campo único dual: código + texto). Si no
+  // hay producto y parece un código (solo dígitos), avisa; un término de texto
+  // normal no dispara aviso (la búsqueda ya filtra el grid).
+  function onSearchKeyDown(e: ReactKeyboardEvent<HTMLInputElement>): void {
+    if (e.key !== 'Enter') return;
+    const code = search.trim();
+    if (code.length < BARCODE_MIN_LENGTH) return;
+    e.preventDefault();
+    void findByBarcode(code).then((product) => {
+      if (product) {
+        onScanResolved(product, code);
+        setSearch('');
+      } else if (/^\d+$/.test(code)) {
+        onScanResolved(null, code);
+      }
+    });
+  }
 
   return (
     <div className="sale-layout">
@@ -109,17 +157,16 @@ export function SalePage() {
           <div className="sale-store-row">
             <label>
               Tienda:{' '}
-              <select
+              <Select
                 value={activeStore ?? ''}
-                onChange={(e) => setStoreId(e.target.value)}
+                onChange={setStoreId}
+                options={stores.map((s) => ({
+                  value: s.id,
+                  label: `${s.code} · ${s.name}`,
+                }))}
+                ariaLabel="Tienda"
                 data-testid="store-select"
-              >
-                {stores.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.code} · {s.name}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
           </div>
         )}
@@ -130,6 +177,24 @@ export function SalePage() {
               <strong>Conexión con el servidor degradada.</strong> El cobro está bloqueado hasta
               recuperar la conexión.
             </span>
+          </div>
+        )}
+
+        {saleNotice && (
+          <div className="sale-success-banner" data-testid="sale-success-banner">
+            <span className="sale-success-mark">✓</span>
+            <span>
+              Venta registrada correctamente · <strong>{saleNotice.ticketNumber}</strong> ·{' '}
+              {eur(Number(saleNotice.total))} €
+            </span>
+            <button
+              type="button"
+              className="sale-success-close"
+              onClick={() => setSaleNotice(null)}
+              aria-label="Cerrar confirmación"
+            >
+              ×
+            </button>
           </div>
         )}
 
@@ -157,6 +222,7 @@ export function SalePage() {
               placeholder="Buscar producto por nombre o SKU…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={onSearchKeyDown}
               data-testid="sale-search"
               autoFocus
             />
@@ -186,26 +252,13 @@ export function SalePage() {
           </div>
         </div>
 
-        <div className="sale-families" data-testid="sale-families">
-          <button
-            className={`fam-chip ${familyId === null ? 'active' : ''}`}
-            onClick={() => setFamilyId(null)}
-            data-testid="fam-chip-all"
-          >
-            Todas <span className="chip-count">{DEMO_TOTAL_COUNT}</span>
-          </button>
-          {families.map((f) => (
-            <button
-              key={f.id}
-              className={`fam-chip ${familyId === f.id ? 'active' : ''}`}
-              onClick={() => setFamilyId(f.id)}
-              data-testid="fam-chip"
-            >
-              <span className="chip-dot" style={{ background: f.color ?? 'var(--ui-text-soft)' }} />
-              {f.name} <span className="chip-count">{DEMO_FAMILY_COUNTS[f.id] ?? 0}</span>
-            </button>
-          ))}
-        </div>
+        <FamilyChips
+          families={families}
+          familyId={familyId}
+          parentFamily={parentFamily}
+          setFamilyId={setFamilyId}
+          setParentFamily={setParentFamily}
+        />
 
         {scanned && (
           <div className="scan-banner" data-testid="scan-banner" onClick={() => setScanned(null)}>
@@ -225,102 +278,23 @@ export function SalePage() {
           </div>
         )}
 
-        {isLoading ? (
-          <p className="sale-empty">Cargando…</p>
-        ) : products.length === 0 ? (
-          <p className="sale-empty" data-testid="sale-empty">
-            Sin resultados.
-          </p>
-        ) : (
-          <div className="sale-grid" data-testid="sale-grid">
-            {products.map((p: Product) => {
-              const stock = stockByProduct.get(p.id);
-              return (
-                <button
-                  key={p.id}
-                  className="prod-card"
-                  data-testid="prod-card"
-                  onClick={() => addToCart(p)}
-                >
-                  <span className="prod-name">{p.name}</span>
-                  <span className="prod-meta">
-                    <span className="prod-price">{eur(Number(p.salePrice))} €</span>
-                    {/* Stock vivo (#34): cantidad + semáforo. Click abre el detalle
-                        sin añadir al carrito (stopPropagation). */}
-                    {stock ? (
-                      stock.quantity === 0 ? (
-                        <span className="prod-stock sold-out" data-testid="prod-stock">
-                          Agotado
-                        </span>
-                      ) : (
-                        <span
-                          className={`prod-stock stock-${stock.level}`}
-                          data-testid="prod-stock"
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setStockDetail(p);
-                          }}
-                          title="Ver stock por tienda"
-                        >
-                          {stock.quantity}
-                        </span>
-                      )
-                    ) : (
-                      <span className="prod-stock neutral" data-testid="prod-stock">
-                        —
-                      </span>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
+        <ProductGrid
+          isLoading={isLoading}
+          products={products}
+          stockByProduct={stockByProduct}
+          onAdd={addToCart}
+          onShowStock={setStockDetail}
+        />
       </div>
-      <CartPanel storeId={activeStore} cashOpen={cashOpen} apiHealthy={apiHealthy} />
+      <CartPanel
+        storeId={activeStore}
+        cashOpen={cashOpen}
+        apiHealthy={apiHealthy}
+        onSaleConfirmed={setSaleNotice}
+      />
       {stockDetail && (
         <ProductStockModal product={stockDetail} onClose={() => setStockDetail(null)} />
       )}
-    </div>
-  );
-}
-
-// Modal de consulta de stock de un producto en todas las tiendas (#34). Se abre
-// desde la tarjeta de producto sin salir de la venta.
-function ProductStockModal({ product, onClose }: { product: Product; onClose: () => void }) {
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ['product-stock', product.id],
-    queryFn: () => getProductStock(product.id),
-  });
-
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="product-stock-modal">
-        <h3>Stock · {product.name}</h3>
-        {isLoading ? (
-          <p className="sale-empty">Cargando…</p>
-        ) : rows.length === 0 ? (
-          <p className="sale-empty" data-testid="product-stock-empty">
-            Sin stock registrado.
-          </p>
-        ) : (
-          <ul className="prod-stock-list">
-            {rows.map((r) => (
-              <li key={r.storeId} data-testid="product-stock-row">
-                <span className={`stock-dot stock-${r.level}`} /> {r.storeName}:{' '}
-                <strong>{r.quantity}</strong> <span className="muted">(mín {r.minStock})</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="modal-foot">
-          <button type="button" onClick={onClose} data-testid="product-stock-close">
-            Cerrar
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

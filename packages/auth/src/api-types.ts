@@ -129,6 +129,14 @@ export interface SalesPage {
   totals: { count: number; totalAmount: string };
 }
 
+export interface SalesQueryInput {
+  storeId?: string;
+  date?: string;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}
+
 // Ticket-resumen para impresión que devuelve GET /sales/:id/ticket.
 // Los Decimal de Prisma viajan como string sobre HTTP, igual que en Sale/SaleLine.
 export interface TicketLine {
@@ -136,6 +144,7 @@ export interface TicketLine {
   qty: string;
   unitPrice: string;
   discountPct: string;
+  discountAmt: string;
   lineTotal: string;
 }
 
@@ -162,7 +171,7 @@ export interface SaleTicket {
 
 export interface CreateSaleInput {
   storeId: string;
-  lines: Array<{ productId: string; qty: number; discountPct?: number }>;
+  lines: Array<{ productId: string; qty: number; discountPct?: number; discountAmt?: number }>;
   paymentMethod: 'CASH' | 'CARD';
   cashGiven?: number;
   ticketDiscountPct?: number;
@@ -185,6 +194,25 @@ export interface CashSession {
   status: CashSessionStatus;
   openedAt: string;
   closedAt: string | null;
+}
+
+export type CashMovementType = 'IN' | 'OUT';
+
+export interface CashMovement {
+  id: string;
+  cashSessionId: string;
+  storeId: string;
+  userId: string;
+  type: CashMovementType;
+  amount: string;
+  reason: string;
+  createdAt: string;
+}
+
+export interface CreateCashMovementInput {
+  type: CashMovementType;
+  amount: number;
+  reason: string;
 }
 
 export interface OpenCashSessionInput {
@@ -303,6 +331,17 @@ export interface AdjustStockInput {
   reason: string;
 }
 
+export interface InventoryCountLine {
+  productId: string;
+  countedQuantity: number;
+}
+
+export interface ConfirmInventoryCountInput {
+  storeId: string;
+  reason: string;
+  lines: InventoryCountLine[];
+}
+
 export interface StockMovement {
   id: string;
   productId: string;
@@ -322,42 +361,92 @@ export interface StockMovementsPage {
   totalItems: number;
 }
 
-// Traspasos central→tienda (semana 3).
-export type TransferStatus = 'DRAFT' | 'SENT' | 'RECEIVED' | 'CLOSED';
+// Pedidos internos central→tienda. El backend mantiene compatibilidad legacy
+// con "transfers", pero el dominio público del TPV es StoreOrder.
+export type StoreOrderStatus = 'DRAFT' | 'SENT' | 'RECEIVED' | 'CLOSED';
 
-export interface TransferLine {
+export interface StoreOrderLine {
   id: string;
-  transferId: string;
+  storeOrderId: string;
   productId: string;
+  productName?: string;
+  barcode?: string | null;
   quantitySent: string;
   quantityReceived: string | null;
   discrepancy: string | null;
   discrepancyNote: string | null;
 }
 
-export interface Transfer {
+export interface StoreOrder {
   id: string;
   originStoreId: string;
   destStoreId: string;
-  status: TransferStatus;
+  status: StoreOrderStatus;
   notes: string | null;
   createdBy: string;
   createdAt: string;
   sentAt: string | null;
   receivedAt: string | null;
   closedAt: string | null;
-  lines: TransferLine[];
+  lines: StoreOrderLine[];
 }
 
-export interface CreateTransferInput {
+export interface CreateStoreOrderInput {
   originStoreId: string;
   destStoreId: string;
   notes?: string;
   lines: Array<{ productId: string; quantitySent: number }>;
 }
 
-export interface ReceiveTransferInput {
+export interface ReceiveStoreOrderInput {
   lines: Array<{ lineId: string; quantityReceived: number; discrepancyNote?: string }>;
+}
+
+export type TransferStatus = StoreOrderStatus;
+export type TransferLine = Omit<StoreOrderLine, 'storeOrderId'> & { transferId: string };
+export type Transfer = Omit<StoreOrder, 'lines'> & { lines: TransferLine[] };
+export type CreateTransferInput = CreateStoreOrderInput;
+export type ReceiveTransferInput = ReceiveStoreOrderInput;
+
+export interface OfficialDeviceStatus {
+  authorized: boolean;
+  device: {
+    id: string;
+    storeId: string;
+    name: string;
+    pairedAt: string | null;
+    lastSeenAt: string | null;
+  } | null;
+}
+
+export interface OfficialDevice {
+  id: string;
+  storeId: string;
+  name: string;
+  pairingToken: string;
+  authorized: boolean;
+  pairedAt: string | null;
+  lastSeenAt: string | null;
+}
+
+export interface CreateOfficialDeviceInput {
+  storeId: string;
+  name: string;
+}
+
+export interface PairDeviceInput {
+  pairingToken: string;
+}
+
+export type TimeClockType = 'CLOCK_IN' | 'CLOCK_OUT';
+
+export interface TimeClockEntry {
+  id: string;
+  storeId: string;
+  userId: string;
+  deviceId: string | null;
+  type: TimeClockType;
+  createdAt: string;
 }
 
 // Evento del canal SSE GET /events (semana 3). El cliente filtra por `type`.

@@ -1,17 +1,54 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
-import { createStore, deleteStore, listStores } from './lib/admin.js';
+import {
+  DEMO_STORE_OPS,
+  DEMO_STORE_SALES,
+  type StoreOps,
+  type StoreSalesPeriod,
+} from './demo/demoData.js';
+import { createStore, deleteStore, listStores, type Store } from './lib/admin.js';
+import { StoreCard } from './stores/StoreCard.js';
+import { StoreDetailModal } from './stores/StoreDetailModal.js';
+import { type StoreForm, StoreFormModal } from './stores/StoreFormModal.js';
 
-interface StoreForm {
-  name: string;
-  code: string;
-  address: string;
+type StatusFilter = 'all' | 'activa' | 'dormida';
+
+const PERIODS: { id: StoreSalesPeriod; label: string }[] = [
+  { id: 'today', label: 'Hoy' },
+  { id: 'week', label: '7 días' },
+  { id: 'month', label: 'Mes' },
+];
+
+const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
+  { id: 'all', label: 'Todas' },
+  { id: 'activa', label: 'Activas' },
+  { id: 'dormida', label: 'Dormidas' },
+];
+
+// Etiqueta de la cifra de ventas en lenguaje natural (la card es para no técnicos).
+const SALES_LABEL: Record<StoreSalesPeriod, string> = {
+  today: 'Ventas de hoy',
+  week: 'Ventas · últimos 7 días',
+  month: 'Ventas de este mes',
+};
+
+function salesOf(storeId: string, period: StoreSalesPeriod): number {
+  return DEMO_STORE_SALES[storeId]?.[period] ?? 0;
 }
 
 export function StoresPage() {
   const qc = useQueryClient();
-  const [form, setForm] = useState<StoreForm | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [period, setPeriod] = useState<StoreSalesPeriod>('today');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  // Override local del estado activa/dormida (demo: no hay backend que persista).
+  const [activeOverrides, setActiveOverrides] = useState<Record<string, boolean>>({});
+  // Estado operativo (fichaje) y dispositivo por tienda; editable en local (demo).
+  const [ops, setOps] = useState<Record<string, StoreOps>>(() =>
+    Object.fromEntries(Object.entries(DEMO_STORE_OPS).map(([k, v]) => [k, { ...v }])),
+  );
+  const [detail, setDetail] = useState<Store | null>(null);
 
   const { data: stores = [], isLoading } = useQuery({
     queryKey: ['stores'],
@@ -27,13 +64,33 @@ export function StoresPage() {
           : { name: s.name, code: s.code },
       ),
     onSuccess: () => {
-      setForm(null);
+      setCreating(false);
       invalidate();
     },
   });
   // La eliminación se conserva en lib (deleteStore) para el futuro; el mockup de
   // Tiendas no muestra el botón Borrar en las cards.
   void deleteStore;
+
+  const isActive = (s: Store): boolean => activeOverrides[s.id] ?? s.active;
+  const toggleActive = (s: Store): void =>
+    setActiveOverrides((prev) => ({ ...prev, [s.id]: !(prev[s.id] ?? s.active) }));
+
+  const opsOf = (id: string): StoreOps | undefined => ops[id];
+  const patchOps = (id: string, patch: Partial<StoreOps>): void =>
+    setOps((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
+
+  // Orden por ventas del periodo (desc) + filtro por estado administrativo (#101, #103).
+  const visibleStores = useMemo(() => {
+    return [...stores]
+      .filter((s) => {
+        const active = activeOverrides[s.id] ?? s.active;
+        if (statusFilter === 'activa') return active;
+        if (statusFilter === 'dormida') return !active;
+        return true;
+      })
+      .sort((a, b) => salesOf(b.id, period) - salesOf(a.id, period));
+  }, [stores, statusFilter, period, activeOverrides]);
 
   return (
     <section className="catalog">
@@ -42,14 +99,45 @@ export function StoresPage() {
           <h2>Tiendas</h2>
           <p className="catalog-sub">{stores.length} ubicaciones</p>
         </div>
-        <button
-          className="btn-primary"
-          onClick={() => setForm({ name: '', code: '', address: '' })}
-          data-testid="new-store"
-        >
-          Nueva tienda
-        </button>
       </header>
+
+      <div className="stores-toolbar">
+        <div className="bo-tabs" role="tablist" aria-label="Filtrar por estado">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              className={`bo-tab ${statusFilter === f.id ? 'active' : ''}`}
+              onClick={() => setStatusFilter(f.id)}
+              data-testid={`store-filter-${f.id}`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="stores-period">
+          <div className="bo-tabs" role="tablist" aria-label="Ordenar por ventas del periodo">
+            {PERIODS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`bo-tab ${period === p.id ? 'active' : ''}`}
+                onClick={() => setPeriod(p.id)}
+                data-testid={`store-period-${p.id}`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <button
+            className="btn-primary stock-tabs-action"
+            onClick={() => setCreating(true)}
+            data-testid="new-store"
+          >
+            Nueva tienda
+          </button>
+        </div>
+      </div>
 
       {isLoading ? (
         <p className="catalog-empty">Cargando…</p>
@@ -57,91 +145,42 @@ export function StoresPage() {
         <p className="catalog-empty" data-testid="stores-empty">
           Sin tiendas. Crea la primera.
         </p>
+      ) : visibleStores.length === 0 ? (
+        <p className="catalog-empty" data-testid="stores-filter-empty">
+          Ninguna tienda con ese estado.
+        </p>
       ) : (
         <div className="store-grid" data-testid="stores-grid">
-          {stores.map((s) => (
-            <div className="store-card" key={s.id} data-testid="store-card">
-              <span className="store-card-icon" aria-hidden="true">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M3 9l1-5h16l1 5" />
-                  <path d="M4 9v11h16V9" />
-                  <path d="M9 20v-6h6v6" />
-                </svg>
-              </span>
-              <span className="store-card-text">
-                <span className="store-card-name">{s.name}</span>
-                <span className="store-card-addr">{s.address ?? '—'}</span>
-              </span>
-              <span className={`store-badge ${s.active ? 'active' : 'muted'}`}>
-                {s.active ? 'Activa' : 'Almacén'}
-              </span>
-            </div>
+          {visibleStores.map((s) => (
+            <StoreCard
+              key={s.id}
+              store={s}
+              active={isActive(s)}
+              sales={salesOf(s.id, period)}
+              periodLabel={SALES_LABEL[period]}
+              onSelect={() => setDetail(s)}
+              onToggleActive={() => toggleActive(s)}
+            />
           ))}
         </div>
       )}
 
-      {form && (
-        <div className="modal-backdrop" onClick={() => setForm(null)}>
-          <form
-            className="modal"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={(e) => {
-              e.preventDefault();
-              createMut.mutate(form);
-            }}
-            data-testid="store-form"
-          >
-            <h3>Nueva tienda</h3>
-            <label>
-              Nombre
-              <input
-                required
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                data-testid="store-name"
-              />
-            </label>
-            <label>
-              Código (p.ej. &quot;01&quot;)
-              <input
-                required
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value })}
-                data-testid="store-code"
-              />
-            </label>
-            <label>
-              Dirección
-              <input
-                value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
-              />
-            </label>
-            {createMut.isError && <p className="form-error">No se pudo crear.</p>}
-            <div className="modal-foot">
-              <button type="button" onClick={() => setForm(null)}>
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={createMut.isPending || !form.name.trim() || !form.code.trim()}
-                data-testid="store-save"
-              >
-                {createMut.isPending ? 'Guardando…' : 'Crear'}
-              </button>
-            </div>
-          </form>
-        </div>
+      {creating && (
+        <StoreFormModal
+          onClose={() => setCreating(false)}
+          onSubmit={(f) => createMut.mutate(f)}
+          pending={createMut.isPending}
+          error={createMut.isError}
+        />
+      )}
+
+      {detail && (
+        <StoreDetailModal
+          store={detail}
+          ops={opsOf(detail.id)}
+          onPatchOps={(patch) => patchOps(detail.id, patch)}
+          onClose={() => setDetail(null)}
+        />
       )}
     </section>
   );

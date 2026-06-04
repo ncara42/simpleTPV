@@ -1,16 +1,46 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 
-import { StarField } from './StarField.js';
-
 export interface LoginFormProps {
   onSubmit: (email: string, password: string) => Promise<void>;
-  title?: string;
-  subtitle?: string;
 }
 
-export function LoginForm({ onSubmit, title = 'simpleTPV', subtitle }: LoginFormProps) {
+function EyeReveal({ open }: { open: boolean }) {
+  return (
+    <svg
+      key={String(open)}
+      className={`eye-icon${open ? ' eye-icon--open' : ' eye-icon--closed'}`}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <g className="eye-lids">
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+        <circle className="eye-pupil" cx="12" cy="12" r="3" />
+        <circle
+          className="eye-glint"
+          cx="13.4"
+          cy="10.6"
+          r="0.75"
+          fill="currentColor"
+          stroke="none"
+        />
+      </g>
+      <line className="eye-slash" x1="2" y1="2" x2="22" y2="22" />
+    </svg>
+  );
+}
+
+export function LoginForm({ onSubmit }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const mountedRef = useRef(true);
@@ -37,97 +67,175 @@ export function LoginForm({ onSubmit, title = 'simpleTPV', subtitle }: LoginForm
 
   return (
     <div className="login-shell">
-      {/* Panel izquierdo — rejilla animada */}
-      <div className="login-left">
-        <div className="login-left-glow" />
-        <StarField />
-      </div>
+      {/* Panel izquierdo — marca */}
+      <aside className="login-brand">
+        <div className="login-brand-glow" aria-hidden="true" />
+        <div className="login-brand-grid" aria-hidden="true" />
+
+        {/* Constelación de líneas que derivan solas */}
+        <svg
+          className="login-brand-net"
+          viewBox="0 0 600 800"
+          preserveAspectRatio="xMidYMid slice"
+          aria-hidden="true"
+        >
+          <g className="login-brand-net-drift">
+            <polyline
+              className="login-brand-net-line"
+              points="80,120 240,80 420,160 520,300 360,360 180,300 80,120"
+            />
+            <polyline
+              className="login-brand-net-line login-brand-net-line--slow"
+              points="180,300 360,360 300,520 90,460 180,300"
+            />
+            <polyline
+              className="login-brand-net-line login-brand-net-line--fast"
+              points="360,360 520,300 480,540 300,520 360,360"
+            />
+            <polyline
+              className="login-brand-net-line login-brand-net-line--slow"
+              points="300,520 480,540 440,700 220,680 90,460 300,520"
+            />
+            <g className="login-brand-net-nodes">
+              <circle cx="80" cy="120" r="2.5" />
+              <circle cx="240" cy="80" r="2.5" />
+              <circle cx="420" cy="160" r="2.5" />
+              <circle cx="520" cy="300" r="2.5" />
+              <circle cx="360" cy="360" r="3" />
+              <circle cx="180" cy="300" r="2.5" />
+              <circle cx="90" cy="460" r="2.5" />
+              <circle cx="300" cy="520" r="3" />
+              <circle cx="480" cy="540" r="2.5" />
+              <circle cx="220" cy="680" r="2.5" />
+              <circle cx="440" cy="700" r="2.5" />
+            </g>
+          </g>
+        </svg>
+
+        {/* Haces de luz que barren el panel */}
+        <div className="login-brand-beam login-brand-beam--a" aria-hidden="true" />
+        <div className="login-brand-beam login-brand-beam--b" aria-hidden="true" />
+
+        {/* Geometrías que flotan y rotan */}
+        <span className="login-brand-shape login-brand-shape--ring" aria-hidden="true" />
+        <span className="login-brand-shape login-brand-shape--tri" aria-hidden="true" />
+        <span className="login-brand-shape login-brand-shape--square" aria-hidden="true" />
+
+        <div className="login-brand-orb" aria-hidden="true" />
+
+        <div className="login-brand-logo">
+          <span className="login-brand-name">qrush</span>
+          <span className="login-brand-suffix">retail</span>
+        </div>
+
+        <div className="login-brand-copy">
+          <span className="login-brand-eyebrow">Plataforma de gestión</span>
+          <h2 className="login-brand-title">
+            Todo tu retail,
+            <br />
+            en un solo lugar.
+          </h2>
+          <p className="login-brand-text">
+            Ventas, inventario, equipo y analítica, sincronizados en tiempo real entre todas tus
+            tiendas.
+          </p>
+        </div>
+      </aside>
 
       {/* Panel derecho — formulario */}
-      <div className="login-right">
-        <div className="login-right-vignette" />
-        <div className="login-form-wrap">
-          <form onSubmit={handleSubmit} className="login-form" noValidate data-testid="login-card">
-            <div className="login-heading">
-              <h1 className="login-title">{title}</h1>
-              {subtitle && <p className="login-subtitle">{subtitle}</p>}
-            </div>
+      <main className="login-panel">
+        <form onSubmit={handleSubmit} className="login-form" noValidate data-testid="login-card">
+          <div className="login-heading">
+            <h1 className="login-title">Bienvenido de nuevo</h1>
+            <p className="login-subtitle">Tu negocio al completo, desde aquí.</p>
+          </div>
 
-            <div className="login-fields">
-              <label className="login-field">
-                <span className="login-label">Correo electrónico</span>
-                <input
-                  type="email"
-                  autoComplete="username"
-                  required
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setError(null);
-                  }}
-                  className={`login-input${error ? ' login-input--error' : ''}`}
-                  placeholder="tu@correo.com"
-                  data-testid="login-email"
-                  disabled={loading}
-                />
-              </label>
+          <label className="login-field">
+            <span className="login-label">Usuario</span>
+            <input
+              type="text"
+              autoComplete="username"
+              required
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError(null);
+              }}
+              className={`login-input${error ? ' login-input--error' : ''}`}
+              data-testid="login-email"
+              disabled={loading}
+            />
+          </label>
 
-              <label className="login-field">
-                <span className="login-label">Contraseña</span>
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setError(null);
-                  }}
-                  className="login-input"
-                  placeholder="••••••••"
-                  data-testid="login-password"
-                  disabled={loading}
-                />
-              </label>
-            </div>
-
-            {error && (
-              <p className="login-error" role="alert" data-testid="login-error">
-                {error}
-              </p>
-            )}
-
-            <div className="login-actions">
-              <button
-                type="submit"
+          <label className="login-field">
+            <span className="login-label">Contraseña</span>
+            <div className="login-input-wrap">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError(null);
+                }}
+                className={`login-input login-input--password${error ? ' login-input--error' : ''}`}
+                data-testid="login-password"
                 disabled={loading}
-                className="login-submit"
-                data-testid="login-submit"
+              />
+              <button
+                type="button"
+                className="login-reveal"
+                onClick={() => setShowPassword((v) => !v)}
+                tabIndex={-1}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
-                {loading ? (
-                  <>
-                    <span className="login-spinner" aria-hidden="true" />
-                    <span
-                      style={{
-                        position: 'absolute',
-                        width: '1px',
-                        height: '1px',
-                        overflow: 'hidden',
-                        clip: 'rect(0,0,0,0)',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      Entrando…
-                    </span>
-                  </>
-                ) : (
-                  'Entrar'
-                )}
+                <EyeReveal open={showPassword} />
               </button>
             </div>
-          </form>
-        </div>
-      </div>
+          </label>
+
+          {error && (
+            <p className="login-error" role="alert" data-testid="login-error">
+              {error}
+            </p>
+          )}
+
+          <div className="login-options">
+            <label className="login-remember">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
+              <span>Recordar sesión</span>
+            </label>
+            <a className="login-forgot" href="#">
+              ¿Olvidaste tu contraseña?
+            </a>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="login-submit"
+            data-testid="login-submit"
+          >
+            {loading ? (
+              <>
+                <span className="login-spinner" aria-hidden="true" />
+                <span className="login-sr-only">Iniciando sesión…</span>
+              </>
+            ) : (
+              'Iniciar sesión'
+            )}
+          </button>
+
+          <p className="login-footnote">
+            ¿Problemas para acceder? <span>Contacta con tu administrador</span>
+          </p>
+        </form>
+      </main>
     </div>
   );
 }

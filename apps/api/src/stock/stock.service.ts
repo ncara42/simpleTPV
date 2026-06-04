@@ -1,55 +1,24 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { AlertType, MovementType } from '@simpletpv/db';
 
+import { assertStoreAccess } from '../auth/store-access.js';
 import { CACHE, type Cache } from '../cache/cache.interface.js';
 import { EVENT_BUS, type EventBus } from '../events/event-bus.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import { type AfterCommit, withTenantTx } from '../prisma/with-tenant-tx.js';
+import {
+  ALERT_URGENCY,
+  alertTypeFor,
+  stockCacheKey,
+  type StockLevel,
+  stockLevel,
+} from './stock.domain.js';
 
-// Clave de cache del stock de un par producto+tienda dentro de un tenant.
-export function stockCacheKey(organizationId: string, storeId: string, productId: string): string {
-  return `stock:${organizationId}:${storeId}:${productId}`;
-}
-
-// Nivel de stock tipo semáforo, derivado de quantity vs minStock:
-//   - red:    sin stock (quantity <= 0).
-//   - yellow: en/por debajo del mínimo (0 < quantity <= minStock).
-//   - green:  por encima del mínimo (quantity > minStock).
-// Función pura, testeable. minStock 0 → solo red (<=0) o green (>0).
-export type StockLevel = 'red' | 'yellow' | 'green';
-
-export function stockLevel(quantity: number, minStock: number): StockLevel {
-  if (quantity <= 0) {
-    return 'red';
-  }
-  if (quantity <= minStock) {
-    return 'yellow';
-  }
-  return 'green';
-}
-
-// Tipo de alerta que CORRESPONDE a un nivel de stock, o null si no hay alerta:
-//   - OUT_OF_STOCK si quantity <= 0 (agotado).
-//   - LOW_STOCK    si 0 < quantity <= minStock (bajo mínimo).
-//   - null         si quantity > minStock (sin alerta).
-// Función pura, testeable. Espeja stockLevel: red→OUT_OF_STOCK, yellow→LOW_STOCK.
-export function alertTypeFor(quantity: number, minStock: number): AlertType | null {
-  if (quantity <= 0) {
-    return 'OUT_OF_STOCK';
-  }
-  if (quantity <= minStock) {
-    return 'LOW_STOCK';
-  }
-  return null;
-}
-
-// Orden de urgencia para listar alertas: OUT_OF_STOCK antes que LOW_STOCK.
-export const ALERT_URGENCY: Record<AlertType, number> = {
-  OUT_OF_STOCK: 0,
-  LOW_STOCK: 1,
-};
+// Tope del tamaño de página de GET /stock/movements (SEC-09): el cliente controla
+// pageSize, así que lo acotamos para no materializar todo el historial del tenant.
+const MAX_MOVEMENTS_PAGE_SIZE = 100;
 
 // Cliente transaccional de Prisma (lo que recibe el callback de $transaction),
 // idéntico al tipo usado en with-tenant-tx. applyMovement opera SIEMPRE sobre un
@@ -213,8 +182,10 @@ export class StockService {
    * Postgres (un único query con join al producto): la lista necesita
    * minStock/nombre que el cache puntual no guarda.
    */
-  async byStore(storeId: string) {
+  async byStore(storeId: string, userId: string, role: string) {
     const tenant = requireTenant();
+    // Aislamiento por tienda (SEC-01): un CLERK solo ve stock de sus tiendas.
+    await assertStoreAccess(this.prisma, { userId, role, storeId });
     const rows = await this.prisma.stock.findMany({
       where: { storeId, organizationId: tenant.organizationId },
       include: { product: { select: { name: true } } },
@@ -238,8 +209,9 @@ export class StockService {
    * Productos "para pedir" de una tienda (#45): los que están por debajo o en el
    * mínimo (nivel amarillo/rojo). Atajo sobre byStore para la vista de reposición.
    */
-  async toReorder(storeId: string) {
-    const rows = await this.byStore(storeId);
+  async toReorder(storeId: string, userId: string, role: string) {
+    // byStore aplica la comprobación de acceso por tienda (SEC-01).
+    const rows = await this.byStore(storeId, userId, role);
     return rows.filter((r) => r.level !== 'green');
   }
 
@@ -488,6 +460,29 @@ export class StockService {
     });
   }
 
+  async confirmInventoryCount(
+    input: {
+      storeId: string;
+      reason: string;
+      lines: Array<{ productId: string; countedQuantity: number }>;
+    },
+    userId: string,
+  ) {
+    const results = [];
+    for (const line of input.lines) {
+      results.push(
+        await this.adjust({
+          productId: line.productId,
+          storeId: input.storeId,
+          newQuantity: line.countedQuantity,
+          reason: input.reason,
+          userId,
+        }),
+      );
+    }
+    return { storeId: input.storeId, adjusted: results };
+  }
+
   /**
    * Historial de movimientos de stock del tenant (#32), filtrable por producto,
    * tienda y rango de fechas, paginado. Orden por createdAt descendente (lo más
@@ -510,6 +505,14 @@ export class StockService {
     pageSize?: number;
   }) {
     const tenant = requireTenant();
+    // Cota defensiva del tamaño de página (SEC-09): pageSize lo controla el cliente
+    // (GET /stock/movements?pageSize=...); sin tope, un valor enorme materializaría
+    // todo el historial de movimientos del tenant. Saneamos page/pageSize ante
+    // valores no finitos, negativos o desproporcionados.
+    const safePageSize = Number.isFinite(pageSize)
+      ? Math.min(Math.max(1, Math.floor(pageSize)), MAX_MOVEMENTS_PAGE_SIZE)
+      : 50;
+    const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
     const createdAt =
       from || to ? { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } : undefined;
     const where = {
@@ -523,12 +526,12 @@ export class StockService {
       this.prisma.stockMovement.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        skip: (safePage - 1) * safePageSize,
+        take: safePageSize,
       }),
       this.prisma.stockMovement.count({ where }),
     ]);
 
-    return { items, page, pageSize, totalItems };
+    return { items, page: safePage, pageSize: safePageSize, totalItems };
   }
 }

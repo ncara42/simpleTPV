@@ -2,7 +2,8 @@ import { BadRequestException, ConflictException, NotFoundException } from '@nest
 import { describe, expect, it, vi } from 'vitest';
 
 import { tenantStorage } from '../prisma/tenant-context.js';
-import { fillRate, leadTimeDays, PurchasesService, suggestQuantity } from './purchases.service.js';
+import { fillRate, leadTimeDays, suggestQuantity } from './purchases.domain.js';
+import { PurchasesService } from './purchases.service.js';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const SUP = '22222222-2222-2222-2222-222222222222';

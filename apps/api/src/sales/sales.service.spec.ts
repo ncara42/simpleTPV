@@ -12,8 +12,8 @@ import {
   computeTotals,
   dayRange,
   formatTicket,
-  SalesService,
-} from './sales.service.js';
+} from './sales.domain.js';
+import { SalesService } from './sales.service.js';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 
@@ -68,6 +68,27 @@ describe('computeTotals', () => {
     expect(result.subtotal).toBeCloseTo(18, 2);
     expect(result.discountTotal).toBeCloseTo(2, 2);
     expect(result.total).toBeCloseTo(18, 2);
+  });
+
+  it('aplica descuento por línea por importe fijo (€) con precedencia sobre el %', () => {
+    const result = computeTotals([
+      // Si llegan ambos, el importe fijo manda (igual que el descuento de ticket).
+      { productId: 'p1', name: 'A', unitPrice: 10, qty: 2, discountPct: 50, discountAmt: 5 },
+    ]);
+    expect(result.lines[0]!.gross).toBeCloseTo(20, 2);
+    expect(result.lines[0]!.discountAmt).toBeCloseTo(5, 2);
+    expect(result.lines[0]!.lineTotal).toBeCloseTo(15, 2);
+    expect(result.subtotal).toBeCloseTo(15, 2);
+    expect(result.discountTotal).toBeCloseTo(5, 2);
+  });
+
+  it('capa el importe fijo de línea al bruto (no negativos)', () => {
+    const result = computeTotals([
+      { productId: 'p1', name: 'A', unitPrice: 10, qty: 1, discountAmt: 999 },
+    ]);
+    expect(result.lines[0]!.discountAmt).toBeCloseTo(10, 2);
+    expect(result.lines[0]!.lineTotal).toBeCloseTo(0, 2);
+    expect(result.total).toBeCloseTo(0, 2);
   });
 
   it('aplica descuento de ticket por porcentaje sobre el subtotal neto', () => {
@@ -229,6 +250,11 @@ describe('buildTaxBreakdown', () => {
     const sum = r.reduce((acc, t) => acc + t.base + t.cuota, 0);
     expect(sum).toBeCloseTo(subtotal - ticketDiscount, 2);
   });
+
+  it('sin líneas o con subtotal 0 devuelve un desglose vacío', () => {
+    expect(buildTaxBreakdown([])).toEqual([]);
+    expect(buildTaxBreakdown([{ taxRate: 21, lineTotal: 0 }])).toEqual([]);
+  });
 });
 
 describe('computeChange', () => {
@@ -312,16 +338,21 @@ function makePrisma() {
 // Construye el servicio con el mismo mock como cliente extendido y base. voidSale
 // abre withTenantTx(base): para que el callback opere sobre los mismos mocks,
 // envolvemos el prisma mock en un base con $transaction que lo reutiliza como tx.
-function makeService(prisma: ReturnType<typeof makePrisma>, base?: unknown) {
+function makeService(prisma: ReturnType<typeof makePrisma>, base?: unknown, verifactu?: unknown) {
   const resolvedBase = base ?? {
     $transaction: vi.fn(async (fn: (t: typeof prisma) => Promise<unknown>) => fn(prisma)),
+  };
+  const resolvedVerifactu = verifactu ?? {
+    createRecordInTx: vi.fn(async () => ({ id: 'vf', hash: 'h', qrData: 'q' })),
+    enqueueSend: vi.fn(async () => undefined),
+    recordFor: vi.fn(async () => ({ id: 'vf', hash: 'h', qrData: 'q' })),
   };
   return new SalesService(
     prisma as never,
     resolvedBase as never,
     new StockService({} as never, new MemoryCache(), {} as never, new InMemoryEventBus()),
     new InMemoryEventBus(),
-    { recordFor: vi.fn(async () => ({ id: 'vf', hash: 'h', qrData: 'q' })) } as never,
+    resolvedVerifactu as never,
   );
 }
 
@@ -531,6 +562,10 @@ describe('SalesService.create', () => {
     const tx = {
       $executeRaw: vi.fn(async () => 1),
       $queryRaw: vi.fn(async () => (storeFound ? [{ code: '01', ticketCounter: 7 }] : [])),
+      // El registro VeriFactu de la venta lee el NIF de la org dentro de la tx (SEC-02).
+      organization: {
+        findFirst: vi.fn(async () => ({ nif: 'B11111111' })),
+      },
       sale: {
         create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
           id: 'new-sale',
@@ -581,6 +616,69 @@ describe('SalesService.create', () => {
     expect(result.ticketNumber).toBe('T01-000007');
     expect(result.total).toBeCloseTo(3, 2);
     expect(result.organizationId).toBe(ORG);
+  });
+
+  it('SEC-02: si la creación del registro VeriFactu falla, la venta hace rollback y NO se encola el envío', async () => {
+    const prisma = makePrisma();
+    prisma.product.findMany = vi.fn(async () => [
+      { id: 'p1', name: 'Café', salePrice: 1.5, taxRate: 21 },
+    ]);
+    const base = makeBase();
+    const verifactu = {
+      // El registro fiscal va DENTRO de la tx de la venta: si lanza, la venta
+      // entera debe revertir (antes vivía en afterCommit y el error se tragaba).
+      createRecordInTx: vi.fn(async () => {
+        throw new Error('fallo registro fiscal');
+      }),
+      enqueueSend: vi.fn(async () => undefined),
+      recordFor: vi.fn(),
+    };
+    const service = makeService(prisma, base, verifactu);
+
+    const dto = {
+      storeId: '22222222-2222-2222-2222-222222222222',
+      paymentMethod: 'CASH' as const,
+      cashGiven: 5,
+      lines: [{ productId: 'p1', qty: 2 }],
+    };
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.create(dto, 'user-1', 'ADMIN')),
+    ).rejects.toThrow(/fallo registro fiscal/);
+    // El error se propaga (la tx revierte) y el envío NO se encola: sin registro
+    // persistido no hay nada que enviar.
+    expect(verifactu.enqueueSend).not.toHaveBeenCalled();
+  });
+
+  it('descuento de línea por importe fijo (€): persiste discountAmt y discountPct 0', async () => {
+    const prisma = makePrisma();
+    prisma.product.findMany = vi.fn(async () => [
+      { id: 'p1', name: 'Café', salePrice: 10, taxRate: 21 },
+    ]);
+    const base = makeBase();
+    const service = makeService(prisma, base);
+
+    const dto = {
+      storeId: '22222222-2222-2222-2222-222222222222',
+      paymentMethod: 'CASH' as const,
+      cashGiven: 50,
+      lines: [{ productId: 'p1', qty: 2, discountAmt: 5 }], // bruto 20 − 5 = neto 15
+    };
+
+    await tenantStorage.run({ organizationId: ORG }, () => service.create(dto, 'user-1', 'ADMIN'));
+
+    const arg = base.__tx.sale.create.mock.calls[0]![0] as {
+      data: {
+        subtotal: number;
+        total: number;
+        lines: { create: Array<{ discountPct: number; discountAmt: number }> };
+      };
+    };
+    expect(arg.data.subtotal).toBeCloseTo(15, 2);
+    expect(arg.data.total).toBeCloseTo(15, 2);
+    // El importe fijo manda: se persiste discountAmt y discountPct queda en 0.
+    expect(arg.data.lines.create[0]!.discountAmt).toBeCloseTo(5, 2);
+    expect(arg.data.lines.create[0]!.discountPct).toBe(0);
   });
 
   it('lanza 409 si no hay caja abierta en la tienda (caja obligatoria)', async () => {

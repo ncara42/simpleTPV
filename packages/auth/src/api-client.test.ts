@@ -16,18 +16,20 @@ describe('api-client', () => {
     vi.restoreAllMocks();
   });
 
-  it('login guarda los tokens en el store', async () => {
+  it('login guarda el accessToken en el store (el refresh va en cookie httpOnly)', async () => {
     const store = createAuthStore('test-auth');
     const client = createApiClient(store);
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ accessToken: 'acc', refreshToken: 'ref' }),
-    );
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse({ accessToken: 'acc' }));
 
     await client.login('a@b.test', 'pw');
 
     expect(store.getState().accessToken).toBe('acc');
-    expect(store.getState().refreshToken).toBe('ref');
     expect(store.getState().isAuthenticated()).toBe(true);
+    // login envía credentials:include para recibir la cookie del refresh (SEC-20).
+    const init = spy.mock.calls[0]![1] as RequestInit;
+    expect(init.credentials).toBe('include');
   });
 
   it('login con 401 lanza "Credenciales inválidas" y no guarda tokens', async () => {
@@ -41,7 +43,7 @@ describe('api-client', () => {
 
   it('fetch añade el Bearer del accessToken', async () => {
     const store = createAuthStore('test-auth');
-    store.getState().setTokens({ accessToken: 'acc', refreshToken: 'ref' });
+    store.getState().setTokens({ accessToken: 'acc' });
     const client = createApiClient(store);
     const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ ok: true }));
 
@@ -53,7 +55,7 @@ describe('api-client', () => {
 
   it('ante 401 refresca el token y reintenta la petición', async () => {
     const store = createAuthStore('test-auth');
-    store.getState().setTokens({ accessToken: 'old', refreshToken: 'ref' });
+    store.getState().setTokens({ accessToken: 'old' });
     const client = createApiClient(store);
 
     const spy = vi
@@ -74,7 +76,7 @@ describe('api-client', () => {
 
   it('si el refresh falla, limpia la sesión', async () => {
     const store = createAuthStore('test-auth');
-    store.getState().setTokens({ accessToken: 'old', refreshToken: 'ref' });
+    store.getState().setTokens({ accessToken: 'old' });
     const client = createApiClient(store);
 
     vi.spyOn(globalThis, 'fetch')

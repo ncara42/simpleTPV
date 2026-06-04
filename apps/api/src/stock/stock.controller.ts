@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query, Req } fr
 
 import type { JwtPayload } from '../auth/jwt-payload.js';
 import { Roles } from '../auth/roles.decorator.js';
-import { AdjustStockDto, SetMinStockDto } from './stock.dto.js';
+import { AdjustStockDto, ConfirmInventoryCountDto, SetMinStockDto } from './stock.dto.js';
 import { StockService } from './stock.service.js';
 
 // Consultas de stock (#28) y alertas/mínimos (#29). AuthGuard global exige
@@ -16,8 +16,11 @@ export class StockController {
   // Stock de todos los productos de una tienda. storeId obligatorio (UUID).
   @Get()
   @Roles('ADMIN', 'MANAGER', 'CLERK')
-  byStore(@Query('storeId', new ParseUUIDPipe()) storeId: string) {
-    return this.stock.byStore(storeId);
+  byStore(
+    @Query('storeId', new ParseUUIDPipe()) storeId: string,
+    @Req() req: { user: JwtPayload },
+  ) {
+    return this.stock.byStore(storeId, req.user.sub, req.user.role);
   }
 
   // Stock global agregado por producto (todas las tiendas + total). Para el
@@ -61,6 +64,12 @@ export class StockController {
     });
   }
 
+  @Post('inventory-count')
+  @Roles('ADMIN', 'MANAGER')
+  confirmInventoryCount(@Body() body: ConfirmInventoryCountDto, @Req() req: { user: JwtPayload }) {
+    return this.stock.confirmInventoryCount(body, req.user.sub);
+  }
+
   // Historial de movimientos de stock (#32), filtrable y paginado. Trazabilidad.
   @Get('movements')
   @Roles('ADMIN', 'MANAGER', 'CLERK')
@@ -85,8 +94,11 @@ export class StockController {
   // Productos "para pedir" de una tienda (bajo/sin stock) — atajo para reposición (#45).
   @Get('to-reorder')
   @Roles('ADMIN', 'MANAGER', 'CLERK')
-  toReorder(@Query('storeId', new ParseUUIDPipe()) storeId: string) {
-    return this.stock.toReorder(storeId);
+  toReorder(
+    @Query('storeId', new ParseUUIDPipe()) storeId: string,
+    @Req() req: { user: JwtPayload },
+  ) {
+    return this.stock.toReorder(storeId, req.user.sub, req.user.role);
   }
 
   // Stock de un producto en todas las tiendas del tenant.

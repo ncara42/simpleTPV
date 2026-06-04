@@ -1,6 +1,6 @@
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AuthService } from './auth.service.js';
 
@@ -29,6 +29,41 @@ function makeUser(overrides: Partial<FakeUser> = {}): FakeUser {
   };
 }
 
+// Store de refresh tokens en memoria (SEC-06): replica la semántica de rotación
+// (markUsed atómico) y revocación por familia que usa AuthService.
+interface TokenRow {
+  id: string;
+  familyId: string;
+  userId: string;
+  usedAt: Date | null;
+  revokedAt: Date | null;
+}
+function makeStore() {
+  const rows = new Map<string, TokenRow>();
+  return {
+    rows,
+    create: async (d: { id: string; familyId: string; userId: string }) => {
+      rows.set(d.id, { ...d, usedAt: null, revokedAt: null });
+    },
+    findById: async (id: string) => rows.get(id) ?? null,
+    markUsed: async (id: string) => {
+      const r = rows.get(id);
+      if (!r || r.usedAt) {
+        return false;
+      }
+      r.usedAt = new Date();
+      return true;
+    },
+    revokeFamily: async (familyId: string) => {
+      for (const r of rows.values()) {
+        if (r.familyId === familyId && !r.revokedAt) {
+          r.revokedAt = new Date();
+        }
+      }
+    },
+  };
+}
+
 function makeService(user: FakeUser | null): AuthService {
   const prisma = {
     user: {
@@ -39,7 +74,7 @@ function makeService(user: FakeUser | null): AuthService {
     },
   };
   const jwt = new JwtService({ secret: 'test-access-secret' });
-  return new AuthService(prisma as never, jwt, {
+  return new AuthService(prisma as never, makeStore() as never, jwt, {
     accessSecret: 'test-access-secret',
     refreshSecret: 'test-refresh-secret',
     accessTtl: '15m',
@@ -74,6 +109,16 @@ describe('AuthService.validateUser', () => {
     const svc = makeService(makeUser({ active: false }));
     const user = await svc.validateUser('admin@org1.test', 'password123');
     expect(user).toBeNull();
+  });
+
+  it('SEC-14: ejecuta bcrypt.compare aunque el email no exista (anti-enumeración por timing)', async () => {
+    const spy = vi.spyOn(bcrypt, 'compare');
+    const svc = makeService(null);
+    const user = await svc.validateUser('nadie@org1.test', 'cualquiera');
+    expect(user).toBeNull();
+    // Se hace una comparación señuelo: no se retorna antes de gastar el bcrypt.
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
   });
 });
 
@@ -112,5 +157,29 @@ describe('AuthService.refresh', () => {
   it('lanza si el refreshToken es inválido', async () => {
     const service = makeService(makeUser());
     await expect(service.refresh('garbage.token.here')).rejects.toThrow();
+  });
+
+  it('SEC-06: rota el refresh (emite uno nuevo) y detecta el reuso revocando la familia', async () => {
+    const service = makeService(makeUser());
+    const user = await service.validateUser('admin@org1.test', 'password123');
+    const { refreshToken: rt1 } = await service.login(user!);
+
+    const rotated = await service.refresh(rt1);
+    expect(typeof rotated.refreshToken).toBe('string');
+    expect(rotated.refreshToken).not.toBe(rt1);
+
+    // Reusar rt1 (ya rotado) → reuso → 401 y revocación de toda la familia.
+    await expect(service.refresh(rt1)).rejects.toThrow(/reutilizado/);
+    // El token rotado rt2 también queda invalidado (misma familia revocada).
+    await expect(service.refresh(rotated.refreshToken)).rejects.toThrow();
+  });
+
+  it('SEC-06: logout revoca la sesión y el refresh deja de funcionar', async () => {
+    const service = makeService(makeUser());
+    const user = await service.validateUser('admin@org1.test', 'password123');
+    const { refreshToken } = await service.login(user!);
+
+    await service.logout(refreshToken);
+    await expect(service.refresh(refreshToken)).rejects.toThrow();
   });
 });

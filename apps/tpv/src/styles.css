@@ -2,6 +2,17 @@
 @import '@simpletpv/ui/theme.css';
 @import '@simpletpv/ui/sidebar.css';
 
+/* La escala de radios de Tailwind apunta a los tokens del design system, de
+   modo que `rounded-lg` y `var(--ui-radius-lg)` rinden el mismo valor en toda
+   la app (utilidades en componentes + reglas en CSS comparten fuente). */
+@theme inline {
+  --radius-xs: var(--ui-radius-xs);
+  --radius-sm: var(--ui-radius-sm);
+  --radius-md: var(--ui-radius-md);
+  --radius-lg: var(--ui-radius-lg);
+  --radius-xl: var(--ui-radius-xl);
+}
+
 .app-shell {
   display: flex;
   min-height: 100vh;

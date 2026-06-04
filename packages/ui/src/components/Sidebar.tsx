@@ -1,4 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { initials } from '../lib/initials.js';
 
 export interface NavItem {
   id: string;
@@ -12,27 +14,122 @@ export interface NavGroup {
   label: string;
 }
 
+export interface SidebarAccount {
+  name: string;
+  subtitle?: string;
+}
+
 export interface SidebarProps {
   items: NavItem[];
   groups?: NavGroup[];
   activeItem: string;
   onSelect: (id: string) => void;
-  user?: { name: string; subtitle?: string };
+  onLogout?: () => void;
   logo?: React.ReactNode;
   brand?: { title: string; subtitle?: string };
+  /** Cuenta en el pie (estilo ChatGPT): avatar + nombre + rol. */
+  account?: SidebarAccount;
 }
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'U';
+function LogoutGlyph() {
+  return (
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 2v10" />
+      <path d="M18.4 6.6a9 9 0 1 1-12.8 0" />
+    </svg>
+  );
 }
 
-export function Sidebar({ items, groups, activeItem, onSelect, user, logo, brand }: SidebarProps) {
+/** Chevron del disparador de cuenta: apunta hacia arriba (el menú abre hacia arriba). */
+function AccountCaret() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="18 15 12 9 6 15" />
+    </svg>
+  );
+}
+
+export function Sidebar({
+  items,
+  groups,
+  activeItem,
+  onSelect,
+  onLogout,
+  logo,
+  brand,
+  account,
+}: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [menuOpen, setMenuOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
+  const accountTriggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const toggleGroup = useCallback((groupId: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
+  }, []);
+
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+
+  // Cerrar el menú de cuenta al hacer click fuera o pulsar Escape (patrón de Select).
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!accountRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMenuOpen(false);
+        accountTriggerRef.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [menuOpen]);
+
+  // Al abrir, llevar el foco al primer item del menú (navegación por teclado).
+  useEffect(() => {
+    if (menuOpen) menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+  }, [menuOpen]);
+
+  // Navegación con flechas entre items del menú de cuenta.
+  const onMenuKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const itemsEls = Array.from(
+      menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [],
+    );
+    if (itemsEls.length === 0) return;
+    const current = itemsEls.indexOf(document.activeElement as HTMLButtonElement);
+    const dir = e.key === 'ArrowDown' ? 1 : -1;
+    const next = (current + dir + itemsEls.length) % itemsEls.length;
+    itemsEls[next]?.focus();
   }, []);
 
   const handleSelect = useCallback(
@@ -46,19 +143,24 @@ export function Sidebar({ items, groups, activeItem, onSelect, user, logo, brand
   const renderItems = (filterGroup?: string) =>
     items
       .filter((item) => item.group === filterGroup)
-      .map((item) => (
-        <li key={item.id}>
-          <button
-            className={`sidebar-item${activeItem === item.id ? ' active' : ''}`}
-            onClick={() => handleSelect(item.id)}
-            title={item.label}
-            data-testid={`nav-${item.id}`}
-          >
-            <span className="sidebar-item-icon">{item.icon}</span>
-            <span className="sidebar-item-label">{item.label}</span>
-          </button>
-        </li>
-      ));
+      .map((item) => {
+        const isActive = activeItem === item.id;
+        return (
+          <li key={item.id}>
+            <button
+              type="button"
+              className={`sidebar-item${isActive ? ' active' : ''}`}
+              onClick={() => handleSelect(item.id)}
+              title={item.label}
+              aria-current={isActive ? 'page' : undefined}
+              data-testid={`nav-${item.id}`}
+            >
+              <span className="sidebar-item-icon">{item.icon}</span>
+              <span className="sidebar-item-label">{item.label}</span>
+            </button>
+          </li>
+        );
+      });
 
   return (
     <>
@@ -69,7 +171,7 @@ export function Sidebar({ items, groups, activeItem, onSelect, user, logo, brand
       />
 
       <aside className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
-        {/* Header: logo + marca */}
+        {/* Header: logotipo (+ marca opcional) */}
         <div className="sidebar-header">
           <span className="sidebar-logo">{logo ?? 'S'}</span>
           {brand && (
@@ -81,45 +183,113 @@ export function Sidebar({ items, groups, activeItem, onSelect, user, logo, brand
         </div>
 
         {/* Nav */}
-        <nav className="sidebar-nav">
-          {groups && groups.length > 0 ? (
-            <>
-              <ul className="sidebar-group-items">{renderItems(undefined)}</ul>
-              {groups.map((group) => {
-                const isCollapsed = !!collapsedGroups[group.id];
-                return (
-                  <div key={group.id}>
-                    <button
-                      className="sidebar-group-header"
-                      onClick={() => toggleGroup(group.id)}
-                      title={group.label}
-                    >
-                      <span>{group.label}</span>
-                      <span>{isCollapsed ? '▸' : '▾'}</span>
-                    </button>
-                    <ul className={`sidebar-group-items${isCollapsed ? ' collapsed' : ''}`}>
-                      {renderItems(group.id)}
-                    </ul>
-                  </div>
-                );
-              })}
-            </>
-          ) : (
-            <ul className="sidebar-group-items">{renderItems(undefined)}</ul>
-          )}
+        <nav className="sidebar-nav" aria-label="Navegación principal">
+          <ul className="sidebar-group-items">{renderItems(undefined)}</ul>
+          {groups?.map((group) => {
+            const isCollapsed = !!collapsedGroups[group.id];
+            return (
+              <div key={group.id} className="sidebar-group">
+                <button
+                  type="button"
+                  className={`sidebar-group-header${isCollapsed ? '' : ' expanded'}`}
+                  onClick={() => toggleGroup(group.id)}
+                  title={group.label}
+                  aria-expanded={!isCollapsed}
+                >
+                  <span className="sidebar-group-label">{group.label}</span>
+                  <svg
+                    className="sidebar-group-chevron"
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                <ul className={`sidebar-group-items${isCollapsed ? ' collapsed' : ''}`}>
+                  {renderItems(group.id)}
+                </ul>
+              </div>
+            );
+          })}
         </nav>
 
-        {/* Footer: bloque de usuario */}
-        {user && (
-          <div className="sidebar-footer">
-            <div className="sidebar-user" data-testid="sidebar-user">
-              <span className="sidebar-avatar">{initials(user.name)}</span>
-              <span className="sidebar-user-text">
-                <span className="sidebar-user-name">{user.name}</span>
-                {user.subtitle && <span className="sidebar-user-sub">{user.subtitle}</span>}
+        {/* Footer: cuenta (estilo ChatGPT) o cierre de sesión simple */}
+        {account ? (
+          <div className="sidebar-footer" ref={accountRef}>
+            {onLogout && menuOpen && (
+              <div
+                className="sidebar-account-menu"
+                role="menu"
+                aria-label="Cuenta"
+                ref={menuRef}
+                onKeyDown={onMenuKeyDown}
+              >
+                <button
+                  type="button"
+                  className="sidebar-account-menu-item"
+                  role="menuitem"
+                  onClick={() => {
+                    closeMenu();
+                    onLogout();
+                  }}
+                  data-testid="logout"
+                >
+                  <span className="sidebar-account-menu-icon">
+                    <LogoutGlyph />
+                  </span>
+                  <span>Cerrar sesión</span>
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              className={`sidebar-account${menuOpen ? ' open' : ''}`}
+              ref={accountTriggerRef}
+              onClick={() => setMenuOpen((v) => !v)}
+              data-testid="account-menu"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              title={account.name}
+            >
+              <span className="sidebar-account-avatar" aria-hidden="true">
+                {initials(account.name)}
               </span>
-            </div>
+              <span className="sidebar-account-meta">
+                <span className="sidebar-account-name">{account.name}</span>
+                {account.subtitle && (
+                  <span className="sidebar-account-sub">{account.subtitle}</span>
+                )}
+              </span>
+              {onLogout && (
+                <span className="sidebar-account-caret" aria-hidden="true">
+                  <AccountCaret />
+                </span>
+              )}
+            </button>
           </div>
+        ) : (
+          onLogout && (
+            <div className="sidebar-footer">
+              <button
+                type="button"
+                className="sidebar-logout"
+                onClick={onLogout}
+                data-testid="logout"
+              >
+                <span className="sidebar-item-icon">
+                  <LogoutGlyph />
+                </span>
+                <span className="sidebar-item-label">Salir</span>
+              </button>
+            </div>
+          )
         )}
       </aside>
     </>

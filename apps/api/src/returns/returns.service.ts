@@ -7,42 +7,16 @@ import {
 } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 
+import { assertStoreAccess } from '../auth/store-access.js';
+import { round2 } from '../common/money.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
-import { withTenantTx } from '../prisma/with-tenant-tx.js';
+import { type TxClient, withTenantTx } from '../prisma/with-tenant-tx.js';
 import { StockService } from '../stock/stock.service.js';
+import { VerifactuService } from '../verifactu/verifactu.service.js';
+import { computeReturnable, computeReturnLineTotal } from './returns.domain.js';
 import type { CreateBlindReturnDto, CreateReturnDto } from './returns.dto.js';
-
-// Redondeo a 2 decimales (céntimos), idéntico al de ventas, para que el cálculo
-// coincida con la columna DECIMAL(12,2).
-function round2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
-}
-
-/**
- * Importe a devolver por una línea: la parte proporcional del neto de la
- * SaleLine. unitario neto = saleLineTotal / saleLineQty (precio ya con
- * descuentos de línea/ticket congelados). Función pura, testeable.
- */
-export function computeReturnLineTotal(
-  saleLineTotal: number,
-  saleLineQty: number,
-  qty: number,
-): number {
-  if (saleLineQty <= 0) {
-    return 0;
-  }
-  return round2((saleLineTotal / saleLineQty) * qty);
-}
-
-/**
- * Cantidad disponible para devolver de una SaleLine: lo vendido menos lo ya
- * devuelto en devoluciones anteriores. Nunca negativa. Función pura, testeable.
- */
-export function computeReturnable(saleLineQty: number, alreadyReturned: number): number {
-  return round2(Math.max(0, saleLineQty - alreadyReturned));
-}
 
 @Injectable()
 export class ReturnsService {
@@ -53,14 +27,51 @@ export class ReturnsService {
     @Inject(PRISMA_BASE) private readonly base: PrismaService,
     // Servicio interno de stock: repone el stock de las líneas devueltas.
     private readonly stock: StockService,
+    // VeriFactu: registro rectificativo de cada devolución (SEC-07), creado en la
+    // misma tx que la devolución (atómico) y enviado tras commit.
+    private readonly verifactu: VerifactuService,
   ) {}
+
+  /**
+   * Crea el registro VeriFactu RECTIFICATION de una devolución DENTRO de su tx y
+   * encola el envío tras commit (mismo patrón que la venta, SEC-02/SEC-07). El
+   * importe va en negativo (abono). `invoiceNumber` referencia la factura original
+   * (ticket de la venta) o, en devoluciones sin ticket, el id de la devolución.
+   * El formato exacto de factura rectificativa AEAT se afinará al integrar el
+   * proveedor certificado (hoy sandbox, no remite).
+   */
+  private async recordRectification(
+    tx: TxClient,
+    organizationId: string,
+    afterCommit: (fn: () => Promise<void>) => void,
+    params: { returnId: string; invoiceNumber: string; total: number },
+  ): Promise<void> {
+    const org = await tx.organization.findFirst({
+      where: { id: organizationId },
+      select: { nif: true },
+    });
+    const record = await this.verifactu.createRecordInTx(tx, organizationId, {
+      type: 'RECTIFICATION',
+      returnId: params.returnId,
+      payload: {
+        nif: org?.nif ?? null,
+        invoiceNumber: params.invoiceNumber,
+        date: new Date().toISOString(),
+        total: -Math.abs(params.total),
+        type: 'RECTIFICATION',
+      },
+    });
+    afterCommit(async () => {
+      await this.verifactu.enqueueSend(record.id, organizationId);
+    });
+  }
 
   /**
    * Crea una devolución parcial contra un ticket de venta. Todo dentro de
    * withTenantTx (cliente base) para que la validación y el create compartan UNA
    * transacción atómica con el tenant fijado (RLS aplicada).
    */
-  async create(dto: CreateReturnDto, userId: string) {
+  async create(dto: CreateReturnDto, userId: string, role: string) {
     const tenant = requireTenant();
 
     return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
@@ -88,6 +99,9 @@ export class ReturnsService {
       if (sale.status === 'VOIDED') {
         throw new BadRequestException('No se puede devolver una venta anulada');
       }
+      // Aislamiento por tienda (SEC-01): un CLERK solo devuelve ventas de las
+      // tiendas a las que está asignado. La tienda la fija la venta original.
+      await assertStoreAccess(tx, { userId, role, storeId: sale.storeId });
 
       const linesById = new Map(sale.lines.map((l) => [l.id, l]));
 
@@ -169,8 +183,47 @@ export class ReturnsService {
         );
       }
 
+      // 7. Registro VeriFactu rectificativo (SEC-07): referencia el ticket de la
+      //    venta original. En la misma tx → atómico con la devolución.
+      await this.recordRectification(tx, tenant.organizationId, afterCommit, {
+        returnId: created.id,
+        invoiceNumber: sale.ticketNumber,
+        total,
+      });
+
       return created;
     });
+  }
+
+  // Lockout en memoria (por réplica) contra fuerza bruta del PIN de autorización
+  // (SEC-19): el PIN es de 4-8 dígitos y un acierto vale para CUALQUIER autorizador
+  // del tenant, así que bajo el throttle global sería forzable en horas. Se acota
+  // por usuario iniciador + tenant; tras N fallos se bloquea unos minutos.
+  private readonly pinAttempts = new Map<string, { count: number; lockedUntil: number }>();
+  private static readonly PIN_MAX_ATTEMPTS = 5;
+  private static readonly PIN_LOCKOUT_MS = 5 * 60_000;
+
+  private assertPinNotLocked(key: string): void {
+    const entry = this.pinAttempts.get(key);
+    if (entry && entry.lockedUntil > Date.now()) {
+      throw new ForbiddenException(
+        'Demasiados intentos de PIN incorrectos; inténtalo de nuevo en unos minutos',
+      );
+    }
+  }
+
+  private registerPinFailure(key: string): void {
+    const entry = this.pinAttempts.get(key) ?? { count: 0, lockedUntil: 0 };
+    entry.count += 1;
+    if (entry.count >= ReturnsService.PIN_MAX_ATTEMPTS) {
+      entry.lockedUntil = Date.now() + ReturnsService.PIN_LOCKOUT_MS;
+      entry.count = 0;
+    }
+    this.pinAttempts.set(key, entry);
+  }
+
+  private clearPinFailures(key: string): void {
+    this.pinAttempts.delete(key);
   }
 
   /**
@@ -204,10 +257,23 @@ export class ReturnsService {
    * producto (movimiento RETURN). El importe de cada línea se calcula del precio
    * de venta ACTUAL del producto (salePrice) × qty. Todo en una tx atómica.
    */
-  async createBlind(dto: CreateBlindReturnDto, userId: string) {
+  async createBlind(dto: CreateBlindReturnDto, userId: string, role: string) {
     const tenant = requireTenant();
-    // Autorización por PIN ANTES de abrir la tx (si falla, no toca nada).
-    const authorizedBy = await this.resolveAuthorizer(dto.managerPin);
+    // Aislamiento por tienda (SEC-01): un CLERK solo hace devoluciones ciegas en
+    // sus tiendas. Se comprueba antes que el PIN para fallar cuanto antes.
+    await assertStoreAccess(this.prisma, { userId, role, storeId: dto.storeId });
+    // Autorización por PIN ANTES de abrir la tx (si falla, no toca nada), con
+    // lockout anti-fuerza-bruta por usuario iniciador + tenant (SEC-19).
+    const pinKey = `${tenant.organizationId}:${userId}`;
+    this.assertPinNotLocked(pinKey);
+    let authorizedBy: string;
+    try {
+      authorizedBy = await this.resolveAuthorizer(dto.managerPin);
+    } catch (err) {
+      this.registerPinFailure(pinKey);
+      throw err;
+    }
+    this.clearPinFailures(pinKey);
 
     // Precios actuales de los productos del tenant (fuente del importe).
     const productIds = dto.lines.map((l) => l.productId);
@@ -260,6 +326,14 @@ export class ReturnsService {
           afterCommit,
         );
       }
+
+      // Registro VeriFactu rectificativo (SEC-07): sin factura original (devolución
+      // sin ticket), referencia el id de la devolución. Atómico con la devolución.
+      await this.recordRectification(tx, tenant.organizationId, afterCommit, {
+        returnId: created.id,
+        invoiceNumber: `BLIND-${created.id}`,
+        total,
+      });
 
       return created;
     });

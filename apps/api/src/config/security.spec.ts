@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_DEV_ORIGINS, parseCorsOrigins, throttleConfig } from './security.js';
+import {
+  DEFAULT_DEV_ORIGINS,
+  parseCorsOrigins,
+  resolveCorsOrigins,
+  sseMaxConnectionsPerUser,
+  throttleConfig,
+  trustProxyHops,
+} from './security.js';
 
 describe('parseCorsOrigins', () => {
   it('sin env devuelve los orígenes de dev por defecto', () => {
@@ -24,6 +31,26 @@ describe('parseCorsOrigins', () => {
   });
 });
 
+describe('resolveCorsOrigins', () => {
+  it('fuera de producción sin CORS_ORIGINS cae a los orígenes de dev', () => {
+    expect(resolveCorsOrigins({})).toEqual(DEFAULT_DEV_ORIGINS);
+    expect(resolveCorsOrigins({ NODE_ENV: 'development' })).toEqual(DEFAULT_DEV_ORIGINS);
+  });
+
+  it('en producción sin CORS_ORIGINS falla (no fail-open a localhost)', () => {
+    expect(() => resolveCorsOrigins({ NODE_ENV: 'production' })).toThrow(/CORS_ORIGINS/);
+    expect(() => resolveCorsOrigins({ NODE_ENV: 'production', CORS_ORIGINS: '   ' })).toThrow(
+      /CORS_ORIGINS/,
+    );
+  });
+
+  it('en producción con CORS_ORIGINS definida la usa', () => {
+    expect(
+      resolveCorsOrigins({ NODE_ENV: 'production', CORS_ORIGINS: 'https://tpv.example.com' }),
+    ).toEqual(['https://tpv.example.com']);
+  });
+});
+
 describe('throttleConfig', () => {
   it('defaults holgados sin env', () => {
     expect(throttleConfig({})).toEqual({ ttl: 60000, limit: 120 });
@@ -41,5 +68,38 @@ describe('throttleConfig', () => {
       ttl: 60000,
       limit: 120,
     });
+  });
+});
+
+describe('sseMaxConnectionsPerUser', () => {
+  it('default 5 sin env', () => {
+    expect(sseMaxConnectionsPerUser({})).toBe(5);
+  });
+
+  it('toma el valor de la env válida (entero)', () => {
+    expect(sseMaxConnectionsPerUser({ SSE_MAX_CONNECTIONS_PER_USER: '3' })).toBe(3);
+    expect(sseMaxConnectionsPerUser({ SSE_MAX_CONNECTIONS_PER_USER: '10.9' })).toBe(10);
+  });
+
+  it('ignora valores inválidos o no positivos y cae al default', () => {
+    expect(sseMaxConnectionsPerUser({ SSE_MAX_CONNECTIONS_PER_USER: 'abc' })).toBe(5);
+    expect(sseMaxConnectionsPerUser({ SSE_MAX_CONNECTIONS_PER_USER: '0' })).toBe(5);
+    expect(sseMaxConnectionsPerUser({ SSE_MAX_CONNECTIONS_PER_USER: '-2' })).toBe(5);
+  });
+});
+
+describe('trustProxyHops', () => {
+  it('default 1 sin env', () => {
+    expect(trustProxyHops({})).toBe(1);
+  });
+
+  it('toma el nº de saltos de la env (incluido 0 = sin proxy)', () => {
+    expect(trustProxyHops({ TRUST_PROXY_HOPS: '2' })).toBe(2);
+    expect(trustProxyHops({ TRUST_PROXY_HOPS: '0' })).toBe(0);
+  });
+
+  it('ignora valores inválidos o negativos y cae al default', () => {
+    expect(trustProxyHops({ TRUST_PROXY_HOPS: 'abc' })).toBe(1);
+    expect(trustProxyHops({ TRUST_PROXY_HOPS: '-1' })).toBe(1);
   });
 });

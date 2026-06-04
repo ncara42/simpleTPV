@@ -3,14 +3,14 @@ import { persist } from 'zustand/middleware';
 
 import type { UserRole } from './api-types.js';
 
+// El refresh token ya NO vive en el cliente (SEC-20): la API lo gestiona en una
+// cookie httpOnly. El store solo guarda el accessToken (corta vida).
 export interface AuthTokens {
   accessToken: string;
-  refreshToken: string;
 }
 
 export interface AuthState {
   accessToken: string | null;
-  refreshToken: string | null;
   setTokens: (tokens: AuthTokens) => void;
   setAccessToken: (accessToken: string) => void;
   clear: () => void;
@@ -49,10 +49,9 @@ export function createAuthStore(storageKey: string) {
     persist(
       (set, get) => ({
         accessToken: null,
-        refreshToken: null,
-        setTokens: ({ accessToken, refreshToken }) => set({ accessToken, refreshToken }),
+        setTokens: ({ accessToken }) => set({ accessToken }),
         setAccessToken: (accessToken) => set({ accessToken }),
-        clear: () => set({ accessToken: null, refreshToken: null }),
+        clear: () => set({ accessToken: null }),
         isAuthenticated: () => get().accessToken !== null,
         getRole: () => decodeRole(get().accessToken),
       }),

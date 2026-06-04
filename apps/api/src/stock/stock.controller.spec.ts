@@ -14,6 +14,10 @@ function makeController() {
     alerts: vi.fn(async (_opts: unknown) => [{ id: 'a1', alertType: 'OUT_OF_STOCK' }]),
     setMin: vi.fn(async (_p: string, _s: string, _m: number) => ({ minStock: 5, level: 'yellow' })),
     adjust: vi.fn(async (_input: unknown) => ({ quantity: 50, level: 'green' })),
+    confirmInventoryCount: vi.fn(async (_input: unknown, _userId: string) => ({
+      storeId: STORE,
+      adjusted: [],
+    })),
     movements: vi.fn(async (_opts: unknown) => ({
       items: [],
       totalItems: 0,
@@ -32,8 +36,8 @@ function req(): { user: { sub: string; organizationId: string; role: string } } 
 describe('StockController', () => {
   it('GET /stock delega el storeId en byStore', async () => {
     const { controller, service } = makeController();
-    const res = (await controller.byStore(STORE)) as Array<{ level: string }>;
-    expect(service.byStore).toHaveBeenCalledWith(STORE);
+    const res = (await controller.byStore(STORE, req())) as Array<{ level: string }>;
+    expect(service.byStore).toHaveBeenCalledWith(STORE, 'user-1', 'ADMIN');
     expect(res[0]!.level).toBe('green');
   });
 
@@ -90,6 +94,20 @@ describe('StockController', () => {
     expect(res.quantity).toBe(50);
   });
 
+  it('POST /stock/inventory-count delega el body y el sub del usuario', async () => {
+    const { controller, service } = makeController();
+    const dto = {
+      storeId: STORE,
+      reason: 'Recuento',
+      lines: [{ productId: PRODUCT, countedQuantity: 7 }],
+    };
+
+    const res = (await controller.confirmInventoryCount(dto, req())) as { storeId: string };
+
+    expect(service.confirmInventoryCount).toHaveBeenCalledWith(dto, 'user-1');
+    expect(res.storeId).toBe(STORE);
+  });
+
   it('GET /stock/movements convierte fechas y números y delega los filtros', async () => {
     const { controller, service } = makeController();
     await controller.movements(PRODUCT, STORE, '2026-05-01', '2026-05-29', '2', '10');
@@ -102,8 +120,8 @@ describe('StockController', () => {
 
   it('GET /stock/to-reorder delega el storeId en toReorder', async () => {
     const { controller, service } = makeController();
-    const res = (await controller.toReorder(STORE)) as Array<{ level: string }>;
-    expect(service.toReorder).toHaveBeenCalledWith(STORE);
+    const res = (await controller.toReorder(STORE, req())) as Array<{ level: string }>;
+    expect(service.toReorder).toHaveBeenCalledWith(STORE, 'user-1', 'ADMIN');
     expect(res[0]!.level).toBe('red');
   });
 });

@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsOptional,
@@ -36,6 +37,7 @@ export class CreatePurchaseOrderDto {
 
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(500)
   @ValidateNested({ each: true })
   @Type(() => CreatePurchaseOrderLineDto)
   lines!: CreatePurchaseOrderLineDto[];
@@ -53,6 +55,7 @@ export class ReceivePurchaseOrderLineDto {
 export class ReceivePurchaseOrderDto {
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(500)
   @ValidateNested({ each: true })
   @Type(() => ReceivePurchaseOrderLineDto)
   lines!: ReceivePurchaseOrderLineDto[];

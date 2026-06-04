@@ -17,8 +17,12 @@ test('login con cualquier credencial entra al TPV (modo demo)', async ({ page })
   await page.getByTestId('login-password').fill('lo-que-sea');
   await page.getByTestId('login-submit').click();
 
-  // Tras entrar se ve la TopBar con "Salir" y desaparece el login.
-  await expect(page.getByTestId('logout')).toBeVisible({ timeout: 10000 });
+  // Tras entrar desaparece el login y se ve la cuenta en el sidebar.
+  await expect(page.getByTestId('account-menu')).toBeVisible({ timeout: 10000 });
   await expect(page.getByTestId('login-card')).toHaveCount(0);
   await expect(page.getByTestId('sale-grid')).toBeVisible();
+
+  // El cierre de sesión vive ahora en el menú de cuenta.
+  await page.getByTestId('account-menu').click();
+  await expect(page.getByTestId('logout')).toBeVisible();
 });

@@ -1,0 +1,153 @@
+/* ─── Select propio (no nativo), estilo Apple ─────────────────
+   Disparador tipo pill con chevron + menú flotante con hairline,
+   sombra suave y check en la opción seleccionada. Hereda el tema
+   vía variables --ui-* (mapeadas a --ap-* en backoffice).
+   ──────────────────────────────────────────────────────────── */
+.ui-select {
+  position: relative;
+  display: inline-block;
+}
+
+.ui-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  height: 2.5rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 10px;
+  background: var(--ui-surface);
+  font-size: 0.86rem;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s,
+    background 0.12s;
+}
+
+.ui-select-trigger:hover {
+  background: var(--ui-surface-subtle);
+}
+
+.ui-select-trigger:focus-visible {
+  outline: none;
+  border-color: var(--ui-primary, #0071e3);
+  box-shadow: var(--ui-focus, 0 0 0 4px rgba(0, 113, 227, 0.32));
+}
+
+.ui-select-trigger[aria-expanded='true'] {
+  border-color: var(--ui-primary, #0071e3);
+  box-shadow: var(--ui-focus, 0 0 0 4px rgba(0, 113, 227, 0.32));
+}
+
+.ui-select-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ui-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-select-value.is-placeholder {
+  color: var(--ui-text-soft);
+}
+
+.ui-select-chevron {
+  flex-shrink: 0;
+  color: var(--ui-text-soft);
+  transition: transform 0.15s ease;
+}
+
+.ui-select-trigger[aria-expanded='true'] .ui-select-chevron {
+  transform: rotate(180deg);
+}
+
+/* ─── Menú flotante ─── */
+.ui-select-menu {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 100%;
+  max-height: 18rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.04),
+    0 10px 30px rgba(0, 0, 0, 0.14);
+  animation: ui-select-pop 0.12s ease;
+}
+
+@keyframes ui-select-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ui-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ui-select-option.is-active {
+  background: var(--ui-brand-soft, rgba(0, 102, 204, 0.08));
+  color: var(--ui-brand-ink, var(--ui-primary));
+}
+
+.ui-select-option.is-selected {
+  font-weight: 600;
+}
+
+.ui-select-option.is-disabled {
+  color: var(--ui-text-soft);
+  cursor: not-allowed;
+}
+
+/* Cuando hay selección activa, opacar las opciones no seleccionadas */
+.ui-select-menu[data-has-selection] .ui-select-option:not(.is-selected) {
+  opacity: 0.45;
+  transition: opacity 0.12s;
+}
+
+/* Restaurar al hacer hover sobre una opción no seleccionada */
+.ui-select-menu[data-has-selection] .ui-select-option.is-active:not(.is-selected) {
+  opacity: 1;
+}
+
+.ui-select-option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-select-check {
+  flex-shrink: 0;
+  color: var(--ui-brand-ink, var(--ui-primary));
+}

@@ -6,7 +6,8 @@ import { MemoryCache } from '../cache/memory-cache.js';
 import { InMemoryEventBus } from '../events/in-memory-event-bus.js';
 import { tenantStorage } from '../prisma/tenant-context.js';
 import { StockService } from '../stock/stock.service.js';
-import { computeReturnable, computeReturnLineTotal, ReturnsService } from './returns.service.js';
+import { computeReturnable, computeReturnLineTotal } from './returns.domain.js';
+import { ReturnsService } from './returns.service.js';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 
@@ -63,6 +64,10 @@ function makeBase(
 ) {
   const tx = {
     $executeRaw: vi.fn(async () => 1),
+    // El registro VeriFactu rectificativo lee el NIF de la org dentro de la tx (SEC-07).
+    organization: {
+      findFirst: vi.fn(async () => ({ nif: 'B11111111' })),
+    },
     sale: {
       findFirst: vi.fn(async () => opts.sale ?? null),
     },
@@ -96,11 +101,29 @@ function makeBase(
   };
 }
 
-function makeService(prisma: ReturnType<typeof makePrisma>, base: unknown) {
+// Mock de VerifactuService: createRecordInTx (en-tx) + enqueueSend (tras commit).
+// Tipamos los parámetros para poder inspeccionar mock.calls[n][2] (el input).
+function makeVerifactu() {
+  return {
+    createRecordInTx: vi.fn(async (_tx: unknown, _org: string, _input: unknown) => ({
+      id: 'vf',
+      hash: 'h',
+      qrData: 'q',
+    })),
+    enqueueSend: vi.fn(async (_id: string, _org: string) => undefined),
+  };
+}
+
+function makeService(
+  prisma: ReturnType<typeof makePrisma>,
+  base: unknown,
+  verifactu: ReturnType<typeof makeVerifactu> = makeVerifactu(),
+) {
   return new ReturnsService(
     prisma as never,
     base as never,
     new StockService({} as never, new MemoryCache(), {} as never, new InMemoryEventBus()),
+    verifactu as never,
   );
 }
 
@@ -110,6 +133,7 @@ function sampleSale() {
     id: 'sale-1',
     storeId: 'store-1',
     status: 'COMPLETED',
+    ticketNumber: 'T01-000001',
     lines: [
       { id: 'sl-1', productId: 'p1', qty: 3, lineTotal: 30 },
       { id: 'sl-2', productId: 'p2', qty: 2, lineTotal: 18 },
@@ -126,6 +150,7 @@ describe('ReturnsService.create', () => {
         service.create(
           { saleId: 'nope', reason: 'roto', lines: [{ saleLineId: 'sl-1', qty: 1 }] },
           'user-1',
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow(NotFoundException);
@@ -139,6 +164,7 @@ describe('ReturnsService.create', () => {
         service.create(
           { saleId: 'sale-1', reason: 'roto', lines: [{ saleLineId: 'sl-1', qty: 1 }] },
           'user-1',
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow(/anulada/);
@@ -152,6 +178,7 @@ describe('ReturnsService.create', () => {
         service.create(
           { saleId: 'sale-1', reason: 'roto', lines: [{ saleLineId: 'ajena', qty: 1 }] },
           'user-1',
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow(/no pertenece a la venta/);
@@ -166,6 +193,7 @@ describe('ReturnsService.create', () => {
         service.create(
           { saleId: 'sale-1', reason: 'roto', lines: [{ saleLineId: 'sl-1', qty: 4 }] },
           'user-1',
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow(/más de lo vendido/);
@@ -180,6 +208,7 @@ describe('ReturnsService.create', () => {
         service.create(
           { saleId: 'sale-1', reason: 'roto', lines: [{ saleLineId: 'sl-1', qty: 2 }] },
           'user-1',
+          'ADMIN',
         ),
       ),
     ).rejects.toThrow(/más de lo vendido/);
@@ -197,6 +226,7 @@ describe('ReturnsService.create', () => {
           lines: [{ saleLineId: 'sl-1', qty: 2 }],
         },
         'user-1',
+        'ADMIN',
       ),
     )) as unknown as {
       organizationId: string;
@@ -221,6 +251,35 @@ describe('ReturnsService.create', () => {
     expect(result.lines[0]!.lineTotal).toBeCloseTo(20, 2);
   });
 
+  it('SEC-07: genera un registro VeriFactu RECTIFICATION (abono, importe negativo) en la misma tx', async () => {
+    const base = makeBase({ sale: sampleSale() });
+    const verifactu = makeVerifactu();
+    const service = makeService(makePrisma(), base, verifactu);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.create(
+        { saleId: 'sale-1', reason: 'roto', lines: [{ saleLineId: 'sl-1', qty: 2 }] },
+        'user-1',
+        'ADMIN',
+      ),
+    );
+
+    expect(verifactu.createRecordInTx).toHaveBeenCalledOnce();
+    const input = verifactu.createRecordInTx.mock.calls[0]![2] as {
+      type: string;
+      returnId: string;
+      payload: { invoiceNumber: string; total: number; type: string };
+    };
+    expect(input.type).toBe('RECTIFICATION');
+    expect(input.returnId).toBe('new-return');
+    expect(input.payload.invoiceNumber).toBe('T01-000001'); // referencia el ticket original
+    expect(input.payload.type).toBe('RECTIFICATION');
+    // sl-1: neto 30/3 uds → 10/ud; devolver 2 → 20 → abono -20.
+    expect(input.payload.total).toBeCloseTo(-20, 2);
+    // El envío a la AEAT se encola tras commit (best-effort, reintentable).
+    expect(verifactu.enqueueSend).toHaveBeenCalledWith('vf', ORG);
+  });
+
   it('éxito con devolución previa parcial: permite devolver el resto disponible', async () => {
     // sl-1 vendió 3, ya devueltos 2 → disponible 1. Devolver 1 → OK, total 10.
     const base = makeBase({ sale: sampleSale(), previous: [{ saleLineId: 'sl-1', qty: 2 }] });
@@ -230,6 +289,7 @@ describe('ReturnsService.create', () => {
       service.create(
         { saleId: 'sale-1', reason: 'resto', lines: [{ saleLineId: 'sl-1', qty: 1 }] },
         'user-1',
+        'ADMIN',
       ),
     )) as unknown as { total: number };
     expect(result.total).toBeCloseTo(10, 2);
@@ -241,6 +301,7 @@ describe('ReturnsService.create', () => {
       service.create(
         { saleId: 'sale-1', reason: 'x', lines: [{ saleLineId: 'sl-1', qty: 1 }] },
         'user-1',
+        'ADMIN',
       ),
     ).rejects.toThrow();
   });
@@ -293,6 +354,9 @@ describe('ReturnsService.createBlind', () => {
   function makeBlindBase() {
     const tx = {
       $executeRaw: vi.fn(async () => 1),
+      organization: {
+        findFirst: vi.fn(async () => ({ nif: 'B11111111' })),
+      },
       return: {
         create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
           id: 'blind-1',
@@ -319,6 +383,7 @@ describe('ReturnsService.createBlind', () => {
       prisma as never,
       base as never,
       new StockService(prisma as never, new MemoryCache(), base as never, new InMemoryEventBus()),
+      makeVerifactu() as never,
     );
   }
 
@@ -333,8 +398,23 @@ describe('ReturnsService.createBlind', () => {
     const otherHash = await bcrypt.hash('9999', 10);
     const svc = service(makeBlindPrisma({ pinHash: otherHash, price: 10 }), makeBlindBase());
     await expect(
-      tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1')),
+      tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1', 'ADMIN')),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('SEC-19: bloquea (lockout) tras 5 PINs incorrectos del mismo usuario', async () => {
+    const otherHash = await bcrypt.hash('9999', 10);
+    const svc = service(makeBlindPrisma({ pinHash: otherHash, price: 10 }), makeBlindBase());
+    // 5 intentos con PIN incorrecto → rechazo normal por PIN inválido.
+    for (let i = 0; i < 5; i++) {
+      await expect(
+        tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1', 'ADMIN')),
+      ).rejects.toThrow(/PIN de autorización inválido/);
+    }
+    // El 6º queda bloqueado por el lockout (mensaje distinto), antes de comparar PIN.
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1', 'ADMIN')),
+    ).rejects.toThrow(/Demasiados intentos/);
   });
 
   it('PIN válido: crea la devolución con importe = precio actual × qty y autorizador', async () => {
@@ -343,7 +423,7 @@ describe('ReturnsService.createBlind', () => {
     const svc = service(makeBlindPrisma({ pinHash, price: 10 }), base);
 
     const res = (await tenantStorage.run({ organizationId: ORG }, () =>
-      svc.createBlind(dto, 'clerk-1'),
+      svc.createBlind(dto, 'clerk-1', 'ADMIN'),
     )) as unknown as { authorizedBy: string; total: number; saleId?: string | null };
 
     // precio 10 × qty 2 = 20.
@@ -360,7 +440,7 @@ describe('ReturnsService.createBlind', () => {
     const pinHash = await bcrypt.hash('4321', 10);
     const svc = service(makeBlindPrisma({ pinHash, price: null }), makeBlindBase());
     await expect(
-      tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1')),
+      tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1', 'ADMIN')),
     ).rejects.toThrow(/no encontrado/);
   });
 
@@ -368,7 +448,9 @@ describe('ReturnsService.createBlind', () => {
     const pinHash = await bcrypt.hash('4321', 10);
     const base = makeBlindBase();
     const svc = service(makeBlindPrisma({ pinHash, price: 10 }), base);
-    await tenantStorage.run({ organizationId: ORG }, () => svc.createBlind(dto, 'clerk-1'));
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      svc.createBlind(dto, 'clerk-1', 'ADMIN'),
+    );
     const mv = base.__tx.stockMovement.create.mock.calls[0]![0] as {
       data: { type: string; quantity: number };
     };

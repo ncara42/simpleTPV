@@ -64,24 +64,21 @@ function buildPath(path: string, query?: QueryParams): string {
 
 interface LoginResponse {
   accessToken: string;
-  refreshToken: string;
 }
 
 // Cliente API ligado a un authStore. `fetch` añade el Bearer y, ante un 401,
-// intenta UN refresh con el refreshToken; si funciona, reintenta la petición
-// original; si falla, limpia la sesión.
+// intenta UN refresh; si funciona, reintenta la petición original; si falla,
+// limpia la sesión. El refresh token NO vive en el cliente (SEC-20): viaja en una
+// cookie httpOnly que el navegador envía con `credentials: 'include'`.
 export function createApiClient(store: AuthStore, baseUrl = '/api'): ApiClient {
   const url = (path: string): string => `${baseUrl}${path}`;
 
   async function tryRefresh(): Promise<boolean> {
-    const { refreshToken, setAccessToken, clear } = store.getState();
-    if (!refreshToken) {
-      return false;
-    }
+    const { setAccessToken, clear } = store.getState();
+    // Sin body: el refresh token va en la cookie httpOnly (credentials:include).
     const res = await fetch(url('/auth/refresh'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
+      credentials: 'include',
     });
     if (!res.ok) {
       clear();
@@ -116,7 +113,12 @@ export function createApiClient(store: AuthStore, baseUrl = '/api'): ApiClient {
 
   return {
     async login(email, password) {
-      const res = await fetch(url('/auth/login'), jsonInit({ email, password }));
+      // credentials:include para que el navegador almacene la cookie httpOnly del
+      // refresh token que devuelve la API (SEC-20).
+      const res = await fetch(url('/auth/login'), {
+        ...jsonInit({ email, password }),
+        credentials: 'include',
+      });
       if (!res.ok) {
         const msg = res.status === 401 ? 'Credenciales inválidas' : `Error ${res.status}`;
         throw new Error(msg);
@@ -125,6 +127,11 @@ export function createApiClient(store: AuthStore, baseUrl = '/api'): ApiClient {
       store.getState().setTokens(tokens satisfies AuthTokens);
     },
     logout() {
+      // Revoca la sesión server-side y limpia la cookie (best-effort), luego borra
+      // el estado local. La cookie httpOnly solo la puede limpiar el servidor.
+      void fetch(url('/auth/logout'), { method: 'POST', credentials: 'include' }).catch(
+        () => undefined,
+      );
       store.getState().clear();
     },
     fetch: authedFetch,

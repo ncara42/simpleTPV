@@ -16,21 +16,24 @@ model Organization {
   currency  String   @default("EUR")
   createdAt DateTime @default(now())
 
-  stores          Store[]
-  users           User[]
-  products        Product[]
-  productFamilies ProductFamily[]
-  auditLogs       AuditLog[]
-  sales           Sale[]
-  saleLines       SaleLine[]
-  cashSessions    CashSession[]
-  returns         Return[]
-  returnLines     ReturnLine[]
-  stock           Stock[]
-  stockMovements  StockMovement[]
-  stockAlerts     StockAlert[]
-  transfers       Transfer[]
-  transferLines   TransferLine[]
+  stores             Store[]
+  users              User[]
+  products           Product[]
+  productFamilies    ProductFamily[]
+  auditLogs          AuditLog[]
+  sales              Sale[]
+  saleLines          SaleLine[]
+  cashSessions       CashSession[]
+  cashMovements      CashMovement[]
+  officialDevices    OfficialDevice[]
+  timeClockEntries   TimeClockEntry[]
+  returns            Return[]
+  returnLines        ReturnLine[]
+  stock              Stock[]
+  stockMovements     StockMovement[]
+  stockAlerts        StockAlert[]
+  transfers          Transfer[]
+  transferLines      TransferLine[]
   suppliers          Supplier[]
   purchaseOrders     PurchaseOrder[]
   purchaseOrderLines PurchaseOrderLine[]
@@ -47,17 +50,20 @@ model Store {
   ticketCounter  Int      @default(0)
   createdAt      DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  users        UserStore[]
-  sales        Sale[]
-  cashSessions CashSession[]
-  returns      Return[]
-  stock          Stock[]
-  stockMovements StockMovement[]
-  stockAlerts    StockAlert[]
-  transfersOut   Transfer[]      @relation("TransferOrigin")
-  transfersIn    Transfer[]      @relation("TransferDest")
-  purchaseOrders PurchaseOrder[]
+  organization     Organization     @relation(fields: [organizationId], references: [id])
+  users            UserStore[]
+  sales            Sale[]
+  cashSessions     CashSession[]
+  cashMovements    CashMovement[]
+  returns          Return[]
+  stock            Stock[]
+  stockMovements   StockMovement[]
+  stockAlerts      StockAlert[]
+  officialDevices  OfficialDevice[]
+  timeClockEntries TimeClockEntry[]
+  transfersOut     Transfer[]       @relation("TransferOrigin")
+  transfersIn      Transfer[]       @relation("TransferDest")
+  purchaseOrders   PurchaseOrder[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -74,14 +80,38 @@ model User {
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  stores       UserStore[]
-  sales        Sale[]
-  cashSessions CashSession[]
-  returns      Return[]
-  stockMovements StockMovement[]
+  organization     Organization     @relation(fields: [organizationId], references: [id])
+  stores           UserStore[]
+  sales            Sale[]
+  cashSessions     CashSession[]
+  cashMovements    CashMovement[]
+  returns          Return[]
+  stockMovements   StockMovement[]
+  timeClockEntries TimeClockEntry[]
+  refreshTokens    RefreshToken[]
 
   @@index([organizationId])
+}
+
+// Sesiones de refresh (SEC-06): un registro por refresh token emitido (id = jti
+// del JWT). La rotación marca usedAt y emite uno nuevo en la misma familia; si se
+// presenta un token ya usado (reuso → robo), se revoca toda la familia. La
+// EXPIRACIÓN la valida el propio JWT (exp); aquí solo vive el estado de rotación.
+// Se accede solo desde el flujo de auth con el rol app_admin (BYPASSRLS), porque
+// login/refresh corren sin contexto de tenant.
+model RefreshToken {
+  id             String    @id @db.Uuid // = jti del refresh JWT
+  organizationId String    @db.Uuid
+  userId         String    @db.Uuid
+  familyId       String    @db.Uuid
+  usedAt         DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([familyId])
+  @@index([userId])
 }
 
 model UserStore {
@@ -112,14 +142,14 @@ model Product {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization   @relation(fields: [organizationId], references: [id])
-  family       ProductFamily? @relation(fields: [familyId], references: [id])
-  saleLines    SaleLine[]
-  returnLines  ReturnLine[]
-  stock          Stock[]
-  stockMovements StockMovement[]
-  stockAlerts    StockAlert[]
-  transferLines  TransferLine[]
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  family             ProductFamily?      @relation(fields: [familyId], references: [id])
+  saleLines          SaleLine[]
+  returnLines        ReturnLine[]
+  stock              Stock[]
+  stockMovements     StockMovement[]
+  stockAlerts        StockAlert[]
+  transferLines      TransferLine[]
   purchaseOrderLines PurchaseOrderLine[]
 
   @@index([organizationId, active])
@@ -161,10 +191,10 @@ model AuditLog {
 }
 
 model Sale {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @db.Uuid
-  storeId        String   @db.Uuid
-  userId         String   @db.Uuid
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @db.Uuid
+  storeId        String        @db.Uuid
+  userId         String        @db.Uuid
   ticketNumber   String
   subtotal       Decimal       @db.Decimal(12, 2)
   discountTotal  Decimal       @default(0) @db.Decimal(12, 2)
@@ -433,20 +463,20 @@ model PurchaseOrderLine {
 // hash. Se envía a la AEAT (vía proveedor certificado) por una cola con
 // reintentos; status refleja el resultado. RLS por tenant.
 model VerifactuRecord {
-  id             String           @id @default(uuid()) @db.Uuid
-  organizationId String           @db.Uuid
-  saleId         String?          @db.Uuid
-  returnId       String?          @db.Uuid
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @db.Uuid
+  saleId         String?         @db.Uuid
+  returnId       String?         @db.Uuid
   type           VerifactuType
-  status         VerifactuStatus  @default(PENDING)
+  status         VerifactuStatus @default(PENDING)
   hash           String // huella SHA-256 de este registro
   previousHash   String? // huella del registro anterior del tenant (encadenamiento)
   qrData         String? // URL de cotejo AEAT para el ticket
   payload        Json // datos del registro (importe, fecha, nif...)
-  attempts       Int              @default(0)
+  attempts       Int             @default(0)
   lastError      String?
   sentAt         DateTime?
-  createdAt      DateTime         @default(now())
+  createdAt      DateTime        @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id])
 
@@ -467,13 +497,67 @@ model CashSession {
   openedAt       DateTime          @default(now())
   closedAt       DateTime?
 
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  store        Store          @relation(fields: [storeId], references: [id])
+  user         User           @relation(fields: [userId], references: [id])
+  movements    CashMovement[]
+  // Índice único parcial "una sola caja OPEN por tienda" definido en SQL en la
+  // migración (Prisma no soporta partial unique indexes en el schema).
+
+  @@index([organizationId, storeId, status])
+}
+
+model CashMovement {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  cashSessionId  String           @db.Uuid
+  storeId        String           @db.Uuid
+  userId         String           @db.Uuid
+  type           CashMovementType
+  amount         Decimal          @db.Decimal(12, 2)
+  reason         String
+  createdAt      DateTime         @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  cashSession  CashSession  @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
+  store        Store        @relation(fields: [storeId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@index([organizationId, cashSessionId, createdAt])
+  @@index([organizationId, storeId, createdAt])
+}
+
+model OfficialDevice {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  storeId        String    @db.Uuid
+  name           String
+  pairingToken   String    @unique
+  authorized     Boolean   @default(false)
+  pairedAt       DateTime?
+  lastSeenAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  store        Store        @relation(fields: [storeId], references: [id])
+
+  @@index([organizationId, storeId, authorized])
+}
+
+model TimeClockEntry {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @db.Uuid
+  storeId        String        @db.Uuid
+  userId         String        @db.Uuid
+  deviceId       String?       @db.Uuid
+  type           TimeClockType
+  createdAt      DateTime      @default(now())
+
   organization Organization @relation(fields: [organizationId], references: [id])
   store        Store        @relation(fields: [storeId], references: [id])
   user         User         @relation(fields: [userId], references: [id])
 
-  @@index([organizationId, storeId, status])
-  // Índice único parcial "una sola caja OPEN por tienda" definido en SQL en la
-  // migración (Prisma no soporta partial unique indexes en el schema).
+  @@index([organizationId, storeId, userId, createdAt])
 }
 
 enum SaleUnit {
@@ -502,6 +586,16 @@ enum UserRole {
 enum CashSessionStatus {
   OPEN
   CLOSED
+}
+
+enum CashMovementType {
+  IN
+  OUT
+}
+
+enum TimeClockType {
+  CLOCK_IN
+  CLOCK_OUT
 }
 
 enum MovementType {

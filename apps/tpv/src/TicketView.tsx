@@ -50,9 +50,11 @@ export function TicketView({ ticket }: { ticket: SaleTicket }) {
             <span className="ticket-line-name">{l.name}</span>
             <span className="ticket-line-calc">
               {Number(l.qty)} × {eur(l.unitPrice)}
-              {Number(l.discountPct) > 0 && (
+              {Number(l.discountPct) > 0 ? (
                 <span className="ticket-line-disc"> −{Number(l.discountPct)}%</span>
-              )}
+              ) : Number(l.discountAmt) > 0 ? (
+                <span className="ticket-line-disc"> −{eur(l.discountAmt)}</span>
+              ) : null}
             </span>
             <span className="ticket-line-total">{eur(l.lineTotal)}</span>
           </li>

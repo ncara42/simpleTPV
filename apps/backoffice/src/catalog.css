@@ -1,11 +1,18 @@
+/* Altura compartida de los controles tipo botón, igualada a la fila de subtabs
+   .bo-tabs: alto del tab (30px) + padding (2×0.18rem) + borde (2×1px). */
+:root {
+  --bo-control-height: calc(30px + 0.36rem + 2px);
+}
+
 .catalog {
-  max-width: 60rem;
+  max-width: 75rem;
   margin: 0 auto;
 }
 
 .catalog-sub {
-  margin: 0.15rem 0 0;
-  font-size: 0.88rem;
+  margin: 0.2rem 0 0;
+  font-size: 0.9rem;
+  letter-spacing: -0.012em;
   color: var(--ui-text-muted);
 }
 
@@ -34,48 +41,181 @@
   color: var(--ui-success);
 }
 
+/* ─── Usuarios: estado, permisos por rol y asignación de tiendas (#104) ─── */
+.user-state {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.user-state.on {
+  color: var(--ui-success);
+}
+.user-state.off {
+  color: var(--ui-text-muted);
+}
+.user-stores-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ui-text-soft);
+}
+/* Checkboxes nativos dentro de modales: no heredar el alto de input de texto. */
+.modal input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  accent-color: var(--ui-primary, #111);
+  cursor: pointer;
+}
+
 /* ─── Tiendas (grid de cards) ─── */
 .store-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-  gap: 0.8rem;
+  grid-template-columns: repeat(auto-fill, minmax(16.5rem, 1fr));
+  gap: 0.9rem;
 }
 .store-card {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem 1.1rem;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.15rem 1.25rem 1.1rem;
   border: 1px solid var(--ui-border);
-  border-radius: 12px;
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-sm);
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
 }
-.store-card-icon {
+.store-card:hover {
+  border-color: var(--ui-border-strong);
+  box-shadow: 0 6px 20px -12px rgba(0, 0, 0, 0.28);
+  transform: translateY(-2px);
+}
+.store-card:focus-visible {
+  outline: none;
+  border-color: var(--ui-primary);
+  box-shadow: var(--ui-focus);
+}
+/* Tienda dormida (estado administrativo inactivo): recede visualmente, pero el
+   interruptor del pie queda intacto para poder reactivarla. */
+.store-card.is-dormant {
+  background: var(--ui-surface-subtle);
+}
+.store-card.is-dormant .store-avatar,
+.store-card.is-dormant .store-card-text,
+.store-card.is-dormant .store-card-metric {
+  opacity: 0.55;
+}
+@media (prefers-reduced-motion: reduce) {
+  .store-card {
+    transition: none;
+  }
+  .store-card:hover {
+    transform: none;
+  }
+}
+.store-card-head {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 9px;
-  background: var(--ui-surface-subtle);
-  color: var(--ui-text-muted);
+  gap: 0.7rem;
+}
+/* Marca de la tienda: iniciales sobre un cuadro teal. Reconocimiento rápido. */
+.store-avatar {
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 11px;
+  background: var(--ui-brand-soft-2);
+  color: var(--ui-brand-ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 .store-card-text {
   display: flex;
   flex-direction: column;
+  gap: 0.05rem;
   min-width: 0;
+  flex: 1;
 }
 .store-card-name {
-  font-weight: 700;
+  font-size: 1.02rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
   color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .store-card-addr {
   font-size: 0.82rem;
   color: var(--ui-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Icono de puerta animado: cerrada (gris) → abierta (verde con rebote en la entrada). */
+.store-open-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  align-self: flex-start;
+  width: 1.35rem;
+  height: 1.35rem;
+  color: var(--ui-text-soft);
+  transition: color 0.35s ease, filter 0.35s ease;
+}
+.store-open-icon.on {
+  color: var(--ui-success);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--ui-success) 40%, transparent));
+}
+.store-icon-closed,
+.store-icon-open {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.store-icon-closed {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+.store-icon-open {
+  opacity: 0;
+  transform: scale(0.65) rotate(-12deg);
+}
+.store-open-icon.on .store-icon-closed {
+  opacity: 0;
+  transform: scale(0.65) rotate(12deg);
+}
+.store-open-icon.on .store-icon-open {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+  animation: store-door-open 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes store-door-open {
+  0% { transform: scale(0.55) rotate(-18deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .store-icon-closed,
+  .store-icon-open {
+    transition: opacity 0.2s ease;
+    transform: none !important;
+  }
+  .store-open-icon.on .store-icon-open {
+    animation: none;
+  }
 }
 .store-badge {
-  margin-left: auto;
   padding: 0.15rem 0.55rem;
   border-radius: 999px;
   font-size: 0.74rem;
@@ -90,34 +230,331 @@
   color: var(--ui-text-muted);
 }
 
+/* ─── Tiendas: toolbar (filtro estado + periodo) y pie de card con ventas (#101, #103) ─── */
+.stores-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.stores-period {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+/* Cifra de ventas: el dato protagonista para el jefe. */
+.store-card-metric {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.store-card-sales-value {
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.store-card-sales-label {
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--ui-text-muted);
+}
+/* Pie = control administrativo: estado + interruptor con la consecuencia escrita. */
+.store-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--ui-border);
+}
+.store-foot-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.store-status-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.store-status-text.muted {
+  color: var(--ui-text-muted);
+}
+.store-foot-hint {
+  font-size: 0.74rem;
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Interruptor encendido/apagado: ON = teal de marca, OFF = neutro. Lectura
+   universal para usuarios no técnicos, sin la jerga "Dormir". */
+.store-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 1.45rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--ui-border-strong);
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+.store-switch.on {
+  background: var(--ui-brand);
+}
+.store-switch-knob {
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.store-switch.on .store-switch-knob {
+  transform: translateX(1.05rem);
+}
+.store-switch:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+@media (prefers-reduced-motion: reduce) {
+  .store-switch,
+  .store-switch-knob {
+    transition: none;
+  }
+}
+
+/* ─── Tiendas: registro de fichajes (aperturas/cierres) + dispositivo (#100, #102) ─── */
+/* Resumen: últimas apertura y cierre, cada una con su tag, quién y cuándo. */
+.store-log-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.store-log-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.store-log-summary-who {
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.store-log-summary-when {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+/* Tag de movimiento: verde para apertura, neutro para cierre. Compartido por el
+   resumen del modal y la tabla del drawer. */
+.store-log-tag {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: 4.5rem;
+  justify-content: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+.store-log-tag.is-open {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.store-log-tag.is-close {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+
+/* Drawer lateral derecho con el registro completo de fichajes. Por encima del
+   modal de detalle (z 50). */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(10, 20, 19, 0.45);
+  display: flex;
+  justify-content: flex-end;
+}
+.store-log-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  width: min(30rem, 100%);
+  height: 100%;
+  padding: 1.5rem;
+  background: var(--ui-surface);
+  box-shadow: -24px 0 70px -24px rgba(0, 0, 0, 0.45);
+  overflow-y: auto;
+  animation: drawer-slide-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .store-log-drawer {
+    animation: none;
+  }
+}
+@keyframes drawer-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.store-log-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.store-log-drawer-head h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.2rem;
+}
+.drawer-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 999px;
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.drawer-close:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+.store-log-empty {
+  margin: 0;
+  padding: 2rem 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--ui-text-soft);
+}
+.store-log-table th,
+.store-log-table td {
+  padding: 0.6rem 0.7rem;
+}
+.store-log-table th:first-child,
+.store-log-table td:first-child {
+  padding-left: 0;
+}
+.store-log-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+
+/* Aviso del dispositivo: banner tokenizado (éxito / advertencia), radio sm. */
+.store-device-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--ui-radius-sm);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  letter-spacing: -0.012em;
+}
+.store-device-note-icon {
+  flex-shrink: 0;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.store-device-note.is-ok {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.store-device-note.is-warn {
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
+}
+/* La acción de autorizar es secundaria dentro del modal: ancho según contenido. */
+.store-detail-modal .modal-body .btn-primary {
+  align-self: flex-start;
+}
+
 /* ─── Toggle segmentado (periodos del dashboard, subtabs de stock/compras) ─── */
 .bo-tabs {
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
-  padding: 0.2rem;
-  border-radius: 9px;
+  gap: 0.15rem;
+  padding: 0.18rem;
+  border-radius: 9999px;
   background: var(--ui-surface-subtle);
   border: 1px solid var(--ui-border);
   width: fit-content;
 }
+/* Subtabs de página (Stock, Compras): separan del contenido inferior.
+   No aplica al selector de periodo del dashboard, anidado en el header. */
+.catalog > .bo-tabs {
+  margin-bottom: 1.5rem;
+}
+/* Fila de subtabs con acción a la derecha (Stock → Traspasos). */
+.stock-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+/* Botón junto a una fila de subtabs (.bo-tabs): mismo tipo de letra que los
+   tabs. La altura ya la fija .btn-primary (var --bo-control-height). */
+.btn-primary.stock-tabs-action {
+  font-size: 0.82rem;
+}
 .bo-tab {
   height: 30px;
-  padding: 0 0.85rem;
+  padding: 0 0.95rem;
   border: none;
-  border-radius: 7px;
+  border-radius: 9999px;
   background: none;
   font-size: 0.82rem;
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: -0.012em;
   color: var(--ui-text-muted);
   cursor: pointer;
   transition:
     background 0.12s,
     color 0.12s;
 }
+.bo-tab:hover {
+  color: var(--ui-text);
+}
 .bo-tab.active {
-  background: var(--ui-primary);
-  color: var(--ui-primary-fg);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 /* ─── Stock: badges por tienda (fondo suave + dot de color) ─── */
@@ -179,147 +616,214 @@
 }
 .catalog-head {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.5rem;
   flex-wrap: wrap;
 }
 .catalog-head h2 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: -0.022em;
   color: var(--ui-text);
   margin: 0;
 }
 .catalog-actions {
   display: flex;
+  align-items: center;
   gap: 0.6rem;
 }
 .catalog-search {
   height: 2.5rem;
   width: 18rem;
   max-width: 50vw;
-  border: 1.5px solid var(--tpv-line, #e4e2db);
-  border-radius: 0.6rem;
-  padding: 0 0.8rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 9999px;
+  padding: 0 1.1rem;
   font-size: 0.9rem;
+  letter-spacing: -0.012em;
+  background: var(--ui-surface);
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+.catalog-search::placeholder {
+  color: var(--ui-text-soft);
 }
 .catalog-search:focus {
   outline: none;
-  border-color: var(--tpv-teal-500, #14b8a6);
-  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
+  border-color: var(--ap-blue-focus);
+  box-shadow: var(--ui-focus);
+}
+/* Cuando .catalog-search recae sobre un <Select> propio (filtros), el chrome
+   lo aporta .ui-select-trigger; el wrapper solo conserva el ancho. */
+.ui-select.catalog-search {
+  width: auto;
+  min-width: 11rem;
+  max-width: 50vw;
+  height: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 0;
 }
 .btn-primary {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
-  height: 2.5rem;
-  padding: 0 1.1rem;
-  border: 1px solid var(--ui-primary);
-  border-radius: 0.6rem;
-  font-weight: 600;
+  height: var(--bo-control-height);
+  padding: 0 1.25rem;
+  border: none;
+  border-radius: 9999px;
+  font-weight: 500;
   font-size: 0.9rem;
+  letter-spacing: -0.012em;
   color: var(--ui-primary-fg);
   cursor: pointer;
   background: var(--ui-primary);
-  transition: background 0.12s;
+  transition:
+    background 0.12s,
+    transform 0.06s;
 }
 .btn-primary:hover {
-  background: #000;
+  background: var(--ui-primary-hover);
+}
+.btn-primary:active {
+  transform: scale(0.96);
+}
+.btn-primary:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
 }
 .btn-primary:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 .catalog-empty {
-  color: #6b7d7a;
-  padding: 2rem 0;
+  color: var(--ui-text-soft);
+  padding: 2.5rem 0;
+  font-size: 0.92rem;
+  letter-spacing: -0.012em;
 }
 .catalog-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
+  letter-spacing: -0.012em;
 }
 .catalog-table th {
   text-align: left;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: #6b7d7a;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 2px solid var(--tpv-line, #e4e2db);
+  letter-spacing: 0.05em;
+  color: var(--ui-text-soft);
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid var(--ui-border-strong);
 }
 .catalog-table td {
-  padding: 0.7rem 0.75rem;
-  border-bottom: 1px solid #f0efe9;
+  padding: 0.8rem 0.85rem;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text);
+}
+.catalog-table tbody tr {
+  transition: background 0.1s;
+}
+.catalog-table tbody tr:hover {
+  background: var(--ui-surface-subtle);
 }
 .catalog-table .muted {
-  color: #98a4a1;
+  color: var(--ui-text-soft);
 }
 .row-actions {
   text-align: right;
   white-space: nowrap;
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
 }
 .row-actions button {
-  border: none;
-  background: none;
   cursor: pointer;
   font-size: 0.85rem;
-  color: var(--tpv-teal-700, #0f766e);
-  padding: 0.2rem 0.5rem;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--ui-primary);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  transition:
+    background 0.1s,
+    border-color 0.1s;
+}
+.row-actions button:hover {
+  background: var(--ap-blue-soft);
+  border-color: var(--ui-primary);
 }
 .row-actions button.danger {
-  color: #c0392b;
+  color: var(--ui-danger);
+}
+.row-actions button.danger:hover {
+  background: var(--ui-danger-soft);
+  border-color: var(--ui-danger);
 }
 
 .modal-backdrop {
   position: fixed;
   inset: 0;
+  /* Por encima de sidebar (30) y topbar (20): el modal cubre toda la app. */
+  z-index: 50;
   background: rgba(10, 20, 19, 0.5);
   display: grid;
   place-items: center;
   padding: 1rem;
 }
 .modal {
-  background: #fff;
-  border-radius: 1rem;
-  padding: 1.75rem;
+  background: var(--ui-surface);
+  border-radius: 18px;
+  padding: 1.85rem;
   width: 100%;
   max-width: 30rem;
-  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 24px 70px -16px rgba(0, 0, 0, 0.4);
 }
 .modal h3 {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   margin-bottom: 1.1rem;
 }
 .modal label {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  font-size: 0.78rem;
+  gap: 0.35rem;
+  font-size: 0.74rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #6b7d7a;
+  letter-spacing: 0.04em;
+  color: var(--ui-text-muted);
   margin-bottom: 0.9rem;
 }
 .modal input {
   height: 2.6rem;
-  border: 1.5px solid var(--tpv-line, #e4e2db);
-  border-radius: 0.55rem;
-  padding: 0 0.75rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 10px;
+  padding: 0 0.8rem;
   font-size: 0.95rem;
   font-weight: 400;
   text-transform: none;
-  letter-spacing: normal;
-  color: #0c1413;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 .modal input:focus {
   outline: none;
-  border-color: var(--tpv-teal-500, #14b8a6);
-  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
+  border-color: var(--ap-blue-focus);
+  box-shadow: var(--ui-focus);
 }
 .modal-row {
   display: grid;
@@ -338,27 +842,279 @@
   margin-top: 0.5rem;
 }
 .modal-foot button:not(.btn-primary) {
-  height: 2.5rem;
-  padding: 0 1rem;
-  border: 1.5px solid var(--tpv-line, #e4e2db);
-  border-radius: 0.6rem;
-  background: #fff;
+  height: var(--bo-control-height);
+  padding: 0 1.1rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  font-weight: 500;
+  font-size: 0.9rem;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
   cursor: pointer;
+  transition:
+    background 0.12s,
+    transform 0.06s;
+}
+.modal-foot button:not(.btn-primary):hover {
+  background: var(--ui-surface-subtle);
+}
+.modal-foot button:not(.btn-primary):active {
+  transform: scale(0.96);
+}
+
+/* ─── Modal de formulario: cabecera + cuerpo scrollable + pie fijo (#105) ─── */
+.modal--form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.05rem;
+  /* El cuerpo hace scroll; cabecera y pie quedan fijos incluso en viewports bajos. */
+  max-height: calc(100vh - 2rem);
+}
+.modal--form h3 {
+  margin-bottom: 0;
+}
+.modal--form label {
+  margin-bottom: 0;
+}
+.modal--form .form-error {
+  margin-bottom: 0;
+}
+.modal--form .modal-foot {
+  margin-top: 0;
+  padding-top: 1.05rem;
+  border-top: 1px solid var(--ui-border, #e4e2db);
+}
+
+/* Cabecera del modal: título + subtítulo de contexto */
+.modal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.modal-sub {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ui-text-soft);
+}
+
+/* Cuerpo scrollable: contiene las secciones del formulario */
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+  /* deja aire para el scrollbar y evita recortar el foco de los inputs */
+  margin: 0 -0.25rem;
+  padding: 0.15rem 0.25rem;
+}
+
+/* Sección agrupada (Datos · Rol · Tiendas) */
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.form-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-muted);
+}
+
+/* ─── Control segmentado de rol ─── */
+.role-segment {
+  display: flex;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface-subtle);
+}
+.role-seg {
+  flex: 1;
+  height: 2.25rem;
+  border: none;
+  border-radius: 9999px;
+  background: transparent;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    transform 0.06s;
+}
+.role-seg.is-active {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font-weight: 600;
+}
+.role-seg:active {
+  transform: scale(0.96);
+}
+.role-seg:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* ─── Chips de tienda ─── */
+.store-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.store-chip {
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    color 0.12s,
+    transform 0.06s;
+}
+.store-chip.is-on {
+  border: 2px solid var(--ui-primary-hover);
+  padding: calc(0.5rem - 1px) calc(0.9rem - 1px);
+  background: var(--ui-brand-soft);
+  color: var(--ui-primary);
+}
+.store-chip:active {
+  transform: scale(0.96);
+}
+.store-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* ─── Pie partido: switch a la izquierda, acciones a la derecha ─── */
+.modal-foot--split {
+  justify-content: space-between;
+  align-items: center;
+}
+.modal-foot-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+/* ─── Switch (Usuario activo) — scope .modal--form para ganar a `.modal label` ─── */
+.modal--form .switch {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+}
+.modal--form .switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.switch-track {
+  position: relative;
+  width: 40px;
+  height: 24px;
+  border-radius: 9999px;
+  background: var(--ui-border-strong);
+  transition: background 0.16s;
+  flex-shrink: 0;
+}
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.16s;
+}
+.switch input:checked + .switch-track {
+  background: var(--ui-primary);
+}
+.switch input:checked + .switch-track .switch-thumb {
+  transform: translateX(16px);
+}
+.switch input:focus-visible + .switch-track {
+  box-shadow: var(--ui-focus);
+}
+
+/* ─── Formulario de usuario: variante compacta (#user-form) ───
+   Acotado a .user-form para no afectar al resto de modales del backoffice,
+   que comparten .modal / .modal-body / .form-section / .modal input / .modal-foot.
+   Un poco más ancho y con menos altura para que entre sin scroll en escritorio. */
+.modal.user-form {
+  max-width: 34rem;
+}
+.user-form.modal--form {
+  gap: 0.85rem;
+}
+.user-form .modal-body {
+  gap: 0.95rem;
+}
+.user-form .form-section {
+  gap: 0.5rem;
+}
+.modal.user-form input {
+  height: 2.35rem;
+}
+.user-form .role-seg {
+  height: 2.1rem;
+}
+.user-form .modal-foot {
+  padding-top: 0.85rem;
 }
 
 /* Árbol de familias */
 .fam-tree {
-  border: 1px solid var(--tpv-line, #e4e2db);
-  border-radius: 0.7rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 16px;
   overflow: hidden;
+  background: var(--ui-surface);
 }
 .fam-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.8rem 1rem;
+  padding: 0.85rem 1.1rem;
   border-bottom: 1px solid var(--ui-border);
-  font-size: 0.92rem;
+  font-size: 0.9rem;
+  letter-spacing: -0.012em;
+  transition: background 0.1s;
+}
+.fam-row:hover {
+  background: var(--ui-surface-subtle);
+}
+/* Familias raíz: fondo un punto más oscuro para distinguirlas de las hijas. */
+.fam-row--root {
+  background: var(--fam-root-bg, #ebebf0);
+}
+.fam-row--root:hover {
+  background: var(--fam-root-bg-hover, #e2e2ea);
 }
 .fam-name {
   display: inline-flex;
@@ -370,27 +1126,117 @@
 .fam-row:last-child {
   border-bottom: none;
 }
-.fam-bullet {
-  color: #98a4a1;
-  margin-right: 0.2rem;
-}
 .fam-actions {
   display: flex;
   gap: 0.3rem;
   white-space: nowrap;
 }
 .fam-actions button {
-  border: none;
-  background: none;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 9999px;
+  background: var(--ui-surface);
   cursor: pointer;
   font-size: 0.82rem;
   color: var(--tpv-teal-700, #0f766e);
-  padding: 0.2rem 0.5rem;
+  padding: 0.25rem 0.7rem;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+.fam-actions button:hover {
+  background: var(--ui-surface-subtle);
 }
 .fam-actions button.danger {
   color: #c0392b;
 }
 
+/* ─── Familias: reorganización (arrastrar + mover a) (#98) ─── */
+.fam-grip {
+  cursor: grab;
+  color: var(--ui-text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  user-select: none;
+  padding: 0 0.15rem;
+  transition:
+    color 0.12s,
+    transform 0.12s;
+}
+.fam-row:hover .fam-grip {
+  color: var(--tpv-teal-700, #0f766e);
+}
+.fam-row[draggable='true']:active {
+  cursor: grabbing;
+}
+.fam-row[draggable='true']:active .fam-grip {
+  cursor: grabbing;
+  transform: scale(1.12);
+}
+
+/* Fila en arrastre: queda como hueco de origen atenuado. */
+.fam-row.fam-dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+  background: var(--ui-surface-subtle);
+  box-shadow: inset 0 0 0 1px var(--ui-border-strong);
+}
+
+/* Línea de inserción: marca dónde caerá la fila (encima/debajo del destino).
+   ::before = línea · ::after = punto en el extremo izquierdo. */
+.fam-row--drop-before::before,
+.fam-row--drop-after::before {
+  content: '';
+  position: absolute;
+  left: 0.6rem;
+  right: 0.6rem;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--tpv-teal-500, #14b8a6);
+  z-index: 1;
+  pointer-events: none;
+}
+.fam-row--drop-before::after,
+.fam-row--drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0.45rem;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tpv-teal-500, #14b8a6);
+  z-index: 1;
+  pointer-events: none;
+}
+.fam-row--drop-before::before {
+  top: -1px;
+}
+.fam-row--drop-before::after {
+  top: -4px;
+}
+.fam-row--drop-after::before {
+  bottom: -1px;
+}
+.fam-row--drop-after::after {
+  bottom: -4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fam-grip,
+  .fam-row[draggable='true']:active .fam-grip {
+    transition: none;
+    transform: none;
+  }
+}
+.fam-move-select {
+  max-width: 12rem;
+}
+.fam-move-select .ui-select-trigger {
+  height: 2rem;
+  font-size: 0.82rem;
+  border-radius: 9999px;
+}
 
 /* Historial de ventas (#14) */
 .catalog-table tfoot td {
@@ -401,18 +1247,42 @@
 }
 .sale-voided td {
   opacity: 0.55;
+}
+.sale-voided .sale-ticket-number,
+.sale-voided td.muted,
+.sale-voided td:not(:first-child) {
   text-decoration: line-through;
 }
+.sale-ticket-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
 .sale-tag-voided {
-  display: inline-block;
-  padding: 0.1rem 0.5rem;
-  border-radius: 0.4rem;
-  font-size: 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.55rem 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
   color: #c0392b;
-  background: rgba(192, 57, 43, 0.12);
+  background: rgba(192, 57, 43, 0.1);
+  border: 1px solid rgba(192, 57, 43, 0.25);
+  text-decoration: none;
+  white-space: nowrap;
+  opacity: 1;
+}
+.sale-tag-voided::before {
+  content: '';
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: #c0392b;
+  flex: none;
 }
 .sales-pager {
   display: flex;
@@ -425,7 +1295,7 @@
   height: 2.4rem;
   padding: 0 1rem;
   border: 1.5px solid var(--tpv-line, #e4e2db);
-  border-radius: 0.6rem;
+  border-radius: 9999px;
   background: #fff;
   cursor: pointer;
   font-size: 0.9rem;
@@ -435,16 +1305,241 @@
   cursor: not-allowed;
 }
 
+/* ─── Ventas: filtros, vistas guardadas y scroll infinito (#95) ─── */
+.sales-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.sales-filters .catalog-search {
+  width: auto;
+  min-width: 11rem;
+}
+/* Los botones del filtro ("Limpiar", "Guardar vista") deben igualar la altura
+   de las pills <Select> contiguas (.ui-select-trigger → 2.5rem). */
+.sales-filters .link-btn {
+  height: 2.5rem;
+  font-size: 0.86rem;
+}
+/* Usuarios: barra de filtros (espejo de stock) con la acción "Nuevo usuario"
+   a la derecha del todo (mismo gesto que la toolbar de Tiendas). */
+.users-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.users-toolbar .sales-filters {
+  margin-bottom: 0;
+}
+
+/* ── Usuarios: selección múltiple + acciones en lote ──────────────────────
+   El círculo con tick replica el control "Recordar sesión" del login. */
+.users-select-col {
+  width: 2.75rem;
+  text-align: center;
+  padding-right: 0 !important;
+}
+.users-table tbody tr {
+  cursor: pointer;
+  user-select: none;
+}
+.users-table tbody tr.is-selected {
+  background: var(--ap-blue-soft);
+}
+.users-table tbody tr.is-selected:hover {
+  background: var(--ap-blue-soft);
+}
+/* Acento izquierdo: refuerza el cambio de color de la fila marcada. */
+.users-table tbody tr.is-selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--ap-blue);
+}
+
+/* Círculo de selección — mismo gesto que "Recordar sesión" del login. */
+.user-check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin: 0;
+  flex-shrink: 0;
+  vertical-align: middle;
+  border: 1.5px solid var(--ui-border-strong);
+  border-radius: 50%;
+  background-color: var(--ui-surface);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+}
+/* Los círculos de fila se insinúan tenues y "aparecen" al pasar el ratón o al
+   entrar en modo selección; el de cabecera (selección total) siempre nítido. */
+.users-table tbody .user-check {
+  opacity: 0.4;
+}
+.users-table tbody tr:hover .user-check,
+.users-table.has-selection tbody .user-check,
+.user-check:checked,
+.user-check:indeterminate {
+  opacity: 1;
+}
+.user-check:hover {
+  border-color: var(--ap-blue);
+}
+.user-check:checked,
+.user-check:indeterminate {
+  background-color: var(--ap-blue);
+  border-color: var(--ap-blue);
+  background-repeat: no-repeat;
+  background-position: center;
+}
+.user-check:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='8' viewBox='0 0 10 8'%3E%3Cpath d='M1 4l2.5 2.5L9 1' stroke='white' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
+}
+.user-check:indeterminate {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='2' viewBox='0 0 10 2'%3E%3Cpath d='M1 1h8' stroke='white' stroke-width='1.75' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.user-check:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* Acciones en lote integradas en la propia toolbar (sin barra aparte): en cuanto
+   hay selección, el lado derecho sustituye "Nuevo usuario" por estos controles. */
+.users-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+/* Botones de selección (Seleccionar todo / Quitar selección): secundarios, al
+   lado del filtro de tienda dentro de .sales-filters. Igualan su altura (2.5rem). */
+.users-sel-btn {
+  height: 2.5rem;
+  padding: 0 1.05rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  font-size: 0.86rem;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    transform 0.06s;
+}
+.users-sel-btn:hover {
+  background: var(--ap-blue-soft);
+  border-color: var(--ui-primary);
+}
+.users-sel-btn:active {
+  transform: scale(0.96);
+}
+.users-bulk-edit,
+.users-bulk-del {
+  height: var(--bo-control-height);
+  padding: 0 1.1rem;
+  border-radius: 9999px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  letter-spacing: -0.012em;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    transform 0.06s;
+}
+.users-bulk-edit {
+  border: none;
+  color: var(--ui-primary-fg);
+  background: var(--ap-blue);
+}
+.users-bulk-edit:hover {
+  background: var(--ap-blue-focus);
+}
+.users-bulk-del {
+  border: 1px solid var(--ui-border-strong);
+  color: var(--ui-danger);
+  background: var(--ui-surface);
+}
+.users-bulk-del:hover {
+  background: var(--ui-danger-soft);
+  border-color: var(--ui-danger);
+}
+.users-bulk-edit:active,
+.users-bulk-del:active {
+  transform: scale(0.96);
+}
+
+.sales-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+.sales-view-chip {
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-surface-subtle);
+}
+.sales-view-apply {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0.2rem 0.2rem 0.2rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ui-text-soft);
+}
+.sales-view-remove {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem 0.2rem 0.3rem;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--ui-text-muted);
+}
+.sales-view-remove:hover {
+  color: var(--ui-danger, #c0392b);
+}
+.sales-sentinel,
+.sales-end {
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--ui-text-muted);
+}
+
 .modal select {
   height: 2.6rem;
-  border: 1.5px solid var(--tpv-line, #e4e2db);
-  border-radius: 0.55rem;
-  padding: 0 0.75rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 10px;
+  padding: 0 0.8rem;
   font-size: 0.95rem;
   font-weight: 400;
   text-transform: none;
-  letter-spacing: normal;
-  background: #fff;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+.modal select:focus {
+  outline: none;
+  border-color: var(--ap-blue-focus);
+  box-shadow: var(--ui-focus);
 }
 
 /* Stock (semana 3): semáforo, tags y utilidades */
@@ -467,18 +1562,218 @@
 }
 .stock-tag {
   display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.stock-tag.stock-red,
+.stock-tag.stock-yellow,
+.stock-tag.stock-green {
+  background: none;
+  color: inherit;
+}
+
+/* ─── Stock: banda de métricas, panel envolvente y etiqueta de rotación (#96) ─── */
+/* Banda de KPIs compacta y visual: chip de icono + valor + etiqueta en una fila. */
+.stock-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.65rem;
+  margin-bottom: 1.5rem;
+}
+@media (max-width: 640px) {
+  .stock-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.stock-metric {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: var(--ui-surface);
+  /* Tono semántico por defecto = marca; cada modificador lo reescribe. */
+  --metric-ink: var(--ui-brand-ink);
+  --metric-soft: var(--ui-brand-soft);
+}
+.stock-metric-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--metric-soft);
+  color: var(--metric-ink);
+}
+.stock-metric-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.stock-metric-val {
+  font-size: 1.5rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.stock-metric-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ui-text-soft);
+}
+/* Acento semántico por token (sin hex sueltos). */
+.stock-metric-danger {
+  --metric-ink: var(--ui-danger);
+  --metric-soft: var(--ui-danger-soft);
+}
+.stock-metric-warning {
+  --metric-ink: var(--ui-warning);
+  --metric-soft: var(--ui-warning-soft);
+}
+.stock-metric-success {
+  --metric-ink: var(--ui-success);
+  --metric-soft: var(--ui-success-soft);
+}
+
+/* Panel que enmarca la toolbar de filtros + la tabla (espejo de .dash-panel). */
+.stock-panel {
+  border: 1px solid var(--ui-border);
+  border-radius: 18px;
+  background: var(--ui-surface);
+  overflow: hidden;
+}
+.stock-panel .sales-filters {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+/* La tabla vive dentro del panel sin doble borde; cabeceras y filas alineadas
+   con el padding de la toolbar (1rem). */
+.stock-panel .catalog-table th,
+.stock-panel .catalog-table td {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+.stock-panel .catalog-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.stock-panel .catalog-empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+}
+.rotation-tag {
+  display: inline-block;
   padding: 0.1rem 0.5rem;
   border-radius: 0.4rem;
-  font-size: 0.8rem;
-  background: #f1f5f9;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
-.stock-tag.stock-red {
+.rotation-alta {
+  background: #dcfce7;
+  color: #166534;
+}
+.rotation-media {
+  background: #fef9c3;
+  color: #854d0e;
+}
+.rotation-baja {
   background: #fee2e2;
   color: #991b1b;
 }
-.stock-tag.stock-yellow {
+
+/* ─── Promociones: tarjetas de reglas y previsualización (#99) ─── */
+.promo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.promo-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 16px;
+  background: var(--ui-surface);
+  transition: border-color 0.12s;
+}
+.promo-card:hover {
+  border-color: var(--ui-border-strong);
+}
+.promo-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.3rem;
+}
+.promo-name {
+  font-weight: 700;
+  color: var(--ui-text);
+}
+.promo-rule {
+  margin: 0 0 0.2rem;
+  font-size: 0.9rem;
+  color: var(--ui-text-soft);
+}
+.promo-dates {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ui-text-muted);
+}
+.promo-card-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.5rem;
+}
+.promo-badge {
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.promo-activa {
+  background: #dcfce7;
+  color: #166534;
+}
+.promo-programada {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.promo-expirada {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.promo-pausada {
   background: #fef3c7;
   color: #92400e;
+}
+.promo-preview {
+  padding: 0.75rem 0.85rem;
+  border: 1px dashed var(--ui-border);
+  border-radius: 0.6rem;
+  background: var(--ui-surface-subtle);
+}
+.promo-preview-title {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-muted);
+}
+.promo-preview p {
+  margin: 0.15rem 0;
+  font-size: 0.9rem;
 }
 .stock-stores {
   list-style: none;
@@ -489,11 +1784,23 @@
   gap: 0.25rem;
 }
 .link-btn {
-  background: none;
-  border: none;
-  color: #2563eb;
+  display: inline-flex;
+  align-items: center;
+  height: 2rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  color: var(--ui-primary);
   cursor: pointer;
-  padding: 0 0.25rem;
   font-size: 0.85rem;
-  text-decoration: underline;
+  letter-spacing: -0.012em;
+  text-decoration: none;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+.link-btn:hover {
+  background: var(--ui-surface-subtle);
+  text-decoration: none;
 }

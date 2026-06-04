@@ -32,9 +32,10 @@ describe('Auth integración (login + tenant desde JWT)', () => {
     await base.onModuleInit();
     prisma = applyTenantExtension(base);
 
-    // El lookup de login usa DATABASE_URL_AUTH (rol app_admin, BYPASSRLS).
+    // El lookup de auth usa DATABASE_URL_AUTH (rol app_admin, BYPASSRLS) e implementa
+    // tanto el lookup de usuarios como el store de refresh tokens (SEC-06).
     lookup = new AuthLookupService();
-    auth = new AuthService(lookup, new JwtService({}), {
+    auth = new AuthService(lookup, lookup, new JwtService({}), {
       accessSecret: 'itest-access',
       refreshSecret: 'itest-refresh',
       accessTtl: '15m',

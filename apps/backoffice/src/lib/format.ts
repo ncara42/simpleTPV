@@ -1,6 +1,11 @@
 // Helpers de formato puros (testeables con vitest) usados por el dashboard.
 
 const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
+const eurCompact = new Intl.NumberFormat('es-ES', {
+  style: 'currency',
+  currency: 'EUR',
+  maximumFractionDigits: 0,
+});
 
 // Importe en euros: 1234.5 → "1234,50 €". Tolera null/undefined → "—".
 export function fmtEur(value: number | null | undefined): string {
@@ -8,6 +13,15 @@ export function fmtEur(value: number | null | undefined): string {
     return '—';
   }
   return eur.format(value);
+}
+
+// Importe en euros sin céntimos: 1234.5 → "1235 €". Para etiquetas estrechas
+// (p.ej. dentro de las barras del dashboard). null/undefined → "—".
+export function fmtEurCompact(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return '—';
+  }
+  return eurCompact.format(value);
 }
 
 // Proporción 0–1 → porcentaje "12,3 %". Útil para tasas (descuento, margen…).
@@ -49,4 +63,28 @@ export function fmtHours(value: number | null | undefined): string {
     return '—';
   }
   return `${value.toFixed(1).replace('.', ',')} h`;
+}
+
+const MONTHS_ES = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+];
+
+// Fecha ISO "YYYY-MM-DD" → "4 jun" (día + mes abreviado en castellano). Sin Date para
+// evitar desfases de zona horaria. Entrada inválida → "—".
+export function fmtDayMonth(date: string | null | undefined): string {
+  if (!date) return '—';
+  const [, m, d] = date.split('-').map((n) => Number.parseInt(n, 10));
+  if (!m || !d || m < 1 || m > 12) return '—';
+  return `${d} ${MONTHS_ES[m - 1]}`;
 }

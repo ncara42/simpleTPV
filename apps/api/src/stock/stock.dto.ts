@@ -1,4 +1,15 @@
-import { IsNotEmpty, IsNumber, IsString, IsUUID, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  IsUUID,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 // Configuración del stock mínimo de un producto en una tienda (#29).
 export class SetMinStockDto {
@@ -31,4 +42,29 @@ export class AdjustStockDto {
   @IsString()
   @IsNotEmpty()
   reason!: string;
+}
+
+export class InventoryCountLineDto {
+  @IsUUID()
+  productId!: string;
+
+  @IsNumber()
+  @Min(0)
+  countedQuantity!: number;
+}
+
+export class ConfirmInventoryCountDto {
+  @IsUUID()
+  storeId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(1000)
+  @ValidateNested({ each: true })
+  @Type(() => InventoryCountLineDto)
+  lines!: InventoryCountLineDto[];
 }

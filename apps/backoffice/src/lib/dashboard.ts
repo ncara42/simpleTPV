@@ -22,6 +22,10 @@ export interface SalesTodayResponse {
     yesterday: number;
     deltaPct: number | null;
   }>;
+  // Serie diaria de facturación para la sparkline de la card. Opcional: hoy solo
+  // la rellena el modo demo; cuando se cablee la API real habrá que añadir el
+  // GROUP BY DATE_TRUNC en dashboard.service.ts.
+  series?: number[];
 }
 
 export interface FamilySales {
@@ -38,6 +42,13 @@ export interface SalesKpis {
   upt: number;
   discountRate: number;
   returnRate: number;
+  // Series diarias por métrica para las sparklines (ver nota en SalesTodayResponse).
+  series?: {
+    avgTicket: number[];
+    upt: number[];
+    discountRate: number[];
+    returnRate: number[];
+  };
 }
 
 export interface MarginKpis {
@@ -45,6 +56,8 @@ export interface MarginKpis {
   realMargin: number;
   marginPct: number;
   revenue: number;
+  // Serie diaria de marginPct para la sparkline (ver nota en SalesTodayResponse).
+  series?: number[];
 }
 
 export interface StockoutKpis {

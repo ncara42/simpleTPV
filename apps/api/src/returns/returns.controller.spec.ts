@@ -27,7 +27,7 @@ describe('ReturnsController', () => {
 
     const res = (await controller.create(dto as never, req('CLERK'))) as { id: string };
 
-    expect(service.create).toHaveBeenCalledWith(dto, 'user-1');
+    expect(service.create).toHaveBeenCalledWith(dto, 'user-1', 'CLERK');
     expect(res.id).toBe('return-1');
   });
 
@@ -40,7 +40,7 @@ describe('ReturnsController', () => {
       lines: [{ productId: 'p1', qty: 1 }],
     };
     const res = (await controller.createBlind(dto as never, req('CLERK'))) as { id: string };
-    expect(service.createBlind).toHaveBeenCalledWith(dto, 'user-1');
+    expect(service.createBlind).toHaveBeenCalledWith(dto, 'user-1', 'CLERK');
     expect(res.id).toBe('blind-1');
   });
 

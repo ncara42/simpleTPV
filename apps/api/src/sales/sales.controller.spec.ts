@@ -70,17 +70,17 @@ describe('SalesController', () => {
     const { controller, service } = makeController();
     const query = { storeId: STORE, date: '2026-05-28', page: 2, pageSize: 10 };
 
-    const res = (await controller.findSales(query)) as { page: number };
+    const res = (await controller.findSales(query, req('MANAGER'))) as { page: number };
 
-    expect(service.findSales).toHaveBeenCalledWith(query);
+    expect(service.findSales).toHaveBeenCalledWith(query, 'user-1', 'MANAGER');
     expect(res).toMatchObject({ page: 1, totals: { count: 0, totalAmount: 0 } });
   });
 
   it('GET /sales sin filtros pasa la query vacía tal cual', async () => {
     const { controller, service } = makeController();
 
-    await controller.findSales({});
+    await controller.findSales({}, req('ADMIN'));
 
-    expect(service.findSales).toHaveBeenCalledWith({});
+    expect(service.findSales).toHaveBeenCalledWith({}, 'user-1', 'ADMIN');
   });
 });
