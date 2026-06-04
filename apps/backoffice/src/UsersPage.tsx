@@ -1,5 +1,6 @@
 import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { DEMO_STORES, type DemoUser, ROLE_LABEL } from './demo/demoData.js';
@@ -153,6 +154,20 @@ export function UsersPage() {
     } else {
       setOverrides((prev) => ({ ...prev, [f.id as string]: patch }));
     }
+  };
+
+  // Activa/desactiva un usuario desde su badge en la tabla, conservando el
+  // resto del overlay local (demo: no hay backend que persista el cambio).
+  const toggleActive = (id: string): void => {
+    const current = allUsers.find((u) => u.id === id);
+    if (!current) return;
+    const active = !current.active;
+    if (extras.some((u) => u.id === id)) {
+      setExtras((prev) => prev.map((u) => (u.id === id ? { ...u, active } : u)));
+    } else {
+      setOverrides((prev) => ({ ...prev, [id]: { ...prev[id], active } }));
+    }
+    invalidate();
   };
 
   // Borrado en lote en local (demo: deleteUser es un stub sin backend).
@@ -354,9 +369,34 @@ export function UsersPage() {
                     </td>
                     <td className="muted">{storesLabel(u.role, u.storeIds ?? [])}</td>
                     <td>
-                      <span className={`user-state ${u.active ? 'on' : 'off'}`}>
-                        {u.active ? 'Activo' : 'Inactivo'}
-                      </span>
+                      <button
+                        type="button"
+                        className={`user-state ${u.active ? 'on' : 'off'}`}
+                        title={
+                          u.active
+                            ? 'Activo — pulsa para desactivar'
+                            : 'Inactivo — pulsa para activar'
+                        }
+                        aria-label={u.active ? 'Activo' : 'Inactivo'}
+                        aria-pressed={u.active}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleActive(u.id);
+                        }}
+                      >
+                        <Check
+                          className="user-state__icon user-state__icon--on"
+                          size={14}
+                          strokeWidth={3}
+                          aria-hidden="true"
+                        />
+                        <X
+                          className="user-state__icon user-state__icon--off"
+                          size={14}
+                          strokeWidth={3}
+                          aria-hidden="true"
+                        />
+                      </button>
                     </td>
                   </tr>
                 );

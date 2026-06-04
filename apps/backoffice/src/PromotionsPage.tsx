@@ -81,11 +81,30 @@ export function PromotionsPage() {
   const [promos, setPromos] = useState<DemoPromotion[]>(DEMO_PROMOTIONS);
   const [filter, setFilter] = useState<'all' | PromoStatus>('all');
   const [form, setForm] = useState<PromoForm | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
 
   const visible = useMemo(
     () => promos.filter((p) => filter === 'all' || promoStatus(p) === filter),
     [promos, filter],
   );
+
+  // ── Selección múltiple + acciones en lote (mismo patrón que Usuarios) ──
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const toggleSelect = (id: string): void =>
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const clearSelection = (): void => setSelected([]);
+  const allVisibleSelected = visible.length > 0 && visible.every((p) => selectedSet.has(p.id));
+  const selectAllVisible = (): void =>
+    setSelected((prev) => [...new Set([...prev, ...visible.map((p) => p.id)])]);
+
+  const selectedPromos = useMemo(
+    () => promos.filter((p) => selectedSet.has(p.id)),
+    [promos, selectedSet],
+  );
+  // Pausar/activar solo aplica a las que están vigentes (activa ⇄ pausada).
+  const activeSel = selectedPromos.filter((p) => promoStatus(p) === 'activa');
+  const pausedSel = selectedPromos.filter((p) => promoStatus(p) === 'pausada');
+
   const save = (f: PromoForm): void => {
     if (f.id) {
       const id = f.id;
@@ -94,31 +113,111 @@ export function PromotionsPage() {
       setPromos((prev) => [{ ...(f as DemoPromotion), id: `promo-${prev.length + 1}` }, ...prev]);
     }
     setForm(null);
+    clearSelection();
   };
-  const toggle = (id: string): void =>
-    setPromos((prev) => prev.map((p) => (p.id === id ? { ...p, active: !p.active } : p)));
+  const editSelected = (): void => {
+    const target = selectedPromos[0];
+    if (target) setForm({ ...target });
+  };
+  const setActiveFor = (ids: Set<string>, active: boolean): void => {
+    setPromos((prev) => prev.map((p) => (ids.has(p.id) ? { ...p, active } : p)));
+    clearSelection();
+  };
+  const pauseSelected = (): void => setActiveFor(new Set(activeSel.map((p) => p.id)), false);
+  const activateSelected = (): void => setActiveFor(new Set(pausedSel.map((p) => p.id)), true);
+  const removeSelected = (): void => {
+    setPromos((prev) => prev.filter((p) => !selectedSet.has(p.id)));
+    clearSelection();
+  };
 
   usePageHeader('Promociones', 'Descuentos y reglas programables');
 
   return (
     <section className="catalog">
       <div className="table-panel">
-        <div className="table-toolbar">
-          <Select
-            className="promo-filter-select"
-            value={filter}
-            onChange={(value) => setFilter(value as 'all' | PromoStatus)}
-            ariaLabel="Filtrar por estado"
-            data-testid="promo-filters"
-            options={STATUS_FILTERS.map((f) => ({ value: f.id, label: f.label }))}
-          />
-          <button
-            className="btn-primary"
-            onClick={() => setForm({ ...EMPTY })}
-            data-testid="new-promo"
-          >
-            Nueva promoción
-          </button>
+        <div className="users-toolbar">
+          <div className="sales-filters">
+            <Select
+              className="promo-filter-select"
+              value={filter}
+              onChange={(value) => setFilter(value as 'all' | PromoStatus)}
+              ariaLabel="Filtrar por estado"
+              data-testid="promo-filters"
+              options={STATUS_FILTERS.map((f) => ({ value: f.id, label: f.label }))}
+            />
+            {selected.length > 0 && (
+              <>
+                {!allVisibleSelected && (
+                  <button
+                    type="button"
+                    className="users-sel-btn"
+                    onClick={selectAllVisible}
+                    data-testid="promo-select-all"
+                  >
+                    Seleccionar todo
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="users-sel-btn"
+                  onClick={clearSelection}
+                  data-testid="promo-clear"
+                >
+                  Quitar selección
+                </button>
+              </>
+            )}
+          </div>
+          {selected.length > 0 ? (
+            <div className="users-toolbar-actions">
+              {selected.length === 1 && (
+                <button
+                  type="button"
+                  className="users-bulk-edit"
+                  onClick={editSelected}
+                  data-testid="promo-edit"
+                >
+                  Editar
+                </button>
+              )}
+              {activeSel.length > 0 && (
+                <button
+                  type="button"
+                  className="promo-bulk-toggle"
+                  onClick={pauseSelected}
+                  data-testid="promo-pause"
+                >
+                  Pausar{activeSel.length > 1 ? ` (${activeSel.length})` : ''}
+                </button>
+              )}
+              {pausedSel.length > 0 && (
+                <button
+                  type="button"
+                  className="promo-bulk-toggle"
+                  onClick={activateSelected}
+                  data-testid="promo-activate"
+                >
+                  Activar{pausedSel.length > 1 ? ` (${pausedSel.length})` : ''}
+                </button>
+              )}
+              <button
+                type="button"
+                className="users-bulk-del"
+                onClick={removeSelected}
+                data-testid="promo-delete"
+              >
+                Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
+              </button>
+            </div>
+          ) : (
+            <button
+              className="btn-primary"
+              onClick={() => setForm({ ...EMPTY })}
+              data-testid="new-promo"
+            >
+              Nueva promoción
+            </button>
+          )}
         </div>
 
         {visible.length === 0 ? (
@@ -126,23 +225,42 @@ export function PromotionsPage() {
             No hay promociones con ese estado.
           </p>
         ) : (
-          <table className="catalog-table promo-table" data-testid="promo-list">
+          <table
+            className={`catalog-table promo-table${selected.length ? ' has-selection' : ''}`}
+            data-testid="promo-list"
+          >
             <thead>
               <tr>
+                <th className="users-select-col" aria-label="Selección" />
                 <th>Promoción</th>
                 <th>Condición</th>
                 <th>Descuento</th>
                 <th>Vigencia</th>
                 <th>Estado</th>
-                <th aria-label="Acciones" />
               </tr>
             </thead>
             <tbody>
               {visible.map((p) => {
                 const status = promoStatus(p);
-                const canToggle = status === 'activa' || status === 'pausada';
+                const isSel = selectedSet.has(p.id);
                 return (
-                  <tr key={p.id} data-testid="promo-card">
+                  <tr
+                    key={p.id}
+                    className={isSel ? 'is-selected' : undefined}
+                    aria-selected={isSel}
+                    onClick={() => toggleSelect(p.id)}
+                    data-testid="promo-card"
+                  >
+                    <td className="users-select-col" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="user-check"
+                        aria-label={`Seleccionar ${p.name}`}
+                        data-testid="promo-select"
+                        checked={isSel}
+                        onChange={() => toggleSelect(p.id)}
+                      />
+                    </td>
                     <td className="promo-name-cell">{p.name}</td>
                     <td className="muted">{conditionShort(p)}</td>
                     <td>
@@ -153,24 +271,6 @@ export function PromotionsPage() {
                       <span className={`promo-badge promo-${status}`} data-testid="promo-status">
                         {STATUS_LABEL[status]}
                       </span>
-                    </td>
-                    <td className="promo-actions-cell">
-                      {canToggle && (
-                        <button
-                          className="link-btn"
-                          onClick={() => toggle(p.id)}
-                          data-testid="promo-toggle"
-                        >
-                          {p.active ? 'Pausar' : 'Activar'}
-                        </button>
-                      )}
-                      <button
-                        className="link-btn"
-                        onClick={() => setForm({ ...p })}
-                        data-testid="promo-edit"
-                      >
-                        Editar
-                      </button>
                     </td>
                   </tr>
                 );

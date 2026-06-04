@@ -43,14 +43,64 @@
 
 /* ─── Usuarios: estado, permisos por rol y asignación de tiendas (#104) ─── */
 .user-state {
-  font-size: 0.78rem;
-  font-weight: 600;
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    background-color 0.25s ease,
+    transform 0.12s ease;
+}
+.user-state:hover {
+  transform: scale(1.12);
+}
+.user-state:active {
+  transform: scale(0.9);
+}
+.user-state:focus-visible {
+  outline: 2px solid var(--ui-text-muted);
+  outline-offset: 2px;
 }
 .user-state.on {
-  color: var(--ui-success);
+  background: var(--ui-success);
 }
 .user-state.off {
-  color: var(--ui-text-muted);
+  background: var(--ui-danger);
+}
+
+/* Tick y cruz apilados en la misma celda de grid: crossfade con giro al
+   alternar estado. place-items del botón los centra y deja el transform libre. */
+.user-state__icon {
+  grid-area: 1 / 1;
+  transition:
+    opacity 0.2s ease,
+    transform 0.25s ease;
+}
+.user-state.on .user-state__icon--on,
+.user-state.off .user-state__icon--off {
+  opacity: 1;
+  transform: rotate(0) scale(1);
+}
+.user-state.on .user-state__icon--off {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.4);
+}
+.user-state.off .user-state__icon--on {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.4);
+}
+@media (prefers-reduced-motion: reduce) {
+  .user-state,
+  .user-state__icon {
+    transition: none;
+  }
 }
 .user-stores-note {
   margin: 0;
@@ -812,7 +862,14 @@
   background: var(--ui-surface-subtle);
 }
 .catalog-table td {
-  padding: 0.8rem 0.85rem;
+  /* Altura de fila fija: todas las filas miden lo mismo —y entre tablas
+     distintas— sin importar si la celda lleva texto, badge, toggle o botones.
+     El alto lo gobierna `height`; el padding vertical es 0 y el contenido se
+     centra con vertical-align. La celda más alta (botón ~28px / toggle 24px)
+     cabe holgada en 3.5rem. */
+  height: 3.5rem;
+  padding: 0 0.85rem;
+  vertical-align: middle;
   border-bottom: 1px solid var(--ui-border);
   color: var(--ui-text);
 }
@@ -1458,14 +1515,17 @@
   text-align: center;
   padding-right: 0 !important;
 }
-.users-table tbody tr {
+.users-table tbody tr,
+.promo-table tbody tr {
   cursor: pointer;
   user-select: none;
 }
-.users-table tbody tr.is-selected {
+.users-table tbody tr.is-selected,
+.promo-table tbody tr.is-selected {
   background: var(--ap-blue-soft);
 }
-.users-table tbody tr.is-selected:hover {
+.users-table tbody tr.is-selected:hover,
+.promo-table tbody tr.is-selected:hover {
   background: var(--ap-blue-soft);
 }
 
@@ -1489,11 +1549,14 @@
 }
 /* Los círculos de fila se insinúan tenues y "aparecen" al pasar el ratón o al
    entrar en modo selección; el de cabecera (selección total) siempre nítido. */
-.users-table tbody .user-check {
+.users-table tbody .user-check,
+.promo-table tbody .user-check {
   opacity: 0.4;
 }
 .users-table tbody tr:hover .user-check,
 .users-table.has-selection tbody .user-check,
+.promo-table tbody tr:hover .user-check,
+.promo-table.has-selection tbody .user-check,
 .user-check:checked,
 .user-check:indeterminate {
   opacity: 1;
@@ -1553,7 +1616,8 @@
   transform: scale(0.96);
 }
 .users-bulk-edit,
-.users-bulk-del {
+.users-bulk-del,
+.promo-bulk-toggle {
   height: var(--bo-control-height);
   padding: 0 1.1rem;
   border-radius: 9999px;
@@ -1584,7 +1648,8 @@
   border-color: var(--ui-danger);
 }
 .users-bulk-edit:active,
-.users-bulk-del:active {
+.users-bulk-del:active,
+.promo-bulk-toggle:active {
   transform: scale(0.96);
 }
 
@@ -1873,29 +1938,16 @@
   background: var(--ap-blue-soft);
   color: var(--ui-primary);
 }
-/* Acciones por fila ancladas a la derecha; tenues en reposo y nítidas al pasar el
-   ratón sobre la fila (mismo gesto que los círculos de selección de Usuarios). */
-.promo-actions-cell {
-  text-align: right;
-  white-space: nowrap;
+/* Pausar/Activar en lote: secundario neutro, a juego con Editar/Borrar de la
+   toolbar de selección (misma geometría que .users-bulk-*). */
+.promo-bulk-toggle {
+  border: 1px solid var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--ui-surface);
 }
-.promo-actions-cell .link-btn {
-  height: 1.9rem;
-  padding: 0 0.8rem;
-  font-size: 0.82rem;
-}
-.promo-actions-cell .link-btn + .link-btn {
-  margin-left: 0.35rem;
-}
-.promo-table tbody tr .promo-actions-cell .link-btn {
-  opacity: 0.5;
-  transition:
-    opacity 0.12s,
-    background 0.12s;
-}
-.promo-table tbody tr:hover .promo-actions-cell .link-btn,
-.promo-actions-cell .link-btn:focus-visible {
-  opacity: 1;
+.promo-bulk-toggle:hover {
+  background: var(--ap-blue-soft);
+  border-color: var(--ui-primary);
 }
 /* Estado de promoción como indicador "punto + etiqueta": el color vive
    en el punto, el texto queda en tinta. Limpio y profesional, sin pills
