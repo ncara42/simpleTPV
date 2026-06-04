@@ -1,4 +1,5 @@
 import { stockLevel } from '@simpletpv/auth';
+import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -116,43 +117,41 @@ export function GlobalStockSection() {
           onChange={(e) => setSearch(e.target.value)}
           data-testid="stock-search"
         />
-        <select
+        <Select
           className="catalog-search"
           value={familyId}
-          onChange={(e) => setFamilyId(e.target.value)}
+          onChange={(value) => setFamilyId(value)}
+          ariaLabel="Filtrar por familia"
           data-testid="stock-family"
-        >
-          <option value="">Todas las familias</option>
-          {DEMO_FAMILIES.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </select>
-        <select
+          options={[
+            { value: '', label: 'Todas las familias' },
+            ...DEMO_FAMILIES.map((f) => ({ value: f.id, label: f.name })),
+          ]}
+        />
+        <Select
           className="catalog-search"
           value={storeId}
-          onChange={(e) => setStoreId(e.target.value)}
+          onChange={(value) => setStoreId(value)}
+          ariaLabel="Filtrar por tienda"
           data-testid="stock-store"
-        >
-          <option value="">Todas las tiendas</option>
-          {storeOptions.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        <select
+          options={[
+            { value: '', label: 'Todas las tiendas' },
+            ...storeOptions.map((s) => ({ value: s.id, label: s.name })),
+          ]}
+        />
+        <Select
           className="catalog-search"
           value={rotation}
-          onChange={(e) => setRotation(e.target.value)}
+          onChange={(value) => setRotation(value)}
+          ariaLabel="Filtrar por rotación"
           data-testid="stock-rotation"
-        >
-          <option value="">Toda rotación</option>
-          <option value="alta">Rotación alta</option>
-          <option value="media">Rotación media</option>
-          <option value="baja">Rotación baja</option>
-        </select>
+          options={[
+            { value: '', label: 'Toda rotación' },
+            { value: 'alta', label: 'Rotación alta' },
+            { value: 'media', label: 'Rotación media' },
+            { value: 'baja', label: 'Rotación baja' },
+          ]}
+        />
       </div>
 
       {filtered.length === 0 ? (
