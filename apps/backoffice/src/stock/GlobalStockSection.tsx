@@ -149,7 +149,17 @@ export function GlobalStockSection() {
                     <td>{row.productName}</td>
                     <td className="muted">{productRootFamily(row.productId)?.name ?? '—'}</td>
                     <td>
-                      <span className={`rotation-tag rotation-${rot}`}>{ROTATION_LABEL[rot]}</span>
+                      <span
+                        className={`rotation-meter rotation-${rot}`}
+                        title={`Rotación ${ROTATION_LABEL[rot].toLowerCase()}`}
+                      >
+                        <span className="rotation-bars" aria-hidden="true">
+                          <i />
+                          <i />
+                          <i />
+                        </span>
+                        <span className="rotation-label">{ROTATION_LABEL[rot]}</span>
+                      </span>
                     </td>
                     <td>
                       <span className="stock-badges">
@@ -157,7 +167,7 @@ export function GlobalStockSection() {
                           <button
                             type="button"
                             key={st.storeId}
-                            className={`store-stock-badge stock-${st.level}`}
+                            className={`store-stock-badge sb-${st.level}`}
                             onClick={() =>
                               setAdjusting({
                                 productId: row.productId,
@@ -171,8 +181,8 @@ export function GlobalStockSection() {
                             data-testid="stock-store-cell"
                             title={`${LEVEL_LABEL[st.level]} · mín ${st.minStock} · clic para ajustar`}
                           >
-                            <span className={`stock-dot stock-${st.level}`} />
-                            {st.storeName} : {st.quantity}
+                            <span className="store-stock-name">{st.storeName}</span>
+                            <span className="store-stock-qty">{st.quantity}</span>
                           </button>
                         ))}
                       </span>

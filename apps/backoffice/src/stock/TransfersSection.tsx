@@ -29,7 +29,7 @@ export function TransfersSection() {
         <div className="sales-filters">
           <button
             type="button"
-            className="btn-primary stock-tabs-action stock-toolbar-action"
+            className="btn-primary stock-toolbar-action"
             onClick={() => setCreating(true)}
             data-testid="new-transfer"
           >

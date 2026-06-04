@@ -570,24 +570,67 @@
   margin-left: auto;
 }
 
-/* ─── Stock: badges por tienda (fondo suave + dot de color) ─── */
+/* ─── Stock: existencias por tienda ───────────────────────────────
+   Chip limpio "nombre + contador". El color solo aparece donde importa
+   (bajo / agotado); el stock sano queda neutro y silencioso. */
 .stock-badges {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: 0.35rem;
 }
 .store-stock-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.18rem 0.6rem;
+  gap: 0.45rem;
+  padding: 0.2rem 0.3rem 0.2rem 0.62rem;
   border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  background: var(--ui-surface-subtle) !important;
-  color: var(--ui-text) !important;
+  background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+  /* Por defecto (nivel "green" = sano): contador neutro. */
+  --qty-soft: var(--ui-surface-subtle);
+  --qty-ink: var(--ui-text);
+}
+.store-stock-badge:hover {
+  border-color: var(--ui-text-soft);
+  background: var(--ui-surface-subtle);
+}
+.store-stock-badge:focus-visible {
+  outline: none;
+  border-color: var(--ui-primary);
+  box-shadow: var(--ui-focus);
+}
+.store-stock-badge.sb-yellow {
+  --qty-soft: var(--ui-warning-soft);
+  --qty-ink: var(--ui-warning);
+}
+.store-stock-badge.sb-red {
+  --qty-soft: var(--ui-danger-soft);
+  --qty-ink: var(--ui-danger);
+}
+.store-stock-name {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ui-text-muted);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.store-stock-qty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.45rem;
+  height: 1.45rem;
+  padding: 0 0.42rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--qty-soft);
+  color: var(--qty-ink);
 }
 .subtab-badge {
   margin-left: 0.35rem;
@@ -1759,24 +1802,45 @@
   padding: 2.5rem 1rem;
   text-align: center;
 }
-.rotation-tag {
-  display: inline-block;
-  padding: 0.1rem 0.5rem;
-  border-radius: 0.4rem;
-  font-size: 0.75rem;
-  font-weight: 600;
+/* ─── Stock: rotación como medidor de barras ───────────────────────
+   Escala ordinal (alta/media/baja) leída de un vistazo. Monocromo y
+   silencioso: las barras llenas usan tinta; las vacías, hairline. */
+.rotation-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
-.rotation-alta {
-  background: #dcfce7;
-  color: #166534;
+.rotation-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
 }
-.rotation-media {
-  background: #fef9c3;
-  color: #854d0e;
+.rotation-bars i {
+  display: block;
+  width: 3px;
+  border-radius: 1.5px;
+  background: var(--ui-border);
 }
-.rotation-baja {
-  background: #fee2e2;
-  color: #991b1b;
+.rotation-bars i:nth-child(1) {
+  height: 7px;
+}
+.rotation-bars i:nth-child(2) {
+  height: 10px;
+}
+.rotation-bars i:nth-child(3) {
+  height: 13px;
+}
+/* Segmentos activos según el nivel. */
+.rotation-alta .rotation-bars i,
+.rotation-media .rotation-bars i:nth-child(-n + 2),
+.rotation-baja .rotation-bars i:nth-child(1) {
+  background: var(--ui-text);
+}
+.rotation-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ui-text-muted);
+  letter-spacing: -0.01em;
 }
 
 /* ─── Promociones: tarjetas de reglas y previsualización (#99) ─── */
