@@ -16,7 +16,7 @@ export const api = isDemo()
   ? {
       ...setup.api,
       login: (_email: string, _password: string): Promise<void> => {
-        setup.useAuthStore.getState().setTokens({ accessToken: DEMO_JWT, refreshToken: DEMO_JWT });
+        setup.useAuthStore.getState().setTokens({ accessToken: DEMO_JWT });
         return Promise.resolve();
       },
       subscribeEvents: (_onEvent: (event: AppEvent) => void): (() => void) => {

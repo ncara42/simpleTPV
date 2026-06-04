@@ -1,3 +1,4 @@
+import { Select } from '@simpletpv/ui';
 import { useEffect, useState } from 'react';
 
 import type { CartItem } from './lib/cart.js';
@@ -143,18 +144,17 @@ export function DiscountModal({
             <div className="space-y-3">
               <label className="block space-y-1.5">
                 <span className="text-xs font-medium text-neutral-500">Línea</span>
-                <select
+                <Select
                   value={productId}
-                  onChange={(e) => setProductId(e.target.value)}
+                  onChange={setProductId}
+                  options={items.map((i) => ({
+                    value: i.productId,
+                    label: i.name,
+                  }))}
+                  ariaLabel="Línea"
                   data-testid="disc-item"
-                  className="h-9 w-full rounded-lg border border-[var(--ui-border)] bg-white px-3 text-sm outline-none focus:border-neutral-400"
-                >
-                  {items.map((i) => (
-                    <option key={i.productId} value={i.productId}>
-                      {i.name}
-                    </option>
-                  ))}
-                </select>
+                  className="w-full"
+                />
               </label>
               {kindToggle(lineKind, setLineKind, 'disc-line')}
               <label className="block space-y-1.5">

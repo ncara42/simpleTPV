@@ -1,3 +1,4 @@
+import { Select } from '@simpletpv/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -156,17 +157,16 @@ export function SalePage() {
           <div className="sale-store-row">
             <label>
               Tienda:{' '}
-              <select
+              <Select
                 value={activeStore ?? ''}
-                onChange={(e) => setStoreId(e.target.value)}
+                onChange={setStoreId}
+                options={stores.map((s) => ({
+                  value: s.id,
+                  label: `${s.code} · ${s.name}`,
+                }))}
+                ariaLabel="Tienda"
                 data-testid="store-select"
-              >
-                {stores.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.code} · {s.name}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
           </div>
         )}

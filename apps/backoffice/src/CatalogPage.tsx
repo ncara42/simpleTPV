@@ -1,3 +1,4 @@
+import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -202,38 +203,36 @@ export function CatalogPage() {
             <div className="modal-row">
               <label>
                 Familia
-                <select
+                <Select
                   value={form.familyId ?? ''}
-                  onChange={(e) =>
-                    setForm({ ...form, familyId: e.target.value || null, subfamilyId: null })
+                  onChange={(value) =>
+                    setForm({ ...form, familyId: value || null, subfamilyId: null })
                   }
+                  options={[
+                    { value: '', label: '— Sin familia —' },
+                    ...DEMO_FAMILIES.map((fam) => ({ value: fam.id, label: fam.name })),
+                  ]}
+                  ariaLabel="Familia"
                   data-testid="form-family"
-                >
-                  <option value="">— Sin familia —</option>
-                  {DEMO_FAMILIES.map((fam) => (
-                    <option key={fam.id} value={fam.id}>
-                      {fam.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
               <label>
                 Subfamilia
-                <select
+                <Select
                   value={form.subfamilyId ?? ''}
                   disabled={subfamilies.length === 0}
-                  onChange={(e) => setForm({ ...form, subfamilyId: e.target.value || null })}
+                  onChange={(value) => setForm({ ...form, subfamilyId: value || null })}
+                  options={[
+                    {
+                      value: '',
+                      label:
+                        subfamilies.length === 0 ? '— Sin subfamilias —' : '— Toda la familia —',
+                    },
+                    ...subfamilies.map((sub) => ({ value: sub.id, label: sub.name })),
+                  ]}
+                  ariaLabel="Subfamilia"
                   data-testid="form-subfamily"
-                >
-                  <option value="">
-                    {subfamilies.length === 0 ? '— Sin subfamilias —' : '— Toda la familia —'}
-                  </option>
-                  {subfamilies.map((sub) => (
-                    <option key={sub.id} value={sub.id}>
-                      {sub.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
             </div>
             <div className="modal-row">

@@ -23,6 +23,11 @@ describe('computeExpected', () => {
   it('redondea a 2 decimales', () => {
     expect(computeExpected(10.1, 0.2)).toBeCloseTo(10.3, 2);
   });
+
+  it('SEC-11: resta los reembolsos en efectivo del turno', () => {
+    // inicial 100 + ventas 250 + neto movimientos 0 − reembolsos 50 = 300.
+    expect(computeExpected(100, 250, 0, 50)).toBeCloseTo(300, 2);
+  });
 });
 
 describe('computeDifference', () => {
@@ -60,6 +65,13 @@ function makePrisma() {
         }),
       ),
     },
+    return: {
+      aggregate: vi.fn(
+        async (_a?: unknown): Promise<{ _sum: { total: number | null } }> => ({
+          _sum: { total: 0 },
+        }),
+      ),
+    },
     cashMovement: {
       groupBy: vi.fn(
         async (
@@ -84,7 +96,7 @@ describe('CashSessionsService.open', () => {
 
     await expect(
       tenantStorage.run({ organizationId: ORG }, () =>
-        service.open({ storeId: STORE, openingAmount: 100 }, 'user-1'),
+        service.open({ storeId: STORE, openingAmount: 100 }, 'user-1', 'ADMIN'),
       ),
     ).rejects.toThrow(BadRequestException);
   });
@@ -99,7 +111,7 @@ describe('CashSessionsService.open', () => {
     const service = makeService(prisma);
 
     const result = (await tenantStorage.run({ organizationId: ORG }, () =>
-      service.open({ storeId: STORE, openingAmount: 100 }, 'user-1'),
+      service.open({ storeId: STORE, openingAmount: 100 }, 'user-1', 'ADMIN'),
     )) as unknown as Record<string, unknown>;
 
     const arg = prisma.cashSession.create.mock.calls[0]![0] as { data: Record<string, unknown> };
@@ -114,7 +126,9 @@ describe('CashSessionsService.open', () => {
   it('lanza 500 si no hay contexto de tenant', async () => {
     const prisma = makePrisma();
     const service = makeService(prisma);
-    await expect(service.open({ storeId: STORE, openingAmount: 0 }, 'user-1')).rejects.toThrow();
+    await expect(
+      service.open({ storeId: STORE, openingAmount: 0 }, 'user-1', 'ADMIN'),
+    ).rejects.toThrow();
   });
 });
 
@@ -126,7 +140,7 @@ describe('CashSessionsService.close', () => {
 
     await expect(
       tenantStorage.run({ organizationId: ORG }, () =>
-        service.close('nope', { countedAmount: 100 }),
+        service.close('nope', { countedAmount: 100 }, 'user-1', 'ADMIN'),
       ),
     ).rejects.toThrow(NotFoundException);
   });
@@ -138,7 +152,7 @@ describe('CashSessionsService.close', () => {
 
     await expect(
       tenantStorage.run({ organizationId: ORG }, () =>
-        service.close('cs-1', { countedAmount: 100 }),
+        service.close('cs-1', { countedAmount: 100 }, 'user-1', 'ADMIN'),
       ),
     ).rejects.toThrow(BadRequestException);
   });
@@ -164,7 +178,7 @@ describe('CashSessionsService.close', () => {
     const service = makeService(prisma);
 
     const result = await tenantStorage.run({ organizationId: ORG }, () =>
-      service.close('cs-1', { countedAmount: 360 }),
+      service.close('cs-1', { countedAmount: 360 }, 'user-1', 'ADMIN'),
     );
 
     // El cuadre viaja al WHERE/data del update con el tenant y status OPEN.
@@ -195,7 +209,7 @@ describe('CashSessionsService.close', () => {
     const service = makeService(prisma);
 
     await tenantStorage.run({ organizationId: ORG }, () =>
-      service.close('cs-1', { countedAmount: 0 }),
+      service.close('cs-1', { countedAmount: 0 }, 'user-1', 'ADMIN'),
     );
 
     const arg = prisma.sale.aggregate.mock.calls[0]![0] as {
@@ -239,13 +253,50 @@ describe('CashSessionsService.close', () => {
     const service = makeService(prisma);
 
     await tenantStorage.run({ organizationId: ORG }, () =>
-      service.close('cs-1', { countedAmount: 165 }),
+      service.close('cs-1', { countedAmount: 165 }, 'user-1', 'ADMIN'),
     );
 
     const arg = prisma.cashSession.updateMany.mock.calls[0]![0] as {
       data: { expectedAmount: number };
     };
     expect(arg.data.expectedAmount).toBeCloseTo(165, 2);
+  });
+
+  it('SEC-11: resta los reembolsos en efectivo del esperado', async () => {
+    const prisma = makePrisma();
+    prisma.cashSession.findFirst = vi.fn(async () => ({
+      id: 'cs-1',
+      status: 'OPEN',
+      storeId: STORE,
+      openingAmount: 100,
+      openedAt: new Date('2026-05-28T08:00:00Z'),
+    }));
+    prisma.sale.aggregate = vi.fn(async () => ({ _sum: { total: 250 } }));
+    // 30€ devueltos en efectivo en el turno → salen del cajón.
+    prisma.return.aggregate = vi.fn(async () => ({ _sum: { total: 30 } }));
+    prisma.cashSession.updateMany = vi.fn(async () => ({ count: 1 }));
+    prisma.cashSession.findFirstOrThrow = vi.fn(async () => ({ id: 'cs-1', status: 'CLOSED' }));
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.close('cs-1', { countedAmount: 320 }, 'user-1', 'ADMIN'),
+    );
+
+    // El filtro de reembolsos acota a la tienda, ventana del turno y efectivo
+    // (venta original CASH o devolución sin ticket).
+    const refundArg = prisma.return.aggregate.mock.calls[0]![0] as {
+      where: { storeId: string; createdAt: { gte: Date }; OR: unknown[] };
+    };
+    expect(refundArg.where.storeId).toBe(STORE);
+    expect(refundArg.where.createdAt.gte).toBeInstanceOf(Date);
+    expect(Array.isArray(refundArg.where.OR)).toBe(true);
+
+    const arg = prisma.cashSession.updateMany.mock.calls[0]![0] as {
+      data: { expectedAmount: number; difference: number };
+    };
+    // 100 + 250 − 30 = 320 → cuadre exacto con 320 contados.
+    expect(arg.data.expectedAmount).toBeCloseTo(320, 2);
+    expect(arg.data.difference).toBeCloseTo(0, 2);
   });
 
   it('lanza 400 si updateMany afecta 0 filas (carrera concurrente)', async () => {
@@ -263,7 +314,7 @@ describe('CashSessionsService.close', () => {
 
     await expect(
       tenantStorage.run({ organizationId: ORG }, () =>
-        service.close('cs-1', { countedAmount: 100 }),
+        service.close('cs-1', { countedAmount: 100 }, 'user-1', 'ADMIN'),
       ),
     ).rejects.toThrow(BadRequestException);
   });
@@ -275,7 +326,9 @@ describe('CashSessionsService.current', () => {
     prisma.cashSession.findFirst = vi.fn(async () => ({ id: 'cs-1', status: 'OPEN' }));
     const service = makeService(prisma);
 
-    const result = await tenantStorage.run({ organizationId: ORG }, () => service.current(STORE));
+    const result = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.current(STORE, 'user-1', 'ADMIN'),
+    );
 
     const arg = prisma.cashSession.findFirst.mock.calls[0]![0] as {
       where: { storeId: string; organizationId: string; status: string };
@@ -291,7 +344,9 @@ describe('CashSessionsService.current', () => {
     prisma.cashSession.findFirst = vi.fn(async () => null);
     const service = makeService(prisma);
 
-    const result = await tenantStorage.run({ organizationId: ORG }, () => service.current(STORE));
+    const result = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.current(STORE, 'user-1', 'ADMIN'),
+    );
     expect(result).toBeNull();
   });
 });
@@ -303,7 +358,9 @@ describe('CashSessionsService.movements', () => {
     const service = makeService(prisma);
 
     await expect(
-      tenantStorage.run({ organizationId: ORG }, () => service.movements('cs-1')),
+      tenantStorage.run({ organizationId: ORG }, () =>
+        service.movements('cs-1', 'user-1', 'ADMIN'),
+      ),
     ).rejects.toThrow(NotFoundException);
   });
 
@@ -314,7 +371,7 @@ describe('CashSessionsService.movements', () => {
     const service = makeService(prisma);
 
     const result = (await tenantStorage.run({ organizationId: ORG }, () =>
-      service.movements('cs-1'),
+      service.movements('cs-1', 'user-1', 'ADMIN'),
     )) as Array<{ id: string }>;
 
     const arg = prisma.cashMovement.findMany.mock.calls[0]![0] as {

@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsNotEmpty,
@@ -30,6 +31,7 @@ export class CreateReturnDto {
 
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(200)
   @ValidateNested({ each: true })
   @Type(() => CreateReturnLineDto)
   lines!: CreateReturnLineDto[];
@@ -62,6 +64,7 @@ export class CreateBlindReturnDto {
 
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(200)
   @ValidateNested({ each: true })
   @Type(() => BlindReturnLineDto)
   lines!: BlindReturnLineDto[];

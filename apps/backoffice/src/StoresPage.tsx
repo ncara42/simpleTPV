@@ -26,6 +26,13 @@ const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: 'dormida', label: 'Dormidas' },
 ];
 
+// Etiqueta de la cifra de ventas en lenguaje natural (la card es para no técnicos).
+const SALES_LABEL: Record<StoreSalesPeriod, string> = {
+  today: 'Ventas de hoy',
+  week: 'Ventas · últimos 7 días',
+  month: 'Ventas de este mes',
+};
+
 function salesOf(storeId: string, period: StoreSalesPeriod): number {
   return DEMO_STORE_SALES[storeId]?.[period] ?? 0;
 }
@@ -73,8 +80,6 @@ export function StoresPage() {
   const patchOps = (id: string, patch: Partial<StoreOps>): void =>
     setOps((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
 
-  const periodLabel = PERIODS.find((p) => p.id === period)?.label ?? '';
-
   // Orden por ventas del periodo (desc) + filtro por estado administrativo (#101, #103).
   const visibleStores = useMemo(() => {
     return [...stores]
@@ -114,8 +119,7 @@ export function StoresPage() {
           ))}
         </div>
         <div className="stores-period">
-          <span className="stores-period-label">Orden por ventas ·</span>
-          <div className="bo-tabs" role="tablist" aria-label="Periodo de ventas">
+          <div className="bo-tabs" role="tablist" aria-label="Ordenar por ventas del periodo">
             {PERIODS.map((p) => (
               <button
                 key={p.id}
@@ -150,7 +154,7 @@ export function StoresPage() {
               active={isActive(s)}
               open={opsOf(s.id)?.open ?? false}
               sales={salesOf(s.id, period)}
-              periodLabel={periodLabel}
+              periodLabel={SALES_LABEL[period]}
               onSelect={() => setDetail(s)}
               onToggleActive={() => toggleActive(s)}
             />

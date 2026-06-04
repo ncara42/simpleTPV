@@ -117,11 +117,21 @@ describe('Ventas — integración', () => {
         VALUES (gen_random_uuid(), ${org1Id}::uuid, ${storeId}::uuid, ${user1Id}::uuid, 0, 'OPEN', now())
       `;
     }
+
+    // Aislamiento por tienda (SEC-01): asignamos al CLERK SOLO a store1. store2
+    // queda deliberadamente sin asignar para poder verificar el 403 cross-store.
+    // Los demás tests usan rol 'ADMIN' (org-wide), así que no dependen de esto.
+    await admin.$executeRaw`DELETE FROM "UserStore" WHERE "userId" = ${user1Id}::uuid`;
+    await admin.$executeRaw`
+      INSERT INTO "UserStore" ("userId", "storeId") VALUES (${user1Id}::uuid, ${store1Id}::uuid)
+      ON CONFLICT ("userId", "storeId") DO NOTHING
+    `;
   });
 
   afterAll(async () => {
     // Cerramos las cajas que abrimos para no dejar OPEN colgando entre runs.
     await admin.$executeRaw`DELETE FROM "CashSession" WHERE "organizationId" = ${org1Id}::uuid AND status = 'OPEN'`;
+    await admin.$executeRaw`DELETE FROM "UserStore" WHERE "userId" = ${user1Id}::uuid`;
     await admin.$disconnect();
     await base.onModuleDestroy();
   });
@@ -411,6 +421,41 @@ describe('Ventas — integración', () => {
         );
       }),
     ).rejects.toThrow(/límite del rol CLERK/);
+  });
+
+  it('SEC-01: rechaza con 403 a un CLERK que vende en una tienda a la que NO está asignado', async () => {
+    // store2 no está en el UserStore del CLERK (solo store1). RLS aísla por org,
+    // no por tienda, así que sin el control de acceso por tienda esto se colaría.
+    await expect(
+      tenantStorage.run({ organizationId: org1Id }, async () => {
+        return service.create(
+          {
+            storeId: store2Id,
+            lines: [{ productId: product1Id, qty: 1 }],
+            paymentMethod: 'CASH',
+            cashGiven: 1000,
+          },
+          user1Id,
+          'CLERK',
+        );
+      }),
+    ).rejects.toThrow(/No tienes acceso a esa tienda/);
+  });
+
+  it('SEC-01: permite a un CLERK vender en su tienda asignada', async () => {
+    const sale = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.create(
+        {
+          storeId: store1Id,
+          lines: [{ productId: product1Id, qty: 1 }],
+          paymentMethod: 'CASH',
+          cashGiven: 1000,
+        },
+        user1Id,
+        'CLERK',
+      );
+    });
+    expect(sale.storeId).toBe(store1Id);
   });
 
   // NOTA: el rechazo de un CLERK con 403 al anular es responsabilidad del

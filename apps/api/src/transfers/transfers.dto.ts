@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsOptional,
@@ -32,6 +33,7 @@ export class CreateTransferDto {
 
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(500)
   @ValidateNested({ each: true })
   @Type(() => CreateTransferLineDto)
   lines!: CreateTransferLineDto[];
@@ -54,6 +56,7 @@ export class ReceiveTransferLineDto {
 export class ReceiveTransferDto {
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(500)
   @ValidateNested({ each: true })
   @Type(() => ReceiveTransferLineDto)
   lines!: ReceiveTransferLineDto[];

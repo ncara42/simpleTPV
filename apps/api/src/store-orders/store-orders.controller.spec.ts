@@ -79,7 +79,7 @@ describe('StoreOrdersController', () => {
       status: string;
     };
 
-    expect(service.receive).toHaveBeenCalledWith('so-1', dto, 'user-1');
+    expect(service.receive).toHaveBeenCalledWith('so-1', dto, 'user-1', 'CLERK');
     expect(res.status).toBe('RECEIVED');
   });
 

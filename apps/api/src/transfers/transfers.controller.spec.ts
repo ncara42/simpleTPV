@@ -50,7 +50,7 @@ describe('TransfersController', () => {
     const { controller, service } = makeController();
     const body = { lines: [{ lineId: 'l1', quantityReceived: 5 }] };
     await controller.receive(ID, body as never, req());
-    expect(service.receive).toHaveBeenCalledWith(ID, body, 'user-1');
+    expect(service.receive).toHaveBeenCalledWith(ID, body, 'user-1', 'MANAGER');
   });
 
   it('POST /transfers/:id/close delega el id', async () => {

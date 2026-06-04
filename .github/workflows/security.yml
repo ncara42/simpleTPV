@@ -50,7 +50,11 @@ jobs:
     permissions:
       contents: read
     container:
-      image: returntocorp/semgrep:latest
+      # Pinneada por DIGEST inmutable (SEC-21), igual que las Actions por SHA: un tag
+      # mutable (:latest) permitiría que una imagen reetiquetada se ejecutara con el
+      # checkout del repo. Migrada al nombre actual `semgrep/semgrep` (returntocorp
+      # está deprecado). Dependabot (github-actions) actualiza el digest.
+      image: semgrep/semgrep@sha256:7cad2bc2d1e44f87f0bf4be6d1fa23aa90fb72015bebc89fb91385d813987a03
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

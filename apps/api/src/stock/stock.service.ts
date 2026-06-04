@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { AlertType, MovementType } from '@simpletpv/db';
 
+import { assertStoreAccess } from '../auth/store-access.js';
 import { CACHE, type Cache } from '../cache/cache.interface.js';
 import { EVENT_BUS, type EventBus } from '../events/event-bus.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -14,6 +15,10 @@ import {
   type StockLevel,
   stockLevel,
 } from './stock.domain.js';
+
+// Tope del tamaño de página de GET /stock/movements (SEC-09): el cliente controla
+// pageSize, así que lo acotamos para no materializar todo el historial del tenant.
+const MAX_MOVEMENTS_PAGE_SIZE = 100;
 
 // Cliente transaccional de Prisma (lo que recibe el callback de $transaction),
 // idéntico al tipo usado en with-tenant-tx. applyMovement opera SIEMPRE sobre un
@@ -177,8 +182,10 @@ export class StockService {
    * Postgres (un único query con join al producto): la lista necesita
    * minStock/nombre que el cache puntual no guarda.
    */
-  async byStore(storeId: string) {
+  async byStore(storeId: string, userId: string, role: string) {
     const tenant = requireTenant();
+    // Aislamiento por tienda (SEC-01): un CLERK solo ve stock de sus tiendas.
+    await assertStoreAccess(this.prisma, { userId, role, storeId });
     const rows = await this.prisma.stock.findMany({
       where: { storeId, organizationId: tenant.organizationId },
       include: { product: { select: { name: true } } },
@@ -202,8 +209,9 @@ export class StockService {
    * Productos "para pedir" de una tienda (#45): los que están por debajo o en el
    * mínimo (nivel amarillo/rojo). Atajo sobre byStore para la vista de reposición.
    */
-  async toReorder(storeId: string) {
-    const rows = await this.byStore(storeId);
+  async toReorder(storeId: string, userId: string, role: string) {
+    // byStore aplica la comprobación de acceso por tienda (SEC-01).
+    const rows = await this.byStore(storeId, userId, role);
     return rows.filter((r) => r.level !== 'green');
   }
 
@@ -497,6 +505,14 @@ export class StockService {
     pageSize?: number;
   }) {
     const tenant = requireTenant();
+    // Cota defensiva del tamaño de página (SEC-09): pageSize lo controla el cliente
+    // (GET /stock/movements?pageSize=...); sin tope, un valor enorme materializaría
+    // todo el historial de movimientos del tenant. Saneamos page/pageSize ante
+    // valores no finitos, negativos o desproporcionados.
+    const safePageSize = Number.isFinite(pageSize)
+      ? Math.min(Math.max(1, Math.floor(pageSize)), MAX_MOVEMENTS_PAGE_SIZE)
+      : 50;
+    const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
     const createdAt =
       from || to ? { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } : undefined;
     const where = {
@@ -510,12 +526,12 @@ export class StockService {
       this.prisma.stockMovement.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        skip: (safePage - 1) * safePageSize,
+        take: safePageSize,
       }),
       this.prisma.stockMovement.count({ where }),
     ]);
 
-    return { items, page, pageSize, totalItems };
+    return { items, page: safePage, pageSize: safePageSize, totalItems };
   }
 }

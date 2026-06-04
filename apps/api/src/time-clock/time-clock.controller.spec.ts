@@ -38,7 +38,7 @@ describe('TimeClockController', () => {
 
     const res = (await controller.create(dto, req('CLERK'))) as { id: string };
 
-    expect(service.create).toHaveBeenCalledWith(dto, 'user-1');
+    expect(service.create).toHaveBeenCalledWith(dto, 'user-1', 'CLERK');
     expect(res.id).toBe('tc-2');
   });
 });

@@ -1,5 +1,5 @@
 import { ApiError } from '@simpletpv/auth';
-import { Button } from '@simpletpv/ui';
+import { Button, Select } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -103,18 +103,17 @@ export function BlindReturnPanel() {
       {stores.length > 1 && (
         <div className="flex items-center gap-2 text-sm">
           <label className="text-neutral-500 font-medium shrink-0">Tienda</label>
-          <select
+          <Select
             value={activeStore ?? ''}
-            onChange={(e) => setStoreId(e.target.value)}
+            onChange={setStoreId}
+            options={stores.map((s) => ({
+              value: s.id,
+              label: s.name,
+            }))}
+            ariaLabel="Tienda"
             data-testid="blind-store-select"
-            className="h-8 flex-1 rounded-md border border-[var(--ui-border)] bg-white px-2 text-sm outline-none focus:border-neutral-400"
-          >
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            className="flex-1"
+          />
         </div>
       )}
 

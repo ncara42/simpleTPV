@@ -1,4 +1,5 @@
-import { firstValueFrom } from 'rxjs';
+import { HttpException } from '@nestjs/common';
+import { firstValueFrom, type Subscription } from 'rxjs';
 import { filter, take } from 'rxjs/operators';
 import { describe, expect, it } from 'vitest';
 
@@ -48,5 +49,44 @@ describe('EventsController', () => {
 
     expect(received).toHaveLength(0);
     sub.unsubscribe();
+  });
+});
+
+describe('EventsController — límite de conexiones SSE por usuario (SEC-03)', () => {
+  // Default de SSE_MAX_CONNECTIONS_PER_USER (config/security.ts).
+  const MAX = 5;
+  const reqAs = (sub: string): { user: JwtPayload } => ({
+    user: { sub, organizationId: ORG, role: 'CLERK' },
+  });
+
+  it('permite hasta el máximo y rechaza con 429 al superarlo; se libera al cerrar', () => {
+    const controller = new EventsController(new InMemoryEventBus());
+    const subs: Subscription[] = [];
+
+    // Abre el máximo de conexiones del MISMO usuario y las mantiene activas.
+    for (let i = 0; i < MAX; i++) {
+      subs.push(controller.stream(reqAs('u1')).subscribe());
+    }
+
+    // La siguiente conexión de u1 se rechaza con 429.
+    let thrown: unknown;
+    try {
+      controller.stream(reqAs('u1'));
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(HttpException);
+    expect((thrown as HttpException).getStatus()).toBe(429);
+
+    // Otro usuario NO se ve afectado por el cupo de u1.
+    expect(() => controller.stream(reqAs('u2')).subscribe().unsubscribe()).not.toThrow();
+
+    // Al cerrar una conexión de u1 se libera un hueco y puede reconectar.
+    subs[0]!.unsubscribe();
+    expect(() => controller.stream(reqAs('u1')).subscribe().unsubscribe()).not.toThrow();
+
+    for (const s of subs) {
+      s.unsubscribe();
+    }
   });
 });

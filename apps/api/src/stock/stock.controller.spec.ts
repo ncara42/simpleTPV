@@ -36,8 +36,8 @@ function req(): { user: { sub: string; organizationId: string; role: string } } 
 describe('StockController', () => {
   it('GET /stock delega el storeId en byStore', async () => {
     const { controller, service } = makeController();
-    const res = (await controller.byStore(STORE)) as Array<{ level: string }>;
-    expect(service.byStore).toHaveBeenCalledWith(STORE);
+    const res = (await controller.byStore(STORE, req())) as Array<{ level: string }>;
+    expect(service.byStore).toHaveBeenCalledWith(STORE, 'user-1', 'ADMIN');
     expect(res[0]!.level).toBe('green');
   });
 
@@ -120,8 +120,8 @@ describe('StockController', () => {
 
   it('GET /stock/to-reorder delega el storeId en toReorder', async () => {
     const { controller, service } = makeController();
-    const res = (await controller.toReorder(STORE)) as Array<{ level: string }>;
-    expect(service.toReorder).toHaveBeenCalledWith(STORE);
+    const res = (await controller.toReorder(STORE, req())) as Array<{ level: string }>;
+    expect(service.toReorder).toHaveBeenCalledWith(STORE, 'user-1', 'ADMIN');
     expect(res[0]!.level).toBe('red');
   });
 });

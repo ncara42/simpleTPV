@@ -189,7 +189,9 @@ describe('StockService.byStore', () => {
       new InMemoryEventBus(),
     );
 
-    const rows = await tenantStorage.run({ organizationId: ORG }, () => service.byStore('s1'));
+    const rows = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.byStore('s1', 'user-1', 'ADMIN'),
+    );
 
     expect(rows[0]).toMatchObject({ productId: 'p1', level: 'red', quantity: 0 });
     expect(rows[1]).toMatchObject({ productId: 'p2', level: 'green', quantity: 8 });
@@ -215,7 +217,9 @@ describe('StockService.toReorder', () => {
       new InMemoryEventBus(),
     );
 
-    const rows = await tenantStorage.run({ organizationId: ORG }, () => service.toReorder('s1'));
+    const rows = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.toReorder('s1', 'user-1', 'ADMIN'),
+    );
 
     expect(rows.map((r) => r.productId)).toEqual(['p1', 'p2']);
     expect(rows.every((r) => r.level !== 'green')).toBe(true);
@@ -576,6 +580,30 @@ describe('StockService.movements', () => {
     expect(arg.where.createdAt).toBeDefined();
     expect(arg.skip).toBe(10); // (page 2 - 1) * pageSize 10
     expect(arg.take).toBe(10);
+  });
+
+  it('SEC-09: acota pageSize a 100 aunque el cliente pida un valor enorme', async () => {
+    const prisma = {
+      stockMovement: {
+        findMany: vi.fn(async (_a?: unknown) => []),
+        count: vi.fn(async (_a?: unknown) => 0),
+      },
+    };
+    const service = new StockService(
+      prisma as never,
+      new MemoryCache(),
+      {} as never,
+      new InMemoryEventBus(),
+    );
+
+    const res = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.movements({ page: 1, pageSize: 100_000_000 }),
+    );
+
+    expect(res.pageSize).toBe(100);
+    const arg = prisma.stockMovement.findMany.mock.calls[0]![0] as { take: number; skip: number };
+    expect(arg.take).toBe(100);
+    expect(arg.skip).toBe(0);
   });
 
   it('sin filtros de fecha no incluye createdAt en el where', async () => {

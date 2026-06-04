@@ -1,7 +1,7 @@
 import type { PrismaService } from './prisma.service.js';
 
 // Cliente transaccional de Prisma (lo que recibe el callback de $transaction).
-type TxClient = Parameters<Parameters<PrismaService['$transaction']>[0]>[0];
+export type TxClient = Parameters<Parameters<PrismaService['$transaction']>[0]>[0];
 
 // Callback que se ejecuta DESPUÉS de que la transacción haga commit. Para efectos
 // que no deben ocurrir si la tx hace rollback (p.ej. publicar eventos en tiempo

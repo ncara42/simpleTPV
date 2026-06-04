@@ -659,6 +659,12 @@
   box-shadow: var(--ui-focus);
 }
 
+/* El <Select> propio dentro de los descuentos iguala el alto/tipografía de los inputs */
+.disc-fields .ui-select-trigger {
+  height: 44px;
+  font-size: 1.1rem;
+}
+
 .cart-msg {
   font-size: var(--ui-text-base);
 }
@@ -2189,6 +2195,10 @@
   border-radius: var(--ui-radius-sm);
   padding: 0 0.6rem;
   background: var(--ui-surface);
+}
+.cash-movement-form .ui-select-trigger {
+  height: 2.2rem;
+  border-radius: 8px;
 }
 
 .ticket-return input,

@@ -338,16 +338,21 @@ function makePrisma() {
 // Construye el servicio con el mismo mock como cliente extendido y base. voidSale
 // abre withTenantTx(base): para que el callback opere sobre los mismos mocks,
 // envolvemos el prisma mock en un base con $transaction que lo reutiliza como tx.
-function makeService(prisma: ReturnType<typeof makePrisma>, base?: unknown) {
+function makeService(prisma: ReturnType<typeof makePrisma>, base?: unknown, verifactu?: unknown) {
   const resolvedBase = base ?? {
     $transaction: vi.fn(async (fn: (t: typeof prisma) => Promise<unknown>) => fn(prisma)),
+  };
+  const resolvedVerifactu = verifactu ?? {
+    createRecordInTx: vi.fn(async () => ({ id: 'vf', hash: 'h', qrData: 'q' })),
+    enqueueSend: vi.fn(async () => undefined),
+    recordFor: vi.fn(async () => ({ id: 'vf', hash: 'h', qrData: 'q' })),
   };
   return new SalesService(
     prisma as never,
     resolvedBase as never,
     new StockService({} as never, new MemoryCache(), {} as never, new InMemoryEventBus()),
     new InMemoryEventBus(),
-    { recordFor: vi.fn(async () => ({ id: 'vf', hash: 'h', qrData: 'q' })) } as never,
+    resolvedVerifactu as never,
   );
 }
 
@@ -557,6 +562,10 @@ describe('SalesService.create', () => {
     const tx = {
       $executeRaw: vi.fn(async () => 1),
       $queryRaw: vi.fn(async () => (storeFound ? [{ code: '01', ticketCounter: 7 }] : [])),
+      // El registro VeriFactu de la venta lee el NIF de la org dentro de la tx (SEC-02).
+      organization: {
+        findFirst: vi.fn(async () => ({ nif: 'B11111111' })),
+      },
       sale: {
         create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
           id: 'new-sale',
@@ -607,6 +616,38 @@ describe('SalesService.create', () => {
     expect(result.ticketNumber).toBe('T01-000007');
     expect(result.total).toBeCloseTo(3, 2);
     expect(result.organizationId).toBe(ORG);
+  });
+
+  it('SEC-02: si la creación del registro VeriFactu falla, la venta hace rollback y NO se encola el envío', async () => {
+    const prisma = makePrisma();
+    prisma.product.findMany = vi.fn(async () => [
+      { id: 'p1', name: 'Café', salePrice: 1.5, taxRate: 21 },
+    ]);
+    const base = makeBase();
+    const verifactu = {
+      // El registro fiscal va DENTRO de la tx de la venta: si lanza, la venta
+      // entera debe revertir (antes vivía en afterCommit y el error se tragaba).
+      createRecordInTx: vi.fn(async () => {
+        throw new Error('fallo registro fiscal');
+      }),
+      enqueueSend: vi.fn(async () => undefined),
+      recordFor: vi.fn(),
+    };
+    const service = makeService(prisma, base, verifactu);
+
+    const dto = {
+      storeId: '22222222-2222-2222-2222-222222222222',
+      paymentMethod: 'CASH' as const,
+      cashGiven: 5,
+      lines: [{ productId: 'p1', qty: 2 }],
+    };
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.create(dto, 'user-1', 'ADMIN')),
+    ).rejects.toThrow(/fallo registro fiscal/);
+    // El error se propaga (la tx revierte) y el envío NO se encola: sin registro
+    // persistido no hay nada que enviar.
+    expect(verifactu.enqueueSend).not.toHaveBeenCalled();
   });
 
   it('descuento de línea por importe fijo (€): persiste discountAmt y discountPct 0', async () => {

@@ -16,8 +16,11 @@ export class StockController {
   // Stock de todos los productos de una tienda. storeId obligatorio (UUID).
   @Get()
   @Roles('ADMIN', 'MANAGER', 'CLERK')
-  byStore(@Query('storeId', new ParseUUIDPipe()) storeId: string) {
-    return this.stock.byStore(storeId);
+  byStore(
+    @Query('storeId', new ParseUUIDPipe()) storeId: string,
+    @Req() req: { user: JwtPayload },
+  ) {
+    return this.stock.byStore(storeId, req.user.sub, req.user.role);
   }
 
   // Stock global agregado por producto (todas las tiendas + total). Para el
@@ -91,8 +94,11 @@ export class StockController {
   // Productos "para pedir" de una tienda (bajo/sin stock) — atajo para reposición (#45).
   @Get('to-reorder')
   @Roles('ADMIN', 'MANAGER', 'CLERK')
-  toReorder(@Query('storeId', new ParseUUIDPipe()) storeId: string) {
-    return this.stock.toReorder(storeId);
+  toReorder(
+    @Query('storeId', new ParseUUIDPipe()) storeId: string,
+    @Req() req: { user: JwtPayload },
+  ) {
+    return this.stock.toReorder(storeId, req.user.sub, req.user.role);
   }
 
   // Stock de un producto en todas las tiendas del tenant.

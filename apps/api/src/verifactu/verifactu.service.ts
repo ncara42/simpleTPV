@@ -10,7 +10,7 @@ import { Queue, type RedisOptions, Worker } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant, tenantStorage } from '../prisma/tenant-context.js';
-import { withTenantTx } from '../prisma/with-tenant-tx.js';
+import { type TxClient, withTenantTx } from '../prisma/with-tenant-tx.js';
 import { buildQrData, computeHash, type VerifactuPayload } from './verifactu.hash.js';
 import { VERIFACTU_PROVIDER, type VerifactuProvider } from './verifactu.provider.js';
 
@@ -69,13 +69,75 @@ export class VerifactuService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Crea el registro VeriFactu de una venta/devolución (#47), encadenado con el
-   * anterior del tenant, y lo encola para envío. Debe llamarse dentro del flujo
-   * de la venta/devolución, idealmente tras commit. Devuelve el registro creado.
+   * Crea el registro VeriFactu encadenado DENTRO de una transacción existente
+   * `tx` (la de la venta/devolución). Así el registro fiscal es ATÓMICO con la
+   * operación que factura: si la creación del registro falla, la venta hace
+   * rollback (no quedan facturas sin su registro VeriFactu — auditoría SEC-02).
    *
-   * El encadenamiento (lectura del último hash + creación) va en una tx con lock
-   * para serializar: dos registros concurrentes del mismo tenant no deben tomar
-   * el mismo previousHash.
+   * El encadenamiento (lock + lectura del último hash + creación) corre en la
+   * MISMA tx: el pg_advisory_xact_lock serializa a los demás registros del tenant
+   * para que dos concurrentes no tomen el mismo previousHash.
+   *
+   * NO encola el envío: el envío a la AEAT es un efecto posterior reintentable y
+   * debe lanzarse con enqueueSend() tras el commit (afterCommit).
+   */
+  async createRecordInTx(
+    tx: TxClient,
+    organizationId: string,
+    input: {
+      type: 'INVOICE' | 'RECTIFICATION';
+      saleId?: string;
+      returnId?: string;
+      payload: VerifactuPayload;
+    },
+  ): Promise<{ id: string; hash: string; qrData: string }> {
+    // Lock de los registros del tenant para serializar el encadenamiento.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${organizationId}))`;
+    const last = await tx.verifactuRecord.findFirst({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      select: { hash: true },
+    });
+    const previousHash = last?.hash ?? null;
+    const hash = computeHash(input.payload, previousHash);
+    const qrData = buildQrData(input.payload.nif, input.payload.invoiceNumber, input.payload.total);
+    const created = await tx.verifactuRecord.create({
+      data: {
+        organizationId,
+        type: input.type,
+        ...(input.saleId ? { saleId: input.saleId } : {}),
+        ...(input.returnId ? { returnId: input.returnId } : {}),
+        hash,
+        previousHash,
+        qrData,
+        payload: input.payload as unknown as object,
+      },
+    });
+    return { id: created.id, hash: created.hash, qrData: created.qrData! };
+  }
+
+  /**
+   * Encola (o procesa en el momento, sin Redis) el envío de un registro ya
+   * creado. Best-effort: el envío es reintentable y su fallo NO debe perder el
+   * registro, que ya está persistido (ver createRecordInTx). Llamar tras commit.
+   */
+  async enqueueSend(recordId: string, organizationId: string): Promise<void> {
+    if (this.queue) {
+      await this.queue.add(
+        'send',
+        { recordId, organizationId },
+        { attempts: MAX_ATTEMPTS, backoff: { type: 'exponential', delay: 2000 } },
+      );
+    } else {
+      await this.processRecord(recordId, organizationId);
+    }
+  }
+
+  /**
+   * Crea el registro VeriFactu de forma autónoma (abre su propia transacción) y
+   * encola el envío. Útil cuando NO se dispone de una tx de la operación que
+   * factura. Para el flujo de venta/devolución, prefiere createRecordInTx dentro
+   * de la transacción + enqueueSend en afterCommit (atomicidad, SEC-02).
    */
   async recordFor(input: {
     type: 'INVOICE' | 'RECTIFICATION';
@@ -84,47 +146,11 @@ export class VerifactuService implements OnModuleInit, OnModuleDestroy {
     payload: VerifactuPayload;
   }): Promise<{ id: string; hash: string; qrData: string }> {
     const tenant = requireTenant();
-    const created = await withTenantTx(this.base, tenant.organizationId, async (tx) => {
-      // Lock de los registros del tenant para serializar el encadenamiento.
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${tenant.organizationId}))`;
-      const last = await tx.verifactuRecord.findFirst({
-        where: { organizationId: tenant.organizationId },
-        orderBy: { createdAt: 'desc' },
-        select: { hash: true },
-      });
-      const previousHash = last?.hash ?? null;
-      const hash = computeHash(input.payload, previousHash);
-      const qrData = buildQrData(
-        input.payload.nif,
-        input.payload.invoiceNumber,
-        input.payload.total,
-      );
-      return tx.verifactuRecord.create({
-        data: {
-          organizationId: tenant.organizationId,
-          type: input.type,
-          ...(input.saleId ? { saleId: input.saleId } : {}),
-          ...(input.returnId ? { returnId: input.returnId } : {}),
-          hash,
-          previousHash,
-          qrData,
-          payload: input.payload as unknown as object,
-        },
-      });
-    });
-
-    // Encolar el envío. Sin cola (sin Redis), procesar en el momento.
-    if (this.queue) {
-      await this.queue.add(
-        'send',
-        { recordId: created.id, organizationId: tenant.organizationId },
-        { attempts: MAX_ATTEMPTS, backoff: { type: 'exponential', delay: 2000 } },
-      );
-    } else {
-      await this.processRecord(created.id, tenant.organizationId);
-    }
-
-    return { id: created.id, hash: created.hash, qrData: created.qrData! };
+    const created = await withTenantTx(this.base, tenant.organizationId, (tx) =>
+      this.createRecordInTx(tx, tenant.organizationId, input),
+    );
+    await this.enqueueSend(created.id, tenant.organizationId);
+    return created;
   }
 
   /**

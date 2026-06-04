@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { assertStoreAccess } from '../auth/store-access.js';
 import { round2 } from '../common/money.js';
 import { EVENT_BUS, type EventBus } from '../events/event-bus.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -45,6 +46,10 @@ export class SalesService {
 
   async create(dto: CreateSaleDto, userId: string, role: SaleRole) {
     const tenant = requireTenant();
+
+    // Aislamiento por tienda (SEC-01): un CLERK solo puede vender en las tiendas
+    // a las que está asignado (UserStore). RLS aísla por org, no por tienda.
+    await assertStoreAccess(this.prisma, { userId, role, storeId: dto.storeId });
 
     // Caja obligatoria: no se puede cobrar sin una sesión de caja abierta para
     // la tienda. Invierte la decisión "caja opcional" de #13 (ver spec
@@ -173,24 +178,28 @@ export class SalesService {
         });
       });
 
-      // Registro VeriFactu de la venta tras commit (#47): encadenado y encolado.
-      // No bloquea la venta si falla (afterCommit es best-effort).
-      afterCommit(async () => {
-        const org = await this.prisma.organization.findFirst({
-          where: { id: tenant.organizationId },
-          select: { nif: true },
-        });
-        await this.verifactu.recordFor({
+      // Registro VeriFactu de la venta DENTRO de la transacción (#47, SEC-02):
+      // atómico con la venta. Si la creación del registro fiscal encadenado falla,
+      // toda la venta hace rollback → nunca queda una factura sin su registro
+      // VeriFactu. Solo el ENVÍO a la AEAT es best-effort: se encola tras commit
+      // (reintentable vía cola/worker), porque el registro ya está persistido.
+      const org = await tx.organization.findFirst({
+        where: { id: tenant.organizationId },
+        select: { nif: true },
+      });
+      const verifactuRecord = await this.verifactu.createRecordInTx(tx, tenant.organizationId, {
+        type: 'INVOICE',
+        saleId: sale.id,
+        payload: {
+          nif: org?.nif ?? null,
+          invoiceNumber: ticketNumber,
+          date: new Date().toISOString(),
+          total: Number(total),
           type: 'INVOICE',
-          saleId: sale.id,
-          payload: {
-            nif: org?.nif ?? null,
-            invoiceNumber: ticketNumber,
-            date: new Date().toISOString(),
-            total: Number(total),
-            type: 'INVOICE',
-          },
-        });
+        },
+      });
+      afterCommit(async () => {
+        await this.verifactu.enqueueSend(verifactuRecord.id, tenant.organizationId);
       });
 
       return sale;

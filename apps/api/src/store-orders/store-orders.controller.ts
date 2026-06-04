@@ -40,7 +40,7 @@ export class StoreOrdersController {
     @Body() body: ReceiveStoreOrderDto,
     @Req() req: { user: JwtPayload },
   ) {
-    return this.storeOrders.receive(id, body, req.user.sub);
+    return this.storeOrders.receive(id, body, req.user.sub, req.user.role);
   }
 
   @Post(':id/close')

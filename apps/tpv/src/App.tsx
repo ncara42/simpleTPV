@@ -1,4 +1,5 @@
 import '@simpletpv/ui/login.css';
+import '@simpletpv/ui/select.css';
 import '@simpletpv/ui/topbar.css';
 import './sale.css';
 import './styles.css';
@@ -32,13 +33,15 @@ const TPV_NAV: NavItem[] = [
   { id: 'clock', label: 'Fichaje', icon: <Clock size={18} /> },
 ];
 
-const TITLES: Record<View, { eyebrow: string; title: string }> = {
-  sale: { eyebrow: 'Tienda Centro', title: 'Venta' },
-  tickets: { eyebrow: 'Tienda Centro', title: 'Tickets emitidos' },
-  orders: { eyebrow: 'Tienda Centro', title: 'Recepción de pedidos' },
-  inventory: { eyebrow: 'Tienda Centro', title: 'Inventario' },
-  cash: { eyebrow: 'Tienda Centro', title: 'Caja' },
-  clock: { eyebrow: 'Tienda Centro', title: 'Fichaje' },
+// Contexto persistente de la barra superior por vista (la tienda activa). El
+// título de cada vista vive en su propio contenido, no se duplica aquí.
+const EYEBROWS: Record<View, string> = {
+  sale: 'Tienda Centro',
+  tickets: 'Tienda Centro',
+  orders: 'Tienda Centro',
+  inventory: 'Tienda Centro',
+  cash: 'Tienda Centro',
+  clock: 'Tienda Centro',
 };
 
 function Home() {
@@ -62,7 +65,7 @@ function Home() {
     }
   }, []);
 
-  const { eyebrow, title } = TITLES[view];
+  const eyebrow = EYEBROWS[view];
 
   return (
     <div className="app-shell">
@@ -71,16 +74,11 @@ function Home() {
         activeItem={view}
         onSelect={(id) => setView(id as View)}
         brand={{ title: 'SimpleTPV', subtitle: 'Punto de venta' }}
-        user={{ name: DEMO_USER.name, subtitle: 'Centro · Dependiente' }}
+        account={{ name: DEMO_USER.name, subtitle: 'Centro · Dependiente' }}
+        onLogout={logout}
       />
       <div className="app-content">
-        <TopBar
-          eyebrow={eyebrow}
-          title={title}
-          activeApp="tpv"
-          onSwitchApp={switchApp}
-          onLogout={logout}
-        />
+        <TopBar eyebrow={eyebrow} activeApp="tpv" onSwitchApp={switchApp} />
         <main className="app-main">
           {view === 'sale' && <SalePage />}
           {view === 'tickets' && <TicketsPanel storeId={activeStore} />}

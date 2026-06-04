@@ -18,6 +18,6 @@ export class TimeClockController {
   @Post()
   @Roles('ADMIN', 'MANAGER', 'CLERK')
   create(@Body() body: CreateTimeClockEntryDto, @Req() req: { user: JwtPayload }) {
-    return this.timeClock.create(body, req.user.sub);
+    return this.timeClock.create(body, req.user.sub, req.user.role);
   }
 }

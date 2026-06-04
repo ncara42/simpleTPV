@@ -1,3 +1,4 @@
+import { Select } from '@simpletpv/ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { DEMO_FAMILIES, DEMO_SALES, type DemoSaleRow, SALE_SELLERS } from './demo/demoData.js';
@@ -139,52 +140,50 @@ export function SalesHistoryPage() {
           <p className="catalog-sub">Historial de tickets · scroll infinito</p>
         </div>
         <div className="catalog-actions">
-          <button onClick={() => exportCsv(filtered)} data-testid="sales-export-csv">
+          <button
+            className="link-btn"
+            onClick={() => exportCsv(filtered)}
+            data-testid="sales-export-csv"
+          >
             Exportar CSV
           </button>
         </div>
       </header>
 
       <div className="sales-filters">
-        <select
+        <Select
           className="catalog-search"
           value={filters.storeId}
-          onChange={(e) => setFilter({ storeId: e.target.value })}
+          onChange={(value) => setFilter({ storeId: value })}
+          ariaLabel="Filtrar por tienda"
           data-testid="sales-store"
-        >
-          <option value="">Todas las tiendas</option>
-          {STORE_OPTIONS.map(([id, name]) => (
-            <option key={id} value={id}>
-              {name}
-            </option>
-          ))}
-        </select>
-        <select
+          options={[
+            { value: '', label: 'Todas las tiendas' },
+            ...STORE_OPTIONS.map(([id, name]) => ({ value: id, label: name })),
+          ]}
+        />
+        <Select
           className="catalog-search"
           value={filters.sellerId}
-          onChange={(e) => setFilter({ sellerId: e.target.value })}
+          onChange={(value) => setFilter({ sellerId: value })}
+          ariaLabel="Filtrar por vendedor"
           data-testid="sales-seller"
-        >
-          <option value="">Todos los vendedores</option>
-          {SALE_SELLERS.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        <select
+          options={[
+            { value: '', label: 'Todos los vendedores' },
+            ...SALE_SELLERS.map((s) => ({ value: s.id, label: s.name })),
+          ]}
+        />
+        <Select
           className="catalog-search"
           value={filters.familyId}
-          onChange={(e) => setFilter({ familyId: e.target.value })}
+          onChange={(value) => setFilter({ familyId: value })}
+          ariaLabel="Filtrar por familia"
           data-testid="sales-family"
-        >
-          <option value="">Todas las familias</option>
-          {DEMO_FAMILIES.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: '', label: 'Todas las familias' },
+            ...DEMO_FAMILIES.map((f) => ({ value: f.id, label: f.name })),
+          ]}
+        />
         {hasFilters && (
           <button
             className="link-btn"
@@ -250,8 +249,10 @@ export function SalesHistoryPage() {
                   data-testid="sales-row"
                 >
                   <td>
-                    {sale.ticketNumber}
-                    {sale.status === 'VOIDED' && <span className="sale-tag-voided">Anulada</span>}
+                    <span className="sale-ticket-cell">
+                      <span className="sale-ticket-number">{sale.ticketNumber}</span>
+                      {sale.status === 'VOIDED' && <span className="sale-tag-voided">Anulada</span>}
+                    </span>
                   </td>
                   <td className="muted">{sale.storeName}</td>
                   <td className="muted">{sale.sellerName}</td>
