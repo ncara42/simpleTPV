@@ -1,4 +1,5 @@
 import { ApiError, type CashSession } from '@simpletpv/auth';
+import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -244,14 +245,16 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
           <div className="cash-form" data-testid="cash-movements">
             {canManageMovements ? (
               <div className="cash-movement-form">
-                <select
+                <Select
                   value={movementType}
-                  onChange={(e) => setMovementType(e.target.value as 'IN' | 'OUT')}
+                  onChange={(value) => setMovementType(value as 'IN' | 'OUT')}
+                  options={[
+                    { value: 'OUT', label: 'Retirada' },
+                    { value: 'IN', label: 'Entrada' },
+                  ]}
+                  ariaLabel="Tipo de movimiento"
                   data-testid="cash-movement-type"
-                >
-                  <option value="OUT">Retirada</option>
-                  <option value="IN">Entrada</option>
-                </select>
+                />
                 <input
                   type="number"
                   min="0.01"

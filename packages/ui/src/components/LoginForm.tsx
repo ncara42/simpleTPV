@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useRef, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { StarField } from './StarField.js';
 
@@ -6,9 +6,10 @@ export interface LoginFormProps {
   onSubmit: (email: string, password: string) => Promise<void>;
   title?: string;
   subtitle?: string;
+  leftPanel?: ReactNode;
 }
 
-export function LoginForm({ onSubmit, title = 'simpleTPV', subtitle }: LoginFormProps) {
+export function LoginForm({ onSubmit, title = 'simpleTPV', subtitle, leftPanel }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +41,7 @@ export function LoginForm({ onSubmit, title = 'simpleTPV', subtitle }: LoginForm
       {/* Panel izquierdo — rejilla animada */}
       <div className="login-left">
         <div className="login-left-glow" />
-        <StarField />
+        {leftPanel ?? <StarField />}
       </div>
 
       {/* Panel derecho — formulario */}

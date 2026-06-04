@@ -1,5 +1,6 @@
 import './dashboard.css';
 
+import { Select } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -13,7 +14,7 @@ import {
   getSalesKpis,
   getSalesToday,
 } from './lib/dashboard.js';
-import { deltaTone, fmtDelta, fmtEur, fmtNum, fmtRate } from './lib/format.js';
+import { deltaTone, fmtDelta, fmtEur, fmtEurCompact, fmtNum, fmtRate } from './lib/format.js';
 
 const PERIODS: Array<{ id: DashboardPeriod; label: string }> = [
   { id: 'today', label: 'Hoy' },
@@ -22,8 +23,17 @@ const PERIODS: Array<{ id: DashboardPeriod; label: string }> = [
   { id: 'month', label: 'Mes' },
 ];
 
-// Paleta para tartas cuando una familia no trae color propio.
-const PIE_FALLBACK = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#db2777'];
+// Subtítulo de panel según el periodo seleccionado (más claro que "Periodo actual").
+const PERIOD_SUBTITLE: Record<DashboardPeriod, string> = {
+  today: 'Hoy',
+  yesterday: 'Ayer',
+  week: 'Esta semana',
+  month: 'Este mes',
+};
+
+// Tintes de respaldo (escala azul Apple + neutros) cuando una familia no
+// trae color propio. Mantiene el lienzo monocromo y sobrio.
+const PIE_FALLBACK = ['#0066cc', '#2997ff', '#5ac8fa', '#86868b', '#0a5ac4', '#1d1d1f', '#a1a1a6'];
 
 export function DashboardPage() {
   const [period, setPeriod] = useState<DashboardPeriod>('today');
@@ -57,8 +67,8 @@ export function DashboardPage() {
     <section className="catalog" data-testid="dashboard">
       <header className="catalog-head">
         <div>
-          <h2>Resumen de hoy</h2>
-          <p className="catalog-sub">Última actualización hace 2 min</p>
+          <h2>Resumen</h2>
+          <p className="catalog-sub">Actualizado hace 2 min</p>
         </div>
         <div className="catalog-actions">
           <nav className="bo-tabs dash-period" data-testid="dash-period">
@@ -73,19 +83,17 @@ export function DashboardPage() {
               </button>
             ))}
           </nav>
-          <select
-            className="catalog-search"
+          <Select
+            className="dash-store"
             value={storeId}
-            onChange={(e) => setStoreId(e.target.value)}
+            onChange={setStoreId}
+            ariaLabel="Tienda"
             data-testid="dash-store"
-          >
-            <option value="">Todas las tiendas</option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: 'Todas las tiendas' },
+              ...stores.map((s) => ({ value: s.id, label: s.name })),
+            ]}
+          />
         </div>
       </header>
 
@@ -95,62 +103,94 @@ export function DashboardPage() {
           label="Facturación hoy"
           value={fmtEur(salesToday.data?.today.total)}
           delta={salesToday.data?.deltaPct ?? null}
+          series={salesToday.data?.series}
+          sparkTone={deltaTone(salesToday.data?.deltaPct ?? null) === 'down' ? 'down' : 'up'}
           testid="kpi-today"
         />
         <KpiCard
           label="Ticket medio"
           value={fmtEur(salesKpis.data?.avgTicket)}
+          series={salesKpis.data?.series?.avgTicket}
           testid="kpi-avg-ticket"
         />
-        <KpiCard label="UPT" value={fmtNum(salesKpis.data?.upt)} testid="kpi-upt" />
-        <KpiCard label="% Margen" value={fmtRate(marginKpis.data?.marginPct)} testid="kpi-margin" />
+        <KpiCard
+          label="UPT"
+          value={fmtNum(salesKpis.data?.upt)}
+          series={salesKpis.data?.series?.upt}
+          testid="kpi-upt"
+        />
+        <KpiCard
+          label="% Margen"
+          value={fmtRate(marginKpis.data?.marginPct)}
+          series={marginKpis.data?.series}
+          testid="kpi-margin"
+        />
         <KpiCard
           label="Tasa descuento"
           value={fmtRate(salesKpis.data?.discountRate)}
+          series={salesKpis.data?.series?.discountRate}
           testid="kpi-discount"
         />
         <KpiCard
           label="Tasa devolución"
           value={fmtRate(salesKpis.data?.returnRate)}
+          series={salesKpis.data?.series?.returnRate}
           testid="kpi-return"
         />
       </div>
 
       <div className="dash-grid">
-        {/* Ventas hoy vs ayer por tienda (barras CSS verticales) */}
-        <div className="dash-panel" data-testid="dash-bars">
+        {/* Ventas hoy vs ayer por tienda (líneas + área, coherente con las sparklines) */}
+        <div className="dash-panel span-7" data-testid="dash-bars">
           <h3>Ventas hoy vs ayer</h3>
           <p className="dash-panel-sub">Facturación neta por tienda</p>
           {(() => {
             const stores = salesToday.data?.byStore ?? [];
-            const max = Math.max(1, ...stores.flatMap((s) => [s.today, s.yesterday]));
+            // Escala a la facturación máxima (Hoy o Ayer) de cualquier tienda → la
+            // barra más alta llena el lienzo y las alturas comparan de un vistazo.
+            const top = Math.max(1, ...stores.flatMap((s) => [s.today, s.yesterday]));
             return (
               <>
                 <div className="dash-bars-chart">
-                  {stores.map((s) => (
-                    <div className="dash-bars-group" key={s.storeId}>
-                      <div className="dash-bars-pair">
-                        <span
-                          className="dash-bar dash-bar-prev"
-                          style={{ height: `${(s.yesterday / max) * 100}%` }}
-                          title={`Ayer: ${fmtEur(s.yesterday)}`}
-                        />
-                        <span
-                          className="dash-bar dash-bar-now"
-                          style={{ height: `${(s.today / max) * 100}%` }}
-                          title={`Hoy: ${fmtEur(s.today)}`}
-                        />
+                  {stores.map((s, i) => {
+                    const tone = deltaTone(s.deltaPct);
+                    return (
+                      <div
+                        className="dash-bars-group"
+                        key={s.storeId}
+                        style={{ '--i': i } as React.CSSProperties}
+                      >
+                        <div className="dash-bars-cap">
+                          <strong className="dash-bars-cap-val">{fmtEur(s.today)}</strong>
+                          <span className={`dash-bars-cap-delta dash-delta-${tone}`}>
+                            {fmtDelta(s.deltaPct)}
+                          </span>
+                        </div>
+                        <div className="dash-bars-pair">
+                          <span
+                            className="dash-bars-bar dash-bars-bar-prev"
+                            style={{ height: `${(s.yesterday / top) * 100}%` }}
+                          >
+                            <span className="dash-bars-bar-val">{fmtEurCompact(s.yesterday)}</span>
+                          </span>
+                          <span
+                            className="dash-bars-bar dash-bars-bar-now"
+                            style={{ height: `${(s.today / top) * 100}%` }}
+                          >
+                            <span className="dash-bars-bar-val">{fmtEurCompact(s.today)}</span>
+                          </span>
+                        </div>
+                        <span className="dash-bars-name">{s.storeName}</span>
                       </div>
-                      <span className="dash-bars-label">{s.storeName}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="dash-bars-legend">
                   <span>
-                    <span className="dash-legend-dot dash-bar-prev" /> Ayer
+                    <span className="dash-legend-dot dash-swatch-prev" /> Ayer
                   </span>
                   <span>
-                    <span className="dash-legend-dot dash-bar-now" /> Hoy
+                    <span className="dash-legend-dot dash-swatch-now" /> Hoy
                   </span>
                 </div>
               </>
@@ -159,36 +199,36 @@ export function DashboardPage() {
         </div>
 
         {/* Ventas por familia (barras CSS horizontales) */}
-        <div className="dash-panel" data-testid="dash-family">
+        <div className="dash-panel span-5" data-testid="dash-family">
           <h3>Ventas por familia</h3>
-          <p className="dash-panel-sub">Periodo actual</p>
+          <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]}</p>
           {(() => {
             const fams = byFamily.data ?? [];
             const max = Math.max(1, ...fams.map((f) => f.total));
             return (
               <ul className="dash-family-list">
-                {fams.map((f, i) => (
-                  <li key={f.familyId ?? `none-${i}`}>
-                    <span className="dash-family-name">{f.familyName}</span>
-                    <span className="dash-family-track">
-                      <span
-                        className="dash-family-fill"
-                        style={{
-                          width: `${(f.total / max) * 100}%`,
-                          background: f.color ?? PIE_FALLBACK[i % PIE_FALLBACK.length] ?? '#16734f',
-                        }}
-                      />
-                    </span>
-                    <span className="dash-family-value">{fmtEur(f.total)}</span>
-                  </li>
-                ))}
+                {fams.map((f, i) => {
+                  return (
+                    <li key={f.familyId ?? `none-${i}`} style={{ '--i': i } as React.CSSProperties}>
+                      <span className="dash-family-name">{f.familyName}</span>
+                      <span className="dash-family-track">
+                        <span
+                          className="dash-family-fill"
+                          style={{ width: `${(f.total / max) * 100}%` }}
+                        >
+                          <span className="dash-family-pct">{fmtEur(f.total)}</span>
+                        </span>
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             );
           })()}
         </div>
 
         {/* Panel de roturas */}
-        <div className="dash-panel" data-testid="dash-stockout">
+        <div className="dash-panel span-5" data-testid="dash-stockout">
           <h3>Roturas de stock</h3>
           <p className="dash-panel-sub">Productos en alerta ahora</p>
           <ul className="dash-stockout-list">
@@ -209,7 +249,7 @@ export function DashboardPage() {
         </div>
 
         {/* Rankings */}
-        <div className="dash-panel" data-testid="dash-rankings">
+        <div className="dash-panel span-7" data-testid="dash-rankings">
           <Rankings data={rankings.data} loading={rankings.isLoading} />
         </div>
       </div>
@@ -217,20 +257,70 @@ export function DashboardPage() {
   );
 }
 
-function KpiCard(props: { label: string; value: string; delta?: number | null; testid: string }) {
+type SparkTone = 'brand' | 'up' | 'down';
+
+function KpiCard(props: {
+  label: string;
+  value: string;
+  delta?: number | null;
+  series?: number[] | undefined;
+  sparkTone?: SparkTone;
+  testid: string;
+}) {
   const tone = deltaTone(props.delta);
   return (
-    <div className="dash-card" data-testid={props.testid}>
-      <span className="dash-card-label">{props.label}</span>
-      <span className="dash-card-value">{props.value}</span>
+    <div className="dash-card-wrap">
       {props.delta !== undefined && (
-        <span className={`dash-card-delta dash-delta-${tone}`}>{fmtDelta(props.delta)}</span>
+        <span className={`dash-card-trend dash-trend-${tone}`}>{fmtDelta(props.delta)}</span>
       )}
+      <div className="dash-card" data-testid={props.testid}>
+        <span className="dash-card-label">{props.label}</span>
+        <span className="dash-card-value">{props.value}</span>
+        {props.series && props.series.length > 1 && (
+          <Sparkline data={props.series} tone={props.sparkTone ?? 'brand'} />
+        )}
+      </div>
     </div>
   );
 }
 
+// Mini-gráfica de tendencia para la card. SVG a mano (como las barras del dashboard),
+// estirado a todo el ancho con preserveAspectRatio="none"; el trazo se mantiene fino
+// gracias a vector-effect. El color (línea + relleno) lo fija la clase de tono.
+function Sparkline(props: { data: number[]; tone?: SparkTone }) {
+  const { data } = props;
+  if (data.length < 2) return null;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const pad = 3; // margen vertical para que el trazo no toque los bordes
+  const span = max - min || 1;
+  const points = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * 100;
+    const y = pad + (1 - (v - min) / span) * (32 - 2 * pad);
+    return [x, y] as const;
+  });
+  const line = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+  const area = `M ${points[0]![0].toFixed(2)},${points[0]![1].toFixed(2)} L ${line} L 100,32 L 0,32 Z`;
+  return (
+    <svg
+      className={`dash-card-spark dash-spark-${props.tone ?? 'brand'}`}
+      viewBox="0 0 100 32"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <path className="dash-spark-area" d={area} />
+      <polyline className="dash-spark-line" points={line} vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
 type RankTab = 'sales' | 'margin' | 'rotation';
+
+const RANK_OPTIONS = [
+  { value: 'sales', label: 'Top ventas' },
+  { value: 'margin', label: 'Top margen' },
+  { value: 'rotation', label: 'Peor rotación' },
+];
 
 function Rankings(props: {
   data: import('./lib/dashboard.js').ProductRankings | undefined;
@@ -240,7 +330,18 @@ function Rankings(props: {
   if (props.loading) {
     return (
       <>
-        <h3>Rankings de producto</h3>
+        <header className="dash-panel-head">
+          <h3>Rankings de producto</h3>
+          <Select
+            className="dash-rank-select"
+            value={tab}
+            onChange={(v) => setTab(v as RankTab)}
+            ariaLabel="Filtrar ranking"
+            data-testid="rank-tabs"
+            options={RANK_OPTIONS}
+            disabled
+          />
+        </header>
         <p className="catalog-empty">Cargando…</p>
       </>
     );
@@ -257,30 +358,17 @@ function Rankings(props: {
 
   return (
     <>
-      <h3>Rankings de producto</h3>
-      <nav className="bo-tabs" data-testid="rank-tabs">
-        <button
-          className={`bo-tab ${tab === 'sales' ? 'active' : ''}`}
-          onClick={() => setTab('sales')}
-          data-testid="rank-sales"
-        >
-          Top ventas
-        </button>
-        <button
-          className={`bo-tab ${tab === 'margin' ? 'active' : ''}`}
-          onClick={() => setTab('margin')}
-          data-testid="rank-margin"
-        >
-          Top margen
-        </button>
-        <button
-          className={`bo-tab ${tab === 'rotation' ? 'active' : ''}`}
-          onClick={() => setTab('rotation')}
-          data-testid="rank-rotation"
-        >
-          Peor rotación
-        </button>
-      </nav>
+      <header className="dash-panel-head">
+        <h3>Rankings de producto</h3>
+        <Select
+          className="dash-rank-select"
+          value={tab}
+          onChange={(v) => setTab(v as RankTab)}
+          ariaLabel="Filtrar ranking"
+          data-testid="rank-tabs"
+          options={RANK_OPTIONS}
+        />
+      </header>
       {rows.length === 0 ? (
         <p className="catalog-empty">Sin datos.</p>
       ) : (

@@ -25,6 +25,13 @@ const EMPTY: UserForm = {
   active: true,
 };
 
+// Opciones de rol para el control segmentado (mismo orden jerárquico que el badge).
+const ROLES: { value: Role; label: string }[] = [
+  { value: 'ADMIN', label: 'Admin' },
+  { value: 'MANAGER', label: 'Responsable' },
+  { value: 'CLERK', label: 'Dependiente' },
+];
+
 // Permisos por rol — visibles y auditables en la ficha (nada implícito). (#104)
 const ROLE_PERMISSIONS: Record<Role, string[]> = {
   ADMIN: [
@@ -195,7 +202,7 @@ export function UsersPage() {
       {form && (
         <div className="modal-backdrop" onClick={() => setForm(null)}>
           <form
-            className="modal modal--form"
+            className="modal modal--form user-form"
             onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => {
               e.preventDefault();
@@ -203,107 +210,131 @@ export function UsersPage() {
             }}
             data-testid="user-form"
           >
-            <h3>{isEdit ? 'Editar usuario' : 'Nuevo usuario'}</h3>
-            <label>
-              Nombre
-              <input
-                required
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                data-testid="user-name"
-              />
-            </label>
-            <label>
-              Email
-              <input
-                type="email"
-                required
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                data-testid="user-email"
-              />
-            </label>
-            <div className="modal-row">
-              <label>
-                {isEdit ? 'Contraseña (opcional)' : 'Contraseña'}
-                <input
-                  type="password"
-                  required={!isEdit}
-                  placeholder={isEdit ? 'Dejar en blanco para mantener' : undefined}
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  data-testid="user-password"
-                />
-              </label>
-              <label>
-                Rol
-                <select
-                  value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
+            <header className="modal-head">
+              <h3>{isEdit ? 'Editar usuario' : 'Nuevo usuario'}</h3>
+            </header>
+
+            <div className="modal-body">
+              <section className="form-section">
+                <label>
+                  Nombre
+                  <input
+                    required
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    data-testid="user-name"
+                  />
+                </label>
+                <label>
+                  Email
+                  <input
+                    type="email"
+                    required
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    data-testid="user-email"
+                  />
+                </label>
+                <label>
+                  {isEdit ? 'Contraseña (opcional)' : 'Contraseña'}
+                  <input
+                    type="password"
+                    required={!isEdit}
+                    placeholder={isEdit ? 'Dejar en blanco para mantener' : undefined}
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    data-testid="user-password"
+                  />
+                </label>
+              </section>
+
+              <section className="form-section">
+                <span className="form-section-title">Rol y permisos</span>
+                <div
+                  className="role-segment"
+                  role="radiogroup"
+                  aria-label="Rol"
                   data-testid="user-role"
                 >
-                  <option value="ADMIN">Admin</option>
-                  <option value="MANAGER">Responsable</option>
-                  <option value="CLERK">Dependiente</option>
-                </select>
-              </label>
-            </div>
-
-            <div className="role-perms" data-testid="role-permissions">
-              <span className="role-perms-title">Permisos de {ROLE_LABEL[form.role]}</span>
-              <ul>
-                {ROLE_PERMISSIONS[form.role].map((p) => (
-                  <li key={p}>{p}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="user-stores-field">
-              <span className="user-stores-label">Tiendas asignadas</span>
-              {form.role === 'ADMIN' ? (
-                <p className="user-stores-note">
-                  Los administradores tienen acceso a <strong>todas las tiendas</strong>.
-                </p>
-              ) : (
-                <div className="user-stores" data-testid="user-stores">
-                  {DEMO_STORES.map((s) => (
-                    <label key={s.id} className="user-store-check">
-                      <input
-                        type="checkbox"
-                        checked={form.storeIds.includes(s.id)}
-                        onChange={() => toggleStore(s.id)}
-                        data-testid={`user-store-${s.id}`}
-                      />
-                      {s.name}
-                    </label>
+                  {ROLES.map((r) => (
+                    <button
+                      type="button"
+                      key={r.value}
+                      role="radio"
+                      aria-checked={form.role === r.value}
+                      className={`role-seg ${form.role === r.value ? 'is-active' : ''}`}
+                      onClick={() => setForm({ ...form, role: r.value })}
+                      data-testid={`user-role-${r.value}`}
+                    >
+                      {r.label}
+                    </button>
                   ))}
                 </div>
-              )}
+                <div className="role-perms" data-testid="role-permissions">
+                  <span className="role-perms-title">Permisos de {ROLE_LABEL[form.role]}</span>
+                  <ul>
+                    {ROLE_PERMISSIONS[form.role].map((p) => (
+                      <li key={p}>{p}</li>
+                    ))}
+                  </ul>
+                </div>
+              </section>
+
+              <section className="form-section">
+                <span className="form-section-title">Acceso a tiendas</span>
+                {form.role === 'ADMIN' ? (
+                  <p className="user-stores-note">
+                    Los administradores acceden a <strong>todas las tiendas</strong>.
+                  </p>
+                ) : (
+                  <div className="store-chips" data-testid="user-stores">
+                    {DEMO_STORES.map((s) => {
+                      const on = form.storeIds.includes(s.id);
+                      return (
+                        <button
+                          type="button"
+                          key={s.id}
+                          aria-pressed={on}
+                          className={`store-chip ${on ? 'is-on' : ''}`}
+                          onClick={() => toggleStore(s.id)}
+                          data-testid={`user-store-${s.id}`}
+                        >
+                          {s.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
             </div>
 
-            <label className="user-active-check">
-              <input
-                type="checkbox"
-                checked={form.active}
-                onChange={(e) => setForm({ ...form, active: e.target.checked })}
-                data-testid="user-active"
-              />
-              Usuario activo
-            </label>
-
             {saveMut.isError && <p className="form-error">No se pudo guardar.</p>}
-            <div className="modal-foot">
-              <button type="button" onClick={() => setForm(null)}>
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={saveMut.isPending}
-                data-testid="user-save"
-              >
-                {saveMut.isPending ? 'Guardando…' : isEdit ? 'Guardar' : 'Crear'}
-              </button>
+            <div className="modal-foot modal-foot--split">
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={form.active}
+                  onChange={(e) => setForm({ ...form, active: e.target.checked })}
+                  data-testid="user-active"
+                />
+                <span className="switch-track">
+                  <span className="switch-thumb" />
+                </span>
+                <span className="switch-text">Usuario activo</span>
+              </label>
+              <div className="modal-foot-actions">
+                <button type="button" onClick={() => setForm(null)}>
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={saveMut.isPending}
+                  data-testid="user-save"
+                >
+                  {saveMut.isPending ? 'Guardando…' : isEdit ? 'Guardar' : 'Crear'}
+                </button>
+              </div>
             </div>
           </form>
         </div>

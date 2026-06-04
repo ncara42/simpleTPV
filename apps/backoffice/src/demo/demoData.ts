@@ -596,6 +596,8 @@ export const DEMO_VERIFACTU: VerifactuRecord[] = Array.from({ length: 6 }, (_, i
 export const DEMO_VERIFACTU_STATS = { sentToday: 128, queued: 0, failed: 0, lastSentSeconds: 14 };
 
 // ─── Dashboard ───────────────────────────────────────────────
+// Las `series` son los últimos ~12 días para las sparklines de las KPI cards;
+// cada array termina en el valor actual ya mostrado (revenue→1284, avgTicket→18.9…).
 export const DEMO_SALES_TODAY: SalesTodayResponse = {
   today: { total: 1284, count: 68 },
   yesterday: { total: 1142, count: 63 },
@@ -607,6 +609,7 @@ export const DEMO_SALES_TODAY: SalesTodayResponse = {
     { storeId: 's-granvia', storeName: 'Gran Vía', today: 360, yesterday: 250, deltaPct: 44 },
     { storeId: 's-online', storeName: 'Online', today: 154, yesterday: 162, deltaPct: -4.9 },
   ],
+  series: [980, 1040, 1010, 1120, 1075, 1150, 1190, 1130, 1210, 1240, 1142, 1284],
 };
 export const DEMO_SALES_KPIS: SalesKpis = {
   salesCount: 68,
@@ -615,12 +618,19 @@ export const DEMO_SALES_KPIS: SalesKpis = {
   upt: 2.4,
   discountRate: 0.062,
   returnRate: 0.018,
+  series: {
+    avgTicket: [17.2, 17.8, 17.5, 18.1, 18.4, 18.0, 18.6, 18.3, 18.9, 18.7, 18.5, 18.9],
+    upt: [2.1, 2.2, 2.15, 2.3, 2.25, 2.35, 2.3, 2.4, 2.35, 2.45, 2.35, 2.4],
+    discountRate: [0.05, 0.055, 0.048, 0.06, 0.058, 0.065, 0.062, 0.07, 0.064, 0.061, 0.059, 0.062],
+    returnRate: [0.012, 0.015, 0.011, 0.02, 0.017, 0.022, 0.019, 0.016, 0.021, 0.018, 0.016, 0.018],
+  },
 };
 export const DEMO_MARGIN_KPIS: MarginKpis = {
   grossMargin: 526,
   realMargin: 500,
   marginPct: 0.41,
   revenue: 1284,
+  series: [0.38, 0.39, 0.385, 0.4, 0.395, 0.405, 0.4, 0.41, 0.405, 0.415, 0.402, 0.41],
 };
 export const DEMO_SALES_BY_FAMILY: FamilySales[] = [
   { familyId: 'fam-flores', familyName: 'Flores CBD', color: '#16734f', total: 488 },

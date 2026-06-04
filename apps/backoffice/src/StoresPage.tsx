@@ -1,3 +1,4 @@
+import { initials } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
@@ -29,6 +30,13 @@ const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: 'activa', label: 'Activas' },
   { id: 'dormida', label: 'Dormidas' },
 ];
+
+// Etiqueta de la cifra de ventas en lenguaje natural (la card es para no técnicos).
+const SALES_LABEL: Record<StoreSalesPeriod, string> = {
+  today: 'Ventas de hoy',
+  week: 'Ventas · últimos 7 días',
+  month: 'Ventas de este mes',
+};
 
 function salesOf(storeId: string, period: StoreSalesPeriod): number {
   return DEMO_STORE_SALES[storeId]?.[period] ?? 0;
@@ -77,8 +85,6 @@ export function StoresPage() {
   const patchOps = (id: string, patch: Partial<StoreOps>): void =>
     setOps((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
 
-  const periodLabel = PERIODS.find((p) => p.id === period)?.label ?? '';
-
   // Orden por ventas del periodo (desc) + filtro por estado administrativo (#101, #103).
   const visibleStores = useMemo(() => {
     return [...stores]
@@ -122,8 +128,7 @@ export function StoresPage() {
           ))}
         </div>
         <div className="stores-period">
-          <span className="stores-period-label">Orden por ventas ·</span>
-          <div className="bo-tabs" role="tablist" aria-label="Periodo de ventas">
+          <div className="bo-tabs" role="tablist" aria-label="Ordenar por ventas del periodo">
             {PERIODS.map((p) => (
               <button
                 key={p.id}
@@ -153,64 +158,81 @@ export function StoresPage() {
         <div className="store-grid" data-testid="stores-grid">
           {visibleStores.map((s) => {
             const active = isActive(s);
-            const open = opsOf(s.id)?.open ?? false;
+            const o = opsOf(s.id);
+            const open = o?.open ?? false;
+            const sales = salesOf(s.id, period);
             return (
               <div
-                className="store-card"
+                className={`store-card ${active ? '' : 'is-dormant'}`}
                 key={s.id}
                 data-testid="store-card"
+                role="button"
+                tabIndex={0}
                 onClick={() => setDetail(s)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setDetail(s);
+                  }
+                }}
                 title="Ver detalle de la tienda"
               >
-                <div className="store-card-top">
-                  <span className="store-card-icon" aria-hidden="true">
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M3 9l1-5h16l1 5" />
-                      <path d="M4 9v11h16V9" />
-                      <path d="M9 20v-6h6v6" />
-                    </svg>
+                {/* Zona 1 — identidad: marca, nombre/dirección y si hay alguien ahora. */}
+                <div className="store-card-head">
+                  <span className="store-avatar" aria-hidden="true">
+                    {initials(s.name)}
                   </span>
                   <span className="store-card-text">
                     <span className="store-card-name">{s.name}</span>
                     <span className="store-card-addr">{s.address ?? '—'}</span>
                   </span>
-                  <span className="store-card-badges">
-                    <span className={`store-open ${open ? 'on' : 'off'}`} data-testid="store-open">
-                      <span className="store-open-dot" />
-                      {open ? 'Abierta' : 'Cerrada'}
-                    </span>
-                    <span
-                      className={`store-badge ${active ? 'active' : 'muted'}`}
-                      data-testid="store-status"
-                    >
-                      {active ? 'Activa' : 'Dormida'}
-                    </span>
+                  <span
+                    className={`store-live ${open ? 'on' : 'off'}`}
+                    data-testid="store-open"
+                    title={
+                      open
+                        ? `Hay alguien trabajando ahora${o?.openedSince ? ` (desde las ${o.openedSince})` : ''}`
+                        : 'Nadie ha fichado ahora mismo'
+                    }
+                  >
+                    <span className="store-live-dot" />
+                    {open ? 'Abierta' : 'Cerrada'}
                   </span>
                 </div>
+
+                {/* Zona 2 — el dato que importa al jefe: cuánto ha vendido. */}
+                <div className="store-card-metric" data-testid="store-sales">
+                  <span className="store-card-sales-value">{fmtEur(sales)}</span>
+                  <span className="store-card-sales-label">{SALES_LABEL[period]}</span>
+                </div>
+
+                {/* Zona 3 — control: encender/apagar la tienda con consecuencia clara. */}
                 <div className="store-card-foot">
-                  <span className="store-card-sales" data-testid="store-sales">
-                    <strong>{fmtEur(salesOf(s.id, period))}</strong>
-                    <span className="store-card-sales-label">ventas · {periodLabel}</span>
+                  <span className="store-foot-text">
+                    <span
+                      className={`store-status-text ${active ? '' : 'muted'}`}
+                      data-testid="store-status"
+                    >
+                      {active ? 'Tienda activa' : 'Tienda en pausa'}
+                    </span>
+                    <span className="store-foot-hint">
+                      {active ? 'El TPV puede vender' : 'El TPV no puede vender'}
+                    </span>
                   </span>
                   <button
                     type="button"
-                    className="link-btn store-toggle"
+                    role="switch"
+                    aria-checked={active}
+                    className={`store-switch ${active ? 'on' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleActive(s);
                     }}
                     data-testid="store-toggle"
+                    aria-label={active ? `Pausar ${s.name}` : `Activar ${s.name}`}
+                    title={active ? 'Pausar tienda' : 'Activar tienda'}
                   >
-                    {active ? 'Dormir' : 'Activar'}
+                    <span className="store-switch-knob" />
                   </button>
                 </div>
               </div>

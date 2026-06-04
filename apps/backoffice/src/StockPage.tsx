@@ -1,4 +1,5 @@
 import type { StockLevel } from '@simpletpv/auth';
+import { Select } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
@@ -58,11 +59,57 @@ function LevelDot({ level }: { level: StockLevel }) {
   );
 }
 
+// Iconos de línea para la banda de KPIs de stock (24×24, currentColor).
+function StockIcon({ name }: { name: 'units' | 'out' | 'low' | 'transit' }) {
+  const common = {
+    width: 20,
+    height: 20,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.8,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
+  if (name === 'units') {
+    return (
+      <svg {...common}>
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+        <path d="m3.3 7 8.7 5 8.7-5M12 22V12" />
+      </svg>
+    );
+  }
+  if (name === 'out') {
+    return (
+      <svg {...common}>
+        <path d="m21.7 18-9-15.6a2 2 0 0 0-3.4 0L0.3 18a2 2 0 0 0 1.7 3h18a2 2 0 0 0 1.7-3z" />
+        <path d="M12 9v4M12 17h.01" />
+      </svg>
+    );
+  }
+  if (name === 'low') {
+    return (
+      <svg {...common}>
+        <path d="M16 17h6v-6M22 17l-8.5-8.5-5 5L2 7" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <path d="M14 18V6a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h1" />
+      <path d="M14 9h4l3 3v5a1 1 0 0 1-1 1h-1M9 18h6" />
+      <circle cx="7" cy="18" r="2" />
+      <circle cx="17" cy="18" r="2" />
+    </svg>
+  );
+}
+
 type Section = 'global' | 'alerts' | 'transfers';
 
 export function StockPage() {
   const qc = useQueryClient();
   const [section, setSection] = useState<Section>('global');
+  const [creatingTransfer, setCreatingTransfer] = useState(false);
 
   // Contador del subtab "Alertas" (badge). Comparte queryKey con AlertsSection.
   const { data: alertCount = [] } = useQuery({
@@ -92,34 +139,48 @@ export function StockPage() {
           <p className="catalog-sub">Stock por tienda en tiempo real</p>
         </div>
       </header>
-      <nav className="bo-tabs" data-testid="stock-subtabs">
-        <button
-          className={`bo-tab ${section === 'global' ? 'active' : ''}`}
-          onClick={() => setSection('global')}
-          data-testid="stock-tab-global"
-        >
-          Stock global
-        </button>
-        <button
-          className={`bo-tab ${section === 'alerts' ? 'active' : ''}`}
-          onClick={() => setSection('alerts')}
-          data-testid="stock-tab-alerts"
-        >
-          Alertas
-          {alertCount.length > 0 && <span className="subtab-badge">{alertCount.length}</span>}
-        </button>
-        <button
-          className={`bo-tab ${section === 'transfers' ? 'active' : ''}`}
-          onClick={() => setSection('transfers')}
-          data-testid="stock-tab-transfers"
-        >
-          Traspasos
-        </button>
-      </nav>
+      <div className="stock-tabs-row">
+        <nav className="bo-tabs" data-testid="stock-subtabs">
+          <button
+            className={`bo-tab ${section === 'global' ? 'active' : ''}`}
+            onClick={() => setSection('global')}
+            data-testid="stock-tab-global"
+          >
+            Stock global
+          </button>
+          <button
+            className={`bo-tab ${section === 'alerts' ? 'active' : ''}`}
+            onClick={() => setSection('alerts')}
+            data-testid="stock-tab-alerts"
+          >
+            Alertas
+            {alertCount.length > 0 && <span className="subtab-badge">{alertCount.length}</span>}
+          </button>
+          <button
+            className={`bo-tab ${section === 'transfers' ? 'active' : ''}`}
+            onClick={() => setSection('transfers')}
+            data-testid="stock-tab-transfers"
+          >
+            Traspasos
+          </button>
+        </nav>
+        {section === 'transfers' && (
+          <button
+            type="button"
+            className="btn-primary stock-tabs-action"
+            onClick={() => setCreatingTransfer(true)}
+            data-testid="new-transfer"
+          >
+            Nuevo traspaso
+          </button>
+        )}
+      </div>
 
       {section === 'global' && <GlobalStockSection />}
       {section === 'alerts' && <AlertsSection />}
-      {section === 'transfers' && <TransfersSection />}
+      {section === 'transfers' && (
+        <TransfersSection creating={creatingTransfer} setCreating={setCreatingTransfer} />
+      )}
     </section>
   );
 }
@@ -202,146 +263,166 @@ function GlobalStockSection() {
 
   return (
     <>
-      <div className="stock-kpis" data-testid="stock-kpis">
-        <div className="stock-kpi">
-          <span className="stock-kpi-val">{kpis.units}</span>
-          <span className="stock-kpi-label">Unidades</span>
+      <div className="stock-metrics" data-testid="stock-kpis">
+        <div className="stock-metric stock-metric-brand">
+          <span className="stock-metric-icon" aria-hidden>
+            <StockIcon name="units" />
+          </span>
+          <span className="stock-metric-body">
+            <span className="stock-metric-val">{kpis.units}</span>
+            <span className="stock-metric-label">Unidades</span>
+          </span>
         </div>
-        <div className="stock-kpi">
-          <span className="stock-kpi-val red">{kpis.out}</span>
-          <span className="stock-kpi-label">Roturas</span>
+        <div className="stock-metric stock-metric-danger">
+          <span className="stock-metric-icon" aria-hidden>
+            <StockIcon name="out" />
+          </span>
+          <span className="stock-metric-body">
+            <span className="stock-metric-val">{kpis.out}</span>
+            <span className="stock-metric-label">Roturas</span>
+          </span>
         </div>
-        <div className="stock-kpi">
-          <span className="stock-kpi-val yellow">{kpis.low}</span>
-          <span className="stock-kpi-label">Stock bajo</span>
+        <div className="stock-metric stock-metric-warning">
+          <span className="stock-metric-icon" aria-hidden>
+            <StockIcon name="low" />
+          </span>
+          <span className="stock-metric-body">
+            <span className="stock-metric-val">{kpis.low}</span>
+            <span className="stock-metric-label">Stock bajo</span>
+          </span>
         </div>
-        <div className="stock-kpi">
-          <span className="stock-kpi-val">{kpis.inTransit}</span>
-          <span className="stock-kpi-label">En tránsito</span>
+        <div className="stock-metric stock-metric-success">
+          <span className="stock-metric-icon" aria-hidden>
+            <StockIcon name="transit" />
+          </span>
+          <span className="stock-metric-body">
+            <span className="stock-metric-val">{kpis.inTransit}</span>
+            <span className="stock-metric-label">En tránsito</span>
+          </span>
         </div>
       </div>
 
-      <div className="sales-filters">
-        <input
-          className="catalog-search"
-          placeholder="Buscar producto…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          data-testid="stock-search"
-        />
-        <select
-          className="catalog-search"
-          value={familyId}
-          onChange={(e) => setFamilyId(e.target.value)}
-          data-testid="stock-family"
-        >
-          <option value="">Todas las familias</option>
-          {DEMO_FAMILIES.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </select>
-        <select
-          className="catalog-search"
-          value={storeId}
-          onChange={(e) => setStoreId(e.target.value)}
-          data-testid="stock-store"
-        >
-          <option value="">Todas las tiendas</option>
-          {storeOptions.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        <select
-          className="catalog-search"
-          value={rotation}
-          onChange={(e) => setRotation(e.target.value)}
-          data-testid="stock-rotation"
-        >
-          <option value="">Toda rotación</option>
-          <option value="alta">Rotación alta</option>
-          <option value="media">Rotación media</option>
-          <option value="baja">Rotación baja</option>
-        </select>
-      </div>
+      <div className="stock-panel">
+        <div className="sales-filters">
+          <input
+            className="catalog-search"
+            placeholder="Buscar producto…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            data-testid="stock-search"
+          />
+          <Select
+            className="catalog-search"
+            value={familyId}
+            onChange={(value) => setFamilyId(value)}
+            ariaLabel="Filtrar por familia"
+            data-testid="stock-family"
+            options={[
+              { value: '', label: 'Todas las familias' },
+              ...DEMO_FAMILIES.map((f) => ({ value: f.id, label: f.name })),
+            ]}
+          />
+          <Select
+            className="catalog-search"
+            value={storeId}
+            onChange={(value) => setStoreId(value)}
+            ariaLabel="Filtrar por tienda"
+            data-testid="stock-store"
+            options={[
+              { value: '', label: 'Todas las tiendas' },
+              ...storeOptions.map((s) => ({ value: s.id, label: s.name })),
+            ]}
+          />
+          <Select
+            className="catalog-search"
+            value={rotation}
+            onChange={(value) => setRotation(value)}
+            ariaLabel="Filtrar por rotación"
+            data-testid="stock-rotation"
+            options={[
+              { value: '', label: 'Toda rotación' },
+              { value: 'alta', label: 'Rotación alta' },
+              { value: 'media', label: 'Rotación media' },
+              { value: 'baja', label: 'Rotación baja' },
+            ]}
+          />
+        </div>
 
-      {filtered.length === 0 ? (
-        <p className="catalog-empty" data-testid="stock-empty">
-          Sin productos para los filtros seleccionados.
-        </p>
-      ) : (
-        <table className="catalog-table" data-testid="stock-table">
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>Familia</th>
-              <th>Rotación</th>
-              <th>{storeId ? storeOptions.find((s) => s.id === storeId)?.name : 'Por tienda'}</th>
-              <th>Total</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((row) => {
-              const visibleStores = storeId
-                ? row.stores.filter((s) => s.storeId === storeId)
-                : row.stores;
-              const rot = DEMO_PRODUCT_ROTATION[row.productId] ?? 'media';
-              return (
-                <tr key={row.productId} data-testid="stock-row">
-                  <td>{row.productName}</td>
-                  <td className="muted">{productRootFamily(row.productId)?.name ?? '—'}</td>
-                  <td>
-                    <span className={`rotation-tag rotation-${rot}`}>{ROTATION_LABEL[rot]}</span>
-                  </td>
-                  <td>
-                    <span className="stock-badges">
-                      {visibleStores.map((st) => (
-                        <button
-                          type="button"
-                          key={st.storeId}
-                          className={`store-stock-badge stock-${st.level}`}
-                          onClick={() =>
-                            setAdjusting({
-                              productId: row.productId,
-                              productName: row.productName,
-                              storeId: st.storeId,
-                              storeName: st.storeName,
-                              quantity: String(st.quantity),
-                              min: String(st.minStock),
-                            })
-                          }
-                          data-testid="stock-store-cell"
-                          title={`${LEVEL_LABEL[st.level]} · mín ${st.minStock} · clic para ajustar`}
-                        >
-                          <span className={`stock-dot stock-${st.level}`} />
-                          {st.storeName} : {st.quantity}
-                        </button>
-                      ))}
-                    </span>
-                  </td>
-                  <td>
-                    <strong>{storeId ? (visibleStores[0]?.quantity ?? 0) : row.total}</strong>
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="link-btn"
-                      onClick={() => setMovementsFor(row.productId)}
-                      data-testid="stock-history"
-                    >
-                      Movimientos
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
+        {filtered.length === 0 ? (
+          <p className="catalog-empty" data-testid="stock-empty">
+            Sin productos para los filtros seleccionados.
+          </p>
+        ) : (
+          <table className="catalog-table" data-testid="stock-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Familia</th>
+                <th>Rotación</th>
+                <th>{storeId ? storeOptions.find((s) => s.id === storeId)?.name : 'Por tienda'}</th>
+                <th>Total</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((row) => {
+                const visibleStores = storeId
+                  ? row.stores.filter((s) => s.storeId === storeId)
+                  : row.stores;
+                const rot = DEMO_PRODUCT_ROTATION[row.productId] ?? 'media';
+                return (
+                  <tr key={row.productId} data-testid="stock-row">
+                    <td>{row.productName}</td>
+                    <td className="muted">{productRootFamily(row.productId)?.name ?? '—'}</td>
+                    <td>
+                      <span className={`rotation-tag rotation-${rot}`}>{ROTATION_LABEL[rot]}</span>
+                    </td>
+                    <td>
+                      <span className="stock-badges">
+                        {visibleStores.map((st) => (
+                          <button
+                            type="button"
+                            key={st.storeId}
+                            className={`store-stock-badge stock-${st.level}`}
+                            onClick={() =>
+                              setAdjusting({
+                                productId: row.productId,
+                                productName: row.productName,
+                                storeId: st.storeId,
+                                storeName: st.storeName,
+                                quantity: String(st.quantity),
+                                min: String(st.minStock),
+                              })
+                            }
+                            data-testid="stock-store-cell"
+                            title={`${LEVEL_LABEL[st.level]} · mín ${st.minStock} · clic para ajustar`}
+                          >
+                            <span className={`stock-dot stock-${st.level}`} />
+                            {st.storeName} : {st.quantity}
+                          </button>
+                        ))}
+                      </span>
+                    </td>
+                    <td>
+                      <strong>{storeId ? (visibleStores[0]?.quantity ?? 0) : row.total}</strong>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="link-btn"
+                        onClick={() => setMovementsFor(row.productId)}
+                        data-testid="stock-history"
+                      >
+                        Movimientos
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       {adjusting && (
         <div className="modal-backdrop" onClick={() => setAdjusting(null)}>
@@ -459,43 +540,52 @@ function AlertsSection() {
   }
   if (alerts.length === 0) {
     return (
-      <p className="catalog-empty" data-testid="alerts-empty">
-        No hay alertas activas.
-      </p>
+      <div className="stock-panel">
+        <p className="catalog-empty" data-testid="alerts-empty">
+          No hay alertas activas.
+        </p>
+      </div>
     );
   }
 
   return (
-    <table className="catalog-table" data-testid="alerts-table">
-      <thead>
-        <tr>
-          <th>Producto</th>
-          <th>Tienda</th>
-          <th>Alerta</th>
-        </tr>
-      </thead>
-      <tbody>
-        {alerts.map((a) => (
-          <tr key={a.id} data-testid="alert-row">
-            <td>{a.productName}</td>
-            <td>{a.storeName}</td>
-            <td>
-              <span
-                className={`stock-tag stock-${a.alertType === 'OUT_OF_STOCK' ? 'red' : 'yellow'}`}
-              >
-                {ALERT_LABEL[a.alertType] ?? a.alertType}
-              </span>
-            </td>
+    <div className="stock-panel">
+      <table className="catalog-table" data-testid="alerts-table">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>Tienda</th>
+            <th>Alerta</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {alerts.map((a) => (
+            <tr key={a.id} data-testid="alert-row">
+              <td>{a.productName}</td>
+              <td>{a.storeName}</td>
+              <td>
+                <span
+                  className={`stock-tag stock-${a.alertType === 'OUT_OF_STOCK' ? 'red' : 'yellow'}`}
+                >
+                  {ALERT_LABEL[a.alertType] ?? a.alertType}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
-function TransfersSection() {
+function TransfersSection({
+  creating,
+  setCreating,
+}: {
+  creating: boolean;
+  setCreating: (v: boolean) => void;
+}) {
   const qc = useQueryClient();
-  const [creating, setCreating] = useState(false);
 
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ['transfers'],
@@ -513,64 +603,52 @@ function TransfersSection() {
 
   return (
     <>
-      <header className="catalog-head">
-        <h2>Traspasos</h2>
-        <div className="catalog-actions">
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => setCreating(true)}
-            data-testid="new-transfer"
-          >
-            Nuevo traspaso
-          </button>
-        </div>
-      </header>
-
-      {isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : transfers.length === 0 ? (
-        <p className="catalog-empty" data-testid="transfers-empty">
-          Sin traspasos.
-        </p>
-      ) : (
-        <table className="catalog-table" data-testid="transfers-table">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Líneas</th>
-              <th>Estado</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {transfers.map((t) => (
-              <tr key={t.id} data-testid="transfer-row">
-                <td className="muted">{dt.format(new Date(t.createdAt))}</td>
-                <td>{t.lines.length}</td>
-                <td>
-                  <span className="stock-tag" data-testid="transfer-status">
-                    {STATUS_LABEL[t.status] ?? t.status}
-                  </span>
-                </td>
-                <td>
-                  {t.status === 'DRAFT' && (
-                    <button
-                      type="button"
-                      className="link-btn"
-                      disabled={sendMutation.isPending}
-                      onClick={() => sendMutation.mutate(t.id)}
-                      data-testid="transfer-send"
-                    >
-                      Enviar
-                    </button>
-                  )}
-                </td>
+      <div className="stock-panel">
+        {isLoading ? (
+          <p className="catalog-empty">Cargando…</p>
+        ) : transfers.length === 0 ? (
+          <p className="catalog-empty" data-testid="transfers-empty">
+            Sin traspasos.
+          </p>
+        ) : (
+          <table className="catalog-table" data-testid="transfers-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Líneas</th>
+                <th>Estado</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {transfers.map((t) => (
+                <tr key={t.id} data-testid="transfer-row">
+                  <td className="muted">{dt.format(new Date(t.createdAt))}</td>
+                  <td>{t.lines.length}</td>
+                  <td>
+                    <span className="stock-tag" data-testid="transfer-status">
+                      {STATUS_LABEL[t.status] ?? t.status}
+                    </span>
+                  </td>
+                  <td>
+                    {t.status === 'DRAFT' && (
+                      <button
+                        type="button"
+                        className="link-btn"
+                        disabled={sendMutation.isPending}
+                        onClick={() => sendMutation.mutate(t.id)}
+                        data-testid="transfer-send"
+                      >
+                        Enviar
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       {creating && (
         <CreateTransferModal
@@ -617,48 +695,42 @@ function CreateTransferModal({
         <h3>Nuevo traspaso</h3>
         <div className="modal-row">
           <label>Origen</label>
-          <select
+          <Select
             value={originStoreId}
-            onChange={(e) => setOriginStoreId(e.target.value)}
+            onChange={(value) => setOriginStoreId(value)}
+            ariaLabel="Origen"
             data-testid="transfer-origin"
-          >
-            <option value="">—</option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: '—' },
+              ...stores.map((s) => ({ value: s.id, label: s.name })),
+            ]}
+          />
         </div>
         <div className="modal-row">
           <label>Destino</label>
-          <select
+          <Select
             value={destStoreId}
-            onChange={(e) => setDestStoreId(e.target.value)}
+            onChange={(value) => setDestStoreId(value)}
+            ariaLabel="Destino"
             data-testid="transfer-dest"
-          >
-            <option value="">—</option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: '—' },
+              ...stores.map((s) => ({ value: s.id, label: s.name })),
+            ]}
+          />
         </div>
         <div className="modal-row">
           <label>Producto</label>
-          <select
+          <Select
             value={productId}
-            onChange={(e) => setProductId(e.target.value)}
+            onChange={(value) => setProductId(value)}
+            ariaLabel="Producto"
             data-testid="transfer-product"
-          >
-            <option value="">—</option>
-            {globalRows.map((r) => (
-              <option key={r.productId} value={r.productId}>
-                {r.productName}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: '—' },
+              ...globalRows.map((r) => ({ value: r.productId, label: r.productName })),
+            ]}
+          />
         </div>
         <div className="modal-row">
           <label>Cantidad</label>

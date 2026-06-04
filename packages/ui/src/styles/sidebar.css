@@ -1,4 +1,11 @@
-/* ─── Sidebar shell (fijo expandido) ──────────────────────── */
+/* ════════════════════════════════════════════════════════════════════
+   Sidebar — lenguaje ChatGPT × Apple.
+   Monocromo y silencioso: selección neutra (no color), filas redondeadas
+   amplias, hairlines, SF Pro con tracking ajustado. El único color vive
+   en el logotipo y el anillo de foco. Todo guiado por --sidebar-*.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ─── Shell (fijo) ─────────────────────────────────────────── */
 .sidebar {
   position: fixed;
   left: 0;
@@ -13,74 +20,112 @@
   overflow: hidden;
 }
 
-/* ─── Header: logo + marca ─────────────────────────────────── */
+/* ─── Header: logotipo (+ marca opcional) ──────────────────── */
 .sidebar-header {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  height: 64px;
+  height: 60px;
   padding: 0 1rem;
   flex-shrink: 0;
 }
 
 .sidebar-logo {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--ui-brand);
   color: #fff;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.9rem;
+  letter-spacing: -0.02em;
 }
 
 .sidebar-brand {
   display: flex;
   flex-direction: column;
-  line-height: 1.15;
+  line-height: 1.2;
   min-width: 0;
 }
 
 .sidebar-brand-title {
-  font-weight: 700;
-  font-size: 0.95rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+  letter-spacing: -0.014em;
   color: var(--ui-text);
 }
 
 .sidebar-brand-sub {
-  font-size: 0.75rem;
-  color: var(--ui-text-soft);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  color: var(--sidebar-group-label-color);
 }
 
 /* ─── Nav ─────────────────────────────────────────────────── */
 .sidebar-nav {
   flex: 1;
   overflow-y: auto;
-  padding: 0.5rem;
+  padding: 0.35rem 0.6rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-group {
+  margin-top: 0.7rem;
 }
 
 .sidebar-group-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.625rem 0.5rem 0.25rem;
-  font-size: 0.625rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  gap: 0.5rem;
+  padding: 0.3rem 0.6rem 0.32rem;
   color: var(--sidebar-group-label-color);
   cursor: pointer;
   background: none;
   border: none;
   width: 100%;
+  border-radius: 6px;
+}
+
+.sidebar-group-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Chevron de plegado: solo al pasar el ratón o con foco. */
+.sidebar-group-chevron {
+  flex-shrink: 0;
+  opacity: 0;
+  transition:
+    transform 0.18s cubic-bezier(0.2, 0, 0, 1),
+    opacity 0.12s ease;
+}
+
+.sidebar-group-header:hover .sidebar-group-chevron,
+.sidebar-group-header:focus-visible .sidebar-group-chevron {
+  opacity: 0.55;
+}
+
+.sidebar-group-header.expanded .sidebar-group-chevron {
+  transform: rotate(180deg);
 }
 
 .sidebar-group-items {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .sidebar-group-items.collapsed {
@@ -91,93 +136,251 @@
 .sidebar-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.55rem 0.6rem;
-  border-radius: var(--ui-radius-sm, 7px);
+  gap: 0.7rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 9px;
   cursor: pointer;
   color: var(--sidebar-text);
-  transition: background 100ms;
   width: 100%;
   background: none;
   border: none;
   text-align: left;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: -0.006em;
+  transition:
+    background 0.13s cubic-bezier(0.2, 0, 0, 1),
+    color 0.13s cubic-bezier(0.2, 0, 0, 1),
+    transform 0.1s ease;
 }
 
 .sidebar-item:hover {
   background: var(--sidebar-item-hover-bg);
+  border-radius: 9999px;
+  color: var(--ui-text);
 }
 
+.sidebar-item:active {
+  transform: scale(0.985);
+}
+
+/* Selección silenciosa: relleno neutro + tinta plena, sin color. */
 .sidebar-item.active {
   background: var(--sidebar-item-active-bg);
+  border-radius: 9999px;
   color: var(--sidebar-text-active);
   font-weight: 600;
 }
 
+.sidebar-item.active:hover {
+  background: var(--sidebar-item-active-bg);
+  color: var(--sidebar-text-active);
+}
+
 .sidebar-item-icon {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: inherit;
 }
 
 .sidebar-item-label {
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* ─── Footer: usuario ─────────────────────────────────────── */
+/* ─── Foco de teclado (a11y) ──────────────────────────────── */
+.sidebar-item:focus-visible,
+.sidebar-logout:focus-visible,
+.sidebar-group-header:focus-visible,
+.sidebar-account-logout:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* ─── Footer ──────────────────────────────────────────────── */
 .sidebar-footer {
-  padding: 0.75rem;
+  position: relative;
+  padding: 0.5rem 0.6rem;
   border-top: 1px solid var(--sidebar-border);
   flex-shrink: 0;
 }
 
-.sidebar-user {
+/* Cuenta (estilo ChatGPT): disparador del menú de cuenta */
+.sidebar-account {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  width: 100%;
+  padding: 0.4rem 0.45rem;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.13s cubic-bezier(0.2, 0, 0, 1);
 }
 
-.sidebar-avatar {
-  width: 32px;
-  height: 32px;
+.sidebar-account:hover,
+.sidebar-account.open {
+  background: var(--sidebar-item-hover-bg);
+}
+
+.sidebar-account:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+.sidebar-account-avatar {
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--ui-success-soft);
-  color: var(--ui-success);
-  font-weight: 700;
-  font-size: 0.75rem;
+  background: var(--sidebar-item-active-bg);
+  color: var(--ui-text);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
-.sidebar-user-text {
+.sidebar-account-meta {
   display: flex;
   flex-direction: column;
-  line-height: 1.2;
+  line-height: 1.25;
   min-width: 0;
+  flex: 1;
 }
 
-.sidebar-user-name {
-  font-size: 0.85rem;
+.sidebar-account-name {
+  font-size: 0.82rem;
   font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-account-sub {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--sidebar-group-label-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-account-caret {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sidebar-group-label-color);
+}
+
+/* Menú de cuenta (popover sobre el footer, abre hacia arriba) */
+.sidebar-account-menu {
+  position: absolute;
+  z-index: 60;
+  left: 0.6rem;
+  right: 0.6rem;
+  bottom: calc(100% + 0.5rem);
+  padding: 0.35rem;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.04),
+    0 10px 30px rgba(0, 0, 0, 0.14);
+  animation: sidebar-account-pop 0.12s ease;
+}
+
+@keyframes sidebar-account-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sidebar-account-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  font-size: 0.86rem;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+  cursor: pointer;
+  transition: background 0.13s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.sidebar-account-menu-item:hover,
+.sidebar-account-menu-item:focus-visible {
+  outline: none;
+  background: var(--sidebar-item-hover-bg);
+}
+
+.sidebar-account-menu-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sidebar-group-label-color);
+}
+
+/* Cierre de sesión simple (cuando no hay cuenta) */
+.sidebar-logout {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: var(--sidebar-text);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: -0.006em;
+  transition:
+    background 0.13s cubic-bezier(0.2, 0, 0, 1),
+    color 0.13s cubic-bezier(0.2, 0, 0, 1),
+    transform 0.1s ease;
+}
+
+.sidebar-logout:hover {
+  background: var(--sidebar-item-hover-bg);
   color: var(--ui-text);
 }
 
-.sidebar-user-sub {
-  font-size: 0.72rem;
-  color: var(--ui-text-soft);
+.sidebar-logout:active {
+  transform: scale(0.985);
 }
 
 /* ─── Móvil ───────────────────────────────────────────────── */
 @media (max-width: 767px) {
   .sidebar {
     transform: translateX(-100%);
-    transition: transform 150ms ease;
+    transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1);
   }
 
   .sidebar.mobile-open {
@@ -188,11 +391,28 @@
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.32);
+    backdrop-filter: blur(1px);
     z-index: 29;
   }
 
   .sidebar-overlay.visible {
     display: block;
+  }
+}
+
+/* ─── Movimiento reducido ─────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .sidebar-item,
+  .sidebar-logout,
+  .sidebar-account-logout,
+  .sidebar-group-chevron {
+    transition: none;
+  }
+
+  .sidebar-item:active,
+  .sidebar-logout:active {
+    transform: none;
   }
 }

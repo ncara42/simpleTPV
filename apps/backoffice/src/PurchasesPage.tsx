@@ -1,4 +1,5 @@
 import type { PurchaseOrder, PurchaseOrderStatus } from '@simpletpv/auth';
+import { Select } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -369,32 +370,24 @@ function SuggestSection() {
       <header className="catalog-head">
         <h2>Generar propuesta de pedido</h2>
         <div className="catalog-actions">
-          <select
+          <Select
             className="catalog-search"
             value={storeId}
-            onChange={(e) => setStoreId(e.target.value)}
+            onChange={(value) => setStoreId(value)}
+            options={stores.map((s) => ({ value: s.id, label: s.name }))}
+            placeholder="Tienda…"
+            ariaLabel="Tienda"
             data-testid="suggest-store"
-          >
-            <option value="">Tienda…</option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <select
+          />
+          <Select
             className="catalog-search"
             value={supplierId}
-            onChange={(e) => setSupplierId(e.target.value)}
+            onChange={(value) => setSupplierId(value)}
+            options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+            placeholder="Proveedor…"
+            ariaLabel="Proveedor"
             data-testid="suggest-supplier"
-          >
-            <option value="">Proveedor…</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          />
           <button
             type="button"
             className="btn-primary"

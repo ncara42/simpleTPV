@@ -41,12 +41,13 @@
   /* ─── Sidebar ─────────────────────────────────────────── */
   --sidebar-bg: #ffffff;
   --sidebar-width-rail: 56px;
-  --sidebar-width-expanded: 212px;
+  --sidebar-width-expanded: 232px;
   --sidebar-current-width: var(--sidebar-width-expanded);
-  --sidebar-item-active-bg: var(--ui-brand-soft);
-  --sidebar-item-hover-bg: var(--ui-surface-subtle);
+  /* Selección silenciosa estilo ChatGPT: relleno neutro, tinta plena. */
+  --sidebar-item-active-bg: rgb(0 0 0 / 0.07);
+  --sidebar-item-hover-bg: rgb(0 0 0 / 0.042);
   --sidebar-text: #6b6b66;
-  --sidebar-text-active: var(--ui-brand-ink);
+  --sidebar-text-active: var(--ui-text);
   --sidebar-group-label-color: #8d897f;
   --sidebar-border: var(--ui-border);
   --content-bg: var(--ui-bg);

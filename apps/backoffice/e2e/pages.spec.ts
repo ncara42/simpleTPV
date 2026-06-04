@@ -1,5 +1,16 @@
 import { expect, test } from '@playwright/test';
 
+// Los <select> nativos se sustituyeron por el componente <Select> propio: abrir el
+// disparador (lleva el data-testid) y pulsar la opción por su data-value.
+async function selectOption(
+  page: import('@playwright/test').Page,
+  testid: string,
+  value: string,
+): Promise<void> {
+  await page.getByTestId(testid).click();
+  await page.locator(`[role="option"][data-value="${value}"]`).click();
+}
+
 async function login(page: import('@playwright/test').Page): Promise<void> {
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
@@ -24,9 +35,9 @@ test('Catálogo: ruta de familia y selector dependiente de subfamilia (#97)', as
   await expect(page.getByTestId('catalog-family').first()).toContainText('›');
   // El modal tiene selector dependiente familia → subfamilia.
   await page.getByTestId('new-product').click();
-  await page.getByTestId('form-family').selectOption('fam-flores');
+  await selectOption(page, 'form-family', 'fam-flores');
   await expect(page.getByTestId('form-subfamily')).toBeEnabled();
-  await page.getByTestId('form-subfamily').selectOption('fam-flores-indica');
+  await selectOption(page, 'form-subfamily', 'fam-flores-indica');
 });
 
 test('Tiendas muestra el grid de 6 ubicaciones', async ({ page }) => {
@@ -94,7 +105,7 @@ test('Stock: KPIs de resumen y filtro por rotación (#96)', async ({ page }) => 
   await expect(page.getByTestId('stock-kpis')).toBeVisible();
   await expect(page.getByTestId('stock-row')).toHaveCount(5);
   // Rotación baja → solo el Vapeador Pro.
-  await page.getByTestId('stock-rotation').selectOption('baja');
+  await selectOption(page, 'stock-rotation', 'baja');
   await expect(page.getByTestId('stock-row')).toHaveCount(1);
   await expect(page.getByTestId('stock-table')).toContainText('Vapeador Pro');
 });
@@ -106,7 +117,7 @@ test('Ventas: scroll infinito, filtros y vistas guardadas (#95)', async ({ page 
   // Primer bloque del scroll infinito (20 de 60).
   await expect(page.getByTestId('sales-row')).toHaveCount(20);
   // Filtrar por la vendedora Marta → sus 15 tickets (caben en un bloque).
-  await page.getByTestId('sales-seller').selectOption('u-marta');
+  await selectOption(page, 'sales-seller', 'u-marta');
   const rows = page.getByTestId('sales-row');
   await expect(rows).toHaveCount(15);
   await expect(rows.first()).toContainText('Marta');
@@ -140,8 +151,9 @@ test('Familias: reordenar familias raíz (#98)', async ({ page }) => {
   const rows = page.getByTestId('fam-row');
   await expect(rows.first()).toContainText('Flores CBD');
   // Fila 3 (0-based) = "Aceites" raíz (DFS: Flores, Índica, Sativa, Aceites…).
-  // Subirla la coloca por encima de "Flores CBD".
-  await rows.nth(3).getByTestId('fam-up').click();
+  // Soltarla en la mitad superior de "Flores CBD" inserta la línea antes (drag
+  // nativo HTML5): el destino se calcula por clientY < punto medio → 'before'.
+  await rows.nth(3).dragTo(rows.first(), { targetPosition: { x: 12, y: 4 } });
   await expect(rows.first()).toContainText('Aceites');
 });
 

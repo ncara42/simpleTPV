@@ -1,3 +1,4 @@
+import { Select } from '@simpletpv/ui';
 import { useMemo, useState } from 'react';
 
 import {
@@ -20,8 +21,8 @@ const STATUS_FILTERS: { id: 'all' | PromoStatus; label: string }[] = [
   { id: 'activa', label: 'Activas' },
   { id: 'programada', label: 'Programadas' },
   { id: 'expirada', label: 'Expiradas' },
+  { id: 'pausada', label: 'Pausadas' },
 ];
-
 function conditionText(p: { conditionType: PromoConditionType; threshold: number }): string {
   return p.conditionType === 'min_qty'
     ? `Si el ticket lleva ${p.threshold} o más productos`
@@ -54,7 +55,6 @@ export function PromotionsPage() {
     () => promos.filter((p) => filter === 'all' || promoStatus(p) === filter),
     [promos, filter],
   );
-
   const save = (f: PromoForm): void => {
     if (f.id) {
       const id = f.id;
@@ -74,27 +74,29 @@ export function PromotionsPage() {
           <h2>Promociones</h2>
           <p className="catalog-sub">Descuentos y reglas programables</p>
         </div>
+      </header>
+
+      <div className="stock-tabs-row">
+        <nav className="bo-tabs" data-testid="promo-filters">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              className={`bo-tab ${filter === f.id ? 'active' : ''}`}
+              onClick={() => setFilter(f.id)}
+              data-testid={`promo-filter-${f.id}`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </nav>
         <button
-          className="btn-primary"
+          className="btn-primary stock-tabs-action"
           onClick={() => setForm({ ...EMPTY })}
           data-testid="new-promo"
         >
           Nueva promoción
         </button>
-      </header>
-
-      <div className="bo-tabs" data-testid="promo-filters" style={{ marginBottom: '1rem' }}>
-        {STATUS_FILTERS.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            className={`bo-tab ${filter === f.id ? 'active' : ''}`}
-            onClick={() => setFilter(f.id)}
-            data-testid={`promo-filter-${f.id}`}
-          >
-            {f.label}
-          </button>
-        ))}
       </div>
 
       {visible.length === 0 ? (
@@ -191,16 +193,18 @@ function PromoModal({
         <div className="modal-row">
           <label>
             Condición
-            <select
+            <Select
               value={form.conditionType}
-              onChange={(e) =>
-                onChange({ ...form, conditionType: e.target.value as PromoConditionType })
+              onChange={(value) =>
+                onChange({ ...form, conditionType: value as PromoConditionType })
               }
+              ariaLabel="Condición de la promoción"
               data-testid="promo-condition"
-            >
-              <option value="min_qty">Nº de productos ≥</option>
-              <option value="min_ticket">Importe del ticket ≥ (€)</option>
-            </select>
+              options={[
+                { value: 'min_qty', label: 'Nº de productos ≥' },
+                { value: 'min_ticket', label: 'Importe del ticket ≥ (€)' },
+              ]}
+            />
           </label>
           <label>
             Umbral
@@ -216,16 +220,16 @@ function PromoModal({
         <div className="modal-row">
           <label>
             Acción
-            <select
+            <Select
               value={form.discountType}
-              onChange={(e) =>
-                onChange({ ...form, discountType: e.target.value as PromoDiscountType })
-              }
+              onChange={(value) => onChange({ ...form, discountType: value as PromoDiscountType })}
+              ariaLabel="Tipo de descuento"
               data-testid="promo-discount-type"
-            >
-              <option value="percent">Descuento %</option>
-              <option value="amount">Descuento €</option>
-            </select>
+              options={[
+                { value: 'percent', label: 'Descuento %' },
+                { value: 'amount', label: 'Descuento €' },
+              ]}
+            />
           </label>
           <label>
             Valor

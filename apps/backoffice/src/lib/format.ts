@@ -1,6 +1,11 @@
 // Helpers de formato puros (testeables con vitest) usados por el dashboard.
 
 const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
+const eurCompact = new Intl.NumberFormat('es-ES', {
+  style: 'currency',
+  currency: 'EUR',
+  maximumFractionDigits: 0,
+});
 
 // Importe en euros: 1234.5 → "1234,50 €". Tolera null/undefined → "—".
 export function fmtEur(value: number | null | undefined): string {
@@ -8,6 +13,15 @@ export function fmtEur(value: number | null | undefined): string {
     return '—';
   }
   return eur.format(value);
+}
+
+// Importe en euros sin céntimos: 1234.5 → "1235 €". Para etiquetas estrechas
+// (p.ej. dentro de las barras del dashboard). null/undefined → "—".
+export function fmtEurCompact(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return '—';
+  }
+  return eurCompact.format(value);
 }
 
 // Proporción 0–1 → porcentaje "12,3 %". Útil para tasas (descuento, margen…).
