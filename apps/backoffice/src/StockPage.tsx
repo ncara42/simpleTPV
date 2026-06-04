@@ -57,8 +57,6 @@ type Section = 'global' | 'alerts' | 'transfers';
 export function StockPage() {
   const qc = useQueryClient();
   const [section, setSection] = useState<Section>('global');
-  const [creatingTransfer, setCreatingTransfer] = useState(false);
-
   // Contador del subtab "Alertas" (badge). Comparte queryKey con AlertsSection.
   const { data: alertCount = [] } = useQuery({
     queryKey: ['stock-alerts'],
@@ -112,23 +110,11 @@ export function StockPage() {
             Traspasos
           </button>
         </nav>
-        {section === 'transfers' && (
-          <button
-            type="button"
-            className="btn-primary stock-tabs-action"
-            onClick={() => setCreatingTransfer(true)}
-            data-testid="new-transfer"
-          >
-            Nuevo traspaso
-          </button>
-        )}
       </div>
 
       {section === 'global' && <GlobalStockSection />}
       {section === 'alerts' && <AlertsSection />}
-      {section === 'transfers' && (
-        <TransfersSection creating={creatingTransfer} setCreating={setCreatingTransfer} />
-      )}
+      {section === 'transfers' && <TransfersSection />}
     </section>
   );
 }
