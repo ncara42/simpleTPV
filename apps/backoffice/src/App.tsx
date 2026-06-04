@@ -70,9 +70,11 @@ const ALL_NAV: NavItem[] = [
 ];
 
 // #106: Compras y VeriFactu se retiran del menú (decisión informe UX 2026-06-02).
+// Notificaciones también sale del sidebar: su acceso es la campana de la TopBar
+// (mismo destino y badge), así que la entrada del menú era redundante.
 // El código (páginas, lib y datos demo) se conserva para una posible reactivación
 // futura: basta con quitar el id de este set para que vuelvan a aparecer.
-const HIDDEN_TABS = new Set<Tab>(['purchases', 'verifactu']);
+const HIDDEN_TABS = new Set<Tab>(['notifications', 'purchases', 'verifactu']);
 const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab));
 
 // La TopBar refleja el título y la descripción de la vista activa (publicados por
@@ -110,7 +112,7 @@ function Home() {
   const [tab, setTab] = useState<Tab>('dashboard');
 
   // Contador de notificaciones (alertas de stock): alimenta el badge de la campana
-  // (TopBar) y el de la entrada del sidebar. Comparte queryKey con NotificationsPage.
+  // de la TopBar. Comparte queryKey con NotificationsPage.
   const { data: alerts = [] } = useQuery({
     queryKey: ['stock-alerts'],
     queryFn: () => listAlerts(),
@@ -127,14 +129,10 @@ function Home() {
     return unsubscribe;
   }, [qc]);
 
-  const nav = NAV.map((item) =>
-    item.id === 'notifications' ? { ...item, badge: alertCount } : item,
-  );
-
   return (
     <div className="app-shell">
       <Sidebar
-        items={nav}
+        items={NAV}
         activeItem={tab}
         onSelect={(id) => setTab(id as Tab)}
         account={{ name: DEMO_USER.name, subtitle: 'Central · Admin' }}
