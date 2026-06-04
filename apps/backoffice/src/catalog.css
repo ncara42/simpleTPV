@@ -1778,6 +1778,11 @@
 .table-panel > .users-toolbar,
 .table-panel > .table-toolbar {
   margin: 0;
+  /* Altura mínima homogénea: TODA cabecera mide lo mismo tenga los controles
+     que tenga. En las tablas con filtros la altura la fija la pill/búsqueda
+     (2.5rem); en Traspasos solo hay un botón (más bajo), así que sin esto la
+     banda quedaba ~2px más corta. 2.5rem control + 1.7rem padding + 1px hairline. */
+  min-height: calc(2.5rem + 1.7rem + 1px);
   padding: 0.85rem 1rem;
   background: var(--ui-surface-subtle);
   border-bottom: 1px solid var(--ui-border);
@@ -1892,27 +1897,42 @@
 .promo-actions-cell .link-btn:focus-visible {
   opacity: 1;
 }
+/* Estado de promoción como indicador "punto + etiqueta": el color vive
+   en el punto, el texto queda en tinta. Limpio y profesional, sin pills
+   pastel. El estado finalizado (expirada) usa punto hueco y recede. */
 .promo-badge {
-  padding: 0.12rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.74rem;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+  white-space: nowrap;
+}
+.promo-badge::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--promo-dot, var(--ui-text-soft));
 }
 .promo-activa {
-  background: #dcfce7;
-  color: #166534;
+  --promo-dot: var(--ui-success);
 }
 .promo-programada {
-  background: #dbeafe;
-  color: #1e40af;
-}
-.promo-expirada {
-  background: var(--ui-surface-subtle);
-  color: var(--ui-text-muted);
+  --promo-dot: var(--ui-primary);
 }
 .promo-pausada {
-  background: #fef3c7;
-  color: #92400e;
+  --promo-dot: var(--ui-warning);
+}
+.promo-expirada {
+  color: var(--ui-text-muted);
+}
+.promo-expirada::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--ui-text-soft);
 }
 .promo-preview {
   padding: 0.75rem 0.85rem;
