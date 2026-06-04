@@ -2,6 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { initials } from '../lib/initials.js';
 
+// Variantes de la micro-animación del icono al hacer hover (definidas como
+// @keyframes en sidebar.css). Se reparten ciclando por la posición del item:
+// así dos vecinos nunca repiten gesto y las cuatro salen equilibradas (un hash
+// del id agrupaba demasiado con pocas entradas).
+const ICON_ANIMS = ['sidebar-icon-hop', 'sidebar-icon-wiggle', 'sidebar-icon-pulse'] as const;
+
+function iconAnimAt(index: number): string {
+  return ICON_ANIMS[index % ICON_ANIMS.length] ?? ICON_ANIMS[0];
+}
+
 export interface NavItem {
   id: string;
   label: string;
@@ -126,7 +136,7 @@ export function Sidebar({
   const renderItems = (filterGroup?: string) =>
     items
       .filter((item) => item.group === filterGroup)
-      .map((item) => {
+      .map((item, index) => {
         const isActive = activeItem === item.id;
         return (
           <li key={item.id}>
@@ -138,7 +148,12 @@ export function Sidebar({
               aria-current={isActive ? 'page' : undefined}
               data-testid={`nav-${item.id}`}
             >
-              <span className="sidebar-item-icon">{item.icon}</span>
+              <span
+                className="sidebar-item-icon"
+                style={{ '--sidebar-icon-anim': iconAnimAt(index) } as React.CSSProperties}
+              >
+                {item.icon}
+              </span>
               <span className="sidebar-item-label">{item.label}</span>
               {item.badge != null && item.badge > 0 && (
                 <span className="sidebar-item-badge" data-testid={`nav-${item.id}-badge`}>

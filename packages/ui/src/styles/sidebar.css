@@ -184,6 +184,73 @@
   align-items: center;
   justify-content: center;
   color: inherit;
+  transition: transform 0.13s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Micro-interacción: al pasar el ratón por la fila, su icono se anima una sola
+   vez (como un mini gif). Cada item recibe una de varias animaciones según un
+   hash de su id (--sidebar-icon-anim, fijado en Sidebar.tsx), así no todos
+   hacen el mismo gesto. Si falta la variable, cae a `hop`. */
+.sidebar-item:hover .sidebar-item-icon,
+.sidebar-logout:hover .sidebar-item-icon {
+  animation: var(--sidebar-icon-anim, sidebar-icon-hop) 0.45s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Saltito vertical con un guiño de giro. */
+@keyframes sidebar-icon-hop {
+  0% {
+    transform: translateY(0) rotate(0);
+  }
+  30% {
+    transform: translateY(-3px) rotate(-8deg);
+  }
+  55% {
+    transform: translateY(0) rotate(6deg);
+  }
+  78% {
+    transform: translateY(-1px) rotate(-3deg);
+  }
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+}
+
+/* Meneo lateral: solo giro, como negando con la cabeza. */
+@keyframes sidebar-icon-wiggle {
+  0% {
+    transform: rotate(0);
+  }
+  20% {
+    transform: rotate(-11deg);
+  }
+  40% {
+    transform: rotate(9deg);
+  }
+  60% {
+    transform: rotate(-6deg);
+  }
+  80% {
+    transform: rotate(3deg);
+  }
+  100% {
+    transform: rotate(0);
+  }
+}
+
+/* Latido: solo escala, un bombeo muy sutil (apenas un guiño). */
+@keyframes sidebar-icon-pulse {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.1);
+  }
+  70% {
+    transform: scale(0.98);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .sidebar-item-label {
@@ -424,5 +491,10 @@
   .sidebar-item:active,
   .sidebar-logout:active {
     transform: none;
+  }
+
+  .sidebar-item:hover .sidebar-item-icon,
+  .sidebar-logout:hover .sidebar-item-icon {
+    animation: none;
   }
 }
