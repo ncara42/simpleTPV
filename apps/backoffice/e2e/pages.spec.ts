@@ -71,7 +71,8 @@ test('Tiendas: orden por ventas y filtro de estado (#101, #103)', async ({ page 
   // Orden por defecto = ventas de hoy desc → Gran Vía (360 €) primera.
   await expect(page.getByTestId('store-card').first()).toContainText('Gran Vía');
   // Filtro "Dormidas" → solo el Almacén (active: false).
-  await page.getByTestId('store-filter-dormida').click();
+  await page.getByTestId('store-status-filter').click();
+  await page.getByRole('option', { name: 'Dormidas' }).click();
   await expect(page.getByTestId('store-card')).toHaveCount(1);
   await expect(page.getByTestId('store-card')).toContainText('Almacén');
 });

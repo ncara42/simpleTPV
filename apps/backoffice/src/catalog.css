@@ -297,10 +297,19 @@
   margin-bottom: 1rem;
   flex-wrap: wrap;
 }
-.stores-period {
+/* Estado + periodo: dos desplegables contiguos, alineados a la izquierda. */
+.stores-filters {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+.stores-filter-select {
+  width: fit-content;
+}
+/* Iguala el alto exterior del antiguo pill (.bo-tabs) que usa el dashboard:
+   alto del tab (30px) + padding vertical del contenedor (0.36rem) + hairlines (2px). */
+.stores-filter-select .ui-select-trigger {
+  height: calc(30px + 0.36rem + 2px);
 }
 /* Cifra de ventas: el dato protagonista para el jefe. */
 .store-card-metric {

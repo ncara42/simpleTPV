@@ -1,3 +1,4 @@
+import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
@@ -98,41 +99,31 @@ export function StoresPage() {
   return (
     <section className="catalog">
       <div className="stores-toolbar">
-        <div className="bo-tabs" role="tablist" aria-label="Filtrar por estado">
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              className={`bo-tab ${statusFilter === f.id ? 'active' : ''}`}
-              onClick={() => setStatusFilter(f.id)}
-              data-testid={`store-filter-${f.id}`}
-            >
-              {f.label}
-            </button>
-          ))}
+        <div className="stores-filters">
+          <Select
+            className="stores-filter-select"
+            value={statusFilter}
+            onChange={(v) => setStatusFilter(v as StatusFilter)}
+            ariaLabel="Filtrar por estado"
+            data-testid="store-status-filter"
+            options={STATUS_FILTERS.map((f) => ({ value: f.id, label: f.label }))}
+          />
+          <Select
+            className="stores-filter-select"
+            value={period}
+            onChange={(v) => setPeriod(v as StoreSalesPeriod)}
+            ariaLabel="Ordenar por ventas del periodo"
+            data-testid="store-period"
+            options={PERIODS.map((p) => ({ value: p.id, label: p.label }))}
+          />
         </div>
-        <div className="stores-period">
-          <div className="bo-tabs" role="tablist" aria-label="Ordenar por ventas del periodo">
-            {PERIODS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className={`bo-tab ${period === p.id ? 'active' : ''}`}
-                onClick={() => setPeriod(p.id)}
-                data-testid={`store-period-${p.id}`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <button
-            className="btn-primary stock-tabs-action"
-            onClick={() => setCreating(true)}
-            data-testid="new-store"
-          >
-            Nueva tienda
-          </button>
-        </div>
+        <button
+          className="btn-primary stock-tabs-action"
+          onClick={() => setCreating(true)}
+          data-testid="new-store"
+        >
+          Nueva tienda
+        </button>
       </div>
 
       {isLoading ? (
