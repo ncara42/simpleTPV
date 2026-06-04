@@ -5,9 +5,14 @@ import { listStores } from '../lib/admin.js';
 import { createTransfer, getGlobalStock, listTransfers, sendTransfer } from '../lib/stock.js';
 import { dt, STATUS_LABEL } from './labels.js';
 
-export function TransfersSection() {
+export function TransfersSection({
+  creating,
+  setCreating,
+}: {
+  creating: boolean;
+  setCreating: (v: boolean) => void;
+}) {
   const qc = useQueryClient();
-  const [creating, setCreating] = useState(false);
 
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ['transfers'],
@@ -25,20 +30,6 @@ export function TransfersSection() {
 
   return (
     <>
-      <header className="catalog-head">
-        <h2>Traspasos</h2>
-        <div className="catalog-actions">
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => setCreating(true)}
-            data-testid="new-transfer"
-          >
-            Nuevo traspaso
-          </button>
-        </div>
-      </header>
-
       {isLoading ? (
         <p className="catalog-empty">Cargando…</p>
       ) : transfers.length === 0 ? (

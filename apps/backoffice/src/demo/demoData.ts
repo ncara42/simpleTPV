@@ -114,6 +114,45 @@ export const DEMO_STORE_OPS: Record<string, StoreOps> = {
   },
 };
 
+// Registro de fichajes (aperturas y cierres) por tienda — demo para el historial del
+// detalle de tienda (#100): quién abrió/cerró, qué día y a qué hora. Ordenado de más
+// reciente a más antiguo. La entrada más reciente de una tienda abierta es una
+// 'apertura' que coincide con DEMO_STORE_OPS (openedBy/openedSince).
+export interface StoreLogEntry {
+  name: string; // empleado que fichó
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
+  type: 'apertura' | 'cierre';
+}
+export const DEMO_STORE_LOG: Record<string, StoreLogEntry[]> = {
+  's-centro': [
+    { name: 'Marta Ruiz', date: '2026-06-04', time: '09:02', type: 'apertura' },
+    { name: 'Luis Pérez', date: '2026-06-03', time: '21:10', type: 'cierre' },
+    { name: 'Luis Pérez', date: '2026-06-03', time: '08:58', type: 'apertura' },
+    { name: 'Marta Ruiz', date: '2026-06-02', time: '21:05', type: 'cierre' },
+    { name: 'Marta Ruiz', date: '2026-06-02', time: '08:55', type: 'apertura' },
+  ],
+  's-norte': [
+    { name: 'Jon Aguirre', date: '2026-06-04', time: '09:15', type: 'apertura' },
+    { name: 'Jon Aguirre', date: '2026-06-03', time: '20:40', type: 'cierre' },
+    { name: 'Marta Ruiz', date: '2026-06-03', time: '09:08', type: 'apertura' },
+    { name: 'Jon Aguirre', date: '2026-06-02', time: '20:30', type: 'cierre' },
+  ],
+  's-sur': [
+    { name: 'Jon Aguirre', date: '2026-06-03', time: '20:25', type: 'cierre' },
+    { name: 'Jon Aguirre', date: '2026-06-03', time: '09:20', type: 'apertura' },
+    { name: 'Marta Ruiz', date: '2026-06-02', time: '20:15', type: 'cierre' },
+    { name: 'Marta Ruiz', date: '2026-06-02', time: '09:05', type: 'apertura' },
+  ],
+  's-granvia': [
+    { name: 'Luis Pérez', date: '2026-06-04', time: '10:00', type: 'apertura' },
+    { name: 'Luis Pérez', date: '2026-06-03', time: '22:00', type: 'cierre' },
+    { name: 'Jon Aguirre', date: '2026-06-03', time: '09:50', type: 'apertura' },
+  ],
+  's-online': [],
+  's-almacen': [],
+};
+
 // ─── Familias y subfamilias (jerarquía de 2 niveles para el mockup) ──────
 // `productCount` es un campo demo extra (FamilyNode no lo trae); FamiliesPage lo lee opcional.
 // Las subfamilias solo existen dentro de su familia padre (parentId apunta a ella).

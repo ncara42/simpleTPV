@@ -74,7 +74,7 @@
   align-items: center;
   gap: 0.15rem;
   padding: 0.2rem;
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-pill);
   background: var(--ui-surface-subtle);
   border: 1px solid var(--ui-border);
 }
@@ -83,7 +83,7 @@
   height: 30px;
   padding: 0 0.9rem;
   border: none;
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-pill);
   background: none;
   font-size: var(--ui-text-sm);
   font-weight: 600;

@@ -72,9 +72,9 @@ function FamilyRow({
   return (
     <>
       <div
-        className={`fam-row${dragging ? ' fam-dragging' : ''}${
-          drop ? ` fam-row--drop-${drop}` : ''
-        }`}
+        className={`fam-row${depth === 0 ? ' fam-row--root' : ''}${
+          dragging ? ' fam-dragging' : ''
+        }${drop ? ` fam-row--drop-${drop}` : ''}`}
         style={{ paddingLeft: `${depth * 1.5 + 0.75}rem` }}
         data-testid="fam-row"
         data-fam-id={node.id}

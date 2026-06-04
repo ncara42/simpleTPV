@@ -69,6 +69,13 @@ test('Tiendas: abierta/cerrada y dispositivo autorizado (#100, #102)', async ({ 
   await page.getByTestId('store-card').filter({ hasText: 'Sur' }).click();
   await expect(page.getByTestId('store-detail')).toBeVisible();
   await expect(page.getByTestId('store-detail-open')).toBeVisible();
+  // Registro de fichajes: abre el drawer lateral con la tabla y lo cierra.
+  await page.getByTestId('store-log-open').click();
+  await expect(page.getByTestId('store-log-drawer')).toBeVisible();
+  await expect(page.getByTestId('store-log-table')).toBeVisible();
+  await page.getByTestId('store-log-close').click();
+  await expect(page.getByTestId('store-log-drawer')).toBeHidden();
+  // Dispositivo sin verificar → flujo de autorización.
   await expect(page.getByTestId('store-device-warn')).toBeVisible();
   await page.getByTestId('store-device-authorize').click();
   await expect(page.getByTestId('store-device-ok')).toBeVisible();
@@ -81,15 +88,35 @@ test('Usuarios muestra 4 usuarios con badge de rol', async ({ page }) => {
   await expect(page.getByTestId('user-role-badge').first()).toBeVisible();
 });
 
-test('Usuarios: editar precarga datos y muestra permisos por rol (#104)', async ({ page }) => {
+test('Usuarios: editar precarga datos y permite renombrar (#104)', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-users').click();
-  await page.getByTestId('user-edit').first().click();
+  // Seleccionar el primer usuario y editar desde las acciones en lote de la toolbar.
+  await page.getByTestId('user-select').first().check();
+  await expect(page.getByTestId('users-edit')).toBeVisible();
+  await page.getByTestId('users-edit').click();
   await expect(page.getByTestId('user-name')).toHaveValue('Ana Caravaca');
-  await expect(page.getByTestId('role-permissions')).toBeVisible();
+  await expect(page.getByTestId('user-role')).toBeVisible();
   await page.getByTestId('user-name').fill('Ana C. Editado');
   await page.getByTestId('user-save').click();
   await expect(page.getByTestId('users-table')).toContainText('Ana C. Editado');
+});
+
+test('Usuarios: edición en lote avanza con "Siguiente (n / total)"', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-users').click();
+  const checks = page.getByTestId('user-select');
+  await checks.nth(0).check();
+  await checks.nth(1).check();
+  await expect(page.getByTestId('users-edit')).toHaveText('Editar (2)');
+  await page.getByTestId('users-edit').click();
+  // Primer paso: el botón primario invita a continuar con el siguiente.
+  await expect(page.getByTestId('user-save')).toHaveText('Siguiente (1 / 2)');
+  await page.getByTestId('user-save').click();
+  // Último paso: el botón confirma el guardado del lote completo.
+  await expect(page.getByTestId('user-save')).toHaveText('Guardar (2 / 2)');
+  await page.getByTestId('user-save').click();
+  await expect(page.getByTestId('user-form')).toHaveCount(0);
 });
 
 test('Stock global muestra la tabla con badges por tienda', async ({ page }) => {
@@ -99,10 +126,10 @@ test('Stock global muestra la tabla con badges por tienda', async ({ page }) => 
   await expect(page.getByTestId('stock-row')).toHaveCount(5);
 });
 
-test('Stock: KPIs de resumen y filtro por rotación (#96)', async ({ page }) => {
+test('Stock: tabla global y filtro por rotación (#96)', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-stock').click();
-  await expect(page.getByTestId('stock-kpis')).toBeVisible();
+  await expect(page.getByTestId('stock-table')).toBeVisible();
   await expect(page.getByTestId('stock-row')).toHaveCount(5);
   // Rotación baja → solo el Vapeador Pro.
   await selectOption(page, 'stock-rotation', 'baja');

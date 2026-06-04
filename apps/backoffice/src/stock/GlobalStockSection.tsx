@@ -3,12 +3,7 @@ import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import {
-  DEMO_FAMILIES,
-  DEMO_PRODUCT_ROTATION,
-  DEMO_STOCK_IN_TRANSIT,
-  productRootFamily,
-} from '../demo/demoData.js';
+import { DEMO_FAMILIES, DEMO_PRODUCT_ROTATION, productRootFamily } from '../demo/demoData.js';
 import { getGlobalStock, listMovements, setMinStock } from '../lib/stock.js';
 import { dt, LEVEL_LABEL, MOVEMENT_LABEL, ROTATION_LABEL } from './labels.js';
 
@@ -61,15 +56,6 @@ export function GlobalStockSection() {
     return true;
   });
 
-  // KPIs del conjunto filtrado (respetan el filtro de tienda).
-  const cells = filtered.flatMap((r) => r.stores.filter((s) => !storeId || s.storeId === storeId));
-  const kpis = {
-    units: cells.reduce((acc, s) => acc + s.quantity, 0),
-    out: cells.filter((s) => s.level === 'red').length,
-    low: cells.filter((s) => s.level === 'yellow').length,
-    inTransit: DEMO_STOCK_IN_TRANSIT,
-  };
-
   const saveAdjust = (): void => {
     if (!adjusting) return;
     setQtyOverlay((prev) => ({
@@ -90,25 +76,6 @@ export function GlobalStockSection() {
 
   return (
     <>
-      <div className="stock-kpis" data-testid="stock-kpis">
-        <div className="stock-kpi">
-          <span className="stock-kpi-val">{kpis.units}</span>
-          <span className="stock-kpi-label">Unidades</span>
-        </div>
-        <div className="stock-kpi">
-          <span className="stock-kpi-val red">{kpis.out}</span>
-          <span className="stock-kpi-label">Roturas</span>
-        </div>
-        <div className="stock-kpi">
-          <span className="stock-kpi-val yellow">{kpis.low}</span>
-          <span className="stock-kpi-label">Stock bajo</span>
-        </div>
-        <div className="stock-kpi">
-          <span className="stock-kpi-val">{kpis.inTransit}</span>
-          <span className="stock-kpi-label">En tránsito</span>
-        </div>
-      </div>
-
       <div className="sales-filters">
         <input
           className="catalog-search"

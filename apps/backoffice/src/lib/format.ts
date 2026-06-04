@@ -64,3 +64,27 @@ export function fmtHours(value: number | null | undefined): string {
   }
   return `${value.toFixed(1).replace('.', ',')} h`;
 }
+
+const MONTHS_ES = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+];
+
+// Fecha ISO "YYYY-MM-DD" → "4 jun" (día + mes abreviado en castellano). Sin Date para
+// evitar desfases de zona horaria. Entrada inválida → "—".
+export function fmtDayMonth(date: string | null | undefined): string {
+  if (!date) return '—';
+  const [, m, d] = date.split('-').map((n) => Number.parseInt(n, 10));
+  if (!m || !d || m < 1 || m > 12) return '—';
+  return `${d} ${MONTHS_ES[m - 1]}`;
+}

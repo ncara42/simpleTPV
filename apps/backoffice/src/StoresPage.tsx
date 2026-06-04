@@ -99,9 +99,6 @@ export function StoresPage() {
           <h2>Tiendas</h2>
           <p className="catalog-sub">{stores.length} ubicaciones</p>
         </div>
-        <button className="btn-primary" onClick={() => setCreating(true)} data-testid="new-store">
-          Nueva tienda
-        </button>
       </header>
 
       <div className="stores-toolbar">
@@ -132,6 +129,13 @@ export function StoresPage() {
               </button>
             ))}
           </div>
+          <button
+            className="btn-primary stock-tabs-action"
+            onClick={() => setCreating(true)}
+            data-testid="new-store"
+          >
+            Nueva tienda
+          </button>
         </div>
       </div>
 
@@ -152,7 +156,6 @@ export function StoresPage() {
               key={s.id}
               store={s}
               active={isActive(s)}
-              open={opsOf(s.id)?.open ?? false}
               sales={salesOf(s.id, period)}
               periodLabel={SALES_LABEL[period]}
               onSelect={() => setDetail(s)}
@@ -175,8 +178,6 @@ export function StoresPage() {
         <StoreDetailModal
           store={detail}
           ops={opsOf(detail.id)}
-          active={isActive(detail)}
-          onToggleActive={() => toggleActive(detail)}
           onPatchOps={(patch) => patchOps(detail.id, patch)}
           onClose={() => setDetail(null)}
         />

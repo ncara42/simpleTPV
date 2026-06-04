@@ -1,3 +1,4 @@
+import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
@@ -16,6 +17,12 @@ interface UserForm {
   active: boolean;
 }
 
+// Asistente de edición en lote: cola de usuarios seleccionados + paso actual.
+interface EditWizard {
+  queue: DemoUser[];
+  step: number;
+}
+
 const EMPTY: UserForm = {
   name: '',
   email: '',
@@ -32,25 +39,6 @@ const ROLES: { value: Role; label: string }[] = [
   { value: 'CLERK', label: 'Dependiente' },
 ];
 
-// Permisos por rol — visibles y auditables en la ficha (nada implícito). (#104)
-const ROLE_PERMISSIONS: Record<Role, string[]> = {
-  ADMIN: [
-    'Acceso total al backoffice y la configuración',
-    'Gestiona usuarios, tiendas, catálogo y precios',
-    'Acceso a todas las tiendas',
-  ],
-  MANAGER: [
-    'Gestiona las tiendas que tiene asignadas',
-    'Ventas, stock, traspasos y arqueos de caja',
-    'No gestiona usuarios ni la configuración global',
-  ],
-  CLERK: [
-    'Operativa de venta en su tienda',
-    'Consulta de stock y productos',
-    'Sin acceso a configuración ni a otras tiendas',
-  ],
-};
-
 function storeName(id: string): string {
   return DEMO_STORES.find((s) => s.id === id)?.name ?? id;
 }
@@ -60,75 +48,156 @@ function storesLabel(role: Role, storeIds: string[]): string {
   return storeIds.length ? storeIds.map(storeName).join(', ') : '—';
 }
 
+function toForm(u: DemoUser): UserForm {
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    password: '',
+    role: u.role,
+    storeIds: u.storeIds ?? [],
+    active: u.active,
+  };
+}
+
 export function UsersPage() {
   const qc = useQueryClient();
   const [form, setForm] = useState<UserForm | null>(null);
+  // Modo asistente (edición en lote). null → alta de un usuario nuevo.
+  const [wizard, setWizard] = useState<EditWizard | null>(null);
+  // Filtros de la barra superior (espejo de la toolbar de stock).
+  const [search, setSearch] = useState('');
+  const [storeFilter, setStoreFilter] = useState('');
+  // Selección múltiple por fila (ids marcados).
+  const [selected, setSelected] = useState<string[]>([]);
   // Overlays locales (demo: no hay backend que persista los cambios).
   const [overrides, setOverrides] = useState<Record<string, Partial<DemoUser>>>({});
   const [extras, setExtras] = useState<DemoUser[]>([]);
+  const [deleted, setDeleted] = useState<string[]>([]);
 
   const { data: users = [], isLoading } = useQuery({ queryKey: ['users'], queryFn: listUsers });
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['users'] });
 
   const allUsers = useMemo<DemoUser[]>(() => {
     const base = (users as DemoUser[]).map((u) => ({ ...u, ...overrides[u.id] }));
-    return [...base, ...extras];
-  }, [users, overrides, extras]);
+    return [...base, ...extras].filter((u) => !deleted.includes(u.id));
+  }, [users, overrides, extras, deleted]);
 
-  const saveMut = useMutation({
-    mutationFn: async (f: UserForm): Promise<{ form: UserForm; mode: 'edit' | 'create' }> => {
-      const exists =
-        (users as DemoUser[]).some((u) => u.id === f.id) || extras.some((u) => u.id === f.id);
-      if (f.id && exists) return { form: f, mode: 'edit' };
+  // Búsqueda por nombre + filtro por tienda. Los ADMIN acceden a todas las
+  // tiendas (storeIds vacío), así que aparecen en cualquier filtro de tienda.
+  const filtered = useMemo<DemoUser[]>(
+    () =>
+      allUsers.filter((u) => {
+        if (search && !u.name.toLowerCase().includes(search.toLowerCase())) return false;
+        if (storeFilter && u.role !== 'ADMIN' && !(u.storeIds ?? []).includes(storeFilter))
+          return false;
+        return true;
+      }),
+    [allUsers, search, storeFilter],
+  );
+
+  // ─── Selección ─────────────────────────────────────────────────────────
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const toggleSelect = (id: string): void =>
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const clearSelection = (): void => setSelected([]);
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((u) => selectedSet.has(u.id));
+  const selectAllFiltered = (): void =>
+    setSelected((prev) => [...new Set([...prev, ...filtered.map((u) => u.id)])]);
+
+  // Usuarios seleccionados que siguen existiendo, en el orden de la lista.
+  const selectedUsers = useMemo(
+    () => allUsers.filter((u) => selectedSet.has(u.id)),
+    [allUsers, selectedSet],
+  );
+
+  // ─── Mutaciones / overlays ─────────────────────────────────────────────
+  const createMut = useMutation({
+    mutationFn: async (f: UserForm): Promise<UserForm> => {
       await createUser({ name: f.name, email: f.email, password: f.password, role: f.role });
-      return { form: f, mode: 'create' };
+      return f;
     },
-    onSuccess: ({ form: f, mode }) => {
-      const patch: Partial<DemoUser> = {
-        name: f.name,
-        email: f.email,
-        role: f.role,
-        storeIds: f.role === 'ADMIN' ? [] : f.storeIds,
-        active: f.active,
-      };
-      if (mode === 'edit' && f.id) {
-        if (extras.some((u) => u.id === f.id)) {
-          setExtras((prev) => prev.map((u) => (u.id === f.id ? { ...u, ...patch } : u)));
-        } else {
-          setOverrides((prev) => ({ ...prev, [f.id as string]: patch }));
-        }
-      } else {
-        setExtras((prev) => [
-          ...prev,
-          {
-            id: `u-${f.email}`,
-            active: f.active,
-            role: f.role,
-            name: f.name,
-            email: f.email,
-            storeIds: patch.storeIds ?? [],
-          },
-        ]);
-      }
-      setForm(null);
+    onSuccess: (f) => {
+      setExtras((prev) => [
+        ...prev,
+        {
+          id: `u-${f.email}`,
+          active: f.active,
+          role: f.role,
+          name: f.name,
+          email: f.email,
+          storeIds: f.role === 'ADMIN' ? [] : f.storeIds,
+        },
+      ]);
+      closeModal();
       invalidate();
     },
   });
 
-  // La eliminación se conserva en lib (deleteUser) para el futuro.
-  void deleteUser;
+  // Aplica la edición de un usuario existente sobre los overlays locales.
+  const applyEdit = (f: UserForm): void => {
+    if (!f.id) return;
+    const patch: Partial<DemoUser> = {
+      name: f.name,
+      email: f.email,
+      role: f.role,
+      storeIds: f.role === 'ADMIN' ? [] : f.storeIds,
+      active: f.active,
+    };
+    if (extras.some((u) => u.id === f.id)) {
+      setExtras((prev) => prev.map((u) => (u.id === f.id ? { ...u, ...patch } : u)));
+    } else {
+      setOverrides((prev) => ({ ...prev, [f.id as string]: patch }));
+    }
+  };
 
-  const openCreate = (): void => setForm({ ...EMPTY });
-  const openEdit = (u: DemoUser): void =>
-    setForm({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      password: '',
-      role: u.role,
-      storeIds: u.storeIds ?? [],
-      active: u.active,
-    });
+  // Borrado en lote en local (demo: deleteUser es un stub sin backend).
+  const removeSelected = (): void => {
+    const ids = new Set(selected);
+    const extraIds = new Set(extras.map((e) => e.id));
+    setExtras((prev) => prev.filter((u) => !ids.has(u.id)));
+    setDeleted((prev) => [...prev, ...selected.filter((id) => !extraIds.has(id))]);
+    selected.forEach((id) => void deleteUser(id));
+    clearSelection();
+    invalidate();
+  };
+
+  // ─── Modal ─────────────────────────────────────────────────────────────
+  const closeModal = (): void => {
+    setForm(null);
+    setWizard(null);
+  };
+
+  const openCreate = (): void => {
+    setWizard(null);
+    setForm({ ...EMPTY });
+  };
+
+  const openBulkEdit = (): void => {
+    const queue = selectedUsers;
+    if (queue.length === 0) return;
+    setWizard({ queue, step: 0 });
+    setForm(toForm(queue[0]!));
+  };
+
+  const submitForm = (): void => {
+    if (!form) return;
+    if (wizard) {
+      applyEdit(form);
+      const next = wizard.step + 1;
+      if (next < wizard.queue.length) {
+        setWizard({ ...wizard, step: next });
+        setForm(toForm(wizard.queue[next]!));
+      } else {
+        closeModal();
+        clearSelection();
+      }
+      invalidate();
+    } else {
+      createMut.mutate(form);
+    }
+  };
 
   const toggleStore = (id: string): void =>
     setForm((f) =>
@@ -142,7 +211,20 @@ export function UsersPage() {
         : f,
     );
 
-  const isEdit = Boolean(form?.id);
+  // Etiqueta del botón primario: "Siguiente (n / total)" mientras quedan
+  // usuarios en la cola; "Guardar" en el último paso (o en alta/edición única).
+  const total = wizard?.queue.length ?? 0;
+  const step = wizard?.step ?? 0;
+  const isLastStep = !wizard || step + 1 >= total;
+  const primaryLabel = !wizard
+    ? createMut.isPending
+      ? 'Guardando…'
+      : 'Crear'
+    : total > 1 && !isLastStep
+      ? `Siguiente (${step + 1} / ${total})`
+      : total > 1
+        ? `Guardar (${total} / ${total})`
+        : 'Guardar';
 
   return (
     <section className="catalog">
@@ -153,65 +235,152 @@ export function UsersPage() {
             {allUsers.length} usuarios
           </p>
         </div>
-        <button className="btn-primary" onClick={openCreate} data-testid="new-user">
-          Nuevo usuario
-        </button>
       </header>
+
+      <div className="users-toolbar">
+        <div className="sales-filters">
+          <input
+            className="catalog-search"
+            placeholder="Buscar por nombre…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            data-testid="users-search"
+          />
+          <Select
+            className="catalog-search"
+            value={storeFilter}
+            onChange={setStoreFilter}
+            ariaLabel="Filtrar por tienda"
+            data-testid="users-store"
+            options={[
+              { value: '', label: 'Todas las tiendas' },
+              ...DEMO_STORES.map((s) => ({ value: s.id, label: s.name })),
+            ]}
+          />
+          {selected.length > 0 && (
+            <>
+              {!allFilteredSelected && (
+                <button
+                  type="button"
+                  className="users-sel-btn"
+                  onClick={selectAllFiltered}
+                  data-testid="users-select-all"
+                >
+                  Seleccionar todo
+                </button>
+              )}
+              <button
+                type="button"
+                className="users-sel-btn"
+                onClick={clearSelection}
+                data-testid="users-clear"
+              >
+                Quitar selección
+              </button>
+            </>
+          )}
+        </div>
+        {selected.length > 0 ? (
+          <div className="users-toolbar-actions">
+            <button
+              type="button"
+              className="users-bulk-edit"
+              onClick={openBulkEdit}
+              data-testid="users-edit"
+            >
+              Editar{selected.length > 1 ? ` (${selected.length})` : ''}
+            </button>
+            <button
+              type="button"
+              className="users-bulk-del"
+              onClick={removeSelected}
+              data-testid="users-delete"
+            >
+              Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
+            </button>
+          </div>
+        ) : (
+          <button className="btn-primary" onClick={openCreate} data-testid="new-user">
+            Nuevo usuario
+          </button>
+        )}
+      </div>
 
       {isLoading ? (
         <p className="catalog-empty">Cargando…</p>
+      ) : filtered.length === 0 ? (
+        <p className="catalog-empty" data-testid="users-empty">
+          Sin usuarios para los filtros seleccionados.
+        </p>
       ) : (
-        <table className="catalog-table" data-testid="users-table">
+        <table
+          className={`catalog-table users-table${selected.length ? ' has-selection' : ''}`}
+          data-testid="users-table"
+        >
           <thead>
             <tr>
+              <th className="users-select-col" aria-label="Selección" />
               <th>Nombre</th>
               <th>Email</th>
               <th>Rol</th>
               <th>Tiendas</th>
               <th>Estado</th>
-              <th />
             </tr>
           </thead>
           <tbody>
-            {allUsers.map((u) => (
-              <tr key={u.id}>
-                <td>{u.name}</td>
-                <td className="muted">{u.email}</td>
-                <td>
-                  <span className="role-badge" data-testid="user-role-badge">
-                    {ROLE_LABEL[u.role]}
-                  </span>
-                </td>
-                <td className="muted">{storesLabel(u.role, u.storeIds ?? [])}</td>
-                <td>
-                  <span className={`user-state ${u.active ? 'on' : 'off'}`}>
-                    {u.active ? 'Activo' : 'Inactivo'}
-                  </span>
-                </td>
-                <td className="row-actions">
-                  <button onClick={() => openEdit(u)} data-testid="user-edit">
-                    Editar
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {filtered.map((u) => {
+              const isSel = selectedSet.has(u.id);
+              return (
+                <tr
+                  key={u.id}
+                  className={isSel ? 'is-selected' : undefined}
+                  aria-selected={isSel}
+                  onClick={() => toggleSelect(u.id)}
+                  data-testid="user-row"
+                >
+                  <td className="users-select-col" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      className="user-check"
+                      aria-label={`Seleccionar ${u.name}`}
+                      data-testid="user-select"
+                      checked={isSel}
+                      onChange={() => toggleSelect(u.id)}
+                    />
+                  </td>
+                  <td>{u.name}</td>
+                  <td className="muted">{u.email}</td>
+                  <td>
+                    <span className="role-badge" data-testid="user-role-badge">
+                      {ROLE_LABEL[u.role]}
+                    </span>
+                  </td>
+                  <td className="muted">{storesLabel(u.role, u.storeIds ?? [])}</td>
+                  <td>
+                    <span className={`user-state ${u.active ? 'on' : 'off'}`}>
+                      {u.active ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}
 
       {form && (
-        <div className="modal-backdrop" onClick={() => setForm(null)}>
+        <div className="modal-backdrop" onClick={closeModal}>
           <form
             className="modal modal--form user-form"
             onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => {
               e.preventDefault();
-              saveMut.mutate(form);
+              submitForm();
             }}
             data-testid="user-form"
           >
             <header className="modal-head">
-              <h3>{isEdit ? 'Editar usuario' : 'Nuevo usuario'}</h3>
+              <h3>{wizard ? 'Editar usuario' : 'Nuevo usuario'}</h3>
             </header>
 
             <div className="modal-body">
@@ -236,11 +405,11 @@ export function UsersPage() {
                   />
                 </label>
                 <label>
-                  {isEdit ? 'Contraseña (opcional)' : 'Contraseña'}
+                  {wizard ? 'Contraseña (opcional)' : 'Contraseña'}
                   <input
                     type="password"
-                    required={!isEdit}
-                    placeholder={isEdit ? 'Dejar en blanco para mantener' : undefined}
+                    required={!wizard}
+                    placeholder={wizard ? 'Dejar en blanco para mantener' : undefined}
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
                     data-testid="user-password"
@@ -249,7 +418,7 @@ export function UsersPage() {
               </section>
 
               <section className="form-section">
-                <span className="form-section-title">Rol y permisos</span>
+                <span className="form-section-title">Rol</span>
                 <div
                   className="role-segment"
                   role="radiogroup"
@@ -269,14 +438,6 @@ export function UsersPage() {
                       {r.label}
                     </button>
                   ))}
-                </div>
-                <div className="role-perms" data-testid="role-permissions">
-                  <span className="role-perms-title">Permisos de {ROLE_LABEL[form.role]}</span>
-                  <ul>
-                    {ROLE_PERMISSIONS[form.role].map((p) => (
-                      <li key={p}>{p}</li>
-                    ))}
-                  </ul>
                 </div>
               </section>
 
@@ -308,7 +469,7 @@ export function UsersPage() {
               </section>
             </div>
 
-            {saveMut.isError && <p className="form-error">No se pudo guardar.</p>}
+            {createMut.isError && <p className="form-error">No se pudo guardar.</p>}
             <div className="modal-foot modal-foot--split">
               <label className="switch">
                 <input
@@ -323,16 +484,16 @@ export function UsersPage() {
                 <span className="switch-text">Usuario activo</span>
               </label>
               <div className="modal-foot-actions">
-                <button type="button" onClick={() => setForm(null)}>
+                <button type="button" onClick={closeModal}>
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   className="btn-primary"
-                  disabled={saveMut.isPending}
+                  disabled={createMut.isPending}
                   data-testid="user-save"
                 >
-                  {saveMut.isPending ? 'Guardando…' : isEdit ? 'Guardar' : 'Crear'}
+                  {primaryLabel}
                 </button>
               </div>
             </div>
