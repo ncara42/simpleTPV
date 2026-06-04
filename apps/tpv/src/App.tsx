@@ -95,7 +95,7 @@ function Home() {
 export default function App() {
   const isAuthed = useAuthStore((s) => s.accessToken !== null);
   if (!isAuthed) {
-    return <LoginForm onSubmit={api.login} subtitle="Punto de venta" />;
+    return <LoginForm onSubmit={api.login} />;
   }
   return <Home />;
 }

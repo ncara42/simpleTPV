@@ -1,17 +1,14 @@
-import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
-
-import { StarField } from './StarField.js';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 
 export interface LoginFormProps {
   onSubmit: (email: string, password: string) => Promise<void>;
-  title?: string;
-  subtitle?: string;
-  leftPanel?: ReactNode;
 }
 
-export function LoginForm({ onSubmit, title = 'simpleTPV', subtitle, leftPanel }: LoginFormProps) {
+export function LoginForm({ onSubmit }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const mountedRef = useRef(true);
@@ -38,97 +35,124 @@ export function LoginForm({ onSubmit, title = 'simpleTPV', subtitle, leftPanel }
 
   return (
     <div className="login-shell">
-      {/* Panel izquierdo — rejilla animada */}
-      <div className="login-left">
-        <div className="login-left-glow" />
-        {leftPanel ?? <StarField />}
-      </div>
+      {/* Panel izquierdo — marca */}
+      <aside className="login-brand">
+        <div className="login-brand-glow" aria-hidden="true" />
+        <div className="login-brand-orb" aria-hidden="true" />
+
+        <div className="login-brand-logo">
+          <span className="login-brand-name">qrush</span>
+          <span className="login-brand-suffix">retail</span>
+        </div>
+
+        <div className="login-brand-copy">
+          <span className="login-brand-eyebrow">Plataforma de gestión</span>
+          <h2 className="login-brand-title">
+            Todo tu retail,
+            <br />
+            en un solo lugar.
+          </h2>
+          <p className="login-brand-text">
+            Ventas, inventario, equipo y analítica, sincronizados en tiempo real entre todas tus
+            tiendas.
+          </p>
+        </div>
+      </aside>
 
       {/* Panel derecho — formulario */}
-      <div className="login-right">
-        <div className="login-right-vignette" />
-        <div className="login-form-wrap">
-          <form onSubmit={handleSubmit} className="login-form" noValidate data-testid="login-card">
-            <div className="login-heading">
-              <h1 className="login-title">{title}</h1>
-              {subtitle && <p className="login-subtitle">{subtitle}</p>}
-            </div>
+      <main className="login-panel">
+        <form onSubmit={handleSubmit} className="login-form" noValidate data-testid="login-card">
+          <div className="login-heading">
+            <h1 className="login-title">Bienvenido de nuevo</h1>
+            <p className="login-subtitle">Introduce tus credenciales para continuar.</p>
+          </div>
 
-            <div className="login-fields">
-              <label className="login-field">
-                <span className="login-label">Correo electrónico</span>
-                <input
-                  type="email"
-                  autoComplete="username"
-                  required
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setError(null);
-                  }}
-                  className={`login-input${error ? ' login-input--error' : ''}`}
-                  placeholder="tu@correo.com"
-                  data-testid="login-email"
-                  disabled={loading}
-                />
-              </label>
+          <label className="login-field">
+            <span className="login-label">Usuario</span>
+            <input
+              type="text"
+              autoComplete="username"
+              required
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError(null);
+              }}
+              className={`login-input${error ? ' login-input--error' : ''}`}
+              data-testid="login-email"
+              disabled={loading}
+            />
+          </label>
 
-              <label className="login-field">
-                <span className="login-label">Contraseña</span>
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setError(null);
-                  }}
-                  className="login-input"
-                  placeholder="••••••••"
-                  data-testid="login-password"
-                  disabled={loading}
-                />
-              </label>
-            </div>
-
-            {error && (
-              <p className="login-error" role="alert" data-testid="login-error">
-                {error}
-              </p>
-            )}
-
-            <div className="login-actions">
-              <button
-                type="submit"
+          <label className="login-field">
+            <span className="login-label">Contraseña</span>
+            <div className="login-input-wrap">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError(null);
+                }}
+                className={`login-input login-input--password${error ? ' login-input--error' : ''}`}
+                data-testid="login-password"
                 disabled={loading}
-                className="login-submit"
-                data-testid="login-submit"
+              />
+              <button
+                type="button"
+                className="login-reveal"
+                onClick={() => setShowPassword((v) => !v)}
+                tabIndex={-1}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
-                {loading ? (
-                  <>
-                    <span className="login-spinner" aria-hidden="true" />
-                    <span
-                      style={{
-                        position: 'absolute',
-                        width: '1px',
-                        height: '1px',
-                        overflow: 'hidden',
-                        clip: 'rect(0,0,0,0)',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      Entrando…
-                    </span>
-                  </>
-                ) : (
-                  'Entrar'
-                )}
+                {showPassword ? 'Ocultar' : 'Mostrar'}
               </button>
             </div>
-          </form>
-        </div>
-      </div>
+          </label>
+
+          {error && (
+            <p className="login-error" role="alert" data-testid="login-error">
+              {error}
+            </p>
+          )}
+
+          <div className="login-options">
+            <label className="login-remember">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
+              <span>Recordar sesión</span>
+            </label>
+            <a className="login-forgot" href="#">
+              ¿Olvidaste tu contraseña?
+            </a>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="login-submit"
+            data-testid="login-submit"
+          >
+            {loading ? (
+              <>
+                <span className="login-spinner" aria-hidden="true" />
+                <span className="login-sr-only">Iniciando sesión…</span>
+              </>
+            ) : (
+              'Iniciar sesión'
+            )}
+          </button>
+
+          <p className="login-footnote">
+            ¿Problemas para acceder? <span>Contacta con tu administrador</span>
+          </p>
+        </form>
+      </main>
     </div>
   );
 }
