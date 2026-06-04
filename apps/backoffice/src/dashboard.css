@@ -254,6 +254,15 @@
 .dash-bars-chart:hover .dash-bars-group:not(:hover) {
   opacity: 0.4;
 }
+/* Tienda elegida en el filtro: se resalta su columna y se atenúan las demás
+   (mismo gesto visual que el hover). */
+.dash-bars-chart.has-selection .dash-bars-group:not(.is-selected) {
+  opacity: 0.4;
+}
+/* El hover siempre manda: resalta la columna apuntada aunque haya otra elegida. */
+.dash-bars-chart:hover .dash-bars-group:hover {
+  opacity: 1;
+}
 /* Cabecera del grupo: facturación de hoy + badge de variación coloreado */
 .dash-bars-cap {
   display: flex;

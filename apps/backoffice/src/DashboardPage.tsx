@@ -1,7 +1,7 @@
 import './dashboard.css';
 
 import { Select } from '@simpletpv/ui';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { DEMO_STOCKOUT_KPIS, DEMO_STOCKOUTS } from './demo/demoData.js';
@@ -42,25 +42,33 @@ export function DashboardPage() {
 
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
 
+  // placeholderData: al cambiar de tienda/periodo se conservan los datos previos
+  // durante el refetch en vez de vaciarse. Así los nodos del DOM (key estable por
+  // tienda/familia) persisten y las gráficas no vuelven a montar ni re-animan.
   const salesToday = useQuery({
     queryKey: ['dash-today', store],
     queryFn: () => getSalesToday(store),
+    placeholderData: keepPreviousData,
   });
   const salesKpis = useQuery({
     queryKey: ['dash-sales-kpis', period, store],
     queryFn: () => getSalesKpis(period, store),
+    placeholderData: keepPreviousData,
   });
   const marginKpis = useQuery({
     queryKey: ['dash-margin', period, store],
     queryFn: () => getMarginKpis(period, store),
+    placeholderData: keepPreviousData,
   });
   const byFamily = useQuery({
     queryKey: ['dash-family', period, store],
     queryFn: () => getSalesByFamily(period, store),
+    placeholderData: keepPreviousData,
   });
   const rankings = useQuery({
     queryKey: ['dash-rankings', period, store],
     queryFn: () => getProductRankings(period, store),
+    placeholderData: keepPreviousData,
   });
 
   return (
@@ -149,14 +157,17 @@ export function DashboardPage() {
             // Escala a la facturación máxima (Hoy o Ayer) de cualquier tienda → la
             // barra más alta llena el lienzo y las alturas comparan de un vistazo.
             const top = Math.max(1, ...stores.flatMap((s) => [s.today, s.yesterday]));
+            // Si la tienda del filtro está en el gráfico, se resalta su columna y
+            // se atenúan las demás (mismo gesto que el hover).
+            const focused = !!storeId && stores.some((s) => s.storeId === storeId);
             return (
               <>
-                <div className="dash-bars-chart">
+                <div className={`dash-bars-chart${focused ? ' has-selection' : ''}`}>
                   {stores.map((s, i) => {
                     const tone = deltaTone(s.deltaPct);
                     return (
                       <div
-                        className="dash-bars-group"
+                        className={`dash-bars-group${s.storeId === storeId ? ' is-selected' : ''}`}
                         key={s.storeId}
                         style={{ '--i': i } as React.CSSProperties}
                       >

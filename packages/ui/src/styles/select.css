@@ -130,6 +130,17 @@
   cursor: not-allowed;
 }
 
+/* Cuando hay selección activa, opacar las opciones no seleccionadas */
+.ui-select-menu[data-has-selection] .ui-select-option:not(.is-selected) {
+  opacity: 0.45;
+  transition: opacity 0.12s;
+}
+
+/* Restaurar al hacer hover sobre una opción no seleccionada */
+.ui-select-menu[data-has-selection] .ui-select-option.is-active:not(.is-selected) {
+  opacity: 1;
+}
+
 .ui-select-option-label {
   overflow: hidden;
   text-overflow: ellipsis;

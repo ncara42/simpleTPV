@@ -191,7 +191,14 @@ export function Select({
         </svg>
       </button>
       {open && (
-        <ul className="ui-select-menu" role="listbox" id={listboxId} ref={listRef} tabIndex={-1}>
+        <ul
+          className="ui-select-menu"
+          role="listbox"
+          id={listboxId}
+          ref={listRef}
+          tabIndex={-1}
+          data-has-selection={value ? 'true' : undefined}
+        >
           {options.map((opt, i) => (
             <li
               key={opt.value}
