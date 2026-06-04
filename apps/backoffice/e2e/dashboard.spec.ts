@@ -24,7 +24,7 @@ test('muestra las 6 KPI cards y el selector de periodo', async ({ page }) => {
     await expect(page.getByTestId(id)).toBeVisible();
   }
   await expect(page.getByTestId('kpi-today')).toContainText('1284');
-  await expect(page.getByTestId('dash-period-today')).toBeVisible();
+  await expect(page.getByTestId('dash-period')).toBeVisible();
 });
 
 test('los paneles de gráficas y roturas se renderizan', async ({ page }) => {

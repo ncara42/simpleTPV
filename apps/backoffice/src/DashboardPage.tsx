@@ -15,6 +15,7 @@ import {
   getSalesToday,
 } from './lib/dashboard.js';
 import { deltaTone, fmtDelta, fmtEur, fmtEurCompact, fmtNum, fmtRate } from './lib/format.js';
+import { usePageHeader } from './lib/pageHeader.js';
 
 const PERIODS: Array<{ id: DashboardPeriod; label: string }> = [
   { id: 'today', label: 'Hoy' },
@@ -71,26 +72,20 @@ export function DashboardPage() {
     placeholderData: keepPreviousData,
   });
 
+  usePageHeader('Resumen', 'Actualizado hace 2 min');
+
   return (
     <section className="catalog" data-testid="dashboard">
-      <header className="catalog-head">
-        <div>
-          <h2>Resumen</h2>
-          <p className="catalog-sub">Actualizado hace 2 min</p>
-        </div>
+      <header className="catalog-head is-actions-only">
         <div className="catalog-actions">
-          <nav className="bo-tabs dash-period" data-testid="dash-period">
-            {PERIODS.map((p) => (
-              <button
-                key={p.id}
-                className={`bo-tab ${period === p.id ? 'active' : ''}`}
-                onClick={() => setPeriod(p.id)}
-                data-testid={`dash-period-${p.id}`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </nav>
+          <Select
+            className="dash-period-select"
+            value={period}
+            onChange={(value) => setPeriod(value as DashboardPeriod)}
+            ariaLabel="Periodo"
+            data-testid="dash-period"
+            options={PERIODS.map((p) => ({ value: p.id, label: p.label }))}
+          />
           <Select
             className="dash-store"
             value={storeId}

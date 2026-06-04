@@ -8,6 +8,7 @@ import {
   type StoreSalesPeriod,
 } from './demo/demoData.js';
 import { createStore, deleteStore, listStores, type Store } from './lib/admin.js';
+import { usePageHeader } from './lib/pageHeader.js';
 import { StoreCard } from './stores/StoreCard.js';
 import { StoreDetailModal } from './stores/StoreDetailModal.js';
 import { type StoreForm, StoreFormModal } from './stores/StoreFormModal.js';
@@ -92,15 +93,10 @@ export function StoresPage() {
       .sort((a, b) => salesOf(b.id, period) - salesOf(a.id, period));
   }, [stores, statusFilter, period, activeOverrides]);
 
+  usePageHeader('Tiendas', `${stores.length} ubicaciones`);
+
   return (
     <section className="catalog">
-      <header className="catalog-head">
-        <div>
-          <h2>Tiendas</h2>
-          <p className="catalog-sub">{stores.length} ubicaciones</p>
-        </div>
-      </header>
-
       <div className="stores-toolbar">
         <div className="bo-tabs" role="tablist" aria-label="Filtrar por estado">
           {STATUS_FILTERS.map((f) => (

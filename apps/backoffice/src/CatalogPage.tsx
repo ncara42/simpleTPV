@@ -1,6 +1,6 @@
 import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
   DEMO_FAMILIES,
@@ -9,6 +9,7 @@ import {
   findFamily,
   stockLevel,
 } from './demo/demoData.js';
+import { usePageHeader } from './lib/pageHeader.js';
 import {
   createProduct,
   deleteProduct,
@@ -30,6 +31,12 @@ interface FormState {
   subfamilyId: string | null; // subfamilia seleccionada (opcional, dentro de la familia)
 }
 
+// Asistente de edición en lote: cola de productos seleccionados + paso actual.
+interface EditWizard {
+  queue: Product[];
+  step: number;
+}
+
 const EMPTY: FormState = {
   name: '',
   salePrice: 0,
@@ -41,56 +48,166 @@ const EMPTY: FormState = {
   subfamilyId: null,
 };
 
+function toForm(p: Product): FormState {
+  const { family, sub } = findFamily(p.familyId);
+  return {
+    id: p.id,
+    name: p.name,
+    salePrice: Number(p.salePrice),
+    sku: p.sku,
+    barcode: p.barcode,
+    costPrice: Number(p.costPrice),
+    taxRate: Number(p.taxRate),
+    familyId: family?.id ?? null,
+    subfamilyId: sub?.id ?? null,
+  };
+}
+
+function toPayload(f: FormState): ProductInput {
+  return {
+    name: f.name,
+    salePrice: Number(f.salePrice),
+    sku: f.sku || null,
+    barcode: f.barcode || null,
+    costPrice: Number(f.costPrice ?? 0),
+    taxRate: Number(f.taxRate ?? 21),
+    // La familia efectiva del producto es la subfamilia si se eligió; si no, la raíz.
+    familyId: f.subfamilyId ?? f.familyId,
+  };
+}
+
+// Parche local (demo: el backend stub no persiste) con los campos editables.
+function toPatch(f: FormState): Partial<Product> {
+  return {
+    name: f.name,
+    salePrice: String(f.salePrice),
+    sku: f.sku || null,
+    barcode: f.barcode || null,
+    costPrice: String(f.costPrice ?? 0),
+    taxRate: String(f.taxRate ?? 21),
+    familyId: f.subfamilyId ?? f.familyId,
+  };
+}
+
 export function CatalogPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
+  const [familyFilter, setFamilyFilter] = useState('');
   const [form, setForm] = useState<FormState | null>(null);
+  // Modo asistente (edición en lote). null → alta de un producto nuevo.
+  const [wizard, setWizard] = useState<EditWizard | null>(null);
+  // Selección múltiple por fila (ids marcados).
+  const [selected, setSelected] = useState<string[]>([]);
+  // Overlays locales (demo: las mutaciones stub no persisten en backend).
+  const [overrides, setOverrides] = useState<Record<string, Partial<Product>>>({});
+  const [extras, setExtras] = useState<Product[]>([]);
+  const [deleted, setDeleted] = useState<string[]>([]);
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products', search],
     queryFn: () => listProducts(search),
   });
-
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['products'] });
 
-  const saveMut = useMutation({
-    mutationFn: (f: FormState) => {
-      const payload: ProductInput = {
-        name: f.name,
-        salePrice: Number(f.salePrice),
-        sku: f.sku || null,
-        barcode: f.barcode || null,
-        costPrice: Number(f.costPrice ?? 0),
-        taxRate: Number(f.taxRate ?? 21),
-        // La familia efectiva del producto es la subfamilia si se eligió; si no, la familia raíz.
-        familyId: f.subfamilyId ?? f.familyId,
-      };
-      return f.id ? updateProduct(f.id, payload) : createProduct(payload);
-    },
-    onSuccess: () => {
-      setForm(null);
+  const allProducts = useMemo<Product[]>(() => {
+    const base = products.map((p) => ({ ...p, ...overrides[p.id] }));
+    return [...base, ...extras].filter((p) => !deleted.includes(p.id));
+  }, [products, overrides, extras, deleted]);
+
+  // Filtro por familia raíz (la búsqueda por texto ya la resuelve listProducts).
+  const filtered = useMemo<Product[]>(
+    () =>
+      allProducts.filter(
+        (p) => !familyFilter || findFamily(p.familyId).family?.id === familyFilter,
+      ),
+    [allProducts, familyFilter],
+  );
+
+  usePageHeader('Catálogo', `${filtered.length} productos activos`, 'catalog-count');
+
+  // ─── Selección ─────────────────────────────────────────────────────────
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const toggleSelect = (id: string): void =>
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const clearSelection = (): void => setSelected([]);
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((p) => selectedSet.has(p.id));
+  const selectAllFiltered = (): void =>
+    setSelected((prev) => [...new Set([...prev, ...filtered.map((p) => p.id)])]);
+
+  // Productos seleccionados que siguen existiendo, en el orden de la lista.
+  const selectedProducts = useMemo(
+    () => filtered.filter((p) => selectedSet.has(p.id)),
+    [filtered, selectedSet],
+  );
+
+  // ─── Mutaciones / overlays ─────────────────────────────────────────────
+  const createMut = useMutation({
+    mutationFn: (f: FormState) => createProduct(toPayload(f)),
+    onSuccess: (created) => {
+      setExtras((prev) => [...prev, created]);
+      closeModal();
       invalidate();
     },
   });
 
-  const delMut = useMutation({
-    mutationFn: (id: string) => deleteProduct(id),
-    onSuccess: invalidate,
-  });
+  // Aplica la edición de un producto existente sobre los overlays locales.
+  const applyEdit = (f: FormState): void => {
+    if (!f.id) return;
+    const patch = toPatch(f);
+    if (extras.some((p) => p.id === f.id)) {
+      setExtras((prev) => prev.map((p) => (p.id === f.id ? { ...p, ...patch } : p)));
+    } else {
+      setOverrides((prev) => ({ ...prev, [f.id as string]: patch }));
+    }
+    void updateProduct(f.id, toPayload(f)); // parity con futuro backend
+  };
 
-  const openEdit = (p: Product): void => {
-    const { family, sub } = findFamily(p.familyId);
-    setForm({
-      id: p.id,
-      name: p.name,
-      salePrice: Number(p.salePrice),
-      sku: p.sku,
-      barcode: p.barcode,
-      costPrice: Number(p.costPrice),
-      taxRate: Number(p.taxRate),
-      familyId: family?.id ?? null,
-      subfamilyId: sub?.id ?? null,
-    });
+  // Borrado en lote en local (demo: deleteProduct es un stub sin backend).
+  const removeSelected = (): void => {
+    const ids = new Set(selected);
+    const extraIds = new Set(extras.map((e) => e.id));
+    setExtras((prev) => prev.filter((p) => !ids.has(p.id)));
+    setDeleted((prev) => [...prev, ...selected.filter((id) => !extraIds.has(id))]);
+    selected.forEach((id) => void deleteProduct(id));
+    clearSelection();
+    invalidate();
+  };
+
+  // ─── Modal ─────────────────────────────────────────────────────────────
+  const closeModal = (): void => {
+    setForm(null);
+    setWizard(null);
+  };
+
+  const openCreate = (): void => {
+    setWizard(null);
+    setForm({ ...EMPTY });
+  };
+
+  const openBulkEdit = (): void => {
+    const queue = selectedProducts;
+    if (queue.length === 0) return;
+    setWizard({ queue, step: 0 });
+    setForm(toForm(queue[0]!));
+  };
+
+  const submitForm = (): void => {
+    if (!form) return;
+    if (wizard) {
+      applyEdit(form);
+      const next = wizard.step + 1;
+      if (next < wizard.queue.length) {
+        setWizard({ ...wizard, step: next });
+        setForm(toForm(wizard.queue[next]!));
+      } else {
+        closeModal();
+        clearSelection();
+      }
+      invalidate();
+    } else {
+      createMut.mutate(form);
+    }
   };
 
   // Subfamilias disponibles para la familia raíz elegida (selector dependiente).
@@ -98,99 +215,176 @@ export function CatalogPage() {
     ? (DEMO_FAMILIES.find((fam) => fam.id === form.familyId)?.children ?? [])
     : [];
 
+  // Etiqueta del botón primario: "Siguiente (n / total)" mientras quedan productos
+  // en la cola; "Guardar" en el último paso (o en alta/edición única).
+  const total = wizard?.queue.length ?? 0;
+  const step = wizard?.step ?? 0;
+  const isLastStep = !wizard || step + 1 >= total;
+  const primaryLabel = !wizard
+    ? createMut.isPending
+      ? 'Guardando…'
+      : 'Crear'
+    : total > 1 && !isLastStep
+      ? `Siguiente (${step + 1} / ${total})`
+      : total > 1
+        ? `Guardar (${total} / ${total})`
+        : 'Guardar';
+
   return (
     <section className="catalog">
-      <header className="catalog-head">
-        <div>
-          <h2>Catálogo</h2>
-          <p className="catalog-sub" data-testid="catalog-count">
-            {products.length} productos activos
-          </p>
+      <div className="table-panel">
+        <div className="users-toolbar">
+          <div className="sales-filters">
+            <span className="search-field">
+              <input
+                className="catalog-search"
+                placeholder="Buscar por nombre, SKU o código…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                data-testid="catalog-search"
+              />
+            </span>
+            <Select
+              className="catalog-search"
+              value={familyFilter}
+              onChange={setFamilyFilter}
+              ariaLabel="Filtrar por familia"
+              data-testid="catalog-family-filter"
+              options={[
+                { value: '', label: 'Todas las familias' },
+                ...DEMO_FAMILIES.map((fam) => ({ value: fam.id, label: fam.name })),
+              ]}
+            />
+            {selected.length > 0 && (
+              <>
+                {!allFilteredSelected && (
+                  <button
+                    type="button"
+                    className="users-sel-btn"
+                    onClick={selectAllFiltered}
+                    data-testid="products-select-all"
+                  >
+                    Seleccionar todo
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="users-sel-btn"
+                  onClick={clearSelection}
+                  data-testid="products-clear"
+                >
+                  Quitar selección
+                </button>
+              </>
+            )}
+          </div>
+          {selected.length > 0 ? (
+            <div className="users-toolbar-actions">
+              <button
+                type="button"
+                className="users-bulk-edit"
+                onClick={openBulkEdit}
+                data-testid="products-edit"
+              >
+                Editar{selected.length > 1 ? ` (${selected.length})` : ''}
+              </button>
+              <button
+                type="button"
+                className="users-bulk-del"
+                onClick={removeSelected}
+                data-testid="products-delete"
+              >
+                Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
+              </button>
+            </div>
+          ) : (
+            <button className="btn-primary" onClick={openCreate} data-testid="new-product">
+              Nuevo producto
+            </button>
+          )}
         </div>
-        <div className="catalog-actions">
-          <input
-            className="catalog-search"
-            placeholder="Buscar por nombre, SKU o código…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            data-testid="catalog-search"
-          />
-          <button
-            className="btn-primary"
-            onClick={() => setForm({ ...EMPTY })}
-            data-testid="new-product"
-          >
-            Nuevo producto
-          </button>
-        </div>
-      </header>
 
-      {isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : products.length === 0 ? (
-        <p className="catalog-empty" data-testid="catalog-empty">
-          Sin productos. Crea el primero.
-        </p>
-      ) : (
-        <table className="catalog-table" data-testid="catalog-table">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Familia</th>
-              <th>SKU</th>
-              <th>Precio</th>
-              <th>IVA</th>
-              <th>Stock</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((p: Product) => (
-              <tr key={p.id}>
-                <td>{p.name}</td>
-                <td className="muted" data-testid="catalog-family">
-                  {familyPathLabel(p.familyId)}
-                </td>
-                <td className="muted">{p.sku ?? '—'}</td>
-                <td>{Number(p.salePrice).toFixed(2).replace('.', ',')} €</td>
-                <td className="muted">{Number(p.taxRate).toFixed(0)}%</td>
-                <td>
-                  {(() => {
-                    const qty = DEMO_PRODUCT_STOCK[p.id] ?? 0;
-                    return (
+        {isLoading ? (
+          <p className="catalog-empty">Cargando…</p>
+        ) : filtered.length === 0 ? (
+          <p className="catalog-empty" data-testid="catalog-empty">
+            {allProducts.length === 0
+              ? 'Sin productos. Crea el primero.'
+              : 'Sin productos para los filtros seleccionados.'}
+          </p>
+        ) : (
+          <table
+            className={`catalog-table users-table${selected.length ? ' has-selection' : ''}`}
+            data-testid="catalog-table"
+          >
+            <thead>
+              <tr>
+                <th className="users-select-col" aria-label="Selección" />
+                <th>Nombre</th>
+                <th>Familia</th>
+                <th>SKU</th>
+                <th>Precio</th>
+                <th>IVA</th>
+                <th>Stock</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p) => {
+                const isSel = selectedSet.has(p.id);
+                const qty = DEMO_PRODUCT_STOCK[p.id] ?? 0;
+                return (
+                  <tr
+                    key={p.id}
+                    className={isSel ? 'is-selected' : undefined}
+                    aria-selected={isSel}
+                    onClick={() => toggleSelect(p.id)}
+                    data-testid="product-row"
+                  >
+                    <td className="users-select-col" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="user-check"
+                        aria-label={`Seleccionar ${p.name}`}
+                        data-testid="product-select"
+                        checked={isSel}
+                        onChange={() => toggleSelect(p.id)}
+                      />
+                    </td>
+                    <td>{p.name}</td>
+                    <td className="muted" data-testid="catalog-family">
+                      {familyPathLabel(p.familyId)}
+                    </td>
+                    <td className="muted">{p.sku ?? '—'}</td>
+                    <td>{Number(p.salePrice).toFixed(2).replace('.', ',')} €</td>
+                    <td className="muted">{Number(p.taxRate).toFixed(0)}%</td>
+                    <td>
                       <span
                         className={`stock-tag stock-${stockLevel(qty)}`}
                         data-testid="catalog-stock"
                       >
                         {qty}
                       </span>
-                    );
-                  })()}
-                </td>
-                <td className="row-actions">
-                  <button onClick={() => openEdit(p)}>Editar</button>
-                  <button className="danger" onClick={() => delMut.mutate(p.id)}>
-                    Borrar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       {form && (
-        <div className="modal-backdrop" onClick={() => setForm(null)}>
+        <div className="modal-backdrop" onClick={closeModal}>
           <form
             className="modal modal--form"
             onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => {
               e.preventDefault();
-              saveMut.mutate(form);
+              submitForm();
             }}
             data-testid="product-form"
           >
-            <h3>{form.id ? 'Editar producto' : 'Nuevo producto'}</h3>
+            <h3>{wizard ? 'Editar producto' : 'Nuevo producto'}</h3>
             <label>
               Nombre
               <input
@@ -273,18 +467,18 @@ export function CatalogPage() {
                 />
               </label>
             </div>
-            {saveMut.isError && <p className="form-error">No se pudo guardar.</p>}
+            {createMut.isError && <p className="form-error">No se pudo guardar.</p>}
             <div className="modal-foot">
-              <button type="button" onClick={() => setForm(null)}>
+              <button type="button" onClick={closeModal}>
                 Cancelar
               </button>
               <button
                 type="submit"
                 className="btn-primary"
-                disabled={saveMut.isPending}
+                disabled={createMut.isPending}
                 data-testid="form-save"
               >
-                {saveMut.isPending ? 'Guardando…' : 'Guardar'}
+                {primaryLabel}
               </button>
             </div>
           </form>

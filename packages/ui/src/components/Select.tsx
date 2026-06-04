@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface SelectOption {
   value: string;
@@ -41,6 +42,16 @@ export function Select({
   const listRef = useRef<HTMLUListElement>(null);
   const typeahead = useRef<{ query: string; at: number }>({ query: '', at: 0 });
   const listboxId = useId();
+  // El menú se renderiza en un portal (document.body) para no quedar recortado
+  // por ancestros con overflow:hidden (p. ej. el árbol de Familias). Posición fija
+  // calculada desde el disparador; abre hacia abajo o hacia arriba según el hueco.
+  const [menuPos, setMenuPos] = useState<{
+    left: number;
+    width: number;
+    top: number | 'auto';
+    bottom: number | 'auto';
+    maxHeight: number;
+  } | null>(null);
 
   const selected = useMemo(() => options.find((o) => o.value === value), [options, value]);
   const selectedIndex = useMemo(
@@ -70,15 +81,52 @@ export function Select({
     [options, onChange, close],
   );
 
-  // Cerrar al hacer click fuera
+  // Cerrar al hacer click fuera (el menú vive en un portal: comprobar ambos nodos)
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) close();
+      const t = e.target as Node;
+      if (!rootRef.current?.contains(t) && !listRef.current?.contains(t)) close();
     };
     document.addEventListener('pointerdown', onPointerDown);
     return () => document.removeEventListener('pointerdown', onPointerDown);
   }, [open, close]);
+
+  // Posicionar el menú flotante respecto al disparador (y recalcular al hacer
+  // scroll o resize mientras está abierto).
+  const updatePosition = useCallback(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const margin = 6;
+    const maxH = 288; // 18rem
+    const spaceBelow = window.innerHeight - rect.bottom - margin;
+    const spaceAbove = rect.top - margin;
+    // Abre hacia abajo salvo que no quepa y arriba haya más sitio.
+    const below = spaceBelow >= Math.min(maxH, 220) || spaceBelow >= spaceAbove;
+    setMenuPos({
+      left: rect.left,
+      width: rect.width,
+      top: below ? rect.bottom + margin : 'auto',
+      bottom: below ? 'auto' : window.innerHeight - rect.top + margin,
+      maxHeight: Math.max(120, Math.min(maxH, below ? spaceBelow : spaceAbove)),
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPos(null);
+      return;
+    }
+    updatePosition();
+    const handler = () => updatePosition();
+    window.addEventListener('scroll', handler, true);
+    window.addEventListener('resize', handler);
+    return () => {
+      window.removeEventListener('scroll', handler, true);
+      window.removeEventListener('resize', handler);
+    };
+  }, [open, updatePosition]);
 
   // Mantener la opción activa a la vista
   useEffect(() => {
@@ -190,49 +238,60 @@ export function Select({
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
-      {open && (
-        <ul
-          className="ui-select-menu"
-          role="listbox"
-          id={listboxId}
-          ref={listRef}
-          tabIndex={-1}
-          data-has-selection={value ? 'true' : undefined}
-        >
-          {options.map((opt, i) => (
-            <li
-              key={opt.value}
-              role="option"
-              data-value={opt.value}
-              aria-selected={opt.value === value}
-              aria-disabled={opt.disabled}
-              className={`ui-select-option${i === activeIndex ? ' is-active' : ''}${
-                opt.value === value ? ' is-selected' : ''
-              }${opt.disabled ? ' is-disabled' : ''}`}
-              onMouseEnter={() => !opt.disabled && setActiveIndex(i)}
-              onClick={() => commit(i)}
-            >
-              <span className="ui-select-option-label">{opt.label}</span>
-              {opt.value === value && (
-                <svg
-                  className="ui-select-check"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      {open &&
+        menuPos &&
+        createPortal(
+          <ul
+            className="ui-select-menu"
+            role="listbox"
+            id={listboxId}
+            ref={listRef}
+            tabIndex={-1}
+            data-has-selection={value ? 'true' : undefined}
+            style={{
+              position: 'fixed',
+              left: menuPos.left,
+              top: menuPos.top,
+              bottom: menuPos.bottom,
+              minWidth: menuPos.width,
+              maxHeight: menuPos.maxHeight,
+            }}
+          >
+            {options.map((opt, i) => (
+              <li
+                key={opt.value}
+                role="option"
+                data-value={opt.value}
+                aria-selected={opt.value === value}
+                aria-disabled={opt.disabled}
+                className={`ui-select-option${i === activeIndex ? ' is-active' : ''}${
+                  opt.value === value ? ' is-selected' : ''
+                }${opt.disabled ? ' is-disabled' : ''}`}
+                onMouseEnter={() => !opt.disabled && setActiveIndex(i)}
+                onClick={() => commit(i)}
+              >
+                <span className="ui-select-option-label">{opt.label}</span>
+                {opt.value === value && (
+                  <svg
+                    className="ui-select-check"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </li>
+            ))}
+          </ul>,
+          document.body,
+        )}
     </div>
   );
 }

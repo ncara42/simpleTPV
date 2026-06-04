@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { usePageHeader } from './lib/pageHeader.js';
 import { OrdersSection } from './purchases/OrdersSection.js';
 import { SuggestSection } from './purchases/SuggestSection.js';
 import { SuppliersSection } from './purchases/SuppliersSection.js';
@@ -8,14 +9,9 @@ type Section = 'orders' | 'suppliers' | 'suggest';
 
 export function PurchasesPage() {
   const [section, setSection] = useState<Section>('orders');
+  usePageHeader('Compras', 'Propuestas y pedidos a proveedor');
   return (
     <section className="catalog" data-testid="purchases-page">
-      <header className="catalog-head">
-        <div>
-          <h2>Compras</h2>
-          <p className="catalog-sub">Propuestas y pedidos a proveedor</p>
-        </div>
-      </header>
       <nav className="bo-tabs" data-testid="purchases-subtabs">
         <button
           className={`bo-tab ${section === 'orders' ? 'active' : ''}`}

@@ -5,13 +5,19 @@
    números tabulares con tracking tight.
    ════════════════════════════════════════════════════════════════════ */
 
-/* ─── Cabecera: control de periodo + selector de tienda ─── */
-.dash-period {
-  margin-right: 0.25rem;
+/* ─── Cabecera: selector de periodo + selector de tienda ─── */
+/* Periodo: desplegable que se ciñe a su etiqueta (Hoy/Ayer/Semana/Mes) y alinea
+   su alto exterior con el selector de tienda contiguo. */
+.dash-period-select {
+  width: fit-content;
+}
+.dash-period-select .ui-select-trigger {
+  height: calc(30px + 0.36rem + 2px);
 }
 
 .dash-store {
-  min-width: 11rem;
+  /* Se ciñe a la tienda seleccionada (acotado por max-width). */
+  width: fit-content;
   max-width: 13rem;
 }
 
@@ -514,7 +520,7 @@
   margin: 0;
 }
 .dash-rank-select {
-  min-width: 9.5rem;
+  width: fit-content;
 }
 .dash-rank-select .ui-select-trigger {
   border-radius: 9999px;

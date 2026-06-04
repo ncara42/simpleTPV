@@ -40,6 +40,22 @@ test('Catálogo: ruta de familia y selector dependiente de subfamilia (#97)', as
   await selectOption(page, 'form-subfamily', 'fam-flores-indica');
 });
 
+test('Catálogo: selección múltiple y edición en lote', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-catalog').click();
+  const checks = page.getByTestId('product-select');
+  await checks.nth(0).check();
+  await checks.nth(1).check();
+  await expect(page.getByTestId('products-edit')).toHaveText('Editar (2)');
+  await page.getByTestId('products-edit').click();
+  // El asistente recorre los seleccionados de uno en uno.
+  await expect(page.getByTestId('form-save')).toHaveText('Siguiente (1 / 2)');
+  await page.getByTestId('form-save').click();
+  await expect(page.getByTestId('form-save')).toHaveText('Guardar (2 / 2)');
+  await page.getByTestId('form-save').click();
+  await expect(page.getByTestId('product-form')).toHaveCount(0);
+});
+
 test('Tiendas muestra el grid de 6 ubicaciones', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-stores').click();
@@ -151,10 +167,14 @@ test('Ventas: scroll infinito, filtros y vistas guardadas (#95)', async ({ page 
   // Guardar la vista actual y verla como chip reutilizable.
   await page.getByTestId('sales-save-view').click();
   await expect(page.getByTestId('sales-views')).toContainText('Marta');
-  // Limpiar vuelve a mostrar todo, con alguna venta anulada.
+  // Limpiar vuelve a mostrar todo.
   await page.getByTestId('sales-clear').click();
   await expect(page.getByTestId('sales-row')).toHaveCount(20);
-  await expect(page.getByText('Anulada').first()).toBeVisible();
+  // Las ventas anuladas ya no llevan etiqueta: la fila se tiñe (clase sale-voided).
+  // El filtro de estado las aísla y solo deben quedar filas anuladas.
+  await selectOption(page, 'sales-status', 'VOIDED');
+  await expect(page.locator('tr.sale-voided').first()).toBeVisible();
+  await expect(page.locator('[data-testid="sales-row"]:not(.sale-voided)')).toHaveCount(0);
 });
 
 test('Compras y VeriFactu están retiradas del menú (#106)', async ({ page }) => {
@@ -189,8 +209,8 @@ test('Promociones: lista por estado y constructor de reglas (#99)', async ({ pag
   await page.getByTestId('nav-promotions').click();
   // 4 promociones demo (activa, programada, expirada, pausada).
   await expect(page.getByTestId('promo-card')).toHaveCount(4);
-  // Filtro "Activas" → solo la promo vigente.
-  await page.getByTestId('promo-filter-activa').click();
+  // Filtro "Activas" (desplegable de estado) → solo la promo vigente.
+  await selectOption(page, 'promo-filters', 'activa');
   await expect(page.getByTestId('promo-card')).toHaveCount(1);
   // Constructor con previsualización del impacto.
   await page.getByTestId('new-promo').click();
