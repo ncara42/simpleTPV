@@ -1,6 +1,6 @@
 import './dashboard.css';
 
-import { Select } from '@simpletpv/ui';
+import { Select, Sparkline } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -106,7 +106,7 @@ export function DashboardPage() {
           label="Facturación hoy"
           value={fmtEur(salesToday.data?.today.total)}
           delta={salesToday.data?.deltaPct ?? null}
-          series={salesToday.data?.series}
+          series={salesToday.data?.intraday}
           sparkTone={deltaTone(salesToday.data?.deltaPct ?? null) === 'down' ? 'down' : 'up'}
           testid="kpi-today"
         />
@@ -127,6 +127,12 @@ export function DashboardPage() {
           value={fmtRate(marginKpis.data?.marginPct)}
           series={marginKpis.data?.series}
           testid="kpi-margin"
+        />
+        <KpiCard
+          label="Beneficio"
+          value={fmtEur(marginKpis.data?.realMargin)}
+          series={marginKpis.data?.realMarginSeries}
+          testid="kpi-profit"
         />
         <KpiCard
           label="Tasa descuento"
@@ -283,40 +289,14 @@ function KpiCard(props: {
         <span className="dash-card-label">{props.label}</span>
         <span className="dash-card-value">{props.value}</span>
         {props.series && props.series.length > 1 && (
-          <Sparkline data={props.series} tone={props.sparkTone ?? 'brand'} />
+          // Sparkline reutilizable de @simpletpv/ui (IT-02), a sangre al pie de la
+          // card vía el wrapper .dash-card-spark.
+          <div className="dash-card-spark">
+            <Sparkline data={props.series} tone={props.sparkTone ?? 'brand'} height={44} />
+          </div>
         )}
       </div>
     </div>
-  );
-}
-
-// Mini-gráfica de tendencia para la card. SVG a mano (como las barras del dashboard),
-// estirado a todo el ancho con preserveAspectRatio="none"; el trazo se mantiene fino
-// gracias a vector-effect. El color (línea + relleno) lo fija la clase de tono.
-function Sparkline(props: { data: number[]; tone?: SparkTone }) {
-  const { data } = props;
-  if (data.length < 2) return null;
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const pad = 3; // margen vertical para que el trazo no toque los bordes
-  const span = max - min || 1;
-  const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * 100;
-    const y = pad + (1 - (v - min) / span) * (32 - 2 * pad);
-    return [x, y] as const;
-  });
-  const line = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
-  const area = `M ${points[0]![0].toFixed(2)},${points[0]![1].toFixed(2)} L ${line} L 100,32 L 0,32 Z`;
-  return (
-    <svg
-      className={`dash-card-spark dash-spark-${props.tone ?? 'brand'}`}
-      viewBox="0 0 100 32"
-      preserveAspectRatio="none"
-      aria-hidden
-    >
-      <path className="dash-spark-area" d={area} />
-      <polyline className="dash-spark-line" points={line} vectorEffect="non-scaling-stroke" />
-    </svg>
   );
 }
 

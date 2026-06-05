@@ -26,6 +26,9 @@ export interface SalesTodayResponse {
   // la rellena el modo demo; cuando se cablee la API real habrá que añadir el
   // GROUP BY DATE_TRUNC en dashboard.service.ts.
   series?: number[];
+  // Acumulado de facturación de HOY por hora (STAT-01): la sparkline intradía de
+  // la card "Facturación hoy". El backend ya lo devuelve (salesToday.intraday).
+  intraday?: number[];
 }
 
 export interface FamilySales {
@@ -56,8 +59,10 @@ export interface MarginKpis {
   realMargin: number;
   marginPct: number;
   revenue: number;
-  // Serie diaria de marginPct para la sparkline (ver nota en SalesTodayResponse).
+  // Serie diaria de marginPct para la sparkline de "% Margen".
   series?: number[];
+  // Serie diaria de beneficio (€, realMargin) para la sparkline de "Beneficio" (STAT-03).
+  realMarginSeries?: number[];
 }
 
 export interface StockoutKpis {

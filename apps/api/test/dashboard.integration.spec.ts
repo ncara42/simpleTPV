@@ -171,9 +171,11 @@ describe('Dashboard — integración', () => {
     `;
     prodBId = pb[0]!.id;
 
-    // Ventas para sales-today (hoy vs ayer, reloj real) en la tienda exclusiva:
-    //  - HOY: prodA 2×100 = 200; prodB 1×50 = 50 con descuento ticket 5 → 45.
-    //  - AYER: prodA 1×100 = 100.
+    // Ventas para sales-today (hoy vs ayer, comparativa a la misma hora) en la
+    // tienda exclusiva. El test inyecta now = hoy 12:00:
+    //  - HOY (a las 9 y 11, ambas < 12): 200 + 45 (50 − 5 ticket) = 245.
+    //  - AYER a las 10 (< 12 → cuenta): 100.
+    //  - AYER a las 23 (> 12 → NO cuenta, prueba el cap "misma hora").
     await seedSale(org1Id, storeOwnId, todayAt(9), [
       { productId: prodAId, unitPrice: 100, qty: 2, lineTotal: 200 },
     ]);
@@ -185,6 +187,9 @@ describe('Dashboard — integración', () => {
       { discountTotal: 5 },
     );
     await seedSale(org1Id, storeOwnId, yesterdayAt(10), [
+      { productId: prodAId, unitPrice: 100, qty: 1, lineTotal: 100 },
+    ]);
+    await seedSale(org1Id, storeOwnId, yesterdayAt(23), [
       { productId: prodAId, unitPrice: 100, qty: 1, lineTotal: 100 },
     ]);
 
@@ -218,18 +223,27 @@ describe('Dashboard — integración', () => {
     await base.onModuleDestroy();
   });
 
-  it('sales-today: total de hoy, de ayer y delta % correctos', async () => {
+  it('sales-today: comparativa a la misma hora (STAT-01) + serie intradía', async () => {
+    // now inyectado a las 12:00 → ayer se capa a las 12:00 (la venta de ayer a las
+    // 23h NO cuenta). Determinista: no depende de la hora real del run.
     const res = await tenantStorage.run({ organizationId: org1Id }, async () =>
-      service.salesToday(storeOwnId),
+      service.salesToday(storeOwnId, todayAt(12)),
     );
-    // Hoy: 200 + 45 (50 − 5 ticket) = 245. Ayer: 100.
+    // Hoy: 200 + 45 (50 − 5 ticket) = 245. Ayer hasta las 12: solo la de las 10 = 100
+    // (la de las 23 queda fuera por el cap de misma hora).
     expect(res.today.total).toBeCloseTo(245, 2);
     expect(res.yesterday.total).toBeCloseTo(100, 2);
     expect(res.today.count).toBe(2);
-    expect(res.yesterday.count).toBe(1);
+    expect(res.yesterday.count).toBe(1); // la venta de ayer a las 23 NO se cuenta
     expect(res.deltaPct).toBeCloseTo(145, 1); // (245-100)/100*100
     const store = res.byStore.find((s) => s.storeId === storeOwnId);
     expect(store?.today).toBeCloseTo(245, 2);
+    // Intradía: acumulado por hora con ventas (9→200, 11→245), termina en today.total.
+    expect(res.intraday.length).toBeGreaterThanOrEqual(2);
+    expect(res.intraday.at(-1)).toBeCloseTo(245, 2);
+    for (let i = 1; i < res.intraday.length; i++) {
+      expect(res.intraday[i]!).toBeGreaterThanOrEqual(res.intraday[i - 1]!); // no decreciente
+    }
   });
 
   it('sales-by-family: agrupa por familia y suma el neto de líneas', async () => {

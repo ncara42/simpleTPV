@@ -39,7 +39,14 @@ export class DashboardService {
 
   // Ventas de hoy vs ayer por tienda + total org, con delta %. No usa el selector
   // de periodo: siempre compara el día de hoy con el de ayer (rango horario completo).
-  async salesToday(storeId?: string): Promise<{
+  // Comparativa de hoy contra ayer A LA MISMA HORA (STAT-01): hoy hasta AHORA y
+  // ayer hasta el mismo tiempo transcurrido del día. Compararse contra el día
+  // completo de ayer haría que el día en curso saliera siempre peor. `now` es
+  // inyectable para tests deterministas (en runtime usa el reloj real).
+  async salesToday(
+    storeId?: string,
+    now: Date = this.now(),
+  ): Promise<{
     today: { total: number; count: number };
     yesterday: { total: number; count: number };
     deltaPct: number | null;
@@ -50,11 +57,19 @@ export class DashboardService {
       yesterday: number;
       deltaPct: number | null;
     }>;
+    // Acumulado de facturación de hoy por hora con ventas (para la sparkline
+    // intradía). Termina en today.total. Vacío/1 punto si aún no hay 2 tramos.
+    intraday: number[];
   }> {
     const { organizationId } = requireTenant();
-    const today = resolvePeriod('today', this.now());
+    const today = resolvePeriod('today', now);
     const yesterday = previousRange(today);
+    // Corte de "misma hora" para ayer: mismo tiempo transcurrido desde medianoche.
+    const elapsedMs = now.getTime() - today.from.getTime();
+    const yesterdaySameHour = new Date(yesterday.from.getTime() + elapsedMs);
 
+    // Filtro común: desde el inicio de ayer hasta AHORA, excluyendo las ventas de
+    // ayer posteriores a la misma hora (las de hoy entran por el primer OR).
     return withTenantTx(this.base, organizationId, async (tx) => {
       const rows = await tx.$queryRaw<
         Array<{
@@ -76,7 +91,8 @@ export class DashboardService {
          AND sa."organizationId" = ${organizationId}::uuid
          AND sa.status = 'COMPLETED'
          AND sa."createdAt" >= ${yesterday.from}
-         AND sa."createdAt" < ${today.to}
+         AND sa."createdAt" < ${now}
+         AND (sa."createdAt" >= ${today.from} OR sa."createdAt" < ${yesterdaySameHour})
         WHERE s."organizationId" = ${organizationId}::uuid
           AND s.active = true
           ${storeId ? this.eqStore('s.id', storeId) : EMPTY}
@@ -118,18 +134,39 @@ export class DashboardService {
         WHERE "organizationId" = ${organizationId}::uuid
           AND status = 'COMPLETED'
           AND "createdAt" >= ${yesterday.from}
-          AND "createdAt" < ${today.to}
+          AND "createdAt" < ${now}
+          AND ("createdAt" >= ${today.from} OR "createdAt" < ${yesterdaySameHour})
           ${storeId ? this.eqStore('"storeId"', storeId) : EMPTY}
         GROUP BY bucket
       `;
       const todayCount = num(counts.find((c) => c.bucket === 'today')?.count);
       const yesterdayCount = num(counts.find((c) => c.bucket === 'yesterday')?.count);
 
+      // Acumulado intradía de HOY por hora con ventas (sparkline STAT-01).
+      const hourly = await tx.$queryRaw<Array<{ hour: number; total: string }>>`
+        SELECT EXTRACT(HOUR FROM "createdAt")::int AS hour, COALESCE(SUM(total), 0) AS total
+        FROM "Sale"
+        WHERE "organizationId" = ${organizationId}::uuid
+          AND status = 'COMPLETED'
+          AND "createdAt" >= ${today.from}
+          AND "createdAt" < ${now}
+          ${storeId ? this.eqStore('"storeId"', storeId) : EMPTY}
+        GROUP BY hour
+        ORDER BY hour
+      `;
+      const intraday: number[] = [];
+      let acc = 0;
+      for (const h of hourly) {
+        acc += num(h.total);
+        intraday.push(Math.round(acc * 100) / 100);
+      }
+
       return {
         today: { total: todayTotal, count: todayCount },
         yesterday: { total: yesterdayTotal, count: yesterdayCount },
         deltaPct: deltaPct(todayTotal, yesterdayTotal),
         byStore,
+        intraday,
       };
     });
   }

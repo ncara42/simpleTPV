@@ -142,39 +142,13 @@
 
 /* Sparkline al pie de la card: empujada abajo (margin-top:auto) y a full-bleed,
    cancelando con márgenes negativos el padding de la card (1.15rem / 1.25rem). */
+/* Wrapper a sangre de la sparkline reutilizable (@simpletpv/ui, clases .ui-spark-*)
+   al pie de la KPI card. El trazo/relleno los aporta @simpletpv/ui/chart.css; aquí
+   solo el sangrado (cancela el padding de la card) y se evita el hueco inline. */
 .dash-card-spark {
-  display: block;
   margin: auto -1.25rem -1.15rem;
   width: calc(100% + 2.5rem);
-  height: 44px;
-}
-.dash-spark-line {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-.dash-spark-area {
-  stroke: none;
-}
-.dash-spark-brand {
-  color: var(--ui-brand);
-}
-.dash-spark-brand .dash-spark-area {
-  fill: var(--ui-brand-soft);
-}
-.dash-spark-up {
-  color: var(--ui-success);
-}
-.dash-spark-up .dash-spark-area {
-  fill: var(--ui-success-soft);
-}
-.dash-spark-down {
-  color: var(--ui-danger);
-}
-.dash-spark-down .dash-spark-area {
-  fill: var(--ui-danger-soft);
+  line-height: 0;
 }
 .dash-delta-up {
   color: var(--ui-success);

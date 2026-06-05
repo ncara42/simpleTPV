@@ -649,6 +649,9 @@ export const DEMO_SALES_TODAY: SalesTodayResponse = {
     { storeId: 's-online', storeName: 'Online', today: 154, yesterday: 162, deltaPct: -4.9 },
   ],
   series: [980, 1040, 1010, 1120, 1075, 1150, 1190, 1130, 1210, 1240, 1142, 1284],
+  // Acumulado intradía de hoy por hora (termina en today.total = 1284). Comparativa
+  // "a la misma hora": ayer (1142) es ayer hasta este mismo instante, no el día entero.
+  intraday: [95, 240, 410, 560, 705, 880, 1010, 1140, 1284],
 };
 export const DEMO_SALES_KPIS: SalesKpis = {
   salesCount: 68,
@@ -670,6 +673,8 @@ export const DEMO_MARGIN_KPIS: MarginKpis = {
   marginPct: 0.41,
   revenue: 1284,
   series: [0.38, 0.39, 0.385, 0.4, 0.395, 0.405, 0.4, 0.41, 0.405, 0.415, 0.402, 0.41],
+  // Beneficio diario en € (termina en realMargin = 500) para la card "Beneficio".
+  realMarginSeries: [372, 405, 389, 448, 425, 466, 476, 463, 490, 515, 459, 500],
 };
 export const DEMO_SALES_BY_FAMILY: FamilySales[] = [
   { familyId: 'fam-flores', familyName: 'Flores CBD', color: '#16734f', total: 488 },
