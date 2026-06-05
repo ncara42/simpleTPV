@@ -11,10 +11,7 @@ import {
   MinLength,
 } from 'class-validator';
 
-// Cota superior de precios alineada con Decimal(10,4) del esquema (6 dígitos
-// enteros). Evita que un valor enorme/con exceso de decimales reviente el INSERT
-// con un 500 en vez de un 400 (SEC-15).
-const MAX_PRICE = 999999.9999;
+import { MAX_PRICE } from '../common/limits.js';
 
 export class CreateProductDto {
   @IsString()

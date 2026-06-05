@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, type Product } from '@simpletpv/db';
 
+import { MAX_PRICE } from '../common/limits.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import type { CreateProductDto, UpdateProductDto } from './products.dto.js';
@@ -93,7 +94,7 @@ export class ProductsService {
       // Mismas cotas que CreateProductDto (SEC-16): el import a mano no debe ser una
       // puerta trasera a precios negativos (que generan ventas/cuadres negativos) ni
       // a valores que excedan Decimal(10,4).
-      if (price < 0 || price > 999999.9999) {
+      if (price < 0 || price > MAX_PRICE) {
         errors.push({ row: rowNumber, message: 'Precio fuera de rango (0–999999.9999)' });
         return;
       }

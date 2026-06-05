@@ -6,6 +6,7 @@ import {
   IsArray,
   IsEnum,
   IsInt,
+  IsNumber,
   IsOptional,
   IsPositive,
   IsUUID,
@@ -15,15 +16,21 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+import { MAX_AMOUNT, MAX_QUANTITY } from '../common/limits.js';
+
 export class CreateSaleLineDto {
   @IsUUID()
   productId!: string;
 
+  // Cantidad — Decimal(10,3): hasta 3 decimales y acotada (A-03).
+  @IsNumber({ maxDecimalPlaces: 3 })
   @IsPositive()
+  @Max(MAX_QUANTITY)
   qty!: number;
 
   // % de descuento de la línea (0–100). Opcional; ausente = sin descuento.
   @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(100)
   discountPct?: number;
@@ -32,7 +39,9 @@ export class CreateSaleLineDto {
   // discountPct, el importe tiene precedencia (resuelto en computeTotals, igual
   // que el descuento de ticket). Se capa al bruto de la línea.
   @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
+  @Max(MAX_AMOUNT)
   discountAmt?: number;
 }
 
@@ -50,21 +59,26 @@ export class CreateSaleDto {
   @IsEnum(PaymentMethod)
   paymentMethod!: PaymentMethod;
 
-  // Solo aplica en efectivo; el servicio valida que cubra el total.
+  // Solo aplica en efectivo; el servicio valida que cubra el total. Importe Decimal(12,2).
   @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
+  @Max(MAX_AMOUNT)
   cashGiven?: number;
 
   // Descuento de ticket por porcentaje (0–100). Si llega también
   // ticketDiscountAmt, el importe tiene precedencia (resuelto en el servicio).
   @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(100)
   ticketDiscountPct?: number;
 
-  // Descuento de ticket por importe fijo (>= 0). Se capa al subtotal.
+  // Descuento de ticket por importe fijo (>= 0). Se capa al subtotal. Decimal(12,2).
   @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
+  @Max(MAX_AMOUNT)
   ticketDiscountAmt?: number;
 }
 
