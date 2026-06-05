@@ -158,7 +158,7 @@ describe('cableado API real (VITE_DEMO_MODE=false)', () => {
   });
 });
 
-describe('modo demo (default): no llama a la API', () => {
+describe('modo demo (opt-in, VITE_DEMO_MODE=true): no llama a la API', () => {
   beforeEach(() => {
     vi.stubEnv('VITE_DEMO_MODE', 'true');
     vi.clearAllMocks();

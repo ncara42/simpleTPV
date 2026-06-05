@@ -26,15 +26,13 @@ FROM deps AS builder
 # build arg. Pásalo solo si los dominios no siguen el patrón admin/tpv.
 ARG VITE_BACKOFFICE_URL
 ENV VITE_BACKOFFICE_URL=$VITE_BACKOFFICE_URL
-# TEMPORAL — fase de presentaciones al cliente (jun 2026). El equipo (Noel + Marco)
-# enseña el TPV al cliente con datos demo y sin fricción de login, así que la imagen
-# de producción se hornea en MODO DEMO por defecto: isDemo() es true salvo que
-# VITE_DEMO_MODE sea exactamente 'false'. En demo, login() ignora las credenciales y
-# todas las libs de datos devuelven datos demo (no se toca la API). Así cualquier
-# despliegue del repo (incluido el Dokploy de Marco) arranca en demo sin config extra.
-# REVERTIR antes de lanzar con auth real: volver a 'false' (era el default por SEC-04)
-# y quitar el override VITE_DEMO_MODE=true del build arg en los proyectos de Dokploy.
-ARG VITE_DEMO_MODE=true
+# Modo demo OPT-IN (A-01): por defecto la imagen se hornea en modo REAL (login real
+# contra la API; isDemo() solo es true si VITE_DEMO_MODE === 'true'). Producción NUNCA
+# cae en demo por omisión. Para la fase de presentaciones al cliente con datos demo y
+# sin fricción de login, pasar EXPLÍCITAMENTE --build-arg VITE_DEMO_MODE=true (en el
+# proyecto de Dokploy de presentación). En demo, login() ignora las credenciales y las
+# libs devuelven datos demo (no se toca la API).
+ARG VITE_DEMO_MODE
 ENV VITE_DEMO_MODE=$VITE_DEMO_MODE
 COPY . .
 RUN pnpm --filter @simpletpv/tpv run build
