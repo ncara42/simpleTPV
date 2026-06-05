@@ -1,14 +1,15 @@
-import { Button } from '@simpletpv/ui';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ClipboardCheck, Search } from 'lucide-react';
+import { ClipboardList, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { useAuthStore } from './lib/auth.js';
 import { type Product, searchProducts } from './lib/catalog.js';
+import { usePageHeader } from './lib/pageHeader.js';
 import { confirmInventoryCount, getStoreStock } from './lib/stock.js';
 import { useDebounce } from './lib/useDebounce.js';
 
 export function InventoryPanel({ storeId }: { storeId: string | null }) {
+  usePageHeader('Inventario', 'Conteo rápido por nombre o código');
   const [search, setSearch] = useState('');
   const [reason, setReason] = useState('Recuento TPV');
   const [counts, setCounts] = useState<Record<string, { product: Product; qty: number }>>({});
@@ -67,14 +68,6 @@ export function InventoryPanel({ storeId }: { storeId: string | null }) {
 
   return (
     <div className="inventory-view" data-testid="inventory-view">
-      <div className="tickets-head">
-        <div>
-          <h2>Inventario</h2>
-          <p>Conteo rápido por nombre o código</p>
-        </div>
-        <ClipboardCheck size={22} />
-      </div>
-
       <div className="sale-search-wrap">
         <Search size={16} />
         <input
@@ -101,11 +94,19 @@ export function InventoryPanel({ storeId }: { storeId: string | null }) {
         </div>
       )}
 
-      <div className="inventory-table" data-testid="inventory-lines">
-        {rows.length === 0 ? (
-          <p className="sale-empty">Escanea productos para empezar el conteo.</p>
-        ) : (
-          rows.map((row) => (
+      {rows.length === 0 ? (
+        <div className="inventory-empty" data-testid="inventory-lines">
+          <span className="inventory-empty-icon" aria-hidden="true">
+            <ClipboardList size={22} />
+          </span>
+          <p className="inventory-empty-title">Empieza el conteo</p>
+          <p className="inventory-empty-text">
+            Escanea o busca un producto para añadirlo al recuento de esta tienda.
+          </p>
+        </div>
+      ) : (
+        <div className="inventory-table" data-testid="inventory-lines">
+          {rows.map((row) => (
             <div className="inventory-row" key={row.product.id} data-testid="inventory-line">
               <span>
                 <strong>{row.product.name}</strong>
@@ -123,17 +124,22 @@ export function InventoryPanel({ storeId }: { storeId: string | null }) {
                 <button onClick={() => add(row.product, 1)}>+</button>
               </div>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
       <div className="inventory-actions">
-        <input
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          data-testid="inventory-reason"
-        />
-        <Button
+        <label className="inventory-reason">
+          <span>Motivo del ajuste</span>
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            data-testid="inventory-reason"
+          />
+        </label>
+        <button
+          type="button"
+          className="inventory-confirm"
           disabled={
             !canConfirm || rows.length === 0 || reason.trim().length === 0 || confirm.isPending
           }
@@ -141,7 +147,7 @@ export function InventoryPanel({ storeId }: { storeId: string | null }) {
           data-testid="inventory-confirm"
         >
           {canConfirm ? 'Confirmar inventario' : 'Solo responsables pueden confirmar'}
-        </Button>
+        </button>
       </div>
     </div>
   );

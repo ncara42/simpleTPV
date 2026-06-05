@@ -15,8 +15,10 @@ import {
   openCashSession,
 } from './lib/cash.js';
 import { eur } from './lib/format.js';
+import { usePageHeader } from './lib/pageHeader.js';
 
 export function CashPanel({ storeId }: { storeId: string | null }) {
+  usePageHeader('Caja', 'Apertura, cierre y arqueo de caja');
   const queryClient = useQueryClient();
   // Total contado, alimentado por el contador de denominaciones (CashCount).
   const [counted, setCounted] = useState(0);
@@ -141,7 +143,7 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
           <span className="cash-spacer" />
           {!closing && (
             <button
-              className="cash-action"
+              className="cash-action primary"
               onClick={() => setClosing(true)}
               data-testid="cash-close"
             >

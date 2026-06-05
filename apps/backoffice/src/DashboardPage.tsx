@@ -239,12 +239,12 @@ export function DashboardPage() {
           <p className="dash-panel-sub">Productos en alerta ahora</p>
           <ul className="dash-stockout-list">
             {DEMO_STOCKOUTS.map((s) => (
-              <li key={`${s.name}-${s.store}`}>
-                <span className={`stock-dot stock-${s.level}`} />
-                <span className="dash-stockout-name">{s.name}</span>
-                <span className="dash-stockout-store">
-                  {s.store} · {s.qty} ud
+              <li key={`${s.name}-${s.store}`} className={`dash-stockout-item lvl-${s.level}`}>
+                <span className="dash-stockout-info">
+                  <span className="dash-stockout-name">{s.name}</span>
+                  <span className="dash-stockout-store">{s.store}</span>
                 </span>
+                <span className="dash-stockout-tag">{s.qty} ud</span>
               </li>
             ))}
           </ul>
@@ -354,13 +354,23 @@ function Rankings(props: {
   }
   const rows =
     tab === 'sales'
-      ? (props.data?.topSales ?? []).map((r) => ({ name: r.name, value: fmtEur(r.total) }))
+      ? (props.data?.topSales ?? []).map((r) => ({
+          name: r.name,
+          value: fmtEur(r.total),
+          num: r.total,
+        }))
       : tab === 'margin'
-        ? (props.data?.topMargin ?? []).map((r) => ({ name: r.name, value: fmtEur(r.margin) }))
+        ? (props.data?.topMargin ?? []).map((r) => ({
+            name: r.name,
+            value: fmtEur(r.margin),
+            num: r.margin,
+          }))
         : (props.data?.worstRotation ?? []).map((r) => ({
             name: r.name,
             value: `${fmtNum(r.units, 0)} ud`,
+            num: r.units,
           }));
+  const max = Math.max(1, ...rows.map((r) => r.num));
 
   return (
     <>
@@ -378,16 +388,23 @@ function Rankings(props: {
       {rows.length === 0 ? (
         <p className="catalog-empty">Sin datos.</p>
       ) : (
-        <table className="catalog-table" data-testid="rank-table">
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={`${r.name}-${i}`}>
-                <td>{r.name}</td>
-                <td className="dash-rank-value">{r.value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ol className="dash-rank-list" data-testid="rank-table">
+          {rows.map((r, i) => (
+            <li
+              key={`${r.name}-${i}`}
+              className="dash-rank-row"
+              style={{ '--i': i } as React.CSSProperties}
+            >
+              <span className="dash-rank-pos">{i + 1}</span>
+              <span className="dash-rank-name">{r.name}</span>
+              <span className="dash-rank-value">{r.value}</span>
+              <span
+                className="dash-rank-meter"
+                style={{ '--w': `${(r.num / max) * 100}%` } as React.CSSProperties}
+              />
+            </li>
+          ))}
+        </ol>
       )}
     </>
   );

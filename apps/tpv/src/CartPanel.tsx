@@ -1,5 +1,5 @@
 import { ApiError } from '@simpletpv/auth';
-import { Percent } from 'lucide-react';
+import { Percent, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { CartLines } from './cart/CartLines.js';
@@ -92,35 +92,51 @@ export function CartPanel({
   // Desglose de IVA (21%) desde el total, calculado en cliente para el mockup.
   const base = total > 0 ? total / 1.21 : 0;
   const iva = total - base;
+  const unitCount = items.reduce((n, i) => n + i.qty, 0);
 
   return (
     <aside
-      className="flex w-80 shrink-0 flex-col rounded-lg border border-[var(--ui-border)] bg-white shadow-sm"
+      className="flex w-80 shrink-0 flex-col overflow-hidden rounded-[var(--ui-radius-lg)] border border-[var(--ui-border)] bg-[var(--ui-surface)]"
       data-testid="cart"
     >
-      {/* Cabecera: Ticket actual + Descuento + Vaciar */}
-      <div className="flex items-center justify-between border-b border-[var(--ui-border)] px-4 py-3">
-        <h2 className="text-sm font-semibold text-neutral-900">Ticket actual</h2>
-        <div className="flex items-center gap-3">
+      {/* Cabecera: Ticket actual + recuento + Descuento + Vaciar */}
+      <header className="flex items-center justify-between gap-2 border-b border-[var(--ui-border)] px-4 py-3.5">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold tracking-tight text-[var(--ui-text)]">
+            Ticket actual
+          </h2>
+          {unitCount > 0 && (
+            <span
+              className="rounded-full bg-[var(--ui-surface-subtle)] px-2 py-0.5 text-xs font-medium tabular-nums text-[var(--ui-text-muted)]"
+              data-testid="cart-count"
+            >
+              {unitCount}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
           <button
-            className="flex items-center gap-1 text-sm font-medium text-neutral-400 hover:text-neutral-700 disabled:opacity-40"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--ui-text-muted)] transition hover:bg-[var(--ui-surface-subtle)] hover:text-[var(--ui-text)] disabled:pointer-events-none disabled:opacity-40"
             onClick={() => setDiscount({ mode: 'line' })}
             disabled={items.length === 0}
             data-testid="cart-discount"
+            title="Descuento"
+            aria-label="Aplicar descuento"
           >
-            <Percent className="h-3.5 w-3.5" />
-            Descuento
+            <Percent className="h-4 w-4" />
           </button>
           <button
-            className="text-sm font-medium text-neutral-400 hover:text-neutral-700"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--ui-text-muted)] transition hover:bg-[var(--ui-danger-soft)] hover:text-[var(--ui-danger)] disabled:pointer-events-none disabled:opacity-40"
             onClick={clear}
             disabled={items.length === 0}
             data-testid="cart-clear"
+            title="Vaciar ticket"
+            aria-label="Vaciar ticket"
           >
-            Vaciar
+            <Trash2 className="h-4 w-4" />
           </button>
         </div>
-      </div>
+      </header>
 
       <CartLines
         items={items}

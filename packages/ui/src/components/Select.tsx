@@ -5,6 +5,8 @@ export interface SelectOption {
   value: string;
   label: string;
   disabled?: boolean;
+  /** Contador opcional alineado a la derecha de la opción (p. ej. nº de items). */
+  count?: number;
 }
 
 export interface SelectProps {
@@ -14,6 +16,8 @@ export interface SelectProps {
   placeholder?: string;
   /** Si se indica, el disparador muestra este texto fijo en vez de la opción seleccionada. */
   triggerLabel?: string;
+  /** Contador opcional alineado junto al chevron del disparador. */
+  triggerCount?: number;
   className?: string;
   disabled?: boolean;
   ariaLabel?: string;
@@ -31,6 +35,7 @@ export function Select({
   options,
   placeholder = 'Seleccionar…',
   triggerLabel,
+  triggerCount,
   className,
   disabled,
   ariaLabel,
@@ -223,6 +228,7 @@ export function Select({
         <span className={`ui-select-value${selected || triggerLabel ? '' : ' is-placeholder'}`}>
           {triggerLabel ?? (selected ? selected.label : placeholder)}
         </span>
+        {triggerCount != null && <span className="ui-select-trigger-count">{triggerCount}</span>}
         <svg
           className="ui-select-chevron"
           width="12"
@@ -271,6 +277,7 @@ export function Select({
                 onClick={() => commit(i)}
               >
                 <span className="ui-select-option-label">{opt.label}</span>
+                {opt.count != null && <span className="ui-select-option-count">{opt.count}</span>}
                 {opt.value === value && (
                   <svg
                     className="ui-select-check"

@@ -9,49 +9,38 @@ function fam(id: string, children: FamilyNode[] = []): FamilyNode {
 }
 
 describe('FamilyChips', () => {
-  it('en el nivel raíz muestra "Todas" y un chip por familia', () => {
+  it('en el nivel raíz muestra "Todas" y una píldora por familia hoja', () => {
     render(
       <FamilyChips
         families={[fam('Flores'), fam('Aceites')]}
         familyId={null}
-        parentFamily={null}
         setFamilyId={vi.fn()}
-        setParentFamily={vi.fn()}
       />,
     );
     expect(screen.getByTestId('fam-chip-all')).toBeInTheDocument();
     expect(screen.getAllByTestId('fam-chip')).toHaveLength(2);
   });
 
-  it('al pulsar una familia con subfamilias entra en ella', () => {
+  it('una familia hoja filtra directo al pulsarla', () => {
     const setFamilyId = vi.fn();
-    const setParentFamily = vi.fn();
-    const flores = fam('Flores', [fam('Indica')]);
-    render(
-      <FamilyChips
-        families={[flores]}
-        familyId={null}
-        parentFamily={null}
-        setFamilyId={setFamilyId}
-        setParentFamily={setParentFamily}
-      />,
-    );
+    render(<FamilyChips families={[fam('Flores')]} familyId={null} setFamilyId={setFamilyId} />);
     fireEvent.click(screen.getByText(/Flores/));
     expect(setFamilyId).toHaveBeenCalledWith('Flores');
-    expect(setParentFamily).toHaveBeenCalledWith(flores);
   });
 
-  it('dentro de una familia muestra "Volver" y "Todo · Familia"', () => {
-    render(
-      <FamilyChips
-        families={[]}
-        familyId={null}
-        parentFamily={fam('Flores', [fam('Indica')])}
-        setFamilyId={vi.fn()}
-        setParentFamily={vi.fn()}
-      />,
-    );
-    expect(screen.getByTestId('fam-back')).toBeInTheDocument();
-    expect(screen.getByTestId('fam-chip-parent')).toBeInTheDocument();
+  it('una familia con subfamilias se muestra como desplegable, no como chip', () => {
+    const flores = fam('Flores', [fam('Indica')]);
+    render(<FamilyChips families={[flores]} familyId={null} setFamilyId={vi.fn()} />);
+    expect(screen.queryByTestId('fam-chip')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Familia Flores' })).toBeInTheDocument();
+  });
+
+  it('al elegir una subfamilia del desplegable filtra por ella', () => {
+    const setFamilyId = vi.fn();
+    const flores = fam('Flores', [fam('Indica')]);
+    render(<FamilyChips families={[flores]} familyId={null} setFamilyId={setFamilyId} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Familia Flores' }));
+    fireEvent.click(screen.getByText('Indica'));
+    expect(setFamilyId).toHaveBeenCalledWith('Indica');
   });
 });

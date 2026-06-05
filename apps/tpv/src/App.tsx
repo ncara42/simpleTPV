@@ -1,3 +1,4 @@
+import '@simpletpv/ui/alert.css';
 import '@simpletpv/ui/login.css';
 import '@simpletpv/ui/select.css';
 import '@simpletpv/ui/topbar.css';
@@ -114,8 +115,7 @@ export default function App() {
     return (
       <LoginForm
         onSubmit={api.login}
-        initialEmail={isDemo() ? 'demo@simpletpv.com' : undefined}
-        initialPassword={isDemo() ? 'demo' : undefined}
+        {...(isDemo() ? { initialEmail: 'demo@simpletpv.com', initialPassword: 'demo' } : {})}
       />
     );
   }

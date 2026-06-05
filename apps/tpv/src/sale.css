@@ -55,7 +55,7 @@
   gap: 0.4rem;
   height: 32px;
   padding: 0 0.7rem;
-  border-radius: var(--ui-radius-sm);
+  border-radius: 9999px;
   border: 1px solid var(--ui-border);
   background: var(--ui-surface-subtle);
   color: var(--ui-text-muted);
@@ -85,10 +85,14 @@
   color: var(--ui-text-soft);
 }
 
-/* ─── Chips de familia ─────────────────────────────────── */
+/* ─── Filtros de familia ───────────────────────────────────
+   Mismo lenguaje que los filtros del backoffice: píldoras completamente
+   redondas. Las familias hoja son botones; las que tienen subfamilias se
+   muestran como un <Select> (desplegable) vestido también de píldora. */
 .sale-families {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
   margin-bottom: 1rem;
 }
@@ -96,37 +100,31 @@
 .fam-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  height: 34px;
-  padding: 0 0.7rem;
-  border-radius: var(--ui-radius-sm);
-  border: 1px solid var(--ui-border);
+  gap: 0.45rem;
+  height: 36px;
+  padding: 0 0.95rem;
+  border-radius: 9999px;
+  border: 1px solid var(--ui-border-strong);
   background: var(--ui-surface);
   font-size: var(--ui-text-sm);
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: -0.012em;
   color: var(--ui-text);
   cursor: pointer;
-  box-shadow: var(--ui-shadow-sm);
   white-space: nowrap;
   transition:
     border-color 0.12s,
     background 0.12s,
+    color 0.12s,
     transform 0.06s;
 }
 
 .fam-chip:hover {
-  border-color: var(--ui-brand);
+  background: var(--ui-surface-subtle);
 }
 
 .fam-chip:active {
-  transform: translateY(1px);
-}
-
-.fam-chip .chip-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
+  transform: translateY(0.5px);
 }
 
 .fam-chip .chip-count {
@@ -146,20 +144,33 @@
   color: rgba(255, 255, 255, 0.72);
 }
 
-.fam-chip.active .chip-dot {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
+/* Desplegable de una familia con subfamilias: el disparador del <Select> se
+   viste como una píldora de familia para alinear con el resto de la fila. */
+.fam-select .ui-select-trigger {
+  height: 36px;
+  padding: 0 0.85rem 0 0.95rem;
+  border-radius: 9999px;
+  border-color: var(--ui-border-strong);
+  font-size: var(--ui-text-sm);
+  font-weight: 500;
+  gap: 0.45rem;
 }
 
-/* Chevron que indica que una familia tiene subfamilias en las que entrar. */
-.fam-chip .fam-chevron {
-  color: var(--ui-text-soft);
-  font-weight: 600;
+.fam-select .ui-select-trigger:hover {
+  background: var(--ui-surface-subtle);
 }
 
-/* Botón "‹ Volver" al nivel de familias raíz. */
-.fam-chip.fam-back {
-  font-weight: 600;
-  color: var(--ui-text-soft);
+/* Familia activa (alguna de sus subfamilias —o "Todo · Familia"— seleccionada):
+   píldora en color de marca, como un chip activo. */
+.fam-select.is-active .ui-select-trigger {
+  background: var(--ui-brand);
+  border-color: var(--ui-brand);
+  color: #fff;
+}
+
+.fam-select.is-active .ui-select-trigger .ui-select-trigger-count,
+.fam-select.is-active .ui-select-trigger .ui-select-chevron {
+  color: rgba(255, 255, 255, 0.82);
 }
 
 /* ─── Cuadrícula de productos ──────────────────────────── */
@@ -201,6 +212,17 @@
   cursor: not-allowed;
 }
 
+/* Agotado (stock ≤ 0): se atenúa y se ordena al final, pero sigue siendo clicable
+   (la venta nunca se bloquea por falta de stock). El hover lo realza para delatar
+   que aún se puede pulsar. */
+.prod-card.is-out {
+  opacity: 0.5;
+}
+
+.prod-card.is-out:hover {
+  opacity: 0.75;
+}
+
 .prod-name {
   font-size: var(--ui-text-base);
   font-weight: 600;
@@ -228,20 +250,20 @@
   font-weight: 700;
   padding: 0.12rem 0.45rem;
   border-radius: var(--ui-radius-xs);
+  font-variant-numeric: tabular-nums;
 }
 
-.prod-stock.neutral {
+/* Color solo donde importa: sin datos, stock sano y agotado quedan neutros (sin fondo);
+   solo el stock bajo (ámbar) destaca. El agotado no alarma en rojo porque la tarjeta
+   entera ya va atenuada (.is-out). */
+.prod-stock.neutral,
+.prod-stock.out-of-stock {
   color: var(--ui-text-soft);
 }
 
-.prod-stock.sold-out {
-  background: var(--ui-danger-soft);
-  color: var(--ui-danger);
-}
-
-.prod-stock.stock-red {
-  background: var(--ui-danger-soft);
-  color: var(--ui-danger);
+.prod-stock.stock-green {
+  color: var(--ui-text-soft);
+  background: none;
 }
 
 .prod-stock.stock-yellow {
@@ -249,9 +271,24 @@
   color: var(--ui-warning);
 }
 
-.prod-stock.stock-green {
-  background: var(--ui-success-soft);
-  color: var(--ui-success);
+.prod-stock.stock-red {
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+}
+
+/* El número en stock es clicable (abre el detalle por tienda); ahora que el
+   estado sano no tiene fondo, una afordancia sutil al pasar/enfocar lo delata. */
+.prod-stock[role='button'] {
+  cursor: pointer;
+}
+
+.prod-stock[role='button']:hover {
+  background: var(--ui-surface-subtle);
+}
+
+.prod-stock[role='button']:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
 }
 
 .stock-dot {
@@ -334,27 +371,12 @@
   border-top: 1px solid var(--ui-border);
 }
 
-/* ─── Recepción de traspasos ───────────────────────────── */
-.transfer-receive {
-  max-width: 48rem;
-}
-
-.transfer-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-
-.transfer-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.8rem 1rem;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
+/* Botones del pie de modal en píldora, como el resto de acciones del TPV. Los
+   <Button> de @simpletpv/ui traen un radio pequeño (rounded-sm); esta regla los
+   capsula (especificidad 0,1,1 > la utilidad Tailwind). Scoped: .modal-foot solo
+   lo usa el modal de recepción. */
+.modal-foot button {
+  border-radius: 9999px;
 }
 
 .cart-table {
@@ -377,13 +399,6 @@
 
 .cart-table input[type='text'] {
   width: 100%;
-}
-
-.transfer-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.6rem;
-  margin-top: 1rem;
 }
 
 .btn-primary {
@@ -411,6 +426,7 @@
 /* Micro-interacción común: todos los botones de acción se "hunden" levemente al
    pulsar (mismo gesto que .prod-card y .fam-chip), salvo si están deshabilitados. */
 .btn-primary:active,
+.cart-checkout:active,
 .cart-create:active,
 .cart-discount:active,
 .cart-void:active,
@@ -421,19 +437,23 @@
 .cash-btn-open:active,
 .cash-btn-close:active,
 .cash-btn-cancel:active,
+.cash-count-reset:active,
 .tpv-tab:active,
 .scan-btn:active,
+.inventory-confirm:active,
 .cash-card-close:active,
 .return-toggle-btn:active {
   transform: translateY(0.5px);
 }
 
 .btn-primary:disabled:active,
+.cart-checkout:disabled:active,
 .pay-confirm:disabled:active,
 .cash-btn-open:disabled:active,
 .cash-btn-close:disabled:active,
 .cart-discount:disabled:active,
-.cart-void:disabled:active {
+.cart-void:disabled:active,
+.inventory-confirm:disabled:active {
   transform: none;
 }
 
@@ -602,6 +622,38 @@
   font-weight: 600;
 }
 
+/* CTA principal del ticket: cobrar. Misma tinta que .btn-primary / .pay-confirm
+   (acción primaria sólida), pero a tamaño "héroe" — ancho completo y más alta —
+   por ser la acción central del POS. La cápsula la aplica la allowlist de
+   píldora y el hundido al pulsar, la lista de :active más abajo. */
+.cart-checkout {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 48px;
+  padding: 0 1.1rem;
+  border: 1px solid var(--ui-primary);
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg);
+  font-weight: 700;
+  font-size: var(--ui-text-md);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background var(--ui-motion-fast);
+}
+
+.cart-checkout:hover:not(:disabled) {
+  background: var(--ui-primary-hover, #000);
+}
+
+.cart-checkout:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .cart-discount {
   padding: 0.6rem;
   font-weight: 600;
@@ -679,7 +731,7 @@
   background: var(--ui-warning-soft);
   color: var(--ui-warning);
   font-size: var(--ui-text-sm);
-  border: 1px solid #f1d9ad;
+  border: 1px solid color-mix(in srgb, var(--ui-warning) 30%, transparent);
   margin-bottom: 0.2rem;
 }
 
@@ -1022,47 +1074,8 @@
   margin-bottom: 0.75rem;
 }
 
-.sale-success-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  padding: 0.8rem 1rem;
-  border: 1px solid #bbf7d0;
-  border-radius: var(--ui-radius-lg);
-  background: #f0fdf4;
-  color: #166534;
-  font-size: var(--ui-text-base);
-  font-weight: 500;
-  box-shadow: var(--ui-shadow-sm);
-}
-
-.sale-success-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--ui-radius-pill);
-  background: #dcfce7;
-  color: #15803d;
-  font-weight: 800;
-  flex-shrink: 0;
-}
-
-.sale-success-close {
-  margin-left: auto;
-  border: 0;
-  background: transparent;
-  color: #15803d;
-  font-size: var(--ui-text-lg);
-  line-height: 1;
-  cursor: pointer;
-}
-
-.sale-success-close:hover {
-  color: #14532d;
-}
+/* La confirmación de venta usa ahora el componente Alert de @simpletpv/ui
+   (toast flotante abajo-derecha). Ver packages/ui/src/styles/alert.css. */
 
 /* ─── Panel de caja ────────────────────────────────────── */
 .cash-panel {
@@ -1076,14 +1089,18 @@
 
 .cash-panel.closed {
   background: var(--ui-warning-soft);
-  border-color: #f1d9ad;
+  border-color: color-mix(in srgb, var(--ui-warning) 30%, transparent);
 }
 
 .cash-bar {
   display: flex;
   align-items: center;
   gap: 1.1rem;
-  padding: 0.8rem 1.1rem;
+  padding: 0.9rem 1.2rem;
+  border-bottom: 1px solid var(--ui-border);
+  /* Alto estable: control 38px + padding vertical + borde, para que la barra
+     no se achique al desaparecer el botón "Cerrar caja". */
+  min-height: calc(38px + 1.8rem + 1px);
 }
 
 .cash-status {
@@ -1103,7 +1120,7 @@
 
 .cash-panel.closed .cash-dot {
   background: var(--ui-warning);
-  box-shadow: 0 0 0 4px #f6e2c0;
+  box-shadow: 0 0 0 4px var(--ui-warning-soft);
 }
 
 .cash-badge {
@@ -1151,8 +1168,8 @@
 }
 
 .cash-action {
-  height: 34px;
-  padding: 0 0.95rem;
+  height: 38px;
+  padding: 0 1.05rem;
   border-radius: var(--ui-radius-sm);
   border: 1px solid var(--ui-border-strong);
   background: var(--ui-surface);
@@ -1174,6 +1191,7 @@
   background: var(--ui-primary);
   border-color: var(--ui-primary);
   color: var(--ui-primary-fg);
+  border-radius: var(--ui-radius-pill);
 }
 
 .cash-action.primary:hover {
@@ -1184,8 +1202,8 @@
 .cash-form {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  padding: 0 1.1rem 1rem;
+  gap: 0.7rem;
+  padding: 0.85rem 1.2rem 1rem;
 }
 
 .cash-field {
@@ -1223,7 +1241,7 @@
 .cash-btn-cancel {
   flex: 1;
   min-height: 38px;
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-pill);
   font-weight: 700;
   cursor: pointer;
   border: none;
@@ -1303,98 +1321,190 @@
 .cash-count {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.9rem;
 }
 
-.cash-count-grid {
+/* Dos grupos (billetes / monedas) en paralelo en ancho cómodo; se apilan en una
+   sola columna al estrechar gracias a auto-fit. La separación la da el gap, sin
+   ruido de bordes ni cabeceras. */
+.cash-count-groups {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 0.35rem 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 0.25rem 2rem;
+}
+
+.cash-count-group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Pequeña separación vertical entre filas: invisible cuando están vacías (fondo
+   transparente) y evita que los fondos de las filas activas (is-active) se peguen
+   y parezcan un solo bloque. */
+.cash-count-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
 }
 
 .cash-count-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 3.6rem 1fr 4.75rem;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
+  min-height: 40px;
+  padding: 0.12rem 0.5rem;
+  border-radius: var(--ui-radius-md);
+  transition: background var(--ui-motion-fast);
 }
 
 .cash-count-denom {
-  width: 3.6rem;
-  font-size: var(--ui-text-base);
+  font-size: var(--ui-text-md);
   font-weight: 600;
-}
-
-.cash-count-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.cash-count-controls button {
-  width: 1.6rem;
-  height: 1.6rem;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-xs);
-  background: #fff;
-  color: var(--ui-text-soft);
-  font-size: 1rem;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.cash-count-controls button:hover {
-  background: #f5f5f5;
-}
-
-.cash-count-controls input {
-  width: 3rem;
-  height: 1.7rem;
-  text-align: center;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-xs);
   font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+  transition: color var(--ui-motion-fast);
+}
+
+/* La fila "se enciende" con un tinte de marca cuando ya tiene piezas contadas,
+   para tener a la vista de un vistazo qué denominaciones llevan algo. */
+.cash-count-row.is-active {
+  background: var(--ui-brand-soft-2);
+}
+
+.cash-count-row.is-active .cash-count-denom {
+  color: var(--ui-text);
+}
+
+/* Stepper tipo cápsula: el borde vive en el contenedor (un único trazo pill
+   alrededor de todo), de modo que NO hay divisores verticales entre −, número y +.
+   Los laterales quedan redondos (semicírculo) como los botones de la card de cobro.
+   Los hijos van sin borde: el hover tiñe su zona y el foco resalta toda la cápsula
+   vía :focus-within. overflow:hidden recorta el tinte del hover a la forma pill. */
+.cash-count-stepper {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  border: 1.5px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface);
+  overflow: hidden;
+  transition:
+    border-color 0.1s,
+    box-shadow 0.1s;
+}
+
+.cash-count-stepper:focus-within {
+  border-color: var(--ui-brand);
+  box-shadow: var(--ui-focus);
+}
+
+.cash-count-stepper button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 1.05rem;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition:
+    background 0.1s,
+    color 0.1s;
+}
+
+.cash-count-stepper button:hover {
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-ink);
+}
+
+.cash-count-stepper input {
+  width: 2.75rem;
+  height: 32px;
+  text-align: center;
+  border: none;
+  background: transparent;
+  font-size: var(--ui-text-md);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text);
+  outline: none;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.cash-count-stepper input::-webkit-outer-spin-button,
+.cash-count-stepper input::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .cash-count-sub {
-  margin-left: auto;
-  min-width: 4.5rem;
   text-align: right;
   font-size: var(--ui-text-base);
-  color: var(--ui-text-soft);
+  font-weight: 600;
+  color: var(--ui-text);
 }
 
+/* ─── Resumen del arqueo ─────────────────────────────────── */
 .cash-count-foot {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  flex-wrap: wrap;
   border-top: 1px solid var(--ui-border);
-  padding-top: 0.6rem;
+  padding-top: 0.85rem;
+}
+
+.cash-count-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 1.75rem;
+}
+
+.cash-count-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.cash-count-metric-label {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
+}
+
+/* Sin color propio: hereda la tinta para "Total"; las clases cash-diff-* colorean
+   la diferencia (success/danger/muted) sobre este mismo elemento. */
+.cash-count-metric-value {
+  font-size: var(--ui-text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .cash-count-reset {
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-xs);
-  background: #fff;
-  padding: 0.35rem 0.7rem;
+  height: 34px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-pill);
+  background: transparent;
   font-size: var(--ui-text-base);
-  color: var(--ui-text-soft);
-  cursor: pointer;
-}
-
-.cash-count-totals {
-  min-width: 14rem;
-}
-
-.cash-count-total-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  font-size: var(--ui-text-md);
-}
-
-.cash-count-total-row span:first-child {
+  font-weight: 600;
   color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast),
+    border-color var(--ui-motion-fast),
+    color var(--ui-motion-fast);
+}
+
+.cash-count-reset:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
 }
 
 .cash-error {
@@ -1766,7 +1876,8 @@
   color: var(--ui-text);
 }
 
-.return-empty {
+.return-empty,
+.inventory-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1779,7 +1890,8 @@
   box-shadow: var(--ui-shadow-sm);
 }
 
-.return-empty-icon {
+.return-empty-icon,
+.inventory-empty-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1791,14 +1903,16 @@
   margin-bottom: 0.25rem;
 }
 
-.return-empty-title {
+.return-empty-title,
+.inventory-empty-title {
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
   color: var(--ui-text);
 }
 
-.return-empty-text {
+.return-empty-text,
+.inventory-empty-text {
   margin: 0;
   font-size: var(--ui-text-base);
   color: var(--ui-text-muted);
@@ -1840,13 +1954,115 @@
   box-shadow: var(--ui-shadow-sm);
 }
 
-/* Fichaje: estado a la izquierda, acción alineada a la derecha y centradas
-   verticalmente (en vez de la insignia y el botón pegados). */
-.time-clock-card {
+/* Fichaje: barra fina con estado + contador a la izquierda y acciones de fichar a
+   la derecha; sustituye la antigua tarjeta-cabecera, ahora la jornada vive en la
+   tabla histórica de abajo. */
+.time-clock-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  padding: 0.7rem 1.1rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.time-clock-bar-state {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+/* Insignia de estado con color según fichado / pausa / fuera. */
+.time-clock-badge--in {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+
+.time-clock-badge--break {
+  background: var(--ui-warning-soft, #fff4e5);
+  color: var(--ui-warning, #b25e00);
+}
+
+.time-clock-badge--out {
+  background: var(--ui-surface-subtle, #f0f0f2);
+  color: var(--ui-text-muted);
+}
+
+/* Contador de tiempo trabajado; avanza en vivo mientras está fichado. En la barra
+   fina del fichaje es más discreto que su tamaño base. */
+.time-clock-counter {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ui-text);
+  line-height: 1;
+}
+
+.time-clock-bar .time-clock-counter {
+  font-size: 1.25rem;
+}
+
+.time-clock-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.time-clock-in,
+.time-clock-out,
+.time-clock-break,
+.time-clock-pair {
+  min-height: 40px;
+  padding: 0 1.2rem;
+  border: none;
+  font-weight: 700;
+  font-size: var(--ui-text-base);
+  cursor: pointer;
+}
+
+.time-clock-in,
+.time-clock-pair {
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg);
+}
+
+.time-clock-in:hover,
+.time-clock-pair:hover {
+  background: var(--ui-primary-hover, #000);
+}
+
+.time-clock-pair {
+  width: 100%;
+  margin-top: 0.4rem;
+}
+
+.time-clock-out {
+  background: var(--ui-danger);
+  color: #fff;
+}
+
+.time-clock-out:hover {
+  filter: brightness(0.94);
+}
+
+.time-clock-break {
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border-strong);
+  color: var(--ui-text);
+}
+
+.time-clock-break:hover {
+  background: var(--ui-border);
+}
+
+.time-clock-in:disabled,
+.time-clock-out:disabled,
+.time-clock-break:disabled,
+.time-clock-pair:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .cash-card-head {
@@ -1917,120 +2133,404 @@
   filter: brightness(0.94);
 }
 
-/* ─── Vista de Pedidos (tabla, mockup) ───────────────────── */
+/* ─── Vista de Pedidos (tabla) ───────────────────────────
+   La tabla replica el sistema canónico del backoffice (.table-panel +
+   .catalog-table), portado verbatim desde apps/backoffice/src/catalog.css,
+   para que sea idéntica a las tablas del panel admin (Traspasos, Usuarios). */
 .transfer-view {
-  max-width: 46rem;
+  /* Mismo ancho que las tablas del backoffice (`.catalog` mide 75rem): así la
+     tabla de Pedidos ocupa lo mismo de ancho que las del panel admin. */
+  max-width: 75rem;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
 }
 
-.transfer-view-head {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
+/* Marco del panel (idéntico al admin): borde, radio 18px y fondo blanco. */
+.table-panel {
+  border: 1px solid var(--ui-border);
+  border-radius: 18px;
+  background: var(--ui-surface);
+  overflow: hidden;
+  box-shadow: var(--ui-shadow-sm);
 }
 
-.transfer-view-title {
-  margin: 0;
-  font-size: var(--ui-text-lg);
-  font-weight: 700;
-  color: var(--ui-text);
-}
-
-.transfer-view-sub {
-  margin: 0;
-  font-size: var(--ui-text-base);
-  color: var(--ui-text-muted);
-}
-
-.transfer-table {
+.catalog-table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 0.9rem;
+  letter-spacing: -0.012em;
+}
+.catalog-table th {
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-soft);
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid var(--ui-border-strong);
+}
+/* La fila de cabeceras lleva un tinte sutil para separarla de las filas. */
+.catalog-table thead th {
+  background: var(--ui-surface-subtle);
+}
+/* Altura de fila fija (3.5rem): todas las filas miden lo mismo —y entre tablas
+   distintas— sin importar si la celda lleva texto, badge o botón. */
+.catalog-table td {
+  height: 3.5rem;
+  padding: 0 0.85rem;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text);
+}
+.catalog-table tbody tr {
+  transition: background 0.1s;
+}
+.catalog-table tbody tr:hover {
+  background: var(--ui-surface-subtle);
+}
+.catalog-table .muted {
+  color: var(--ui-text-soft);
+}
+
+/* Cabeceras y filas alineadas con el padding del panel (1rem). */
+.table-panel .catalog-table th,
+.table-panel .catalog-table td {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+.table-panel .catalog-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.catalog-empty {
+  color: var(--ui-text-soft);
+  padding: 2.5rem 0;
+  font-size: 0.92rem;
+  letter-spacing: -0.012em;
+}
+.table-panel .catalog-empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+}
+
+/* Acción de fila en píldora (idéntica al "Enviar" de Traspasos). Scoped a
+   .table-panel para no chocar con el .link-btn global del TPV (enlace subrayado). */
+.table-panel .link-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 2rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  color: var(--ui-primary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  letter-spacing: -0.012em;
+  text-decoration: none;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+.table-panel .link-btn:hover {
+  background: var(--ap-blue-soft);
+  border-color: var(--ui-primary);
+}
+.table-panel .link-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Estado del pedido: tick circular como el "estado de usuario" del admin.
+   Verde = Recibido · Naranja = Pendiente. */
+.order-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.order-state__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  color: #fff;
+  flex-shrink: 0;
+}
+.order-state.received .order-state__icon {
+  background: var(--ui-success);
+}
+.order-state.pending .order-state__icon {
+  background: var(--ui-warning);
+}
+.order-state.voided .order-state__icon {
+  background: var(--ui-danger);
+}
+
+/* Botón de acción de fila "Recibir": píldora (heredada de .table-panel
+   .link-btn) con icono. La columna de acción se alinea a la derecha. */
+.catalog-table__action {
+  text-align: right;
+}
+.table-panel .link-btn--receive {
+  gap: 0.4rem;
+}
+
+/* ─── Recepción de pedido (modal) ──────────────────────────
+   Reutiliza .pay-overlay/.pay-modal (modal de cobro) y restila la tabla de
+   líneas con el sistema de diseño (--ui-*), sin grises Tailwind sueltos. */
+.recv-modal {
+  width: min(46rem, 94vw);
+  max-height: 88vh;
+}
+.recv-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.4rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.recv-modal__title {
+  margin: 0;
+  font-size: var(--ui-text-lg);
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.recv-modal__close {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--ui-text-soft);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.recv-modal__close:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+.recv-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.1rem 1.4rem;
+  overflow-y: auto;
+}
+
+/* Marco de la tabla de líneas, idéntico en lenguaje a .table-panel. */
+.recv-table-wrap {
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg);
   overflow: hidden;
   background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-sm);
 }
-
-.transfer-table thead th {
+.recv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  letter-spacing: -0.012em;
+}
+.recv-table th {
   text-align: left;
-  font-size: var(--ui-text-xs);
+  font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--ui-text-soft);
+  padding: 0.55rem 0.85rem;
   background: var(--ui-surface-subtle);
-  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--ui-border-strong);
+}
+.recv-table td {
+  padding: 0.55rem 0.85rem;
+  vertical-align: middle;
   border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text);
+}
+.recv-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.recv-table__num {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.recv-table__name {
+  color: var(--ui-text);
+}
+.recv-table__sent {
+  color: var(--ui-text-muted);
 }
 
-.transfer-table th.num,
-.transfer-table td.num {
+/* Inputs de la tabla en tokens (sustituye los grises Tailwind). Píldora 9999
+   como el resto de inputs del TPV (allowlist de píldora en styles.css). */
+.recv-input {
+  height: 2rem;
+  width: 100%;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  padding: 0 0.55rem;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text);
+  outline: none;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+.recv-input::placeholder {
+  color: var(--ui-text-soft);
+}
+.recv-input:focus {
+  border-color: var(--ui-brand);
+  box-shadow: var(--ui-focus);
+}
+.recv-input--num {
+  width: 4.5rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
-.transfer-table tbody td {
+.recv-error {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-danger);
+}
+
+/* La confirmación "Pedido recibido" usa ahora el componente Alert de
+   @simpletpv/ui (toast flotante abajo-derecha). Ver packages/ui/src/styles/alert.css. */
+
+/* Filas de la tabla de tickets: clicables (abren el detalle), por eso el cursor.
+   La tabla reutiliza .catalog-table; el resto de tablas no son clicables. */
+.tickets-view .catalog-table tbody tr {
+  cursor: pointer;
+}
+
+/* Cabecera del detalle de ticket: aloja el «← Volver» sobre la tarjeta. */
+.ticket-detail-head {
+  margin-bottom: 0.75rem;
+}
+
+/* ─── Cabecera del panel (buscador + filtros) ─────────────
+   Banda superior del .table-panel con el mismo lenguaje que los paneles del
+   admin: buscador en píldora (lupa + desvanecido) y filtros como <Select>.
+   Portado verbatim desde apps/backoffice/src/catalog.css. */
+.table-panel > .users-toolbar,
+.table-panel > .sales-filters {
+  margin: 0;
+  /* Altura mínima homogénea: la cabecera mide lo mismo tenga los controles que
+     tenga. La fija la píldora/buscador (2.5rem) + el padding. */
+  min-height: calc(2.5rem + 1.7rem + 1px);
   padding: 0.85rem 1rem;
-  font-size: var(--ui-text-base);
-  color: var(--ui-text);
+  background: var(--ui-surface-subtle);
   border-bottom: 1px solid var(--ui-border);
-  vertical-align: middle;
 }
 
-.transfer-table tbody tr:last-child td {
-  border-bottom: none;
+.users-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.users-toolbar .sales-filters {
+  margin-bottom: 0;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
-.transfer-table td.action {
-  text-align: right;
+.sales-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.sales-filters input.catalog-search {
+  width: auto;
+  min-width: 11rem;
 }
 
-.transfer-badge {
+.catalog-search {
+  height: 2.5rem;
+  width: 18rem;
+  max-width: 50vw;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 9999px;
+  padding: 0 1.1rem;
+  font-size: 0.9rem;
+  letter-spacing: -0.012em;
+  background: var(--ui-surface);
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+.catalog-search::placeholder {
+  color: var(--ui-text-soft);
+}
+.catalog-search:focus {
+  outline: none;
+  border-color: var(--ap-blue-focus);
+  box-shadow: var(--ui-focus);
+}
+
+/* Buscador con lupa a la izquierda (máscara SVG tintada con el token de tema) y
+   desvanecido a la derecha (el velo usa --ui-surface: solo aparece si el texto
+   no cabe, nunca corta de golpe). */
+.search-field {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  height: 24px;
-  padding: 0 0.6rem;
-  border-radius: var(--ui-radius-pill);
-  font-size: var(--ui-text-sm);
-  font-weight: 600;
+}
+.search-field::before {
+  content: '';
+  position: absolute;
+  left: 0.95rem;
+  top: 50%;
+  width: 1.05rem;
+  height: 1.05rem;
+  transform: translateY(-50%);
+  background-color: var(--ui-text-soft);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  pointer-events: none;
+}
+.search-field .catalog-search {
+  padding-left: 2.6rem;
+}
+.search-field::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: 2.25rem;
+  border-radius: 0 9999px 9999px 0;
+  background: linear-gradient(to right, transparent, var(--ui-surface) 70%);
+  pointer-events: none;
 }
 
-.transfer-badge.pending {
-  background: var(--ui-surface-subtle);
-  color: var(--ui-text-muted);
-  border: 1px solid var(--ui-border);
-}
-
-.transfer-badge.received {
-  background: var(--ui-success-soft);
-  color: var(--ui-success);
-}
-
-.transfer-receive-link {
+/* Filtro como <Select> propio: el chrome lo aporta .ui-select-trigger; el
+   wrapper (.ui-select) solo conserva el ancho. */
+.ui-select.catalog-search {
+  width: fit-content;
+  max-width: 50vw;
+  height: auto;
+  padding: 0;
   border: none;
   background: none;
-  color: var(--ui-text);
-  font-size: var(--ui-text-base);
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0.3rem 0.4rem;
-  border-radius: var(--ui-radius-sm);
-}
-
-.transfer-receive-link:hover {
-  background: var(--ui-surface-subtle);
-}
-
-.transfer-empty {
-  padding: 2.5rem 1.5rem;
-  text-align: center;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  background: var(--ui-surface);
+  border-radius: 0;
 }
 
 .tickets-view,
@@ -2039,7 +2539,9 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  max-width: 62rem;
+  /* Mismo ancho que la tabla de Pedidos (`.transfer-view`): así Tickets, Inventario
+     y Fichaje ocupan lo mismo de ancho que el resto de tablas estilo admin. */
+  max-width: 75rem;
 }
 
 .tickets-head {
@@ -2230,15 +2732,29 @@
   padding: 0 1rem;
 }
 
-/* Fila de acción del inventario: el motivo es un campo real que ocupa el ancho
-   disponible y el botón de confirmar se sitúa justo al lado (no en el extremo). */
+/* Fila de acción del inventario: el motivo es un campo etiquetado que ocupa el
+   ancho disponible y el botón de confirmar se sitúa justo al lado (no en el
+   extremo), alineado con el input (align-items: flex-end, no con la etiqueta). */
 .inventory-actions {
   justify-content: flex-start;
+  align-items: flex-end;
+}
+
+.inventory-reason {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.inventory-reason > span {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
+  font-weight: 600;
 }
 
 .inventory-actions input {
-  flex: 1;
-  width: auto;
+  width: 100%;
   height: 36px;
   padding: 0 0.8rem;
   border: 1px solid var(--ui-border-strong);
@@ -2252,6 +2768,31 @@
 .inventory-actions input:focus {
   border-color: var(--ui-brand);
   box-shadow: var(--ui-focus);
+}
+
+/* CTA de confirmar inventario: <button> nativo (el <Button> compartido renderiza
+   "fantasma" en el TPV — ver memoria tpv-button-ghost-tailwind). Clon de
+   .cash-btn-open; la cápsula y el hundido al pulsar los aportan las allowlists
+   de styles.css y la lista :active de este archivo. */
+.inventory-confirm {
+  min-height: 38px;
+  padding: 0 1.1rem;
+  border: none;
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg);
+  font-size: var(--ui-text-base);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.inventory-confirm:hover:not(:disabled) {
+  background: var(--ui-primary-hover, #000);
+}
+
+.inventory-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Icono decorativo a la derecha de las cabeceras de sección: acento sutil,
@@ -2301,6 +2842,14 @@
 
 .cash-movement-form {
   align-items: stretch;
+  gap: 0.6rem;
+}
+
+/* Iguala las alturas de Select + importes + botón a la rejilla del sistema (40px),
+   con más aire y targets táctiles. No afecta a ticket-return / inventory. */
+.cash-movement-form input,
+.cash-movement-form .ui-select-trigger {
+  height: 40px;
 }
 
 .cash-movement-form input {
@@ -2308,12 +2857,13 @@
 }
 
 .cash-movement-list {
-  margin: 0.75rem 0 0;
+  margin: 0.85rem 0 0;
   padding: 0;
   list-style: none;
 }
 
 .cash-movement-list li {
-  padding: 0.5rem 0;
+  padding: 0.65rem 0.1rem;
   border-top: 1px solid var(--ui-border);
+  font-size: var(--ui-text-base);
 }

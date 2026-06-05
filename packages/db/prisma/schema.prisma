@@ -596,6 +596,8 @@ enum CashMovementType {
 enum TimeClockType {
   CLOCK_IN
   CLOCK_OUT
+  BREAK_START
+  BREAK_END
 }
 
 enum MovementType {

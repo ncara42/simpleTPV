@@ -22,6 +22,11 @@ export const CASH_DENOMINATIONS: ReadonlyArray<{ cents: number; label: string }>
   { cents: 1, label: '1 ct' },
 ];
 
+// Partición para el arqueo: billetes (≥ 5 €) y monedas (< 5 €). Conserva el orden
+// de mayor a menor de CASH_DENOMINATIONS; se usa para agrupar el conteo en dos columnas.
+const CASH_NOTES = CASH_DENOMINATIONS.filter((d) => d.cents >= 500);
+const CASH_COINS = CASH_DENOMINATIONS.filter((d) => d.cents < 500);
+
 export type CashCounts = Record<string, number>;
 
 // Total contado (en euros) a partir del número de piezas por denominación.
@@ -87,46 +92,71 @@ export function CashCount({
         ? 'cash-diff-negative'
         : 'cash-diff-zero';
 
+  // Una fila de denominación: etiqueta, stepper −/+ y subtotal que solo aparece al
+  // contar (> 0) para no saturar de "0,00 €". La clase is-active "enciende" la fila.
+  const renderDenom = (d: { cents: number; label: string }) => {
+    const n = counts[d.cents] ?? 0;
+    return (
+      <div
+        className={`cash-count-row${n > 0 ? ' is-active' : ''}`}
+        key={d.cents}
+        data-testid="cash-count-row"
+      >
+        <span className="cash-count-denom">{d.label}</span>
+        <div className="cash-count-stepper">
+          <button type="button" aria-label={`Quitar ${d.label}`} onClick={() => bump(d.cents, -1)}>
+            −
+          </button>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            inputMode="numeric"
+            value={n === 0 ? '' : n}
+            onChange={(e) => setCount(d.cents, Number(e.target.value))}
+            data-testid={`cash-count-${d.cents}`}
+            aria-label={`Cantidad de ${d.label}`}
+          />
+          <button type="button" aria-label={`Añadir ${d.label}`} onClick={() => bump(d.cents, 1)}>
+            +
+          </button>
+        </div>
+        <span className="cash-count-sub tabular-nums">
+          {n > 0 ? `${eur((n * d.cents) / 100)} €` : ''}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div className="cash-count" data-testid="cash-count">
-      <div className="cash-count-grid">
-        {CASH_DENOMINATIONS.map((d) => {
-          const n = counts[d.cents] ?? 0;
-          return (
-            <div className="cash-count-row" key={d.cents} data-testid="cash-count-row">
-              <span className="cash-count-denom">{d.label}</span>
-              <div className="cash-count-controls">
-                <button
-                  type="button"
-                  aria-label={`Quitar ${d.label}`}
-                  onClick={() => bump(d.cents, -1)}
-                >
-                  −
-                </button>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  inputMode="numeric"
-                  value={n === 0 ? '' : n}
-                  onChange={(e) => setCount(d.cents, Number(e.target.value))}
-                  data-testid={`cash-count-${d.cents}`}
-                  aria-label={`Cantidad de ${d.label}`}
-                />
-                <button
-                  type="button"
-                  aria-label={`Añadir ${d.label}`}
-                  onClick={() => bump(d.cents, 1)}
-                >
-                  +
-                </button>
-              </div>
-              <span className="cash-count-sub tabular-nums">{eur((n * d.cents) / 100)} €</span>
-            </div>
-          );
-        })}
+      <div className="cash-count-groups">
+        <section className="cash-count-group">
+          <div className="cash-count-rows">{CASH_NOTES.map(renderDenom)}</div>
+        </section>
+        <section className="cash-count-group">
+          <div className="cash-count-rows">{CASH_COINS.map(renderDenom)}</div>
+        </section>
       </div>
       <div className="cash-count-foot">
+        <div className="cash-count-summary">
+          <div className="cash-count-metric">
+            <span className="cash-count-metric-label">Total contado</span>
+            <span className="cash-count-metric-value tabular-nums" data-testid="cash-count-total">
+              {eur(total)} €
+            </span>
+          </div>
+          <div className="cash-count-metric">
+            <span className="cash-count-metric-label">Diferencia vs teórico</span>
+            <span
+              className={`cash-count-metric-value tabular-nums ${diffClass}`}
+              data-testid="cash-count-diff"
+            >
+              {difference > 0 ? '+' : ''}
+              {eur(difference)} €
+            </span>
+          </div>
+        </div>
         <button
           type="button"
           className="cash-count-reset"
@@ -135,21 +165,6 @@ export function CashCount({
         >
           Reiniciar conteo
         </button>
-        <div className="cash-count-totals">
-          <div className="cash-count-total-row">
-            <span>Total contado</span>
-            <span className="tabular-nums" data-testid="cash-count-total">
-              {eur(total)} €
-            </span>
-          </div>
-          <div className={`cash-count-total-row cash-diff ${diffClass}`}>
-            <span>Diferencia vs teórico</span>
-            <span className="tabular-nums" data-testid="cash-count-diff">
-              {difference > 0 ? '+' : ''}
-              {eur(difference)} €
-            </span>
-          </div>
-        </div>
       </div>
     </div>
   );

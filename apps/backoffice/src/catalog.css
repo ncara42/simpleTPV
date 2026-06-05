@@ -786,6 +786,29 @@
   display: inline-flex;
   align-items: center;
 }
+/* Lupa a la izquierda, dentro de la píldora: misma lupa que los buscadores del
+   panel TPV (icono search de lucide). Se pinta como máscara para que se tinte con
+   el token de tema --ui-text-soft (el color del SVG es indiferente: la máscara usa
+   el canal alfa). Solo afecta a inputs envueltos en .search-field, nunca a los
+   <Select> de filtro ni a numéricos que reusan .catalog-search sin envoltorio. */
+.search-field::before {
+  content: '';
+  position: absolute;
+  left: 0.95rem;
+  top: 50%;
+  width: 1.05rem;
+  height: 1.05rem;
+  transform: translateY(-50%);
+  background-color: var(--ui-text-soft);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  pointer-events: none;
+}
+.search-field .catalog-search {
+  padding-left: 2.6rem;
+}
 .search-field::after {
   content: '';
   position: absolute;

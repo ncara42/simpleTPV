@@ -1,5 +1,5 @@
 import { TimeClockType } from '@simpletpv/db';
-import { IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { IsDateString, IsEnum, IsOptional, IsUUID } from 'class-validator';
 
 export class CreateTimeClockEntryDto {
   @IsUUID()
@@ -11,4 +11,36 @@ export class CreateTimeClockEntryDto {
 
   @IsEnum(TimeClockType)
   type!: TimeClockType;
+}
+
+export class TimeClockHistoryQueryDto {
+  @IsUUID()
+  storeId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
+
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @IsOptional()
+  @IsDateString()
+  to?: string;
+}
+
+// Histórico del propio empleado (TPV): NO acepta `userId` — el endpoint lo fuerza
+// al del token, así un CLERK nunca puede leer fichajes de otro usuario.
+export class TimeClockHistoryMeQueryDto {
+  @IsUUID()
+  storeId!: string;
+
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 }

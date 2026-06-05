@@ -714,3 +714,81 @@ export const DEMO_STOCKOUTS: Array<{
   { name: 'Flor Lemon Haze', store: 'Norte', qty: 3, level: 'yellow' },
   { name: 'Infusión relax', store: 'Sur', qty: 4, level: 'yellow' },
 ];
+
+// Control horario (fichajes): una fila por empleado y jornada con totales ya
+// calculados. workedMinutes descuenta las pausas (breakMinutes). Coherente con
+// DEMO_USERS y DEMO_STORES; alimenta TimeClockPage (tabla + filtros + totales).
+export interface DemoTimeClockRow {
+  id: string;
+  userId: string;
+  userName: string;
+  storeId: string;
+  storeName: string;
+  date: string; // YYYY-MM-DD
+  firstIn: string; // HH:MM
+  lastOut: string; // HH:MM
+  breakMinutes: number;
+  workedMinutes: number;
+}
+export const DEMO_TIME_CLOCK: DemoTimeClockRow[] = [
+  {
+    id: 'tc-1',
+    userId: 'u-luis',
+    userName: 'Luis Pérez',
+    storeId: 's-centro',
+    storeName: 'Centro',
+    date: '2026-06-03',
+    firstIn: '09:02',
+    lastOut: '17:10',
+    breakMinutes: 45,
+    workedMinutes: 443,
+  },
+  {
+    id: 'tc-2',
+    userId: 'u-marta',
+    userName: 'Marta Ruiz',
+    storeId: 's-norte',
+    storeName: 'Norte',
+    date: '2026-06-03',
+    firstIn: '08:30',
+    lastOut: '15:00',
+    breakMinutes: 30,
+    workedMinutes: 360,
+  },
+  {
+    id: 'tc-3',
+    userId: 'u-jon',
+    userName: 'Jon Aguirre',
+    storeId: 's-sur',
+    storeName: 'Sur',
+    date: '2026-06-03',
+    firstIn: '10:00',
+    lastOut: '18:05',
+    breakMinutes: 60,
+    workedMinutes: 425,
+  },
+  {
+    id: 'tc-4',
+    userId: 'u-luis',
+    userName: 'Luis Pérez',
+    storeId: 's-centro',
+    storeName: 'Centro',
+    date: '2026-06-02',
+    firstIn: '09:00',
+    lastOut: '17:00',
+    breakMinutes: 45,
+    workedMinutes: 435,
+  },
+  {
+    id: 'tc-5',
+    userId: 'u-marta',
+    userName: 'Marta Ruiz',
+    storeId: 's-norte',
+    storeName: 'Norte',
+    date: '2026-06-02',
+    firstIn: '08:45',
+    lastOut: '16:30',
+    breakMinutes: 30,
+    workedMinutes: 435,
+  },
+];

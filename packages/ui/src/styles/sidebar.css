@@ -280,6 +280,26 @@
   letter-spacing: -0.01em;
 }
 
+/* Contador del fichaje en vivo: píldora verde "turno activo" al extremo derecho
+   del item, empujada por margin-left:auto. Números tabulares para que no baile
+   el ancho al avanzar el reloj. */
+.sidebar-item-counter {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 0.1rem 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ─── Foco de teclado (a11y) ──────────────────────────────── */
 .sidebar-item:focus-visible,
 .sidebar-logout:focus-visible,

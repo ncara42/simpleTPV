@@ -11,6 +11,7 @@ import {
   BarChart2,
   Bell,
   CheckSquare,
+  Clock,
   LayoutDashboard,
   Package,
   Percent,
@@ -36,6 +37,7 @@ import { PurchasesPage } from './PurchasesPage.js';
 import { SalesHistoryPage } from './SalesHistoryPage.js';
 import { StockPage } from './StockPage.js';
 import { StoresPage } from './StoresPage.js';
+import { TimeClockPage } from './TimeClockPage.js';
 import { TransfersPage } from './TransfersPage.js';
 import { UsersPage } from './UsersPage.js';
 import { VerifactuPage } from './VerifactuPage.js';
@@ -49,6 +51,7 @@ type Tab =
   | 'transfers'
   | 'promotions'
   | 'users'
+  | 'timeclock'
   | 'stores'
   | 'sales'
   | 'purchases'
@@ -63,6 +66,7 @@ const ALL_NAV: NavItem[] = [
   { id: 'transfers', label: 'Traspasos', icon: <ArrowLeftRight size={18} /> },
   { id: 'promotions', label: 'Promociones', icon: <Percent size={18} /> },
   { id: 'users', label: 'Usuarios', icon: <Users size={18} /> },
+  { id: 'timeclock', label: 'Control horario', icon: <Clock size={18} /> },
   { id: 'stores', label: 'Tiendas', icon: <Store size={18} /> },
   { id: 'sales', label: 'Ventas', icon: <Receipt size={18} /> },
   { id: 'purchases', label: 'Compras', icon: <ShoppingCart size={18} /> },
@@ -154,6 +158,7 @@ function Home() {
             {tab === 'transfers' && <TransfersPage />}
             {tab === 'promotions' && <PromotionsPage />}
             {tab === 'users' && <UsersPage />}
+            {tab === 'timeclock' && <TimeClockPage />}
             {tab === 'stores' && <StoresPage />}
             {tab === 'sales' && <SalesHistoryPage />}
             {tab === 'purchases' && <PurchasesPage />}

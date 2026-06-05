@@ -205,6 +205,28 @@ test('Familias: reordenar familias raíz (#98)', async ({ page }) => {
   await expect(rows.first()).toContainText('Aceites');
 });
 
+test('Control horario muestra la tabla de fichajes con totales', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-timeclock').click();
+  await expect(page.getByTestId('timeclock-table')).toBeVisible();
+  // 5 jornadas demo (3 del 03/06 + 2 del 02/06).
+  await expect(page.getByTestId('timeclock-row')).toHaveCount(5);
+  await expect(page.getByTestId('timeclock-totals')).toContainText('5 jornadas');
+});
+
+test('Control horario: filtro por empleado reduce las jornadas', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-timeclock').click();
+  // Luis Pérez tiene 2 jornadas (03/06 y 02/06).
+  await selectOption(page, 'timeclock-employee', 'u-luis');
+  const rows = page.getByTestId('timeclock-row');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toContainText('Luis Pérez');
+  // Limpiar vuelve a mostrar todas.
+  await page.getByTestId('timeclock-clear').click();
+  await expect(page.getByTestId('timeclock-row')).toHaveCount(5);
+});
+
 test('Promociones: lista por estado y constructor de reglas (#99)', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-promotions').click();

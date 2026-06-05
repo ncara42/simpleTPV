@@ -51,9 +51,19 @@
 }
 
 .ui-select-value {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Contador opcional del disparador (junto al chevron). */
+.ui-select-trigger-count {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ui-text-soft);
+  font-variant-numeric: tabular-nums;
 }
 
 .ui-select-value.is-placeholder {
@@ -142,9 +152,23 @@
 }
 
 .ui-select-option-label {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Contador opcional de la opción (alineado a la derecha, antes del check). */
+.ui-select-option-count {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ui-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-select-option.is-selected .ui-select-option-count {
+  color: var(--ui-brand-ink, var(--ui-primary));
 }
 
 .ui-select-check {

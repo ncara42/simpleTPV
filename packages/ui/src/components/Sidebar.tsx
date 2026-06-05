@@ -19,6 +19,8 @@ export interface NavItem {
   group?: string;
   /** Contador opcional (p. ej. notificaciones sin leer) pintado a la derecha del item. */
   badge?: number;
+  /** Texto opcional (p. ej. temporizador del fichaje en vivo) como píldora a la derecha. */
+  counter?: string;
 }
 
 export interface NavGroup {
@@ -155,6 +157,11 @@ export function Sidebar({
                 {item.icon}
               </span>
               <span className="sidebar-item-label">{item.label}</span>
+              {item.counter && (
+                <span className="sidebar-item-counter" data-testid={`nav-${item.id}-counter`}>
+                  {item.counter}
+                </span>
+              )}
               {item.badge != null && item.badge > 0 && (
                 <span className="sidebar-item-badge" data-testid={`nav-${item.id}-badge`}>
                   {item.badge}

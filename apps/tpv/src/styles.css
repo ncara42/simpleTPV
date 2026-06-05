@@ -13,6 +13,101 @@
   --radius-xl: var(--ui-radius-xl);
 }
 
+/* ════════════════════════════════════════════════════════════════════
+   FUNDACIÓN APPLE — TPV (duplicada del backoffice para coherencia)
+   Mismo lenguaje visual que el panel de administración: acento único
+   Action Blue, lienzo parchment, tinta #1d1d1f, hairlines, gramática de
+   radios 8/12/18/pill, cero sombras de chrome, SF Pro.
+   Re-mapeamos los tokens --ui-* / --tpv-* para que TODA la app herede la
+   paleta sin tocar regla por regla (sale.css ya está construido sobre ellos).
+   ════════════════════════════════════════════════════════════════════ */
+:root {
+  /* ─── Acento único: Action Blue ─────────────────────────── */
+  --ap-blue: #0066cc;
+  --ap-blue-focus: #0071e3;
+  --ap-blue-soft: rgba(0, 102, 204, 0.08);
+  --ap-blue-soft-2: rgba(0, 102, 204, 0.14);
+
+  /* ─── Superficies ───────────────────────────────────────── */
+  --ap-canvas: #f5f5f7; /* parchment — lienzo de la app */
+  --ap-surface: #ffffff; /* cards, paneles */
+  --ap-pearl: #fafafc; /* superficie sutil */
+  --ap-ink: #1d1d1f; /* tinta — titulares y cuerpo */
+  --ap-gray-1: #6e6e73; /* texto secundario */
+  --ap-gray-2: #86868b; /* texto terciario */
+  --ap-hairline: #e3e3e6; /* hairline suave */
+  --ap-hairline-strong: #d2d2d7; /* hairline marcado */
+
+  /* ─── Remapeo de tokens del sistema compartido ──────────── */
+  --ui-bg: var(--ap-canvas);
+  --ui-surface: var(--ap-surface);
+  --ui-surface-subtle: var(--ap-canvas);
+  --ui-border: var(--ap-hairline);
+  --ui-border-strong: var(--ap-hairline-strong);
+
+  --ui-text: var(--ap-ink);
+  --ui-text-muted: var(--ap-gray-1);
+  --ui-text-soft: var(--ap-gray-2);
+
+  --ui-primary: var(--ap-blue);
+  --ui-primary-hover: var(--ap-blue-focus);
+  --ui-primary-fg: #ffffff;
+
+  /* La "marca" pasa a ser el azul Apple (barras, dots, activos). */
+  --ui-brand: var(--ap-blue);
+  --ui-brand-ink: var(--ap-blue);
+  --ui-brand-soft: var(--ap-blue-soft);
+  --ui-brand-soft-2: var(--ap-blue-soft-2);
+
+  /* ─── Semántica (tonos Apple sobre claro) ───────────────── */
+  --ui-danger: #d70015;
+  --ui-danger-soft: #ffe5e7;
+  --ui-warning: #b25000;
+  --ui-warning-soft: #fff1e3;
+  --ui-success: #1d7d4f;
+  --ui-success-soft: #e3f4ea;
+
+  /* ─── Forma / foco / elevación ──────────────────────────── */
+  --ui-radius: 12px;
+  --ui-radius-sm: 8px;
+  --ui-radius-lg: 18px;
+  --ui-focus: 0 0 0 4px rgba(0, 113, 227, 0.32);
+  /* Apple no usa sombras en chrome: la elevación es el hairline. */
+  --ui-shadow-sm: none;
+  --ui-shadow-panel: none;
+
+  /* ─── Fallbacks --tpv-* usados inline en varias páginas ─── */
+  --tpv-line: var(--ap-hairline);
+  --tpv-teal-500: var(--ap-blue-focus);
+  --tpv-teal-700: var(--ap-blue);
+
+  /* ─── Sidebar ───────────────────────────────────────────── */
+  --sidebar-bg: var(--ap-surface);
+  /* Selección silenciosa estilo ChatGPT: relleno neutro, tinta ink. */
+  --sidebar-item-active-bg: rgba(0, 0, 0, 0.065);
+  --sidebar-item-hover-bg: rgba(0, 0, 0, 0.038);
+  --sidebar-text: var(--ap-gray-1);
+  --sidebar-text-active: var(--ap-ink);
+  /* gray-1 (no gray-2) para que las etiquetas de grupo a 11px cumplan AA. */
+  --sidebar-group-label-color: var(--ap-gray-1);
+  --content-bg: var(--ap-canvas);
+}
+
+/* SF Pro como voz del panel (Inter como sustituto open-source). */
+body {
+  font-family:
+    'SF Pro Text',
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Inter',
+    'Segoe UI',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ─── Shell ──────────────────────────────────────────────── */
 .app-shell {
   display: flex;
   min-height: 100vh;
@@ -29,7 +124,7 @@
 
 .app-main {
   flex: 1;
-  padding: 1.5rem 2rem;
+  padding: 2rem 2.5rem 3.5rem;
   min-width: 0;
 }
 
@@ -37,4 +132,149 @@
   .app-content {
     margin-left: 0;
   }
+  .app-main {
+    padding: 1.25rem 1.1rem 2.5rem;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   SIDEBAR — la estructura y la selección en cápsula viven en la base
+   compartida (@simpletpv/ui/sidebar.css), guiadas por --sidebar-*.
+   Aquí solo el realce de marca del logo.
+   ════════════════════════════════════════════════════════════ */
+.sidebar-logo {
+  box-shadow: 0 1px 2px rgba(0, 102, 204, 0.25);
+}
+
+/* ════════════════════════════════════════════════════════════
+   TOPBAR — Apple: hairline, pills sobrios, tracking tight
+   ════════════════════════════════════════════════════════════ */
+.topbar {
+  height: 64px;
+  padding: 0 2.5rem;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--ap-hairline);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.topbar-title {
+  font-size: 1.32rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ap-ink);
+}
+
+.topbar-right {
+  gap: 1rem;
+}
+
+.topbar-switch {
+  padding: 0.18rem;
+  border-radius: 9999px;
+  background: var(--ap-canvas);
+  border: 1px solid var(--ap-hairline);
+}
+
+.topbar-switch-btn {
+  height: 28px;
+  padding: 0 0.9rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ap-gray-1);
+}
+
+.topbar-switch-btn.active {
+  background: var(--ap-surface);
+  color: var(--ap-ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Perfil del usuario en el topbar (tema Apple) */
+.topbar-user {
+  padding-left: 1rem;
+  border-left: 1px solid var(--ap-hairline);
+}
+
+.topbar-avatar {
+  background: var(--ap-canvas);
+  color: var(--ap-gray-1);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.topbar-user-name {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ap-ink);
+}
+
+.topbar-user-sub {
+  color: var(--ap-gray-2);
+}
+
+/* ─── Forma pill de Apple en los controles del TPV ───────────────
+   A diferencia del backoffice (que pone TODOS los <button> en cápsula),
+   el TPV es un POS: la cuadrícula de producto (.prod-card es un <button>)
+   y los steppers +/- deben conservar su radio. Por eso la cápsula se
+   aplica de forma SELECTIVA a los desplegables y a los botones de acción.
+   ──────────────────────────────────────────────────────────────── */
+.app-shell .ui-select-trigger {
+  border-radius: 9999px;
+}
+
+.btn-primary,
+.cart-checkout,
+.cart-create,
+.cart-discount,
+.cart-void,
+.cart-print,
+.pay-confirm,
+.pay-cancel,
+.cash-action,
+.cash-btn-open,
+.cash-btn-close,
+.cash-btn-cancel,
+.cash-card-close,
+.scan-btn,
+.inventory-confirm,
+.return-toggle,
+.return-toggle-btn,
+.time-clock-in,
+.time-clock-out,
+.time-clock-break,
+.time-clock-pair,
+.tpv-tab,
+.link-btn {
+  border-radius: 9999px;
+}
+
+/* ─── Inputs y campos del TPV en píldora (igualar al panel admin) ─────────
+   Petición: que TODOS los inputs luzcan border-radius 9999 como el backoffice.
+   En los buscadores el borde vive en el wrapper (.sale-search-wrap, .tickets-search,
+   .return-view-search) → la cápsula va ahí; en el resto, en el propio input/select.
+   Se prefija con .app-shell para ganar especificidad sobre las reglas por-componente
+   de sale.css sin depender del orden de carga, y para tocar solo .tickets-search sin
+   afectar a sus hermanas contenedor (.inventory-results / .ticket-detail-card /
+   .inventory-table). Quedan fuera a propósito: la cuadrícula de producto, los
+   steppers +/- (cápsula propia) y los <textarea> (multilínea). */
+.app-shell .sale-search-wrap,
+.app-shell .tickets-search,
+.app-shell .return-view-search,
+.app-shell .disc-fields input,
+.app-shell .disc-fields select,
+.app-shell .pay-field input,
+.app-shell .cash-field input,
+.app-shell .blind-field input,
+.app-shell .ticket-return input,
+.app-shell .inventory-row input,
+.app-shell .inventory-actions input,
+.app-shell .cash-movement-form input,
+.app-shell .cash-movement-form select {
+  border-radius: 9999px;
 }
