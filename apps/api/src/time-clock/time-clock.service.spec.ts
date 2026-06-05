@@ -2,6 +2,7 @@ import { ConflictException, ForbiddenException, NotFoundException } from '@nestj
 import { describe, expect, it, vi } from 'vitest';
 
 import { tenantStorage } from '../prisma/tenant-context.js';
+import { endOfLocalDay, startOfLocalDay } from './time-clock.compute.js';
 import { TimeClockService } from './time-clock.service.js';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
@@ -12,11 +13,29 @@ function makePrisma() {
     officialDevice: {
       findFirst: vi.fn(async (_a?: unknown) => null as unknown),
     },
+    userStore: {
+      findFirst: vi.fn(async (_a?: unknown) => null as unknown),
+    },
     timeClockEntry: {
       findFirst: vi.fn(async (_a?: unknown) => null as unknown),
       findMany: vi.fn(async (_a?: unknown) => [] as unknown),
       create: vi.fn(async (_a?: unknown) => ({ id: 'tc-1' }) as unknown),
     },
+  };
+}
+
+// Fichaje tal como lo devuelve history (con user/store incluidos), a una hora del
+// 2026-06-05 en hora local para que localDayKey agrupe igual en cualquier zona.
+function histEntry(type: string, hhmm: string, opts: { userId?: string; userName?: string } = {}) {
+  const userId = opts.userId ?? 'user-1';
+  return {
+    id: `${type}-${hhmm}-${userId}`,
+    type,
+    createdAt: new Date(`2026-06-05T${hhmm}:00`),
+    userId,
+    storeId: STORE,
+    user: { name: opts.userName ?? 'Ana' },
+    store: { name: 'Centro' },
   };
 }
 
@@ -186,5 +205,81 @@ describe('TimeClockService', () => {
     expect(res.workedMs).toBe(30 * 60 * 1000); // 30 min trabajados antes de la pausa
     expect(res.runningSince).toBeNull(); // en pausa: no cuenta en vivo
     expect(res.entries).toHaveLength(2);
+  });
+
+  // --- Historial para backoffice: agrupación por jornada y totales ---
+
+  it('history agrupa por usuario+jornada y calcula horas trabajadas y de pausa', async () => {
+    const prisma = makePrisma();
+    prisma.timeClockEntry.findMany = vi.fn(async () => [
+      histEntry('CLOCK_IN', '08:00'),
+      histEntry('BREAK_START', '10:00'),
+      histEntry('BREAK_END', '10:30'),
+      histEntry('CLOCK_OUT', '14:00'),
+      histEntry('CLOCK_IN', '09:00', { userId: 'user-2', userName: 'Beto' }),
+      histEntry('CLOCK_OUT', '13:00', { userId: 'user-2', userName: 'Beto' }),
+    ]);
+    const service = makeService(prisma);
+
+    const rows = (await tenantStorage.run({ organizationId: ORG }, () =>
+      service.history({ storeId: STORE }, 'ADMIN', 'admin-1'),
+    )) as Array<{
+      userId: string;
+      userName: string;
+      date: string;
+      firstIn: string | null;
+      lastOut: string | null;
+      workedMs: number;
+      breakMs: number;
+    }>;
+
+    expect(rows).toHaveLength(2);
+
+    const ana = rows.find((r) => r.userId === 'user-1')!;
+    expect(ana.userName).toBe('Ana');
+    expect(ana.date).toBe('2026-06-05');
+    expect(ana.workedMs).toBe(5.5 * 60 * 60 * 1000); // 2h antes de la pausa + 3.5h después
+    expect(ana.breakMs).toBe(30 * 60 * 1000);
+    expect(ana.firstIn).toBe(new Date('2026-06-05T08:00:00').toISOString());
+    expect(ana.lastOut).toBe(new Date('2026-06-05T14:00:00').toISOString());
+
+    const beto = rows.find((r) => r.userId === 'user-2')!;
+    expect(beto.workedMs).toBe(4 * 60 * 60 * 1000);
+    expect(beto.breakMs).toBe(0);
+  });
+
+  it('history filtra por userId y aplica el rango de fechas explícito', async () => {
+    const prisma = makePrisma();
+    prisma.timeClockEntry.findMany = vi.fn(async () => []);
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.history(
+        { storeId: STORE, userId: 'user-1', from: '2026-06-01', to: '2026-06-03' },
+        'ADMIN',
+        'admin-1',
+      ),
+    );
+
+    const arg = prisma.timeClockEntry.findMany.mock.calls[0]![0] as {
+      where: { userId?: string; createdAt: { gte: Date; lte: Date } };
+    };
+    expect(arg.where.userId).toBe('user-1');
+    expect(arg.where.createdAt.gte.getTime()).toBe(
+      startOfLocalDay(new Date('2026-06-01')).getTime(),
+    );
+    expect(arg.where.createdAt.lte.getTime()).toBe(endOfLocalDay(new Date('2026-06-03')).getTime());
+  });
+
+  it('history lanza 403 para un CLERK sin acceso a la tienda', async () => {
+    const prisma = makePrisma();
+    prisma.userStore.findFirst = vi.fn(async () => null);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () =>
+        service.history({ storeId: STORE }, 'CLERK', 'clerk-1'),
+      ),
+    ).rejects.toThrow(ForbiddenException);
   });
 });
