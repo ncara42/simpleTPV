@@ -32,6 +32,18 @@ function lineFields(item: CartItem | undefined): { kind: Kind; value: string } {
   return { kind: 'pct', value: '' };
 }
 
+// Toggle tipo píldora, calcado del methodClass del modal de cobrar (PaymentModal).
+const segClass = (active: boolean) =>
+  [
+    'h-12 rounded-full border text-sm font-semibold transition-colors active:translate-y-[0.5px]',
+    active
+      ? 'border-[var(--ui-brand)] bg-[var(--ui-brand-soft)] text-[var(--ui-brand-ink)]'
+      : 'border-[var(--ui-border)] bg-[var(--ui-surface)] text-[var(--ui-text-muted)] hover:bg-[var(--ui-surface-subtle)]',
+  ].join(' ');
+
+const numberInputClass =
+  'h-12 w-full rounded-full border border-[var(--ui-border)] bg-[var(--ui-surface)] px-4 text-lg tabular-nums text-[var(--ui-text)] outline-none transition-[border-color,box-shadow] placeholder:text-[var(--ui-text-muted)] focus:border-[var(--ui-brand)] focus:shadow-[var(--ui-focus)] [appearance:textfield] [&::-webkit-outer-spin-button]:[appearance:none] [&::-webkit-inner-spin-button]:[appearance:none]';
+
 export function DiscountModal({
   items,
   ticketDiscountPct,
@@ -89,12 +101,7 @@ export function DiscountModal({
             type="button"
             onClick={() => set(k)}
             data-testid={`${testidPrefix}-${k}`}
-            className={[
-              'h-9 rounded-lg border text-sm font-medium transition-colors',
-              kind === k
-                ? 'border-neutral-900 bg-neutral-900 text-white'
-                : 'border-[var(--ui-border)] bg-white text-neutral-600 hover:bg-neutral-50',
-            ].join(' ')}
+            className={segClass(kind === k)}
           >
             {k === 'pct' ? 'Porcentaje %' : 'Importe €'}
           </button>
@@ -112,11 +119,11 @@ export function DiscountModal({
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-sm rounded-xl border border-[var(--ui-border)] bg-white shadow-2xl"
+        className="w-full max-w-sm overflow-hidden rounded-[var(--ui-radius-xl)] border border-[var(--ui-border)] bg-[var(--ui-surface)] shadow-[0_6px_22px_-10px_rgba(0,0,0,0.18)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-[var(--ui-border)] px-5 py-4">
-          <h2 className="text-base font-semibold text-neutral-900">Descuento</h2>
+          <h2 className="text-base font-semibold text-[var(--ui-text)]">Descuento</h2>
         </div>
 
         <div className="space-y-4 p-5">
@@ -128,12 +135,7 @@ export function DiscountModal({
                 type="button"
                 onClick={() => setMode(m)}
                 data-testid={m === 'line' ? 'disc-line' : 'disc-ticket'}
-                className={[
-                  'h-9 rounded-lg border text-sm font-medium transition-colors',
-                  mode === m
-                    ? 'border-neutral-900 bg-neutral-900 text-white'
-                    : 'border-[var(--ui-border)] bg-white text-neutral-600 hover:bg-neutral-50',
-                ].join(' ')}
+                className={segClass(mode === m)}
               >
                 {m === 'line' ? 'Por línea' : 'Por ticket'}
               </button>
@@ -142,80 +144,71 @@ export function DiscountModal({
 
           {mode === 'line' ? (
             <div className="space-y-3">
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-neutral-500">Línea</span>
-                <Select
-                  value={productId}
-                  onChange={setProductId}
-                  options={items.map((i) => ({
-                    value: i.productId,
-                    label: i.name,
-                  }))}
-                  ariaLabel="Línea"
-                  data-testid="disc-item"
-                  className="w-full"
-                />
-              </label>
+              <Select
+                value={productId}
+                onChange={setProductId}
+                options={items.map((i) => ({
+                  value: i.productId,
+                  label: i.name,
+                }))}
+                ariaLabel="Línea"
+                data-testid="disc-item"
+                className="w-full"
+              />
               {kindToggle(lineKind, setLineKind, 'disc-line')}
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-neutral-500">
-                  {lineKind === 'pct' ? 'Descuento (%)' : 'Descuento (€)'}
-                </span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  max={lineKind === 'pct' ? 100 : undefined}
-                  step={lineKind === 'pct' ? '1' : '0.01'}
-                  value={lineValue}
-                  onChange={(e) => setLineValue(e.target.value)}
-                  data-testid="disc-line-value"
-                  autoFocus
-                  className="h-9 w-full rounded-lg border border-[var(--ui-border)] bg-white px-3 text-sm outline-none focus:border-neutral-400"
-                />
-              </label>
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={lineKind === 'pct' ? 100 : undefined}
+                step={lineKind === 'pct' ? '1' : '0.01'}
+                value={lineValue}
+                onChange={(e) => setLineValue(e.target.value)}
+                data-testid="disc-line-value"
+                placeholder="Descuento"
+                aria-label="Descuento"
+                autoFocus
+                className={numberInputClass}
+              />
             </div>
           ) : (
             <div className="space-y-3">
               {kindToggle(ticketKind, setTicketKind, 'disc-ticket')}
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-neutral-500">
-                  {ticketKind === 'pct' ? 'Descuento (%)' : 'Descuento (€)'}
-                </span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  max={ticketKind === 'pct' ? 100 : undefined}
-                  step={ticketKind === 'pct' ? '1' : '0.01'}
-                  value={ticketValue}
-                  onChange={(e) => setTicketValue(e.target.value)}
-                  data-testid="disc-ticket-value"
-                  autoFocus
-                  className="h-9 w-full rounded-lg border border-[var(--ui-border)] bg-white px-3 text-sm outline-none focus:border-neutral-400"
-                />
-              </label>
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={ticketKind === 'pct' ? 100 : undefined}
+                step={ticketKind === 'pct' ? '1' : '0.01'}
+                value={ticketValue}
+                onChange={(e) => setTicketValue(e.target.value)}
+                data-testid="disc-ticket-value"
+                placeholder="Descuento"
+                aria-label="Descuento"
+                autoFocus
+                className={numberInputClass}
+              />
             </div>
           )}
+        </div>
 
-          <div className="flex gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onCancel}
-              data-testid="disc-cancel"
-              className="h-10 flex-1 rounded-lg border border-[var(--ui-border)] bg-white text-sm font-medium text-neutral-600 hover:bg-neutral-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleApply}
-              data-testid="disc-apply"
-              className="h-10 flex-1 rounded-lg border border-neutral-900 bg-neutral-900 text-sm font-semibold text-white hover:bg-neutral-800"
-            >
-              Aplicar
-            </button>
-          </div>
+        <div className="flex gap-2 border-t border-[var(--ui-border)] p-5">
+          <button
+            type="button"
+            onClick={onCancel}
+            data-testid="disc-cancel"
+            className="h-12 flex-1 rounded-full border border-[var(--ui-border)] bg-[var(--ui-surface)] text-sm font-medium text-[var(--ui-text-muted)] transition-colors hover:bg-[var(--ui-surface-subtle)] active:translate-y-[0.5px] disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleApply}
+            data-testid="disc-apply"
+            className="h-12 flex-1 rounded-full bg-[var(--ui-primary)] text-sm font-semibold text-[var(--ui-primary-fg)] transition-colors hover:bg-[var(--ui-primary-hover)] active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Aplicar
+          </button>
         </div>
       </div>
     </div>
