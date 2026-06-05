@@ -1,4 +1,5 @@
 import {
+  DEMO_DISCOUNT_BY_EMPLOYEE,
   DEMO_MARGIN_KPIS,
   DEMO_RANKINGS,
   DEMO_SALES_BY_FAMILY,
@@ -90,6 +91,14 @@ export interface SalesByHour {
   revenue: number;
 }
 
+// Descuento medio por vendedor (STAT-04): tasa de descuento de ticket por usuario.
+export interface DiscountByEmployee {
+  userId: string;
+  userName: string;
+  salesCount: number;
+  avgDiscountPct: number;
+}
+
 // Dashboard (IT-09): en demo devuelve los datos calcados al mockup; en real va
 // contra /dashboard/*. NOTA: el backend devuelve los KPIs y el intradía (STAT-01),
 // pero AÚN NO las series diarias de las sparklines de las cards (series/
@@ -117,6 +126,17 @@ export function getSalesByFamily(
 export function getSalesByHour(period: DashboardPeriod, storeId?: string): Promise<SalesByHour[]> {
   if (isDemo()) return Promise.resolve(DEMO_SALES_BY_HOUR);
   return api.get<SalesByHour[]>('/dashboard/sales-by-hour', periodQuery(period, storeId));
+}
+
+export function getDiscountByEmployee(
+  period: DashboardPeriod,
+  storeId?: string,
+): Promise<DiscountByEmployee[]> {
+  if (isDemo()) return Promise.resolve(DEMO_DISCOUNT_BY_EMPLOYEE);
+  return api.get<DiscountByEmployee[]>(
+    '/dashboard/discount-by-employee',
+    periodQuery(period, storeId),
+  );
 }
 
 export function getSalesKpis(period: DashboardPeriod, storeId?: string): Promise<SalesKpis> {

@@ -30,6 +30,11 @@ export class DashboardController {
     return this.dashboard.salesByHour(query);
   }
 
+  @Get('discount-by-employee')
+  discountByEmployee(@Query() query: DashboardPeriodQueryDto) {
+    return this.dashboard.discountByEmployee(query);
+  }
+
   @Get('sales-kpis')
   salesKpis(@Query() query: DashboardPeriodQueryDto) {
     return this.dashboard.salesKpis(query);

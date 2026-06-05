@@ -8,6 +8,7 @@ import { DEMO_STOCKOUT_KPIS, DEMO_STOCKOUTS } from './demo/demoData.js';
 import { listStores } from './lib/admin.js';
 import {
   type DashboardPeriod,
+  getDiscountByEmployee,
   getMarginKpis,
   getProductRankings,
   getSalesByFamily,
@@ -70,6 +71,11 @@ export function DashboardPage() {
   const byHour = useQuery({
     queryKey: ['dash-hour', period, store],
     queryFn: () => getSalesByHour(period, store),
+    placeholderData: keepPreviousData,
+  });
+  const discountByEmp = useQuery({
+    queryKey: ['dash-discount-emp', period, store],
+    queryFn: () => getDiscountByEmployee(period, store),
     placeholderData: keepPreviousData,
   });
   const rankings = useQuery({
@@ -272,7 +278,7 @@ export function DashboardPage() {
         </div>
 
         {/* Ventas por hora (STAT-02): barras con el Chart reutilizable (IT-02) */}
-        <div className="dash-panel" data-testid="dash-hour">
+        <div className="dash-panel span-7" data-testid="dash-hour">
           <h3>Ventas por hora</h3>
           <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]} · importe por franja</p>
           <Chart
@@ -281,6 +287,33 @@ export function DashboardPage() {
             formatValue={fmtEurCompact}
             ariaLabel="Ventas por hora"
           />
+        </div>
+
+        {/* Descuento medio por empleado (STAT-04) */}
+        <div className="dash-panel span-5" data-testid="dash-discount-emp">
+          <h3>Descuento por empleado</h3>
+          <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]} · tasa media de descuento</p>
+          {(() => {
+            const emps = discountByEmp.data ?? [];
+            const max = Math.max(0.0001, ...emps.map((e) => e.avgDiscountPct));
+            return (
+              <ul className="dash-family-list">
+                {emps.map((e, i) => (
+                  <li key={e.userId} style={{ '--i': i } as React.CSSProperties}>
+                    <span className="dash-family-name">{e.userName}</span>
+                    <span className="dash-family-track">
+                      <span
+                        className="dash-family-fill"
+                        style={{ width: `${(e.avgDiscountPct / max) * 100}%` }}
+                      >
+                        <span className="dash-family-pct">{fmtRate(e.avgDiscountPct)}</span>
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            );
+          })()}
         </div>
       </div>
     </section>

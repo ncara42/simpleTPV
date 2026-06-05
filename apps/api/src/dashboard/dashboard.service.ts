@@ -244,6 +244,59 @@ export class DashboardService {
     });
   }
 
+  // Descuento medio por vendedor (STAT-04): tasa de descuento de ticket por usuario
+  // sobre sus ventas COMPLETED del periodo. Misma fórmula que salesKpis.discountRate
+  // (descuento / precio de tarifa), pero agrupada por vendedor. Útil para detectar
+  // quién regala más margen. Ordena de mayor a menor descuento.
+  async discountByEmployee(
+    q: DashboardPeriodQueryDto,
+  ): Promise<
+    Array<{ userId: string; userName: string; salesCount: number; avgDiscountPct: number }>
+  > {
+    const { organizationId } = requireTenant();
+    const range = this.rangeFor(q);
+    const { storeId } = q;
+
+    return withTenantTx(this.base, organizationId, async (tx) => {
+      const rows = await tx.$queryRaw<
+        Array<{
+          userId: string;
+          userName: string;
+          count: bigint;
+          discount: string;
+          subtotal: string;
+        }>
+      >`
+        SELECT u.id::text AS "userId",
+               u.name AS "userName",
+               COUNT(sa.id) AS count,
+               COALESCE(SUM(sa."discountTotal"), 0) AS discount,
+               COALESCE(SUM(sa.subtotal), 0) AS subtotal
+        FROM "Sale" sa
+        JOIN "User" u ON u.id = sa."userId"
+        WHERE sa."organizationId" = ${organizationId}::uuid
+          AND sa.status = 'COMPLETED'
+          AND sa."createdAt" >= ${range.from}
+          AND sa."createdAt" < ${range.to}
+          ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+        GROUP BY u.id, u.name
+      `;
+      return rows
+        .map((r) => {
+          const discount = num(r.discount);
+          const subtotal = num(r.subtotal);
+          return {
+            userId: r.userId,
+            userName: r.userName,
+            salesCount: num(r.count),
+            // Descuento / precio de tarifa (subtotal neto de línea + descuento de ticket).
+            avgDiscountPct: subtotal + discount > 0 ? discount / (subtotal + discount) : 0,
+          };
+        })
+        .sort((a, b) => b.avgDiscountPct - a.avgDiscountPct);
+    });
+  }
+
   // KPIs de venta: ticket medio, UPT, tasa de descuento, tasa de devolución.
   async salesKpis(q: DashboardPeriodQueryDto): Promise<{
     salesCount: number;

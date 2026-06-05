@@ -10,6 +10,7 @@ import type {
 } from '@simpletpv/auth';
 
 import type {
+  DiscountByEmployee,
   FamilySales,
   MarginKpis,
   ProductRankings,
@@ -624,6 +625,13 @@ export const DEMO_SALES_BY_HOUR: SalesByHour[] = [
   { hour: 18, count: 11, revenue: 224 },
   { hour: 19, count: 8, revenue: 162 },
   { hour: 20, count: 3, revenue: 61 },
+];
+// Descuento medio por vendedor (STAT-04), ordenado de mayor a menor (quién regala más).
+export const DEMO_DISCOUNT_BY_EMPLOYEE: DiscountByEmployee[] = [
+  { userId: 'u-jon', userName: 'Jon Aguirre', salesCount: 22, avgDiscountPct: 0.094 },
+  { userId: 'u-luis', userName: 'Luis Pérez', salesCount: 31, avgDiscountPct: 0.071 },
+  { userId: 'u-ana', userName: 'Ana Caravaca', salesCount: 28, avgDiscountPct: 0.052 },
+  { userId: 'u-marta', userName: 'Marta Ruiz', salesCount: 19, avgDiscountPct: 0.038 },
 ];
 export const DEMO_STOCKOUT_KPIS: StockoutKpis = {
   events: 4,

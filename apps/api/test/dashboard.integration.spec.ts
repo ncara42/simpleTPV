@@ -270,6 +270,17 @@ describe('Dashboard — integración', () => {
     expect(rows.every((r) => [9, 11, 13].includes(r.hour))).toBe(true);
   });
 
+  it('discount-by-employee: descuento medio por vendedor (STAT-04)', async () => {
+    const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.discountByEmployee(periodQuery()),
+    );
+    // Todas las ventas del periodo las hizo el mismo vendedor (3 ventas).
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.salesCount).toBe(3);
+    // Σ descuento de ticket 5 / (Σ subtotal 350 + 5) ≈ 0.0141.
+    expect(rows[0]!.avgDiscountPct).toBeCloseTo(5 / 355, 4);
+  });
+
   it('sales-kpis: ticket medio, UPT, tasa de descuento y de devolución', async () => {
     const kpis = await tenantStorage.run({ organizationId: org1Id }, async () =>
       service.salesKpis(periodQuery()),
