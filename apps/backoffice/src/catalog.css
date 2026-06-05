@@ -1728,12 +1728,24 @@
 .sales-view-remove:hover {
   color: var(--ui-danger, #c0392b);
 }
-.sales-sentinel,
-.sales-end {
-  padding: 1rem;
-  text-align: center;
+/* Botón de export: empuja a la derecha del toolbar del DataTable (IT-06). */
+.sales-export {
+  margin-left: auto;
+}
+
+/* Pie de agregados del historial (count, total, margen y descuento medios). */
+.sales-totals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 1.25rem;
   font-size: 0.85rem;
   color: var(--ui-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.sales-totals strong {
+  color: var(--ui-text);
+  font-weight: 600;
 }
 
 .modal select {

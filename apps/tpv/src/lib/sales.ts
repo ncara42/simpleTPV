@@ -62,7 +62,7 @@ export function listSales(query: SalesQueryInput): Promise<SalesPage> {
       page: query.page ?? 1,
       pageSize: query.pageSize ?? 20,
       totalItems: 1,
-      totals: { count: 1, totalAmount: '73.80' },
+      totals: { count: 1, totalAmount: '73.80', avgDiscountPct: 0.05, avgMarginPct: 0.42 },
     });
   }
   return api.get<SalesPage>('/sales', {

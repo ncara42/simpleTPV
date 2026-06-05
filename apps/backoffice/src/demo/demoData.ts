@@ -1,7 +1,6 @@
 import type {
   FamilyNode,
   Product,
-  SalesPage,
   SaleSummary,
   StockAlert,
   StockGlobalRow,
@@ -504,79 +503,7 @@ export const DEMO_ALERTS: StockAlert[] = [
   },
 ];
 
-// ─── Ventas (5 tickets del mockup) ───────────────────────────
-// `storeName` y `lines` son campos demo extra; SalesHistoryPage los lee opcional.
-export interface DemoSale extends SaleSummary {
-  storeName: string;
-  lines: number;
-}
-const DEMO_SALE_ITEMS: DemoSale[] = [
-  {
-    id: 'v-1042',
-    ticketNumber: '#A-1042',
-    createdAt: '2026-06-02T12:41:00.000Z',
-    total: '53.90',
-    paymentMethod: 'CASH',
-    status: 'COMPLETED',
-    storeId: 's-centro',
-    storeName: 'Centro',
-    lines: 3,
-  },
-  {
-    id: 'v-1041',
-    ticketNumber: '#A-1041',
-    createdAt: '2026-06-02T12:30:00.000Z',
-    total: '24.90',
-    paymentMethod: 'CARD',
-    status: 'COMPLETED',
-    storeId: 's-centro',
-    storeName: 'Centro',
-    lines: 1,
-  },
-  {
-    id: 'v-1040',
-    ticketNumber: '#A-1040',
-    createdAt: '2026-06-02T12:18:00.000Z',
-    total: '88.40',
-    paymentMethod: 'CARD',
-    status: 'VOIDED',
-    storeId: 's-norte',
-    storeName: 'Norte',
-    lines: 5,
-  },
-  {
-    id: 'v-1039',
-    ticketNumber: '#A-1039',
-    createdAt: '2026-06-02T11:57:00.000Z',
-    total: '34.40',
-    paymentMethod: 'CASH',
-    status: 'COMPLETED',
-    storeId: 's-sur',
-    storeName: 'Sur',
-    lines: 2,
-  },
-  {
-    id: 'v-1038',
-    ticketNumber: '#A-1038',
-    createdAt: '2026-06-02T11:40:00.000Z',
-    total: '61.20',
-    paymentMethod: 'CARD',
-    status: 'COMPLETED',
-    storeId: 's-granvia',
-    storeName: 'Gran Vía',
-    lines: 4,
-  },
-];
-export const DEMO_SALES_PAGE: SalesPage = {
-  items: DEMO_SALE_ITEMS,
-  page: 1,
-  pageSize: 20,
-  totalItems: DEMO_SALE_ITEMS.length,
-  // totals agrega solo COMPLETED (las VOIDED no suman): 53.90+24.90+34.40+61.20 = 174.40 (4 tickets).
-  totals: { count: 4, totalAmount: '174.40' },
-};
-
-// ─── Ventas: dataset enriquecido para el historial con scroll infinito y filtros (#95) ───
+// ─── Ventas: dataset del historial paginado con DataTable y filtros (#95 / IT-06) ───
 // Cada venta lleva vendedor y familia (raíz) dominante para poder filtrar por ambos.
 export interface DemoSaleRow extends SaleSummary {
   storeName: string;

@@ -1,14 +1,16 @@
-import { Select } from '@simpletpv/ui';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Badge, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 
 import { DEMO_FAMILIES, DEMO_SALES, type DemoSaleRow, SALE_SELLERS } from './demo/demoData.js';
-import { fmtEur } from './lib/format.js';
+import { listSales, type SalesQueryInput } from './lib/admin.js';
+import { fmtEur, fmtRate } from './lib/format.js';
 import { usePageHeader } from './lib/pageHeader.js';
 
 const hour = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
 const PAYMENT_LABEL: Record<string, string> = { CASH: 'Efectivo', CARD: 'Tarjeta' };
 const STATUS_LABEL: Record<string, string> = { COMPLETED: 'Completadas', VOIDED: 'Anuladas' };
-const PAGE = 20; // tamaño de bloque del scroll infinito
+const PAGE_SIZE = 20;
 
 interface Filters {
   storeId: string;
@@ -32,10 +34,21 @@ function loadViews(): SavedView[] {
   }
 }
 
-// Tiendas/vendedores/familias presentes en las ventas, para poblar los selectores.
+// Tiendas con venta (para poblar el selector).
 const STORE_OPTIONS = Array.from(new Map(DEMO_SALES.map((s) => [s.storeId, s.storeName])));
 
-function exportCsv(items: DemoSaleRow[]) {
+// Mapea los filtros de la UI a la query de listSales (sellerId → userId, igual que
+// findSales): solo se incluyen los activos.
+function toQuery(filters: Filters): SalesQueryInput {
+  return {
+    ...(filters.storeId ? { storeId: filters.storeId } : {}),
+    ...(filters.sellerId ? { userId: filters.sellerId } : {}),
+    ...(filters.familyId ? { familyId: filters.familyId } : {}),
+    ...(filters.status ? { status: filters.status } : {}),
+  };
+}
+
+function downloadCsv(items: DemoSaleRow[]): void {
   const header = 'Nº ticket,Hora,Tienda,Vendedor,Familia,Importe (€),Método,Estado';
   const rows = items.map((s) =>
     [
@@ -49,8 +62,7 @@ function exportCsv(items: DemoSaleRow[]) {
       s.status === 'VOIDED' ? 'Anulada' : 'Completada',
     ].join(','),
   );
-  const csv = [header, ...rows].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -59,57 +71,54 @@ function exportCsv(items: DemoSaleRow[]) {
   URL.revokeObjectURL(url);
 }
 
+const columns: DataTableColumn<DemoSaleRow>[] = [
+  { key: 'ticketNumber', header: 'Ticket' },
+  { key: 'storeName', header: 'Tienda' },
+  { key: 'sellerName', header: 'Vendedor' },
+  { key: 'familyName', header: 'Familia' },
+  {
+    key: 'paymentMethod',
+    header: 'Pago',
+    render: (r) => PAYMENT_LABEL[r.paymentMethod] ?? r.paymentMethod,
+  },
+  {
+    key: 'status',
+    header: 'Estado',
+    render: (r) =>
+      r.status === 'VOIDED' ? (
+        <Badge variant="danger">Anulada</Badge>
+      ) : (
+        <Badge variant="success">Completada</Badge>
+      ),
+  },
+  { key: 'total', header: 'Total', align: 'right', render: (r) => fmtEur(Number(r.total)) },
+  { key: 'createdAt', header: 'Hora', render: (r) => hour.format(new Date(r.createdAt)) },
+];
+
 export function SalesHistoryPage() {
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
-  const [visible, setVisible] = useState(PAGE);
+  const [page, setPage] = useState(1);
   const [views, setViews] = useState<SavedView[]>(() => loadViews());
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  const setFilter = (patch: Partial<Filters>): void => setFilters((f) => ({ ...f, ...patch }));
+  // Al cambiar un filtro se vuelve a la primera página.
+  const setFilter = (patch: Partial<Filters>): void => {
+    setFilters((f) => ({ ...f, ...patch }));
+    setPage(1);
+  };
 
-  // Conjunto filtrado completo (sin paginar): por tienda, vendedor, familia y estado.
-  const filtered = useMemo(
-    () =>
-      DEMO_SALES.filter(
-        (s) =>
-          (!filters.storeId || s.storeId === filters.storeId) &&
-          (!filters.sellerId || s.sellerId === filters.sellerId) &&
-          (!filters.familyId || s.familyId === filters.familyId) &&
-          (!filters.status || s.status === filters.status),
-      ),
-    [filters],
+  const query = useQuery({
+    queryKey: ['sales-history', filters, page],
+    queryFn: () => listSales({ ...toQuery(filters), page, pageSize: PAGE_SIZE }),
+    placeholderData: keepPreviousData,
+  });
+  const data = query.data;
+  const totals = data?.totals;
+
+  usePageHeader('Ventas', 'Historial de tickets');
+
+  const hasFilters = Boolean(
+    filters.storeId || filters.sellerId || filters.familyId || filters.status,
   );
-  const filteredRef = useRef(filtered);
-  filteredRef.current = filtered;
-
-  // Reinicia el scroll al cambiar los filtros.
-  useEffect(() => setVisible(PAGE), [filters]);
-
-  const shown = filtered.slice(0, visible);
-  const hasMore = visible < filtered.length;
-
-  // Scroll infinito: cuando el centinela entra en viewport, carga otro bloque.
-  useEffect(() => {
-    if (!hasMore) return;
-    const el = sentinelRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver((entries) => {
-      if (entries[0]?.isIntersecting) {
-        setVisible((v) => Math.min(filteredRef.current.length, v + PAGE));
-      }
-    });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [hasMore]);
-
-  // Totales del conjunto filtrado (solo COMPLETED suman importe).
-  const totals = useMemo(() => {
-    const completed = filtered.filter((s) => s.status !== 'VOIDED');
-    return {
-      count: filtered.length,
-      amount: completed.reduce((acc, s) => acc + Number(s.total), 0),
-    };
-  }, [filtered]);
 
   const persistViews = (next: SavedView[]): void => {
     setViews(next);
@@ -120,7 +129,7 @@ export function SalesHistoryPage() {
     }
   };
   const saveView = (): void => {
-    if (!filters.storeId && !filters.sellerId && !filters.familyId && !filters.status) return;
+    if (!hasFilters) return;
     const name =
       [
         STORE_OPTIONS.find(([id]) => id === filters.storeId)?.[1],
@@ -134,180 +143,158 @@ export function SalesHistoryPage() {
     persistViews([...views, { name, ...filters }]);
   };
   const removeView = (name: string): void => persistViews(views.filter((v) => v.name !== name));
+  const applyView = (v: SavedView): void => {
+    setFilters({
+      storeId: v.storeId,
+      sellerId: v.sellerId,
+      familyId: v.familyId,
+      status: v.status,
+    });
+    setPage(1);
+  };
 
-  const hasFilters = Boolean(
-    filters.storeId || filters.sellerId || filters.familyId || filters.status,
-  );
+  // Exporta TODO el conjunto filtrado (no solo la página visible).
+  const exportCsv = async (): Promise<void> => {
+    const all = await listSales({ ...toQuery(filters), page: 1, pageSize: 100000 });
+    downloadCsv(all.items);
+  };
 
-  usePageHeader('Ventas', 'Historial de tickets · scroll infinito');
-
-  return (
-    <section className="catalog">
-      <div className="table-panel">
-        <div className="users-toolbar sales-toolbar">
-          <div className="sales-filters">
-            <Select
-              className="catalog-search"
-              value={filters.storeId}
-              onChange={(value) => setFilter({ storeId: value })}
-              ariaLabel="Filtrar por tienda"
-              data-testid="sales-store"
-              options={[
-                { value: '', label: 'Todas las tiendas' },
-                ...STORE_OPTIONS.map(([id, name]) => ({ value: id, label: name })),
-              ]}
-            />
-            <Select
-              className="catalog-search"
-              value={filters.sellerId}
-              onChange={(value) => setFilter({ sellerId: value })}
-              ariaLabel="Filtrar por vendedor"
-              data-testid="sales-seller"
-              options={[
-                { value: '', label: 'Todos los vendedores' },
-                ...SALE_SELLERS.map((s) => ({ value: s.id, label: s.name })),
-              ]}
-            />
-            <Select
-              className="catalog-search"
-              value={filters.familyId}
-              onChange={(value) => setFilter({ familyId: value })}
-              ariaLabel="Filtrar por familia"
-              data-testid="sales-family"
-              options={[
-                { value: '', label: 'Todas las familias' },
-                ...DEMO_FAMILIES.map((f) => ({ value: f.id, label: f.name })),
-              ]}
-            />
-            <Select
-              className="catalog-search"
-              value={filters.status}
-              onChange={(value) => setFilter({ status: value })}
-              ariaLabel="Filtrar por estado"
-              data-testid="sales-status"
-              options={[
-                { value: '', label: 'Todos los estados' },
-                { value: 'COMPLETED', label: 'Completadas' },
-                { value: 'VOIDED', label: 'Anuladas' },
-              ]}
-            />
-            {hasFilters && (
-              <>
-                <button
-                  type="button"
-                  className="users-sel-btn"
-                  onClick={() => setFilters(NO_FILTERS)}
-                  data-testid="sales-clear"
-                >
-                  Limpiar
-                </button>
-                <button
-                  type="button"
-                  className="users-sel-btn"
-                  onClick={saveView}
-                  data-testid="sales-save-view"
-                >
-                  Guardar vista
-                </button>
-              </>
-            )}
-          </div>
-          <button
-            className="btn-primary"
-            onClick={() => exportCsv(filtered)}
-            data-testid="sales-export-csv"
-          >
-            Exportar CSV
-          </button>
-        </div>
-
-        {views.length > 0 && (
-          <div className="sales-views" data-testid="sales-views">
-            {views.map((v) => (
-              <span key={v.name} className="sales-view-chip">
-                <button
-                  className="sales-view-apply"
-                  onClick={() =>
-                    setFilters({
-                      storeId: v.storeId,
-                      sellerId: v.sellerId,
-                      familyId: v.familyId,
-                      status: v.status ?? '',
-                    })
-                  }
-                  data-testid="sales-view-apply"
-                >
-                  {v.name}
-                </button>
-                <button
-                  className="sales-view-remove"
-                  onClick={() => removeView(v.name)}
-                  aria-label={`Eliminar vista ${v.name}`}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-
-        {filtered.length === 0 ? (
-          <p className="catalog-empty" data-testid="sales-empty">
-            Sin ventas para los filtros seleccionados.
-          </p>
-        ) : (
+  const toolbar = (
+    <>
+      <div className="sales-filters">
+        <Select
+          className="catalog-search"
+          value={filters.storeId}
+          onChange={(value) => setFilter({ storeId: value })}
+          ariaLabel="Filtrar por tienda"
+          data-testid="sales-store"
+          options={[
+            { value: '', label: 'Todas las tiendas' },
+            ...STORE_OPTIONS.map(([id, name]) => ({ value: id, label: name })),
+          ]}
+        />
+        <Select
+          className="catalog-search"
+          value={filters.sellerId}
+          onChange={(value) => setFilter({ sellerId: value })}
+          ariaLabel="Filtrar por vendedor"
+          data-testid="sales-seller"
+          options={[
+            { value: '', label: 'Todos los vendedores' },
+            ...SALE_SELLERS.map((s) => ({ value: s.id, label: s.name })),
+          ]}
+        />
+        <Select
+          className="catalog-search"
+          value={filters.familyId}
+          onChange={(value) => setFilter({ familyId: value })}
+          ariaLabel="Filtrar por familia"
+          data-testid="sales-family"
+          options={[
+            { value: '', label: 'Todas las familias' },
+            ...DEMO_FAMILIES.map((f) => ({ value: f.id, label: f.name })),
+          ]}
+        />
+        <Select
+          className="catalog-search"
+          value={filters.status}
+          onChange={(value) => setFilter({ status: value })}
+          ariaLabel="Filtrar por estado"
+          data-testid="sales-status"
+          options={[
+            { value: '', label: 'Todos los estados' },
+            { value: 'COMPLETED', label: 'Completadas' },
+            { value: 'VOIDED', label: 'Anuladas' },
+          ]}
+        />
+        {hasFilters && (
           <>
-            <table className="catalog-table" data-testid="sales-table">
-              <thead>
-                <tr>
-                  <th>Ticket</th>
-                  <th>Tienda</th>
-                  <th>Vendedor</th>
-                  <th>Familia</th>
-                  <th>Pago</th>
-                  <th>Total</th>
-                  <th>Hora</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((sale) => (
-                  <tr
-                    key={sale.id}
-                    className={sale.status === 'VOIDED' ? 'sale-voided' : undefined}
-                    data-testid="sales-row"
-                  >
-                    <td>{sale.ticketNumber}</td>
-                    <td className="muted">{sale.storeName}</td>
-                    <td className="muted">{sale.sellerName}</td>
-                    <td className="muted">{sale.familyName}</td>
-                    <td className="muted">
-                      {PAYMENT_LABEL[sale.paymentMethod] ?? sale.paymentMethod}
-                    </td>
-                    <td>{fmtEur(Number(sale.total))}</td>
-                    <td className="muted">{hour.format(new Date(sale.createdAt))}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr data-testid="sales-totals">
-                  <td colSpan={4}>{totals.count} tickets</td>
-                  <td colSpan={3}>Total (completadas): {fmtEur(totals.amount)}</td>
-                </tr>
-              </tfoot>
-            </table>
-
-            {hasMore ? (
-              <div ref={sentinelRef} className="sales-sentinel" data-testid="sales-sentinel">
-                Cargando más…
-              </div>
-            ) : (
-              <p className="sales-end muted" data-testid="sales-end">
-                Mostrando {shown.length} de {filtered.length} tickets
-              </p>
-            )}
+            <button
+              type="button"
+              className="users-sel-btn"
+              onClick={() => {
+                setFilters(NO_FILTERS);
+                setPage(1);
+              }}
+              data-testid="sales-clear"
+            >
+              Limpiar
+            </button>
+            <button
+              type="button"
+              className="users-sel-btn"
+              onClick={saveView}
+              data-testid="sales-save-view"
+            >
+              Guardar vista
+            </button>
           </>
         )}
       </div>
+      <button
+        className="btn-primary sales-export"
+        onClick={() => void exportCsv()}
+        data-testid="sales-export-csv"
+      >
+        Exportar CSV
+      </button>
+    </>
+  );
+
+  const footer = (
+    <div className="sales-totals" data-testid="sales-totals">
+      <span>{totals?.count ?? 0} tickets</span>
+      <span>
+        Total: <strong>{fmtEur(Number(totals?.totalAmount ?? 0))}</strong>
+      </span>
+      <span>Margen medio: {fmtRate(totals?.avgMarginPct)}</span>
+      <span>Descuento medio: {fmtRate(totals?.avgDiscountPct)}</span>
+    </div>
+  );
+
+  return (
+    <section className="catalog">
+      {views.length > 0 && (
+        <div className="sales-views" data-testid="sales-views">
+          {views.map((v) => (
+            <span key={v.name} className="sales-view-chip">
+              <button
+                className="sales-view-apply"
+                onClick={() => applyView(v)}
+                data-testid="sales-view-apply"
+              >
+                {v.name}
+              </button>
+              <button
+                className="sales-view-remove"
+                onClick={() => removeView(v.name)}
+                aria-label={`Eliminar vista ${v.name}`}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <DataTable
+        columns={columns}
+        rows={data?.items ?? []}
+        rowKey={(r) => r.id}
+        loading={query.isLoading}
+        toolbar={toolbar}
+        footer={footer}
+        pagination={{
+          page,
+          pageSize: PAGE_SIZE,
+          totalItems: data?.totalItems ?? 0,
+          onPageChange: setPage,
+        }}
+        emptyState={
+          <span data-testid="sales-empty">Sin ventas para los filtros seleccionados.</span>
+        }
+        data-testid="sales-table"
+      />
     </section>
   );
 }

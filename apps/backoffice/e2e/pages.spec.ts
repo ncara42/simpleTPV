@@ -154,28 +154,34 @@ test('Stock: tabla global y filtro por rotación (#96)', async ({ page }) => {
   await expect(page.getByTestId('stock-table')).toContainText('Vapeador Pro');
 });
 
-test('Ventas: scroll infinito, filtros y vistas guardadas (#95)', async ({ page }) => {
+test('Ventas: DataTable con filtros, paginación y agregados (#95 / IT-06)', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-sales').click();
   await expect(page.getByTestId('sales-table')).toBeVisible();
-  // Primer bloque del scroll infinito (20 de 60).
-  await expect(page.getByTestId('sales-row')).toHaveCount(20);
-  // Filtrar por la vendedora Marta → sus 15 tickets (caben en un bloque).
+  // Primera página del DataTable: 20 de 60.
+  await expect(page.getByTestId('ui-dt-row')).toHaveCount(20);
+  // Agregados de IT-04 en el pie (margen medio).
+  await expect(page.getByTestId('sales-totals')).toContainText('Margen medio');
+  // Paginación: ir a la página siguiente (filas 21-40).
+  await page.getByLabel('Página siguiente').click();
+  await expect(page.getByTestId('ui-dt-row')).toHaveCount(20);
+  // Filtrar por la vendedora Marta → sus 15 tickets (vuelve a la página 1).
   await selectOption(page, 'sales-seller', 'u-marta');
-  const rows = page.getByTestId('sales-row');
+  const rows = page.getByTestId('ui-dt-row');
   await expect(rows).toHaveCount(15);
   await expect(rows.first()).toContainText('Marta');
   // Guardar la vista actual y verla como chip reutilizable.
   await page.getByTestId('sales-save-view').click();
   await expect(page.getByTestId('sales-views')).toContainText('Marta');
-  // Limpiar vuelve a mostrar todo.
+  // Limpiar vuelve a mostrar la primera página completa.
   await page.getByTestId('sales-clear').click();
-  await expect(page.getByTestId('sales-row')).toHaveCount(20);
-  // Las ventas anuladas ya no llevan etiqueta: la fila se tiñe (clase sale-voided).
-  // El filtro de estado las aísla y solo deben quedar filas anuladas.
+  await expect(page.getByTestId('ui-dt-row')).toHaveCount(20);
+  // Filtro de estado: solo anuladas (4), cada una con su badge "Anulada".
   await selectOption(page, 'sales-status', 'VOIDED');
-  await expect(page.locator('tr.sale-voided').first()).toBeVisible();
-  await expect(page.locator('[data-testid="sales-row"]:not(.sale-voided)')).toHaveCount(0);
+  const voided = page.getByTestId('ui-dt-row');
+  await expect(voided).toHaveCount(4);
+  await expect(voided.filter({ hasText: 'Anulada' })).toHaveCount(4);
+  await expect(voided.filter({ hasText: 'Completada' })).toHaveCount(0);
 });
 
 test('Compras y VeriFactu están retiradas del menú (#106)', async ({ page }) => {

@@ -121,17 +121,30 @@ export interface SaleSummary {
 
 // Página de ventas con metadatos de paginación y totales del día. `totals`
 // agrega SOLO ventas COMPLETED (las VOIDED se listan en items pero no suman).
+// avgDiscountPct/avgMarginPct son tasas (0..1) sobre el conjunto filtrado (IT-04).
 export interface SalesPage {
   items: SaleSummary[];
   page: number;
   pageSize: number;
   totalItems: number;
-  totals: { count: number; totalAmount: string };
+  totals: {
+    count: number;
+    totalAmount: string;
+    avgDiscountPct: number;
+    avgMarginPct: number;
+  };
 }
 
+// Filtros del historial (#14 + IT-04). Todos opcionales. `userId` filtra por
+// vendedor; `from`/`to` (YYYY-MM-DD) acotan por rango; `status` por estado.
 export interface SalesQueryInput {
   storeId?: string;
   date?: string;
+  from?: string;
+  to?: string;
+  userId?: string;
+  familyId?: string;
+  status?: string;
   q?: string;
   page?: number;
   pageSize?: number;
