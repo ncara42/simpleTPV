@@ -1,6 +1,6 @@
 import './dashboard.css';
 
-import { Select, Sparkline } from '@simpletpv/ui';
+import { Chart, Select, Sparkline } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -11,6 +11,7 @@ import {
   getMarginKpis,
   getProductRankings,
   getSalesByFamily,
+  getSalesByHour,
   getSalesKpis,
   getSalesToday,
 } from './lib/dashboard.js';
@@ -64,6 +65,11 @@ export function DashboardPage() {
   const byFamily = useQuery({
     queryKey: ['dash-family', period, store],
     queryFn: () => getSalesByFamily(period, store),
+    placeholderData: keepPreviousData,
+  });
+  const byHour = useQuery({
+    queryKey: ['dash-hour', period, store],
+    queryFn: () => getSalesByHour(period, store),
     placeholderData: keepPreviousData,
   });
   const rankings = useQuery({
@@ -263,6 +269,18 @@ export function DashboardPage() {
         {/* Rankings */}
         <div className="dash-panel span-7" data-testid="dash-rankings">
           <Rankings data={rankings.data} loading={rankings.isLoading} />
+        </div>
+
+        {/* Ventas por hora (STAT-02): barras con el Chart reutilizable (IT-02) */}
+        <div className="dash-panel" data-testid="dash-hour">
+          <h3>Ventas por hora</h3>
+          <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]} · importe por franja</p>
+          <Chart
+            data={(byHour.data ?? []).map((h) => ({ label: `${h.hour}h`, value: h.revenue }))}
+            height={200}
+            formatValue={fmtEurCompact}
+            ariaLabel="Ventas por hora"
+          />
         </div>
       </div>
     </section>

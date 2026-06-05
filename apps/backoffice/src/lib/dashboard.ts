@@ -2,6 +2,7 @@ import {
   DEMO_MARGIN_KPIS,
   DEMO_RANKINGS,
   DEMO_SALES_BY_FAMILY,
+  DEMO_SALES_BY_HOUR,
   DEMO_SALES_KPIS,
   DEMO_SALES_TODAY,
   DEMO_STOCKOUT_KPIS,
@@ -82,6 +83,13 @@ export interface ProductRankings {
   worstRotation: Array<{ productId: string; name: string; units: number }>;
 }
 
+// Ventas por hora del día (STAT-02): tickets e importe por hora con ventas.
+export interface SalesByHour {
+  hour: number;
+  count: number;
+  revenue: number;
+}
+
 // Dashboard (IT-09): en demo devuelve los datos calcados al mockup; en real va
 // contra /dashboard/*. NOTA: el backend devuelve los KPIs y el intradía (STAT-01),
 // pero AÚN NO las series diarias de las sparklines de las cards (series/
@@ -104,6 +112,11 @@ export function getSalesByFamily(
 ): Promise<FamilySales[]> {
   if (isDemo()) return Promise.resolve(DEMO_SALES_BY_FAMILY);
   return api.get<FamilySales[]>('/dashboard/sales-by-family', periodQuery(period, storeId));
+}
+
+export function getSalesByHour(period: DashboardPeriod, storeId?: string): Promise<SalesByHour[]> {
+  if (isDemo()) return Promise.resolve(DEMO_SALES_BY_HOUR);
+  return api.get<SalesByHour[]>('/dashboard/sales-by-hour', periodQuery(period, storeId));
 }
 
 export function getSalesKpis(period: DashboardPeriod, storeId?: string): Promise<SalesKpis> {

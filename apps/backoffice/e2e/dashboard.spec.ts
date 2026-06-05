@@ -35,4 +35,6 @@ test('los paneles de gráficas y roturas se renderizan', async ({ page }) => {
   await expect(page.getByTestId('dash-family')).toBeVisible();
   await expect(page.getByTestId('dash-stockout')).toBeVisible();
   await expect(page.getByTestId('dash-rankings')).toBeVisible();
+  // Ventas por hora (STAT-02 / IT-10).
+  await expect(page.getByTestId('dash-hour')).toBeVisible();
 });

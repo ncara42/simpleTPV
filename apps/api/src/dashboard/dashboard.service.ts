@@ -216,6 +216,34 @@ export class DashboardService {
     });
   }
 
+  // Ventas por hora del día (STAT-02 / KPI-V10): nº de tickets e importe agrupados
+  // por la hora de `createdAt`. Identifica las horas pico para dimensionar personal.
+  // Solo devuelve las horas con ventas COMPLETED en el periodo.
+  async salesByHour(
+    q: DashboardPeriodQueryDto,
+  ): Promise<Array<{ hour: number; count: number; revenue: number }>> {
+    const { organizationId } = requireTenant();
+    const range = this.rangeFor(q);
+    const { storeId } = q;
+
+    return withTenantTx(this.base, organizationId, async (tx) => {
+      const rows = await tx.$queryRaw<Array<{ hour: number; count: bigint; revenue: string }>>`
+        SELECT EXTRACT(HOUR FROM "createdAt")::int AS hour,
+               COUNT(*) AS count,
+               COALESCE(SUM(total), 0) AS revenue
+        FROM "Sale"
+        WHERE "organizationId" = ${organizationId}::uuid
+          AND status = 'COMPLETED'
+          AND "createdAt" >= ${range.from}
+          AND "createdAt" < ${range.to}
+          ${storeId ? this.eqStore('"storeId"', storeId) : EMPTY}
+        GROUP BY hour
+        ORDER BY hour
+      `;
+      return rows.map((r) => ({ hour: r.hour, count: num(r.count), revenue: num(r.revenue) }));
+    });
+  }
+
   // KPIs de venta: ticket medio, UPT, tasa de descuento, tasa de devolución.
   async salesKpis(q: DashboardPeriodQueryDto): Promise<{
     salesCount: number;

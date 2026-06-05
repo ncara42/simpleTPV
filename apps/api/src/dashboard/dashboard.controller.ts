@@ -25,6 +25,11 @@ export class DashboardController {
     return this.dashboard.salesByFamily(query);
   }
 
+  @Get('sales-by-hour')
+  salesByHour(@Query() query: DashboardPeriodQueryDto) {
+    return this.dashboard.salesByHour(query);
+  }
+
   @Get('sales-kpis')
   salesKpis(@Query() query: DashboardPeriodQueryDto) {
     return this.dashboard.salesKpis(query);

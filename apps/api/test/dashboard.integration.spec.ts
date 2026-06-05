@@ -256,6 +256,20 @@ describe('Dashboard — integración', () => {
     expect(fam?.familyName).toBe(`${TAG}-fam`);
   });
 
+  it('sales-by-hour: agrupa tickets e importe por hora del día (STAT-02)', async () => {
+    // Las ventas del periodo se sembraron a las 9, 11 y 13 (UTC).
+    const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.salesByHour(periodQuery()),
+    );
+    const byHour = new Map(rows.map((r) => [r.hour, r]));
+    expect(byHour.get(9)!.count).toBe(1);
+    expect(byHour.get(9)!.revenue).toBeCloseTo(200, 2);
+    expect(byHour.get(11)!.revenue).toBeCloseTo(45, 2); // 50 − 5 de descuento de ticket
+    expect(byHour.get(13)!.revenue).toBeCloseTo(100, 2);
+    // Solo devuelve horas con ventas (no las 24 del día).
+    expect(rows.every((r) => [9, 11, 13].includes(r.hour))).toBe(true);
+  });
+
   it('sales-kpis: ticket medio, UPT, tasa de descuento y de devolución', async () => {
     const kpis = await tenantStorage.run({ organizationId: org1Id }, async () =>
       service.salesKpis(periodQuery()),

@@ -13,6 +13,7 @@ import type {
   FamilySales,
   MarginKpis,
   ProductRankings,
+  SalesByHour,
   SalesKpis,
   SalesTodayResponse,
   StockoutKpis,
@@ -609,6 +610,20 @@ export const DEMO_SALES_BY_FAMILY: FamilySales[] = [
   { familyId: 'fam-cosmetica', familyName: 'Cosmética', color: '#7c3aed', total: 220 },
   { familyId: 'fam-vapeo', familyName: 'Vapeo', color: '#2563eb', total: 152 },
   { familyId: 'fam-infusiones', familyName: 'Infusiones', color: '#0e7c6b', total: 80 },
+];
+// Ventas por hora (STAT-02): jornada 9–20h con pico de mediodía y de tarde.
+export const DEMO_SALES_BY_HOUR: SalesByHour[] = [
+  { hour: 9, count: 4, revenue: 86 },
+  { hour: 10, count: 7, revenue: 142 },
+  { hour: 11, count: 9, revenue: 188 },
+  { hour: 12, count: 12, revenue: 246 },
+  { hour: 13, count: 10, revenue: 205 },
+  { hour: 14, count: 5, revenue: 98 },
+  { hour: 16, count: 6, revenue: 124 },
+  { hour: 17, count: 9, revenue: 176 },
+  { hour: 18, count: 11, revenue: 224 },
+  { hour: 19, count: 8, revenue: 162 },
+  { hour: 20, count: 3, revenue: 61 },
 ];
 export const DEMO_STOCKOUT_KPIS: StockoutKpis = {
   events: 4,
