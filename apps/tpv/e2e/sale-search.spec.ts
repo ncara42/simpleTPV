@@ -13,8 +13,8 @@ async function login(page: import('@playwright/test').Page): Promise<void> {
 test('tras login se ven los productos demo', async ({ page }) => {
   await login(page);
   await expect(page.getByTestId('sale-grid')).toBeVisible({ timeout: 10000 });
-  // 12 productos demo.
-  expect(await page.getByTestId('prod-card').count()).toBe(12);
+  // 36 productos demo.
+  expect(await page.getByTestId('prod-card').count()).toBe(36);
 });
 
 test('la búsqueda en vivo filtra los productos (debounce)', async ({ page }) => {
@@ -32,9 +32,9 @@ test('la búsqueda en vivo filtra los productos (debounce)', async ({ page }) =>
   expect(names.every((n) => /cbd/i.test(n))).toBe(true);
 });
 
-test('el chip "Todas" muestra el total demo (88)', async ({ page }) => {
+test('el chip "Todas" muestra el total demo (112)', async ({ page }) => {
   await login(page);
-  await expect(page.getByTestId('fam-chip-all')).toContainText('88');
+  await expect(page.getByTestId('fam-chip-all')).toContainText('112');
 });
 
 test('los productos agotados muestran "0", se atenúan y van al final', async ({ page }) => {
@@ -58,18 +58,18 @@ test('familia con subfamilias → desplegable → producto', async ({ page }) =>
   const families = page.getByTestId('sale-families');
 
   // "Aceites" tiene subfamilias → es un desplegable. Abrirlo y elegir
-  // "Todo · Aceites" filtra a sus 3 productos (todo el subárbol).
+  // "Todo · Aceites" filtra a sus 8 productos (todo el subárbol).
   await families.getByRole('button', { name: 'Familia Aceites' }).click();
   await page.getByRole('option', { name: 'Todo · Aceites' }).click();
-  await expect(page.getByTestId('prod-card')).toHaveCount(3);
+  await expect(page.getByTestId('prod-card')).toHaveCount(8);
 
-  // Reabrir y elegir la subfamilia "CBD 10%": filtra a su único producto.
+  // Reabrir y elegir la subfamilia "CBD 10%": filtra a sus 3 productos.
   await families.getByRole('button', { name: 'Familia Aceites' }).click();
   await page.getByRole('option', { name: 'CBD 10%' }).click();
-  await expect(page.getByTestId('prod-card')).toHaveCount(1);
-  await expect(page.getByTestId('prod-card')).toContainText('Aceite CBD 10%');
+  await expect(page.getByTestId('prod-card')).toHaveCount(3);
+  await expect(page.getByTestId('prod-card').first()).toContainText('Aceite CBD 10%');
 
   // "Todas" vuelve a todos los productos.
   await families.getByTestId('fam-chip-all').click();
-  await expect(page.getByTestId('prod-card')).toHaveCount(12);
+  await expect(page.getByTestId('prod-card')).toHaveCount(36);
 });

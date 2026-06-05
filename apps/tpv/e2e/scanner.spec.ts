@@ -33,7 +33,7 @@ test('la navegación del sidebar muestra cada vista calcada', async ({ page }) =
 
   await page.getByTestId('nav-clock').click();
   await expect(page.getByTestId('time-clock-view')).toBeVisible();
-  await expect(page.getByTestId('time-clock-toggle')).toBeVisible();
+  await expect(page.getByTestId('time-clock-state')).toBeVisible();
 
   await page.getByTestId('nav-sale').click();
   await expect(page.getByTestId('sale-grid')).toBeVisible();
