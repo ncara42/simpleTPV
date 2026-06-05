@@ -6,6 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma, type SaleStatus } from '@simpletpv/db';
 
 import { assertStoreAccess } from '../auth/store-access.js';
 import { round2 } from '../common/money.js';
@@ -28,6 +29,13 @@ import {
   type TicketDiscount,
 } from './sales.domain.js';
 import type { CreateSaleDto } from './sales.dto.js';
+
+// Los Decimal de Postgres llegan como string por el driver pg (y como Decimal por
+// Prisma en los aggregate). `num` los normaliza a number con fallback a 0.
+function num(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
 
 @Injectable()
 export class SalesService {
@@ -369,13 +377,23 @@ export class SalesService {
     {
       storeId,
       date,
+      from,
+      to,
       q,
+      userId: vendorId,
+      familyId,
+      status,
       page = 1,
       pageSize = 20,
     }: {
       storeId?: string;
       date?: string;
+      from?: string;
+      to?: string;
       q?: string;
+      userId?: string;
+      familyId?: string;
+      status?: SaleStatus;
       page?: number;
       pageSize?: number;
     },
@@ -388,12 +406,26 @@ export class SalesService {
       userId,
       role,
     );
-    const term = q?.trim();
+    const term = q?.trim() || undefined;
 
-    const where = {
+    // Rango de fechas: from/to (prioritario, abierto por un extremo si falta uno)
+    // o un único `date`. dayRange(x).lt es el día siguiente, así que `to` es inclusivo.
+    const range: { gte?: Date; lt?: Date } | undefined =
+      from || to
+        ? { ...(from ? { gte: dayRange(from).gte } : {}), ...(to ? { lt: dayRange(to).lt } : {}) }
+        : date
+          ? dayRange(date)
+          : undefined;
+
+    // Filtro base SIN status: lo comparten el listado (que añade el status pedido)
+    // y los agregados (que SIEMPRE fuerzan COMPLETED — las VOIDED se listan pero no
+    // suman en importe/margen/descuento).
+    const baseWhere = {
       organizationId: tenant.organizationId,
       ...(storeFilter ? { storeId: storeFilter } : {}),
-      ...(date ? { createdAt: dayRange(date) } : {}),
+      ...(range ? { createdAt: range } : {}),
+      ...(vendorId ? { userId: vendorId } : {}),
+      ...(familyId ? { lines: { some: { product: { familyId } } } } : {}),
       ...(term
         ? {
             OR: [
@@ -405,8 +437,9 @@ export class SalesService {
           }
         : {}),
     };
+    const where = { ...baseWhere, ...(status ? { status } : {}) };
 
-    const [items, totalItems, totals] = await Promise.all([
+    const [items, totalItems, agg, marginRow] = await Promise.all([
       this.prisma.sale.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -426,12 +459,41 @@ export class SalesService {
       }),
       this.prisma.sale.count({ where }),
       this.prisma.sale.aggregate({
-        // Los totales del día solo cuentan ventas COMPLETED (las VOIDED no suman).
-        where: { ...where, status: 'COMPLETED' },
-        _sum: { total: true },
+        // Los totales solo cuentan ventas COMPLETED (las VOIDED no suman). subtotal
+        // y discountTotal alimentan avgDiscountPct (= descuento / precio de tarifa).
+        where: { ...baseWhere, status: 'COMPLETED' },
+        _sum: { total: true, subtotal: true, discountTotal: true },
         _count: true,
       }),
+      // Margen real sobre el coste CONGELADO en la línea (IT-03). Necesita un
+      // producto de columnas (costPrice*qty) que el aggregate de Prisma no expresa,
+      // así que va por SQL crudo dentro de withTenantTx (fija el tenant para RLS).
+      withTenantTx(
+        this.base,
+        tenant.organizationId,
+        (tx) =>
+          tx.$queryRaw<Array<{ margin: string; revenue: string }>>`
+          SELECT
+            COALESCE(SUM(sl."lineTotal" - sl."costPrice" * sl.qty), 0) AS margin,
+            COALESCE(SUM(sl."lineTotal"), 0) AS revenue
+          FROM "SaleLine" sl
+          JOIN "Sale" sa ON sa.id = sl."saleId"
+          WHERE ${this.completedSalesWhereSql({
+            organizationId: tenant.organizationId,
+            storeFilter,
+            range,
+            vendorId,
+            familyId,
+            term,
+          })}
+        `,
+      ),
     ]);
+
+    const subtotal = num(agg._sum.subtotal);
+    const discount = num(agg._sum.discountTotal);
+    const revenue = num(marginRow[0]?.revenue);
+    const margin = num(marginRow[0]?.margin);
 
     return {
       items,
@@ -439,10 +501,64 @@ export class SalesService {
       pageSize,
       totalItems,
       totals: {
-        count: totals._count,
-        totalAmount: totals._sum.total ?? 0,
+        count: agg._count,
+        totalAmount: agg._sum.total ?? 0,
+        // Tasa de descuento media: descuento de ticket / precio de tarifa
+        // (subtotal neto de línea + descuento de ticket). Coherente con el dashboard.
+        avgDiscountPct: subtotal + discount > 0 ? discount / (subtotal + discount) : 0,
+        // Margen medio: margen real / facturación (neto de líneas). Usa costPrice congelado.
+        avgMarginPct: revenue > 0 ? margin / revenue : 0,
       },
     };
+  }
+
+  // Construye el WHERE (Prisma.Sql parametrizado) de los agregados sobre ventas
+  // COMPLETED del filtro actual. Replica el filtro estructurado de findSales
+  // (tienda, rango, vendedor, familia y búsqueda libre) para que avgMarginPct —que
+  // va por SQL crudo sobre SaleLine— cuadre con los totales calculados por Prisma.
+  private completedSalesWhereSql(f: {
+    organizationId: string;
+    storeFilter: { in: string[] } | string | undefined;
+    range: { gte?: Date; lt?: Date } | undefined;
+    vendorId: string | undefined;
+    familyId: string | undefined;
+    term: string | undefined;
+  }): Prisma.Sql {
+    const conds: Prisma.Sql[] = [
+      Prisma.sql`sa."organizationId" = ${f.organizationId}::uuid`,
+      Prisma.sql`sa.status = 'COMPLETED'`,
+    ];
+    if (typeof f.storeFilter === 'string') {
+      conds.push(Prisma.sql`sa."storeId" = ${f.storeFilter}::uuid`);
+    } else if (f.storeFilter) {
+      const ids = f.storeFilter.in;
+      conds.push(
+        ids.length > 0
+          ? Prisma.sql`sa."storeId" IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))})`
+          : Prisma.sql`FALSE`,
+      );
+    }
+    if (f.range?.gte) conds.push(Prisma.sql`sa."createdAt" >= ${f.range.gte}`);
+    if (f.range?.lt) conds.push(Prisma.sql`sa."createdAt" < ${f.range.lt}`);
+    if (f.vendorId) conds.push(Prisma.sql`sa."userId" = ${f.vendorId}::uuid`);
+    if (f.familyId) {
+      conds.push(
+        Prisma.sql`EXISTS (SELECT 1 FROM "SaleLine" slf JOIN "Product" pf ON pf.id = slf."productId" WHERE slf."saleId" = sa.id AND pf."familyId" = ${f.familyId}::uuid)`,
+      );
+    }
+    if (f.term) {
+      const pat = `%${f.term}%`;
+      const ors: Prisma.Sql[] = [
+        Prisma.sql`sa."ticketNumber" ILIKE ${pat}`,
+        Prisma.sql`EXISTS (SELECT 1 FROM "User" uq WHERE uq.id = sa."userId" AND uq.name ILIKE ${pat})`,
+        Prisma.sql`EXISTS (SELECT 1 FROM "SaleLine" slq WHERE slq."saleId" = sa.id AND slq.name ILIKE ${pat})`,
+      ];
+      if (Number.isFinite(Number(f.term))) {
+        ors.push(Prisma.sql`sa.total = ${Number(f.term)}`);
+      }
+      conds.push(Prisma.sql`(${Prisma.join(ors, ' OR ')})`);
+    }
+    return Prisma.join(conds, ' AND ');
   }
 
   private async salesStoreFilter(

@@ -1,4 +1,4 @@
-import { PaymentMethod } from '@simpletpv/db';
+import { PaymentMethod, SaleStatus } from '@simpletpv/db';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -78,9 +78,37 @@ export class ListSalesQueryDto {
   storeId?: string;
 
   // Día a filtrar en formato YYYY-MM-DD. El servicio lo convierte al rango UTC.
+  // Atajo de un solo día; `from`/`to` tienen prioridad si llegan.
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'date debe tener formato YYYY-MM-DD' })
   date?: string;
+
+  // Rango de fechas [from, to] (ambos inclusive, YYYY-MM-DD). Cualquiera de los
+  // dos puede ir solo (rango abierto por un extremo). El servicio los pasa a UTC.
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'from debe tener formato YYYY-MM-DD' })
+  from?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'to debe tener formato YYYY-MM-DD' })
+  to?: string;
+
+  // Filtra por vendedor (User.id de quien registró la venta).
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
+
+  // Filtra por familia de producto: ventas con al menos una línea cuyo producto
+  // pertenece a esta familia.
+  @IsOptional()
+  @IsUUID()
+  familyId?: string;
+
+  // Filtra por estado de la venta (COMPLETED/VOIDED). Afecta solo al listado; los
+  // agregados de importe/margen/descuento se calculan siempre sobre COMPLETED.
+  @IsOptional()
+  @IsEnum(SaleStatus)
+  status?: SaleStatus;
 
   @IsOptional()
   q?: string;

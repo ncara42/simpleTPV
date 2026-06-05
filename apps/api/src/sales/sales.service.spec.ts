@@ -332,6 +332,12 @@ function makePrisma() {
     },
     // voidSale corre dentro de withTenantTx → el tx hace SELECT set_config.
     $executeRaw: vi.fn(async (): Promise<number> => 1),
+    // findSales calcula el margen con un SQL crudo dentro de withTenantTx.
+    $queryRaw: vi.fn(
+      async (): Promise<Array<{ margin: string; revenue: string }>> => [
+        { margin: '0', revenue: '0' },
+      ],
+    ),
   };
 }
 
@@ -820,7 +826,13 @@ describe('SalesService.findSales', () => {
     expect(arg.where.status).toBe('COMPLETED');
     expect(arg.where.organizationId).toBe(ORG);
     expect(arg.where.storeId).toBe(STORE);
-    expect(res.totals).toEqual({ count: 3, totalAmount: 150.5 });
+    // subtotal/discountTotal ausentes en el mock → tasas 0; el margen sale del SQL.
+    expect(res.totals).toEqual({
+      count: 3,
+      totalAmount: 150.5,
+      avgDiscountPct: 0,
+      avgMarginPct: 0,
+    });
   });
 
   it('totals.totalAmount es 0 cuando no hay ventas COMPLETED (sum null)', async () => {
@@ -829,6 +841,96 @@ describe('SalesService.findSales', () => {
     const service = makeService(prisma);
 
     const res = await tenantStorage.run({ organizationId: ORG }, () => service.findSales({}));
-    expect(res.totals).toEqual({ count: 0, totalAmount: 0 });
+    expect(res.totals).toEqual({
+      count: 0,
+      totalAmount: 0,
+      avgDiscountPct: 0,
+      avgMarginPct: 0,
+    });
+  });
+
+  it('aplica los filtros nuevos (vendedor, familia, estado) al where del listado', async () => {
+    const prisma = makePrisma();
+    const service = makeService(prisma);
+    const VENDOR = '33333333-3333-3333-3333-333333333333';
+    const FAMILY = '44444444-4444-4444-4444-444444444444';
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.findSales({ userId: VENDOR, familyId: FAMILY, status: 'VOIDED' }),
+    );
+
+    const arg = prisma.sale.findMany.mock.calls[0]![0] as {
+      where: {
+        userId: string;
+        status: string;
+        lines: { some: { product: { familyId: string } } };
+      };
+    };
+    expect(arg.where.userId).toBe(VENDOR);
+    expect(arg.where.status).toBe('VOIDED');
+    expect(arg.where.lines.some.product.familyId).toBe(FAMILY);
+    // Los agregados IGNORAN el status pedido (siempre COMPLETED) y el vendedor SÍ.
+    const aggArg = prisma.sale.aggregate.mock.calls[0]![0] as {
+      where: { status: string; userId: string };
+    };
+    expect(aggArg.where.status).toBe('COMPLETED');
+    expect(aggArg.where.userId).toBe(VENDOR);
+  });
+
+  it('rango from/to: createdAt gte el inicio de from y lt el día siguiente a to', async () => {
+    const prisma = makePrisma();
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.findSales({ from: '2026-05-01', to: '2026-05-31' }),
+    );
+
+    const arg = prisma.sale.findMany.mock.calls[0]![0] as {
+      where: { createdAt: { gte: Date; lt: Date } };
+    };
+    expect(arg.where.createdAt.gte.toISOString()).toBe('2026-05-01T00:00:00.000Z');
+    // `to` inclusivo → lt = 2026-06-01 (día siguiente a to).
+    expect(arg.where.createdAt.lt.toISOString()).toBe('2026-06-01T00:00:00.000Z');
+  });
+
+  it('rango abierto: from sin to → solo gte; to sin from → solo lt', async () => {
+    const prisma = makePrisma();
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.findSales({ from: '2026-05-10' }),
+    );
+    const onlyFrom = prisma.sale.findMany.mock.calls[0]![0] as {
+      where: { createdAt: { gte?: Date; lt?: Date } };
+    };
+    expect(onlyFrom.where.createdAt.gte?.toISOString()).toBe('2026-05-10T00:00:00.000Z');
+    expect(onlyFrom.where.createdAt.lt).toBeUndefined();
+
+    const prisma2 = makePrisma();
+    const service2 = makeService(prisma2);
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service2.findSales({ to: '2026-05-20' }),
+    );
+    const onlyTo = prisma2.sale.findMany.mock.calls[0]![0] as {
+      where: { createdAt: { gte?: Date; lt?: Date } };
+    };
+    expect(onlyTo.where.createdAt.gte).toBeUndefined();
+    expect(onlyTo.where.createdAt.lt?.toISOString()).toBe('2026-05-21T00:00:00.000Z');
+  });
+
+  it('agregados: avgDiscountPct y avgMarginPct se derivan de aggregate + margen SQL', async () => {
+    const prisma = makePrisma();
+    // subtotal 800 + discount 200 → descuento 200/1000 = 0.2.
+    prisma.sale.aggregate = vi.fn(async () => ({
+      _sum: { total: 800, subtotal: 800, discountTotal: 200 },
+      _count: 4,
+    }));
+    // margen 300 sobre revenue 1000 → 0.3.
+    prisma.$queryRaw = vi.fn(async () => [{ margin: '300', revenue: '1000' }]);
+    const service = makeService(prisma);
+
+    const res = await tenantStorage.run({ organizationId: ORG }, () => service.findSales({}));
+    expect(res.totals.avgDiscountPct).toBeCloseTo(0.2, 4);
+    expect(res.totals.avgMarginPct).toBeCloseTo(0.3, 4);
   });
 });
