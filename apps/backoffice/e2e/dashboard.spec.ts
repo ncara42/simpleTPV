@@ -35,7 +35,9 @@ test('los paneles de gráficas y roturas se renderizan', async ({ page }) => {
   await expect(page.getByTestId('dash-family')).toBeVisible();
   await expect(page.getByTestId('dash-stockout')).toBeVisible();
   await expect(page.getByTestId('dash-rankings')).toBeVisible();
-  // Ventas por hora (STAT-02 / IT-10) y descuento por empleado (STAT-04 / IT-11).
+  // Estadística avanzada: ventas por hora (IT-10), descuento por empleado (IT-11)
+  // y rotación de producto (IT-12).
   await expect(page.getByTestId('dash-hour')).toBeVisible();
   await expect(page.getByTestId('dash-discount-emp')).toBeVisible();
+  await expect(page.getByTestId('dash-rotation')).toBeVisible();
 });

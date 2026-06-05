@@ -14,6 +14,7 @@ import type {
   FamilySales,
   MarginKpis,
   ProductRankings,
+  ProductRotation,
   SalesByHour,
   SalesKpis,
   SalesTodayResponse,
@@ -632,6 +633,52 @@ export const DEMO_DISCOUNT_BY_EMPLOYEE: DiscountByEmployee[] = [
   { userId: 'u-luis', userName: 'Luis Pérez', salesCount: 31, avgDiscountPct: 0.071 },
   { userId: 'u-ana', userName: 'Ana Caravaca', salesCount: 28, avgDiscountPct: 0.052 },
   { userId: 'u-marta', userName: 'Marta Ruiz', salesCount: 19, avgDiscountPct: 0.038 },
+];
+// Rotación + evolución (STAT-05/06): top por unidades; los de cola llevan más días
+// sin venta (stock muerto). `trend` = unidades por día (sparkline de evolución).
+export const DEMO_ROTATION_STATS: ProductRotation[] = [
+  {
+    productId: 'p-aceite-cbd-10',
+    name: 'Aceite CBD 10%',
+    units: 142,
+    daysSinceLastSale: 0,
+    trend: [12, 18, 15, 22, 19, 26, 30],
+  },
+  {
+    productId: 'p-flor-premium',
+    name: 'Flor Premium 3,5g',
+    units: 120,
+    daysSinceLastSale: 0,
+    trend: [10, 14, 12, 18, 16, 20, 22],
+  },
+  {
+    productId: 'p-resina-premium',
+    name: 'Resina Premium 1g',
+    units: 88,
+    daysSinceLastSale: 1,
+    trend: [8, 11, 9, 13, 12, 16, 14],
+  },
+  {
+    productId: 'p-crema-regeneradora',
+    name: 'Crema regeneradora 50ml',
+    units: 60,
+    daysSinceLastSale: 2,
+    trend: [6, 8, 7, 10, 9, 11, 9],
+  },
+  {
+    productId: 'p-vapeador-pro',
+    name: 'Vapeador Pro',
+    units: 12,
+    daysSinceLastSale: 9,
+    trend: [3, 2, 1, 2, 1, 2, 1],
+  },
+  {
+    productId: 'p-liquido-vape',
+    name: 'Líquido vape 10ml',
+    units: 4,
+    daysSinceLastSale: 21,
+    trend: [1, 0, 1, 0, 1, 0, 1],
+  },
 ];
 export const DEMO_STOCKOUT_KPIS: StockoutKpis = {
   events: 4,

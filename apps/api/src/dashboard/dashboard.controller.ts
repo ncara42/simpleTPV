@@ -54,4 +54,9 @@ export class DashboardController {
   productRankings(@Query() query: ProductRankingsQueryDto) {
     return this.dashboard.productRankings(query);
   }
+
+  @Get('product-rotation')
+  productRotation(@Query() query: DashboardPeriodQueryDto) {
+    return this.dashboard.productRotation(query);
+  }
 }

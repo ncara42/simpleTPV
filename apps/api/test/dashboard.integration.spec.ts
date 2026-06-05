@@ -281,6 +281,22 @@ describe('Dashboard — integración', () => {
     expect(rows[0]!.avgDiscountPct).toBeCloseTo(5 / 355, 4);
   });
 
+  it('product-rotation: unidades por producto + días sin venta + tendencia (STAT-05/06)', async () => {
+    const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.productRotation(periodQuery()),
+    );
+    const a = rows.find((r) => r.productId === prodAId);
+    const b = rows.find((r) => r.productId === prodBId);
+    // prodA: qty 2 (9h) + 1 (13h) = 3; prodB: qty 1 (11h).
+    expect(a?.units).toBe(3);
+    expect(b?.units).toBe(1);
+    // Hubo última venta → daysSinceLastSale es un número (el periodo es un día único).
+    expect(typeof a?.daysSinceLastSale).toBe('number');
+    // Tendencia: al menos el día con ventas del periodo.
+    expect(a!.trend.length).toBeGreaterThanOrEqual(1);
+    expect(a!.trend.reduce((s, n) => s + n, 0)).toBe(3); // suma de la tendencia = unidades
+  });
+
   it('sales-kpis: ticket medio, UPT, tasa de descuento y de devolución', async () => {
     const kpis = await tenantStorage.run({ organizationId: org1Id }, async () =>
       service.salesKpis(periodQuery()),

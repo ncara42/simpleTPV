@@ -565,6 +565,80 @@ export class DashboardService {
     });
   }
 
+  // Rotación + evolución de producto (STAT-05/06): por producto activo, unidades
+  // vendidas en el periodo, días desde la última venta (de CUALQUIER fecha → detecta
+  // stock muerto) y una tendencia de unidades por día (sparkline de evolución). Top
+  // por unidades vendidas.
+  async productRotation(q: DashboardPeriodQueryDto): Promise<
+    Array<{
+      productId: string;
+      name: string;
+      units: number;
+      daysSinceLastSale: number | null;
+      trend: number[];
+    }>
+  > {
+    const { organizationId } = requireTenant();
+    const range = this.rangeFor(q);
+    const { storeId } = q;
+    const now = this.now();
+    const LIMIT = 8;
+
+    return withTenantTx(this.base, organizationId, async (tx) => {
+      // Resumen: unidades del periodo (FILTER por rango/tienda) + última venta de
+      // cualquier fecha (MAX sin filtrar → días sin venta global, para stock muerto).
+      const summary = await tx.$queryRaw<
+        Array<{ productId: string; name: string; units: string; lastSale: Date | null }>
+      >`
+        SELECT p.id::text AS "productId", p.name AS name,
+               COALESCE(SUM(sl.qty) FILTER (
+                 WHERE sa."createdAt" >= ${range.from} AND sa."createdAt" < ${range.to}
+                 ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+               ), 0) AS units,
+               MAX(sa."createdAt") AS "lastSale"
+        FROM "Product" p
+        LEFT JOIN "SaleLine" sl ON sl."productId" = p.id
+        LEFT JOIN "Sale" sa ON sa.id = sl."saleId" AND sa.status = 'COMPLETED'
+        WHERE p."organizationId" = ${organizationId}::uuid AND p.active = true
+        GROUP BY p.id, p.name
+        ORDER BY units DESC, p.name ASC
+        LIMIT ${LIMIT}
+      `;
+
+      // Tendencia: unidades por día y producto en el periodo (evolución, STAT-06).
+      // Ordenadas por día → al agrupar por producto queda la serie cronológica.
+      const daily = await tx.$queryRaw<Array<{ productId: string; units: string }>>`
+        SELECT sl."productId"::text AS "productId", COALESCE(SUM(sl.qty), 0) AS units
+        FROM "SaleLine" sl
+        JOIN "Sale" sa ON sa.id = sl."saleId"
+        WHERE sa."organizationId" = ${organizationId}::uuid
+          AND sa.status = 'COMPLETED'
+          AND sa."createdAt" >= ${range.from}
+          AND sa."createdAt" < ${range.to}
+          ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+        GROUP BY sl."productId", DATE(sa."createdAt")
+        ORDER BY DATE(sa."createdAt")
+      `;
+      const trendByProduct = new Map<string, number[]>();
+      for (const r of daily) {
+        const arr = trendByProduct.get(r.productId) ?? [];
+        arr.push(num(r.units));
+        trendByProduct.set(r.productId, arr);
+      }
+
+      const dayMs = 24 * 60 * 60 * 1000;
+      return summary.map((r) => ({
+        productId: r.productId,
+        name: r.name,
+        units: num(r.units),
+        daysSinceLastSale: r.lastSale
+          ? Math.floor((now.getTime() - new Date(r.lastSale).getTime()) / dayMs)
+          : null,
+        trend: trendByProduct.get(r.productId) ?? [],
+      }));
+    });
+  }
+
   // Fragmento parametrizado `AND <col> = $storeId::uuid` para inyectar el filtro
   // opcional de tienda sin concatenar strings. `column` proviene SIEMPRE de
   // literales del propio código (nunca de input del usuario), por eso es seguro

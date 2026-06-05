@@ -11,6 +11,7 @@ import {
   getDiscountByEmployee,
   getMarginKpis,
   getProductRankings,
+  getProductRotation,
   getSalesByFamily,
   getSalesByHour,
   getSalesKpis,
@@ -76,6 +77,11 @@ export function DashboardPage() {
   const discountByEmp = useQuery({
     queryKey: ['dash-discount-emp', period, store],
     queryFn: () => getDiscountByEmployee(period, store),
+    placeholderData: keepPreviousData,
+  });
+  const rotation = useQuery({
+    queryKey: ['dash-rotation', period, store],
+    queryFn: () => getProductRotation(period, store),
     placeholderData: keepPreviousData,
   });
   const rankings = useQuery({
@@ -314,6 +320,35 @@ export function DashboardPage() {
               </ul>
             );
           })()}
+        </div>
+
+        {/* Rotación + evolución de producto (STAT-05/06): unidades, días sin venta
+            y sparkline de evolución (IT-02) */}
+        <div className="dash-panel" data-testid="dash-rotation">
+          <h3>Rotación de producto</h3>
+          <p className="dash-panel-sub">
+            {PERIOD_SUBTITLE[period]} · unidades, días sin venta y evolución
+          </p>
+          <ul className="dash-rotation-list">
+            {(rotation.data ?? []).map((p) => (
+              <li key={p.productId} className="dash-rotation-row">
+                <span className="dash-rotation-name">{p.name}</span>
+                <span className="dash-rotation-units">{fmtNum(p.units, 0)} ud</span>
+                <span className="dash-rotation-days">
+                  {p.daysSinceLastSale == null
+                    ? 'sin ventas'
+                    : p.daysSinceLastSale <= 0
+                      ? 'hoy'
+                      : `hace ${p.daysSinceLastSale} d`}
+                </span>
+                <span className="dash-rotation-spark">
+                  {p.trend.length > 1 && (
+                    <Sparkline data={p.trend} tone="brand" height={28} ariaLabel="Evolución" />
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </section>

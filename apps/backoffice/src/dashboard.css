@@ -720,3 +720,41 @@
   border-color: var(--ui-warning);
   background: var(--ui-warning-soft);
 }
+
+/* Rotación de producto (IT-12): fila con nombre, unidades, días sin venta y la
+   sparkline de evolución a la derecha. */
+.dash-rotation-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dash-rotation-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto 120px;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--ui-border);
+}
+.dash-rotation-row:last-child {
+  border-bottom: none;
+}
+.dash-rotation-name {
+  font-weight: 500;
+  letter-spacing: -0.012em;
+}
+.dash-rotation-units {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.dash-rotation-days {
+  color: var(--ui-text-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.dash-rotation-spark {
+  width: 120px;
+  color: var(--ui-brand);
+}

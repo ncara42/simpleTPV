@@ -2,6 +2,7 @@ import {
   DEMO_DISCOUNT_BY_EMPLOYEE,
   DEMO_MARGIN_KPIS,
   DEMO_RANKINGS,
+  DEMO_ROTATION_STATS,
   DEMO_SALES_BY_FAMILY,
   DEMO_SALES_BY_HOUR,
   DEMO_SALES_KPIS,
@@ -99,6 +100,16 @@ export interface DiscountByEmployee {
   avgDiscountPct: number;
 }
 
+// Rotación + evolución de producto (STAT-05/06): unidades del periodo, días desde
+// la última venta y tendencia de unidades por día (sparkline).
+export interface ProductRotation {
+  productId: string;
+  name: string;
+  units: number;
+  daysSinceLastSale: number | null;
+  trend: number[];
+}
+
 // Dashboard (IT-09): en demo devuelve los datos calcados al mockup; en real va
 // contra /dashboard/*. NOTA: el backend devuelve los KPIs y el intradía (STAT-01),
 // pero AÚN NO las series diarias de las sparklines de las cards (series/
@@ -137,6 +148,14 @@ export function getDiscountByEmployee(
     '/dashboard/discount-by-employee',
     periodQuery(period, storeId),
   );
+}
+
+export function getProductRotation(
+  period: DashboardPeriod,
+  storeId?: string,
+): Promise<ProductRotation[]> {
+  if (isDemo()) return Promise.resolve(DEMO_ROTATION_STATS);
+  return api.get<ProductRotation[]>('/dashboard/product-rotation', periodQuery(period, storeId));
 }
 
 export function getSalesKpis(period: DashboardPeriod, storeId?: string): Promise<SalesKpis> {
