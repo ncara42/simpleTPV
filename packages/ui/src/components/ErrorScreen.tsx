@@ -1,6 +1,7 @@
 /**
  * Fallback de Sentry.ErrorBoundary (#79). Sustituye la pantalla en blanco por un
  * mensaje amable cuando un error de render escapa. Mínimo, sin librerías nuevas.
+ * Compartido por apps/tpv y apps/backoffice (idéntico en ambas).
  */
 export function ErrorScreen() {
   return (

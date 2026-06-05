@@ -1,6 +1,7 @@
 export { Alert, type AlertProps, type AlertVariant } from './components/Alert.js';
 export { Badge } from './components/Badge.js';
 export { Button } from './components/Button.js';
+export { ErrorScreen } from './components/ErrorScreen.js';
 export { Input } from './components/Input.js';
 export { LoginForm, type LoginFormProps } from './components/LoginForm.js';
 export { Select, type SelectOption, type SelectProps } from './components/Select.js';

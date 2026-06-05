@@ -1,12 +1,12 @@
 import './styles.css';
 
 import * as Sentry from '@sentry/react';
+import { ErrorScreen } from '@simpletpv/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import App from './App.js';
-import { ErrorScreen } from './observability/ErrorScreen.js';
 import { initSentry } from './observability/sentry.js';
 
 initSentry();
