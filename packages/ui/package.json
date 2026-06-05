@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./alert.css": "./src/styles/alert.css",
+    "./chart.css": "./src/styles/chart.css",
     "./datatable.css": "./src/styles/datatable.css",
     "./login.css": "./src/styles/login.css",
     "./select.css": "./src/styles/select.css",
