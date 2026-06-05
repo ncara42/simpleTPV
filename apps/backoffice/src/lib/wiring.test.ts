@@ -12,6 +12,7 @@ import { api } from './auth.js';
 import * as dashboard from './dashboard.js';
 import * as families from './families.js';
 import * as products from './products.js';
+import * as purchases from './purchases.js';
 import * as stock from './stock.js';
 
 const get = vi.mocked(api.get);
@@ -170,6 +171,25 @@ describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
     });
     await stock.sendTransfer('t1');
     expect(post).toHaveBeenCalledWith('/transfers/t1/send');
+  });
+
+  it('purchases: pedidos de compra contra /purchase-orders', async () => {
+    await purchases.listPurchaseOrders('DRAFT');
+    expect(get).toHaveBeenCalledWith('/purchase-orders', { status: 'DRAFT' });
+    await purchases.getPurchaseOrder('po-1');
+    expect(get).toHaveBeenCalledWith('/purchase-orders/po-1');
+    await purchases.createPurchaseOrder({ supplierId: 's', storeId: 'st', lines: [] } as never);
+    expect(post).toHaveBeenCalledWith('/purchase-orders', {
+      supplierId: 's',
+      storeId: 'st',
+      lines: [],
+    });
+    await purchases.confirmPurchaseOrder('po-1');
+    expect(post).toHaveBeenCalledWith('/purchase-orders/po-1/confirm');
+    await purchases.receivePurchaseOrder('po-1', { lines: [] } as never);
+    expect(post).toHaveBeenCalledWith('/purchase-orders/po-1/receive', { lines: [] });
+    await purchases.suggestPurchase({ storeId: 'st' } as never);
+    expect(post).toHaveBeenCalledWith('/purchase-orders/suggest', { storeId: 'st' });
   });
 });
 
