@@ -33,5 +33,22 @@ echo "[entrypoint] Aplicando migraciones de base de datos…"
 # caen a DATABASE_URL si faltan). El runtime usa solo sus variables dedicadas.
 unset DATABASE_URL
 
+# Validar que las variables de runtime están presentes tras el unset.
+# Sin ellas, PrismaService y AuthLookupService crashean en el constructor.
+if [ -z "$DATABASE_URL_APP" ]; then
+  echo "[entrypoint] ERROR: DATABASE_URL_APP no está definida. Abortando." >&2
+  echo "[entrypoint] Configúrala en Dokploy con la URL del rol app (RLS aplicada)." >&2
+  exit 1
+fi
+if [ -z "$DATABASE_URL_AUTH" ]; then
+  echo "[entrypoint] ERROR: DATABASE_URL_AUTH no está definida. Abortando." >&2
+  echo "[entrypoint] Configúrala en Dokploy con la URL del rol app_admin (BYPASSRLS)." >&2
+  exit 1
+fi
+if [ -z "$JWT_SECRET" ] || [ -z "$JWT_REFRESH_SECRET" ]; then
+  echo "[entrypoint] ERROR: JWT_SECRET y JWT_REFRESH_SECRET deben estar definidas. Abortando." >&2
+  exit 1
+fi
+
 echo "[entrypoint] Migraciones aplicadas. Arrancando la API…"
 exec "$@"
