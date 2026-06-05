@@ -9,3 +9,4 @@ export { type NavGroup, type NavItem, Sidebar, type SidebarProps } from './compo
 export { TopBar, type TopBarProps } from './components/TopBar.js';
 export { cn } from './lib/cn.js';
 export { initials } from './lib/initials.js';
+export { siblingAppUrl } from './lib/nav.js';
