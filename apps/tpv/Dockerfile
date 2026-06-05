@@ -26,12 +26,15 @@ FROM deps AS builder
 # build arg. Pásalo solo si los dominios no siguen el patrón admin/tpv.
 ARG VITE_BACKOFFICE_URL
 ENV VITE_BACKOFFICE_URL=$VITE_BACKOFFICE_URL
-# Modo REAL por defecto en la imagen de producción (SEC-04). isDemo() considera
-# demo salvo que VITE_DEMO_MODE sea exactamente 'false', así que la imagen DEBE
-# hornearse con 'false'; sin esto, un build de prod sin la var caía en modo demo
-# (login falso que acepta cualquier credencial). `pnpm dev` (fuera de Docker)
-# mantiene el demo por defecto. Override a 'true' solo para una demo estática.
-ARG VITE_DEMO_MODE=false
+# TEMPORAL — fase de presentaciones al cliente (jun 2026). El equipo (Noel + Marco)
+# enseña el TPV al cliente con datos demo y sin fricción de login, así que la imagen
+# de producción se hornea en MODO DEMO por defecto: isDemo() es true salvo que
+# VITE_DEMO_MODE sea exactamente 'false'. En demo, login() ignora las credenciales y
+# todas las libs de datos devuelven datos demo (no se toca la API). Así cualquier
+# despliegue del repo (incluido el Dokploy de Marco) arranca en demo sin config extra.
+# REVERTIR antes de lanzar con auth real: volver a 'false' (era el default por SEC-04)
+# y quitar el override VITE_DEMO_MODE=true del build arg en los proyectos de Dokploy.
+ARG VITE_DEMO_MODE=true
 ENV VITE_DEMO_MODE=$VITE_DEMO_MODE
 COPY . .
 RUN pnpm --filter @simpletpv/tpv run build
