@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // backoffice en modo real (IT-09), sin backend. isDemo() (api-config) NO se mockea:
 // lee VITE_DEMO_MODE, que stubeamos por bloque.
 vi.mock('./auth.js', () => ({
-  api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), del: vi.fn() },
+  api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), del: vi.fn() },
 }));
 
 import * as admin from './admin.js';
@@ -12,9 +12,11 @@ import { api } from './auth.js';
 import * as dashboard from './dashboard.js';
 import * as families from './families.js';
 import * as products from './products.js';
+import * as stock from './stock.js';
 
 const get = vi.mocked(api.get);
 const post = vi.mocked(api.post);
+const put = vi.mocked(api.put);
 const patch = vi.mocked(api.patch);
 const del = vi.mocked(api.del);
 
@@ -24,6 +26,7 @@ describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
     vi.clearAllMocks();
     get.mockResolvedValue([] as never);
     post.mockResolvedValue({} as never);
+    put.mockResolvedValue({} as never);
     patch.mockResolvedValue({} as never);
     del.mockResolvedValue(undefined as never);
   });
@@ -135,6 +138,38 @@ describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
       period: 'yesterday',
       storeId: 'st1',
     });
+  });
+
+  it('stock: global/alerts/min/movements/adjust y traspasos', async () => {
+    await stock.getGlobalStock();
+    expect(get).toHaveBeenCalledWith('/stock/global');
+    await stock.listAlerts('st1');
+    expect(get).toHaveBeenCalledWith('/stock/alerts', { storeId: 'st1' });
+    await stock.setMinStock({ productId: 'p1', storeId: 'st1', minStock: 5 } as never);
+    expect(put).toHaveBeenCalledWith('/stock/min', {
+      productId: 'p1',
+      storeId: 'st1',
+      minStock: 5,
+    });
+    await stock.listMovements('p1');
+    expect(get).toHaveBeenCalledWith('/stock/movements', { productId: 'p1' });
+    await stock.adjustStock({ productId: 'p1', storeId: 'st1', newQuantity: 3, reason: 'r' });
+    expect(post).toHaveBeenCalledWith('/stock/adjust', {
+      productId: 'p1',
+      storeId: 'st1',
+      newQuantity: 3,
+      reason: 'r',
+    });
+    await stock.listTransfers('SENT');
+    expect(get).toHaveBeenCalledWith('/transfers', { status: 'SENT' });
+    await stock.createTransfer({ originStoreId: 'a', destStoreId: 'b', lines: [] } as never);
+    expect(post).toHaveBeenCalledWith('/transfers', {
+      originStoreId: 'a',
+      destStoreId: 'b',
+      lines: [],
+    });
+    await stock.sendTransfer('t1');
+    expect(post).toHaveBeenCalledWith('/transfers/t1/send');
   });
 });
 
