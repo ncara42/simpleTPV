@@ -1,6 +1,8 @@
 import type { NewUser, SalesPage, SalesQueryInput, Store, StoreInput, User } from '@simpletpv/auth';
 
 import { DEMO_SALES, DEMO_STORES, DEMO_USERS, type DemoSaleRow } from '../demo/demoData.js';
+import { isDemo } from './api-config.js';
+import { api } from './auth.js';
 
 export type { NewUser, SalesQueryInput, Store, StoreInput, User };
 
@@ -11,36 +13,48 @@ export interface SalesView extends Omit<SalesPage, 'items'> {
   items: DemoSaleRow[];
 }
 
+// Usuarios (IT-09): /users (solo ADMIN). createUser envía NewUser (incl. pin/password).
 export function listUsers(): Promise<User[]> {
-  return Promise.resolve(DEMO_USERS);
+  if (isDemo()) return Promise.resolve(DEMO_USERS);
+  return api.get<User[]>('/users');
 }
 export function createUser(input: NewUser): Promise<User> {
-  return Promise.resolve({
-    id: `u-${input.email}`,
-    name: input.name,
-    email: input.email,
-    role: input.role,
-    active: true,
-  });
+  if (isDemo()) {
+    return Promise.resolve({
+      id: `u-${input.email}`,
+      name: input.name,
+      email: input.email,
+      role: input.role,
+      active: true,
+    });
+  }
+  return api.post<User>('/users', input);
 }
-export function deleteUser(_id: string): Promise<void> {
-  return Promise.resolve();
+export function deleteUser(id: string): Promise<void> {
+  if (isDemo()) return Promise.resolve();
+  return api.del(`/users/${id}`);
 }
 
+// Tiendas (IT-09): /stores (solo ADMIN).
 export function listStores(): Promise<Store[]> {
-  return Promise.resolve(DEMO_STORES);
+  if (isDemo()) return Promise.resolve(DEMO_STORES);
+  return api.get<Store[]>('/stores');
 }
 export function createStore(input: StoreInput): Promise<Store> {
-  return Promise.resolve({
-    id: `s-${input.code}`,
-    name: input.name,
-    code: input.code,
-    address: input.address ?? null,
-    active: true,
-  });
+  if (isDemo()) {
+    return Promise.resolve({
+      id: `s-${input.code}`,
+      name: input.name,
+      code: input.code,
+      address: input.address ?? null,
+      active: true,
+    });
+  }
+  return api.post<Store>('/stores', input);
 }
-export function deleteStore(_id: string): Promise<void> {
-  return Promise.resolve();
+export function deleteStore(id: string): Promise<void> {
+  if (isDemo()) return Promise.resolve();
+  return api.del(`/stores/${id}`);
 }
 
 const DEFAULT_PAGE_SIZE = 20;

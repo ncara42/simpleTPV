@@ -7,6 +7,7 @@ vi.mock('./auth.js', () => ({
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), del: vi.fn() },
 }));
 
+import * as admin from './admin.js';
 import { api } from './auth.js';
 import * as families from './families.js';
 import * as products from './products.js';
@@ -49,6 +50,26 @@ describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
     expect(patch).toHaveBeenCalledWith('/products/p-1', { name: 'Q' });
     await products.deleteProduct('p-1');
     expect(del).toHaveBeenCalledWith('/products/p-1');
+  });
+
+  it('admin: usuarios y tiendas', async () => {
+    await admin.listUsers();
+    expect(get).toHaveBeenCalledWith('/users');
+    await admin.createUser({ name: 'Ana', email: 'a@b.test', role: 'MANAGER' } as never);
+    expect(post).toHaveBeenCalledWith('/users', {
+      name: 'Ana',
+      email: 'a@b.test',
+      role: 'MANAGER',
+    });
+    await admin.deleteUser('u-1');
+    expect(del).toHaveBeenCalledWith('/users/u-1');
+
+    await admin.listStores();
+    expect(get).toHaveBeenCalledWith('/stores');
+    await admin.createStore({ name: 'Centro', code: '01' } as never);
+    expect(post).toHaveBeenCalledWith('/stores', { name: 'Centro', code: '01' });
+    await admin.deleteStore('s-1');
+    expect(del).toHaveBeenCalledWith('/stores/s-1');
   });
 });
 
