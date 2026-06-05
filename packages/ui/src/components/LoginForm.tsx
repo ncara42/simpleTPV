@@ -8,6 +8,8 @@ import {
 
 export interface LoginFormProps {
   onSubmit: (email: string, password: string) => Promise<void>;
+  initialEmail?: string;
+  initialPassword?: string;
 }
 
 function EyeReveal({ open }: { open: boolean }) {
@@ -42,9 +44,9 @@ function EyeReveal({ open }: { open: boolean }) {
   );
 }
 
-export function LoginForm({ onSubmit }: LoginFormProps) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+export function LoginForm({ onSubmit, initialEmail = '', initialPassword = '' }: LoginFormProps) {
+  const [email, setEmail] = useState(initialEmail);
+  const [password, setPassword] = useState(initialPassword);
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
