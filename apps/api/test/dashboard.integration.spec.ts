@@ -92,10 +92,15 @@ describe('Dashboard — integración', () => {
     `;
     const saleId = rows[0]!.id;
     for (const l of lines) {
+      // IT-03: el dashboard ahora calcula el margen con el coste CONGELADO en la
+      // línea (SaleLine.costPrice), no con el join a Product.costPrice. Sembrando
+      // directo (sin pasar por SalesService) hay que congelarlo a mano; el subquery
+      // copia el coste actual del producto, igual que SalesService al vender.
       await admin.$executeRaw`
-        INSERT INTO "SaleLine" ("id","organizationId","saleId","productId","name","unitPrice","qty","discountAmt","discountPct","taxRate","lineTotal")
+        INSERT INTO "SaleLine" ("id","organizationId","saleId","productId","name","unitPrice","qty","discountAmt","discountPct","taxRate","costPrice","lineTotal")
         VALUES (gen_random_uuid(), ${orgId}::uuid, ${saleId}::uuid, ${l.productId}::uuid, ${TAG},
-                ${l.unitPrice}, ${l.qty}, ${l.discountAmt ?? 0}, 0, 21, ${l.lineTotal})
+                ${l.unitPrice}, ${l.qty}, ${l.discountAmt ?? 0}, 0, 21,
+                (SELECT "costPrice" FROM "Product" WHERE id = ${l.productId}::uuid), ${l.lineTotal})
       `;
     }
     return saleId;

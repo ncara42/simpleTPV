@@ -84,6 +84,9 @@ export class SalesService {
           ? { discountAmt: l.discountAmt }
           : { discountPct: l.discountPct ?? 0 }),
         taxRate: Number(product.taxRate),
+        // Congela el coste del producto en el momento de la venta (IT-03) para
+        // una rentabilidad histórica fiable aunque el coste cambie después.
+        costPrice: Number(product.costPrice),
       };
     });
 
@@ -138,6 +141,7 @@ export class SalesService {
               discountPct: l.discountPct ?? 0,
               discountAmt: l.discountAmt,
               taxRate: l.taxRate ?? 21,
+              costPrice: l.costPrice ?? 0,
               lineTotal: l.lineTotal,
             })),
           },

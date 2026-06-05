@@ -163,6 +163,25 @@ describe('Ventas — integración', () => {
     expect(Number(sale.cashChange)).toBeCloseTo(1000 - Number(sale.total), 2);
   });
 
+  it('IT-03: congela costPrice y discountSource en la línea de venta', async () => {
+    const [prod] = await admin.$queryRaw<Array<{ costPrice: string }>>`
+      SELECT "costPrice"::text AS "costPrice" FROM "Product" WHERE id = ${product1Id}::uuid
+    `;
+    const sale = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.create(
+        { storeId: store1Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
+        user1Id,
+        'ADMIN',
+      );
+    });
+    const line = sale.lines[0]!;
+    // El coste del producto queda congelado en la línea → rentabilidad histórica
+    // fiable aunque Product.costPrice cambie después.
+    expect(Number(line.costPrice)).toBeCloseTo(Number(prod!.costPrice), 4);
+    // Descuento manual del vendedor → origen VOLUNTARY por defecto (STAT-04).
+    expect(line.discountSource).toBe('VOLUNTARY');
+  });
+
   it('numera tickets secuencialmente por tienda', async () => {
     const a = await tenantStorage.run({ organizationId: org1Id }, async () => {
       return service.create(

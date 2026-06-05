@@ -268,12 +268,11 @@ export class DashboardService {
     return withTenantTx(this.base, organizationId, async (tx) => {
       const [r] = await tx.$queryRaw<Array<{ gross: string; real: string; revenue: string }>>`
         SELECT
-          COALESCE(SUM((sl."unitPrice" - p."costPrice") * sl.qty), 0) AS gross,
-          COALESCE(SUM(sl."lineTotal" - p."costPrice" * sl.qty), 0) AS real,
+          COALESCE(SUM((sl."unitPrice" - sl."costPrice") * sl.qty), 0) AS gross,
+          COALESCE(SUM(sl."lineTotal" - sl."costPrice" * sl.qty), 0) AS real,
           COALESCE(SUM(sl."lineTotal"), 0) AS revenue
         FROM "SaleLine" sl
         JOIN "Sale" sa ON sa.id = sl."saleId"
-        JOIN "Product" p ON p.id = sl."productId"
         WHERE sa."organizationId" = ${organizationId}::uuid
           AND sa.status = 'COMPLETED'
           AND sa."createdAt" >= ${range.from}
@@ -391,7 +390,7 @@ export class DashboardService {
         Array<{ productId: string; name: string; margin: string }>
       >`
         SELECT p.id::text AS "productId", p.name AS name,
-               COALESCE(SUM(sl."lineTotal" - p."costPrice" * sl.qty), 0) AS margin
+               COALESCE(SUM(sl."lineTotal" - sl."costPrice" * sl.qty), 0) AS margin
         FROM "SaleLine" sl
         JOIN "Sale" sa ON sa.id = sl."saleId"
         JOIN "Product" p ON p.id = sl."productId"

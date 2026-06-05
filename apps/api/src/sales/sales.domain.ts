@@ -23,6 +23,8 @@ export interface PricedLine {
   discountAmt?: number;
   // IVA del producto congelado en el momento de la venta.
   taxRate?: number;
+  // Coste unitario del producto congelado en el momento de la venta (IT-03).
+  costPrice?: number;
 }
 
 export interface TicketDiscount {
