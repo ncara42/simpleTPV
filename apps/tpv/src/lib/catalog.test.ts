@@ -28,30 +28,41 @@ describe('familySubtreeIds', () => {
 
 describe('searchProducts', () => {
   it('sin familia devuelve todos los productos demo', async () => {
-    expect(await searchProducts('', null)).toHaveLength(12);
+    expect(await searchProducts('', null)).toHaveLength(36);
   });
 
   it('una familia PADRE devuelve los productos de todas sus subfamilias (subárbol)', async () => {
     const aceites = await searchProducts('', 'fam-aceites');
-    expect(aceites).toHaveLength(3); // CBD 10%, CBD 5%, Full spectrum
+    expect(aceites).toHaveLength(8); // CBD 10% (3) + CBD 5% (3) + Full spectrum (2)
     expect(aceites.map((p) => p.id).sort()).toEqual(
-      ['p-aceite-cbd-10', 'p-aceite-cbd-5', 'p-aceite-full'].sort(),
+      [
+        'p-aceite-cbd-10',
+        'p-aceite-cbd-10-30ml',
+        'p-aceite-cbd-10-menta',
+        'p-aceite-cbd-5',
+        'p-aceite-cbd-5-30ml',
+        'p-aceite-cbd-5-naranja',
+        'p-aceite-full',
+        'p-aceite-full-20',
+      ].sort(),
     );
   });
 
   it('una subfamilia hoja filtra solo sus productos', async () => {
     const cbd10 = await searchProducts('', 'fam-aceites-cbd10');
-    expect(cbd10).toHaveLength(1);
-    expect(cbd10[0]!.id).toBe('p-aceite-cbd-10');
+    expect(cbd10.map((p) => p.id).sort()).toEqual(
+      ['p-aceite-cbd-10', 'p-aceite-cbd-10-30ml', 'p-aceite-cbd-10-menta'].sort(),
+    );
   });
 
   it('una familia hoja filtra directamente sus productos', async () => {
-    expect(await searchProducts('', 'fam-cosmetica')).toHaveLength(2);
+    expect(await searchProducts('', 'fam-cosmetica')).toHaveLength(7);
   });
 
   it('combina término de búsqueda y familia', async () => {
     const r = await searchProducts('full', 'fam-aceites');
-    expect(r).toHaveLength(1);
-    expect(r[0]!.name).toBe('Aceite full spectrum');
+    expect(r.map((p) => p.name).sort()).toEqual(
+      ['Aceite full spectrum', 'Aceite full spectrum 20%'].sort(),
+    );
   });
 });

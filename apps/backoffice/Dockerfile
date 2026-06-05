@@ -20,9 +20,10 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
 FROM deps AS builder
-# URL del TPV para el toggle Backoffice/TPV. Vite la inyecta en build, así que
-# debe llegar como build arg (Dokploy → "Build args"); sin ella, el toggle cae
-# al default de localhost de apps/backoffice/src/lib/nav.ts.
+# URL del TPV para el toggle Backoffice/TPV (override OPCIONAL). Por defecto
+# apps/backoffice/src/lib/nav.ts deriva la URL del hostname en runtime
+# (admin.noelcaravaca.com → tpv.noelcaravaca.com), así que ya no hace falta este
+# build arg. Pásalo solo si los dominios no siguen el patrón admin/tpv.
 ARG VITE_TPV_URL
 ENV VITE_TPV_URL=$VITE_TPV_URL
 COPY . .

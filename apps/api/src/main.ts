@@ -1,5 +1,11 @@
 import 'reflect-metadata';
 
+import { resolve } from 'node:path';
+
+import { config } from 'dotenv';
+
+config({ path: resolve(import.meta.dirname, '../../.env.local') });
+
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';

@@ -70,131 +70,143 @@ export function GlobalStockSection() {
     setAdjusting(null);
   };
 
-  if (isLoading) {
-    return <p className="catalog-empty">Cargando…</p>;
-  }
-
   return (
     <>
-      <div className="sales-filters">
-        <input
-          className="catalog-search"
-          placeholder="Buscar producto…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          data-testid="stock-search"
-        />
-        <Select
-          className="catalog-search"
-          value={familyId}
-          onChange={(value) => setFamilyId(value)}
-          ariaLabel="Filtrar por familia"
-          data-testid="stock-family"
-          options={[
-            { value: '', label: 'Todas las familias' },
-            ...DEMO_FAMILIES.map((f) => ({ value: f.id, label: f.name })),
-          ]}
-        />
-        <Select
-          className="catalog-search"
-          value={storeId}
-          onChange={(value) => setStoreId(value)}
-          ariaLabel="Filtrar por tienda"
-          data-testid="stock-store"
-          options={[
-            { value: '', label: 'Todas las tiendas' },
-            ...storeOptions.map((s) => ({ value: s.id, label: s.name })),
-          ]}
-        />
-        <Select
-          className="catalog-search"
-          value={rotation}
-          onChange={(value) => setRotation(value)}
-          ariaLabel="Filtrar por rotación"
-          data-testid="stock-rotation"
-          options={[
-            { value: '', label: 'Toda rotación' },
-            { value: 'alta', label: 'Rotación alta' },
-            { value: 'media', label: 'Rotación media' },
-            { value: 'baja', label: 'Rotación baja' },
-          ]}
-        />
-      </div>
+      <div className="table-panel">
+        <div className="sales-filters">
+          <span className="search-field">
+            <input
+              className="catalog-search"
+              placeholder="Buscar producto…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              data-testid="stock-search"
+            />
+          </span>
+          <Select
+            className="catalog-search"
+            value={familyId}
+            onChange={(value) => setFamilyId(value)}
+            ariaLabel="Filtrar por familia"
+            data-testid="stock-family"
+            options={[
+              { value: '', label: 'Todas las familias' },
+              ...DEMO_FAMILIES.map((f) => ({ value: f.id, label: f.name })),
+            ]}
+          />
+          <Select
+            className="catalog-search"
+            value={storeId}
+            onChange={(value) => setStoreId(value)}
+            ariaLabel="Filtrar por tienda"
+            data-testid="stock-store"
+            options={[
+              { value: '', label: 'Todas las tiendas' },
+              ...storeOptions.map((s) => ({ value: s.id, label: s.name })),
+            ]}
+          />
+          <Select
+            className="catalog-search"
+            value={rotation}
+            onChange={(value) => setRotation(value)}
+            ariaLabel="Filtrar por rotación"
+            data-testid="stock-rotation"
+            options={[
+              { value: '', label: 'Toda rotación' },
+              { value: 'alta', label: 'Rotación alta' },
+              { value: 'media', label: 'Rotación media' },
+              { value: 'baja', label: 'Rotación baja' },
+            ]}
+          />
+        </div>
 
-      {filtered.length === 0 ? (
-        <p className="catalog-empty" data-testid="stock-empty">
-          Sin productos para los filtros seleccionados.
-        </p>
-      ) : (
-        <table className="catalog-table" data-testid="stock-table">
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>Familia</th>
-              <th>Rotación</th>
-              <th>{storeId ? storeOptions.find((s) => s.id === storeId)?.name : 'Por tienda'}</th>
-              <th>Total</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((row) => {
-              const visibleStores = storeId
-                ? row.stores.filter((s) => s.storeId === storeId)
-                : row.stores;
-              const rot = DEMO_PRODUCT_ROTATION[row.productId] ?? 'media';
-              return (
-                <tr key={row.productId} data-testid="stock-row">
-                  <td>{row.productName}</td>
-                  <td className="muted">{productRootFamily(row.productId)?.name ?? '—'}</td>
-                  <td>
-                    <span className={`rotation-tag rotation-${rot}`}>{ROTATION_LABEL[rot]}</span>
-                  </td>
-                  <td>
-                    <span className="stock-badges">
-                      {visibleStores.map((st) => (
-                        <button
-                          type="button"
-                          key={st.storeId}
-                          className={`store-stock-badge stock-${st.level}`}
-                          onClick={() =>
-                            setAdjusting({
-                              productId: row.productId,
-                              productName: row.productName,
-                              storeId: st.storeId,
-                              storeName: st.storeName,
-                              quantity: String(st.quantity),
-                              min: String(st.minStock),
-                            })
-                          }
-                          data-testid="stock-store-cell"
-                          title={`${LEVEL_LABEL[st.level]} · mín ${st.minStock} · clic para ajustar`}
-                        >
-                          <span className={`stock-dot stock-${st.level}`} />
-                          {st.storeName} : {st.quantity}
-                        </button>
-                      ))}
-                    </span>
-                  </td>
-                  <td>
-                    <strong>{storeId ? (visibleStores[0]?.quantity ?? 0) : row.total}</strong>
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="link-btn"
-                      onClick={() => setMovementsFor(row.productId)}
-                      data-testid="stock-history"
-                    >
-                      Movimientos
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
+        {isLoading ? (
+          <p className="catalog-empty">Cargando…</p>
+        ) : filtered.length === 0 ? (
+          <p className="catalog-empty" data-testid="stock-empty">
+            Sin productos para los filtros seleccionados.
+          </p>
+        ) : (
+          <table className="catalog-table" data-testid="stock-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Familia</th>
+                <th>Rotación</th>
+                <th>{storeId ? storeOptions.find((s) => s.id === storeId)?.name : 'Por tienda'}</th>
+                <th>Total</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((row) => {
+                const visibleStores = storeId
+                  ? row.stores.filter((s) => s.storeId === storeId)
+                  : row.stores;
+                const rot = DEMO_PRODUCT_ROTATION[row.productId] ?? 'media';
+                return (
+                  <tr key={row.productId} data-testid="stock-row">
+                    <td>{row.productName}</td>
+                    <td className="muted">{productRootFamily(row.productId)?.name ?? '—'}</td>
+                    <td>
+                      <span
+                        className={`rotation-meter rotation-${rot}`}
+                        title={`Rotación ${ROTATION_LABEL[rot].toLowerCase()}`}
+                      >
+                        <span className="rotation-bars" aria-hidden="true">
+                          <i />
+                          <i />
+                          <i />
+                        </span>
+                        <span className="rotation-label">{ROTATION_LABEL[rot]}</span>
+                      </span>
+                    </td>
+                    <td>
+                      <span className="stock-badges">
+                        {visibleStores.map((st) => (
+                          <button
+                            type="button"
+                            key={st.storeId}
+                            className={`store-stock-badge sb-${st.level}`}
+                            onClick={() =>
+                              setAdjusting({
+                                productId: row.productId,
+                                productName: row.productName,
+                                storeId: st.storeId,
+                                storeName: st.storeName,
+                                quantity: String(st.quantity),
+                                min: String(st.minStock),
+                              })
+                            }
+                            data-testid="stock-store-cell"
+                            title={`${LEVEL_LABEL[st.level]} · mín ${st.minStock} · clic para ajustar`}
+                          >
+                            <span className="store-stock-name">{st.storeName}</span>
+                            <span className="store-stock-qty">{st.quantity}</span>
+                          </button>
+                        ))}
+                      </span>
+                    </td>
+                    <td>
+                      <strong>{storeId ? (visibleStores[0]?.quantity ?? 0) : row.total}</strong>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="link-btn"
+                        onClick={() => setMovementsFor(row.productId)}
+                        data-testid="stock-history"
+                      >
+                        Movimientos
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       {adjusting && (
         <div className="modal-backdrop" onClick={() => setAdjusting(null)}>

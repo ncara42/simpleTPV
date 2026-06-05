@@ -15,6 +15,7 @@ import {
   getSalesToday,
 } from './lib/dashboard.js';
 import { deltaTone, fmtDelta, fmtEur, fmtEurCompact, fmtNum, fmtRate } from './lib/format.js';
+import { usePageHeader } from './lib/pageHeader.js';
 
 const PERIODS: Array<{ id: DashboardPeriod; label: string }> = [
   { id: 'today', label: 'Hoy' },
@@ -71,26 +72,20 @@ export function DashboardPage() {
     placeholderData: keepPreviousData,
   });
 
+  usePageHeader('Resumen', 'Actualizado hace 2 min');
+
   return (
     <section className="catalog" data-testid="dashboard">
-      <header className="catalog-head">
-        <div>
-          <h2>Resumen</h2>
-          <p className="catalog-sub">Actualizado hace 2 min</p>
-        </div>
+      <header className="catalog-head is-actions-only">
         <div className="catalog-actions">
-          <nav className="bo-tabs dash-period" data-testid="dash-period">
-            {PERIODS.map((p) => (
-              <button
-                key={p.id}
-                className={`bo-tab ${period === p.id ? 'active' : ''}`}
-                onClick={() => setPeriod(p.id)}
-                data-testid={`dash-period-${p.id}`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </nav>
+          <Select
+            className="dash-period-select"
+            value={period}
+            onChange={(value) => setPeriod(value as DashboardPeriod)}
+            ariaLabel="Periodo"
+            data-testid="dash-period"
+            options={PERIODS.map((p) => ({ value: p.id, label: p.label }))}
+          />
           <Select
             className="dash-store"
             value={storeId}
@@ -244,12 +239,12 @@ export function DashboardPage() {
           <p className="dash-panel-sub">Productos en alerta ahora</p>
           <ul className="dash-stockout-list">
             {DEMO_STOCKOUTS.map((s) => (
-              <li key={`${s.name}-${s.store}`}>
-                <span className={`stock-dot stock-${s.level}`} />
-                <span className="dash-stockout-name">{s.name}</span>
-                <span className="dash-stockout-store">
-                  {s.store} · {s.qty} ud
+              <li key={`${s.name}-${s.store}`} className={`dash-stockout-item lvl-${s.level}`}>
+                <span className="dash-stockout-info">
+                  <span className="dash-stockout-name">{s.name}</span>
+                  <span className="dash-stockout-store">{s.store}</span>
                 </span>
+                <span className="dash-stockout-tag">{s.qty} ud</span>
               </li>
             ))}
           </ul>
@@ -359,13 +354,23 @@ function Rankings(props: {
   }
   const rows =
     tab === 'sales'
-      ? (props.data?.topSales ?? []).map((r) => ({ name: r.name, value: fmtEur(r.total) }))
+      ? (props.data?.topSales ?? []).map((r) => ({
+          name: r.name,
+          value: fmtEur(r.total),
+          num: r.total,
+        }))
       : tab === 'margin'
-        ? (props.data?.topMargin ?? []).map((r) => ({ name: r.name, value: fmtEur(r.margin) }))
+        ? (props.data?.topMargin ?? []).map((r) => ({
+            name: r.name,
+            value: fmtEur(r.margin),
+            num: r.margin,
+          }))
         : (props.data?.worstRotation ?? []).map((r) => ({
             name: r.name,
             value: `${fmtNum(r.units, 0)} ud`,
+            num: r.units,
           }));
+  const max = Math.max(1, ...rows.map((r) => r.num));
 
   return (
     <>
@@ -383,16 +388,23 @@ function Rankings(props: {
       {rows.length === 0 ? (
         <p className="catalog-empty">Sin datos.</p>
       ) : (
-        <table className="catalog-table" data-testid="rank-table">
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={`${r.name}-${i}`}>
-                <td>{r.name}</td>
-                <td className="dash-rank-value">{r.value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ol className="dash-rank-list" data-testid="rank-table">
+          {rows.map((r, i) => (
+            <li
+              key={`${r.name}-${i}`}
+              className="dash-rank-row"
+              style={{ '--i': i } as React.CSSProperties}
+            >
+              <span className="dash-rank-pos">{i + 1}</span>
+              <span className="dash-rank-name">{r.name}</span>
+              <span className="dash-rank-value">{r.value}</span>
+              <span
+                className="dash-rank-meter"
+                style={{ '--w': `${(r.num / max) * 100}%` } as React.CSSProperties}
+              />
+            </li>
+          ))}
+        </ol>
       )}
     </>
   );

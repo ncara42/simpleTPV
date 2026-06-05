@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// El cierre de caja del TPV (CashPanel embebido en Venta) con conteo por
-// denominaciones y persistencia del conteo en curso.
+// El cierre de caja del TPV (CashPanel en su vista "Caja" del sidebar) con
+// conteo por denominaciones y persistencia del conteo en curso.
 async function login(page: import('@playwright/test').Page): Promise<void> {
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
@@ -15,6 +15,10 @@ async function login(page: import('@playwright/test').Page): Promise<void> {
 test('cierre de caja: contar por denominaciones y confirmar', async ({ page }) => {
   await login(page);
   await page.getByTestId('sale-grid').waitFor({ timeout: 10000 });
+
+  // La caja vive en su propia vista del sidebar (ya no embebida en Venta).
+  await page.getByTestId('nav-cash').click();
+  await expect(page.getByTestId('cash-panel')).toBeVisible();
 
   // Caja demo abierta → Cerrar caja muestra el contador de denominaciones.
   await page.getByTestId('cash-close').click();
@@ -33,6 +37,9 @@ test('cierre de caja: contar por denominaciones y confirmar', async ({ page }) =
 test('el conteo en curso persiste al cerrar y reabrir el panel', async ({ page }) => {
   await login(page);
   await page.getByTestId('sale-grid').waitFor({ timeout: 10000 });
+
+  await page.getByTestId('nav-cash').click();
+  await expect(page.getByTestId('cash-panel')).toBeVisible();
 
   await page.getByTestId('cash-close').click();
   await page.getByTestId('cash-count-2000').fill('3'); // 3×20€ = 60€

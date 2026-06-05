@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { eur } from './lib/format';
+
 export interface PaymentData {
   paymentMethod: 'CASH' | 'CARD';
   cashGiven?: number;
@@ -12,6 +14,39 @@ interface PaymentModalProps {
   busy: boolean;
 }
 
+const BILLS = [5, 10, 20, 50, 100, 200];
+
+// Importes sugeridos para el pago en efectivo: los próximos redondeos de 5 y 10
+// y los billetes comunes que cubren el total. Deduplicado, ordenado y limitado
+// a 3 chips (más el chip "Exacto") para no recargar la card.
+function quickAmounts(total: number): number[] {
+  const candidates = [
+    Math.ceil(total / 5) * 5,
+    Math.ceil(total / 10) * 10,
+    ...BILLS.filter((bill) => bill >= total),
+  ];
+  return Array.from(new Set(candidates))
+    .filter((amount) => amount > total)
+    .sort((a, b) => a - b)
+    .slice(0, 3);
+}
+
+const methodClass = (active: boolean) =>
+  [
+    'h-12 rounded-full border text-sm font-semibold transition-colors active:translate-y-[0.5px]',
+    active
+      ? 'border-[var(--ui-brand)] bg-[var(--ui-brand-soft)] text-[var(--ui-brand-ink)]'
+      : 'border-[var(--ui-border)] bg-[var(--ui-surface)] text-[var(--ui-text-muted)] hover:bg-[var(--ui-surface-subtle)]',
+  ].join(' ');
+
+const chipClass = (active: boolean) =>
+  [
+    'h-9 rounded-full border px-1 text-sm font-medium tabular-nums whitespace-nowrap transition-colors active:translate-y-[0.5px]',
+    active
+      ? 'border-[var(--ui-brand)] bg-[var(--ui-brand-soft)] text-[var(--ui-brand-ink)]'
+      : 'border-[var(--ui-border)] bg-[var(--ui-surface)] text-[var(--ui-text)] hover:bg-[var(--ui-surface-subtle)]',
+  ].join(' ');
+
 export function PaymentModal({ total, onConfirm, onCancel, busy }: PaymentModalProps) {
   const [method, setMethod] = useState<'CASH' | 'CARD'>('CASH');
   const [given, setGiven] = useState('');
@@ -20,6 +55,10 @@ export function PaymentModal({ total, onConfirm, onCancel, busy }: PaymentModalP
   const givenValid = given !== '' && !Number.isNaN(givenNum) && givenNum >= total;
   const change = givenValid ? givenNum - total : 0;
   const canConfirm = !busy && (method === 'CARD' || givenValid);
+
+  const quick = quickAmounts(total);
+  const isAmount = (amount: number) =>
+    given !== '' && !Number.isNaN(givenNum) && Math.abs(givenNum - amount) < 0.005;
 
   function handleConfirm() {
     if (!canConfirm) return;
@@ -39,13 +78,16 @@ export function PaymentModal({ total, onConfirm, onCancel, busy }: PaymentModalP
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-sm rounded-xl border border-[var(--ui-border)] bg-white shadow-2xl"
+        className="w-full max-w-sm overflow-hidden rounded-[var(--ui-radius-xl)] border border-[var(--ui-border)] bg-[var(--ui-surface)] shadow-[0_6px_22px_-10px_rgba(0,0,0,0.18)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[var(--ui-border)] px-5 py-4">
-          <h2 className="text-base font-semibold text-neutral-900">Cobrar</h2>
-          <div className="text-xl font-bold tabular-nums text-neutral-900" data-testid="pay-total">
-            {total.toFixed(2)} €
+          <h2 className="text-base font-semibold text-[var(--ui-text)]">Cobrar</h2>
+          <div
+            className="text-2xl font-bold tabular-nums tracking-tight text-[var(--ui-text)]"
+            data-testid="pay-total"
+          >
+            {eur(total)} €
           </div>
         </div>
 
@@ -55,12 +97,7 @@ export function PaymentModal({ total, onConfirm, onCancel, busy }: PaymentModalP
               type="button"
               onClick={() => setMethod('CASH')}
               data-testid="pay-cash"
-              className={[
-                'h-11 rounded-lg border text-sm font-semibold transition-colors',
-                method === 'CASH'
-                  ? 'border-neutral-900 bg-neutral-900 text-white'
-                  : 'border-[var(--ui-border)] bg-white text-neutral-600 hover:bg-neutral-50',
-              ].join(' ')}
+              className={methodClass(method === 'CASH')}
             >
               Efectivo
             </button>
@@ -68,12 +105,7 @@ export function PaymentModal({ total, onConfirm, onCancel, busy }: PaymentModalP
               type="button"
               onClick={() => setMethod('CARD')}
               data-testid="pay-card"
-              className={[
-                'h-11 rounded-lg border text-sm font-semibold transition-colors',
-                method === 'CARD'
-                  ? 'border-neutral-900 bg-neutral-900 text-white'
-                  : 'border-[var(--ui-border)] bg-white text-neutral-600 hover:bg-neutral-50',
-              ].join(' ')}
+              className={methodClass(method === 'CARD')}
             >
               Tarjeta
             </button>
@@ -81,52 +113,75 @@ export function PaymentModal({ total, onConfirm, onCancel, busy }: PaymentModalP
 
           {method === 'CASH' && (
             <div className="space-y-3">
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-neutral-500">Entregado</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={given}
-                  onChange={(e) => setGiven(e.target.value)}
-                  data-testid="cash-given"
-                  autoFocus
-                  className="h-12 w-full rounded-lg border border-[var(--ui-border)] bg-white px-3 text-lg tabular-nums outline-none transition-colors focus:border-neutral-400"
-                />
-              </label>
-              <div className="flex items-center justify-between rounded-lg bg-neutral-50 px-4 py-2.5 text-sm">
-                <span className="font-medium text-neutral-500">Cambio</span>
+              <div
+                className="grid gap-2"
+                style={{ gridTemplateColumns: `repeat(${quick.length + 1}, minmax(0, 1fr))` }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setGiven(String(total))}
+                  className={chipClass(isAmount(total))}
+                >
+                  Exacto
+                </button>
+                {quick.map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    onClick={() => setGiven(String(amount))}
+                    className={chipClass(isAmount(amount))}
+                  >
+                    {amount} €
+                  </button>
+                ))}
+              </div>
+
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                value={given}
+                onChange={(e) => setGiven(e.target.value)}
+                data-testid="cash-given"
+                placeholder="Entregado"
+                aria-label="Entregado"
+                autoFocus
+                className="h-12 w-full rounded-full border border-[var(--ui-border)] bg-[var(--ui-surface)] px-4 text-lg tabular-nums text-[var(--ui-text)] outline-none transition-[border-color,box-shadow] placeholder:text-[var(--ui-text-muted)] focus:border-[var(--ui-brand)] focus:shadow-[var(--ui-focus)] [appearance:textfield] [&::-webkit-outer-spin-button]:[appearance:none] [&::-webkit-inner-spin-button]:[appearance:none]"
+              />
+
+              <div className="flex items-center justify-between rounded-full bg-[var(--ui-surface-subtle)] px-5 py-3 text-sm">
+                <span className="text-lg font-medium text-[var(--ui-text-muted)]">Cambio</span>
                 <span
-                  className="text-base font-bold tabular-nums text-neutral-900"
+                  className="text-lg font-bold tabular-nums text-[var(--ui-brand-ink)]"
                   data-testid="cash-change"
                 >
-                  {change.toFixed(2)} €
+                  {eur(change)} €
                 </span>
               </div>
             </div>
           )}
+        </div>
 
-          <div className="flex gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={busy}
-              data-testid="pay-cancel"
-              className="h-11 flex-1 rounded-lg border border-[var(--ui-border)] bg-white text-sm font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirm}
-              disabled={!canConfirm}
-              data-testid="pay-confirm"
-              className="h-11 flex-1 rounded-lg border border-neutral-900 bg-neutral-900 text-sm font-semibold text-white hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {busy ? 'Cobrando…' : 'Confirmar'}
-            </button>
-          </div>
+        <div className="flex gap-2 border-t border-[var(--ui-border)] p-5">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={busy}
+            data-testid="pay-cancel"
+            className="h-12 flex-1 rounded-full border border-[var(--ui-border)] bg-[var(--ui-surface)] text-sm font-medium text-[var(--ui-text-muted)] transition-colors hover:bg-[var(--ui-surface-subtle)] active:translate-y-[0.5px] disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={!canConfirm}
+            data-testid="pay-confirm"
+            className="h-12 flex-1 rounded-full bg-[var(--ui-primary)] text-sm font-semibold text-[var(--ui-primary-fg)] transition-colors hover:bg-[var(--ui-primary-hover)] active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {busy ? 'Cobrando…' : 'Confirmar'}
+          </button>
         </div>
       </div>
     </div>

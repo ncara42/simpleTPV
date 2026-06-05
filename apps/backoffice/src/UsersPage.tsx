@@ -1,9 +1,11 @@
 import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { DEMO_STORES, type DemoUser, ROLE_LABEL } from './demo/demoData.js';
 import { createUser, deleteUser, listUsers, type NewUser } from './lib/admin.js';
+import { usePageHeader } from './lib/pageHeader.js';
 
 type Role = NewUser['role'];
 
@@ -96,6 +98,8 @@ export function UsersPage() {
     [allUsers, search, storeFilter],
   );
 
+  usePageHeader('Usuarios', `${allUsers.length} usuarios`, 'users-count');
+
   // ─── Selección ─────────────────────────────────────────────────────────
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const toggleSelect = (id: string): void =>
@@ -150,6 +154,20 @@ export function UsersPage() {
     } else {
       setOverrides((prev) => ({ ...prev, [f.id as string]: patch }));
     }
+  };
+
+  // Activa/desactiva un usuario desde su badge en la tabla, conservando el
+  // resto del overlay local (demo: no hay backend que persista el cambio).
+  const toggleActive = (id: string): void => {
+    const current = allUsers.find((u) => u.id === id);
+    if (!current) return;
+    const active = !current.active;
+    if (extras.some((u) => u.id === id)) {
+      setExtras((prev) => prev.map((u) => (u.id === id ? { ...u, active } : u)));
+    } else {
+      setOverrides((prev) => ({ ...prev, [id]: { ...prev[id], active } }));
+    }
+    invalidate();
   };
 
   // Borrado en lote en local (demo: deleteUser es un stub sin backend).
@@ -228,145 +246,165 @@ export function UsersPage() {
 
   return (
     <section className="catalog">
-      <header className="catalog-head">
-        <div>
-          <h2>Usuarios</h2>
-          <p className="catalog-sub" data-testid="users-count">
-            {allUsers.length} usuarios
-          </p>
-        </div>
-      </header>
-
-      <div className="users-toolbar">
-        <div className="sales-filters">
-          <input
-            className="catalog-search"
-            placeholder="Buscar por nombre…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            data-testid="users-search"
-          />
-          <Select
-            className="catalog-search"
-            value={storeFilter}
-            onChange={setStoreFilter}
-            ariaLabel="Filtrar por tienda"
-            data-testid="users-store"
-            options={[
-              { value: '', label: 'Todas las tiendas' },
-              ...DEMO_STORES.map((s) => ({ value: s.id, label: s.name })),
-            ]}
-          />
-          {selected.length > 0 && (
-            <>
-              {!allFilteredSelected && (
+      <div className="table-panel">
+        <div className="users-toolbar">
+          <div className="sales-filters">
+            <span className="search-field">
+              <input
+                className="catalog-search"
+                placeholder="Buscar por nombre…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                data-testid="users-search"
+              />
+            </span>
+            <Select
+              className="catalog-search"
+              value={storeFilter}
+              onChange={setStoreFilter}
+              ariaLabel="Filtrar por tienda"
+              data-testid="users-store"
+              options={[
+                { value: '', label: 'Todas las tiendas' },
+                ...DEMO_STORES.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+            />
+            {selected.length > 0 && (
+              <>
+                {!allFilteredSelected && (
+                  <button
+                    type="button"
+                    className="users-sel-btn"
+                    onClick={selectAllFiltered}
+                    data-testid="users-select-all"
+                  >
+                    Seleccionar todo
+                  </button>
+                )}
                 <button
                   type="button"
                   className="users-sel-btn"
-                  onClick={selectAllFiltered}
-                  data-testid="users-select-all"
+                  onClick={clearSelection}
+                  data-testid="users-clear"
                 >
-                  Seleccionar todo
+                  Quitar selección
                 </button>
-              )}
+              </>
+            )}
+          </div>
+          {selected.length > 0 ? (
+            <div className="users-toolbar-actions">
               <button
                 type="button"
-                className="users-sel-btn"
-                onClick={clearSelection}
-                data-testid="users-clear"
+                className="users-bulk-edit"
+                onClick={openBulkEdit}
+                data-testid="users-edit"
               >
-                Quitar selección
+                Editar{selected.length > 1 ? ` (${selected.length})` : ''}
               </button>
-            </>
+              <button
+                type="button"
+                className="users-bulk-del"
+                onClick={removeSelected}
+                data-testid="users-delete"
+              >
+                Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
+              </button>
+            </div>
+          ) : (
+            <button className="btn-primary" onClick={openCreate} data-testid="new-user">
+              Nuevo usuario
+            </button>
           )}
         </div>
-        {selected.length > 0 ? (
-          <div className="users-toolbar-actions">
-            <button
-              type="button"
-              className="users-bulk-edit"
-              onClick={openBulkEdit}
-              data-testid="users-edit"
-            >
-              Editar{selected.length > 1 ? ` (${selected.length})` : ''}
-            </button>
-            <button
-              type="button"
-              className="users-bulk-del"
-              onClick={removeSelected}
-              data-testid="users-delete"
-            >
-              Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
-            </button>
-          </div>
+
+        {isLoading ? (
+          <p className="catalog-empty">Cargando…</p>
+        ) : filtered.length === 0 ? (
+          <p className="catalog-empty" data-testid="users-empty">
+            Sin usuarios para los filtros seleccionados.
+          </p>
         ) : (
-          <button className="btn-primary" onClick={openCreate} data-testid="new-user">
-            Nuevo usuario
-          </button>
+          <table
+            className={`catalog-table users-table${selected.length ? ' has-selection' : ''}`}
+            data-testid="users-table"
+          >
+            <thead>
+              <tr>
+                <th className="users-select-col" aria-label="Selección" />
+                <th>Nombre</th>
+                <th>Email</th>
+                <th>Rol</th>
+                <th>Tiendas</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((u) => {
+                const isSel = selectedSet.has(u.id);
+                return (
+                  <tr
+                    key={u.id}
+                    className={isSel ? 'is-selected' : undefined}
+                    aria-selected={isSel}
+                    onClick={() => toggleSelect(u.id)}
+                    data-testid="user-row"
+                  >
+                    <td className="users-select-col" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="user-check"
+                        aria-label={`Seleccionar ${u.name}`}
+                        data-testid="user-select"
+                        checked={isSel}
+                        onChange={() => toggleSelect(u.id)}
+                      />
+                    </td>
+                    <td>{u.name}</td>
+                    <td className="muted">{u.email}</td>
+                    <td>
+                      <span className="role-badge" data-testid="user-role-badge">
+                        {ROLE_LABEL[u.role]}
+                      </span>
+                    </td>
+                    <td className="muted">{storesLabel(u.role, u.storeIds ?? [])}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className={`user-state ${u.active ? 'on' : 'off'}`}
+                        title={
+                          u.active
+                            ? 'Activo — pulsa para desactivar'
+                            : 'Inactivo — pulsa para activar'
+                        }
+                        aria-label={u.active ? 'Activo' : 'Inactivo'}
+                        aria-pressed={u.active}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleActive(u.id);
+                        }}
+                      >
+                        <Check
+                          className="user-state__icon user-state__icon--on"
+                          size={14}
+                          strokeWidth={3}
+                          aria-hidden="true"
+                        />
+                        <X
+                          className="user-state__icon user-state__icon--off"
+                          size={14}
+                          strokeWidth={3}
+                          aria-hidden="true"
+                        />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </div>
-
-      {isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : filtered.length === 0 ? (
-        <p className="catalog-empty" data-testid="users-empty">
-          Sin usuarios para los filtros seleccionados.
-        </p>
-      ) : (
-        <table
-          className={`catalog-table users-table${selected.length ? ' has-selection' : ''}`}
-          data-testid="users-table"
-        >
-          <thead>
-            <tr>
-              <th className="users-select-col" aria-label="Selección" />
-              <th>Nombre</th>
-              <th>Email</th>
-              <th>Rol</th>
-              <th>Tiendas</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((u) => {
-              const isSel = selectedSet.has(u.id);
-              return (
-                <tr
-                  key={u.id}
-                  className={isSel ? 'is-selected' : undefined}
-                  aria-selected={isSel}
-                  onClick={() => toggleSelect(u.id)}
-                  data-testid="user-row"
-                >
-                  <td className="users-select-col" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      className="user-check"
-                      aria-label={`Seleccionar ${u.name}`}
-                      data-testid="user-select"
-                      checked={isSel}
-                      onChange={() => toggleSelect(u.id)}
-                    />
-                  </td>
-                  <td>{u.name}</td>
-                  <td className="muted">{u.email}</td>
-                  <td>
-                    <span className="role-badge" data-testid="user-role-badge">
-                      {ROLE_LABEL[u.role]}
-                    </span>
-                  </td>
-                  <td className="muted">{storesLabel(u.role, u.storeIds ?? [])}</td>
-                  <td>
-                    <span className={`user-state ${u.active ? 'on' : 'off'}`}>
-                      {u.active ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
 
       {form && (
         <div className="modal-backdrop" onClick={closeModal}>

@@ -6,6 +6,7 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./alert.css": "./src/styles/alert.css",
     "./login.css": "./src/styles/login.css",
     "./select.css": "./src/styles/select.css",
     "./sidebar.css": "./src/styles/sidebar.css",

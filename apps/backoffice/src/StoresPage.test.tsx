@@ -30,14 +30,16 @@ describe('StoresPage', () => {
   it('renderiza la cabecera, filtros y las tarjetas de tienda', async () => {
     renderPage();
     expect(screen.getByTestId('new-store')).toBeInTheDocument();
-    expect(screen.getByTestId('store-filter-all')).toBeInTheDocument();
+    expect(screen.getByTestId('store-status-filter')).toBeInTheDocument();
+    expect(screen.getByTestId('store-period')).toBeInTheDocument();
     await waitFor(() => expect(screen.getAllByTestId('store-card')).toHaveLength(2));
   });
 
   it('filtra por estado (dormidas deja solo una)', async () => {
     renderPage();
     await waitFor(() => expect(screen.getAllByTestId('store-card')).toHaveLength(2));
-    fireEvent.click(screen.getByTestId('store-filter-dormida'));
+    fireEvent.click(screen.getByTestId('store-status-filter'));
+    fireEvent.click(screen.getByRole('option', { name: 'Dormidas' }));
     expect(screen.getAllByTestId('store-card')).toHaveLength(1);
   });
 

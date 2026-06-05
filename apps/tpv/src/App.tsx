@@ -1,3 +1,4 @@
+import '@simpletpv/ui/alert.css';
 import '@simpletpv/ui/login.css';
 import '@simpletpv/ui/select.css';
 import '@simpletpv/ui/topbar.css';
@@ -15,8 +16,11 @@ import { InventoryPanel } from './InventoryPanel.js';
 import { isDemo } from './lib/api-config.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { useCart } from './lib/cart.js';
+import { formatDuration } from './lib/format.js';
 import { switchApp } from './lib/nav.js';
+import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
 import { listStores } from './lib/sales.js';
+import { useTimeClock } from './lib/useTimeClock.js';
 import { SalePage } from './SalePage.js';
 import { StoreOrderReceivePanel } from './StoreOrderReceivePanel.js';
 import { TicketsPanel } from './TicketsPanel.js';
@@ -33,22 +37,35 @@ const TPV_NAV: NavItem[] = [
   { id: 'clock', label: 'Fichaje', icon: <Clock size={18} /> },
 ];
 
-// Contexto persistente de la barra superior por vista (la tienda activa). El
-// título de cada vista vive en su propio contenido, no se duplica aquí.
-const EYEBROWS: Record<View, string> = {
-  sale: 'Tienda Centro',
-  tickets: 'Tienda Centro',
-  orders: 'Tienda Centro',
-  inventory: 'Tienda Centro',
-  cash: 'Tienda Centro',
-  clock: 'Tienda Centro',
-};
+// La TopBar refleja el título y la descripción de la vista activa (publicados por
+// cada vista vía usePageHeader, igual que el backoffice).
+function ShellTopBar() {
+  const { title, description, descriptionTestId } = usePageHeaderValue();
+  return (
+    <TopBar
+      title={title}
+      subtitle={description}
+      subtitleTestId={descriptionTestId}
+      activeApp="tpv"
+      onSwitchApp={switchApp}
+    />
+  );
+}
 
 function Home() {
   const logout = useAuthStore((s) => s.clear);
   const [view, setView] = useState<View>('sale');
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
   const activeStore = stores[0]?.id ?? null;
+
+  // El item "Fichaje" del sidebar muestra el temporizador del turno en vivo
+  // mientras hay jornada activa; si no, solo su icono y etiqueta.
+  const { status, liveWorkedMs } = useTimeClock(activeStore);
+  const navItems = TPV_NAV.map((item) =>
+    item.id === 'clock' && status !== 'OUT'
+      ? { ...item, counter: formatDuration(liveWorkedMs) }
+      : item,
+  );
 
   // Precarga del carrito demo: solo la primera vez (al montar) para que
   // "Ticket actual" aparezca con las 3 líneas del mockup al entrar. Lee el
@@ -65,12 +82,10 @@ function Home() {
     }
   }, []);
 
-  const eyebrow = EYEBROWS[view];
-
   return (
     <div className="app-shell">
       <Sidebar
-        items={TPV_NAV}
+        items={navItems}
         activeItem={view}
         onSelect={(id) => setView(id as View)}
         brand={{ title: 'SimpleTPV', subtitle: 'Punto de venta' }}
@@ -78,15 +93,17 @@ function Home() {
         onLogout={logout}
       />
       <div className="app-content">
-        <TopBar eyebrow={eyebrow} activeApp="tpv" onSwitchApp={switchApp} />
-        <main className="app-main">
-          {view === 'sale' && <SalePage />}
-          {view === 'tickets' && <TicketsPanel storeId={activeStore} />}
-          {view === 'orders' && <StoreOrderReceivePanel />}
-          {view === 'inventory' && <InventoryPanel storeId={activeStore} />}
-          {view === 'cash' && <CashPanel storeId={activeStore} />}
-          {view === 'clock' && <TimeClockPanel storeId={activeStore} />}
-        </main>
+        <PageHeaderProvider>
+          <ShellTopBar />
+          <main className="app-main">
+            {view === 'sale' && <SalePage />}
+            {view === 'tickets' && <TicketsPanel storeId={activeStore} />}
+            {view === 'orders' && <StoreOrderReceivePanel />}
+            {view === 'inventory' && <InventoryPanel storeId={activeStore} />}
+            {view === 'cash' && <CashPanel storeId={activeStore} />}
+            {view === 'clock' && <TimeClockPanel storeId={activeStore} />}
+          </main>
+        </PageHeaderProvider>
       </div>
     </div>
   );
@@ -95,7 +112,12 @@ function Home() {
 export default function App() {
   const isAuthed = useAuthStore((s) => s.accessToken !== null);
   if (!isAuthed) {
-    return <LoginForm onSubmit={api.login} />;
+    return (
+      <LoginForm
+        onSubmit={api.login}
+        {...(isDemo() ? { initialEmail: 'demo@simpletpv.com', initialPassword: 'demo' } : {})}
+      />
+    );
   }
   return <Home />;
 }

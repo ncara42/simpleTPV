@@ -6,16 +6,58 @@ export interface TopBarProps {
    */
   eyebrow?: string;
   /**
-   * Título opcional. Por defecto las apps NO lo pasan: el título vive una sola
-   * vez en la cabecera de la propia vista. Disponible para consumidores que sí
-   * quieran un título en la barra.
+   * Título de la barra. El backoffice lo usa para reflejar el título de la vista
+   * activa (junto a `subtitle`) y así liberar espacio en el contenido. Otras apps
+   * pueden omitirlo si prefieren que el título viva en la cabecera de la vista.
    */
   title?: string;
+  /**
+   * Descripción/subtítulo bajo el título (p. ej. «12 productos activos»). Solo se
+   * pinta si hay `title`. Acompaña a la cabecera informativa del backoffice.
+   */
+  subtitle?: string | undefined;
+  /** data-testid opcional para el subtítulo (preserva hooks de e2e como `catalog-count`). */
+  subtitleTestId?: string | undefined;
   activeApp?: 'backoffice' | 'tpv';
   onSwitchApp?: (app: 'backoffice' | 'tpv') => void;
+  /** Si se define, pinta la campana de notificaciones a la izquierda del conmutador. */
+  onNotifications?: () => void;
+  /** Nº de notificaciones sin leer; se muestra como badge sobre la campana si > 0. */
+  notificationCount?: number;
+  /** Marca la campana como activa (la vista de notificaciones está abierta). */
+  notificationsActive?: boolean;
 }
 
-export function TopBar({ eyebrow, title, activeApp = 'tpv', onSwitchApp }: TopBarProps) {
+function BellGlyph() {
+  return (
+    <svg
+      width="19"
+      height="19"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </svg>
+  );
+}
+
+export function TopBar({
+  eyebrow,
+  title,
+  subtitle,
+  subtitleTestId,
+  activeApp = 'tpv',
+  onSwitchApp,
+  onNotifications,
+  notificationCount = 0,
+  notificationsActive = false,
+}: TopBarProps) {
   return (
     <header className="topbar" data-testid="topbar">
       <div className="topbar-left">
@@ -25,8 +67,35 @@ export function TopBar({ eyebrow, title, activeApp = 'tpv', onSwitchApp }: TopBa
             {title}
           </h1>
         )}
+        {title && subtitle && (
+          <p className="topbar-subtitle" data-testid={subtitleTestId} title={subtitle}>
+            {subtitle}
+          </p>
+        )}
       </div>
       <div className="topbar-right">
+        {onNotifications && (
+          <button
+            type="button"
+            className={`topbar-notif${notificationsActive ? ' active' : ''}`}
+            onClick={onNotifications}
+            aria-label={
+              notificationCount > 0
+                ? `Notificaciones (${notificationCount} sin leer)`
+                : 'Notificaciones'
+            }
+            aria-pressed={notificationsActive}
+            title="Notificaciones"
+            data-testid="topbar-notifications"
+          >
+            <BellGlyph />
+            {notificationCount > 0 && (
+              <span className="topbar-notif-badge" data-testid="topbar-notifications-badge">
+                {notificationCount}
+              </span>
+            )}
+          </button>
+        )}
         <div className="topbar-switch" role="group" aria-label="Cambiar de app">
           <button
             type="button"

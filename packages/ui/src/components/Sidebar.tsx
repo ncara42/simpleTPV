@@ -2,11 +2,25 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { initials } from '../lib/initials.js';
 
+// Variantes de la micro-animación del icono al hacer hover (definidas como
+// @keyframes en sidebar.css). Se reparten ciclando por la posición del item:
+// así dos vecinos nunca repiten gesto y las cuatro salen equilibradas (un hash
+// del id agrupaba demasiado con pocas entradas).
+const ICON_ANIMS = ['sidebar-icon-hop', 'sidebar-icon-wiggle', 'sidebar-icon-pulse'] as const;
+
+function iconAnimAt(index: number): string {
+  return ICON_ANIMS[index % ICON_ANIMS.length] ?? ICON_ANIMS[0];
+}
+
 export interface NavItem {
   id: string;
   label: string;
   icon: React.ReactNode;
   group?: string;
+  /** Contador opcional (p. ej. notificaciones sin leer) pintado a la derecha del item. */
+  badge?: number;
+  /** Texto opcional (p. ej. temporizador del fichaje en vivo) como píldora a la derecha. */
+  counter?: string;
 }
 
 export interface NavGroup {
@@ -46,25 +60,6 @@ function LogoutGlyph() {
     >
       <path d="M12 2v10" />
       <path d="M18.4 6.6a9 9 0 1 1-12.8 0" />
-    </svg>
-  );
-}
-
-/** Chevron del disparador de cuenta: apunta hacia arriba (el menú abre hacia arriba). */
-function AccountCaret() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="18 15 12 9 6 15" />
     </svg>
   );
 }
@@ -143,7 +138,7 @@ export function Sidebar({
   const renderItems = (filterGroup?: string) =>
     items
       .filter((item) => item.group === filterGroup)
-      .map((item) => {
+      .map((item, index) => {
         const isActive = activeItem === item.id;
         return (
           <li key={item.id}>
@@ -155,8 +150,23 @@ export function Sidebar({
               aria-current={isActive ? 'page' : undefined}
               data-testid={`nav-${item.id}`}
             >
-              <span className="sidebar-item-icon">{item.icon}</span>
+              <span
+                className="sidebar-item-icon"
+                style={{ '--sidebar-icon-anim': iconAnimAt(index) } as React.CSSProperties}
+              >
+                {item.icon}
+              </span>
               <span className="sidebar-item-label">{item.label}</span>
+              {item.counter && (
+                <span className="sidebar-item-counter" data-testid={`nav-${item.id}-counter`}>
+                  {item.counter}
+                </span>
+              )}
+              {item.badge != null && item.badge > 0 && (
+                <span className="sidebar-item-badge" data-testid={`nav-${item.id}-badge`}>
+                  {item.badge}
+                </span>
+              )}
             </button>
           </li>
         );
@@ -267,11 +277,6 @@ export function Sidebar({
                   <span className="sidebar-account-sub">{account.subtitle}</span>
                 )}
               </span>
-              {onLogout && (
-                <span className="sidebar-account-caret" aria-hidden="true">
-                  <AccountCaret />
-                </span>
-              )}
             </button>
           </div>
         ) : (

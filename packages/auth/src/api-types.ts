@@ -438,7 +438,7 @@ export interface PairDeviceInput {
   pairingToken: string;
 }
 
-export type TimeClockType = 'CLOCK_IN' | 'CLOCK_OUT';
+export type TimeClockType = 'CLOCK_IN' | 'CLOCK_OUT' | 'BREAK_START' | 'BREAK_END';
 
 export interface TimeClockEntry {
   id: string;
@@ -447,6 +447,34 @@ export interface TimeClockEntry {
   deviceId: string | null;
   type: TimeClockType;
   createdAt: string;
+}
+
+// Estado derivado de la máquina de fichajes: fuera, fichado o en pausa.
+export type TimeClockStatus = 'OUT' | 'IN' | 'BREAK';
+
+// Resumen del día de un empleado, derivado de la secuencia de fichajes.
+export interface TimeClockSummary {
+  status: TimeClockStatus;
+  // ms trabajados hoy (descontando pausas), hasta el corte del servidor.
+  workedMs: number;
+  // ms en pausa hoy.
+  breakMs: number;
+  // Marca temporal desde la que el cliente sigue contando en vivo si status === 'IN'.
+  runningSince: string | null;
+  entries: TimeClockEntry[];
+}
+
+// Fila del historial de control horario (backoffice): un día de un empleado.
+export interface TimeClockHistoryRow {
+  userId: string;
+  userName: string;
+  storeId: string;
+  storeName: string;
+  date: string; // YYYY-MM-DD
+  firstIn: string | null;
+  lastOut: string | null;
+  workedMs: number;
+  breakMs: number;
 }
 
 // Evento del canal SSE GET /events (semana 3). El cliente filtra por `type`.

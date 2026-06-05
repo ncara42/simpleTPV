@@ -1,3 +1,4 @@
+export { Alert, type AlertProps, type AlertVariant } from './components/Alert.js';
 export { Badge } from './components/Badge.js';
 export { Button } from './components/Button.js';
 export { Input } from './components/Input.js';

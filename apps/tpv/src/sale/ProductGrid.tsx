@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 import type { Product } from '../lib/catalog.js';
 import { eur } from '../lib/format.js';
 import type { StockRow } from '../lib/stock.js';
@@ -18,6 +20,20 @@ export function ProductGrid({
   onAdd: (p: Product) => void;
   onShowStock: (p: Product) => void;
 }) {
+  // Clasifica (agotado = hay fila de stock con quantity ≤ 0) y ordena con partición
+  // estable: los agotados al final, conservando el orden de la API dentro de cada grupo
+  // (desempate por índice original). Los productos sin fila de stock NO son agotados:
+  // "sin fila" significa que nunca se dio de alta stock en esa tienda, no un 0 confirmado.
+  const ordered = useMemo(() => {
+    return products
+      .map((p, i) => {
+        const stock = stockByProduct.get(p.id) ?? null;
+        const out = stock != null && stock.quantity <= 0;
+        return { p, stock, out, i };
+      })
+      .sort((a, b) => (a.out === b.out ? a.i - b.i : a.out ? 1 : -1));
+  }, [products, stockByProduct]);
+
   if (isLoading) {
     return <p className="sale-empty">Cargando…</p>;
   }
@@ -30,17 +46,24 @@ export function ProductGrid({
   }
   return (
     <div className="sale-grid" data-testid="sale-grid">
-      {products.map((p) => {
-        const stock = stockByProduct.get(p.id);
+      {ordered.map(({ p, stock, out }) => {
         return (
-          <button key={p.id} className="prod-card" data-testid="prod-card" onClick={() => onAdd(p)}>
+          <button
+            key={p.id}
+            className={`prod-card${out ? ' is-out' : ''}`}
+            data-testid="prod-card"
+            onClick={() => onAdd(p)}
+          >
             <span className="prod-name">{p.name}</span>
             <span className="prod-meta">
               <span className="prod-price">{eur(Number(p.salePrice))} €</span>
               {stock ? (
-                stock.quantity === 0 ? (
-                  <span className="prod-stock sold-out" data-testid="prod-stock">
-                    Agotado
+                out ? (
+                  // Agotado (≤ 0): muestra la cantidad (0 o negativo si hubo sobreventa)
+                  // en gris suave; la tarjeta queda atenuada pero SIGUE siendo clicable
+                  // (la venta nunca se bloquea por falta de stock).
+                  <span className="prod-stock out-of-stock" data-testid="prod-stock">
+                    {stock.quantity}
                   </span>
                 ) : (
                   <span

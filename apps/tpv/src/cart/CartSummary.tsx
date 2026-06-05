@@ -1,5 +1,3 @@
-import { Button } from '@simpletpv/ui';
-
 import { eur } from '../lib/format.js';
 
 // Pie del ticket: descuento total, base imponible, IVA, total y botón de cobro,
@@ -30,60 +28,63 @@ export function CartSummary({
   onClearDiscounts: () => void;
 }) {
   return (
-    <div className="space-y-2 border-t border-[var(--ui-border)] p-4">
-      {discountTotal > 0 && (
-        <div className="flex items-center justify-between text-sm text-green-700">
-          <span className="flex items-center gap-2">
-            Descuento
-            <button
-              type="button"
-              onClick={onClearDiscounts}
-              data-testid="cart-discount-clear"
-              className="text-xs font-medium text-neutral-400 underline hover:text-neutral-700"
-            >
-              Quitar
-            </button>
-          </span>
-          <span className="tabular-nums" data-testid="cart-discount-total">
-            −{eur(discountTotal)} €
+    <div className="border-t border-[var(--ui-border)] px-4 py-4">
+      <div className="space-y-1.5">
+        {discountTotal > 0 && (
+          <div className="flex items-center justify-between text-sm text-[var(--ui-success)]">
+            <span className="flex items-center gap-2">
+              Descuento
+              <button
+                type="button"
+                onClick={onClearDiscounts}
+                data-testid="cart-discount-clear"
+                className="text-xs font-medium text-[var(--ui-text-soft)] underline-offset-2 hover:text-[var(--ui-text)] hover:underline"
+              >
+                Quitar
+              </button>
+            </span>
+            <span className="font-medium tabular-nums" data-testid="cart-discount-total">
+              −{eur(discountTotal)} €
+            </span>
+          </div>
+        )}
+        <div className="flex justify-between text-sm text-[var(--ui-text-muted)]">
+          <span>Base imponible</span>
+          <span className="tabular-nums" data-testid="cart-base">
+            {eur(base)} €
           </span>
         </div>
-      )}
-      <div className="flex justify-between text-sm text-neutral-500">
-        <span>Base imponible</span>
-        <span className="tabular-nums" data-testid="cart-base">
-          {eur(base)} €
-        </span>
+        <div className="flex justify-between text-sm text-[var(--ui-text-muted)]">
+          <span>IVA (21%)</span>
+          <span className="tabular-nums" data-testid="cart-iva">
+            {eur(iva)} €
+          </span>
+        </div>
       </div>
-      <div className="flex justify-between text-sm text-neutral-500">
-        <span>IVA (21%)</span>
-        <span className="tabular-nums" data-testid="cart-iva">
-          {eur(iva)} €
-        </span>
-      </div>
-      <div className="flex items-baseline justify-between pt-1">
-        <span className="text-base font-bold text-neutral-900">Total</span>
+
+      <div className="mt-3 flex items-baseline justify-between border-t border-[var(--ui-border)] pt-3">
+        <span className="text-sm font-semibold text-[var(--ui-text)]">Total</span>
         <span
-          className="text-2xl font-bold tracking-tight tabular-nums text-neutral-900"
+          className="text-2xl font-bold tracking-tight tabular-nums text-[var(--ui-text)]"
           data-testid="cart-total"
         >
           {eur(total)} €
         </span>
       </div>
 
-      <Button
-        size="lg"
-        className="w-full text-base"
+      <button
+        type="button"
+        className="cart-checkout mt-4"
         onClick={onCheckout}
         disabled={!canCheckout}
         data-testid="cart-checkout"
       >
         {itemCount > 0 ? `Cobrar · ${eur(total)} €` : 'Cobrar'}
-      </Button>
+      </button>
 
       {!cashOpen && itemCount > 0 && (
         <p
-          className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700"
+          className="mt-3 rounded-[var(--ui-radius-sm)] bg-[var(--ui-warning-soft)] px-3 py-2 text-xs font-medium text-[var(--ui-warning)]"
           data-testid="cart-cash-warning"
         >
           Abre la caja para poder cobrar
@@ -91,14 +92,14 @@ export function CartSummary({
       )}
       {!apiHealthy && itemCount > 0 && (
         <p
-          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+          className="mt-3 rounded-[var(--ui-radius-sm)] bg-[var(--ui-danger-soft)] px-3 py-2 text-xs font-medium text-[var(--ui-danger)]"
           data-testid="cart-api-warning"
         >
           Servidor no disponible
         </p>
       )}
       {error && (
-        <p className="text-xs text-red-600" data-testid="cart-msg">
+        <p className="mt-3 text-xs text-[var(--ui-danger)]" data-testid="cart-msg">
           {error}
         </p>
       )}

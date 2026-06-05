@@ -43,14 +43,64 @@
 
 /* ─── Usuarios: estado, permisos por rol y asignación de tiendas (#104) ─── */
 .user-state {
-  font-size: 0.78rem;
-  font-weight: 600;
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    background-color 0.25s ease,
+    transform 0.12s ease;
+}
+.user-state:hover {
+  transform: scale(1.12);
+}
+.user-state:active {
+  transform: scale(0.9);
+}
+.user-state:focus-visible {
+  outline: 2px solid var(--ui-text-muted);
+  outline-offset: 2px;
 }
 .user-state.on {
-  color: var(--ui-success);
+  background: var(--ui-success);
 }
 .user-state.off {
-  color: var(--ui-text-muted);
+  background: var(--ui-danger);
+}
+
+/* Tick y cruz apilados en la misma celda de grid: crossfade con giro al
+   alternar estado. place-items del botón los centra y deja el transform libre. */
+.user-state__icon {
+  grid-area: 1 / 1;
+  transition:
+    opacity 0.2s ease,
+    transform 0.25s ease;
+}
+.user-state.on .user-state__icon--on,
+.user-state.off .user-state__icon--off {
+  opacity: 1;
+  transform: rotate(0) scale(1);
+}
+.user-state.on .user-state__icon--off {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.4);
+}
+.user-state.off .user-state__icon--on {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.4);
+}
+@media (prefers-reduced-motion: reduce) {
+  .user-state,
+  .user-state__icon {
+    transition: none;
+  }
 }
 .user-stores-note {
   margin: 0;
@@ -170,7 +220,9 @@
   width: 1.35rem;
   height: 1.35rem;
   color: var(--ui-text-soft);
-  transition: color 0.35s ease, filter 0.35s ease;
+  transition:
+    color 0.35s ease,
+    filter 0.35s ease;
 }
 .store-open-icon.on {
   color: var(--ui-success);
@@ -182,7 +234,9 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition:
+    opacity 0.3s ease,
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .store-icon-closed {
   opacity: 1;
@@ -202,8 +256,12 @@
   animation: store-door-open 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 @keyframes store-door-open {
-  0% { transform: scale(0.55) rotate(-18deg); }
-  100% { transform: scale(1) rotate(0deg); }
+  0% {
+    transform: scale(0.55) rotate(-18deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .store-icon-closed,
@@ -239,10 +297,19 @@
   margin-bottom: 1rem;
   flex-wrap: wrap;
 }
-.stores-period {
+/* Estado + periodo: dos desplegables contiguos, alineados a la izquierda. */
+.stores-filters {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+.stores-filter-select {
+  width: fit-content;
+}
+/* Iguala el alto exterior del antiguo pill (.bo-tabs) que usa el dashboard:
+   alto del tab (30px) + padding vertical del contenedor (0.36rem) + hairlines (2px). */
+.stores-filter-select .ui-select-trigger {
+  height: calc(30px + 0.36rem + 2px);
 }
 /* Cifra de ventas: el dato protagonista para el jefe. */
 .store-card-metric {
@@ -557,24 +624,72 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
-/* ─── Stock: badges por tienda (fondo suave + dot de color) ─── */
+/* La acción "Nuevo traspaso" se ancla al extremo derecho de la cabecera. */
+.sales-filters > .stock-toolbar-action {
+  margin-left: auto;
+}
+
+/* ─── Stock: existencias por tienda ───────────────────────────────
+   Chip limpio "nombre + contador". El color solo aparece donde importa
+   (bajo / agotado); el stock sano queda neutro y silencioso. */
 .stock-badges {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: 0.35rem;
 }
 .store-stock-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.18rem 0.6rem;
+  gap: 0.45rem;
+  padding: 0.2rem 0.3rem 0.2rem 0.62rem;
   border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  background: var(--ui-surface-subtle) !important;
-  color: var(--ui-text) !important;
+  background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+  /* Por defecto (nivel "green" = sano): contador neutro. */
+  --qty-soft: var(--ui-surface-subtle);
+  --qty-ink: var(--ui-text);
+}
+.store-stock-badge:hover {
+  border-color: var(--ui-text-soft);
+  background: var(--ui-surface-subtle);
+}
+.store-stock-badge:focus-visible {
+  outline: none;
+  border-color: var(--ui-primary);
+  box-shadow: var(--ui-focus);
+}
+.store-stock-badge.sb-yellow {
+  --qty-soft: var(--ui-warning-soft);
+  --qty-ink: var(--ui-warning);
+}
+.store-stock-badge.sb-red {
+  --qty-soft: var(--ui-danger-soft);
+  --qty-ink: var(--ui-danger);
+}
+.store-stock-name {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ui-text-muted);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.store-stock-qty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.45rem;
+  height: 1.45rem;
+  padding: 0 0.42rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--qty-soft);
+  color: var(--qty-ink);
 }
 .subtab-badge {
   margin-left: 0.35rem;
@@ -622,6 +737,12 @@
   margin-bottom: 1.5rem;
   flex-wrap: wrap;
 }
+/* El título de la vista vive ahora en la TopBar, así que la cabecera solo conserva
+   su fila de controles (filtros del dashboard, acción «Nueva familia»…). Se alinean
+   a la izquierda, aprovechando el espacio que dejó el título. */
+.catalog-head.is-actions-only {
+  justify-content: flex-start;
+}
 .catalog-head h2 {
   font-size: 1.6rem;
   font-weight: 600;
@@ -656,11 +777,55 @@
   border-color: var(--ap-blue-focus);
   box-shadow: var(--ui-focus);
 }
+/* Búsqueda con desvanecido: si el texto o el placeholder no caben en el input,
+   se difuminan contra el fondo del propio campo en el borde derecho para que no
+   parezcan cortados de golpe. El velo usa --ui-surface, así que es invisible
+   cuando el contenido cabe y solo aparece cuando hay desbordamiento. */
+.search-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+/* Lupa a la izquierda, dentro de la píldora: misma lupa que los buscadores del
+   panel TPV (icono search de lucide). Se pinta como máscara para que se tinte con
+   el token de tema --ui-text-soft (el color del SVG es indiferente: la máscara usa
+   el canal alfa). Solo afecta a inputs envueltos en .search-field, nunca a los
+   <Select> de filtro ni a numéricos que reusan .catalog-search sin envoltorio. */
+.search-field::before {
+  content: '';
+  position: absolute;
+  left: 0.95rem;
+  top: 50%;
+  width: 1.05rem;
+  height: 1.05rem;
+  transform: translateY(-50%);
+  background-color: var(--ui-text-soft);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  pointer-events: none;
+}
+.search-field .catalog-search {
+  padding-left: 2.6rem;
+}
+.search-field::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: 2.25rem;
+  border-radius: 0 9999px 9999px 0;
+  background: linear-gradient(to right, transparent, var(--ui-surface) 70%);
+  pointer-events: none;
+}
 /* Cuando .catalog-search recae sobre un <Select> propio (filtros), el chrome
    lo aporta .ui-select-trigger; el wrapper solo conserva el ancho. */
 .ui-select.catalog-search {
-  width: auto;
-  min-width: 11rem;
+  /* Las pills de filtro se ciñen a su etiqueta (sin ancho fijo): el disparador
+     mide lo que ocupa la opción seleccionada, acotado por max-width. */
+  width: fit-content;
   max-width: 50vw;
   height: auto;
   padding: 0;
@@ -723,8 +888,20 @@
   padding: 0.55rem 0.85rem;
   border-bottom: 1px solid var(--ui-border-strong);
 }
+/* La fila de cabeceras (Nombre, Email…) lleva un tinte muy sutil para
+   separarla visualmente de las filas de datos en blanco. */
+.catalog-table thead th {
+  background: var(--ui-surface-subtle);
+}
 .catalog-table td {
-  padding: 0.8rem 0.85rem;
+  /* Altura de fila fija: todas las filas miden lo mismo —y entre tablas
+     distintas— sin importar si la celda lleva texto, badge, toggle o botones.
+     El alto lo gobierna `height`; el padding vertical es 0 y el contenido se
+     centra con vertical-align. La celda más alta (botón ~28px / toggle 24px)
+     cabe holgada en 3.5rem. */
+  height: 3.5rem;
+  padding: 0 0.85rem;
+  vertical-align: middle;
   border-bottom: 1px solid var(--ui-border);
   color: var(--ui-text);
 }
@@ -1100,14 +1277,22 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.85rem 1.1rem;
+  /* Altura fija: los botones que aparecen al seleccionar (incl. el Select "Mover",
+     más alto que el texto) caben dentro sin agrandar la fila. */
+  min-height: 3.125rem;
+  padding: 0.5rem 1.1rem;
   border-bottom: 1px solid var(--ui-border);
   font-size: 0.9rem;
   letter-spacing: -0.012em;
+  cursor: pointer;
   transition: background 0.1s;
 }
 .fam-row:hover {
   background: var(--ui-surface-subtle);
+}
+.fam-row:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--ap-blue-focus);
 }
 /* Familias raíz: fondo un punto más oscuro para distinguirlas de las hijas. */
 .fam-row--root {
@@ -1115,6 +1300,12 @@
 }
 .fam-row--root:hover {
   background: var(--fam-root-bg-hover, #e2e2ea);
+}
+/* Fila activa: solo un tinte de fondo (sin contorno ni cambio de tamaño del div).
+   Solo esta fila muestra sus botones. */
+.fam-row.is-selected,
+.fam-row.is-selected:hover {
+  background: var(--ap-blue-soft);
 }
 .fam-name {
   display: inline-flex;
@@ -1130,6 +1321,17 @@
   display: flex;
   gap: 0.3rem;
   white-space: nowrap;
+  animation: fam-actions-in 0.13s var(--ui-ease);
+}
+@keyframes fam-actions-in {
+  from {
+    opacity: 0;
+    transform: translateX(0.4rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .fam-actions button {
   display: inline-flex;
@@ -1228,6 +1430,9 @@
     transition: none;
     transform: none;
   }
+  .fam-actions {
+    animation: none;
+  }
 }
 .fam-move-select {
   max-width: 12rem;
@@ -1245,44 +1450,11 @@
   border-bottom: none;
   padding-top: 0.7rem;
 }
+/* Tickets anulados: en vez de una pill, la fila entera se tiñe de rojo flojo y
+   el texto va tachado para dejar claro que la venta no computa en los totales. */
 .sale-voided td {
-  opacity: 0.55;
-}
-.sale-voided .sale-ticket-number,
-.sale-voided td.muted,
-.sale-voided td:not(:first-child) {
+  background: var(--ui-danger-soft);
   text-decoration: line-through;
-}
-.sale-ticket-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-.sale-tag-voided {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.15rem 0.55rem 0.15rem 0.45rem;
-  border-radius: 999px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  line-height: 1.3;
-  color: #c0392b;
-  background: rgba(192, 57, 43, 0.1);
-  border: 1px solid rgba(192, 57, 43, 0.25);
-  text-decoration: none;
-  white-space: nowrap;
-  opacity: 1;
-}
-.sale-tag-voided::before {
-  content: '';
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 50%;
-  background: #c0392b;
-  flex: none;
 }
 .sales-pager {
   display: flex;
@@ -1313,7 +1485,9 @@
   flex-wrap: wrap;
   margin-bottom: 0.75rem;
 }
-.sales-filters .catalog-search {
+/* Solo el input de búsqueda conserva un ancho mínimo; las pills <Select> de la
+   barra se ciñen a su etiqueta (regla .ui-select.catalog-search → fit-content). */
+.sales-filters input.catalog-search {
   width: auto;
   min-width: 11rem;
 }
@@ -1335,6 +1509,35 @@
 }
 .users-toolbar .sales-filters {
   margin-bottom: 0;
+  /* Reclama el espacio libre para que la acción de la derecha (p. ej. "Exportar
+     CSV" en Ventas) quede fijada arriba a la derecha y los filtros, si no caben,
+     bajen de línea dentro de esta zona en vez de empujar el botón. */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Ventas tiene muchos filtros: la toolbar no parte la acción a otra línea. Los
+   filtros se reparten en varias líneas dentro de su zona y "Exportar CSV" queda
+   fijo arriba a la derecha (misma posición que "Nuevo …" en el resto de tablas). */
+.sales-toolbar {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+.sales-toolbar > .btn-primary {
+  flex-shrink: 0;
+}
+
+/* Cabecera genérica de tabla: filtros/búsqueda a la izquierda y acción principal
+   a la derecha (espejo de .users-toolbar, reutilizable en cualquier .table-panel,
+   p. ej. Familias). */
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.table-toolbar .sales-filters {
+  margin-bottom: 0;
 }
 
 /* ── Usuarios: selección múltiple + acciones en lote ──────────────────────
@@ -1344,19 +1547,18 @@
   text-align: center;
   padding-right: 0 !important;
 }
-.users-table tbody tr {
+.users-table tbody tr,
+.promo-table tbody tr {
   cursor: pointer;
   user-select: none;
 }
-.users-table tbody tr.is-selected {
+.users-table tbody tr.is-selected,
+.promo-table tbody tr.is-selected {
   background: var(--ap-blue-soft);
 }
-.users-table tbody tr.is-selected:hover {
+.users-table tbody tr.is-selected:hover,
+.promo-table tbody tr.is-selected:hover {
   background: var(--ap-blue-soft);
-}
-/* Acento izquierdo: refuerza el cambio de color de la fila marcada. */
-.users-table tbody tr.is-selected td:first-child {
-  box-shadow: inset 3px 0 0 var(--ap-blue);
 }
 
 /* Círculo de selección — mismo gesto que "Recordar sesión" del login. */
@@ -1379,11 +1581,14 @@
 }
 /* Los círculos de fila se insinúan tenues y "aparecen" al pasar el ratón o al
    entrar en modo selección; el de cabecera (selección total) siempre nítido. */
-.users-table tbody .user-check {
+.users-table tbody .user-check,
+.promo-table tbody .user-check {
   opacity: 0.4;
 }
 .users-table tbody tr:hover .user-check,
 .users-table.has-selection tbody .user-check,
+.promo-table tbody tr:hover .user-check,
+.promo-table.has-selection tbody .user-check,
 .user-check:checked,
 .user-check:indeterminate {
   opacity: 1;
@@ -1443,7 +1648,8 @@
   transform: scale(0.96);
 }
 .users-bulk-edit,
-.users-bulk-del {
+.users-bulk-del,
+.promo-bulk-toggle {
   height: var(--bo-control-height);
   padding: 0 1.1rem;
   border-radius: 9999px;
@@ -1474,7 +1680,8 @@
   border-color: var(--ui-danger);
 }
 .users-bulk-edit:active,
-.users-bulk-del:active {
+.users-bulk-del:active,
+.promo-bulk-toggle:active {
   transform: scale(0.96);
 }
 
@@ -1483,6 +1690,14 @@
   flex-wrap: wrap;
   gap: 0.4rem;
   margin-bottom: 1rem;
+}
+/* Dentro del panel de Ventas las vistas guardadas son una segunda franja de la
+   cabecera: mismo tinte que la toolbar, separada de la tabla por un hairline. */
+.table-panel > .sales-views {
+  margin: 0;
+  padding: 0.6rem 1rem;
+  background: var(--ui-surface-subtle);
+  border-bottom: 1px solid var(--ui-border);
 }
 .sales-view-chip {
   display: inline-flex;
@@ -1643,118 +1858,165 @@
   --metric-soft: var(--ui-success-soft);
 }
 
-/* Panel que enmarca la toolbar de filtros + la tabla (espejo de .dash-panel). */
-.stock-panel {
+/* Panel que enmarca la toolbar de filtros + la tabla (espejo de .dash-panel).
+   Marco común de Stock, Usuarios y Catálogo: superficie blanca, borde fino y
+   esquinas redondeadas (sin doble borde con la tabla interior). */
+.table-panel {
   border: 1px solid var(--ui-border);
   border-radius: 18px;
   background: var(--ui-surface);
   overflow: hidden;
+  box-shadow: var(--ui-shadow-sm);
 }
-.stock-panel .sales-filters {
+/* La barra de filtros/acciones es la cabecera del panel: separada por hairline
+   y con el mismo tinte sutil que la fila de cabeceras de la tabla, para que
+   toda la zona de chrome quede diferenciada de las filas de datos en blanco. */
+.table-panel > .sales-filters,
+.table-panel > .users-toolbar,
+.table-panel > .table-toolbar {
   margin: 0;
+  /* Altura mínima homogénea: TODA cabecera mide lo mismo tenga los controles
+     que tenga. En las tablas con filtros la altura la fija la pill/búsqueda
+     (2.5rem); en Traspasos solo hay un botón (más bajo), así que sin esto la
+     banda quedaba ~2px más corta. 2.5rem control + 1.7rem padding + 1px hairline. */
+  min-height: calc(2.5rem + 1.7rem + 1px);
   padding: 0.85rem 1rem;
+  background: var(--ui-surface-subtle);
   border-bottom: 1px solid var(--ui-border);
 }
-/* La tabla vive dentro del panel sin doble borde; cabeceras y filas alineadas
-   con el padding de la toolbar (1rem). */
-.stock-panel .catalog-table th,
-.stock-panel .catalog-table td {
+/* El árbol de Familias trae su propio marco (borde, radio, fondo); dentro de un
+   .table-panel lo cede al panel para no duplicarlo. */
+.table-panel > .fam-tree {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+/* Cabeceras y filas alineadas con el padding de la barra (1rem). */
+.table-panel .catalog-table th,
+.table-panel .catalog-table td {
   padding-left: 1rem;
   padding-right: 1rem;
 }
-.stock-panel .catalog-table tbody tr:last-child td {
+.table-panel .catalog-table tbody tr:last-child td {
   border-bottom: none;
 }
-.stock-panel .catalog-empty {
+.table-panel .catalog-empty {
   padding: 2.5rem 1rem;
   text-align: center;
 }
-.rotation-tag {
-  display: inline-block;
-  padding: 0.1rem 0.5rem;
-  border-radius: 0.4rem;
-  font-size: 0.75rem;
-  font-weight: 600;
+/* ─── Stock: rotación como medidor de barras ───────────────────────
+   Escala ordinal (alta/media/baja) leída de un vistazo. Monocromo y
+   silencioso: las barras llenas usan tinta; las vacías, hairline. */
+.rotation-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
-.rotation-alta {
-  background: #dcfce7;
-  color: #166534;
+.rotation-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
 }
-.rotation-media {
-  background: #fef9c3;
-  color: #854d0e;
+.rotation-bars i {
+  display: block;
+  width: 3px;
+  border-radius: 1.5px;
+  background: var(--ui-border);
 }
-.rotation-baja {
-  background: #fee2e2;
-  color: #991b1b;
+.rotation-bars i:nth-child(1) {
+  height: 7px;
+}
+.rotation-bars i:nth-child(2) {
+  height: 10px;
+}
+.rotation-bars i:nth-child(3) {
+  height: 13px;
+}
+/* Segmentos activos según el nivel. */
+.rotation-alta .rotation-bars i,
+.rotation-media .rotation-bars i:nth-child(-n + 2),
+.rotation-baja .rotation-bars i:nth-child(1) {
+  background: var(--ui-text);
+}
+.rotation-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ui-text-muted);
+  letter-spacing: -0.01em;
 }
 
 /* ─── Promociones: tarjetas de reglas y previsualización (#99) ─── */
-.promo-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+/* ─── Promociones: tabla compacta de reglas + previsualización en el modal (#99) ───
+   Misma piel que el resto de tablas del backoffice (.catalog-table dentro de un
+   .table-panel); aquí solo se afinan columnas concretas. */
+/* Filtro de estado: se ciñe a su etiqueta en vez del ancho fijo de las pills de
+   búsqueda (.catalog-search → 11rem), para que «Todas» no quede holgado. */
+.promo-filter-select {
+  width: fit-content;
 }
-.promo-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 1.1rem;
-  border: 1px solid var(--ui-border);
-  border-radius: 16px;
-  background: var(--ui-surface);
-  transition: border-color 0.12s;
-}
-.promo-card:hover {
-  border-color: var(--ui-border-strong);
-}
-.promo-card-head {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 0.3rem;
-}
-.promo-name {
-  font-weight: 700;
+.promo-name-cell {
+  font-weight: 600;
   color: var(--ui-text);
 }
-.promo-rule {
-  margin: 0 0 0.2rem;
-  font-size: 0.9rem;
-  color: var(--ui-text-soft);
-}
-.promo-dates {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--ui-text-muted);
-}
-.promo-card-actions {
-  display: flex;
-  flex-shrink: 0;
-  gap: 0.5rem;
-}
-.promo-badge {
+/* Chip de descuento: el «qué te llevas» de la regla. Usa el acento de marca para
+   diferenciarse del badge de estado, que aporta su propio color por columna. */
+.promo-discount {
+  display: inline-block;
   padding: 0.12rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.74rem;
+  font-size: 0.8rem;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--ap-blue-soft);
+  color: var(--ui-primary);
+}
+/* Pausar/Activar en lote: secundario neutro, a juego con Editar/Borrar de la
+   toolbar de selección (misma geometría que .users-bulk-*). */
+.promo-bulk-toggle {
+  border: 1px solid var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+}
+.promo-bulk-toggle:hover {
+  background: var(--ap-blue-soft);
+  border-color: var(--ui-primary);
+}
+/* Estado de promoción como indicador "punto + etiqueta": el color vive
+   en el punto, el texto queda en tinta. Limpio y profesional, sin pills
+   pastel. El estado finalizado (expirada) usa punto hueco y recede. */
+.promo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+  white-space: nowrap;
+}
+.promo-badge::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--promo-dot, var(--ui-text-soft));
 }
 .promo-activa {
-  background: #dcfce7;
-  color: #166534;
+  --promo-dot: var(--ui-success);
 }
 .promo-programada {
-  background: #dbeafe;
-  color: #1e40af;
-}
-.promo-expirada {
-  background: var(--ui-surface-subtle);
-  color: var(--ui-text-muted);
+  --promo-dot: var(--ui-primary);
 }
 .promo-pausada {
-  background: #fef3c7;
-  color: #92400e;
+  --promo-dot: var(--ui-warning);
+}
+.promo-expirada {
+  color: var(--ui-text-muted);
+}
+.promo-expirada::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--ui-text-soft);
 }
 .promo-preview {
   padding: 0.75rem 0.85rem;

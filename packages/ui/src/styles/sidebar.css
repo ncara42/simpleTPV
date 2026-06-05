@@ -184,6 +184,73 @@
   align-items: center;
   justify-content: center;
   color: inherit;
+  transition: transform 0.13s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Micro-interacción: al pasar el ratón por la fila, su icono se anima una sola
+   vez (como un mini gif). Cada item recibe una de varias animaciones según un
+   hash de su id (--sidebar-icon-anim, fijado en Sidebar.tsx), así no todos
+   hacen el mismo gesto. Si falta la variable, cae a `hop`. */
+.sidebar-item:hover .sidebar-item-icon,
+.sidebar-logout:hover .sidebar-item-icon {
+  animation: var(--sidebar-icon-anim, sidebar-icon-hop) 0.45s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Saltito vertical con un guiño de giro. */
+@keyframes sidebar-icon-hop {
+  0% {
+    transform: translateY(0) rotate(0);
+  }
+  30% {
+    transform: translateY(-3px) rotate(-8deg);
+  }
+  55% {
+    transform: translateY(0) rotate(6deg);
+  }
+  78% {
+    transform: translateY(-1px) rotate(-3deg);
+  }
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+}
+
+/* Meneo lateral: solo giro, como negando con la cabeza. */
+@keyframes sidebar-icon-wiggle {
+  0% {
+    transform: rotate(0);
+  }
+  20% {
+    transform: rotate(-11deg);
+  }
+  40% {
+    transform: rotate(9deg);
+  }
+  60% {
+    transform: rotate(-6deg);
+  }
+  80% {
+    transform: rotate(3deg);
+  }
+  100% {
+    transform: rotate(0);
+  }
+}
+
+/* Latido: solo escala, un bombeo muy sutil (apenas un guiño). */
+@keyframes sidebar-icon-pulse {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.1);
+  }
+  70% {
+    transform: scale(0.98);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .sidebar-item-label {
@@ -191,6 +258,46 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Badge de contador (p. ej. notificaciones): píldora roja discreta al extremo
+   derecho del item, empujada por margin-left:auto sin desplazar la etiqueta. */
+.sidebar-item-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--ui-danger);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+/* Contador del fichaje en vivo: píldora verde "turno activo" al extremo derecho
+   del item, empujada por margin-left:auto. Números tabulares para que no baile
+   el ancho al avanzar el reloj. */
+.sidebar-item-counter {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 0.1rem 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ─── Foco de teclado (a11y) ──────────────────────────────── */
@@ -274,14 +381,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.sidebar-account-caret {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--sidebar-group-label-color);
 }
 
 /* Menú de cuenta (popover sobre el footer, abre hacia arriba) */
@@ -412,5 +511,10 @@
   .sidebar-item:active,
   .sidebar-logout:active {
     transform: none;
+  }
+
+  .sidebar-item:hover .sidebar-item-icon,
+  .sidebar-logout:hover .sidebar-item-icon {
+    animation: none;
   }
 }

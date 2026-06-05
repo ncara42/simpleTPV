@@ -4,6 +4,16 @@ import type { TimeClockType } from '@simpletpv/db';
 import { assertStoreAccess } from '../auth/store-access.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
+import {
+  computeWorked,
+  deriveStatus,
+  endOfLocalDay,
+  localDayKey,
+  nextStateOrThrow,
+  startOfLocalDay,
+  statusFromLastType,
+  totalWorkedMs,
+} from './time-clock.compute.js';
 
 @Injectable()
 export class TimeClockService {
@@ -25,6 +35,15 @@ export class TimeClockService {
     const tenant = requireTenant();
     // Aislamiento por tienda (SEC-01): un CLERK solo ficha en sus tiendas.
     await assertStoreAccess(this.prisma, { userId, role, storeId: input.storeId });
+
+    // Validación de secuencia: el estado actual lo determina el último fichaje;
+    // nextStateOrThrow lanza 409 si la transición es inválida (p.ej. doble entrada).
+    const last = await this.prisma.timeClockEntry.findFirst({
+      where: { organizationId: tenant.organizationId, storeId: input.storeId, userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    nextStateOrThrow(statusFromLastType(last?.type), input.type);
+
     if (!input.deviceId) {
       throw new ForbiddenException('Este TPV no está autorizado como dispositivo oficial');
     }
@@ -47,6 +66,111 @@ export class TimeClockService {
         deviceId: input.deviceId,
         type: input.type,
       },
+    });
+  }
+
+  /** Resumen de la jornada de HOY del usuario: estado, horas y lista de fichajes. */
+  async today(storeId: string, userId: string) {
+    const tenant = requireTenant();
+    const now = new Date();
+    const entries = await this.prisma.timeClockEntry.findMany({
+      where: {
+        organizationId: tenant.organizationId,
+        storeId,
+        userId,
+        createdAt: { gte: startOfLocalDay(now) },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    const totals = computeWorked(entries, now);
+    return {
+      status: deriveStatus(entries),
+      workedMs: totals.workedMs,
+      breakMs: totals.breakMs,
+      runningSince: totals.runningSince,
+      entries,
+    };
+  }
+
+  /**
+   * Historial de control horario por empleado y día para gestión (backoffice).
+   * Agrupa los fichajes por usuario+jornada y calcula totales de horas.
+   */
+  async history(
+    params: { storeId: string; userId?: string; from?: string; to?: string },
+    role: string,
+    requestingUserId: string,
+  ) {
+    const tenant = requireTenant();
+    await assertStoreAccess(this.prisma, {
+      userId: requestingUserId,
+      role,
+      storeId: params.storeId,
+    });
+
+    const now = new Date();
+    const from = params.from
+      ? startOfLocalDay(new Date(params.from))
+      : startOfLocalDay(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+    const to = params.to ? endOfLocalDay(new Date(params.to)) : endOfLocalDay(now);
+
+    const entries = await this.prisma.timeClockEntry.findMany({
+      where: {
+        organizationId: tenant.organizationId,
+        storeId: params.storeId,
+        ...(params.userId ? { userId: params.userId } : {}),
+        createdAt: { gte: from, lte: to },
+      },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        user: { select: { name: true } },
+        store: { select: { name: true } },
+      },
+    });
+
+    // Agrupa por usuario + día (jornada).
+    type Group = {
+      userId: string;
+      userName: string;
+      storeId: string;
+      storeName: string;
+      date: string;
+      rows: typeof entries;
+    };
+    const groups = new Map<string, Group>();
+    for (const e of entries) {
+      const date = localDayKey(e.createdAt);
+      const key = `${e.userId}__${date}`;
+      let group = groups.get(key);
+      if (!group) {
+        group = {
+          userId: e.userId,
+          userName: e.user.name,
+          storeId: e.storeId,
+          storeName: e.store.name,
+          date,
+          rows: [],
+        };
+        groups.set(key, group);
+      }
+      group.rows.push(e);
+    }
+
+    return [...groups.values()].map((g) => {
+      const totals = computeWorked(g.rows, now);
+      const firstIn = g.rows.find((r) => r.type === 'CLOCK_IN');
+      const lastOut = [...g.rows].reverse().find((r) => r.type === 'CLOCK_OUT');
+      return {
+        userId: g.userId,
+        userName: g.userName,
+        storeId: g.storeId,
+        storeName: g.storeName,
+        date: g.date,
+        firstIn: firstIn ? firstIn.createdAt.toISOString() : null,
+        lastOut: lastOut ? lastOut.createdAt.toISOString() : null,
+        workedMs: totalWorkedMs(totals, now),
+        breakMs: totals.breakMs,
+      };
     });
   }
 }

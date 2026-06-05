@@ -1,4 +1,4 @@
-import { Select } from '@simpletpv/ui';
+import { Alert, Select } from '@simpletpv/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -9,20 +9,14 @@ import {
 } from 'react';
 
 import { CartPanel } from './CartPanel.js';
-import { CashPanel } from './CashPanel.js';
 import { api } from './lib/auth.js';
 import { beep } from './lib/beep.js';
 import { useCart } from './lib/cart.js';
 import { currentCashSession } from './lib/cash.js';
-import {
-  type FamilyNode,
-  findByBarcode,
-  listFamilies,
-  type Product,
-  searchProducts,
-} from './lib/catalog.js';
+import { findByBarcode, listFamilies, type Product, searchProducts } from './lib/catalog.js';
 import { eur } from './lib/format.js';
 import { useHealthCheck } from './lib/health.js';
+import { usePageHeader } from './lib/pageHeader.js';
 import { listStores } from './lib/sales.js';
 import { getStoreStock, type StockRow } from './lib/stock.js';
 import { BARCODE_MIN_LENGTH, useBarcodeScanner } from './lib/useBarcodeScanner.js';
@@ -32,11 +26,9 @@ import { ProductGrid } from './sale/ProductGrid.js';
 import { ProductStockModal } from './sale/ProductStockModal.js';
 
 export function SalePage() {
+  usePageHeader('Venta', 'Escanea o añade productos al ticket');
   const [search, setSearch] = useState('');
   const [familyId, setFamilyId] = useState<string | null>(null);
-  // Navegación en dos pasos: si está dentro de una familia con subfamilias,
-  // `parentFamily` es esa familia y los chips muestran sus subfamilias.
-  const [parentFamily, setParentFamily] = useState<FamilyNode | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [scanned, setScanned] = useState<{ product: Product | null; code: string } | null>(null);
   const [stockDetail, setStockDetail] = useState<Product | null>(null);
@@ -181,24 +173,17 @@ export function SalePage() {
         )}
 
         {saleNotice && (
-          <div className="sale-success-banner" data-testid="sale-success-banner">
-            <span className="sale-success-mark">✓</span>
-            <span>
-              Venta registrada correctamente · <strong>{saleNotice.ticketNumber}</strong> ·{' '}
-              {eur(Number(saleNotice.total))} €
-            </span>
-            <button
-              type="button"
-              className="sale-success-close"
-              onClick={() => setSaleNotice(null)}
-              aria-label="Cerrar confirmación"
-            >
-              ×
-            </button>
-          </div>
+          <Alert
+            variant="success"
+            data-testid="sale-success-banner"
+            duration={5000}
+            onClose={() => setSaleNotice(null)}
+            closeLabel="Cerrar confirmación"
+          >
+            Venta registrada correctamente · <strong>{saleNotice.ticketNumber}</strong> ·{' '}
+            {eur(Number(saleNotice.total))} €
+          </Alert>
         )}
-
-        <CashPanel storeId={activeStore} />
 
         <div className="sale-search-row">
           <div className="sale-search-wrap">
@@ -252,13 +237,7 @@ export function SalePage() {
           </div>
         </div>
 
-        <FamilyChips
-          families={families}
-          familyId={familyId}
-          parentFamily={parentFamily}
-          setFamilyId={setFamilyId}
-          setParentFamily={setParentFamily}
-        />
+        <FamilyChips families={families} familyId={familyId} setFamilyId={setFamilyId} />
 
         {scanned && (
           <div className="scan-banner" data-testid="scan-banner" onClick={() => setScanned(null)}>
