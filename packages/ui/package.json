@@ -11,6 +11,7 @@
     "./select.css": "./src/styles/select.css",
     "./sidebar.css": "./src/styles/sidebar.css",
     "./theme.css": "./src/styles/theme.css",
+    "./theme-apple.css": "./src/styles/theme-apple.css",
     "./topbar.css": "./src/styles/topbar.css"
   },
   "scripts": {
