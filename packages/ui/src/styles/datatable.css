@@ -1,0 +1,211 @@
+/* DataTable — tabla de datos reutilizable. Sigue DESIGN_SYSTEM.md §10.10:
+   contenedor con hairline + radio lg, cabecera uppercase 0.7rem en superficie sutil,
+   filas de 3.5rem con hover, números tabulares. Hereda el tema vía --ui-*. */
+.ui-dt {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  overflow: hidden;
+}
+
+/* Slot superior (filtros/acciones). */
+.ui-dt-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.85rem;
+  background: var(--ui-surface-subtle);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.ui-dt-scroll {
+  overflow-x: auto;
+}
+
+.ui-dt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  letter-spacing: -0.012em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-dt-table th {
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-soft);
+  padding: 0.55rem 0.85rem;
+  background: var(--ui-surface-subtle);
+  border-bottom: 1px solid var(--ui-border-strong);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  white-space: nowrap;
+}
+
+.ui-dt-col-right {
+  text-align: right;
+}
+.ui-dt-col-center {
+  text-align: center;
+}
+
+/* Cabecera ordenable: botón a ancho completo que respeta la alineación. */
+.ui-dt-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.ui-dt-col-right .ui-dt-sort {
+  justify-content: flex-end;
+}
+.ui-dt-col-center .ui-dt-sort {
+  justify-content: center;
+}
+.ui-dt-sort:hover {
+  color: var(--ui-text);
+}
+.ui-dt-sort:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+  border-radius: var(--ui-radius-xs);
+}
+
+/* Chevron de orden: tenue por defecto, pleno y orientado según la dirección. */
+.ui-dt-sort-icon {
+  flex-shrink: 0;
+  opacity: 0;
+  transition:
+    transform 0.15s ease,
+    opacity 0.12s ease;
+}
+.ui-dt-sort:hover .ui-dt-sort-icon {
+  opacity: 0.45;
+}
+th[aria-sort='ascending'] .ui-dt-sort-icon,
+th[aria-sort='descending'] .ui-dt-sort-icon {
+  opacity: 1;
+  color: var(--ui-brand-ink, var(--ui-primary));
+}
+th[aria-sort='descending'] .ui-dt-sort-icon {
+  transform: rotate(180deg);
+}
+
+.ui-dt-table td {
+  height: 3.5rem;
+  padding: 0 0.85rem;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text);
+}
+.ui-dt-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.ui-dt-table tbody tr {
+  transition: background 0.1s;
+}
+.ui-dt-table tbody tr:hover {
+  background: var(--ui-surface-subtle);
+}
+
+/* Estado vacío y carga ocupan toda la fila sin desmontar la tabla. */
+.ui-dt-empty td {
+  height: auto;
+  padding: 2.5rem 0.85rem;
+  text-align: center;
+  color: var(--ui-text-muted);
+}
+.ui-dt-empty tr:hover,
+.ui-dt-table tbody tr.ui-dt-skeleton:hover {
+  background: transparent;
+}
+
+.ui-dt-skel-bar {
+  height: 0.8rem;
+  border-radius: var(--ui-radius-xs);
+  background: linear-gradient(
+    90deg,
+    var(--ui-surface-subtle) 25%,
+    var(--ui-border) 37%,
+    var(--ui-surface-subtle) 63%
+  );
+  background-size: 400% 100%;
+  animation: ui-dt-shimmer 1.4s ease infinite;
+}
+@keyframes ui-dt-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+/* Slot inferior (totales/agregados) + paginador. */
+.ui-dt-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.85rem;
+  background: var(--ui-surface-subtle);
+  border-top: 1px solid var(--ui-border);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
+}
+
+.ui-dt-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.ui-dt-pager-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.9rem;
+  min-width: 1.9rem;
+  padding: 0 0.6rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.ui-dt-pager-btn:hover:not(:disabled) {
+  background: var(--ui-surface-subtle);
+}
+.ui-dt-pager-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.ui-dt-pager-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-dt-skel-bar {
+    animation: none;
+  }
+  .ui-dt-sort-icon {
+    transition: none;
+  }
+}

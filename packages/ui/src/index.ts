@@ -1,6 +1,15 @@
 export { Alert, type AlertProps, type AlertVariant } from './components/Alert.js';
 export { Badge } from './components/Badge.js';
 export { Button } from './components/Button.js';
+export {
+  DataTable,
+  type DataTableAlign,
+  type DataTableColumn,
+  type DataTablePagination,
+  type DataTableProps,
+  type DataTableSort,
+  type SortDir,
+} from './components/DataTable.js';
 export { ErrorScreen } from './components/ErrorScreen.js';
 export { Input } from './components/Input.js';
 export { LoginForm, type LoginFormProps } from './components/LoginForm.js';
