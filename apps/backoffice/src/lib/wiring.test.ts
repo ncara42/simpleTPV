@@ -9,6 +9,7 @@ vi.mock('./auth.js', () => ({
 
 import * as admin from './admin.js';
 import { api } from './auth.js';
+import * as dashboard from './dashboard.js';
 import * as families from './families.js';
 import * as products from './products.js';
 
@@ -113,6 +114,27 @@ describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
     expect(res.items[0]!.sellerName).toBe('Marta Ruiz');
     expect(res.items[0]!.storeName).toBe('Centro');
     expect(res.totals.avgMarginPct).toBe(0.4);
+  });
+
+  it('dashboard: endpoints /dashboard/* con period y storeId', async () => {
+    await dashboard.getSalesToday('st1');
+    expect(get).toHaveBeenCalledWith('/dashboard/sales-today', { storeId: 'st1' });
+    await dashboard.getSalesByFamily('week', 'st1');
+    expect(get).toHaveBeenCalledWith('/dashboard/sales-by-family', {
+      period: 'week',
+      storeId: 'st1',
+    });
+    await dashboard.getSalesKpis('month');
+    expect(get).toHaveBeenCalledWith('/dashboard/sales-kpis', { period: 'month' });
+    await dashboard.getMarginKpis('today', 'st1');
+    expect(get).toHaveBeenCalledWith('/dashboard/margin-kpis', { period: 'today', storeId: 'st1' });
+    await dashboard.getStockoutKpis('week');
+    expect(get).toHaveBeenCalledWith('/dashboard/stockout-kpis', { period: 'week' });
+    await dashboard.getProductRankings('yesterday', 'st1');
+    expect(get).toHaveBeenCalledWith('/dashboard/product-rankings', {
+      period: 'yesterday',
+      storeId: 'st1',
+    });
   });
 });
 
