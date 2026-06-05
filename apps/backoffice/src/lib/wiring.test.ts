@@ -71,6 +71,49 @@ describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
     await admin.deleteStore('s-1');
     expect(del).toHaveBeenCalledWith('/stores/s-1');
   });
+
+  it('sales: GET /sales con filtros y mapea user/store anidados a planos', async () => {
+    get.mockResolvedValueOnce({
+      items: [
+        {
+          id: 's1',
+          ticketNumber: 'T01-000001',
+          createdAt: '2026-06-02T10:00:00.000Z',
+          total: '10.00',
+          paymentMethod: 'CASH',
+          status: 'COMPLETED',
+          storeId: 'st1',
+          user: { name: 'Marta Ruiz' },
+          store: { name: 'Centro', code: '01' },
+        },
+      ],
+      page: 2,
+      pageSize: 10,
+      totalItems: 1,
+      totals: { count: 1, totalAmount: '10.00', avgDiscountPct: 0.05, avgMarginPct: 0.4 },
+    } as never);
+
+    const res = await admin.listSales({
+      storeId: 'st1',
+      userId: 'u-marta',
+      status: 'COMPLETED',
+      page: 2,
+      pageSize: 10,
+    });
+
+    // page/pageSize viajan como string; solo los filtros activos.
+    expect(get).toHaveBeenCalledWith('/sales', {
+      storeId: 'st1',
+      userId: 'u-marta',
+      status: 'COMPLETED',
+      page: '2',
+      pageSize: '10',
+    });
+    // El item anidado se aplana para el DataTable.
+    expect(res.items[0]!.sellerName).toBe('Marta Ruiz');
+    expect(res.items[0]!.storeName).toBe('Centro');
+    expect(res.totals.avgMarginPct).toBe(0.4);
+  });
 });
 
 describe('modo demo (opt-in, VITE_DEMO_MODE=true): no llama a la API', () => {
