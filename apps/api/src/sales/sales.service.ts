@@ -37,6 +37,19 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// Filtros del historial de ventas, compartidos por el listado (findSales), sus
+// agregados y el export (generateExportCsv). Todos opcionales.
+interface SalesFilterQuery {
+  storeId?: string;
+  date?: string;
+  from?: string;
+  to?: string;
+  q?: string;
+  userId?: string; // vendedor
+  familyId?: string;
+  status?: SaleStatus;
+}
+
 @Injectable()
 export class SalesService {
   constructor(
@@ -374,70 +387,18 @@ export class SalesService {
    * Defensa en profundidad: además de RLS, el where lleva organizationId explícito.
    */
   async findSales(
-    {
-      storeId,
-      date,
-      from,
-      to,
-      q,
-      userId: vendorId,
-      familyId,
-      status,
-      page = 1,
-      pageSize = 20,
-    }: {
-      storeId?: string;
-      date?: string;
-      from?: string;
-      to?: string;
-      q?: string;
-      userId?: string;
-      familyId?: string;
-      status?: SaleStatus;
-      page?: number;
-      pageSize?: number;
-    },
-    userId = '',
+    query: SalesFilterQuery & { page?: number; pageSize?: number },
+    requesterId = '',
     role: SaleRole = 'ADMIN',
   ) {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
     const tenant = requireTenant();
-    const storeFilter: { in: string[] } | string | undefined = await this.salesStoreFilter(
-      storeId,
-      userId,
+    const { where, baseWhere, range, storeFilter, term } = await this.buildSalesFilter(
+      query,
+      requesterId,
       role,
     );
-    const term = q?.trim() || undefined;
-
-    // Rango de fechas: from/to (prioritario, abierto por un extremo si falta uno)
-    // o un único `date`. dayRange(x).lt es el día siguiente, así que `to` es inclusivo.
-    const range: { gte?: Date; lt?: Date } | undefined =
-      from || to
-        ? { ...(from ? { gte: dayRange(from).gte } : {}), ...(to ? { lt: dayRange(to).lt } : {}) }
-        : date
-          ? dayRange(date)
-          : undefined;
-
-    // Filtro base SIN status: lo comparten el listado (que añade el status pedido)
-    // y los agregados (que SIEMPRE fuerzan COMPLETED — las VOIDED se listan pero no
-    // suman en importe/margen/descuento).
-    const baseWhere = {
-      organizationId: tenant.organizationId,
-      ...(storeFilter ? { storeId: storeFilter } : {}),
-      ...(range ? { createdAt: range } : {}),
-      ...(vendorId ? { userId: vendorId } : {}),
-      ...(familyId ? { lines: { some: { product: { familyId } } } } : {}),
-      ...(term
-        ? {
-            OR: [
-              { ticketNumber: { contains: term, mode: 'insensitive' as const } },
-              { user: { name: { contains: term, mode: 'insensitive' as const } } },
-              { lines: { some: { name: { contains: term, mode: 'insensitive' as const } } } },
-              ...(Number.isFinite(Number(term)) ? [{ total: Number(term) }] : []),
-            ],
-          }
-        : {}),
-    };
-    const where = { ...baseWhere, ...(status ? { status } : {}) };
 
     const [items, totalItems, agg, marginRow] = await Promise.all([
       this.prisma.sale.findMany({
@@ -482,8 +443,8 @@ export class SalesService {
             organizationId: tenant.organizationId,
             storeFilter,
             range,
-            vendorId,
-            familyId,
+            vendorId: query.userId,
+            familyId: query.familyId,
             term,
           })}
         `,
@@ -510,6 +471,98 @@ export class SalesService {
         avgMarginPct: revenue > 0 ? margin / revenue : 0,
       },
     };
+  }
+
+  // Construye el filtro Prisma del historial a partir de la query. `baseWhere` NO
+  // incluye status (los agregados fuerzan COMPLETED); `where` sí lo añade para el
+  // listado. Devuelve también las piezas (range/storeFilter/term) que el SQL de
+  // margen necesita. Compartido por findSales y generateExportCsv (un único filtro).
+  private async buildSalesFilter(query: SalesFilterQuery, requesterId: string, role: SaleRole) {
+    const tenant = requireTenant();
+    const storeFilter: { in: string[] } | string | undefined = await this.salesStoreFilter(
+      query.storeId,
+      requesterId,
+      role,
+    );
+    const term = query.q?.trim() || undefined;
+
+    // Rango de fechas: from/to (prioritario, abierto por un extremo si falta uno)
+    // o un único `date`. dayRange(x).lt es el día siguiente, así que `to` es inclusivo.
+    const range: { gte?: Date; lt?: Date } | undefined =
+      query.from || query.to
+        ? {
+            ...(query.from ? { gte: dayRange(query.from).gte } : {}),
+            ...(query.to ? { lt: dayRange(query.to).lt } : {}),
+          }
+        : query.date
+          ? dayRange(query.date)
+          : undefined;
+
+    // Filtro base SIN status: lo comparten el listado (que añade el status pedido)
+    // y los agregados (que SIEMPRE fuerzan COMPLETED — las VOIDED se listan pero no
+    // suman en importe/margen/descuento).
+    const baseWhere = {
+      organizationId: tenant.organizationId,
+      ...(storeFilter ? { storeId: storeFilter } : {}),
+      ...(range ? { createdAt: range } : {}),
+      ...(query.userId ? { userId: query.userId } : {}),
+      ...(query.familyId ? { lines: { some: { product: { familyId: query.familyId } } } } : {}),
+      ...(term
+        ? {
+            OR: [
+              { ticketNumber: { contains: term, mode: 'insensitive' as const } },
+              { user: { name: { contains: term, mode: 'insensitive' as const } } },
+              { lines: { some: { name: { contains: term, mode: 'insensitive' as const } } } },
+              ...(Number.isFinite(Number(term)) ? [{ total: Number(term) }] : []),
+            ],
+          }
+        : {}),
+    };
+    const where = { ...baseWhere, ...(query.status ? { status: query.status } : {}) };
+    return { where, baseWhere, range, storeFilter, term };
+  }
+
+  // Genera el CSV del historial de ventas que casa con `query` (mismo filtro que el
+  // listado, SIN paginación: TODAS las filas). Lo invoca el worker de SalesExport.
+  // Una fila por venta; importes con punto decimal y campos de texto escapados.
+  async generateExportCsv(
+    query: SalesFilterQuery,
+    requesterId: string,
+    role: SaleRole,
+  ): Promise<{ csv: string; rowCount: number }> {
+    const { where } = await this.buildSalesFilter(query, requesterId, role);
+    const rows = await this.prisma.sale.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        ticketNumber: true,
+        createdAt: true,
+        status: true,
+        paymentMethod: true,
+        subtotal: true,
+        discountTotal: true,
+        total: true,
+        user: { select: { name: true } },
+        store: { select: { name: true, code: true } },
+      },
+    });
+    // Escapa comillas/comas/saltos (mismo criterio que purchases.exportCsv).
+    const esc = (v: string): string => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const header = 'ticket,fecha,tienda,vendedor,estado,metodo_pago,subtotal,descuento,total';
+    const lines = rows.map((r) =>
+      [
+        esc(r.ticketNumber),
+        r.createdAt.toISOString(),
+        esc(r.store.name),
+        esc(r.user.name),
+        r.status,
+        r.paymentMethod,
+        String(r.subtotal),
+        String(r.discountTotal),
+        String(r.total),
+      ].join(','),
+    );
+    return { csv: [header, ...lines].join('\n'), rowCount: rows.length };
   }
 
   // Construye el WHERE (Prisma.Sql parametrizado) de los agregados sobre ventas

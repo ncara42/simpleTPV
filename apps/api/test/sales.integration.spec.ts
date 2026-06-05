@@ -20,6 +20,7 @@ import { InMemoryEventBus } from '../src/events/in-memory-event-bus.js';
 import { applyTenantExtension, PrismaService } from '../src/prisma/prisma.service.js';
 import { tenantStorage } from '../src/prisma/tenant-context.js';
 import { SalesService } from '../src/sales/sales.service.js';
+import { SalesExportService } from '../src/sales/sales-export.service.js';
 import { StockService } from '../src/stock/stock.service.js';
 import { stubVerifactu } from './helpers/stub-verifactu.js';
 
@@ -858,6 +859,70 @@ describe('Ventas — integración', () => {
       expect(res.totals.avgDiscountPct).toBeCloseTo(expDiscountPct, 4);
       // Sanity: hubo descuento real → la tasa es > 0 (no un falso 0 trivial).
       expect(expDiscountPct).toBeGreaterThan(0);
+    });
+  });
+
+  describe('SalesExport — export asíncrono a CSV (IT-05)', () => {
+    let exporter: SalesExportService;
+    // Días únicos propios (base distinta de findSales para no colisionar).
+    let dayCursor = new Date(Date.UTC(2300, 0, 1) + (Date.now() % (365 * 100)) * 86400000);
+    function uniqueDay(): string {
+      const d = dayCursor.toISOString().slice(0, 10);
+      dayCursor = new Date(dayCursor.getTime() + 86400000);
+      return d;
+    }
+
+    beforeAll(() => {
+      // Sin onModuleInit → sin cola → requestExport procesa en el momento (determinista).
+      exporter = new SalesExportService(prisma as unknown as PrismaService, service);
+    });
+
+    it('genera el CSV del filtro y se descarga (sin Redis → síncrono)', async () => {
+      const day = uniqueDay();
+      const aId = await createSaleAt(store1Id, `${day}T09:00:00.000Z`);
+      const bId = await createSaleAt(store1Id, `${day}T10:00:00.000Z`);
+      const tickets = await admin.$queryRaw<Array<{ ticketNumber: string }>>`
+        SELECT "ticketNumber" FROM "Sale" WHERE id IN (${aId}::uuid, ${bId}::uuid)
+      `;
+
+      const req = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        exporter.requestExport({ storeId: store1Id, date: day }, user1Id, 'ADMIN'),
+      );
+      expect(req.status).toBe('COMPLETED');
+
+      const meta = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        exporter.getExport(req.id),
+      );
+      expect(meta.status).toBe('COMPLETED');
+      expect(meta.rowCount).toBe(2);
+
+      const { csv } = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        exporter.downloadCsv(req.id),
+      );
+      const lines = csv.split('\n');
+      expect(lines[0]).toBe(
+        'ticket,fecha,tienda,vendedor,estado,metodo_pago,subtotal,descuento,total',
+      );
+      expect(lines).toHaveLength(3); // cabecera + 2 ventas
+      for (const t of tickets) {
+        expect(csv).toContain(t.ticketNumber);
+      }
+    });
+
+    it('aísla por tenant: org2 no ve el export de org1', async () => {
+      const day = uniqueDay();
+      await createSaleAt(store1Id, `${day}T09:00:00.000Z`);
+      const req = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        exporter.requestExport({ storeId: store1Id, date: day }, user1Id, 'ADMIN'),
+      );
+
+      // org2 no puede consultar ni descargar el export de org1 (RLS → 404).
+      await expect(
+        tenantStorage.run({ organizationId: org2Id }, async () => exporter.getExport(req.id)),
+      ).rejects.toThrow();
+      await expect(
+        tenantStorage.run({ organizationId: org2Id }, async () => exporter.downloadCsv(req.id)),
+      ).rejects.toThrow();
     });
   });
 });

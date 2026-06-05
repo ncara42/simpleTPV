@@ -38,6 +38,7 @@ model Organization {
   purchaseOrders     PurchaseOrder[]
   purchaseOrderLines PurchaseOrderLine[]
   verifactuRecords   VerifactuRecord[]
+  salesExports       SalesExport[]
 }
 
 model Store {
@@ -490,6 +491,33 @@ model VerifactuRecord {
 
   @@index([organizationId, status, createdAt])
   @@index([organizationId, createdAt])
+}
+
+// Export asíncrono del historial de ventas a CSV (IT-05). Se pide con unos filtros
+// (los mismos que el listado), se encola un job que genera el CSV en background y
+// el resultado (csv + estado) se guarda aquí — así la UI no se bloquea. RLS por tenant.
+model SalesExport {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @db.Uuid
+  status         SalesExportStatus @default(PENDING)
+  filters        Json // filtros con los que se pidió (storeId, rango, vendedor, familia, estado, q)
+  rowCount       Int? // nº de ventas exportadas (cuando COMPLETED)
+  csv            String? // contenido CSV generado (cuando COMPLETED)
+  error          String? // mensaje de error (cuando FAILED)
+  requestedById  String            @db.Uuid // usuario que pidió el export
+  createdAt      DateTime          @default(now())
+  completedAt    DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, status, createdAt])
+}
+
+enum SalesExportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
 }
 
 model CashSession {
