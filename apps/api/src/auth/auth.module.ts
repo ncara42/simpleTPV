@@ -5,6 +5,7 @@ import { AuthController } from './auth.controller.js';
 import { AUTH_GUARD_CONFIG, AuthGuard, type AuthGuardConfig } from './auth.guard.js';
 import { type AuthConfig, AuthService } from './auth.service.js';
 import { AuthLookupService } from './auth-lookup.service.js';
+import { USER_STATE_VALIDATOR, UserStateService } from './user-state.service.js';
 
 function requireSecret(name: 'JWT_SECRET' | 'JWT_REFRESH_SECRET'): string {
   const value = process.env[name];
@@ -40,11 +41,15 @@ function authConfig(): AuthConfig {
       provide: AUTH_GUARD_CONFIG,
       useFactory: (): AuthGuardConfig => ({ accessSecret: authConfig().accessSecret }),
     },
+    // Revalidación del estado del usuario por petición (A-04). El alias del token
+    // desacopla al guard de la implementación concreta (y permite mockearla).
+    UserStateService,
+    { provide: USER_STATE_VALIDATOR, useExisting: UserStateService },
     AuthGuard,
   ],
   // Exportamos JwtModule y el token de config para que módulos que importen
   // AuthModule (p.ej. ProductsModule con @UseGuards(AuthGuard)) puedan resolver
   // las dependencias del guard al reinstanciarlo en su propio contexto.
-  exports: [AuthService, AuthGuard, AUTH_GUARD_CONFIG, JwtModule],
+  exports: [AuthService, AuthGuard, AUTH_GUARD_CONFIG, USER_STATE_VALIDATOR, JwtModule],
 })
 export class AuthModule {}

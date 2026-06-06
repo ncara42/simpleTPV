@@ -27,6 +27,16 @@ export class AuthLookupService implements UserLookup, RefreshTokenStore, OnModul
     };
   }
 
+  // Estado mínimo del usuario para la revalidación por petición del AuthGuard
+  // (A-04). Mismo lookup BYPASSRLS (el guard corre antes de fijar el tenant);
+  // selecciona solo lo necesario (no trae passwordHash/pinHash).
+  async getUserState(id: string): Promise<{ active: boolean; role: string } | null> {
+    return this.client.user.findUnique({
+      where: { id },
+      select: { active: true, role: true },
+    });
+  }
+
   // --- RefreshTokenStore (SEC-06) ---
 
   async create(data: {
