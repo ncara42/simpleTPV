@@ -3,6 +3,7 @@ import { Copy, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useState } from 'react';
 
 import { Modal } from './components/Modal.js';
+import { SectionToolbar } from './components/SectionToolbar.js';
 import { createApiKey, listApiKeys, revokeApiKey } from './lib/api-keys.js';
 import { usePageHeader } from './lib/pageHeader.js';
 
@@ -96,24 +97,19 @@ export function ApiKeysPage() {
   return (
     <section className="catalog" data-testid="apikeys-page">
       <div className="table-panel">
-        <div className="users-toolbar">
-          <div className="sales-filters">
-            <span className="muted">
-              {active.length} key{active.length !== 1 ? 's' : ''} activa
-              {active.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-          <button
-            className="btn-primary"
-            onClick={() => {
-              setShowCreate(true);
-              setJustCreated(null);
-            }}
-            data-testid="apikey-new"
-          >
-            Nueva API key
-          </button>
-        </div>
+        <SectionToolbar
+          actionLabel="Nueva API key"
+          onAction={() => {
+            setShowCreate(true);
+            setJustCreated(null);
+          }}
+          actionTestId="apikey-new"
+        >
+          <span className="muted">
+            {active.length} key{active.length !== 1 ? 's' : ''} activa
+            {active.length !== 1 ? 's' : ''}
+          </span>
+        </SectionToolbar>
 
         {justCreated && (
           <div className="apikey-banner" data-testid="apikey-banner">

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
+import { SectionToolbar } from '../components/SectionToolbar.js';
 import {
   createCustomer,
   type Customer,
@@ -96,20 +97,15 @@ export function CustomersSection() {
 
   return (
     <div className="table-panel" data-testid="b2b-customers">
-      <div className="users-toolbar">
-        <div className="sales-filters">
-          <span className="muted">
-            {customers.length} cliente{customers.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-        <button
-          className="btn-primary"
-          onClick={() => setForm({ ...EMPTY })}
-          data-testid="b2b-new-customer"
-        >
-          Nuevo cliente
-        </button>
-      </div>
+      <SectionToolbar
+        actionLabel="Nuevo cliente"
+        onAction={() => setForm({ ...EMPTY })}
+        actionTestId="b2b-new-customer"
+      >
+        <span className="muted">
+          {customers.length} cliente{customers.length !== 1 ? 's' : ''}
+        </span>
+      </SectionToolbar>
 
       {isLoading ? (
         <p className="catalog-empty">Cargando…</p>

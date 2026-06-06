@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
+import { SectionToolbar } from '../components/SectionToolbar.js';
 import {
   createWholesaleOrder,
   getWholesaleOrder,
@@ -277,31 +278,26 @@ export function OrdersSection() {
 
   return (
     <div className="table-panel" data-testid="b2b-orders">
-      <div className="users-toolbar">
-        <div className="sales-filters">
-          <Select
-            className="catalog-search"
-            value={statusFilter}
-            onChange={setStatusFilter}
-            ariaLabel="Filtrar por estado"
-            data-testid="b2b-orders-status"
-            options={[
-              { value: '', label: 'Todos los estados' },
-              { value: 'DRAFT', label: 'Borrador' },
-              { value: 'CONFIRMED', label: 'Confirmado' },
-              { value: 'SHIPPED', label: 'Enviado' },
-              { value: 'CANCELLED', label: 'Cancelado' },
-            ]}
-          />
-        </div>
-        <button
-          className="btn-primary"
-          onClick={() => setCreating(true)}
-          data-testid="b2b-new-order"
-        >
-          Nuevo pedido
-        </button>
-      </div>
+      <SectionToolbar
+        actionLabel="Nuevo pedido"
+        onAction={() => setCreating(true)}
+        actionTestId="b2b-new-order"
+      >
+        <Select
+          className="catalog-search"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          ariaLabel="Filtrar por estado"
+          data-testid="b2b-orders-status"
+          options={[
+            { value: '', label: 'Todos los estados' },
+            { value: 'DRAFT', label: 'Borrador' },
+            { value: 'CONFIRMED', label: 'Confirmado' },
+            { value: 'SHIPPED', label: 'Enviado' },
+            { value: 'CANCELLED', label: 'Cancelado' },
+          ]}
+        />
+      </SectionToolbar>
 
       {isLoading ? (
         <p className="catalog-empty">Cargando…</p>
