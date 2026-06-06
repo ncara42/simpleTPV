@@ -2,6 +2,7 @@ import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { Modal } from '../components/Modal.js';
 import {
   createPriceList,
   deletePriceList,
@@ -68,87 +69,81 @@ function PriceListDetail({
   const canAdd = productId !== '' && price !== '' && Number(price) >= 0;
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal modal--form"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="b2b-pricelist-detail"
-      >
-        <header className="modal-head">
-          <h3>Tarifa · {priceList.name}</h3>
-        </header>
-        <div className="modal-body">
-          {items.length === 0 ? (
-            <p className="catalog-empty">Sin precios. Añade el primero abajo.</p>
-          ) : (
-            <table className="catalog-table">
-              <thead>
-                <tr>
-                  <th>Producto</th>
-                  <th>PVP</th>
-                  <th>Precio mayorista</th>
-                  <th aria-label="Acciones" />
+    <Modal onClose={onClose} className="modal--form" testId="b2b-pricelist-detail">
+      <header className="modal-head">
+        <h3>Tarifa · {priceList.name}</h3>
+      </header>
+      <div className="modal-body">
+        {items.length === 0 ? (
+          <p className="catalog-empty">Sin precios. Añade el primero abajo.</p>
+        ) : (
+          <table className="catalog-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>PVP</th>
+                <th>Precio mayorista</th>
+                <th aria-label="Acciones" />
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it) => (
+                <tr key={it.id} data-testid="b2b-pricelist-item">
+                  <td>{it.product?.name ?? it.productId}</td>
+                  <td className="muted">{it.product ? eur(it.product.salePrice) : '—'}</td>
+                  <td>{eur(it.price)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="link-btn"
+                      onClick={() => removeItemMut.mutate(it.productId)}
+                    >
+                      Quitar
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {items.map((it) => (
-                  <tr key={it.id} data-testid="b2b-pricelist-item">
-                    <td>{it.product?.name ?? it.productId}</td>
-                    <td className="muted">{it.product ? eur(it.product.salePrice) : '—'}</td>
-                    <td>{eur(it.price)}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="link-btn"
-                        onClick={() => removeItemMut.mutate(it.productId)}
-                      >
-                        Quitar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+              ))}
+            </tbody>
+          </table>
+        )}
 
-          <section className="form-section">
-            <span className="form-section-title">Añadir / actualizar precio</span>
-            <div className="b2b-item-form">
-              <Select
-                value={productId}
-                onChange={setProductId}
-                ariaLabel="Producto"
-                options={productOptions}
-                data-testid="b2b-item-product"
-              />
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Precio €"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                data-testid="b2b-item-price"
-              />
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={!canAdd || setItemMut.isPending}
-                onClick={() => setItemMut.mutate({ productId, price: Number(price) })}
-                data-testid="b2b-item-add"
-              >
-                Añadir
-              </button>
-            </div>
-          </section>
-        </div>
-        <div className="modal-foot modal-foot-actions">
-          <button type="button" onClick={onClose}>
-            Cerrar
-          </button>
-        </div>
+        <section className="form-section">
+          <span className="form-section-title">Añadir / actualizar precio</span>
+          <div className="b2b-item-form">
+            <Select
+              value={productId}
+              onChange={setProductId}
+              ariaLabel="Producto"
+              options={productOptions}
+              data-testid="b2b-item-product"
+            />
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Precio €"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              data-testid="b2b-item-price"
+            />
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!canAdd || setItemMut.isPending}
+              onClick={() => setItemMut.mutate({ productId, price: Number(price) })}
+              data-testid="b2b-item-add"
+            >
+              Añadir
+            </button>
+          </div>
+        </section>
       </div>
-    </div>
+      <div className="modal-foot modal-foot-actions">
+        <button type="button" onClick={onClose}>
+          Cerrar
+        </button>
+      </div>
+    </Modal>
   );
 }
 
@@ -244,48 +239,46 @@ export function PriceListsSection() {
       )}
 
       {creating && (
-        <div className="modal-backdrop" onClick={() => setCreating(false)}>
-          <form
-            className="modal modal--form"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (newName.trim()) createMut.mutate(newName.trim());
-            }}
-            data-testid="b2b-pricelist-form"
-          >
-            <header className="modal-head">
-              <h3>Nueva tarifa</h3>
-            </header>
-            <div className="modal-body">
-              <section className="form-section">
-                <label>
-                  Nombre
-                  <input
-                    required
-                    autoFocus
-                    placeholder="Mayorista, distribuidor…"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    data-testid="b2b-pricelist-name"
-                  />
-                </label>
-              </section>
-            </div>
-            <div className="modal-foot modal-foot-actions">
-              <button type="button" onClick={() => setCreating(false)}>
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={!newName.trim() || createMut.isPending}
-              >
-                Crear
-              </button>
-            </div>
-          </form>
-        </div>
+        <Modal
+          onClose={() => setCreating(false)}
+          className="modal--form"
+          testId="b2b-pricelist-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (newName.trim()) createMut.mutate(newName.trim());
+          }}
+        >
+          <header className="modal-head">
+            <h3>Nueva tarifa</h3>
+          </header>
+          <div className="modal-body">
+            <section className="form-section">
+              <label>
+                Nombre
+                <input
+                  required
+                  autoFocus
+                  placeholder="Mayorista, distribuidor…"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  data-testid="b2b-pricelist-name"
+                />
+              </label>
+            </section>
+          </div>
+          <div className="modal-foot modal-foot-actions">
+            <button type="button" onClick={() => setCreating(false)}>
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={!newName.trim() || createMut.isPending}
+            >
+              Crear
+            </button>
+          </div>
+        </Modal>
       )}
 
       {detailOf && <PriceListDetail priceList={detailOf} onClose={() => setDetailOf(null)} />}

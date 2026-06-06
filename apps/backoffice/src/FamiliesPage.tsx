@@ -2,6 +2,7 @@ import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
+import { Modal } from './components/Modal.js';
 import {
   createFamily,
   deleteFamily,
@@ -370,49 +371,47 @@ export function FamiliesPage() {
       </div>
 
       {form && (
-        <div className="modal-backdrop" onClick={() => setForm(null)}>
-          <form
-            className="modal modal--form"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={(e) => {
-              e.preventDefault();
-              saveMut.mutate(form);
-            }}
-            data-testid="family-form"
-          >
-            <h3>
-              {form.id
-                ? 'Editar familia'
-                : form.parentId
-                  ? 'Nueva familia hija'
-                  : 'Nueva familia raíz'}
-            </h3>
-            <label>
-              Nombre
-              <input
-                required
-                autoFocus
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                data-testid="family-name"
-              />
-            </label>
-            {saveMut.isError && <p className="form-error">No se pudo guardar.</p>}
-            <div className="modal-foot">
-              <button type="button" onClick={() => setForm(null)}>
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={saveMut.isPending}
-                data-testid="family-save"
-              >
-                {saveMut.isPending ? 'Guardando…' : 'Guardar'}
-              </button>
-            </div>
-          </form>
-        </div>
+        <Modal
+          onClose={() => setForm(null)}
+          className="modal--form"
+          testId="family-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            saveMut.mutate(form);
+          }}
+        >
+          <h3>
+            {form.id
+              ? 'Editar familia'
+              : form.parentId
+                ? 'Nueva familia hija'
+                : 'Nueva familia raíz'}
+          </h3>
+          <label>
+            Nombre
+            <input
+              required
+              autoFocus
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              data-testid="family-name"
+            />
+          </label>
+          {saveMut.isError && <p className="form-error">No se pudo guardar.</p>}
+          <div className="modal-foot">
+            <button type="button" onClick={() => setForm(null)}>
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={saveMut.isPending}
+              data-testid="family-save"
+            >
+              {saveMut.isPending ? 'Guardando…' : 'Guardar'}
+            </button>
+          </div>
+        </Modal>
       )}
     </section>
   );

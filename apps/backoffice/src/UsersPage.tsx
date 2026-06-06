@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { Modal } from './components/Modal.js';
 import { DEMO_STORES, type DemoUser, ROLE_LABEL } from './demo/demoData.js';
 import { createUser, deleteUser, listUsers, type NewUser } from './lib/admin.js';
 import { usePageHeader } from './lib/pageHeader.js';
@@ -407,136 +408,134 @@ export function UsersPage() {
       </div>
 
       {form && (
-        <div className="modal-backdrop" onClick={closeModal}>
-          <form
-            className="modal modal--form user-form"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={(e) => {
-              e.preventDefault();
-              submitForm();
-            }}
-            data-testid="user-form"
-          >
-            <header className="modal-head">
-              <h3>{wizard ? 'Editar usuario' : 'Nuevo usuario'}</h3>
-            </header>
+        <Modal
+          onClose={closeModal}
+          className="modal--form user-form"
+          testId="user-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submitForm();
+          }}
+        >
+          <header className="modal-head">
+            <h3>{wizard ? 'Editar usuario' : 'Nuevo usuario'}</h3>
+          </header>
 
-            <div className="modal-body">
-              <section className="form-section">
-                <label>
-                  Nombre
-                  <input
-                    required
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    data-testid="user-name"
-                  />
-                </label>
-                <label>
-                  Email
-                  <input
-                    type="email"
-                    required
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    data-testid="user-email"
-                  />
-                </label>
-                <label>
-                  {wizard ? 'Contraseña (opcional)' : 'Contraseña'}
-                  <input
-                    type="password"
-                    required={!wizard}
-                    placeholder={wizard ? 'Dejar en blanco para mantener' : undefined}
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    data-testid="user-password"
-                  />
-                </label>
-              </section>
-
-              <section className="form-section">
-                <span className="form-section-title">Rol</span>
-                <div
-                  className="role-segment"
-                  role="radiogroup"
-                  aria-label="Rol"
-                  data-testid="user-role"
-                >
-                  {ROLES.map((r) => (
-                    <button
-                      type="button"
-                      key={r.value}
-                      role="radio"
-                      aria-checked={form.role === r.value}
-                      className={`role-seg ${form.role === r.value ? 'is-active' : ''}`}
-                      onClick={() => setForm({ ...form, role: r.value })}
-                      data-testid={`user-role-${r.value}`}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <section className="form-section">
-                <span className="form-section-title">Acceso a tiendas</span>
-                {form.role === 'ADMIN' ? (
-                  <p className="user-stores-note">
-                    Los administradores acceden a <strong>todas las tiendas</strong>.
-                  </p>
-                ) : (
-                  <div className="store-chips" data-testid="user-stores">
-                    {DEMO_STORES.map((s) => {
-                      const on = form.storeIds.includes(s.id);
-                      return (
-                        <button
-                          type="button"
-                          key={s.id}
-                          aria-pressed={on}
-                          className={`store-chip ${on ? 'is-on' : ''}`}
-                          onClick={() => toggleStore(s.id)}
-                          data-testid={`user-store-${s.id}`}
-                        >
-                          {s.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-            </div>
-
-            {createMut.isError && <p className="form-error">No se pudo guardar.</p>}
-            <div className="modal-foot modal-foot--split">
-              <label className="switch">
+          <div className="modal-body">
+            <section className="form-section">
+              <label>
+                Nombre
                 <input
-                  type="checkbox"
-                  checked={form.active}
-                  onChange={(e) => setForm({ ...form, active: e.target.checked })}
-                  data-testid="user-active"
+                  required
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  data-testid="user-name"
                 />
-                <span className="switch-track">
-                  <span className="switch-thumb" />
-                </span>
-                <span className="switch-text">Usuario activo</span>
               </label>
-              <div className="modal-foot-actions">
-                <button type="button" onClick={closeModal}>
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={createMut.isPending}
-                  data-testid="user-save"
-                >
-                  {primaryLabel}
-                </button>
+              <label>
+                Email
+                <input
+                  type="email"
+                  required
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  data-testid="user-email"
+                />
+              </label>
+              <label>
+                {wizard ? 'Contraseña (opcional)' : 'Contraseña'}
+                <input
+                  type="password"
+                  required={!wizard}
+                  placeholder={wizard ? 'Dejar en blanco para mantener' : undefined}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  data-testid="user-password"
+                />
+              </label>
+            </section>
+
+            <section className="form-section">
+              <span className="form-section-title">Rol</span>
+              <div
+                className="role-segment"
+                role="radiogroup"
+                aria-label="Rol"
+                data-testid="user-role"
+              >
+                {ROLES.map((r) => (
+                  <button
+                    type="button"
+                    key={r.value}
+                    role="radio"
+                    aria-checked={form.role === r.value}
+                    className={`role-seg ${form.role === r.value ? 'is-active' : ''}`}
+                    onClick={() => setForm({ ...form, role: r.value })}
+                    data-testid={`user-role-${r.value}`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
               </div>
+            </section>
+
+            <section className="form-section">
+              <span className="form-section-title">Acceso a tiendas</span>
+              {form.role === 'ADMIN' ? (
+                <p className="user-stores-note">
+                  Los administradores acceden a <strong>todas las tiendas</strong>.
+                </p>
+              ) : (
+                <div className="store-chips" data-testid="user-stores">
+                  {DEMO_STORES.map((s) => {
+                    const on = form.storeIds.includes(s.id);
+                    return (
+                      <button
+                        type="button"
+                        key={s.id}
+                        aria-pressed={on}
+                        className={`store-chip ${on ? 'is-on' : ''}`}
+                        onClick={() => toggleStore(s.id)}
+                        data-testid={`user-store-${s.id}`}
+                      >
+                        {s.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </div>
+
+          {createMut.isError && <p className="form-error">No se pudo guardar.</p>}
+          <div className="modal-foot modal-foot--split">
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={form.active}
+                onChange={(e) => setForm({ ...form, active: e.target.checked })}
+                data-testid="user-active"
+              />
+              <span className="switch-track">
+                <span className="switch-thumb" />
+              </span>
+              <span className="switch-text">Usuario activo</span>
+            </label>
+            <div className="modal-foot-actions">
+              <button type="button" onClick={closeModal}>
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={createMut.isPending}
+                data-testid="user-save"
+              >
+                {primaryLabel}
+              </button>
             </div>
-          </form>
-        </div>
+          </div>
+        </Modal>
       )}
     </section>
   );

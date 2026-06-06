@@ -2,6 +2,7 @@ import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { Modal } from '../components/Modal.js';
 import {
   createCustomer,
   type Customer,
@@ -158,100 +159,98 @@ export function CustomersSection() {
       )}
 
       {form && (
-        <div className="modal-backdrop" onClick={() => setForm(null)}>
-          <form
-            className="modal modal--form"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={(e) => {
-              e.preventDefault();
-              saveMut.mutate(form);
-            }}
-            data-testid="b2b-customer-form"
-          >
-            <header className="modal-head">
-              <h3>{form.id ? 'Editar cliente' : 'Nuevo cliente'}</h3>
-            </header>
-            <div className="modal-body">
-              <section className="form-section">
-                <label>
-                  Nombre
-                  <input
-                    required
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    data-testid="b2b-customer-name"
-                  />
-                </label>
-                <label>
-                  NIF
-                  <input
-                    value={form.nif}
-                    onChange={(e) => setForm({ ...form, nif: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Email
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Teléfono
-                  <input
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Dirección
-                  <input
-                    value={form.address}
-                    onChange={(e) => setForm({ ...form, address: e.target.value })}
-                  />
-                </label>
-              </section>
-              <section className="form-section">
-                <span className="form-section-title">Tarifa mayorista</span>
-                <Select
-                  value={form.priceListId}
-                  onChange={(v) => setForm({ ...form, priceListId: v })}
-                  ariaLabel="Tarifa"
-                  options={tariffOptions}
-                  data-testid="b2b-customer-tariff"
-                />
-              </section>
-            </div>
-            {saveMut.isError && <p className="form-error">No se pudo guardar.</p>}
-            <div className="modal-foot modal-foot--split">
-              <label className="switch">
+        <Modal
+          onClose={() => setForm(null)}
+          className="modal--form"
+          testId="b2b-customer-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            saveMut.mutate(form);
+          }}
+        >
+          <header className="modal-head">
+            <h3>{form.id ? 'Editar cliente' : 'Nuevo cliente'}</h3>
+          </header>
+          <div className="modal-body">
+            <section className="form-section">
+              <label>
+                Nombre
                 <input
-                  type="checkbox"
-                  checked={form.active}
-                  onChange={(e) => setForm({ ...form, active: e.target.checked })}
+                  required
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  data-testid="b2b-customer-name"
                 />
-                <span className="switch-track">
-                  <span className="switch-thumb" />
-                </span>
-                <span className="switch-text">Cliente activo</span>
               </label>
-              <div className="modal-foot-actions">
-                <button type="button" onClick={() => setForm(null)}>
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={!form.name.trim() || saveMut.isPending}
-                  data-testid="b2b-customer-save"
-                >
-                  {saveMut.isPending ? 'Guardando…' : 'Guardar'}
-                </button>
-              </div>
+              <label>
+                NIF
+                <input
+                  value={form.nif}
+                  onChange={(e) => setForm({ ...form, nif: e.target.value })}
+                />
+              </label>
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                />
+              </label>
+              <label>
+                Teléfono
+                <input
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                />
+              </label>
+              <label>
+                Dirección
+                <input
+                  value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                />
+              </label>
+            </section>
+            <section className="form-section">
+              <span className="form-section-title">Tarifa mayorista</span>
+              <Select
+                value={form.priceListId}
+                onChange={(v) => setForm({ ...form, priceListId: v })}
+                ariaLabel="Tarifa"
+                options={tariffOptions}
+                data-testid="b2b-customer-tariff"
+              />
+            </section>
+          </div>
+          {saveMut.isError && <p className="form-error">No se pudo guardar.</p>}
+          <div className="modal-foot modal-foot--split">
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={form.active}
+                onChange={(e) => setForm({ ...form, active: e.target.checked })}
+              />
+              <span className="switch-track">
+                <span className="switch-thumb" />
+              </span>
+              <span className="switch-text">Cliente activo</span>
+            </label>
+            <div className="modal-foot-actions">
+              <button type="button" onClick={() => setForm(null)}>
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={!form.name.trim() || saveMut.isPending}
+                data-testid="b2b-customer-save"
+              >
+                {saveMut.isPending ? 'Guardando…' : 'Guardar'}
+              </button>
             </div>
-          </form>
-        </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

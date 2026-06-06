@@ -2,6 +2,7 @@ import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { Modal } from '../components/Modal.js';
 import {
   createWholesaleOrder,
   getWholesaleOrder,
@@ -80,95 +81,93 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
     setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <form
-        className="modal modal--form"
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (canSubmit) createMut.mutate();
-        }}
-        data-testid="b2b-order-form"
-      >
-        <header className="modal-head">
-          <h3>Nuevo pedido mayorista</h3>
-        </header>
-        <div className="modal-body">
-          <section className="form-section">
-            <span className="form-section-title">Cliente</span>
-            <Select
-              value={customerId}
-              onChange={setCustomerId}
-              ariaLabel="Cliente"
-              options={customerOptions}
-              data-testid="b2b-order-customer"
-            />
-          </section>
+    <Modal
+      onClose={onClose}
+      className="modal--form"
+      testId="b2b-order-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (canSubmit) createMut.mutate();
+      }}
+    >
+      <header className="modal-head">
+        <h3>Nuevo pedido mayorista</h3>
+      </header>
+      <div className="modal-body">
+        <section className="form-section">
+          <span className="form-section-title">Cliente</span>
+          <Select
+            value={customerId}
+            onChange={setCustomerId}
+            ariaLabel="Cliente"
+            options={customerOptions}
+            data-testid="b2b-order-customer"
+          />
+        </section>
 
-          <section className="form-section">
-            <span className="form-section-title">Líneas</span>
-            {lines.map((l, i) => (
-              <div className="b2b-item-form" key={i}>
-                <Select
-                  value={l.productId}
-                  onChange={(v) => setLine(i, { productId: v })}
-                  ariaLabel="Producto"
-                  options={productOptions}
-                  data-testid="b2b-order-line-product"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.001"
-                  value={l.qty}
-                  onChange={(e) => setLine(i, { qty: e.target.value })}
-                  aria-label="Cantidad"
-                  data-testid="b2b-order-line-qty"
-                />
-                <button
-                  type="button"
-                  className="link-btn"
-                  onClick={() => setLines((prev) => prev.filter((_, idx) => idx !== i))}
-                  disabled={lines.length === 1}
-                  aria-label="Quitar línea"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              className="link-btn"
-              onClick={() => setLines((prev) => [...prev, { productId: '', qty: '1' }])}
-              data-testid="b2b-order-add-line"
-            >
-              + Añadir línea
-            </button>
-          </section>
-
-          <section className="form-section">
-            <label>
-              Notas
-              <input value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </label>
-          </section>
-        </div>
-        {createMut.isError && <p className="form-error">No se pudo crear el pedido.</p>}
-        <div className="modal-foot modal-foot-actions">
-          <button type="button" onClick={onClose}>
-            Cancelar
-          </button>
+        <section className="form-section">
+          <span className="form-section-title">Líneas</span>
+          {lines.map((l, i) => (
+            <div className="b2b-item-form" key={i}>
+              <Select
+                value={l.productId}
+                onChange={(v) => setLine(i, { productId: v })}
+                ariaLabel="Producto"
+                options={productOptions}
+                data-testid="b2b-order-line-product"
+              />
+              <input
+                type="number"
+                min="0"
+                step="0.001"
+                value={l.qty}
+                onChange={(e) => setLine(i, { qty: e.target.value })}
+                aria-label="Cantidad"
+                data-testid="b2b-order-line-qty"
+              />
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => setLines((prev) => prev.filter((_, idx) => idx !== i))}
+                disabled={lines.length === 1}
+                aria-label="Quitar línea"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
           <button
-            type="submit"
-            className="btn-primary"
-            disabled={!canSubmit}
-            data-testid="b2b-order-save"
+            type="button"
+            className="link-btn"
+            onClick={() => setLines((prev) => [...prev, { productId: '', qty: '1' }])}
+            data-testid="b2b-order-add-line"
           >
-            {createMut.isPending ? 'Creando…' : 'Crear pedido'}
+            + Añadir línea
           </button>
-        </div>
-      </form>
-    </div>
+        </section>
+
+        <section className="form-section">
+          <label>
+            Notas
+            <input value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </label>
+        </section>
+      </div>
+      {createMut.isError && <p className="form-error">No se pudo crear el pedido.</p>}
+      <div className="modal-foot modal-foot-actions">
+        <button type="button" onClick={onClose}>
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          className="btn-primary"
+          disabled={!canSubmit}
+          data-testid="b2b-order-save"
+        >
+          {createMut.isPending ? 'Creando…' : 'Crear pedido'}
+        </button>
+      </div>
+    </Modal>
   );
 }
 
@@ -189,82 +188,76 @@ function OrderDetailModal({ orderId, onClose }: { orderId: string; onClose: () =
   });
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal modal--form"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="b2b-order-detail"
-      >
-        <header className="modal-head">
-          <h3>Pedido {order ? `· ${order.customer.name}` : ''}</h3>
-        </header>
-        <div className="modal-body">
-          {!order ? (
-            <p className="catalog-empty">Cargando…</p>
-          ) : (
-            <>
-              <p className="muted">
-                {fmtDate(order.createdAt)} ·{' '}
-                <span className="role-badge">{STATUS_LABEL[order.status]}</span>
-              </p>
-              <table className="catalog-table">
-                <thead>
-                  <tr>
-                    <th>Producto</th>
-                    <th>Cant.</th>
-                    <th>Precio</th>
-                    <th>Subtotal</th>
+    <Modal onClose={onClose} className="modal--form" testId="b2b-order-detail">
+      <header className="modal-head">
+        <h3>Pedido {order ? `· ${order.customer.name}` : ''}</h3>
+      </header>
+      <div className="modal-body">
+        {!order ? (
+          <p className="catalog-empty">Cargando…</p>
+        ) : (
+          <>
+            <p className="muted">
+              {fmtDate(order.createdAt)} ·{' '}
+              <span className="role-badge">{STATUS_LABEL[order.status]}</span>
+            </p>
+            <table className="catalog-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Cant.</th>
+                  <th>Precio</th>
+                  <th>Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {order.lines.map((l) => (
+                  <tr key={l.id}>
+                    <td>{l.product?.name ?? l.productId}</td>
+                    <td className="muted">{Number(l.qty)}</td>
+                    <td className="muted">{eur(l.unitPrice)}</td>
+                    <td>{eur(l.lineTotal)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {order.lines.map((l) => (
-                    <tr key={l.id}>
-                      <td>{l.product?.name ?? l.productId}</td>
-                      <td className="muted">{Number(l.qty)}</td>
-                      <td className="muted">{eur(l.unitPrice)}</td>
-                      <td>{eur(l.lineTotal)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={3}>Total</td>
-                    <td>
-                      <strong>{eur(order.total)}</strong>
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-              {order.notes && <p className="muted">Notas: {order.notes}</p>}
-            </>
-          )}
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={3}>Total</td>
+                  <td>
+                    <strong>{eur(order.total)}</strong>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+            {order.notes && <p className="muted">Notas: {order.notes}</p>}
+          </>
+        )}
+      </div>
+      <div className="modal-foot modal-foot--split">
+        <div className="b2b-status-actions">
+          {order &&
+            NEXT[order.status].map((next) => (
+              <button
+                key={next}
+                type="button"
+                className={next === 'CANCELLED' ? 'link-btn' : 'btn-primary'}
+                disabled={statusMut.isPending}
+                onClick={() => statusMut.mutate(next)}
+                data-testid={`b2b-order-to-${next}`}
+              >
+                {next === 'CANCELLED'
+                  ? 'Cancelar pedido'
+                  : `Marcar ${STATUS_LABEL[next].toLowerCase()}`}
+              </button>
+            ))}
         </div>
-        <div className="modal-foot modal-foot--split">
-          <div className="b2b-status-actions">
-            {order &&
-              NEXT[order.status].map((next) => (
-                <button
-                  key={next}
-                  type="button"
-                  className={next === 'CANCELLED' ? 'link-btn' : 'btn-primary'}
-                  disabled={statusMut.isPending}
-                  onClick={() => statusMut.mutate(next)}
-                  data-testid={`b2b-order-to-${next}`}
-                >
-                  {next === 'CANCELLED'
-                    ? 'Cancelar pedido'
-                    : `Marcar ${STATUS_LABEL[next].toLowerCase()}`}
-                </button>
-              ))}
-          </div>
-          <div className="modal-foot-actions">
-            <button type="button" onClick={onClose}>
-              Cerrar
-            </button>
-          </div>
+        <div className="modal-foot-actions">
+          <button type="button" onClick={onClose}>
+            Cerrar
+          </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

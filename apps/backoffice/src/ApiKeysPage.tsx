@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useState } from 'react';
 
+import { Modal } from './components/Modal.js';
 import { createApiKey, listApiKeys, revokeApiKey } from './lib/api-keys.js';
 import { usePageHeader } from './lib/pageHeader.js';
 
@@ -206,59 +207,57 @@ export function ApiKeysPage() {
       </div>
 
       {showCreate && (
-        <div className="modal-backdrop" onClick={() => setShowCreate(false)}>
-          <form
-            className="modal modal--form"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (form.name.trim()) createMut.mutate();
-            }}
-            data-testid="apikey-form"
-          >
-            <header className="modal-head">
-              <h3>Nueva API key</h3>
-            </header>
-            <div className="modal-body">
-              <section className="form-section">
-                <label>
-                  Nombre
-                  <input
-                    autoFocus
-                    required
-                    placeholder="ERP, mayorista externo…"
-                    value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    data-testid="apikey-name"
-                  />
-                </label>
-                <label>
-                  Tarifa (opcional)
-                  <input
-                    placeholder="ID de tarifa mayorista"
-                    value={form.priceListId}
-                    onChange={(e) => setForm((f) => ({ ...f, priceListId: e.target.value }))}
-                  />
-                </label>
-                <p className="muted">
-                  Si se asigna una tarifa, <code>/public/stock</code> incluye el precio mayorista.
-                </p>
-              </section>
-            </div>
-            <div className="modal-foot modal-foot-actions">
-              <button type="button" onClick={() => setShowCreate(false)}>
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={!form.name.trim() || createMut.isPending}
-              >
-                {createMut.isPending ? 'Creando…' : 'Crear'}
-              </button>
-            </div>
-          </form>
-        </div>
+        <Modal
+          onClose={() => setShowCreate(false)}
+          className="modal--form"
+          testId="apikey-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (form.name.trim()) createMut.mutate();
+          }}
+        >
+          <header className="modal-head">
+            <h3>Nueva API key</h3>
+          </header>
+          <div className="modal-body">
+            <section className="form-section">
+              <label>
+                Nombre
+                <input
+                  autoFocus
+                  required
+                  placeholder="ERP, mayorista externo…"
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  data-testid="apikey-name"
+                />
+              </label>
+              <label>
+                Tarifa (opcional)
+                <input
+                  placeholder="ID de tarifa mayorista"
+                  value={form.priceListId}
+                  onChange={(e) => setForm((f) => ({ ...f, priceListId: e.target.value }))}
+                />
+              </label>
+              <p className="muted">
+                Si se asigna una tarifa, <code>/public/stock</code> incluye el precio mayorista.
+              </p>
+            </section>
+          </div>
+          <div className="modal-foot modal-foot-actions">
+            <button type="button" onClick={() => setShowCreate(false)}>
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={!form.name.trim() || createMut.isPending}
+            >
+              {createMut.isPending ? 'Creando…' : 'Crear'}
+            </button>
+          </div>
+        </Modal>
       )}
     </section>
   );

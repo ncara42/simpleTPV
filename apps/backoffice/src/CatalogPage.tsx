@@ -2,6 +2,7 @@ import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
+import { Modal } from './components/Modal.js';
 import {
   DEMO_FAMILIES,
   DEMO_PRODUCT_STOCK,
@@ -374,115 +375,112 @@ export function CatalogPage() {
       </div>
 
       {form && (
-        <div className="modal-backdrop" onClick={closeModal}>
-          <form
-            className="modal modal--form"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={(e) => {
-              e.preventDefault();
-              submitForm();
-            }}
-            data-testid="product-form"
-          >
-            <h3>{wizard ? 'Editar producto' : 'Nuevo producto'}</h3>
+        <Modal
+          onClose={closeModal}
+          className="modal--form"
+          testId="product-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submitForm();
+          }}
+        >
+          <h3>{wizard ? 'Editar producto' : 'Nuevo producto'}</h3>
+          <label>
+            Nombre
+            <input
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              data-testid="form-name"
+            />
+          </label>
+          <div className="modal-row">
             <label>
-              Nombre
-              <input
-                required
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                data-testid="form-name"
+              Familia
+              <Select
+                value={form.familyId ?? ''}
+                onChange={(value) =>
+                  setForm({ ...form, familyId: value || null, subfamilyId: null })
+                }
+                options={[
+                  { value: '', label: '— Sin familia —' },
+                  ...DEMO_FAMILIES.map((fam) => ({ value: fam.id, label: fam.name })),
+                ]}
+                ariaLabel="Familia"
+                data-testid="form-family"
               />
             </label>
-            <div className="modal-row">
-              <label>
-                Familia
-                <Select
-                  value={form.familyId ?? ''}
-                  onChange={(value) =>
-                    setForm({ ...form, familyId: value || null, subfamilyId: null })
-                  }
-                  options={[
-                    { value: '', label: '— Sin familia —' },
-                    ...DEMO_FAMILIES.map((fam) => ({ value: fam.id, label: fam.name })),
-                  ]}
-                  ariaLabel="Familia"
-                  data-testid="form-family"
-                />
-              </label>
-              <label>
-                Subfamilia
-                <Select
-                  value={form.subfamilyId ?? ''}
-                  disabled={subfamilies.length === 0}
-                  onChange={(value) => setForm({ ...form, subfamilyId: value || null })}
-                  options={[
-                    {
-                      value: '',
-                      label:
-                        subfamilies.length === 0 ? '— Sin subfamilias —' : '— Toda la familia —',
-                    },
-                    ...subfamilies.map((sub) => ({ value: sub.id, label: sub.name })),
-                  ]}
-                  ariaLabel="Subfamilia"
-                  data-testid="form-subfamily"
-                />
-              </label>
-            </div>
-            <div className="modal-row">
-              <label>
-                Precio venta (€)
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={form.salePrice}
-                  onChange={(e) => setForm({ ...form, salePrice: Number(e.target.value) })}
-                  data-testid="form-price"
-                />
-              </label>
-              <label>
-                IVA (%)
-                <input
-                  type="number"
-                  step="1"
-                  value={form.taxRate}
-                  onChange={(e) => setForm({ ...form, taxRate: Number(e.target.value) })}
-                />
-              </label>
-            </div>
-            <div className="modal-row">
-              <label>
-                SKU
-                <input
-                  value={form.sku ?? ''}
-                  onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                />
-              </label>
-              <label>
-                Código de barras
-                <input
-                  value={form.barcode ?? ''}
-                  onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-                />
-              </label>
-            </div>
-            {createMut.isError && <p className="form-error">No se pudo guardar.</p>}
-            <div className="modal-foot">
-              <button type="button" onClick={closeModal}>
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={createMut.isPending}
-                data-testid="form-save"
-              >
-                {primaryLabel}
-              </button>
-            </div>
-          </form>
-        </div>
+            <label>
+              Subfamilia
+              <Select
+                value={form.subfamilyId ?? ''}
+                disabled={subfamilies.length === 0}
+                onChange={(value) => setForm({ ...form, subfamilyId: value || null })}
+                options={[
+                  {
+                    value: '',
+                    label: subfamilies.length === 0 ? '— Sin subfamilias —' : '— Toda la familia —',
+                  },
+                  ...subfamilies.map((sub) => ({ value: sub.id, label: sub.name })),
+                ]}
+                ariaLabel="Subfamilia"
+                data-testid="form-subfamily"
+              />
+            </label>
+          </div>
+          <div className="modal-row">
+            <label>
+              Precio venta (€)
+              <input
+                type="number"
+                step="0.01"
+                required
+                value={form.salePrice}
+                onChange={(e) => setForm({ ...form, salePrice: Number(e.target.value) })}
+                data-testid="form-price"
+              />
+            </label>
+            <label>
+              IVA (%)
+              <input
+                type="number"
+                step="1"
+                value={form.taxRate}
+                onChange={(e) => setForm({ ...form, taxRate: Number(e.target.value) })}
+              />
+            </label>
+          </div>
+          <div className="modal-row">
+            <label>
+              SKU
+              <input
+                value={form.sku ?? ''}
+                onChange={(e) => setForm({ ...form, sku: e.target.value })}
+              />
+            </label>
+            <label>
+              Código de barras
+              <input
+                value={form.barcode ?? ''}
+                onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+              />
+            </label>
+          </div>
+          {createMut.isError && <p className="form-error">No se pudo guardar.</p>}
+          <div className="modal-foot">
+            <button type="button" onClick={closeModal}>
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={createMut.isPending}
+              data-testid="form-save"
+            >
+              {primaryLabel}
+            </button>
+          </div>
+        </Modal>
       )}
     </section>
   );
