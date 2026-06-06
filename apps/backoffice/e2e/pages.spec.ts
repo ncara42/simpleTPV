@@ -184,6 +184,21 @@ test('Ventas: DataTable con filtros, paginación y agregados (#95 / IT-06)', asy
   await expect(voided.filter({ hasText: 'Completada' })).toHaveCount(0);
 });
 
+test('Ventas: columnas configurables ocultan una columna y persiste (IT-16)', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-sales').click();
+  await expect(page.getByRole('columnheader', { name: 'Familia' })).toBeVisible();
+  await page.getByTestId('sales-columns-toggle').click();
+  await expect(page.getByTestId('sales-columns-editor')).toBeVisible();
+  await page.getByTestId('col-toggle-familyName').click();
+  await expect(page.getByRole('columnheader', { name: 'Familia' })).toBeHidden();
+  // Persiste tras recargar (demo → localStorage; real → /me/preferences).
+  await page.reload();
+  await page.getByTestId('nav-sales').click();
+  await expect(page.getByTestId('sales-table')).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Familia' })).toBeHidden();
+});
+
 test('Compras y VeriFactu están retiradas del menú (#106)', async ({ page }) => {
   await login(page);
   await expect(page.getByTestId('nav-purchases')).toHaveCount(0);
