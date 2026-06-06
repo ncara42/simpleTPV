@@ -13,3 +13,11 @@
 .claude
 docs
 *.md
+
+# Ficheros de entorno locales: pueden contener secretos de desarrollo y NUNCA
+# deben entrar al contexto de build (en los frontends, Vite hornearía cualquier
+# variable VITE_* en el bundle público). Se conserva .env.example como plantilla.
+.env
+.env.local
+.env.*.local
+!.env.example
