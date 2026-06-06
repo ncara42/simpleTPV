@@ -338,23 +338,67 @@ export class StockService {
         resolved,
         ...(storeId ? { storeId } : {}),
       },
-      include: { product: { select: { name: true } }, store: { select: { name: true } } },
+      include: {
+        product: { select: { name: true, familyId: true } },
+        store: { select: { name: true } },
+      },
     });
-    // Orden por urgencia y antigüedad. Lo hacemos en memoria porque el orden por
-    // urgencia depende de un mapa (no de una columna), y el volumen de alertas
-    // activas es pequeño.
+
+    // Anti-rotura por arquetipo (IT-13): el arquetipo de un producto es su familia
+    // (mismo `familyId` = productos sustituibles). Una alerta se DEGRADA a 'soft' si
+    // hay un sustituto (otro producto de la misma familia) con stock en esa tienda —
+    // si se acaba el de sandía pero queda el de fresa, no es rotura real. Solo es
+    // 'critical' cuando ningún sustituto tiene stock (el arquetipo entero está caído).
+    const familyIds = [
+      ...new Set(rows.map((r) => r.product.familyId).filter((f): f is string => !!f)),
+    ];
+    const substitutes = familyIds.length
+      ? await this.prisma.stock.findMany({
+          where: {
+            organizationId: tenant.organizationId,
+            quantity: { gt: 0 },
+            product: { familyId: { in: familyIds }, active: true },
+            ...(storeId ? { storeId } : {}),
+          },
+          select: { storeId: true, productId: true, product: { select: { familyId: true } } },
+        })
+      : [];
+    // (familyId|storeId) → productos de esa familia con stock en esa tienda.
+    const stockedByFamilyStore = new Map<string, Set<string>>();
+    for (const s of substitutes) {
+      const key = `${s.product.familyId}|${s.storeId}`;
+      (stockedByFamilyStore.get(key) ?? stockedByFamilyStore.set(key, new Set()).get(key)!).add(
+        s.productId,
+      );
+    }
+
+    // Orden: críticas primero; dentro, por urgencia de tipo y antigüedad. Lo hacemos
+    // en memoria (el orden depende de mapas, no de columnas, y el volumen es pequeño).
     return rows
-      .map((r) => ({
-        id: r.id,
-        productId: r.productId,
-        productName: r.product.name,
-        storeId: r.storeId,
-        storeName: r.store.name,
-        alertType: r.alertType,
-        resolved: r.resolved,
-        createdAt: r.createdAt,
-      }))
+      .map((r) => {
+        const fam = r.product.familyId;
+        const stocked = fam
+          ? (stockedByFamilyStore.get(`${fam}|${r.storeId}`) ?? new Set<string>())
+          : new Set<string>();
+        // Hay sustituto si OTRO producto de la familia tiene stock en la tienda.
+        const hasSubstituteStock = [...stocked].some((pid) => pid !== r.productId);
+        return {
+          id: r.id,
+          productId: r.productId,
+          productName: r.product.name,
+          storeId: r.storeId,
+          storeName: r.store.name,
+          alertType: r.alertType,
+          hasSubstituteStock,
+          severity: hasSubstituteStock ? ('soft' as const) : ('critical' as const),
+          resolved: r.resolved,
+          createdAt: r.createdAt,
+        };
+      })
       .sort((a, b) => {
+        const bySeverity =
+          (a.severity === 'critical' ? 0 : 1) - (b.severity === 'critical' ? 0 : 1);
+        if (bySeverity !== 0) return bySeverity;
         const byUrgency = ALERT_URGENCY[a.alertType] - ALERT_URGENCY[b.alertType];
         return byUrgency !== 0 ? byUrgency : a.createdAt.getTime() - b.createdAt.getTime();
       });

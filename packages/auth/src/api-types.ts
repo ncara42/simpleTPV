@@ -327,6 +327,10 @@ export interface StockAlert {
   storeId: string;
   storeName: string;
   alertType: AlertType;
+  // Anti-rotura por arquetipo (IT-13): hay sustituto de la misma familia con stock.
+  hasSubstituteStock: boolean;
+  // 'soft' si hay sustituto (rotura no crítica, el cliente sustituye); 'critical' si no.
+  severity: 'soft' | 'critical';
   resolved: boolean;
   createdAt: string;
 }

@@ -123,7 +123,9 @@ function Home() {
     queryKey: ['stock-alerts'],
     queryFn: () => listAlerts(),
   });
-  const alertCount = alerts.length;
+  // Anti-rotura por arquetipo (IT-13): el badge de la campana cuenta solo roturas
+  // CRÍTICAS (sin sustituto en la familia). Las degradadas (hay sustituto) no alarman.
+  const alertCount = alerts.filter((a) => a.severity === 'critical').length;
 
   // Tiempo real (#33): el SSE refresca el contador aunque no estés en Notificaciones.
   useEffect(() => {

@@ -52,11 +52,18 @@ export function NotificationsPage() {
                   <td>{a.productName}</td>
                   <td>{a.storeName}</td>
                   <td>
+                    {/* Degradación por arquetipo: una rotura con sustituto en la
+                        familia se pinta como aviso (amarillo), no como crítica (rojo). */}
                     <span
-                      className={`stock-tag stock-${a.alertType === 'OUT_OF_STOCK' ? 'red' : 'yellow'}`}
+                      className={`stock-tag stock-${a.severity === 'critical' ? 'red' : 'yellow'}`}
                     >
                       {ALERT_LABEL[a.alertType] ?? a.alertType}
                     </span>
+                    {a.hasSubstituteStock && (
+                      <span className="alert-substitute" data-testid="alert-substitute">
+                        · hay sustituto
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

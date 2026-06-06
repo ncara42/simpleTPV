@@ -1798,6 +1798,13 @@
   background: none;
   color: inherit;
 }
+/* Anti-rotura por arquetipo (IT-13): nota de que hay sustituto en la familia →
+   la rotura está degradada (no crítica). */
+.alert-substitute {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--ui-text-muted);
+}
 
 /* ─── Stock: banda de métricas, panel envolvente y etiqueta de rotación (#96) ─── */
 /* Banda de KPIs compacta y visual: chip de icono + valor + etiqueta en una fila. */

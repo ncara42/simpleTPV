@@ -169,6 +169,66 @@ describe('Alertas de stock — integración', () => {
     expect(alerts.find((x) => x.productId === productId)!.alertType).toBe('LOW_STOCK');
   });
 
+  it('arquetipo (familia): degrada la alerta si hay un sustituto con stock (IT-13)', async () => {
+    // Arquetipo = familia (mismo familyId = sustitutos). Familia F con A agotado
+    // (alerta) y B con stock → la alerta de A se degrada a 'soft'. Producto C sin
+    // familia y agotado → 'critical'. La crítica ordena antes que la degradada.
+    const [fam] = await admin.$queryRaw<Array<{ id: string }>>`
+      INSERT INTO "ProductFamily" ("id","organizationId","name","sortOrder","createdAt","updatedAt")
+      VALUES (gen_random_uuid(), ${org1Id}::uuid, 'IT13-fam', 0, now(), now()) RETURNING id::text
+    `;
+    const famId = fam!.id;
+    const mkProduct = async (name: string, fId: string | null): Promise<string> => {
+      const [p] = await admin.$queryRaw<Array<{ id: string }>>`
+        INSERT INTO "Product" ("id","organizationId","familyId","name","salePrice","costPrice","taxRate","saleUnit","unitSymbol","active","createdAt","updatedAt")
+        VALUES (gen_random_uuid(), ${org1Id}::uuid, ${fId}::uuid, ${name}, 10, 6, 21, 'UNIT', 'ud', true, now(), now())
+        RETURNING id::text
+      `;
+      return p!.id;
+    };
+    const aId = await mkProduct('IT13-A-agotado', famId);
+    const bId = await mkProduct('IT13-B-sustituto', famId);
+    const cId = await mkProduct('IT13-C-sin-familia', null);
+    const ids = [aId, bId, cId];
+    try {
+      for (const [pid, qty] of [
+        [aId, 0],
+        [bId, 50],
+        [cId, 0],
+      ] as const) {
+        await admin.$executeRaw`
+          INSERT INTO "Stock" ("id","organizationId","productId","storeId","quantity","minStock","updatedAt")
+          VALUES (gen_random_uuid(), ${org1Id}::uuid, ${pid}::uuid, ${store1Id}::uuid, ${qty}, 5, now())
+        `;
+      }
+      for (const pid of [aId, cId]) {
+        await admin.$executeRaw`
+          INSERT INTO "StockAlert" ("id","organizationId","productId","storeId","alertType","resolved","createdAt")
+          VALUES (gen_random_uuid(), ${org1Id}::uuid, ${pid}::uuid, ${store1Id}::uuid, 'OUT_OF_STOCK', false, now())
+        `;
+      }
+
+      const alerts = await activeAlerts(store1Id);
+      const a = alerts.find((x) => x.productId === aId)!;
+      const c = alerts.find((x) => x.productId === cId)!;
+      // A: hay sustituto (B con stock en la misma familia) → degradada.
+      expect(a.hasSubstituteStock).toBe(true);
+      expect(a.severity).toBe('soft');
+      // C: sin familia (sin arquetipo) → sin sustituto → crítica.
+      expect(c.hasSubstituteStock).toBe(false);
+      expect(c.severity).toBe('critical');
+      // La crítica va antes que la degradada en el orden.
+      expect(alerts.findIndex((x) => x.productId === cId)).toBeLessThan(
+        alerts.findIndex((x) => x.productId === aId),
+      );
+    } finally {
+      await admin.$executeRaw`DELETE FROM "StockAlert" WHERE "productId" = ANY(${ids}::uuid[])`;
+      await admin.$executeRaw`DELETE FROM "Stock" WHERE "productId" = ANY(${ids}::uuid[])`;
+      await admin.$executeRaw`DELETE FROM "Product" WHERE id = ANY(${ids}::uuid[])`;
+      await admin.$executeRaw`DELETE FROM "ProductFamily" WHERE id = ${famId}::uuid`;
+    }
+  });
+
   it('aislamiento por tenant: org2 no ve las alertas de org1', async () => {
     await sell(95); // crea alerta en org1
     const fromOrg2 = await tenantStorage.run({ organizationId: org2Id }, async () =>
