@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
+import { requireOwned } from '../common/tenant-scope.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import type { CreateCustomerDto, UpdateCustomerDto } from './b2b.dto.js';
@@ -10,12 +11,14 @@ import type { CreateCustomerDto, UpdateCustomerDto } from './b2b.dto.js';
 export class CustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async assertPriceListInOrg(priceListId: string, organizationId: string): Promise<void> {
-    const pl = await this.prisma.priceList.findFirst({
-      where: { id: priceListId, organizationId },
-      select: { id: true },
-    });
-    if (!pl) throw new BadRequestException('La tarifa no existe en la organización.');
+  private assertPriceListInOrg(priceListId: string, organizationId: string): Promise<unknown> {
+    return requireOwned(
+      this.prisma.priceList.findFirst({
+        where: { id: priceListId, organizationId },
+        select: { id: true },
+      }),
+      'La tarifa no existe en la organización.',
+    );
   }
 
   async list() {

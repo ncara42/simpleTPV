@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
+import { requireOwned } from '../common/tenant-scope.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import type { CreatePriceListDto, SetPriceListItemDto, UpdatePriceListDto } from './b2b.dto.js';
@@ -64,16 +65,20 @@ export class PriceListsService {
   // Upsert de un precio de la tarifa. Verifica que tarifa y producto son del tenant.
   async setItem(priceListId: string, dto: SetPriceListItemDto) {
     const { organizationId } = requireTenant();
-    const pl = await this.prisma.priceList.findFirst({
-      where: { id: priceListId, organizationId },
-      select: { id: true },
-    });
-    if (!pl) throw new BadRequestException('Tarifa no encontrada.');
-    const prod = await this.prisma.product.findFirst({
-      where: { id: dto.productId, organizationId },
-      select: { id: true },
-    });
-    if (!prod) throw new BadRequestException('Producto no encontrado.');
+    await requireOwned(
+      this.prisma.priceList.findFirst({
+        where: { id: priceListId, organizationId },
+        select: { id: true },
+      }),
+      'Tarifa no encontrada.',
+    );
+    await requireOwned(
+      this.prisma.product.findFirst({
+        where: { id: dto.productId, organizationId },
+        select: { id: true },
+      }),
+      'Producto no encontrado.',
+    );
     return this.prisma.priceListItem.upsert({
       where: { priceListId_productId: { priceListId, productId: dto.productId } },
       create: { organizationId, priceListId, productId: dto.productId, price: dto.price },

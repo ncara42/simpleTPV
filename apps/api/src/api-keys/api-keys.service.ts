@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto';
 
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
+import { requireFound } from '../common/tenant-scope.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import { ApiKeyLookupService } from './api-key-lookup.service.js';
@@ -62,11 +63,10 @@ export class ApiKeysService {
 
   async revoke(id: string): Promise<void> {
     const { organizationId } = requireTenant();
-    const existing = await this.prisma.apiKey.findFirst({
-      where: { id, organizationId },
-      select: { id: true },
-    });
-    if (!existing) throw new NotFoundException('API key no encontrada');
+    await requireFound(
+      this.prisma.apiKey.findFirst({ where: { id, organizationId }, select: { id: true } }),
+      'API key no encontrada',
+    );
     await this.prisma.apiKey.updateMany({
       where: { id, organizationId },
       data: { revokedAt: new Date() },

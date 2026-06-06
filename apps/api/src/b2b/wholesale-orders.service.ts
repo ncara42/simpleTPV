@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 
+import { requireFound, requireOwned } from '../common/tenant-scope.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import type { CreateWholesaleOrderDto, ListWholesaleOrdersQueryDto } from './b2b.dto.js';
@@ -18,11 +19,13 @@ export class WholesaleOrdersService {
 
   async create(dto: CreateWholesaleOrderDto) {
     const { organizationId } = requireTenant();
-    const customer = await this.prisma.customer.findFirst({
-      where: { id: dto.customerId, organizationId },
-      select: { id: true, priceListId: true },
-    });
-    if (!customer) throw new BadRequestException('Cliente no encontrado.');
+    const customer = await requireOwned(
+      this.prisma.customer.findFirst({
+        where: { id: dto.customerId, organizationId },
+        select: { id: true, priceListId: true },
+      }),
+      'Cliente no encontrado.',
+    );
 
     const productIds = [...new Set(dto.lines.map((l) => l.productId))];
     const products = await this.prisma.product.findMany({
@@ -122,11 +125,13 @@ export class WholesaleOrdersService {
     if (!VALID_STATUS.includes(status as Status)) {
       throw new BadRequestException('Estado no válido.');
     }
-    const order = await this.prisma.wholesaleOrder.findFirst({
-      where: { id, organizationId },
-      select: { status: true },
-    });
-    if (!order) throw new NotFoundException('Pedido no encontrado.');
+    const order = await requireFound(
+      this.prisma.wholesaleOrder.findFirst({
+        where: { id, organizationId },
+        select: { status: true },
+      }),
+      'Pedido no encontrado.',
+    );
     if (order.status === 'SHIPPED' || order.status === 'CANCELLED') {
       throw new BadRequestException('El pedido ya está cerrado y no admite cambios de estado.');
     }
