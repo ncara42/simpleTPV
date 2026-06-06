@@ -35,10 +35,29 @@ async function bootstrap(): Promise<void> {
   // arrays de líneas además están acotados con @ArrayMaxSize en los DTOs, SEC-10).
   app.useBodyParser('json', { limit: '512kb' });
 
-  // Cabeceras de seguridad (helmet). CSP desactivada: la API sirve JSON + la UI de
-  // Swagger en /docs, y una CSP estricta por defecto rompería esa UI. El resto de
-  // protecciones (nosniff, HSTS, frameguard, etc.) quedan activas.
-  app.use(helmet({ contentSecurityPolicy: false }));
+  // Swagger/OpenAPI solo se monta FUERA de producción (ver más abajo). Lo
+  // calculamos aquí porque la CSP depende de ello.
+  const swaggerEnabled = process.env.NODE_ENV !== 'production';
+
+  // Cabeceras de seguridad (helmet). La API sirve JSON, así que en producción
+  // (sin Swagger) una CSP que niega todo origen por defecto es segura y no rompe
+  // nada (A-06). Cuando Swagger SÍ está montado (dev/staging) su UI necesita
+  // inline scripts/estilos, así que ahí desactivamos la CSP. El resto de
+  // protecciones (nosniff, HSTS, frameguard, etc.) quedan siempre activas.
+  app.use(
+    helmet({
+      contentSecurityPolicy: swaggerEnabled
+        ? false
+        : {
+            useDefaults: false,
+            directives: {
+              defaultSrc: ["'none'"],
+              frameAncestors: ["'none'"],
+              baseUri: ["'none'"],
+            },
+          },
+    }),
+  );
 
   // CORS por allowlist (env CORS_ORIGINS, CSV). En dev, orígenes de los frontends.
   app.enableCors({
@@ -59,7 +78,6 @@ async function bootstrap(): Promise<void> {
   // Swagger/OpenAPI (#48). Solo FUERA de producción: publicar el contrato completo
   // (rutas, DTOs, validaciones) en prod facilita el reconocimiento a un atacante
   // (SEC-17). En dev/staging queda servido en `docs` (tras el proxy, /api/docs).
-  const swaggerEnabled = process.env.NODE_ENV !== 'production';
   if (swaggerEnabled) {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('simpleTPV API')
