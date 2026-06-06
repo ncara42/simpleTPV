@@ -374,6 +374,8 @@ export function DashboardPage() {
                   units: a.units,
                   days: a.daysSinceLastSale,
                   trend: a.trend,
+                  isNew: false,
+                  archeAvg: null as number | null,
                 }))
               : (rotation.data ?? []).map((p) => ({
                   key: p.productId,
@@ -382,16 +384,27 @@ export function DashboardPage() {
                   units: p.units,
                   days: p.daysSinceLastSale,
                   trend: p.trend,
+                  isNew: p.isNew,
+                  archeAvg: p.archetypeAvgDaily,
                 }))
             ).map((r) => (
               <li key={r.key} className="dash-rotation-row">
                 <span className="dash-rotation-name">
                   {r.label}
                   {r.sub && <span className="dash-rotation-arch"> · {r.sub}</span>}
+                  {r.isNew && <span className="dash-new-tag">nuevo</span>}
                 </span>
                 <span className="dash-rotation-units">{fmtNum(r.units, 0)} ud</span>
                 <span className="dash-rotation-days">
-                  {r.days == null ? 'sin ventas' : r.days <= 0 ? 'hoy' : `hace ${r.days} d`}
+                  {/* Producto nuevo: su día-a-día propio es poco fiable → mostramos la
+                      referencia de su arquetipo (IT-15). */}
+                  {r.isNew && r.archeAvg != null
+                    ? `~${fmtNum(r.archeAvg, 1)}/día · arquetipo`
+                    : r.days == null
+                      ? 'sin ventas'
+                      : r.days <= 0
+                        ? 'hoy'
+                        : `hace ${r.days} d`}
                 </span>
                 <span className="dash-rotation-spark">
                   {r.trend.length > 1 && (

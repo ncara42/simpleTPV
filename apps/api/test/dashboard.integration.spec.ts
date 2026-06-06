@@ -381,6 +381,33 @@ describe('Dashboard — integración', () => {
     }
   });
 
+  it('product-rotation: marca el producto nuevo y le da la referencia de su arquetipo (IT-15)', async () => {
+    // Producto nuevo (creado hace 4 días) en TAG-fam con 5 ud en el periodo.
+    const [np] = await admin.$queryRaw<Array<{ id: string }>>`
+      INSERT INTO "Product" ("id","organizationId","familyId","name","salePrice","costPrice","taxRate","saleUnit","unitSymbol","active","createdAt","updatedAt")
+      VALUES (gen_random_uuid(), ${org1Id}::uuid, ${familyId}::uuid, ${`${TAG}-new`}, 100, 60, 21, 'UNIT', 'ud', true, now() - interval '4 days', now())
+      RETURNING id::text
+    `;
+    const newId = np!.id;
+    const saleId = await seedSale(org1Id, storeOwnId, periodAt(10), [
+      { productId: newId, unitPrice: 100, qty: 5, lineTotal: 500 },
+    ]);
+    try {
+      const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.productRotation(periodQuery()),
+      );
+      const row = rows.find((r) => r.productId === newId);
+      expect(row).toBeTruthy();
+      expect(row!.isNew).toBe(true);
+      // Arquetipo TAG-fam: (prodA 3 + prodB 1 + nuevo 5 = 9 ud / 1 día) / 3 productos = 3.
+      expect(row!.archetypeAvgDaily).toBeCloseTo(3, 3);
+    } finally {
+      await admin.$executeRaw`DELETE FROM "SaleLine" WHERE "saleId" = ${saleId}::uuid`;
+      await admin.$executeRaw`DELETE FROM "Sale" WHERE id = ${saleId}::uuid`;
+      await admin.$executeRaw`DELETE FROM "Product" WHERE id = ${newId}::uuid`;
+    }
+  });
+
   it('sales-kpis: ticket medio, UPT, tasa de descuento y de devolución', async () => {
     const kpis = await tenantStorage.run({ organizationId: org1Id }, async () =>
       service.salesKpis(periodQuery()),

@@ -590,6 +590,11 @@ export class DashboardService {
       units: number;
       daysSinceLastSale: number | null;
       trend: number[];
+      // IT-15: producto con poca historia → su dato propio es poco fiable.
+      isNew: boolean;
+      // Media diaria por producto de SU arquetipo (familia), sobre días abiertos: la
+      // referencia robusta en la que se apoya un producto nuevo. null si no tiene familia.
+      archetypeAvgDaily: number | null;
     }>
   > {
     const { organizationId } = requireTenant();
@@ -597,14 +602,25 @@ export class DashboardService {
     const { storeId } = q;
     const now = this.now();
     const LIMIT = 8;
+    const NEW_PRODUCT_DAYS = 21;
+    const dayMs = 24 * 60 * 60 * 1000;
 
     return withTenantTx(this.base, organizationId, async (tx) => {
       // Resumen: unidades del periodo (FILTER por rango/tienda) + última venta de
-      // cualquier fecha (MAX sin filtrar → días sin venta global, para stock muerto).
+      // cualquier fecha (MAX sin filtrar → días sin venta global, para stock muerto) +
+      // familia (arquetipo) y fecha de alta (para isNew).
       const summary = await tx.$queryRaw<
-        Array<{ productId: string; name: string; units: string; lastSale: Date | null }>
+        Array<{
+          productId: string;
+          name: string;
+          familyId: string | null;
+          createdAt: Date;
+          units: string;
+          lastSale: Date | null;
+        }>
       >`
         SELECT p.id::text AS "productId", p.name AS name,
+               p."familyId"::text AS "familyId", p."createdAt" AS "createdAt",
                COALESCE(SUM(sl.qty) FILTER (
                  WHERE sa."createdAt" >= ${range.from} AND sa."createdAt" < ${range.to}
                  ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
@@ -614,10 +630,47 @@ export class DashboardService {
         LEFT JOIN "SaleLine" sl ON sl."productId" = p.id
         LEFT JOIN "Sale" sa ON sa.id = sl."saleId" AND sa.status = 'COMPLETED'
         WHERE p."organizationId" = ${organizationId}::uuid AND p.active = true
-        GROUP BY p.id, p.name
+        GROUP BY p.id, p.name, p."familyId", p."createdAt"
         ORDER BY units DESC, p.name ASC
         LIMIT ${LIMIT}
       `;
+
+      // Agregado por arquetipo (familia) para la referencia de los productos nuevos:
+      // unidades del periodo y nº de productos activos por familia. La media diaria por
+      // producto del arquetipo = (unidades familia / díasDisponibles) / nº productos.
+      const familyAgg = await tx.$queryRaw<
+        Array<{ familyId: string | null; units: string; productCount: bigint }>
+      >`
+        SELECT p."familyId"::text AS "familyId",
+               COALESCE(SUM(sl.qty) FILTER (
+                 WHERE sa."createdAt" >= ${range.from} AND sa."createdAt" < ${range.to}
+                 ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+               ), 0) AS units,
+               COUNT(DISTINCT p.id) AS "productCount"
+        FROM "Product" p
+        LEFT JOIN "SaleLine" sl ON sl."productId" = p.id
+        LEFT JOIN "Sale" sa ON sa.id = sl."saleId" AND sa.status = 'COMPLETED'
+        WHERE p."organizationId" = ${organizationId}::uuid AND p.active = true
+        GROUP BY p."familyId"
+      `;
+      const familyById = new Map(
+        familyAgg.map((f) => [f.familyId, { units: num(f.units), count: num(f.productCount) }]),
+      );
+
+      // Días con tienda abierta en el periodo (IT-14): denominador de la media.
+      const sessionDays = await tx.$queryRaw<Array<{ day: Date }>>`
+        SELECT DISTINCT DATE("openedAt") AS day
+        FROM "CashSession"
+        WHERE "organizationId" = ${organizationId}::uuid
+          AND "openedAt" >= ${range.from}
+          AND "openedAt" < ${range.to}
+          ${storeId ? this.eqStore('"storeId"', storeId) : EMPTY}
+      `;
+      const periodDays = Math.max(
+        1,
+        Math.round((range.to.getTime() - range.from.getTime()) / dayMs),
+      );
+      const diasDisponibles = sessionDays.length > 0 ? sessionDays.length : periodDays;
 
       // Tendencia: unidades por día y producto en el periodo (evolución, STAT-06).
       // Ordenadas por día → al agrupar por producto queda la serie cronológica.
@@ -640,16 +693,26 @@ export class DashboardService {
         trendByProduct.set(r.productId, arr);
       }
 
-      const dayMs = 24 * 60 * 60 * 1000;
-      return summary.map((r) => ({
-        productId: r.productId,
-        name: r.name,
-        units: num(r.units),
-        daysSinceLastSale: r.lastSale
-          ? Math.floor((now.getTime() - new Date(r.lastSale).getTime()) / dayMs)
-          : null,
-        trend: trendByProduct.get(r.productId) ?? [],
-      }));
+      return summary.map((r) => {
+        const fam = familyById.get(r.familyId);
+        // Media diaria por producto del arquetipo (referencia robusta del nuevo).
+        const archetypeAvgDaily =
+          fam && fam.count > 0
+            ? Math.round((fam.units / diasDisponibles / fam.count) * 1000) / 1000
+            : null;
+        const daysSinceCreated = Math.floor((now.getTime() - r.createdAt.getTime()) / dayMs);
+        return {
+          productId: r.productId,
+          name: r.name,
+          units: num(r.units),
+          daysSinceLastSale: r.lastSale
+            ? Math.floor((now.getTime() - new Date(r.lastSale).getTime()) / dayMs)
+            : null,
+          trend: trendByProduct.get(r.productId) ?? [],
+          isNew: daysSinceCreated < NEW_PRODUCT_DAYS,
+          archetypeAvgDaily,
+        };
+      });
     });
   }
 

@@ -109,6 +109,9 @@ export interface ProductRotation {
   units: number;
   daysSinceLastSale: number | null;
   trend: number[];
+  // IT-15: producto con poca historia; se apoya en la media de su arquetipo.
+  isNew: boolean;
+  archetypeAvgDaily: number | null;
 }
 
 // Rotación agregada por arquetipo (= familia, IT-13): vista por defecto, más sólida

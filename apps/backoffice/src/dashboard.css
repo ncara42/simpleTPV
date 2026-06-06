@@ -794,3 +794,16 @@
   background: var(--ui-surface);
   color: var(--ui-text);
 }
+/* Marca "nuevo" (IT-15): producto con poca historia; se lee contra su arquetipo. */
+.dash-new-tag {
+  margin-left: 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ui-brand);
+  border: 1px solid var(--ui-brand);
+  border-radius: 0.5rem;
+  padding: 0.02rem 0.4rem;
+  vertical-align: middle;
+}

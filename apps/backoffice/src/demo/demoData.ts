@@ -697,6 +697,8 @@ export const DEMO_ROTATION_STATS: ProductRotation[] = [
     units: 142,
     daysSinceLastSale: 0,
     trend: [12, 18, 15, 22, 19, 26, 30],
+    isNew: false,
+    archetypeAvgDaily: 0.99,
   },
   {
     productId: 'p-flor-premium',
@@ -704,6 +706,8 @@ export const DEMO_ROTATION_STATS: ProductRotation[] = [
     units: 120,
     daysSinceLastSale: 0,
     trend: [10, 14, 12, 18, 16, 20, 22],
+    isNew: false,
+    archetypeAvgDaily: 0.39,
   },
   {
     productId: 'p-resina-premium',
@@ -711,6 +715,8 @@ export const DEMO_ROTATION_STATS: ProductRotation[] = [
     units: 88,
     daysSinceLastSale: 1,
     trend: [8, 11, 9, 13, 12, 16, 14],
+    isNew: false,
+    archetypeAvgDaily: 0.39,
   },
   {
     productId: 'p-crema-regeneradora',
@@ -718,6 +724,8 @@ export const DEMO_ROTATION_STATS: ProductRotation[] = [
     units: 60,
     daysSinceLastSale: 2,
     trend: [6, 8, 7, 10, 9, 11, 9],
+    isNew: false,
+    archetypeAvgDaily: 0.24,
   },
   {
     productId: 'p-vapeador-pro',
@@ -725,6 +733,8 @@ export const DEMO_ROTATION_STATS: ProductRotation[] = [
     units: 12,
     daysSinceLastSale: 9,
     trend: [3, 2, 1, 2, 1, 2, 1],
+    isNew: false,
+    archetypeAvgDaily: 0.21,
   },
   {
     productId: 'p-liquido-vape',
@@ -732,6 +742,8 @@ export const DEMO_ROTATION_STATS: ProductRotation[] = [
     units: 4,
     daysSinceLastSale: 21,
     trend: [1, 0, 1, 0, 1, 0, 1],
+    isNew: true,
+    archetypeAvgDaily: 0.21,
   },
 ];
 export const DEMO_STOCKOUT_KPIS: StockoutKpis = {
