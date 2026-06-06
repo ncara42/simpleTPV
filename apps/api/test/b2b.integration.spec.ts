@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { CustomersService } from '../src/b2b/customers.service.js';
 import { PriceListsService } from '../src/b2b/price-lists.service.js';
+import { WholesaleOrdersService } from '../src/b2b/wholesale-orders.service.js';
 import { applyTenantExtension, PrismaService } from '../src/prisma/prisma.service.js';
 import { tenantStorage } from '../src/prisma/tenant-context.js';
 
@@ -15,10 +16,13 @@ describe('B2B clientes + tarifas — integración', () => {
   let prisma: ReturnType<typeof applyTenantExtension>;
   let customers: CustomersService;
   let priceLists: PriceListsService;
+  let orders: WholesaleOrdersService;
   let admin: PrismaClient;
   let org1Id: string;
   let org2Id: string;
   let productId: string;
+  let productId2: string;
+  let salePrice2: number;
   let priceListId: string;
   let customerId: string;
   const TAG = `b2b-${Date.now()}`;
@@ -32,6 +36,7 @@ describe('B2B clientes + tarifas — integración', () => {
     prisma = applyTenantExtension(base);
     customers = new CustomersService(prisma as unknown as PrismaService);
     priceLists = new PriceListsService(prisma as unknown as PrismaService);
+    orders = new WholesaleOrdersService(prisma as unknown as PrismaService);
 
     const adminUrl = process.env.DATABASE_URL;
     if (!adminUrl) throw new Error('DATABASE_URL (superuser) requerido en setup.');
@@ -48,13 +53,19 @@ describe('B2B clientes + tarifas — integración', () => {
     if (o1.length === 0 || o2.length === 0) throw new Error('Seed no ejecutado.');
     org1Id = o1[0]!.id;
     org2Id = o2[0]!.id;
-    const products = await admin.$queryRaw<Array<{ id: string }>>`
-      SELECT id::text FROM "Product" WHERE "organizationId" = ${org1Id}::uuid ORDER BY name LIMIT 1
+    const products = await admin.$queryRaw<Array<{ id: string; salePrice: string }>>`
+      SELECT id::text, "salePrice"::text FROM "Product"
+      WHERE "organizationId" = ${org1Id}::uuid ORDER BY name LIMIT 2
     `;
     productId = products[0]!.id;
+    productId2 = products[1]!.id;
+    salePrice2 = Number(products[1]!.salePrice);
   });
 
   afterAll(async () => {
+    // Los pedidos referencian al cliente (RESTRICT) → borrarlos antes que los clientes.
+    await admin.$executeRaw`DELETE FROM "WholesaleOrderLine" WHERE "orderId" IN (SELECT id FROM "WholesaleOrder" WHERE "customerId" IN (SELECT id FROM "Customer" WHERE name LIKE ${`${TAG}%`}))`;
+    await admin.$executeRaw`DELETE FROM "WholesaleOrder" WHERE "customerId" IN (SELECT id FROM "Customer" WHERE name LIKE ${`${TAG}%`})`;
     await admin.$executeRaw`DELETE FROM "Customer" WHERE name LIKE ${`${TAG}%`}`;
     await admin.$executeRaw`DELETE FROM "PriceList" WHERE name LIKE ${`${TAG}%`}`;
     await admin.$disconnect();
@@ -92,5 +103,36 @@ describe('B2B clientes + tarifas — integración', () => {
     expect(cs.some((c) => c.id === customerId)).toBe(false);
     const pls = await asOrg(org2Id, () => priceLists.list());
     expect(pls.some((p) => p.id === priceListId)).toBe(false);
+  });
+
+  it('pedido: congela el precio desde la tarifa del cliente (fallback al PVP)', async () => {
+    const order = await asOrg(org1Id, () =>
+      orders.create({
+        customerId,
+        lines: [
+          { productId, qty: 2 },
+          { productId: productId2, qty: 1 },
+        ],
+      }),
+    );
+    expect(order.status).toBe('DRAFT');
+    const lp1 = order.lines.find((l) => l.productId === productId)!;
+    const lp2 = order.lines.find((l) => l.productId === productId2)!;
+    // productId está en la tarifa a 9.5 → 9.5; productId2 no está → su PVP.
+    expect(Number(lp1.unitPrice)).toBeCloseTo(9.5, 2);
+    expect(Number(lp1.lineTotal)).toBeCloseTo(19, 2);
+    expect(Number(lp2.unitPrice)).toBeCloseTo(salePrice2, 2);
+    expect(Number(order.total)).toBeCloseTo(19 + salePrice2, 2);
+  });
+
+  it('pedido: transición de estado y cierre tras SHIPPED', async () => {
+    const order = await asOrg(org1Id, () =>
+      orders.create({ customerId, lines: [{ productId, qty: 1 }] }),
+    );
+    await asOrg(org1Id, () => orders.updateStatus(order.id, 'CONFIRMED'));
+    const shipped = await asOrg(org1Id, () => orders.updateStatus(order.id, 'SHIPPED'));
+    expect(shipped?.status).toBe('SHIPPED');
+    // Cerrado: no admite más cambios.
+    await expect(asOrg(org1Id, () => orders.updateStatus(order.id, 'CANCELLED'))).rejects.toThrow();
   });
 });

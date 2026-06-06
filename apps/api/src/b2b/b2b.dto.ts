@@ -1,5 +1,8 @@
+import { Type } from 'class-transformer';
 import {
+  ArrayMinSize,
   IsBoolean,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -9,9 +12,10 @@ import {
   Min,
   MinLength,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
 
-import { MAX_PRICE } from '../common/limits.js';
+import { MAX_PRICE, MAX_QUANTITY } from '../common/limits.js';
 
 // ── Clientes B2B ──────────────────────────────────────────────────────────────
 export class CreateCustomerDto {
@@ -111,4 +115,52 @@ export class SetPriceListItemDto {
   @Min(0)
   @Max(MAX_PRICE)
   price!: number;
+}
+
+// ── Pedidos mayoristas (IT-17c) ──────────────────────────────────────────────
+export class WholesaleOrderLineDto {
+  @IsUUID()
+  productId!: string;
+
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0.001)
+  @Max(MAX_QUANTITY)
+  qty!: number;
+}
+
+export class CreateWholesaleOrderDto {
+  @IsUUID()
+  customerId!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  notes?: string;
+
+  @ValidateNested({ each: true })
+  @ArrayMinSize(1)
+  @Type(() => WholesaleOrderLineDto)
+  lines!: WholesaleOrderLineDto[];
+}
+
+export class UpdateWholesaleOrderStatusDto {
+  // El servicio valida que sea un valor del enum y que la transición sea posible.
+  @IsString()
+  status!: string;
+}
+
+export class ListWholesaleOrdersQueryDto {
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsUUID()
+  customerId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  page?: number;
 }
