@@ -298,7 +298,9 @@ export function DashboardPage() {
         {/* Descuento medio por empleado (STAT-04) */}
         <div className="dash-panel span-5" data-testid="dash-discount-emp">
           <h3>Descuento por empleado</h3>
-          <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]} · tasa media de descuento</p>
+          <p className="dash-panel-sub">
+            {PERIOD_SUBTITLE[period]} · descuento voluntario medio (sin promociones)
+          </p>
           {(() => {
             const emps = discountByEmp.data ?? [];
             const max = Math.max(0.0001, ...emps.map((e) => e.avgDiscountPct));

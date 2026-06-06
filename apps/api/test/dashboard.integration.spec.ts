@@ -77,11 +77,15 @@ describe('Dashboard — integración', () => {
       qty: number;
       lineTotal: number;
       discountAmt?: number;
+      discountSource?: 'VOLUNTARY' | 'PROMOTION';
     }>,
     opts?: { discountTotal?: number },
   ): Promise<string> {
     const subtotal = lines.reduce((a, l) => a + l.lineTotal, 0);
-    const discountTotal = opts?.discountTotal ?? 0;
+    // discountTotal incluye los descuentos de línea (como en el TPV real); si el test
+    // pasa uno explícito (descuento de ticket) tiene precedencia.
+    const discountTotal =
+      opts?.discountTotal ?? lines.reduce((a, l) => a + (l.discountAmt ?? 0), 0);
     const total = subtotal - discountTotal;
     const rows = await admin.$queryRaw<Array<{ id: string }>>`
       INSERT INTO "Sale" ("id","organizationId","storeId","userId","ticketNumber","subtotal","discountTotal","total","paymentMethod","status","createdAt")
@@ -97,9 +101,9 @@ describe('Dashboard — integración', () => {
       // directo (sin pasar por SalesService) hay que congelarlo a mano; el subquery
       // copia el coste actual del producto, igual que SalesService al vender.
       await admin.$executeRaw`
-        INSERT INTO "SaleLine" ("id","organizationId","saleId","productId","name","unitPrice","qty","discountAmt","discountPct","taxRate","costPrice","lineTotal")
+        INSERT INTO "SaleLine" ("id","organizationId","saleId","productId","name","unitPrice","qty","discountAmt","discountPct","discountSource","taxRate","costPrice","lineTotal")
         VALUES (gen_random_uuid(), ${orgId}::uuid, ${saleId}::uuid, ${l.productId}::uuid, ${TAG},
-                ${l.unitPrice}, ${l.qty}, ${l.discountAmt ?? 0}, 0, 21,
+                ${l.unitPrice}, ${l.qty}, ${l.discountAmt ?? 0}, 0, ${l.discountSource ?? 'VOLUNTARY'}::"DiscountSource", 21,
                 (SELECT "costPrice" FROM "Product" WHERE id = ${l.productId}::uuid), ${l.lineTotal})
       `;
     }
@@ -277,8 +281,44 @@ describe('Dashboard — integración', () => {
     // Todas las ventas del periodo las hizo el mismo vendedor (3 ventas).
     expect(rows).toHaveLength(1);
     expect(rows[0]!.salesCount).toBe(3);
-    // Σ descuento de ticket 5 / (Σ subtotal 350 + 5) ≈ 0.0141.
+    // Σ descuento de ticket 5 / (Σ subtotal 350 + 5) ≈ 0.0141. (Sin promociones en el
+    // periodo, el voluntario coincide con el total.)
     expect(rows[0]!.avgDiscountPct).toBeCloseTo(5 / 355, 4);
+  });
+
+  it('discount-by-employee: excluye promociones, solo cuenta el descuento voluntario (IT-11)', async () => {
+    // Ventana aislada (2150) para no mezclar con el periodo (año 2200+).
+    const day = '2150-07-22';
+    const at = new Date(`${day}T10:00:00.000Z`);
+    // Venta 1: descuento VOLUNTARIO 20 (bruto 100 → lineTotal 80).
+    await seedSale(org1Id, storeOwnId, at, [
+      {
+        productId: prodAId,
+        unitPrice: 100,
+        qty: 1,
+        lineTotal: 80,
+        discountAmt: 20,
+        discountSource: 'VOLUNTARY',
+      },
+    ]);
+    // Venta 2: descuento de PROMOCIÓN 30 (bruto 100 → lineTotal 70) → NO debe contar.
+    await seedSale(org1Id, storeOwnId, at, [
+      {
+        productId: prodAId,
+        unitPrice: 100,
+        qty: 1,
+        lineTotal: 70,
+        discountAmt: 30,
+        discountSource: 'PROMOTION',
+      },
+    ]);
+    const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.discountByEmployee({ period: 'custom', from: day, to: day, storeId: storeOwnId }),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.salesCount).toBe(2);
+    // Voluntario 20 / tarifa (subtotal 150 + descuentos 50) = 0.10. La promoción 30 fuera.
+    expect(rows[0]!.avgDiscountPct).toBeCloseTo(0.1, 4);
   });
 
   it('product-rotation: unidades por producto + días sin venta + tendencia (STAT-05/06)', async () => {

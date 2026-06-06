@@ -258,12 +258,20 @@ export class DashboardService {
     const { storeId } = q;
 
     return withTenantTx(this.base, organizationId, async (tx) => {
+      // Solo cuenta el descuento VOLUNTARIO (decisión comercial del vendedor); las
+      // promociones preestablecidas son irrelevantes. discountTotal incluye todos los
+      // descuentos (línea + ticket) y el origen solo se distingue por línea
+      // (SaleLine.discountSource), así que: voluntario = discountTotal − Σ descuentos de
+      // líneas PROMOTION (queda el voluntario de línea + el de ticket, que también aplica
+      // el vendedor a mano). El subquery escalar por venta evita que el JOIN a líneas
+      // duplique discountTotal/subtotal.
       const rows = await tx.$queryRaw<
         Array<{
           userId: string;
           userName: string;
           count: bigint;
           discount: string;
+          promo: string;
           subtotal: string;
         }>
       >`
@@ -271,6 +279,10 @@ export class DashboardService {
                u.name AS "userName",
                COUNT(sa.id) AS count,
                COALESCE(SUM(sa."discountTotal"), 0) AS discount,
+               COALESCE(SUM(
+                 (SELECT COALESCE(SUM(sl."discountAmt"), 0) FROM "SaleLine" sl
+                  WHERE sl."saleId" = sa.id AND sl."discountSource" = 'PROMOTION')
+               ), 0) AS promo,
                COALESCE(SUM(sa.subtotal), 0) AS subtotal
         FROM "Sale" sa
         JOIN "User" u ON u.id = sa."userId"
@@ -283,14 +295,16 @@ export class DashboardService {
       `;
       return rows
         .map((r) => {
-          const discount = num(r.discount);
+          const totalDiscount = num(r.discount);
+          const voluntary = totalDiscount - num(r.promo); // excluye promociones
           const subtotal = num(r.subtotal);
+          const tarifa = subtotal + totalDiscount; // precio de tarifa (lista)
           return {
             userId: r.userId,
             userName: r.userName,
             salesCount: num(r.count),
-            // Descuento / precio de tarifa (subtotal neto de línea + descuento de ticket).
-            avgDiscountPct: subtotal + discount > 0 ? discount / (subtotal + discount) : 0,
+            // Descuento VOLUNTARIO / precio de tarifa.
+            avgDiscountPct: tarifa > 0 ? voluntary / tarifa : 0,
           };
         })
         .sort((a, b) => b.avgDiscountPct - a.avgDiscountPct);
