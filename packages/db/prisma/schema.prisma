@@ -39,6 +39,26 @@ model Organization {
   purchaseOrderLines PurchaseOrderLine[]
   verifactuRecords   VerifactuRecord[]
   salesExports       SalesExport[]
+  userPreferences    UserPreference[]
+}
+
+// Personalización por usuario (IT-16): preferencias clave-valor (JSON) por usuario.
+// Cada fila es un ámbito ('dashboard.cards', 'table.sales.columns', 'defaults'…) con
+// su valor JSON. RLS por tenant; el servicio acota además a req.user (cada uno solo
+// ve/edita las suyas).
+model UserPreference {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  userId         String   @db.Uuid
+  key            String
+  value          Json
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@index([organizationId, userId])
 }
 
 model Store {
@@ -90,6 +110,7 @@ model User {
   stockMovements   StockMovement[]
   timeClockEntries TimeClockEntry[]
   refreshTokens    RefreshToken[]
+  preferences      UserPreference[]
 
   @@index([organizationId])
 }

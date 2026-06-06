@@ -1,9 +1,14 @@
-import { Controller, Get, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Put, Req } from '@nestjs/common';
 import type { Store } from '@simpletpv/db';
 
 import type { JwtPayload } from '../auth/jwt-payload.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { StoresService } from '../stores/stores.service.js';
+import { SetPreferenceDto } from './preferences.dto.js';
+import { PreferencesService } from './preferences.service.js';
+
+// Clave de preferencia: ámbito en kebab/dot (p.ej. 'dashboard.cards'), acotada.
+const PREF_KEY = /^[a-zA-Z0-9._-]{1,64}$/;
 
 // Recursos del usuario autenticado. Sin @Roles: solo lo protege el AuthGuard
 // global, así que cualquier autenticado (incluido CLERK) puede acceder.
@@ -15,11 +20,31 @@ export class MeController {
   constructor(
     private readonly stores: StoresService,
     private readonly prisma: PrismaService,
+    private readonly prefs: PreferencesService,
   ) {}
 
   @Get('stores')
   findStores(): Promise<Store[]> {
     return this.stores.findAll();
+  }
+
+  // Personalización (IT-16): preferencias del usuario autenticado. Cada uno solo ve
+  // y edita las suyas (se usa siempre req.user.sub).
+  @Get('preferences')
+  preferences(@Req() req: { user: JwtPayload }): Promise<Record<string, unknown>> {
+    return this.prefs.getAll(req.user.sub);
+  }
+
+  @Put('preferences/:key')
+  setPreference(
+    @Req() req: { user: JwtPayload },
+    @Param('key') key: string,
+    @Body() body: SetPreferenceDto,
+  ): Promise<{ key: string; value: unknown }> {
+    if (!PREF_KEY.test(key)) {
+      throw new BadRequestException('Clave de preferencia no válida.');
+    }
+    return this.prefs.set(req.user.sub, key, body.value);
   }
 
   // Perfil del usuario autenticado: rol + tiendas asignadas.
