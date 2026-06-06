@@ -2,6 +2,8 @@ export { type ApiClient, ApiError, createApiClient, type QueryParams } from './a
 export type {
   AdjustStockInput,
   AlertType,
+  ApiKey,
+  ApiKeyCreated,
   AppEvent,
   AppEventType,
   CashMovement,
@@ -10,6 +12,7 @@ export type {
   CashSessionStatus,
   CloseCashSessionInput,
   ConfirmInventoryCountInput,
+  CreateApiKeyInput,
   CreateBlindReturnInput,
   CreateCashMovementInput,
   CreateOfficialDeviceInput,

@@ -591,3 +591,23 @@ export interface SuggestionRow {
   coberturaDias: number | null;
   cantidadSugerida: number;
 }
+
+// API keys (IT-18).
+export interface ApiKey {
+  id: string;
+  name: string;
+  prefix: string;
+  priceListId: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface ApiKeyCreated extends ApiKey {
+  key: string;
+}
+
+export interface CreateApiKeyInput {
+  name: string;
+  priceListId?: string;
+}

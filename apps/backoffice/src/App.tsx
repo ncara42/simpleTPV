@@ -14,6 +14,7 @@ import {
   Bell,
   CheckSquare,
   Clock,
+  KeyRound,
   LayoutDashboard,
   Package,
   Percent,
@@ -25,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { ApiKeysPage } from './ApiKeysPage.js';
 import { CatalogPage } from './CatalogPage.js';
 import { DashboardPage } from './DashboardPage.js';
 import { DEMO_USER } from './demo/demoData.js';
@@ -57,7 +59,8 @@ type Tab =
   | 'stores'
   | 'sales'
   | 'purchases'
-  | 'verifactu';
+  | 'verifactu'
+  | 'apikeys';
 
 const ALL_NAV: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
@@ -73,6 +76,7 @@ const ALL_NAV: NavItem[] = [
   { id: 'sales', label: 'Ventas', icon: <Receipt size={18} /> },
   { id: 'purchases', label: 'Compras', icon: <ShoppingCart size={18} /> },
   { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} /> },
+  { id: 'apikeys', label: 'API Keys', icon: <KeyRound size={18} /> },
 ];
 
 // #106: Compras y VeriFactu se retiran del menú (decisión informe UX 2026-06-02).
@@ -167,6 +171,7 @@ function Home() {
             {tab === 'sales' && <SalesHistoryPage />}
             {tab === 'purchases' && <PurchasesPage />}
             {tab === 'verifactu' && <VerifactuPage />}
+            {tab === 'apikeys' && <ApiKeysPage />}
           </main>
         </PageHeaderProvider>
       </div>
