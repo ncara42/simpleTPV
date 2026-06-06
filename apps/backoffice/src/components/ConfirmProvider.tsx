@@ -2,7 +2,7 @@ import { createContext, type ReactNode, useCallback, useContext, useState } from
 
 import { Modal } from './Modal.js';
 
-export interface ConfirmOptions {
+interface ConfirmOptions {
   title?: string;
   message: string;
   confirmLabel?: string;
