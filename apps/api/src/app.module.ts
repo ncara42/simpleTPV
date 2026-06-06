@@ -3,6 +3,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { SentryGlobalFilter } from '@sentry/nestjs/setup';
 
+import { ApiKeysModule } from './api-keys/api-keys.module.js';
 import { AuditInterceptor } from './audit/audit.interceptor.js';
 import { AuthGuard } from './auth/auth.guard.js';
 import { AuthModule } from './auth/auth.module.js';
@@ -21,6 +22,7 @@ import { MeModule } from './me/me.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProductFamiliesModule } from './product-families/product-families.module.js';
 import { ProductsModule } from './products/products.module.js';
+import { PublicModule } from './public/public.module.js';
 import { PurchasesModule } from './purchases/purchases.module.js';
 import { ReturnsModule } from './returns/returns.module.js';
 import { SalesModule } from './sales/sales.module.js';
@@ -63,6 +65,8 @@ const throttle = throttleConfig(process.env);
     MeModule,
     DevicesModule,
     TimeClockModule,
+    ApiKeysModule,
+    PublicModule,
   ],
   // Orden de guards: AuthGuard primero (popula request.user desde el JWT),
   // luego RolesGuard (lee user.role). Los APP_GUARD corren en orden de registro.

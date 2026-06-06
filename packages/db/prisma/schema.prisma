@@ -45,6 +45,7 @@ model Organization {
   priceListItems     PriceListItem[]
   wholesaleOrders    WholesaleOrder[]
   wholesaleOrderLines WholesaleOrderLine[]
+  apiKeys            ApiKey[]
 }
 
 // Personalización por usuario (IT-16): preferencias clave-valor (JSON) por usuario.
@@ -742,6 +743,7 @@ model PriceList {
   organization Organization    @relation(fields: [organizationId], references: [id])
   items        PriceListItem[]
   customers    Customer[]
+  apiKeys      ApiKey[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -802,4 +804,27 @@ model WholesaleOrderLine {
   product      Product        @relation(fields: [productId], references: [id])
 
   @@index([organizationId, orderId])
+}
+
+// ─── API pública con API key (IT-18) ─────────────────────────────────────────
+// Clave de API a nivel de organización para la API pública de stock. Solo se guarda
+// el hash (sha256) de la key y un prefijo visible; la key completa se muestra una vez.
+// `priceListId` indica de qué tarifa se exponen los precios mayoristas. RLS por tenant
+// para la gestión; el lookup de autenticación usa el rol app_admin (BYPASSRLS), igual
+// que el login, porque ocurre antes de conocer el tenant.
+model ApiKey {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  name           String
+  prefix         String
+  hashedKey      String    @unique
+  priceListId    String?   @db.Uuid
+  createdAt      DateTime  @default(now())
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  priceList    PriceList?   @relation(fields: [priceListId], references: [id])
+
+  @@index([organizationId])
 }
