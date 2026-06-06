@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { Modal } from '../components/Modal.js';
 import { listStores } from '../lib/admin.js';
 import { createTransfer, getGlobalStock, listTransfers, sendTransfer } from '../lib/stock.js';
 import { dt, STATUS_LABEL } from './labels.js';
@@ -122,89 +123,87 @@ function CreateTransferModal({
     originStoreId && destStoreId && originStoreId !== destStoreId && productId && Number(qty) > 0;
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="transfer-form">
-        <h3>Nuevo traspaso</h3>
-        <div className="modal-row">
-          <label>Origen</label>
-          <select
-            value={originStoreId}
-            onChange={(e) => setOriginStoreId(e.target.value)}
-            data-testid="transfer-origin"
-          >
-            <option value="">—</option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="modal-row">
-          <label>Destino</label>
-          <select
-            value={destStoreId}
-            onChange={(e) => setDestStoreId(e.target.value)}
-            data-testid="transfer-dest"
-          >
-            <option value="">—</option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="modal-row">
-          <label>Producto</label>
-          <select
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
-            data-testid="transfer-product"
-          >
-            <option value="">—</option>
-            {globalRows.map((r) => (
-              <option key={r.productId} value={r.productId}>
-                {r.productName}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="modal-row">
-          <label>Cantidad</label>
-          <input
-            type="number"
-            min={1}
-            value={qty}
-            onChange={(e) => setQty(e.target.value)}
-            data-testid="transfer-qty"
-          />
-        </div>
-        {originStoreId && destStoreId && originStoreId === destStoreId && (
-          <p className="muted">Origen y destino deben ser distintos.</p>
-        )}
-        <div className="modal-foot">
-          <button type="button" onClick={onClose}>
-            Cancelar
-          </button>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={!canSubmit || mutation.isPending}
-            onClick={() =>
-              mutation.mutate({
-                originStoreId,
-                destStoreId,
-                lines: [{ productId, quantitySent: Number(qty) }],
-              })
-            }
-            data-testid="transfer-save"
-          >
-            Crear
-          </button>
-        </div>
-        {mutation.isError && <p className="muted">No se pudo crear el traspaso.</p>}
+    <Modal onClose={onClose} testId="transfer-form" ariaLabel="Nuevo traspaso">
+      <h3>Nuevo traspaso</h3>
+      <div className="modal-row">
+        <label>Origen</label>
+        <select
+          value={originStoreId}
+          onChange={(e) => setOriginStoreId(e.target.value)}
+          data-testid="transfer-origin"
+        >
+          <option value="">—</option>
+          {stores.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
       </div>
-    </div>
+      <div className="modal-row">
+        <label>Destino</label>
+        <select
+          value={destStoreId}
+          onChange={(e) => setDestStoreId(e.target.value)}
+          data-testid="transfer-dest"
+        >
+          <option value="">—</option>
+          {stores.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="modal-row">
+        <label>Producto</label>
+        <select
+          value={productId}
+          onChange={(e) => setProductId(e.target.value)}
+          data-testid="transfer-product"
+        >
+          <option value="">—</option>
+          {globalRows.map((r) => (
+            <option key={r.productId} value={r.productId}>
+              {r.productName}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="modal-row">
+        <label>Cantidad</label>
+        <input
+          type="number"
+          min={1}
+          value={qty}
+          onChange={(e) => setQty(e.target.value)}
+          data-testid="transfer-qty"
+        />
+      </div>
+      {originStoreId && destStoreId && originStoreId === destStoreId && (
+        <p className="muted">Origen y destino deben ser distintos.</p>
+      )}
+      <div className="modal-foot">
+        <button type="button" onClick={onClose}>
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={!canSubmit || mutation.isPending}
+          onClick={() =>
+            mutation.mutate({
+              originStoreId,
+              destStoreId,
+              lines: [{ productId, quantitySent: Number(qty) }],
+            })
+          }
+          data-testid="transfer-save"
+        >
+          Crear
+        </button>
+      </div>
+      {mutation.isError && <p className="muted">No se pudo crear el traspaso.</p>}
+    </Modal>
   );
 }

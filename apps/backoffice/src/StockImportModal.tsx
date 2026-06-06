@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 
+import { Modal } from './components/Modal.js';
 import { listStores, type Store } from './lib/admin.js';
 import { adjustStock, getGlobalStock, type StockGlobalRow } from './lib/stock.js';
 
@@ -125,94 +126,96 @@ export function StockImportModal({ onClose, onImported }: Props) {
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ minWidth: '26rem' }}>
-        <h3>Cargar stock inicial desde CSV</h3>
-        <p style={{ marginBottom: '0.75rem', opacity: 0.7, fontSize: '0.88rem' }}>
-          El fichero debe tener cabecera con las columnas: <code>producto,tienda,cantidad</code>. El
-          nombre del producto y la tienda deben coincidir exactamente con los del sistema (o usar el
-          SKU como producto).
-        </p>
+    <Modal
+      onClose={onClose}
+      style={{ minWidth: '26rem' }}
+      ariaLabel="Cargar stock inicial desde CSV"
+    >
+      <h3>Cargar stock inicial desde CSV</h3>
+      <p style={{ marginBottom: '0.75rem', opacity: 0.7, fontSize: '0.88rem' }}>
+        El fichero debe tener cabecera con las columnas: <code>producto,tienda,cantidad</code>. El
+        nombre del producto y la tienda deben coincidir exactamente con los del sistema (o usar el
+        SKU como producto).
+      </p>
 
-        <a
-          href="data:text/csv;charset=utf-8,producto%2Ctienda%2Ccantidad%0AProducto%20ejemplo%2CTienda%20Centro%2C50"
-          download="plantilla_stock.csv"
-          style={{
-            fontSize: '0.82rem',
-            color: 'var(--tpv-teal-500, #14b8a6)',
-            display: 'inline-block',
-            marginBottom: '1rem',
-          }}
+      <a
+        href="data:text/csv;charset=utf-8,producto%2Ctienda%2Ccantidad%0AProducto%20ejemplo%2CTienda%20Centro%2C50"
+        download="plantilla_stock.csv"
+        style={{
+          fontSize: '0.82rem',
+          color: 'var(--tpv-teal-500, #14b8a6)',
+          display: 'inline-block',
+          marginBottom: '1rem',
+        }}
+      >
+        ↓ Descargar plantilla CSV
+      </a>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".csv,text/csv"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void handleFile(f);
+        }}
+      />
+
+      {!summary && (
+        <button
+          className="btn-primary"
+          style={{ width: '100%', marginBottom: '0.5rem' }}
+          disabled={loading}
+          onClick={() => inputRef.current?.click()}
         >
-          ↓ Descargar plantilla CSV
-        </a>
+          {loading ? 'Cargando…' : 'Seleccionar fichero CSV'}
+        </button>
+      )}
 
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".csv,text/csv"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void handleFile(f);
-          }}
-        />
+      {loading && (
+        <p style={{ textAlign: 'center', opacity: 0.6, fontSize: '0.85rem' }}>
+          Procesando filas, por favor espera…
+        </p>
+      )}
 
-        {!summary && (
+      {error && <p className="form-error">{error}</p>}
+
+      {summary && (
+        <div style={{ marginTop: '0.75rem' }}>
+          <p style={{ color: summary.ok > 0 ? 'var(--tpv-teal-500, #14b8a6)' : undefined }}>
+            ✓ {summary.ok} ajuste{summary.ok !== 1 ? 's' : ''} de stock realizados correctamente.
+          </p>
+          {summary.errors.length > 0 && (
+            <div style={{ marginTop: '0.5rem' }}>
+              <p style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                {summary.errors.length} fila{summary.errors.length !== 1 ? 's' : ''} con error:
+              </p>
+              <ul style={{ fontSize: '0.85rem', paddingLeft: '1.2rem', opacity: 0.8 }}>
+                {summary.errors.map((e) => (
+                  <li key={e.row}>
+                    Fila {e.row}: {e.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <button
             className="btn-primary"
-            style={{ width: '100%', marginBottom: '0.5rem' }}
-            disabled={loading}
-            onClick={() => inputRef.current?.click()}
+            style={{ width: '100%', marginTop: '0.75rem' }}
+            onClick={() => {
+              setSummary(null);
+              if (inputRef.current) inputRef.current.value = '';
+            }}
           >
-            {loading ? 'Cargando…' : 'Seleccionar fichero CSV'}
+            Cargar otro fichero
           </button>
-        )}
-
-        {loading && (
-          <p style={{ textAlign: 'center', opacity: 0.6, fontSize: '0.85rem' }}>
-            Procesando filas, por favor espera…
-          </p>
-        )}
-
-        {error && <p className="form-error">{error}</p>}
-
-        {summary && (
-          <div style={{ marginTop: '0.75rem' }}>
-            <p style={{ color: summary.ok > 0 ? 'var(--tpv-teal-500, #14b8a6)' : undefined }}>
-              ✓ {summary.ok} ajuste{summary.ok !== 1 ? 's' : ''} de stock realizados correctamente.
-            </p>
-            {summary.errors.length > 0 && (
-              <div style={{ marginTop: '0.5rem' }}>
-                <p style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
-                  {summary.errors.length} fila{summary.errors.length !== 1 ? 's' : ''} con error:
-                </p>
-                <ul style={{ fontSize: '0.85rem', paddingLeft: '1.2rem', opacity: 0.8 }}>
-                  {summary.errors.map((e) => (
-                    <li key={e.row}>
-                      Fila {e.row}: {e.message}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <button
-              className="btn-primary"
-              style={{ width: '100%', marginTop: '0.75rem' }}
-              onClick={() => {
-                setSummary(null);
-                if (inputRef.current) inputRef.current.value = '';
-              }}
-            >
-              Cargar otro fichero
-            </button>
-          </div>
-        )}
-
-        <div className="modal-foot" style={{ marginTop: '1rem' }}>
-          <button onClick={onClose}>Cerrar</button>
         </div>
+      )}
+
+      <div className="modal-foot" style={{ marginTop: '1rem' }}>
+        <button onClick={onClose}>Cerrar</button>
       </div>
-    </div>
+    </Modal>
   );
 }

@@ -1,4 +1,5 @@
 import {
+  type CSSProperties,
   type FormEventHandler,
   type MouseEvent,
   type ReactNode,
@@ -17,6 +18,7 @@ interface ModalProps {
   onSubmit?: FormEventHandler<HTMLFormElement>;
   labelledBy?: string;
   ariaLabel?: string;
+  style?: CSSProperties;
 }
 
 // Elementos que pueden recibir foco dentro del modal (para el foco inicial y el trap).
@@ -36,6 +38,7 @@ export function Modal({
   onSubmit,
   labelledBy,
   ariaLabel,
+  style,
 }: ModalProps) {
   const panelRef = useRef<HTMLElement>(null);
 
@@ -87,6 +90,7 @@ export function Modal({
         <form
           ref={panelRef as Ref<HTMLFormElement>}
           className={panelClass}
+          style={style}
           onClick={stop}
           onSubmit={onSubmit}
           data-testid={testId}
@@ -102,6 +106,7 @@ export function Modal({
         <div
           ref={panelRef as Ref<HTMLDivElement>}
           className={panelClass}
+          style={style}
           onClick={stop}
           data-testid={testId}
           role="dialog"

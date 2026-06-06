@@ -9,13 +9,16 @@ vi.mock('./lib/families.js', () => ({
   deleteFamily: vi.fn(),
 }));
 
+import { ConfirmProvider } from './components/ConfirmProvider.js';
 import { FamiliesPage } from './FamiliesPage.js';
 
 function renderPage(): void {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <FamiliesPage />
+      <ConfirmProvider>
+        <FamiliesPage />
+      </ConfirmProvider>
     </QueryClientProvider>,
   );
 }

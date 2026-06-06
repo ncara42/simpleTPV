@@ -3,6 +3,7 @@ import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { Modal } from '../components/Modal.js';
 import { DEMO_FAMILIES, DEMO_PRODUCT_ROTATION, productRootFamily } from '../demo/demoData.js';
 import { getGlobalStock, listMovements, setMinStock } from '../lib/stock.js';
 import { dt, LEVEL_LABEL, MOVEMENT_LABEL, ROTATION_LABEL } from './labels.js';
@@ -209,53 +210,51 @@ export function GlobalStockSection() {
       </div>
 
       {adjusting && (
-        <div className="modal-backdrop" onClick={() => setAdjusting(null)}>
-          <div
-            className="modal modal--form"
-            onClick={(e) => e.stopPropagation()}
-            data-testid="stock-adjust-form"
-          >
-            <h3>Ajustar existencias</h3>
-            <p className="muted">
-              {adjusting.productName} · {adjusting.storeName}
-            </p>
-            <div className="modal-row">
-              <label>
-                Existencias
-                <input
-                  type="number"
-                  min={0}
-                  value={adjusting.quantity}
-                  onChange={(e) => setAdjusting({ ...adjusting, quantity: e.target.value })}
-                  data-testid="stock-adjust-qty"
-                />
-              </label>
-              <label>
-                Stock mínimo
-                <input
-                  type="number"
-                  min={0}
-                  value={adjusting.min}
-                  onChange={(e) => setAdjusting({ ...adjusting, min: e.target.value })}
-                  data-testid="stock-adjust-min"
-                />
-              </label>
-            </div>
-            <div className="modal-foot">
-              <button type="button" onClick={() => setAdjusting(null)}>
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={saveAdjust}
-                data-testid="stock-adjust-save"
-              >
-                Guardar
-              </button>
-            </div>
+        <Modal
+          onClose={() => setAdjusting(null)}
+          className="modal--form"
+          testId="stock-adjust-form"
+        >
+          <h3>Ajustar existencias</h3>
+          <p className="muted">
+            {adjusting.productName} · {adjusting.storeName}
+          </p>
+          <div className="modal-row">
+            <label>
+              Existencias
+              <input
+                type="number"
+                min={0}
+                value={adjusting.quantity}
+                onChange={(e) => setAdjusting({ ...adjusting, quantity: e.target.value })}
+                data-testid="stock-adjust-qty"
+              />
+            </label>
+            <label>
+              Stock mínimo
+              <input
+                type="number"
+                min={0}
+                value={adjusting.min}
+                onChange={(e) => setAdjusting({ ...adjusting, min: e.target.value })}
+                data-testid="stock-adjust-min"
+              />
+            </label>
           </div>
-        </div>
+          <div className="modal-foot">
+            <button type="button" onClick={() => setAdjusting(null)}>
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={saveAdjust}
+              data-testid="stock-adjust-save"
+            >
+              Guardar
+            </button>
+          </div>
+        </Modal>
       )}
 
       {movementsFor && (
@@ -272,43 +271,41 @@ function MovementsModal({ productId, onClose }: { productId: string; onClose: ()
   });
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="movements-modal">
-        <h3>Movimientos de stock</h3>
-        {isLoading ? (
-          <p className="catalog-empty">Cargando…</p>
-        ) : !data || data.items.length === 0 ? (
-          <p className="catalog-empty" data-testid="movements-empty">
-            Sin movimientos.
-          </p>
-        ) : (
-          <table className="catalog-table" data-testid="movements-table">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Tipo</th>
-                <th>Cantidad</th>
-                <th>Motivo</th>
+    <Modal onClose={onClose} testId="movements-modal" ariaLabel="Movimientos de stock">
+      <h3>Movimientos de stock</h3>
+      {isLoading ? (
+        <p className="catalog-empty">Cargando…</p>
+      ) : !data || data.items.length === 0 ? (
+        <p className="catalog-empty" data-testid="movements-empty">
+          Sin movimientos.
+        </p>
+      ) : (
+        <table className="catalog-table" data-testid="movements-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Cantidad</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.items.map((m) => (
+              <tr key={m.id} data-testid="movement-row">
+                <td className="muted">{dt.format(new Date(m.createdAt))}</td>
+                <td>{MOVEMENT_LABEL[m.type] ?? m.type}</td>
+                <td>{m.quantity}</td>
+                <td className="muted">{m.reason ?? '—'}</td>
               </tr>
-            </thead>
-            <tbody>
-              {data.items.map((m) => (
-                <tr key={m.id} data-testid="movement-row">
-                  <td className="muted">{dt.format(new Date(m.createdAt))}</td>
-                  <td>{MOVEMENT_LABEL[m.type] ?? m.type}</td>
-                  <td>{m.quantity}</td>
-                  <td className="muted">{m.reason ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        <div className="modal-foot">
-          <button type="button" onClick={onClose}>
-            Cerrar
-          </button>
-        </div>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <div className="modal-foot">
+        <button type="button" onClick={onClose}>
+          Cerrar
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
