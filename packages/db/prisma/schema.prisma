@@ -40,6 +40,11 @@ model Organization {
   verifactuRecords   VerifactuRecord[]
   salesExports       SalesExport[]
   userPreferences    UserPreference[]
+  customers          Customer[]
+  priceLists         PriceList[]
+  priceListItems     PriceListItem[]
+  wholesaleOrders    WholesaleOrder[]
+  wholesaleOrderLines WholesaleOrderLine[]
 }
 
 // Personalización por usuario (IT-16): preferencias clave-valor (JSON) por usuario.
@@ -173,6 +178,8 @@ model Product {
   stockAlerts        StockAlert[]
   transferLines      TransferLine[]
   purchaseOrderLines PurchaseOrderLine[]
+  priceListItems     PriceListItem[]
+  wholesaleOrderLines WholesaleOrderLine[]
 
   @@index([organizationId, active])
   @@index([organizationId, barcode])
@@ -699,4 +706,100 @@ enum VerifactuStatus {
   PENDING
   SENT
   FAILED
+}
+
+// ─── B2B mayorista saliente (IT-17) ──────────────────────────────────────────
+// Cliente B2B (empresa) con una tarifa (lista de precios) asignable. RLS por tenant.
+model Customer {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  name           String
+  nif            String?
+  email          String?
+  phone          String?
+  address        String?
+  priceListId    String?  @db.Uuid
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  priceList    PriceList?       @relation(fields: [priceListId], references: [id])
+  orders       WholesaleOrder[]
+
+  @@index([organizationId, active])
+}
+
+// Tarifa: lista de precios por producto, asignable a varios clientes (y a una API key
+// en IT-18 para exponer el precio mayorista en la API pública).
+model PriceList {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  name           String
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  items        PriceListItem[]
+  customers    Customer[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model PriceListItem {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  priceListId    String  @db.Uuid
+  productId      String  @db.Uuid
+  price          Decimal @db.Decimal(10, 4)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  priceList    PriceList    @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id])
+
+  @@unique([priceListId, productId])
+  @@index([organizationId, priceListId])
+}
+
+enum WholesaleOrderStatus {
+  DRAFT
+  CONFIRMED
+  SHIPPED
+  CANCELLED
+}
+
+// Pedido mayorista saliente: un cliente B2B pide productos; el precio de cada línea se
+// congela desde la tarifa del cliente (o el precio de venta si no hay tarifa).
+model WholesaleOrder {
+  id             String               @id @default(uuid()) @db.Uuid
+  organizationId String               @db.Uuid
+  customerId     String               @db.Uuid
+  status         WholesaleOrderStatus @default(DRAFT)
+  total          Decimal              @default(0) @db.Decimal(12, 2)
+  notes          String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id])
+  customer     Customer             @relation(fields: [customerId], references: [id])
+  lines        WholesaleOrderLine[]
+
+  @@index([organizationId, status])
+}
+
+model WholesaleOrderLine {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  orderId        String  @db.Uuid
+  productId      String  @db.Uuid
+  qty            Decimal @db.Decimal(12, 3)
+  unitPrice      Decimal @db.Decimal(10, 4)
+  lineTotal      Decimal @db.Decimal(12, 2)
+
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  order        WholesaleOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product        @relation(fields: [productId], references: [id])
+
+  @@index([organizationId, orderId])
 }
