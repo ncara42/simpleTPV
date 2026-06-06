@@ -758,3 +758,39 @@
   width: 120px;
   color: var(--ui-brand);
 }
+/* Subetiqueta del arquetipo (nº de productos) en la fila de rotación (IT-13). */
+.dash-rotation-arch {
+  color: var(--ui-text-muted);
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+/* Conmutador Arquetipo/Producto: píldora segmentada anclada en la esquina del panel. */
+.dash-toggle {
+  position: absolute;
+  top: 1.4rem;
+  right: 1.5rem;
+  display: inline-flex;
+  gap: 0.15rem;
+  padding: 0.18rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface-subtle);
+}
+.dash-toggle button {
+  border: none;
+  background: none;
+  padding: 0.18rem 0.7rem;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.dash-toggle button.is-active {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}

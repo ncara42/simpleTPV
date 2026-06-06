@@ -653,6 +653,93 @@ export class DashboardService {
     });
   }
 
+  // Rotación AGREGADA POR ARQUETIPO (IT-13): el arquetipo es la familia del producto
+  // (familyId). Agregar por arquetipo da más volumen → estadística más sólida y con
+  // menos sesgo que por SKU concreto. Por arquetipo: nº de productos, unidades del
+  // periodo, días desde la última venta del grupo y la tendencia sumada. Los productos
+  // sin familia caen en un grupo "Sin arquetipo". Es la vista por DEFECTO; el detalle
+  // por producto es el drill-down (productRotation).
+  async archetypeRotation(q: DashboardPeriodQueryDto): Promise<
+    Array<{
+      familyId: string | null;
+      familyName: string;
+      productCount: number;
+      units: number;
+      daysSinceLastSale: number | null;
+      trend: number[];
+    }>
+  > {
+    const { organizationId } = requireTenant();
+    const range = this.rangeFor(q);
+    const { storeId } = q;
+    const now = this.now();
+    const LIMIT = 8;
+    const NONE = '∅'; // clave para el grupo sin familia (familyId NULL)
+
+    return withTenantTx(this.base, organizationId, async (tx) => {
+      const summary = await tx.$queryRaw<
+        Array<{
+          familyId: string | null;
+          familyName: string | null;
+          productCount: bigint;
+          units: string;
+          lastSale: Date | null;
+        }>
+      >`
+        SELECT pf.id::text AS "familyId",
+               pf.name AS "familyName",
+               COUNT(DISTINCT p.id) AS "productCount",
+               COALESCE(SUM(sl.qty) FILTER (
+                 WHERE sa."createdAt" >= ${range.from} AND sa."createdAt" < ${range.to}
+                 ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+               ), 0) AS units,
+               MAX(sa."createdAt") AS "lastSale"
+        FROM "Product" p
+        LEFT JOIN "ProductFamily" pf ON pf.id = p."familyId"
+        LEFT JOIN "SaleLine" sl ON sl."productId" = p.id
+        LEFT JOIN "Sale" sa ON sa.id = sl."saleId" AND sa.status = 'COMPLETED'
+        WHERE p."organizationId" = ${organizationId}::uuid AND p.active = true
+        GROUP BY pf.id, pf.name
+        ORDER BY units DESC, "familyName" ASC
+        LIMIT ${LIMIT}
+      `;
+
+      // Tendencia por familia (suma de unidades por día del arquetipo).
+      const daily = await tx.$queryRaw<Array<{ familyId: string | null; units: string }>>`
+        SELECT p."familyId"::text AS "familyId", COALESCE(SUM(sl.qty), 0) AS units
+        FROM "SaleLine" sl
+        JOIN "Sale" sa ON sa.id = sl."saleId"
+        JOIN "Product" p ON p.id = sl."productId"
+        WHERE sa."organizationId" = ${organizationId}::uuid
+          AND sa.status = 'COMPLETED'
+          AND sa."createdAt" >= ${range.from}
+          AND sa."createdAt" < ${range.to}
+          ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+        GROUP BY p."familyId", DATE(sa."createdAt")
+        ORDER BY DATE(sa."createdAt")
+      `;
+      const trendByFamily = new Map<string, number[]>();
+      for (const r of daily) {
+        const key = r.familyId ?? NONE;
+        const arr = trendByFamily.get(key) ?? [];
+        arr.push(num(r.units));
+        trendByFamily.set(key, arr);
+      }
+
+      const dayMs = 24 * 60 * 60 * 1000;
+      return summary.map((r) => ({
+        familyId: r.familyId,
+        familyName: r.familyName ?? 'Sin arquetipo',
+        productCount: num(r.productCount),
+        units: num(r.units),
+        daysSinceLastSale: r.lastSale
+          ? Math.floor((now.getTime() - new Date(r.lastSale).getTime()) / dayMs)
+          : null,
+        trend: trendByFamily.get(r.familyId ?? NONE) ?? [],
+      }));
+    });
+  }
+
   // Fragmento parametrizado `AND <col> = $storeId::uuid` para inyectar el filtro
   // opcional de tienda sin concatenar strings. `column` proviene SIEMPRE de
   // literales del propio código (nunca de input del usuario), por eso es seguro

@@ -337,6 +337,19 @@ describe('Dashboard — integración', () => {
     expect(a!.trend.reduce((s, n) => s + n, 0)).toBe(3); // suma de la tendencia = unidades
   });
 
+  it('archetype-rotation: agrega la rotación por arquetipo (familia) (IT-13)', async () => {
+    const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.archetypeRotation(periodQuery()),
+    );
+    const fam = rows.find((r) => r.familyId === familyId);
+    expect(fam).toBeTruthy();
+    // El arquetipo agrega sus 2 productos: prodA 3 + prodB 1 = 4 unidades.
+    expect(fam!.units).toBe(4);
+    expect(fam!.productCount).toBe(2);
+    // Tendencia = suma de unidades por día del arquetipo (un solo día en el periodo).
+    expect(fam!.trend.reduce((s, n) => s + n, 0)).toBe(4);
+  });
+
   it('sales-kpis: ticket medio, UPT, tasa de descuento y de devolución', async () => {
     const kpis = await tenantStorage.run({ organizationId: org1Id }, async () =>
       service.salesKpis(periodQuery()),

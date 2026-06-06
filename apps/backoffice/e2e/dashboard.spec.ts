@@ -40,4 +40,8 @@ test('los paneles de gráficas y roturas se renderizan', async ({ page }) => {
   await expect(page.getByTestId('dash-hour')).toBeVisible();
   await expect(page.getByTestId('dash-discount-emp')).toBeVisible();
   await expect(page.getByTestId('dash-rotation')).toBeVisible();
+  // Rotación por arquetipo por defecto (IT-13) con conmutador a producto.
+  await expect(page.getByTestId('rotation-by-archetype')).toHaveAttribute('aria-selected', 'true');
+  await page.getByTestId('rotation-by-product').click();
+  await expect(page.getByTestId('rotation-by-product')).toHaveAttribute('aria-selected', 'true');
 });

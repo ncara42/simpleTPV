@@ -10,6 +10,7 @@ import type {
 } from '@simpletpv/auth';
 
 import type {
+  ArchetypeRotation,
   DiscountByEmployee,
   FamilySales,
   MarginKpis,
@@ -640,6 +641,50 @@ export const DEMO_DISCOUNT_BY_EMPLOYEE: DiscountByEmployee[] = [
 ];
 // Rotación + evolución (STAT-05/06): top por unidades; los de cola llevan más días
 // sin venta (stock muerto). `trend` = unidades por día (sparkline de evolución).
+// Rotación por arquetipo (IT-13): agrega los productos de cada familia → vista por
+// defecto, más sólida que por SKU. (En demo, números calcados de los productos.)
+export const DEMO_ARCHETYPE_ROTATION: ArchetypeRotation[] = [
+  {
+    familyId: 'fam-aceites',
+    familyName: 'Aceites',
+    productCount: 12,
+    units: 262,
+    daysSinceLastSale: 0,
+    trend: [30, 42, 38, 51, 47, 60, 66],
+  },
+  {
+    familyId: 'fam-flores',
+    familyName: 'Flores CBD',
+    productCount: 24,
+    units: 208,
+    daysSinceLastSale: 0,
+    trend: [24, 30, 28, 36, 33, 40, 44],
+  },
+  {
+    familyId: 'fam-cosmetica',
+    familyName: 'Cosmética',
+    productCount: 18,
+    units: 96,
+    daysSinceLastSale: 1,
+    trend: [12, 15, 13, 17, 14, 18, 16],
+  },
+  {
+    familyId: 'fam-vapeo',
+    familyName: 'Vapeo',
+    productCount: 9,
+    units: 41,
+    daysSinceLastSale: 4,
+    trend: [8, 6, 5, 7, 5, 6, 4],
+  },
+  {
+    familyId: 'fam-infusiones',
+    familyName: 'Infusiones',
+    productCount: 7,
+    units: 12,
+    daysSinceLastSale: 12,
+    trend: [3, 2, 2, 2, 1, 1, 1],
+  },
+];
 export const DEMO_ROTATION_STATS: ProductRotation[] = [
   {
     productId: 'p-aceite-cbd-10',

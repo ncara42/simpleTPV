@@ -1,4 +1,5 @@
 import {
+  DEMO_ARCHETYPE_ROTATION,
   DEMO_DISCOUNT_BY_EMPLOYEE,
   DEMO_MARGIN_KPIS,
   DEMO_RANKINGS,
@@ -110,6 +111,17 @@ export interface ProductRotation {
   trend: number[];
 }
 
+// Rotación agregada por arquetipo (= familia, IT-13): vista por defecto, más sólida
+// estadísticamente que por SKU concreto. El detalle por producto es el drill-down.
+export interface ArchetypeRotation {
+  familyId: string | null;
+  familyName: string;
+  productCount: number;
+  units: number;
+  daysSinceLastSale: number | null;
+  trend: number[];
+}
+
 // Dashboard (IT-09): en demo devuelve los datos calcados al mockup; en real va
 // contra /dashboard/*. NOTA: el backend devuelve los KPIs y el intradía (STAT-01),
 // pero AÚN NO las series diarias de las sparklines de las cards (series/
@@ -156,6 +168,17 @@ export function getProductRotation(
 ): Promise<ProductRotation[]> {
   if (isDemo()) return Promise.resolve(DEMO_ROTATION_STATS);
   return api.get<ProductRotation[]>('/dashboard/product-rotation', periodQuery(period, storeId));
+}
+
+export function getArchetypeRotation(
+  period: DashboardPeriod,
+  storeId?: string,
+): Promise<ArchetypeRotation[]> {
+  if (isDemo()) return Promise.resolve(DEMO_ARCHETYPE_ROTATION);
+  return api.get<ArchetypeRotation[]>(
+    '/dashboard/archetype-rotation',
+    periodQuery(period, storeId),
+  );
 }
 
 export function getSalesKpis(period: DashboardPeriod, storeId?: string): Promise<SalesKpis> {

@@ -8,6 +8,7 @@ import { DEMO_STOCKOUT_KPIS, DEMO_STOCKOUTS } from './demo/demoData.js';
 import { listStores } from './lib/admin.js';
 import {
   type DashboardPeriod,
+  getArchetypeRotation,
   getDiscountByEmployee,
   getMarginKpis,
   getProductRankings,
@@ -82,6 +83,14 @@ export function DashboardPage() {
   const rotation = useQuery({
     queryKey: ['dash-rotation', period, store],
     queryFn: () => getProductRotation(period, store),
+    placeholderData: keepPreviousData,
+  });
+  // Rotación: por defecto AGREGADA POR ARQUETIPO (más sólida); 'product' es el
+  // drill-down al SKU concreto (IT-13).
+  const [rotationLevel, setRotationLevel] = useState<'archetype' | 'product'>('archetype');
+  const archetypeRotation = useQuery({
+    queryKey: ['dash-arch-rotation', period, store],
+    queryFn: () => getArchetypeRotation(period, store),
     placeholderData: keepPreviousData,
   });
   const rankings = useQuery({
@@ -324,28 +333,69 @@ export function DashboardPage() {
           })()}
         </div>
 
-        {/* Rotación + evolución de producto (STAT-05/06): unidades, días sin venta
-            y sparkline de evolución (IT-02) */}
+        {/* Rotación (STAT-05/06): por defecto AGREGADA POR ARQUETIPO (familia) — más
+            sólida estadísticamente; el conmutador baja al detalle por producto (IT-13). */}
         <div className="dash-panel" data-testid="dash-rotation">
-          <h3>Rotación de producto</h3>
+          <div className="dash-toggle" role="tablist" aria-label="Nivel de rotación">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={rotationLevel === 'archetype'}
+              className={rotationLevel === 'archetype' ? 'is-active' : ''}
+              onClick={() => setRotationLevel('archetype')}
+              data-testid="rotation-by-archetype"
+            >
+              Arquetipo
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={rotationLevel === 'product'}
+              className={rotationLevel === 'product' ? 'is-active' : ''}
+              onClick={() => setRotationLevel('product')}
+              data-testid="rotation-by-product"
+            >
+              Producto
+            </button>
+          </div>
+          <h3>Rotación</h3>
           <p className="dash-panel-sub">
-            {PERIOD_SUBTITLE[period]} · unidades, días sin venta y evolución
+            {PERIOD_SUBTITLE[period]} ·{' '}
+            {rotationLevel === 'archetype'
+              ? 'por arquetipo (familia) · unidades y evolución'
+              : 'por producto · unidades, días sin venta y evolución'}
           </p>
           <ul className="dash-rotation-list">
-            {(rotation.data ?? []).map((p) => (
-              <li key={p.productId} className="dash-rotation-row">
-                <span className="dash-rotation-name">{p.name}</span>
-                <span className="dash-rotation-units">{fmtNum(p.units, 0)} ud</span>
+            {(rotationLevel === 'archetype'
+              ? (archetypeRotation.data ?? []).map((a) => ({
+                  key: a.familyId ?? 'none',
+                  label: a.familyName,
+                  sub: `${a.productCount} productos`,
+                  units: a.units,
+                  days: a.daysSinceLastSale,
+                  trend: a.trend,
+                }))
+              : (rotation.data ?? []).map((p) => ({
+                  key: p.productId,
+                  label: p.name,
+                  sub: null as string | null,
+                  units: p.units,
+                  days: p.daysSinceLastSale,
+                  trend: p.trend,
+                }))
+            ).map((r) => (
+              <li key={r.key} className="dash-rotation-row">
+                <span className="dash-rotation-name">
+                  {r.label}
+                  {r.sub && <span className="dash-rotation-arch"> · {r.sub}</span>}
+                </span>
+                <span className="dash-rotation-units">{fmtNum(r.units, 0)} ud</span>
                 <span className="dash-rotation-days">
-                  {p.daysSinceLastSale == null
-                    ? 'sin ventas'
-                    : p.daysSinceLastSale <= 0
-                      ? 'hoy'
-                      : `hace ${p.daysSinceLastSale} d`}
+                  {r.days == null ? 'sin ventas' : r.days <= 0 ? 'hoy' : `hace ${r.days} d`}
                 </span>
                 <span className="dash-rotation-spark">
-                  {p.trend.length > 1 && (
-                    <Sparkline data={p.trend} tone="brand" height={28} ariaLabel="Evolución" />
+                  {r.trend.length > 1 && (
+                    <Sparkline data={r.trend} tone="brand" height={28} ariaLabel="Evolución" />
                   )}
                 </span>
               </li>

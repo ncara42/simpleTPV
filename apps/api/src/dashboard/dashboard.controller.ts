@@ -59,4 +59,9 @@ export class DashboardController {
   productRotation(@Query() query: DashboardPeriodQueryDto) {
     return this.dashboard.productRotation(query);
   }
+
+  @Get('archetype-rotation')
+  archetypeRotation(@Query() query: DashboardPeriodQueryDto) {
+    return this.dashboard.archetypeRotation(query);
+  }
 }
