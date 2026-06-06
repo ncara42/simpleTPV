@@ -34,9 +34,10 @@ export function setPreference(
 }
 
 // Carga todas las preferencias y expone un setter optimista (cachea por clave).
+// `loaded` permite aplicar valores por defecto una sola vez tras la carga inicial.
 export function usePreferences() {
   const qc = useQueryClient();
-  const { data } = useQuery({
+  const { data, isSuccess } = useQuery({
     queryKey: ['preferences'],
     queryFn: getPreferences,
     staleTime: Infinity, // solo cambian vía nuestra mutación; sin refetch espurio
@@ -54,6 +55,7 @@ export function usePreferences() {
   });
   return {
     prefs: data ?? {},
+    loaded: isSuccess,
     setPref: (key: string, value: unknown) => mutation.mutate({ key, value }),
   };
 }

@@ -42,6 +42,19 @@ test('personalización: ocultar una KPI card la quita y persiste (IT-16)', async
   await expect(page.getByTestId('kpi-upt')).toBeHidden();
 });
 
+test('preferencias por defecto: el dashboard recuerda el periodo elegido (IT-16)', async ({
+  page,
+}) => {
+  await expect(page.getByTestId('dash-period')).toContainText('Hoy');
+  await page.getByTestId('dash-period').click();
+  await page.locator('[role="option"][data-value="week"]').click();
+  await expect(page.getByTestId('dash-period')).toContainText('Semana');
+  // Tras recargar, el periodo guardado se reaplica.
+  await page.reload();
+  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByTestId('dash-period')).toContainText('Semana');
+});
+
 test('los paneles de gráficas y roturas se renderizan', async ({ page }) => {
   await expect(page.getByTestId('dash-bars')).toBeVisible();
   await expect(page.getByTestId('dash-family')).toBeVisible();

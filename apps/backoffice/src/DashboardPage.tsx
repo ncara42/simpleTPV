@@ -2,7 +2,7 @@ import './dashboard.css';
 
 import { Chart, Select, Sparkline } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { DEMO_STOCKOUT_KPIS, DEMO_STOCKOUTS } from './demo/demoData.js';
 import { listStores } from './lib/admin.js';
@@ -109,8 +109,31 @@ export function DashboardPage() {
   usePageHeader('Resumen', 'Actualizado hace 2 min');
 
   // KPI cards personalizables (IT-16): cada usuario elige cuáles ve y en qué orden.
-  const { prefs, setPref } = usePreferences();
+  const { prefs, setPref, loaded: prefsLoaded } = usePreferences();
   const [cardsEditorOpen, setCardsEditorOpen] = useState(false);
+
+  // Periodo y tienda por defecto (IT-16): el dashboard recuerda el último elegido. Se
+  // aplica UNA vez tras cargar las preferencias; los cambios del usuario lo reescriben.
+  const defaultsApplied = useRef(false);
+  useEffect(() => {
+    if (!prefsLoaded || defaultsApplied.current) return;
+    defaultsApplied.current = true;
+    const d = readPref<{ period?: DashboardPeriod; storeId?: string }>(
+      prefs,
+      'dashboard.defaults',
+      {},
+    );
+    if (d.period && PERIODS.some((p) => p.id === d.period)) setPeriod(d.period);
+    if (typeof d.storeId === 'string') setStoreId(d.storeId);
+  }, [prefsLoaded, prefs]);
+  const saveDashboardDefault = (patch: { period?: DashboardPeriod; storeId?: string }): void => {
+    const cur = readPref<{ period?: DashboardPeriod; storeId?: string }>(
+      prefs,
+      'dashboard.defaults',
+      {},
+    );
+    setPref('dashboard.defaults', { ...cur, ...patch });
+  };
   const cardDefs: Array<{ id: string; label: string; node: React.ReactNode }> = [
     {
       id: 'kpi-today',
@@ -232,7 +255,10 @@ export function DashboardPage() {
           <Select
             className="dash-period-select"
             value={period}
-            onChange={(value) => setPeriod(value as DashboardPeriod)}
+            onChange={(value) => {
+              setPeriod(value as DashboardPeriod);
+              saveDashboardDefault({ period: value as DashboardPeriod });
+            }}
             ariaLabel="Periodo"
             data-testid="dash-period"
             options={PERIODS.map((p) => ({ value: p.id, label: p.label }))}
@@ -240,7 +266,10 @@ export function DashboardPage() {
           <Select
             className="dash-store"
             value={storeId}
-            onChange={setStoreId}
+            onChange={(value) => {
+              setStoreId(value);
+              saveDashboardDefault({ storeId: value });
+            }}
             ariaLabel="Tienda"
             data-testid="dash-store"
             options={[
