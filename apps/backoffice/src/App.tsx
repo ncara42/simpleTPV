@@ -17,6 +17,7 @@ import {
   Handshake,
   KeyRound,
   LayoutDashboard,
+  LifeBuoy,
   Package,
   Percent,
   Receipt,
@@ -33,6 +34,7 @@ import { CatalogPage } from './CatalogPage.js';
 import { DashboardPage } from './DashboardPage.js';
 import { DEMO_USER } from './demo/demoData.js';
 import { FamiliesPage } from './FamiliesPage.js';
+import { HelpPage } from './HelpPage.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { switchApp } from './lib/nav.js';
 import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
@@ -63,7 +65,8 @@ type Tab =
   | 'purchases'
   | 'verifactu'
   | 'b2b'
-  | 'apikeys';
+  | 'apikeys'
+  | 'help';
 
 const ALL_NAV: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
@@ -81,6 +84,7 @@ const ALL_NAV: NavItem[] = [
   { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} /> },
   { id: 'b2b', label: 'Mayorista', icon: <Handshake size={18} /> },
   { id: 'apikeys', label: 'API Keys', icon: <KeyRound size={18} /> },
+  { id: 'help', label: 'Ayuda', icon: <LifeBuoy size={18} /> },
 ];
 
 // #106: Compras y VeriFactu se retiran del menú (decisión informe UX 2026-06-02).
@@ -177,6 +181,7 @@ function Home() {
             {tab === 'verifactu' && <VerifactuPage />}
             {tab === 'b2b' && <B2bPage />}
             {tab === 'apikeys' && <ApiKeysPage />}
+            {tab === 'help' && <HelpPage />}
           </main>
         </PageHeaderProvider>
       </div>

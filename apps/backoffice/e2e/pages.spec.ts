@@ -298,6 +298,20 @@ test('Mayorista: clientes, tarifas y pedidos en sub-pestañas (IT-17)', async ({
   await expect(page.getByTestId('b2b-order-row')).toHaveCount(2);
 });
 
+test('Ayuda: canales de contacto y FAQ (IT-20)', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-help').click();
+  await expect(page.getByTestId('help-page')).toBeVisible();
+  // Canales con los esquemas correctos (wa.me / mailto / tel).
+  await expect(page.getByTestId('help-whatsapp')).toHaveAttribute('href', /^https:\/\/wa\.me\//);
+  await expect(page.getByTestId('help-email')).toHaveAttribute('href', /^mailto:/);
+  await expect(page.getByTestId('help-phone')).toHaveAttribute('href', /^tel:/);
+  // FAQ en acordeón: abrir la primera muestra su respuesta.
+  const first = page.getByTestId('faq-item').first();
+  await first.locator('summary').click();
+  await expect(first).toHaveJSProperty('open', true);
+});
+
 test('Confirmación: borrar cliente usa el diálogo del design system (IT-19)', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-b2b').click();

@@ -2220,3 +2220,68 @@
     transform: translateY(0);
   }
 }
+
+/* ── Centro de ayuda / soporte (IT-20) ──────────────────────────────────────
+   Canales de contacto en tarjetas + FAQ en acordeón. */
+.help-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.4rem;
+}
+.help-intro {
+  margin: 0 0 1rem;
+}
+.help-channels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem;
+}
+.help-channel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  padding: 1rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  text-decoration: none;
+  transition:
+    border-color 0.15s var(--ui-ease),
+    background 0.15s var(--ui-ease);
+}
+.help-channel:hover {
+  border-color: var(--ui-primary);
+  background: var(--ui-surface-subtle);
+}
+.help-channel-label {
+  font-weight: 600;
+}
+.help-channel-value {
+  font-size: 0.85rem;
+  color: var(--ui-text-muted);
+}
+.help-faq {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.help-faq-item {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  padding: 0.2rem 0.85rem;
+}
+.help-faq-item > summary {
+  cursor: pointer;
+  padding: 0.6rem 0;
+  font-weight: 500;
+  list-style: revert;
+}
+.help-faq-item > p {
+  margin: 0 0 0.7rem;
+  color: var(--ui-text-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
