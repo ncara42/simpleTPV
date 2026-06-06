@@ -263,3 +263,50 @@ test('Promociones: lista por estado y constructor de reglas (#99)', async ({ pag
   await page.getByTestId('promo-save').click();
   await expect(page.getByTestId('promo-list')).toContainText('Test 3x2');
 });
+
+test('Mayorista: clientes, tarifas y pedidos en sub-pestañas (IT-17)', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-b2b').click();
+  await expect(page.getByTestId('b2b-page')).toBeVisible();
+
+  // Clientes: 2 demo + alta de uno nuevo que aparece en la tabla.
+  await expect(page.getByTestId('b2b-customer-row')).toHaveCount(2);
+  await page.getByTestId('b2b-new-customer').click();
+  await page.getByTestId('b2b-customer-name').fill('Cliente E2E');
+  await page.getByTestId('b2b-customer-save').click();
+  await expect(page.getByTestId('b2b-customers-table')).toContainText('Cliente E2E');
+
+  // Tarifas: 2 demo y el detalle de precios de una de ellas.
+  await page.getByTestId('b2b-tab-pricelists').click();
+  await expect(page.getByTestId('b2b-pricelist-row')).toHaveCount(2);
+  await page
+    .getByTestId('b2b-pricelists-table')
+    .getByRole('button', { name: 'Precios' })
+    .first()
+    .click();
+  await expect(page.getByTestId('b2b-pricelist-detail')).toBeVisible();
+  await expect(page.getByTestId('b2b-pricelist-item').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Cerrar' }).click();
+
+  // Pedidos: 1 demo + alta de un pedido (cliente + 1 línea) que aparece en la lista.
+  await page.getByTestId('b2b-tab-orders').click();
+  await expect(page.getByTestId('b2b-order-row')).toHaveCount(1);
+  await page.getByTestId('b2b-new-order').click();
+  await selectOption(page, 'b2b-order-customer', 'cust-herbolario');
+  await selectOption(page, 'b2b-order-line-product', 'p-aceite-cbd-10');
+  await page.getByTestId('b2b-order-save').click();
+  await expect(page.getByTestId('b2b-order-row')).toHaveCount(2);
+});
+
+test('API Keys: lista, alta y banner de un solo uso (IT-18)', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-apikeys').click();
+  await expect(page.getByTestId('apikeys-page')).toBeVisible();
+  await expect(page.getByTestId('apikeys-table')).toBeVisible();
+  // Alta: la key completa se muestra una sola vez en el banner.
+  await page.getByTestId('apikey-new').click();
+  await page.getByTestId('apikey-name').fill('Key E2E');
+  await page.getByRole('button', { name: 'Crear' }).click();
+  await expect(page.getByTestId('apikey-banner')).toContainText('no se mostrará');
+  await expect(page.getByTestId('apikeys-table')).toContainText('Key E2E');
+});

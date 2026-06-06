@@ -27,27 +27,37 @@ const DEMO_KEYS: ApiKey[] = [
 ];
 
 export function listApiKeys(): Promise<ApiKey[]> {
-  if (isDemo()) return Promise.resolve(DEMO_KEYS);
+  if (isDemo()) return Promise.resolve(DEMO_KEYS.map((k) => ({ ...k })));
   return api.get<ApiKey[]>('/api-keys');
 }
 
 export function createApiKey(input: CreateApiKeyInput): Promise<ApiKeyCreated> {
   if (isDemo()) {
-    return Promise.resolve({
+    const prefix = 'demo1234';
+    const created: ApiKey = {
       id: `ak-${Date.now()}`,
       name: input.name,
-      prefix: 'demo1234',
+      prefix,
       priceListId: input.priceListId ?? null,
       createdAt: new Date().toISOString(),
       lastUsedAt: null,
       revokedAt: null,
-      key: `stpv_demo1234_demoKeyOnlyShownOnce_${Date.now()}`,
+    };
+    // Persiste en el array demo (mutable) para que la tabla refleje el alta.
+    DEMO_KEYS.unshift(created);
+    return Promise.resolve({
+      ...created,
+      key: `stpv_${prefix}_demoKeyOnlyShownOnce_${Date.now()}`,
     });
   }
   return api.post<ApiKeyCreated>('/api-keys', input);
 }
 
 export function revokeApiKey(id: string): Promise<void> {
-  if (isDemo()) return Promise.resolve();
+  if (isDemo()) {
+    const k = DEMO_KEYS.find((x) => x.id === id);
+    if (k) k.revokedAt = new Date().toISOString();
+    return Promise.resolve();
+  }
   return api.del(`/api-keys/${id}`);
 }

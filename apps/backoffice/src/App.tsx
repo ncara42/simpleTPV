@@ -14,6 +14,7 @@ import {
   Bell,
   CheckSquare,
   Clock,
+  Handshake,
   KeyRound,
   LayoutDashboard,
   Package,
@@ -27,6 +28,7 @@ import {
 import { useEffect, useState } from 'react';
 
 import { ApiKeysPage } from './ApiKeysPage.js';
+import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
 import { DashboardPage } from './DashboardPage.js';
 import { DEMO_USER } from './demo/demoData.js';
@@ -60,6 +62,7 @@ type Tab =
   | 'sales'
   | 'purchases'
   | 'verifactu'
+  | 'b2b'
   | 'apikeys';
 
 const ALL_NAV: NavItem[] = [
@@ -76,6 +79,7 @@ const ALL_NAV: NavItem[] = [
   { id: 'sales', label: 'Ventas', icon: <Receipt size={18} /> },
   { id: 'purchases', label: 'Compras', icon: <ShoppingCart size={18} /> },
   { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} /> },
+  { id: 'b2b', label: 'Mayorista', icon: <Handshake size={18} /> },
   { id: 'apikeys', label: 'API Keys', icon: <KeyRound size={18} /> },
 ];
 
@@ -171,6 +175,7 @@ function Home() {
             {tab === 'sales' && <SalesHistoryPage />}
             {tab === 'purchases' && <PurchasesPage />}
             {tab === 'verifactu' && <VerifactuPage />}
+            {tab === 'b2b' && <B2bPage />}
             {tab === 'apikeys' && <ApiKeysPage />}
           </main>
         </PageHeaderProvider>

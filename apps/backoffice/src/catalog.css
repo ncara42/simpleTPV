@@ -2085,3 +2085,65 @@
   background: var(--ui-surface-subtle);
   text-decoration: none;
 }
+
+/* ── B2B mayorista (IT-17) ──────────────────────────────────────────────────
+   Fila de alta de precio (tarifa) y de línea de pedido: selector + número +
+   acción, alineados horizontalmente. */
+.b2b-item-form {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+.b2b-item-form > .ui-select {
+  flex: 1 1 auto;
+  min-width: 10rem;
+}
+.b2b-item-form input[type='number'] {
+  width: 7rem;
+}
+.b2b-status-actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+/* ── API keys (IT-18) ───────────────────────────────────────────────────────
+   Banner de la key recién creada (visible una sola vez) + control de revelado. */
+.apikey-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--ui-warning);
+  background: var(--ui-warning-soft);
+  border-radius: var(--ui-radius-lg);
+}
+.apikey-banner-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1 1 auto;
+}
+.apikey-reveal {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.apikey-reveal-code {
+  padding: 0.3rem 0.55rem;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+.apikey-revoked {
+  margin-top: 1rem;
+}
+.apikey-revoked summary {
+  cursor: pointer;
+  padding: 0.4rem 0;
+}

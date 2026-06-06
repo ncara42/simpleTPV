@@ -611,3 +611,97 @@ export interface CreateApiKeyInput {
   name: string;
   priceListId?: string;
 }
+
+// ── B2B mayorista saliente (IT-17) ───────────────────────────────────────────
+export interface Customer {
+  id: string;
+  name: string;
+  nif: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  priceListId: string | null;
+  active: boolean;
+  // En list/update la API incluye la tarifa asignada (id + nombre).
+  priceList?: { id: string; name: string } | null;
+}
+
+export interface CustomerInput {
+  name: string;
+  nif?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  priceListId?: string | null;
+  active?: boolean;
+}
+
+// Resumen de tarifa (lista). itemCount = precios fijados; customerCount = clientes que la usan.
+export interface PriceListSummary {
+  id: string;
+  name: string;
+  active: boolean;
+  itemCount: number;
+  customerCount: number;
+}
+
+// Precio de un producto dentro de una tarifa. price/salePrice son Decimal → string.
+export interface PriceListItem {
+  id: string;
+  productId: string;
+  price: string;
+  product?: { name: string; salePrice: string };
+}
+
+export interface PriceListDetail {
+  id: string;
+  name: string;
+  active: boolean;
+  items: PriceListItem[];
+}
+
+export type WholesaleOrderStatus = 'DRAFT' | 'CONFIRMED' | 'SHIPPED' | 'CANCELLED';
+
+export interface WholesaleOrderLine {
+  id: string;
+  productId: string;
+  qty: string;
+  unitPrice: string;
+  lineTotal: string;
+  product?: { name: string };
+}
+
+// Fila del listado de pedidos mayoristas (paginado).
+export interface WholesaleOrderSummary {
+  id: string;
+  customerId: string;
+  customerName: string;
+  status: WholesaleOrderStatus;
+  total: string;
+  lineCount: number;
+  createdAt: string;
+}
+
+export interface WholesaleOrdersPage {
+  items: WholesaleOrderSummary[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+}
+
+export interface WholesaleOrderDetail {
+  id: string;
+  customerId: string;
+  status: WholesaleOrderStatus;
+  total: string;
+  notes: string | null;
+  createdAt: string;
+  customer: { name: string; nif: string | null };
+  lines: WholesaleOrderLine[];
+}
+
+export interface CreateWholesaleOrderInput {
+  customerId: string;
+  notes?: string;
+  lines: { productId: string; qty: number }[];
+}

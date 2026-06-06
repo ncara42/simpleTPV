@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, Eye, EyeOff, Key, Plus, Trash2 } from 'lucide-react';
+import { Copy, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useState } from 'react';
 
 import { createApiKey, listApiKeys, revokeApiKey } from './lib/api-keys.js';
@@ -28,24 +28,24 @@ function RevealKey({ value }: { value: string }) {
   }
 
   return (
-    <div className="api-key-reveal">
-      <code className="api-key-reveal__code">{visible ? value : '•'.repeat(32)}</code>
+    <div className="apikey-reveal">
+      <code className="apikey-reveal-code">{visible ? value : '•'.repeat(32)}</code>
       <button
         type="button"
+        className="link-btn"
         title={visible ? 'Ocultar' : 'Mostrar'}
         onClick={() => setVisible((v) => !v)}
-        className="api-key-reveal__btn"
       >
         {visible ? <EyeOff size={14} /> : <Eye size={14} />}
       </button>
       <button
         type="button"
+        className="link-btn"
         title={copied ? '¡Copiado!' : 'Copiar'}
         onClick={copy}
-        className="api-key-reveal__btn"
       >
         <Copy size={14} />
-        {copied && <span className="api-key-reveal__copied">¡Copiado!</span>}
+        {copied ? ' ¡Copiado!' : ''}
       </button>
     </div>
   );
@@ -59,12 +59,11 @@ interface CreateForm {
 const EMPTY_FORM: CreateForm = { name: '', priceListId: '' };
 
 export function ApiKeysPage() {
-  usePageHeader('API Keys');
+  usePageHeader('API Keys', 'Acceso externo de solo lectura al stock');
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateForm>(EMPTY_FORM);
   const [justCreated, setJustCreated] = useState<{ id: string; key: string } | null>(null);
-  const [confirmRevokeId, setConfirmRevokeId] = useState<string | null>(null);
 
   const { data: keys = [], isLoading } = useQuery({
     queryKey: ['api-keys'],
@@ -87,195 +86,180 @@ export function ApiKeysPage() {
 
   const revokeMut = useMutation({
     mutationFn: (id: string) => revokeApiKey(id),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['api-keys'] });
-      setConfirmRevokeId(null);
-    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['api-keys'] }),
   });
 
   const active = keys.filter((k) => !k.revokedAt);
   const revoked = keys.filter((k) => k.revokedAt);
 
   return (
-    <div className="page-container">
-      <div className="page-actions">
-        <button
-          type="button"
-          className="btn btn--primary btn--sm"
-          onClick={() => {
-            setShowCreate(true);
-            setJustCreated(null);
-          }}
-        >
-          <Plus size={14} />
-          Nueva API key
-        </button>
-      </div>
-
-      {/* Banner con la key recién creada — solo visible una vez */}
-      {justCreated && (
-        <div className="api-key-banner" data-testid="api-key-banner">
-          <Key size={16} />
-          <div>
-            <strong>Guarda esta key ahora — no se mostrará de nuevo.</strong>
-            <RevealKey value={justCreated.key} />
+    <section className="catalog" data-testid="apikeys-page">
+      <div className="table-panel">
+        <div className="users-toolbar">
+          <div className="sales-filters">
+            <span className="muted">
+              {active.length} key{active.length !== 1 ? 's' : ''} activa
+              {active.length !== 1 ? 's' : ''}
+            </span>
           </div>
           <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            onClick={() => setJustCreated(null)}
-            aria-label="Cerrar"
+            className="btn-primary"
+            onClick={() => {
+              setShowCreate(true);
+              setJustCreated(null);
+            }}
+            data-testid="apikey-new"
           >
-            ×
+            Nueva API key
           </button>
         </div>
-      )}
 
-      {/* Modal de creación */}
-      {showCreate && (
-        <div className="modal-backdrop" onClick={() => setShowCreate(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3 className="modal__title">Nueva API key</h3>
-            <div className="form-field">
-              <label htmlFor="apikey-name">Nombre</label>
-              <input
-                id="apikey-name"
-                type="text"
-                className="input"
-                placeholder="ERP, mayorista externo…"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              />
+        {justCreated && (
+          <div className="apikey-banner" data-testid="apikey-banner">
+            <KeyRound size={16} />
+            <div className="apikey-banner-body">
+              <strong>Guarda esta key ahora — no se mostrará de nuevo.</strong>
+              <RevealKey value={justCreated.key} />
             </div>
-            <div className="form-field">
-              <label htmlFor="apikey-pricelist">
-                Tarifa (<span className="form-field__optional">opcional</span>)
-              </label>
-              <input
-                id="apikey-pricelist"
-                type="text"
-                className="input"
-                placeholder="ID de tarifa mayorista"
-                value={form.priceListId}
-                onChange={(e) => setForm((f) => ({ ...f, priceListId: e.target.value }))}
-              />
-              <span className="form-field__hint">
-                Si se asigna una tarifa, el endpoint /public/stock incluye el precio mayorista.
-              </span>
-            </div>
-            <div className="modal__actions">
-              <button type="button" className="btn btn--ghost" onClick={() => setShowCreate(false)}>
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn btn--primary"
-                disabled={!form.name.trim() || createMut.isPending}
-                onClick={() => createMut.mutate()}
-              >
-                {createMut.isPending ? 'Creando…' : 'Crear'}
-              </button>
-            </div>
+            <button
+              type="button"
+              className="link-btn"
+              onClick={() => setJustCreated(null)}
+              aria-label="Cerrar"
+            >
+              ×
+            </button>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Modal de confirmación de revocación */}
-      {confirmRevokeId && (
-        <div className="modal-backdrop" onClick={() => setConfirmRevokeId(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3 className="modal__title">Revocar API key</h3>
-            <p>Esta acción es irreversible. El acceso externo dejará de funcionar de inmediato.</p>
-            <div className="modal__actions">
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={() => setConfirmRevokeId(null)}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn btn--danger"
-                disabled={revokeMut.isPending}
-                onClick={() => revokeMut.mutate(confirmRevokeId)}
-              >
-                {revokeMut.isPending ? 'Revocando…' : 'Revocar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isLoading && <p className="text-muted">Cargando…</p>}
-
-      {!isLoading && active.length === 0 && (
-        <p className="text-muted">No hay API keys activas. Crea una para dar acceso externo.</p>
-      )}
-
-      {active.length > 0 && (
-        <table className="data-table" data-testid="api-keys-table">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Prefijo</th>
-              <th>Tarifa</th>
-              <th>Creada</th>
-              <th>Último uso</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {active.map((k) => (
-              <tr key={k.id}>
-                <td>{k.name}</td>
-                <td>
-                  <code>stpv_{k.prefix}_…</code>
-                </td>
-                <td>{k.priceListId ?? '—'}</td>
-                <td>{fmtDate(k.createdAt)}</td>
-                <td>{fmtDate(k.lastUsedAt)}</td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn btn--ghost btn--sm btn--danger"
-                    title="Revocar"
-                    onClick={() => setConfirmRevokeId(k.id)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {revoked.length > 0 && (
-        <details className="api-keys-revoked">
-          <summary>Revocadas ({revoked.length})</summary>
-          <table className="data-table data-table--muted">
+        {isLoading ? (
+          <p className="catalog-empty">Cargando…</p>
+        ) : active.length === 0 ? (
+          <p className="catalog-empty">
+            No hay API keys activas. Crea una para dar acceso externo.
+          </p>
+        ) : (
+          <table className="catalog-table" data-testid="apikeys-table">
             <thead>
               <tr>
                 <th>Nombre</th>
                 <th>Prefijo</th>
-                <th>Revocada</th>
+                <th>Tarifa</th>
+                <th>Creada</th>
+                <th>Último uso</th>
+                <th aria-label="Acciones" />
               </tr>
             </thead>
             <tbody>
-              {revoked.map((k) => (
+              {active.map((k) => (
                 <tr key={k.id}>
                   <td>{k.name}</td>
-                  <td>
+                  <td className="muted">
                     <code>stpv_{k.prefix}_…</code>
                   </td>
-                  <td>{fmtDate(k.revokedAt)}</td>
+                  <td className="muted">{k.priceListId ?? '—'}</td>
+                  <td className="muted">{fmtDate(k.createdAt)}</td>
+                  <td className="muted">{fmtDate(k.lastUsedAt)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="link-btn"
+                      onClick={() => {
+                        if (window.confirm(`¿Revocar la API key "${k.name}"? Es irreversible.`))
+                          revokeMut.mutate(k.id);
+                      }}
+                    >
+                      Revocar
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </details>
+        )}
+
+        {revoked.length > 0 && (
+          <details className="apikey-revoked">
+            <summary className="muted">Revocadas ({revoked.length})</summary>
+            <table className="catalog-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Prefijo</th>
+                  <th>Revocada</th>
+                </tr>
+              </thead>
+              <tbody>
+                {revoked.map((k) => (
+                  <tr key={k.id}>
+                    <td className="muted">{k.name}</td>
+                    <td className="muted">
+                      <code>stpv_{k.prefix}_…</code>
+                    </td>
+                    <td className="muted">{fmtDate(k.revokedAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        )}
+      </div>
+
+      {showCreate && (
+        <div className="modal-backdrop" onClick={() => setShowCreate(false)}>
+          <form
+            className="modal modal--form"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (form.name.trim()) createMut.mutate();
+            }}
+            data-testid="apikey-form"
+          >
+            <header className="modal-head">
+              <h3>Nueva API key</h3>
+            </header>
+            <div className="modal-body">
+              <section className="form-section">
+                <label>
+                  Nombre
+                  <input
+                    autoFocus
+                    required
+                    placeholder="ERP, mayorista externo…"
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    data-testid="apikey-name"
+                  />
+                </label>
+                <label>
+                  Tarifa (opcional)
+                  <input
+                    placeholder="ID de tarifa mayorista"
+                    value={form.priceListId}
+                    onChange={(e) => setForm((f) => ({ ...f, priceListId: e.target.value }))}
+                  />
+                </label>
+                <p className="muted">
+                  Si se asigna una tarifa, <code>/public/stock</code> incluye el precio mayorista.
+                </p>
+              </section>
+            </div>
+            <div className="modal-foot modal-foot-actions">
+              <button type="button" onClick={() => setShowCreate(false)}>
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={!form.name.trim() || createMut.isPending}
+              >
+                {createMut.isPending ? 'Creando…' : 'Crear'}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
-    </div>
+    </section>
   );
 }

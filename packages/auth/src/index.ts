@@ -21,6 +21,9 @@ export type {
   CreateSaleInput,
   CreateStoreOrderInput,
   CreateTransferInput,
+  CreateWholesaleOrderInput,
+  Customer,
+  CustomerInput,
   FamilyInput,
   FamilyNode,
   InventoryCountLine,
@@ -30,6 +33,9 @@ export type {
   OfficialDeviceStatus,
   OpenCashSessionInput,
   PairDeviceInput,
+  PriceListDetail,
+  PriceListItem,
+  PriceListSummary,
   Product,
   ProductInput,
   PurchaseOrder,
@@ -77,6 +83,11 @@ export type {
   UserRole,
   VerifactuRecord,
   VerifactuStatus,
+  WholesaleOrderDetail,
+  WholesaleOrderLine,
+  WholesaleOrdersPage,
+  WholesaleOrderStatus,
+  WholesaleOrderSummary,
 } from './api-types.js';
 export { type AuthState, type AuthStore, type AuthTokens, createAuthStore } from './auth-store.js';
 export { type AuthSetup, setupAuth } from './setup.js';
