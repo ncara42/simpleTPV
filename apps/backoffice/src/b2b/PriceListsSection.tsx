@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useConfirm } from '../components/ConfirmProvider.js';
 import { Modal } from '../components/Modal.js';
 import { SectionToolbar } from '../components/SectionToolbar.js';
+import { useToast } from '../components/ToastProvider.js';
 import {
   createPriceList,
   deletePriceList,
@@ -152,6 +153,7 @@ function PriceListDetail({
 export function PriceListsSection() {
   const qc = useQueryClient();
   const confirm = useConfirm();
+  const toast = useToast();
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [detailOf, setDetailOf] = useState<PriceListSummary | null>(null);
@@ -168,11 +170,17 @@ export function PriceListsSection() {
       invalidate();
       setCreating(false);
       setNewName('');
+      toast('Tarifa creada', 'success');
     },
+    onError: () => toast('No se pudo crear la tarifa', 'error'),
   });
   const removeMut = useMutation({
     mutationFn: (id: string) => deletePriceList(id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      toast('Tarifa eliminada', 'success');
+    },
+    onError: () => toast('No se pudo eliminar la tarifa', 'error'),
   });
 
   return (

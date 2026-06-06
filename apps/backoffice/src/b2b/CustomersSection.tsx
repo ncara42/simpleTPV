@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useConfirm } from '../components/ConfirmProvider.js';
 import { Modal } from '../components/Modal.js';
 import { SectionToolbar } from '../components/SectionToolbar.js';
+import { useToast } from '../components/ToastProvider.js';
 import {
   createCustomer,
   type Customer,
@@ -66,6 +67,7 @@ function toInput(f: Form): CustomerInput {
 export function CustomersSection() {
   const qc = useQueryClient();
   const confirm = useConfirm();
+  const toast = useToast();
   const [form, setForm] = useState<Form | null>(null);
 
   const { data: customers = [], isLoading } = useQuery({
@@ -81,15 +83,21 @@ export function CustomersSection() {
 
   const saveMut = useMutation({
     mutationFn: (f: Form) => (f.id ? updateCustomer(f.id, toInput(f)) : createCustomer(toInput(f))),
-    onSuccess: () => {
+    onSuccess: (_data, f) => {
       invalidate();
       setForm(null);
+      toast(f.id ? 'Cliente actualizado' : 'Cliente creado', 'success');
     },
+    onError: () => toast('No se pudo guardar el cliente', 'error'),
   });
 
   const removeMut = useMutation({
     mutationFn: (id: string) => deleteCustomer(id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      toast('Cliente eliminado', 'success');
+    },
+    onError: () => toast('No se pudo eliminar el cliente', 'error'),
   });
 
   const tariffOptions = [

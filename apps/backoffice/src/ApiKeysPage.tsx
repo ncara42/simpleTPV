@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useConfirm } from './components/ConfirmProvider.js';
 import { Modal } from './components/Modal.js';
 import { SectionToolbar } from './components/SectionToolbar.js';
+import { useToast } from './components/ToastProvider.js';
 import { createApiKey, listApiKeys, revokeApiKey } from './lib/api-keys.js';
 import { usePageHeader } from './lib/pageHeader.js';
 
@@ -65,6 +66,7 @@ export function ApiKeysPage() {
   usePageHeader('API Keys', 'Acceso externo de solo lectura al stock');
   const qc = useQueryClient();
   const confirm = useConfirm();
+  const toast = useToast();
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateForm>(EMPTY_FORM);
   const [justCreated, setJustCreated] = useState<{ id: string; key: string } | null>(null);
@@ -90,7 +92,11 @@ export function ApiKeysPage() {
 
   const revokeMut = useMutation({
     mutationFn: (id: string) => revokeApiKey(id),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['api-keys'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['api-keys'] });
+      toast('API key revocada', 'success');
+    },
+    onError: () => toast('No se pudo revocar la API key', 'error'),
   });
 
   const active = keys.filter((k) => !k.revokedAt);

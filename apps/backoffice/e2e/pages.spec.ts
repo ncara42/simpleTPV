@@ -314,6 +314,8 @@ test('Confirmación: borrar cliente usa el diálogo del design system (IT-19)', 
   await expect(page.getByTestId('confirm-dialog')).toBeVisible();
   await page.getByTestId('confirm-accept').click();
   await expect(page.getByTestId('b2b-customers-table')).not.toContainText('Cliente a borrar');
+  // Feedback de la acción mediante toast (IT-19).
+  await expect(page.getByTestId('toast-stack')).toContainText('Cliente eliminado');
 });
 
 test('Modal: accesible (role dialog) y se cierra con Escape (IT-19)', async ({ page }) => {
