@@ -298,6 +298,17 @@ test('Mayorista: clientes, tarifas y pedidos en sub-pestañas (IT-17)', async ({
   await expect(page.getByTestId('b2b-order-row')).toHaveCount(2);
 });
 
+test('Modal: accesible (role dialog) y se cierra con Escape (IT-19)', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-b2b').click();
+  await page.getByTestId('b2b-new-customer').click();
+  const form = page.getByTestId('b2b-customer-form');
+  await expect(form).toHaveAttribute('role', 'dialog');
+  await expect(form).toHaveAttribute('aria-modal', 'true');
+  await page.keyboard.press('Escape');
+  await expect(form).toHaveCount(0);
+});
+
 test('API Keys: lista, alta y banner de un solo uso (IT-18)', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-apikeys').click();
