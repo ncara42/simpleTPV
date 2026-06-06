@@ -30,6 +30,18 @@ test('muestra las 7 KPI cards y el selector de periodo', async ({ page }) => {
   await expect(page.getByTestId('dash-period')).toBeVisible();
 });
 
+test('personalización: ocultar una KPI card la quita y persiste (IT-16)', async ({ page }) => {
+  await expect(page.getByTestId('kpi-upt')).toBeVisible();
+  await page.getByTestId('dash-customize').click();
+  await expect(page.getByTestId('dash-cards-editor')).toBeVisible();
+  await page.getByTestId('card-toggle-kpi-upt').click();
+  await expect(page.getByTestId('kpi-upt')).toBeHidden();
+  // Persiste tras recargar (demo → localStorage; en real → /me/preferences).
+  await page.reload();
+  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByTestId('kpi-upt')).toBeHidden();
+});
+
 test('los paneles de gráficas y roturas se renderizan', async ({ page }) => {
   await expect(page.getByTestId('dash-bars')).toBeVisible();
   await expect(page.getByTestId('dash-family')).toBeVisible();

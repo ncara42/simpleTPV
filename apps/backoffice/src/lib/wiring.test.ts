@@ -11,6 +11,7 @@ import * as admin from './admin.js';
 import { api } from './auth.js';
 import * as dashboard from './dashboard.js';
 import * as families from './families.js';
+import { getPreferences, setPreference } from './preferences.js';
 import * as products from './products.js';
 import * as purchases from './purchases.js';
 import * as stock from './stock.js';
@@ -190,6 +191,15 @@ describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
     expect(post).toHaveBeenCalledWith('/purchase-orders/po-1/receive', { lines: [] });
     await purchases.suggestPurchase({ storeId: 'st' } as never);
     expect(post).toHaveBeenCalledWith('/purchase-orders/suggest', { storeId: 'st' });
+  });
+
+  it('preferences: GET /me/preferences y PUT /me/preferences/:key', async () => {
+    await getPreferences();
+    expect(get).toHaveBeenCalledWith('/me/preferences');
+    await setPreference('dashboard.cards', { hidden: ['kpi-upt'] });
+    expect(put).toHaveBeenCalledWith('/me/preferences/dashboard.cards', {
+      value: { hidden: ['kpi-upt'] },
+    });
   });
 });
 

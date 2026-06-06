@@ -20,6 +20,13 @@ import {
 } from './lib/dashboard.js';
 import { deltaTone, fmtDelta, fmtEur, fmtEurCompact, fmtNum, fmtRate } from './lib/format.js';
 import { usePageHeader } from './lib/pageHeader.js';
+import { readPref, usePreferences } from './lib/preferences.js';
+
+// Personalización de las KPI cards (IT-16): orden + visibilidad por usuario.
+interface CardsPref {
+  order: string[];
+  hidden: string[];
+}
 
 const PERIODS: Array<{ id: DashboardPeriod; label: string }> = [
   { id: 'today', label: 'Hoy' },
@@ -101,6 +108,123 @@ export function DashboardPage() {
 
   usePageHeader('Resumen', 'Actualizado hace 2 min');
 
+  // KPI cards personalizables (IT-16): cada usuario elige cuáles ve y en qué orden.
+  const { prefs, setPref } = usePreferences();
+  const [cardsEditorOpen, setCardsEditorOpen] = useState(false);
+  const cardDefs: Array<{ id: string; label: string; node: React.ReactNode }> = [
+    {
+      id: 'kpi-today',
+      label: 'Facturación hoy',
+      node: (
+        <KpiCard
+          key="kpi-today"
+          label="Facturación hoy"
+          value={fmtEur(salesToday.data?.today.total)}
+          delta={salesToday.data?.deltaPct ?? null}
+          series={salesToday.data?.intraday}
+          sparkTone={deltaTone(salesToday.data?.deltaPct ?? null) === 'down' ? 'down' : 'up'}
+          testid="kpi-today"
+        />
+      ),
+    },
+    {
+      id: 'kpi-avg-ticket',
+      label: 'Ticket medio',
+      node: (
+        <KpiCard
+          key="kpi-avg-ticket"
+          label="Ticket medio"
+          value={fmtEur(salesKpis.data?.avgTicket)}
+          series={salesKpis.data?.series?.avgTicket}
+          testid="kpi-avg-ticket"
+        />
+      ),
+    },
+    {
+      id: 'kpi-upt',
+      label: 'UPT',
+      node: (
+        <KpiCard
+          key="kpi-upt"
+          label="UPT"
+          value={fmtNum(salesKpis.data?.upt)}
+          series={salesKpis.data?.series?.upt}
+          testid="kpi-upt"
+        />
+      ),
+    },
+    {
+      id: 'kpi-margin',
+      label: '% Margen',
+      node: (
+        <KpiCard
+          key="kpi-margin"
+          label="% Margen"
+          value={fmtRate(marginKpis.data?.marginPct)}
+          series={marginKpis.data?.series}
+          testid="kpi-margin"
+        />
+      ),
+    },
+    {
+      id: 'kpi-profit',
+      label: 'Beneficio',
+      node: (
+        <KpiCard
+          key="kpi-profit"
+          label="Beneficio"
+          value={fmtEur(marginKpis.data?.realMargin)}
+          series={marginKpis.data?.realMarginSeries}
+          testid="kpi-profit"
+        />
+      ),
+    },
+    {
+      id: 'kpi-discount',
+      label: 'Tasa descuento',
+      node: (
+        <KpiCard
+          key="kpi-discount"
+          label="Tasa descuento"
+          value={fmtRate(salesKpis.data?.discountRate)}
+          series={salesKpis.data?.series?.discountRate}
+          testid="kpi-discount"
+        />
+      ),
+    },
+    {
+      id: 'kpi-return',
+      label: 'Tasa devolución',
+      node: (
+        <KpiCard
+          key="kpi-return"
+          label="Tasa devolución"
+          value={fmtRate(salesKpis.data?.returnRate)}
+          series={salesKpis.data?.series?.returnRate}
+          testid="kpi-return"
+        />
+      ),
+    },
+  ];
+  const allCardIds = cardDefs.map((c) => c.id);
+  const cardsPref = readPref<CardsPref>(prefs, 'dashboard.cards', {
+    order: allCardIds,
+    hidden: [],
+  });
+  // Saneado: respeta el orden guardado, añade al final las cards nuevas y descarta ids
+  // desconocidos (robusto ante versiones viejas del pref).
+  const savedOrder = (Array.isArray(cardsPref.order) ? cardsPref.order : []).filter((id) =>
+    allCardIds.includes(id),
+  );
+  const cardOrder = [...savedOrder, ...allCardIds.filter((id) => !savedOrder.includes(id))];
+  const cardHidden = (Array.isArray(cardsPref.hidden) ? cardsPref.hidden : []).filter((id) =>
+    allCardIds.includes(id),
+  );
+  const visibleCards = cardOrder
+    .filter((id) => !cardHidden.includes(id))
+    .map((id) => cardDefs.find((c) => c.id === id))
+    .filter((c): c is (typeof cardDefs)[number] => Boolean(c));
+
   return (
     <section className="catalog" data-testid="dashboard">
       <header className="catalog-head is-actions-only">
@@ -127,52 +251,28 @@ export function DashboardPage() {
         </div>
       </header>
 
-      {/* KPI cards */}
+      {/* KPI cards personalizables (IT-16): el usuario elige cuáles y en qué orden. */}
+      <div className="dash-cards-head">
+        <button
+          type="button"
+          className="dash-customize"
+          onClick={() => setCardsEditorOpen((o) => !o)}
+          data-testid="dash-customize"
+          aria-expanded={cardsEditorOpen}
+        >
+          Personalizar tarjetas
+        </button>
+      </div>
+      {cardsEditorOpen && (
+        <CardsEditor
+          defs={cardDefs}
+          order={cardOrder}
+          hidden={cardHidden}
+          onChange={(next) => setPref('dashboard.cards', next)}
+        />
+      )}
       <div className="dash-cards" data-testid="dash-cards">
-        <KpiCard
-          label="Facturación hoy"
-          value={fmtEur(salesToday.data?.today.total)}
-          delta={salesToday.data?.deltaPct ?? null}
-          series={salesToday.data?.intraday}
-          sparkTone={deltaTone(salesToday.data?.deltaPct ?? null) === 'down' ? 'down' : 'up'}
-          testid="kpi-today"
-        />
-        <KpiCard
-          label="Ticket medio"
-          value={fmtEur(salesKpis.data?.avgTicket)}
-          series={salesKpis.data?.series?.avgTicket}
-          testid="kpi-avg-ticket"
-        />
-        <KpiCard
-          label="UPT"
-          value={fmtNum(salesKpis.data?.upt)}
-          series={salesKpis.data?.series?.upt}
-          testid="kpi-upt"
-        />
-        <KpiCard
-          label="% Margen"
-          value={fmtRate(marginKpis.data?.marginPct)}
-          series={marginKpis.data?.series}
-          testid="kpi-margin"
-        />
-        <KpiCard
-          label="Beneficio"
-          value={fmtEur(marginKpis.data?.realMargin)}
-          series={marginKpis.data?.realMarginSeries}
-          testid="kpi-profit"
-        />
-        <KpiCard
-          label="Tasa descuento"
-          value={fmtRate(salesKpis.data?.discountRate)}
-          series={salesKpis.data?.series?.discountRate}
-          testid="kpi-discount"
-        />
-        <KpiCard
-          label="Tasa devolución"
-          value={fmtRate(salesKpis.data?.returnRate)}
-          series={salesKpis.data?.series?.returnRate}
-          testid="kpi-return"
-        />
+        {visibleCards.map((c) => c.node)}
       </div>
 
       <div className="dash-grid">
@@ -417,6 +517,69 @@ export function DashboardPage() {
         </div>
       </div>
     </section>
+  );
+}
+
+// Editor de las KPI cards (IT-16): casilla de visibilidad + flechas de orden por card.
+function CardsEditor(props: {
+  defs: Array<{ id: string; label: string }>;
+  order: string[];
+  hidden: string[];
+  onChange: (next: { order: string[]; hidden: string[] }) => void;
+}) {
+  const labelOf = (id: string): string => props.defs.find((d) => d.id === id)?.label ?? id;
+  const move = (i: number, dir: -1 | 1): void => {
+    const j = i + dir;
+    if (j < 0 || j >= props.order.length) return;
+    const order = [...props.order];
+    const tmp = order[i]!;
+    order[i] = order[j]!;
+    order[j] = tmp;
+    props.onChange({ order, hidden: props.hidden });
+  };
+  const toggle = (id: string): void => {
+    const hidden = props.hidden.includes(id)
+      ? props.hidden.filter((h) => h !== id)
+      : [...props.hidden, id];
+    props.onChange({ order: props.order, hidden });
+  };
+  return (
+    <div className="dash-cards-editor" data-testid="dash-cards-editor">
+      <p className="dash-cards-editor-title">Tarjetas del panel</p>
+      <ul>
+        {props.order.map((id, i) => (
+          <li key={id}>
+            <label>
+              <input
+                type="checkbox"
+                checked={!props.hidden.includes(id)}
+                onChange={() => toggle(id)}
+                data-testid={`card-toggle-${id}`}
+              />
+              {labelOf(id)}
+            </label>
+            <span className="dash-cards-editor-move">
+              <button
+                type="button"
+                onClick={() => move(i, -1)}
+                disabled={i === 0}
+                aria-label={`Subir ${labelOf(id)}`}
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                onClick={() => move(i, 1)}
+                disabled={i === props.order.length - 1}
+                aria-label={`Bajar ${labelOf(id)}`}
+              >
+                ↓
+              </button>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
