@@ -118,6 +118,8 @@ export interface ArchetypeRotation {
   familyName: string;
   productCount: number;
   units: number;
+  // Media diaria sobre días con tienda abierta (IT-14), no naturales.
+  ventaMediaDiaria: number;
   daysSinceLastSale: number | null;
   trend: number[];
 }

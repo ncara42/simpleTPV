@@ -665,6 +665,7 @@ export class DashboardService {
       familyName: string;
       productCount: number;
       units: number;
+      ventaMediaDiaria: number;
       daysSinceLastSale: number | null;
       trend: number[];
     }>
@@ -675,6 +676,7 @@ export class DashboardService {
     const now = this.now();
     const LIMIT = 8;
     const NONE = '∅'; // clave para el grupo sin familia (familyId NULL)
+    const dayMsConst = 24 * 60 * 60 * 1000;
 
     return withTenantTx(this.base, organizationId, async (tx) => {
       const summary = await tx.$queryRaw<
@@ -726,17 +728,39 @@ export class DashboardService {
         trendByFamily.set(key, arr);
       }
 
-      const dayMs = 24 * 60 * 60 * 1000;
-      return summary.map((r) => ({
-        familyId: r.familyId,
-        familyName: r.familyName ?? 'Sin arquetipo',
-        productCount: num(r.productCount),
-        units: num(r.units),
-        daysSinceLastSale: r.lastSale
-          ? Math.floor((now.getTime() - new Date(r.lastSale).getTime()) / dayMs)
-          : null,
-        trend: trendByFamily.get(r.familyId ?? NONE) ?? [],
-      }));
+      // Contexto — días disponibles (IT-14): la venta media diaria se divide por los
+      // días con la TIENDA ABIERTA (caja abierta) en el periodo, no por los naturales,
+      // para que los días cerrados (festivos, descanso) no diluyan la media ni generen
+      // falsas señales. Si no hay datos de caja, se usan los días naturales del periodo.
+      // (El "días sin stock" por producto requiere histórico de niveles y queda fuera.)
+      const sessionDays = await tx.$queryRaw<Array<{ day: Date }>>`
+        SELECT DISTINCT DATE("openedAt") AS day
+        FROM "CashSession"
+        WHERE "organizationId" = ${organizationId}::uuid
+          AND "openedAt" >= ${range.from}
+          AND "openedAt" < ${range.to}
+          ${storeId ? this.eqStore('"storeId"', storeId) : EMPTY}
+      `;
+      const periodDays = Math.max(
+        1,
+        Math.round((range.to.getTime() - range.from.getTime()) / dayMsConst),
+      );
+      const diasDisponibles = sessionDays.length > 0 ? sessionDays.length : periodDays;
+
+      return summary.map((r) => {
+        const units = num(r.units);
+        return {
+          familyId: r.familyId,
+          familyName: r.familyName ?? 'Sin arquetipo',
+          productCount: num(r.productCount),
+          units,
+          ventaMediaDiaria: Math.round((units / diasDisponibles) * 1000) / 1000,
+          daysSinceLastSale: r.lastSale
+            ? Math.floor((now.getTime() - new Date(r.lastSale).getTime()) / dayMsConst)
+            : null,
+          trend: trendByFamily.get(r.familyId ?? NONE) ?? [],
+        };
+      });
     });
   }
 

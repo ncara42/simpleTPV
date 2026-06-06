@@ -362,7 +362,7 @@ export function DashboardPage() {
           <p className="dash-panel-sub">
             {PERIOD_SUBTITLE[period]} ·{' '}
             {rotationLevel === 'archetype'
-              ? 'por arquetipo (familia) · unidades y evolución'
+              ? 'por arquetipo (familia) · media/día sobre días con tienda abierta'
               : 'por producto · unidades, días sin venta y evolución'}
           </p>
           <ul className="dash-rotation-list">
@@ -370,7 +370,7 @@ export function DashboardPage() {
               ? (archetypeRotation.data ?? []).map((a) => ({
                   key: a.familyId ?? 'none',
                   label: a.familyName,
-                  sub: `${a.productCount} productos`,
+                  sub: `${a.productCount} productos · ${fmtNum(a.ventaMediaDiaria, 1)} ud/día`,
                   units: a.units,
                   days: a.daysSinceLastSale,
                   trend: a.trend,

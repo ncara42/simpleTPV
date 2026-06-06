@@ -350,6 +350,37 @@ describe('Dashboard — integración', () => {
     expect(fam!.trend.reduce((s, n) => s + n, 0)).toBe(4);
   });
 
+  it('archetype-rotation: la media diaria usa días con tienda abierta, no naturales (IT-14)', async () => {
+    // Ventana de 5 días pero la tienda solo abre caja 2 días → la media usa 2, no 5.
+    const d1 = new Date('2199-05-01T10:00:00.000Z');
+    const d3 = new Date('2199-05-03T10:00:00.000Z');
+    for (const d of [d1, d3]) {
+      await seedSale(org1Id, storeOwnId, d, [
+        { productId: prodAId, unitPrice: 100, qty: 10, lineTotal: 1000 },
+      ]);
+      await admin.$executeRaw`
+        INSERT INTO "CashSession" ("id","organizationId","storeId","userId","openingAmount","status","openedAt")
+        VALUES (gen_random_uuid(), ${org1Id}::uuid, ${storeOwnId}::uuid, ${user1Id}::uuid, 0, 'CLOSED', ${d})
+      `;
+    }
+    try {
+      const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.archetypeRotation({
+          period: 'custom',
+          from: '2199-05-01',
+          to: '2199-05-05',
+          storeId: storeOwnId,
+        }),
+      );
+      const fam = rows.find((r) => r.familyId === familyId);
+      expect(fam!.units).toBe(20);
+      // 20 ud / 2 días con caja abierta = 10 (no 20/5 = 4 con días naturales).
+      expect(fam!.ventaMediaDiaria).toBeCloseTo(10, 3);
+    } finally {
+      await admin.$executeRaw`DELETE FROM "CashSession" WHERE "storeId" = ${storeOwnId}::uuid AND "openedAt" >= '2199-01-01'`;
+    }
+  });
+
   it('sales-kpis: ticket medio, UPT, tasa de descuento y de devolución', async () => {
     const kpis = await tenantStorage.run({ organizationId: org1Id }, async () =>
       service.salesKpis(periodQuery()),
