@@ -298,6 +298,24 @@ test('Mayorista: clientes, tarifas y pedidos en sub-pestañas (IT-17)', async ({
   await expect(page.getByTestId('b2b-order-row')).toHaveCount(2);
 });
 
+test('Confirmación: borrar cliente usa el diálogo del design system (IT-19)', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-b2b').click();
+  await page.getByTestId('b2b-new-customer').click();
+  await page.getByTestId('b2b-customer-name').fill('Cliente a borrar');
+  await page.getByTestId('b2b-customer-save').click();
+  await expect(page.getByTestId('b2b-customers-table')).toContainText('Cliente a borrar');
+  // Borrar abre el ConfirmDialog (no el window.confirm nativo).
+  await page
+    .getByTestId('b2b-customer-row')
+    .filter({ hasText: 'Cliente a borrar' })
+    .getByRole('button', { name: 'Borrar' })
+    .click();
+  await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  await page.getByTestId('confirm-accept').click();
+  await expect(page.getByTestId('b2b-customers-table')).not.toContainText('Cliente a borrar');
+});
+
 test('Modal: accesible (role dialog) y se cierra con Escape (IT-19)', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-b2b').click();

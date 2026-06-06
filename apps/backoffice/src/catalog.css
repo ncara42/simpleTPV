@@ -2147,3 +2147,31 @@
   cursor: pointer;
   padding: 0.4rem 0;
 }
+
+/* ── Limpieza UX (IT-19) ────────────────────────────────────────────────────
+   Botón de acción destructiva (confirmar borrado/revocación) y modal de
+   confirmación estrecho. */
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--ui-danger);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-danger);
+  color: #fff;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s var(--ui-ease);
+}
+.btn-danger:hover {
+  opacity: 0.9;
+}
+.btn-danger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.modal--confirm {
+  max-width: 26rem;
+}

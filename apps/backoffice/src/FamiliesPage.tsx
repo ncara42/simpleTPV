@@ -2,6 +2,7 @@ import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
+import { useConfirm } from './components/ConfirmProvider.js';
 import { Modal } from './components/Modal.js';
 import {
   createFamily,
@@ -65,7 +66,7 @@ interface RowActions {
   onMoveTo: (childId: string, toParentId: string) => void;
   onEdit: (n: FamilyNode) => void;
   onAddChild: (parentId: string) => void;
-  onDelete: (n: FamilyNode) => void;
+  onDelete: (n: FamilyNode) => void | Promise<void>;
 }
 
 function FamilyRow({
@@ -147,7 +148,7 @@ function FamilyRow({
             )}
             {depth === 0 && <button onClick={() => actions.onAddChild(node.id)}>+ Hija</button>}
             <button onClick={() => actions.onEdit(node)}>Editar</button>
-            <button className="danger" onClick={() => actions.onDelete(node)}>
+            <button className="danger" onClick={() => void actions.onDelete(node)}>
               Borrar
             </button>
           </span>
@@ -162,6 +163,7 @@ function FamilyRow({
 
 export function FamiliesPage() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [form, setForm] = useState<FormState | null>(null);
   // Toolbar de la tabla: búsqueda por nombre + filtro por familia raíz.
   const [search, setSearch] = useState('');
@@ -284,13 +286,16 @@ export function FamiliesPage() {
   const onMoveTo = (childId: string, toParentId: string): void =>
     setTree((prev) => moveToParent(prev ?? view, childId, toParentId));
 
-  const onDelete = (node: FamilyNode): void => {
+  const onDelete = async (node: FamilyNode): Promise<void> => {
     const n = countDescendants(node);
-    if (
-      n > 0 &&
-      !window.confirm(`"${node.name}" tiene ${n} subfamilia(s). ¿Borrar todo el grupo?`)
-    ) {
-      return;
+    if (n > 0) {
+      const ok = await confirm({
+        title: 'Borrar familia',
+        message: `"${node.name}" tiene ${n} subfamilia(s). ¿Borrar todo el grupo?`,
+        confirmLabel: 'Borrar',
+        danger: true,
+      });
+      if (!ok) return;
     }
     delMut.mutate(node.id);
     setTree((prev) => removeNode(prev ?? view, node.id));

@@ -2,6 +2,7 @@ import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { useConfirm } from '../components/ConfirmProvider.js';
 import { Modal } from '../components/Modal.js';
 import { SectionToolbar } from '../components/SectionToolbar.js';
 import {
@@ -150,6 +151,7 @@ function PriceListDetail({
 
 export function PriceListsSection() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [detailOf, setDetailOf] = useState<PriceListSummary | null>(null);
@@ -216,13 +218,14 @@ export function PriceListsSection() {
                   <button
                     type="button"
                     className="link-btn"
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          `¿Eliminar la tarifa "${p.name}"? Los clientes que la usen quedarán sin tarifa.`,
-                        )
-                      )
-                        removeMut.mutate(p.id);
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: 'Eliminar tarifa',
+                        message: `¿Eliminar la tarifa "${p.name}"? Los clientes que la usen quedarán sin tarifa.`,
+                        confirmLabel: 'Eliminar',
+                        danger: true,
+                      });
+                      if (ok) removeMut.mutate(p.id);
                     }}
                   >
                     Borrar

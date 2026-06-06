@@ -2,6 +2,7 @@ import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { useConfirm } from '../components/ConfirmProvider.js';
 import { Modal } from '../components/Modal.js';
 import { SectionToolbar } from '../components/SectionToolbar.js';
 import {
@@ -64,6 +65,7 @@ function toInput(f: Form): CustomerInput {
 
 export function CustomersSection() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [form, setForm] = useState<Form | null>(null);
 
   const { data: customers = [], isLoading } = useQuery({
@@ -140,9 +142,14 @@ export function CustomersSection() {
                   <button
                     type="button"
                     className="link-btn"
-                    onClick={() => {
-                      if (window.confirm(`¿Eliminar el cliente "${c.name}"?`))
-                        removeMut.mutate(c.id);
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: 'Eliminar cliente',
+                        message: `¿Eliminar el cliente "${c.name}"? Esta acción no se puede deshacer.`,
+                        confirmLabel: 'Eliminar',
+                        danger: true,
+                      });
+                      if (ok) removeMut.mutate(c.id);
                     }}
                   >
                     Borrar

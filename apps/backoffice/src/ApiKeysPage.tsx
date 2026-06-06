@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useState } from 'react';
 
+import { useConfirm } from './components/ConfirmProvider.js';
 import { Modal } from './components/Modal.js';
 import { SectionToolbar } from './components/SectionToolbar.js';
 import { createApiKey, listApiKeys, revokeApiKey } from './lib/api-keys.js';
@@ -63,6 +64,7 @@ const EMPTY_FORM: CreateForm = { name: '', priceListId: '' };
 export function ApiKeysPage() {
   usePageHeader('API Keys', 'Acceso externo de solo lectura al stock');
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateForm>(EMPTY_FORM);
   const [justCreated, setJustCreated] = useState<{ id: string; key: string } | null>(null);
@@ -161,9 +163,14 @@ export function ApiKeysPage() {
                     <button
                       type="button"
                       className="link-btn"
-                      onClick={() => {
-                        if (window.confirm(`¿Revocar la API key "${k.name}"? Es irreversible.`))
-                          revokeMut.mutate(k.id);
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: 'Revocar API key',
+                          message: `¿Revocar la API key "${k.name}"? El acceso externo dejará de funcionar de inmediato. Es irreversible.`,
+                          confirmLabel: 'Revocar',
+                          danger: true,
+                        });
+                        if (ok) revokeMut.mutate(k.id);
                       }}
                     >
                       Revocar
