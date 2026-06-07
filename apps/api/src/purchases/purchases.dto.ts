@@ -8,8 +8,10 @@ import {
   IsPositive,
   IsString,
   IsUUID,
+  Matches,
   Max,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 
@@ -62,6 +64,17 @@ export class ReceivePurchaseOrderLineDto {
   @Min(0)
   @Max(MAX_QUANTITY)
   quantityReceived!: number;
+
+  // Lote y caducidad de lo recibido (#126). Obligatorio el lote para productos con
+  // tracksBatch (validado en el servicio); ignorado para el resto. expiryDate opcional.
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  lotCode?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'expiryDate debe tener formato YYYY-MM-DD' })
+  expiryDate?: string;
 }
 
 export class ReceivePurchaseOrderDto {
