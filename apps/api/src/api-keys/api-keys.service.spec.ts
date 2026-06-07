@@ -77,20 +77,22 @@ describe('ApiKeysService.generate', () => {
     expect(createCall.data['hashedKey']).toBe(expectedHash);
   });
 
-  it('el prefix guardado en BD coincide con los primeros 8 chars del segmento aleatorio', async () => {
+  it('el prefix guardado en BD coincide con el prefix de la key devuelta', async () => {
     const prisma = makePrisma();
     const svc = makeService(prisma);
 
     const result = await run(() => svc.generate({ name: 'test-key' }));
 
-    // key: stpv_<prefix8>_<rand> → split por _ → ['stpv', prefix, rand]
-    const parts = result.key.split('_');
-    const prefixFromKey = parts[1];
     const createCall = prisma.apiKey.create.mock.calls[0]![0] as {
       data: Record<string, unknown>;
     };
-    expect(createCall.data['prefix']).toBe(prefixFromKey);
-    expect(result.prefix).toBe(prefixFromKey);
+    // OJO: el prefix son los 8 primeros chars del segmento aleatorio base64url,
+    // que PUEDE contener '_' y '-'. Por eso NO se puede partir la key por '_'
+    // (haría flaky el test). Verificamos que el prefix persistido coincide con
+    // el devuelto, mide 8 y que la key lo embebe en la posición esperada.
+    expect(result.prefix).toHaveLength(8);
+    expect(createCall.data['prefix']).toBe(result.prefix);
+    expect(result.key.startsWith(`stpv_${result.prefix}_`)).toBe(true);
   });
 
   it('incluye priceListId si se proporciona en el DTO', async () => {
