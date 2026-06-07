@@ -9,6 +9,7 @@ import {
   IsNumber,
   IsOptional,
   IsPositive,
+  IsString,
   IsUUID,
   Matches,
   Max,
@@ -49,6 +50,21 @@ export class CreateSaleDto {
   @IsUUID()
   storeId!: string;
 
+  // Idempotencia de ventas offline (offline slice 2): UUID generado por el TPV al
+  // encolar la venta. Al sincronizar, si ya existe una venta con este clientId se
+  // devuelve la existente en vez de duplicarla. Las ventas online lo omiten.
+  @IsOptional()
+  @IsUUID()
+  clientId?: string;
+
+  // Nº de ticket pre-asignado de un bloque reservado (solo ventas offline que se
+  // sincronizan). Si se omite, el servidor lo asigna incrementando el contador
+  // de la tienda. El índice único (organizationId, ticketNumber) evita colisiones.
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{1,40}$/)
+  ticketNumber?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(200)
@@ -80,6 +96,18 @@ export class CreateSaleDto {
   @Min(0)
   @Max(MAX_AMOUNT)
   ticketDiscountAmt?: number;
+}
+
+// Reserva de un bloque de números de ticket para un dispositivo (offline slice 2).
+export class ReserveTicketBlockDto {
+  @IsUUID()
+  storeId!: string;
+
+  // Tamaño del bloque a reservar (acotado para no disparar el contador).
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  size!: number;
 }
 
 // Query del listado de ventas (#14). Todos los campos son opcionales: sin

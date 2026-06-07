@@ -11,6 +11,7 @@ import { Banknote, ClipboardCheck, Clock, ReceiptText, ShoppingBag, Truck } from
 import { useEffect, useState } from 'react';
 
 import { CashPanel } from './CashPanel.js';
+import { ConnectivityBanner } from './ConnectivityBanner.js';
 import { DEMO_CART_LINES, DEMO_USER } from './demo/demoData.js';
 import { InventoryPanel } from './InventoryPanel.js';
 import { isDemo } from './lib/api-config.js';
@@ -20,6 +21,7 @@ import { formatDuration } from './lib/format.js';
 import { switchApp } from './lib/nav.js';
 import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
 import { listStores } from './lib/sales.js';
+import { useOfflineSync } from './lib/useOfflineSync.js';
 import { useTimeClock } from './lib/useTimeClock.js';
 import { SalePage } from './SalePage.js';
 import { StoreOrderReceivePanel } from './StoreOrderReceivePanel.js';
@@ -58,6 +60,11 @@ function Home() {
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
   const activeStore = stores[0]?.id ?? null;
 
+  // Venta offline (offline slice 2c): reserva bloque de tickets con conexión,
+  // sincroniza la cola al reconectar y expone el nº de ventas pendientes. En demo
+  // no hay backend, así que se desactiva (storeId null → no-op).
+  const queuedCount = useOfflineSync(isDemo() ? null : activeStore);
+
   // El item "Fichaje" del sidebar muestra el temporizador del turno en vivo
   // mientras hay jornada activa; si no, solo su icono y etiqueta.
   const { status, liveWorkedMs } = useTimeClock(activeStore);
@@ -93,6 +100,7 @@ function Home() {
         onLogout={logout}
       />
       <div className="app-content">
+        <ConnectivityBanner queuedCount={queuedCount} />
         <PageHeaderProvider>
           <ShellTopBar />
           <main className="app-main">

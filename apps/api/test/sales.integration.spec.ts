@@ -19,6 +19,7 @@ import { MemoryCache } from '../src/cache/memory-cache.js';
 import { InMemoryEventBus } from '../src/events/in-memory-event-bus.js';
 import { applyTenantExtension, PrismaService } from '../src/prisma/prisma.service.js';
 import { tenantStorage } from '../src/prisma/tenant-context.js';
+import { formatTicket } from '../src/sales/sales.domain.js';
 import { SalesService } from '../src/sales/sales.service.js';
 import { SalesExportService } from '../src/sales/sales-export.service.js';
 import { StockService } from '../src/stock/stock.service.js';
@@ -162,6 +163,65 @@ describe('Ventas — integración', () => {
     expect(sale.paymentMethod).toBe('CASH');
     expect(Number(sale.cashGiven)).toBe(1000);
     expect(Number(sale.cashChange)).toBeCloseTo(1000 - Number(sale.total), 2);
+  });
+
+  it('idempotencia offline (S2): dos create con el mismo clientId crean UNA sola venta', async () => {
+    const clientId = '44444444-4444-4444-4444-444444444444';
+    const run = () =>
+      tenantStorage.run({ organizationId: org1Id }, () =>
+        service.create(
+          {
+            storeId: store1Id,
+            clientId,
+            lines: [{ productId: product1Id, qty: 1 }],
+            paymentMethod: 'CASH',
+            cashGiven: 1000,
+          },
+          user1Id,
+          'ADMIN',
+        ),
+      );
+
+    const first = await run();
+    const second = await run();
+
+    // El segundo create devuelve la MISMA venta (no recrea).
+    expect(second.id).toBe(first.id);
+    expect(second.ticketNumber).toBe(first.ticketNumber);
+
+    // En BD solo existe una venta con ese clientId.
+    const rows = await admin.$queryRaw<Array<{ n: number }>>`
+      SELECT count(*)::int AS n FROM "Sale" WHERE "clientId" = ${clientId}::uuid
+    `;
+    expect(Number(rows[0]!.n)).toBe(1);
+  });
+
+  it('bloques de ticket offline (S2): reserva un bloque y la venta sincronizada usa su nº sin re-incrementar el contador', async () => {
+    const before = await readCounter(store1Id);
+    const block = await tenantStorage.run({ organizationId: org1Id }, () =>
+      service.reserveTicketBlock(store1Id, 5, user1Id, 'ADMIN'),
+    );
+    expect(block.to - block.from + 1).toBe(5);
+    const afterReserve = await readCounter(store1Id);
+    expect(afterReserve).toBe(before + 5); // la reserva saltó el contador +5
+
+    const ticketNumber = formatTicket(block.code, block.from);
+    const sale = await tenantStorage.run({ organizationId: org1Id }, () =>
+      service.create(
+        {
+          storeId: store1Id,
+          clientId: '55555555-5555-5555-5555-555555555555',
+          ticketNumber,
+          lines: [{ productId: product1Id, qty: 1 }],
+          paymentMethod: 'CARD',
+        },
+        user1Id,
+        'ADMIN',
+      ),
+    );
+    expect(sale.ticketNumber).toBe(ticketNumber);
+    // La venta offline usa el nº del bloque y NO re-incrementa el contador.
+    expect(await readCounter(store1Id)).toBe(afterReserve);
   });
 
   it('IT-03: congela costPrice y discountSource en la línea de venta', async () => {

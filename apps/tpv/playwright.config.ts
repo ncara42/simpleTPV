@@ -17,6 +17,8 @@ export default defineConfig({
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
-    env: { VITE_DEMO_MODE: 'true' },
+    // PWA desactivada en e2e: el service worker (precache/registro) no debe
+    // interferir con los tests deterministas; el offline se prueba aparte.
+    env: { VITE_DEMO_MODE: 'true', VITE_PWA_DISABLED: 'true' },
   },
 });
