@@ -68,7 +68,7 @@ export function OrdersSection() {
                 <td className="muted">{new Date(o.createdAt).toLocaleDateString('es-ES')}</td>
                 <td>{o.lines.length}</td>
                 <td>
-                  <span className="stock-tag" data-testid="order-status">
+                  <span className="status-badge" data-testid="order-status">
                     {STATUS_LABEL[o.status]}
                   </span>
                 </td>

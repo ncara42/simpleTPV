@@ -59,7 +59,7 @@ export function TransfersSection() {
                   <td className="muted">{dt.format(new Date(t.createdAt))}</td>
                   <td>{t.lines.length}</td>
                   <td>
-                    <span className="stock-tag" data-testid="transfer-status">
+                    <span className="status-badge" data-testid="transfer-status">
                       {STATUS_LABEL[t.status] ?? t.status}
                     </span>
                   </td>
