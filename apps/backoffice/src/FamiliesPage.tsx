@@ -11,7 +11,16 @@ import {
   listFamilies,
   updateFamily,
 } from './lib/families.js';
-import { countDescendants, moveToParent, removeNode } from './lib/family-tree.js';
+import {
+  countDescendants,
+  type DropPosition,
+  flattenTree,
+  insertChild,
+  isDescendantOf,
+  moveToParent,
+  removeNode,
+  reorderSiblings,
+} from './lib/family-tree.js';
 import { usePageHeader } from './lib/pageHeader.js';
 
 interface FormState {
@@ -20,8 +29,6 @@ interface FormState {
   parentId: string | null;
 }
 
-type DropPosition = 'before' | 'after';
-
 // Normaliza para buscar sin distinguir mayúsculas ni acentos.
 const norm = (s: string): string =>
   s
@@ -29,28 +36,6 @@ const norm = (s: string): string =>
     .toLowerCase()
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '');
-
-function reorderSiblings(
-  tree: FamilyNode[],
-  parentId: string | null,
-  fromId: string,
-  toId: string,
-  position: DropPosition,
-): FamilyNode[] {
-  const move = (list: FamilyNode[]): FamilyNode[] => {
-    const from = list.findIndex((n) => n.id === fromId);
-    const to = list.findIndex((n) => n.id === toId);
-    if (from < 0 || to < 0 || from === to) return list;
-    const next = [...list];
-    const [moved] = next.splice(from, 1);
-    const targetIndex = next.findIndex((n) => n.id === toId);
-    const insertAt = position === 'after' ? targetIndex + 1 : targetIndex;
-    next.splice(insertAt, 0, moved!);
-    return next;
-  };
-  if (parentId === null) return move(tree);
-  return tree.map((n) => (n.id === parentId ? { ...n, children: move(n.children) } : n));
-}
 
 interface RowActions {
   roots: FamilyNode[];
@@ -83,6 +68,11 @@ function FamilyRow({
   const dragging = actions.dragId === node.id;
   const drop = actions.dropTarget?.id === node.id ? actions.dropTarget.position : null;
   const selected = actions.selectedId === node.id;
+  // Destinos válidos para "Mover": cualquier arquetipo salvo el propio subárbol y
+  // el padre actual. La sangría del label indica la profundidad del destino.
+  const moveOptions = flattenTree(actions.roots)
+    .filter((f) => !isDescendantOf(actions.roots, node.id, f.node.id) && f.node.id !== parentId)
+    .map((f) => ({ value: f.node.id, label: `${'– '.repeat(f.depth)}${f.node.name}` }));
   return (
     <>
       <div
@@ -132,21 +122,22 @@ function FamilyRow({
         </span>
         {selected && (
           <span className="fam-actions" onClick={(e) => e.stopPropagation()}>
-            {depth > 0 && parentId && (
+            {moveOptions.length > 0 && (
               <Select
                 className="fam-move-select"
-                value={parentId}
-                onChange={(value) => actions.onMoveTo(node.id, value)}
+                value=""
+                onChange={(value) => {
+                  if (value) actions.onMoveTo(node.id, value);
+                }}
                 triggerLabel="Mover"
-                options={actions.roots.map((r) => ({
-                  value: r.id,
-                  label: r.id === parentId ? r.name : `Mover a: ${r.name}`,
-                }))}
-                ariaLabel="Mover a otra familia"
+                options={[{ value: '', label: 'Mover bajo…' }, ...moveOptions]}
+                ariaLabel="Mover bajo otro arquetipo"
                 data-testid="fam-move-to"
               />
             )}
-            {depth === 0 && <button onClick={() => actions.onAddChild(node.id)}>+ Hija</button>}
+            <button onClick={() => actions.onAddChild(node.id)} data-testid="fam-add-child">
+              + Hija
+            </button>
             <button onClick={() => actions.onEdit(node)}>Editar</button>
             <button className="danger" onClick={() => void actions.onDelete(node)}>
               Borrar
@@ -237,23 +228,15 @@ export function FamiliesPage() {
       setTree((prev) => {
         const base = prev ?? view;
         if (f.id) {
-          // Renombrar en el árbol (raíz o hija).
-          return base.map((n) =>
-            n.id === f.id
-              ? { ...n, name: f.name }
-              : {
-                  ...n,
-                  children: n.children.map((c) => (c.id === f.id ? { ...c, name: f.name } : c)),
-                },
-          );
+          // Renombrar en el árbol a cualquier profundidad.
+          const rename = (list: FamilyNode[]): FamilyNode[] =>
+            list.map((n) =>
+              n.id === f.id ? { ...n, name: f.name } : { ...n, children: rename(n.children) },
+            );
+          return rename(base);
         }
         const node: FamilyNode = { ...saved, children: [] };
-        if (f.parentId) {
-          return base.map((n) =>
-            n.id === f.parentId ? { ...n, children: [...n.children, node] } : n,
-          );
-        }
-        return [...base, node];
+        return f.parentId ? insertChild(base, f.parentId, node) : [...base, node];
       });
       setForm(null);
       invalidate();

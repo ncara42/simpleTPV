@@ -214,6 +214,19 @@ test('Familias muestra las 5 raíz con subfamilias anidadas (#97)', async ({ pag
   await expect(page.getByTestId('fam-count').first()).toContainText('productos');
 });
 
+test('Familias: crear un subnivel anidado (profundidad arbitraria, UX)', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-families').click();
+  // Selecciona una subfamilia (Índica, hija de Flores) para revelar sus acciones.
+  const indica = page.getByTestId('fam-row').filter({ hasText: 'Índica' }).first();
+  await indica.click();
+  // El botón "+ Hija" ahora está disponible también en subfamilias (antes solo raíz).
+  await indica.getByTestId('fam-add-child').click();
+  await page.getByTestId('family-name').fill('Subnivel E2E');
+  await page.getByTestId('family-save').click();
+  await expect(page.getByTestId('fam-tree')).toContainText('Subnivel E2E');
+});
+
 test('Familias: reordenar familias raíz (#98)', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-families').click();
