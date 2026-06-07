@@ -2419,3 +2419,8 @@
   flex-direction: column;
   gap: var(--ui-space-2);
 }
+
+/* ── Vista unificada Dashboard + Ventas (IT-19) ─────────────────────────────── */
+.overview-sales {
+  margin-top: var(--ui-space-6);
+}

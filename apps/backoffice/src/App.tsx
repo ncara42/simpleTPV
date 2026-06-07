@@ -31,7 +31,6 @@ import { useEffect, useState } from 'react';
 import { ApiKeysPage } from './ApiKeysPage.js';
 import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
-import { DashboardPage } from './DashboardPage.js';
 import { DEMO_USER } from './demo/demoData.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { HelpPage } from './HelpPage.js';
@@ -40,9 +39,9 @@ import { switchApp } from './lib/nav.js';
 import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
 import { listAlerts } from './lib/stock.js';
 import { NotificationsPage } from './NotificationsPage.js';
+import { OverviewPage } from './OverviewPage.js';
 import { PromotionsPage } from './PromotionsPage.js';
 import { PurchasesPage } from './PurchasesPage.js';
-import { SalesHistoryPage } from './SalesHistoryPage.js';
 import { StockPage } from './StockPage.js';
 import { StoresPage } from './StoresPage.js';
 import { TimeClockPage } from './TimeClockPage.js';
@@ -188,7 +187,12 @@ function Home() {
             onNotifications={() => setTab('notifications')}
           />
           <main className="bo-main">
-            {tab === 'dashboard' && <DashboardPage />}
+            {(tab === 'dashboard' || tab === 'sales') && (
+              <OverviewPage
+                scrollTo={tab === 'sales' ? 'sales' : null}
+                initialStoreId={navStoreId}
+              />
+            )}
             {tab === 'notifications' && <NotificationsPage />}
             {tab === 'catalog' && <CatalogPage />}
             {tab === 'families' && <FamiliesPage />}
@@ -198,7 +202,6 @@ function Home() {
             {tab === 'users' && <UsersPage />}
             {tab === 'timeclock' && <TimeClockPage />}
             {tab === 'stores' && <StoresPage onOpenStoreView={openStoreView} />}
-            {tab === 'sales' && <SalesHistoryPage initialStoreId={navStoreId} />}
             {tab === 'purchases' && <PurchasesPage />}
             {tab === 'verifactu' && <VerifactuPage />}
             {tab === 'b2b' && <B2bPage />}
