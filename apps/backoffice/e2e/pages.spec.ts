@@ -298,6 +298,19 @@ test('Mayorista: clientes, tarifas y pedidos en sub-pestañas (IT-17)', async ({
   await expect(page.getByTestId('b2b-order-row')).toHaveCount(2);
 });
 
+test('Traspasos: modal de nuevo traspaso con el patrón estándar (UX)', async ({ page }) => {
+  await login(page);
+  await page.getByTestId('nav-transfers').click();
+  await page.getByTestId('new-transfer').click();
+  const form = page.getByTestId('transfer-form');
+  await expect(form).toBeVisible();
+  await expect(form).toHaveAttribute('role', 'dialog');
+  // Selects del patrón estándar + cantidad.
+  await expect(page.getByTestId('transfer-origin')).toBeVisible();
+  await expect(page.getByTestId('transfer-product')).toBeVisible();
+  await expect(page.getByTestId('transfer-qty')).toBeVisible();
+});
+
 test('Ayuda: canales de contacto y FAQ (IT-20)', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-help').click();
