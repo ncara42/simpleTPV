@@ -263,13 +263,14 @@ test('Control horario: filtro por empleado reduce las jornadas', async ({ page }
   await expect(page.getByTestId('timeclock-row')).toHaveCount(5);
 });
 
-test('Promociones: lista por estado y constructor de reglas (#99)', async ({ page }) => {
+test('Promociones: filtro por 3 grupos y constructor de reglas (#99)', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-promotions').click();
-  // 4 promociones demo (activa, programada, expirada, pausada).
+  // Por defecto se ven todas las promociones (4): los 3 chips arrancan activos.
   await expect(page.getByTestId('promo-card')).toHaveCount(4);
-  // Filtro "Activas" (desplegable de estado) → solo la promo vigente.
-  await selectOption(page, 'promo-filters', 'activa');
+  // Desactivar "Programadas" e "Inactivas" deja solo la promo activa.
+  await page.getByTestId('promo-group-programada').click();
+  await page.getByTestId('promo-group-inactiva').click();
   await expect(page.getByTestId('promo-card')).toHaveCount(1);
   // Constructor con previsualización del impacto.
   await page.getByTestId('new-promo').click();

@@ -2424,3 +2424,29 @@
 .overview-sales {
   margin-top: var(--ui-space-6);
 }
+
+/* ── Promociones: chips de filtro por grupo (UX) ────────────────────────────── */
+.promo-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+}
+.promo-chip {
+  padding: var(--ui-space-1) var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.12s var(--ui-ease),
+    color 0.12s var(--ui-ease),
+    border-color 0.12s var(--ui-ease);
+}
+.promo-chip.is-on {
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg);
+  border-color: var(--ui-primary);
+}

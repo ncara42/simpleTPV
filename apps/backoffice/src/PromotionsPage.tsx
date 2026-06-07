@@ -18,13 +18,18 @@ const STATUS_LABEL: Record<PromoStatus, string> = {
   expirada: 'Expirada',
   pausada: 'Pausada',
 };
-const STATUS_FILTERS: { id: 'all' | PromoStatus; label: string }[] = [
-  { id: 'all', label: 'Todas' },
+// Tres grupos de filtrado (informe §5): activas, programadas e inactivas
+// (expiradas + pausadas). Se muestran todos por defecto y cada chip los alterna.
+type PromoGroup = 'activa' | 'programada' | 'inactiva';
+const PROMO_GROUPS: { id: PromoGroup; label: string }[] = [
   { id: 'activa', label: 'Activas' },
   { id: 'programada', label: 'Programadas' },
-  { id: 'expirada', label: 'Expiradas' },
-  { id: 'pausada', label: 'Pausadas' },
+  { id: 'inactiva', label: 'Inactivas' },
 ];
+function promoGroup(p: DemoPromotion): PromoGroup {
+  const s = promoStatus(p);
+  return s === 'activa' || s === 'programada' ? s : 'inactiva';
+}
 function conditionText(p: { conditionType: PromoConditionType; threshold: number }): string {
   return p.conditionType === 'min_qty'
     ? `Si el ticket lleva ${p.threshold} o más productos`
@@ -80,14 +85,21 @@ const EMPTY: PromoForm = {
 
 export function PromotionsPage() {
   const [promos, setPromos] = useState<DemoPromotion[]>(DEMO_PROMOTIONS);
-  const [filter, setFilter] = useState<'all' | PromoStatus>('all');
+  // Grupos visibles: los tres activos por defecto (se ven todas las promociones).
+  const [groups, setGroups] = useState<Set<PromoGroup>>(
+    () => new Set<PromoGroup>(['activa', 'programada', 'inactiva']),
+  );
+  const toggleGroup = (g: PromoGroup): void =>
+    setGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(g)) next.delete(g);
+      else next.add(g);
+      return next;
+    });
   const [form, setForm] = useState<PromoForm | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
 
-  const visible = useMemo(
-    () => promos.filter((p) => filter === 'all' || promoStatus(p) === filter),
-    [promos, filter],
-  );
+  const visible = useMemo(() => promos.filter((p) => groups.has(promoGroup(p))), [promos, groups]);
 
   // ── Selección múltiple + acciones en lote (mismo patrón que Usuarios) ──
   const selectedSet = useMemo(() => new Set(selected), [selected]);
@@ -138,14 +150,20 @@ export function PromotionsPage() {
       <div className="table-panel">
         <div className="users-toolbar">
           <div className="sales-filters">
-            <Select
-              className="promo-filter-select"
-              value={filter}
-              onChange={(value) => setFilter(value as 'all' | PromoStatus)}
-              ariaLabel="Filtrar por estado"
-              data-testid="promo-filters"
-              options={STATUS_FILTERS.map((f) => ({ value: f.id, label: f.label }))}
-            />
+            <div className="promo-chips" role="group" aria-label="Filtrar por estado">
+              {PROMO_GROUPS.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  className={`promo-chip${groups.has(g.id) ? ' is-on' : ''}`}
+                  aria-pressed={groups.has(g.id)}
+                  onClick={() => toggleGroup(g.id)}
+                  data-testid={`promo-group-${g.id}`}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
             {selected.length > 0 && (
               <>
                 {!allVisibleSelected && (
