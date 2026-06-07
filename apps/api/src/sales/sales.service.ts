@@ -68,6 +68,20 @@ export class SalesService {
   async create(dto: CreateSaleDto, userId: string, role: SaleRole) {
     const tenant = requireTenant();
 
+    // Idempotencia de ventas offline (offline slice 2): si esta venta ya se
+    // sincronizó antes con este clientId, devuelve la existente sin recrearla ni
+    // mover stock de nuevo. El índice único (organizationId, clientId) es el
+    // backstop ante reenvíos concurrentes.
+    if (dto.clientId) {
+      const existing = await this.prisma.sale.findFirst({
+        where: { clientId: dto.clientId, organizationId: tenant.organizationId },
+        include: { lines: true },
+      });
+      if (existing) {
+        return existing;
+      }
+    }
+
     // Aislamiento por tienda (SEC-01): un CLERK solo puede vender en las tiendas
     // a las que está asignado (UserStore). RLS aísla por org, no por tienda.
     await assertStoreAccess(this.prisma, { userId, role, storeId: dto.storeId });
@@ -146,6 +160,7 @@ export class SalesService {
           storeId: dto.storeId,
           userId,
           ticketNumber,
+          clientId: dto.clientId ?? null,
           subtotal,
           discountTotal,
           total,

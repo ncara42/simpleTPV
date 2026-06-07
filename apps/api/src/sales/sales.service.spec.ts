@@ -362,6 +362,34 @@ function makeService(prisma: ReturnType<typeof makePrisma>, base?: unknown, veri
   );
 }
 
+describe('SalesService.create — idempotencia offline (S2)', () => {
+  it('si ya existe una venta con el mismo clientId, la devuelve sin recrearla', async () => {
+    const prisma = makePrisma();
+    const existing = { id: 'sale-existing', ticketNumber: 'CENTRO-000007', lines: [] };
+    prisma.sale.findFirst = vi.fn(async () => existing);
+    const base = { $transaction: vi.fn() };
+    const service = makeService(prisma, base);
+
+    const dto = {
+      storeId: '22222222-2222-2222-2222-222222222222',
+      clientId: '33333333-3333-3333-3333-333333333333',
+      paymentMethod: 'CASH',
+      lines: [{ productId: 'p1', qty: 1 }],
+    };
+    const result = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.create(dto as never, 'user-1', 'ADMIN'),
+    );
+
+    expect(result).toBe(existing);
+    // No entra en la transacción de creación: no recrea la venta ni mueve stock.
+    expect(base.$transaction).not.toHaveBeenCalled();
+    const where = (prisma.sale.findFirst.mock.calls[0]![0] as { where: Record<string, unknown> })
+      .where;
+    expect(where.clientId).toBe('33333333-3333-3333-3333-333333333333');
+    expect(where.organizationId).toBe(ORG);
+  });
+});
+
 describe('SalesService.voidSale', () => {
   it('lanza 404 si la venta no existe', async () => {
     const prisma = makePrisma();

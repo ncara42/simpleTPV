@@ -49,6 +49,13 @@ export class CreateSaleDto {
   @IsUUID()
   storeId!: string;
 
+  // Idempotencia de ventas offline (offline slice 2): UUID generado por el TPV al
+  // encolar la venta. Al sincronizar, si ya existe una venta con este clientId se
+  // devuelve la existente en vez de duplicarla. Las ventas online lo omiten.
+  @IsOptional()
+  @IsUUID()
+  clientId?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(200)

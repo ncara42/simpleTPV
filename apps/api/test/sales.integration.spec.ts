@@ -164,6 +164,37 @@ describe('Ventas — integración', () => {
     expect(Number(sale.cashChange)).toBeCloseTo(1000 - Number(sale.total), 2);
   });
 
+  it('idempotencia offline (S2): dos create con el mismo clientId crean UNA sola venta', async () => {
+    const clientId = '44444444-4444-4444-4444-444444444444';
+    const run = () =>
+      tenantStorage.run({ organizationId: org1Id }, () =>
+        service.create(
+          {
+            storeId: store1Id,
+            clientId,
+            lines: [{ productId: product1Id, qty: 1 }],
+            paymentMethod: 'CASH',
+            cashGiven: 1000,
+          },
+          user1Id,
+          'ADMIN',
+        ),
+      );
+
+    const first = await run();
+    const second = await run();
+
+    // El segundo create devuelve la MISMA venta (no recrea).
+    expect(second.id).toBe(first.id);
+    expect(second.ticketNumber).toBe(first.ticketNumber);
+
+    // En BD solo existe una venta con ese clientId.
+    const rows = await admin.$queryRaw<Array<{ n: number }>>`
+      SELECT count(*)::int AS n FROM "Sale" WHERE "clientId" = ${clientId}::uuid
+    `;
+    expect(Number(rows[0]!.n)).toBe(1);
+  });
+
   it('IT-03: congela costPrice y discountSource en la línea de venta', async () => {
     const [prod] = await admin.$queryRaw<Array<{ costPrice: string }>>`
       SELECT "costPrice"::text AS "costPrice" FROM "Product" WHERE id = ${product1Id}::uuid

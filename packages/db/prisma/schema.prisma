@@ -235,6 +235,11 @@ model Sale {
   status         SaleStatus    @default(COMPLETED)
   voidedAt       DateTime?
   voidedBy       String?       @db.Uuid
+  // Idempotencia de ventas offline (offline slice 2): UUID generado por el
+  // cliente al encolar la venta. Al sincronizar, si ya existe una venta con este
+  // clientId en la org se devuelve la existente en vez de duplicarla. NULL en las
+  // ventas online normales (Postgres permite múltiples NULL en el índice único).
+  clientId       String?       @db.Uuid
   createdAt      DateTime      @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id])
@@ -244,6 +249,7 @@ model Sale {
   returns      Return[]
 
   @@unique([organizationId, ticketNumber])
+  @@unique([organizationId, clientId])
   @@index([organizationId, storeId, createdAt])
 }
 
