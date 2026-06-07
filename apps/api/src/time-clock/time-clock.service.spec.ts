@@ -39,8 +39,21 @@ function histEntry(type: string, hhmm: string, opts: { userId?: string; userName
   };
 }
 
+// Cliente base mock para withTenantTx: su $transaction ejecuta el callback con un
+// `tx` que reutiliza los mismos mocks que `prisma` (timeClockEntry/officialDevice),
+// de modo que las aserciones sobre prisma.timeClockEntry.create siguen valiendo.
+// $executeRaw cubre el set_config de withTenantTx y el advisory lock (S-12).
+function makeBase(prisma: ReturnType<typeof makePrisma>) {
+  const tx = {
+    $executeRaw: vi.fn(async () => 0),
+    timeClockEntry: prisma.timeClockEntry,
+    officialDevice: prisma.officialDevice,
+  };
+  return { $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)) };
+}
+
 function makeService(prisma: ReturnType<typeof makePrisma>) {
-  return new TimeClockService(prisma as never);
+  return new TimeClockService(prisma as never, makeBase(prisma) as never);
 }
 
 // Hace que el "último fichaje" (que determina el estado actual) sea de un tipo dado.

@@ -41,6 +41,10 @@ const throttle = throttleConfig(process.env);
   imports: [
     // Rate limiting global por IP (#72). Límite holgado para el TPV; corta abuso y
     // fuerza bruta. El login lo restringe más con @Throttle a nivel de ruta.
+    // S-09 (diferido): el almacenamiento del throttler es EN MEMORIA por proceso.
+    // Correcto con réplica única (despliegue actual en Dokploy). Al escalar a
+    // varias réplicas hay que respaldarlo en Redis (nestjs-throttler-storage-redis)
+    // o un atacante rota entre réplicas y multiplica el límite efectivo.
     ThrottlerModule.forRoot([{ ttl: throttle.ttl, limit: throttle.limit }]),
     PrismaModule,
     CacheModule,

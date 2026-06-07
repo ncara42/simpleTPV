@@ -317,6 +317,15 @@ export class SalesService {
     // estado y la reposición de stock de las líneas deben aplicarse juntas o no
     // aplicarse — si la reposición fallara, la anulación no debe quedar a medias.
     return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
+      // Bloqueo pesimista sobre la venta (S-10). `createReturn` también toma
+      // FOR UPDATE sobre esta fila; sin él, anulación y devolución concurrentes
+      // corren en transacciones distintas y, en READ COMMITTED, voidSale puede
+      // leer return.count()=0 antes de que el commit de la devolución sea visible
+      // → repondría el stock por segunda vez y dejaría un Return colgando de una
+      // venta anulada. Con el lock, la segunda transacción espera al commit de la
+      // primera y entonces ve el Return (→ 400) o el estado ya VOIDED.
+      await tx.$executeRaw`SELECT id FROM "Sale" WHERE id = ${id}::uuid FOR UPDATE`;
+
       const sale = await tx.sale.findFirst({
         where: { id, organizationId: tenant.organizationId },
         include: { lines: true },

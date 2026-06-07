@@ -542,6 +542,59 @@ describe('StockService.adjust', () => {
   });
 });
 
+describe('StockService.confirmInventoryCount', () => {
+  it('aplica todas las líneas en UNA sola transacción con el delta por par (S-11)', async () => {
+    const movementCreate = vi.fn(async (_a?: unknown) => ({ id: 'mov' }));
+    const tx = {
+      $executeRaw: vi.fn(async () => 1),
+      // Actual 10 en cada par (del lock FOR UPDATE).
+      $queryRaw: vi.fn(async () => [{ quantity: '10' }]),
+      stock: {
+        upsert: vi.fn(async () => ({ quantity: 0, minStock: 0 })),
+        findFirstOrThrow: vi.fn(async () => ({ quantity: 0, minStock: 0 })),
+      },
+      stockMovement: { create: movementCreate },
+      stockAlert: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async () => ({ id: 'a' })),
+        update: vi.fn(async () => ({})),
+      },
+    };
+    const base = { $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)) };
+    const service = new StockService(
+      {} as never,
+      new MemoryCache(),
+      base as never,
+      new InMemoryEventBus(),
+    );
+
+    const res = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.confirmInventoryCount(
+        {
+          storeId: 's1',
+          reason: 'recuento mensual',
+          lines: [
+            { productId: 'p1', countedQuantity: 12 },
+            { productId: 'p2', countedQuantity: 8 },
+          ],
+        },
+        'user-1',
+      ),
+    );
+
+    // S-11: una ÚNICA transacción para todo el recuento (antes, una por línea).
+    expect(base.$transaction).toHaveBeenCalledTimes(1);
+    // Un movimiento ADJUSTMENT por línea con el delta correcto (counted - 10).
+    expect(movementCreate).toHaveBeenCalledTimes(2);
+    const deltas = movementCreate.mock.calls.map(
+      (c) => (c[0] as { data: { quantity: number } }).data.quantity,
+    );
+    expect(deltas).toEqual([2, -2]);
+    expect(res.storeId).toBe('s1');
+    expect(res.adjusted).toHaveLength(2);
+  });
+});
+
 describe('StockService.movements', () => {
   it('aplica filtros (producto, tienda, fechas) y pagina, aislado por tenant', async () => {
     const prisma = {

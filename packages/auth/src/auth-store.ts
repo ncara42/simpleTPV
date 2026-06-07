@@ -44,6 +44,13 @@ function decodeRole(token: string | null): UserRole | null {
 
 // Store de sesión persistido en localStorage. La clave incluye el nombre de la
 // app para que TPV y backoffice no compartan sesión en el mismo navegador.
+//
+// S-08 (accept-risk): solo se persiste el accessToken (JWT de vida corta); el
+// refresh token vive en cookie httpOnly fuera de JS (SEC-20). Un access en
+// localStorage es accesible a XSS, pero se acepta el riesgo porque (1) es de
+// vida corta y (2) la CSP estricta de los SPAs (`script-src 'self'`) bloquea la
+// inyección de scripts externos. Para cerrarlo del todo: mover a sessionStorage
+// vía `storage: createJSONStorage(() => sessionStorage)`.
 export function createAuthStore(storageKey: string) {
   return create<AuthState>()(
     persist(

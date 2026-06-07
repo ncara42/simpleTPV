@@ -199,6 +199,9 @@ export class ReturnsService {
   // (SEC-19): el PIN es de 4-8 dígitos y un acierto vale para CUALQUIER autorizador
   // del tenant, así que bajo el throttle global sería forzable en horas. Se acota
   // por usuario iniciador + tenant; tras N fallos se bloquea unos minutos.
+  // S-09 (diferido): el Map es por proceso. Correcto con réplica única (Dokploy
+  // hoy). Al escalar a varias réplicas, mover el contador a Redis (INCR+EXPIRE)
+  // o dos réplicas permiten 2×N intentos antes del lockout.
   private readonly pinAttempts = new Map<string, { count: number; lockedUntil: number }>();
   private static readonly PIN_MAX_ATTEMPTS = 5;
   private static readonly PIN_LOCKOUT_MS = 5 * 60_000;

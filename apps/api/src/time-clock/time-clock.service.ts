@@ -1,9 +1,11 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { TimeClockType } from '@simpletpv/db';
 
 import { assertStoreAccess } from '../auth/store-access.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
+import { withTenantTx } from '../prisma/with-tenant-tx.js';
 import {
   computeWorked,
   deriveStatus,
@@ -17,7 +19,11 @@ import {
 
 @Injectable()
 export class TimeClockService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Base: para withTenantTx (lectura+validación+inserción atómicas con lock).
+    @Inject(PRISMA_BASE) private readonly base: PrismaService,
+  ) {}
 
   async current(storeId: string, userId: string) {
     const tenant = requireTenant();
@@ -36,36 +42,47 @@ export class TimeClockService {
     // Aislamiento por tienda (SEC-01): un CLERK solo ficha en sus tiendas.
     await assertStoreAccess(this.prisma, { userId, role, storeId: input.storeId });
 
-    // Validación de secuencia: el estado actual lo determina el último fichaje;
-    // nextStateOrThrow lanza 409 si la transición es inválida (p.ej. doble entrada).
-    const last = await this.prisma.timeClockEntry.findFirst({
-      where: { organizationId: tenant.organizationId, storeId: input.storeId, userId },
-      orderBy: { createdAt: 'desc' },
-    });
-    nextStateOrThrow(statusFromLastType(last?.type), input.type);
+    // S-12: la lectura del último fichaje, la validación de secuencia y la
+    // inserción deben ser atómicas y serializadas por (usuario, tienda). Sin
+    // esto, dos peticiones concurrentes leen el mismo "último fichaje", ambas
+    // pasan nextStateOrThrow y crean entradas duplicadas (TimeClockEntry no tiene
+    // restricción UNIQUE que lo impida), corrompiendo la máquina de estados y las
+    // horas trabajadas. El advisory lock por (userId, storeId) hace que la
+    // segunda transacción espere al commit de la primera y reevalúe la secuencia.
+    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userId} || ':' || ${input.storeId}, 0))`;
 
-    if (!input.deviceId) {
-      throw new ForbiddenException('Este TPV no está autorizado como dispositivo oficial');
-    }
-    const device = await this.prisma.officialDevice.findFirst({
-      where: {
-        id: input.deviceId,
-        storeId: input.storeId,
-        organizationId: tenant.organizationId,
-        authorized: true,
-      },
-    });
-    if (!device) {
-      throw new NotFoundException('Dispositivo oficial no autorizado para esta tienda');
-    }
-    return this.prisma.timeClockEntry.create({
-      data: {
-        organizationId: tenant.organizationId,
-        storeId: input.storeId,
-        userId,
-        deviceId: input.deviceId,
-        type: input.type,
-      },
+      // Validación de secuencia: el estado actual lo determina el último fichaje;
+      // nextStateOrThrow lanza 409 si la transición es inválida (p.ej. doble entrada).
+      const last = await tx.timeClockEntry.findFirst({
+        where: { organizationId: tenant.organizationId, storeId: input.storeId, userId },
+        orderBy: { createdAt: 'desc' },
+      });
+      nextStateOrThrow(statusFromLastType(last?.type), input.type);
+
+      if (!input.deviceId) {
+        throw new ForbiddenException('Este TPV no está autorizado como dispositivo oficial');
+      }
+      const device = await tx.officialDevice.findFirst({
+        where: {
+          id: input.deviceId,
+          storeId: input.storeId,
+          organizationId: tenant.organizationId,
+          authorized: true,
+        },
+      });
+      if (!device) {
+        throw new NotFoundException('Dispositivo oficial no autorizado para esta tienda');
+      }
+      return tx.timeClockEntry.create({
+        data: {
+          organizationId: tenant.organizationId,
+          storeId: input.storeId,
+          userId,
+          deviceId: input.deviceId,
+          type: input.type,
+        },
+      });
     });
   }
 

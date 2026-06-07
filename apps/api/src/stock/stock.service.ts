@@ -454,6 +454,53 @@ export class StockService {
    * consistente bajo concurrencia, y applyMovement reevalúa las alertas dentro
    * de la misma tx. RLS + organizationId explícito.
    */
+  // Ajuste de stock de un par producto+tienda DENTRO de una tx ya abierta. Toma
+  // lock pesimista de la fila de Stock (FOR UPDATE) para serializar ajustes
+  // concurrentes del par y aplica el movimiento en la MISMA tx. Lo comparten
+  // `adjust` (un par) y `confirmInventoryCount` (recuento completo en una sola tx).
+  private async adjustInTx(
+    tx: TxClient,
+    organizationId: string,
+    input: {
+      productId: string;
+      storeId: string;
+      newQuantity: number;
+      reason: string;
+      userId: string;
+    },
+    afterCommit: AfterCommit,
+  ) {
+    const { productId, storeId, newQuantity, reason, userId } = input;
+    // FOR UPDATE: dos ajustes simultáneos leerían el mismo "actual" y el segundo
+    // pisaría al primero. Con el lock el segundo espera y lee el valor ya ajustado.
+    // Si no existe la fila, no bloquea ninguna (current 0).
+    const rows = await tx.$queryRaw<Array<{ quantity: string }>>`
+      SELECT quantity::text FROM "Stock"
+      WHERE "productId" = ${productId}::uuid AND "storeId" = ${storeId}::uuid
+      FOR UPDATE
+    `;
+    const current = rows.length > 0 ? Number(rows[0]!.quantity) : 0;
+    const delta = newQuantity - current;
+
+    const resulting = await this.applyMovement(
+      tx,
+      { organizationId, productId, storeId, type: 'ADJUSTMENT', quantity: delta, reason, userId },
+      afterCommit,
+    );
+
+    const updated = await tx.stock.findFirstOrThrow({
+      where: { productId, storeId, organizationId },
+    });
+    const minStock = Number(updated.minStock);
+    return {
+      productId,
+      storeId,
+      quantity: resulting,
+      minStock,
+      level: stockLevel(resulting, minStock),
+    };
+  }
+
   async adjust(input: {
     productId: string;
     storeId: string;
@@ -461,47 +508,10 @@ export class StockService {
     reason: string;
     userId: string;
   }) {
-    const { productId, storeId, newQuantity, reason, userId } = input;
     const tenant = requireTenant();
-    return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
-      // Lock pesimista de la fila de Stock del par para serializar ajustes
-      // concurrentes: dos ajustes simultáneos leerían el mismo "actual" y el
-      // segundo pisaría al primero. Con FOR UPDATE el segundo espera y lee el
-      // valor ya ajustado. Si no existe la fila, no bloquea ninguna (current 0).
-      const rows = await tx.$queryRaw<Array<{ quantity: string }>>`
-        SELECT quantity::text FROM "Stock"
-        WHERE "productId" = ${productId}::uuid AND "storeId" = ${storeId}::uuid
-        FOR UPDATE
-      `;
-      const current = rows.length > 0 ? Number(rows[0]!.quantity) : 0;
-      const delta = newQuantity - current;
-
-      const resulting = await this.applyMovement(
-        tx,
-        {
-          organizationId: tenant.organizationId,
-          productId,
-          storeId,
-          type: 'ADJUSTMENT',
-          quantity: delta,
-          reason,
-          userId,
-        },
-        afterCommit,
-      );
-
-      const updated = await tx.stock.findFirstOrThrow({
-        where: { productId, storeId, organizationId: tenant.organizationId },
-      });
-      const minStock = Number(updated.minStock);
-      return {
-        productId,
-        storeId,
-        quantity: resulting,
-        minStock,
-        level: stockLevel(resulting, minStock),
-      };
-    });
+    return withTenantTx(this.base, tenant.organizationId, (tx, afterCommit) =>
+      this.adjustInTx(tx, tenant.organizationId, input, afterCommit),
+    );
   }
 
   async confirmInventoryCount(
@@ -512,19 +522,32 @@ export class StockService {
     },
     userId: string,
   ) {
-    const results = [];
-    for (const line of input.lines) {
-      results.push(
-        await this.adjust({
-          productId: line.productId,
-          storeId: input.storeId,
-          newQuantity: line.countedQuantity,
-          reason: input.reason,
-          userId,
-        }),
-      );
-    }
-    return { storeId: input.storeId, adjusted: results };
+    const tenant = requireTenant();
+    // S-11: TODO el recuento en UNA sola tx. Antes era una tx por línea (N
+    // transacciones independientes): un recuento concurrente sobre pares
+    // solapados podía interleaver lecturas y, si fallaba la línea k, dejaba las
+    // k-1 anteriores ya aplicadas. Con una única tx, los FOR UPDATE de cada par
+    // se mantienen hasta el commit → el recuento es atómico y serializado.
+    return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
+      const adjusted = [];
+      for (const line of input.lines) {
+        adjusted.push(
+          await this.adjustInTx(
+            tx,
+            tenant.organizationId,
+            {
+              productId: line.productId,
+              storeId: input.storeId,
+              newQuantity: line.countedQuantity,
+              reason: input.reason,
+              userId,
+            },
+            afterCommit,
+          ),
+        );
+      }
+      return { storeId: input.storeId, adjusted };
+    });
   }
 
   /**

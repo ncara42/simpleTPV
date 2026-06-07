@@ -79,7 +79,7 @@ describe('Control horario — integración', () => {
     base = new PrismaService();
     await base.onModuleInit();
     prisma = applyTenantExtension(base);
-    service = new TimeClockService(prisma as unknown as PrismaService);
+    service = new TimeClockService(prisma as unknown as PrismaService, base);
 
     const adminUrl = process.env.DATABASE_URL;
     if (!adminUrl) {
