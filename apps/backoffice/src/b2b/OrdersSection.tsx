@@ -1,5 +1,6 @@
 import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowUpRight } from 'lucide-react';
 import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
@@ -292,6 +293,9 @@ export function OrdersSection() {
         onAction={() => setCreating(true)}
         actionTestId="b2b-new-order"
       >
+        <span className="status-badge status-badge--success" data-testid="b2b-orders-direction">
+          <ArrowUpRight size={13} aria-hidden="true" /> Salientes · a clientes
+        </span>
         <Select
           className="catalog-search"
           value={statusFilter}

@@ -37,6 +37,7 @@
 .status-badge {
   display: inline-flex;
   align-items: center;
+  gap: var(--ui-space-1);
   padding: var(--ui-space-1) var(--ui-space-2);
   border-radius: var(--ui-radius-pill);
   font-size: var(--ui-text-xs);

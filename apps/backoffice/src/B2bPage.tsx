@@ -11,7 +11,7 @@ type Section = 'customers' | 'pricelists' | 'orders';
 // con sub-pestañas (mismo patrón que Compras).
 export function B2bPage() {
   const [section, setSection] = useState<Section>('customers');
-  usePageHeader('Mayorista', 'Clientes, tarifas y pedidos B2B');
+  usePageHeader('Mayorista', 'Clientes, tarifas y pedidos salientes (ventas a clientes B2B)');
   return (
     <section className="catalog" data-testid="b2b-page">
       <nav className="bo-tabs" data-testid="b2b-subtabs">
@@ -34,7 +34,7 @@ export function B2bPage() {
           onClick={() => setSection('orders')}
           data-testid="b2b-tab-orders"
         >
-          Pedidos
+          Pedidos salientes
         </button>
       </nav>
       {section === 'customers' && <CustomersSection />}
