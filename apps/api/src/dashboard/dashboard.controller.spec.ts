@@ -12,10 +12,14 @@ function makeController(): {
   const service = {
     salesToday: vi.fn().mockResolvedValue('salesToday'),
     salesByFamily: vi.fn().mockResolvedValue('salesByFamily'),
+    salesByHour: vi.fn().mockResolvedValue('salesByHour'),
+    discountByEmployee: vi.fn().mockResolvedValue('discountByEmployee'),
     salesKpis: vi.fn().mockResolvedValue('salesKpis'),
     marginKpis: vi.fn().mockResolvedValue('marginKpis'),
     stockoutKpis: vi.fn().mockResolvedValue('stockoutKpis'),
     productRankings: vi.fn().mockResolvedValue('productRankings'),
+    productRotation: vi.fn().mockResolvedValue('productRotation'),
+    archetypeRotation: vi.fn().mockResolvedValue('archetypeRotation'),
   };
   return {
     controller: new DashboardController(service as unknown as DashboardService),
@@ -53,5 +57,23 @@ describe('DashboardController', () => {
     const q = { period: 'today' as const, limit: 5 };
     await expect(controller.productRankings(q)).resolves.toBe('productRankings');
     expect(service.productRankings).toHaveBeenCalledWith(q);
+  });
+
+  it('sales-by-hour y discount-by-employee reenvían la query de periodo', async () => {
+    const { controller, service } = makeController();
+    const q = { period: 'week' as const };
+    await expect(controller.salesByHour(q)).resolves.toBe('salesByHour');
+    await expect(controller.discountByEmployee(q)).resolves.toBe('discountByEmployee');
+    expect(service.salesByHour).toHaveBeenCalledWith(q);
+    expect(service.discountByEmployee).toHaveBeenCalledWith(q);
+  });
+
+  it('product-rotation y archetype-rotation reenvían la query de periodo', async () => {
+    const { controller, service } = makeController();
+    const q = { period: 'month' as const, storeId: 's3' };
+    await expect(controller.productRotation(q)).resolves.toBe('productRotation');
+    await expect(controller.archetypeRotation(q)).resolves.toBe('archetypeRotation');
+    expect(service.productRotation).toHaveBeenCalledWith(q);
+    expect(service.archetypeRotation).toHaveBeenCalledWith(q);
   });
 });
