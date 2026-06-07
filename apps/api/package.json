@@ -25,7 +25,7 @@
     "@sentry/nestjs": "^10.55.0",
     "@simpletpv/db": "workspace:*",
     "bcryptjs": "^3.0.3",
-    "bullmq": "^5.77.6",
+    "bullmq": "^5.78.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "dotenv": "^16.6.1",
