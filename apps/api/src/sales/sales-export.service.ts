@@ -16,8 +16,14 @@ import { SalesService } from './sales.service.js';
 
 const QUEUE_NAME = 'sales-export';
 
+// Formato del export: 'sales' (historial de ventas, IT-05) o 'accounting' (libro
+// de IVA repercutido para gestoría, #125). Se persiste DENTRO de filters (Json)
+// para no requerir migración: parametriza el job junto con los filtros.
+export type ExportFormat = 'sales' | 'accounting';
+
 // Filtros del export (los mismos del listado, sin paginación). Se guardan en
 // SalesExport.filters y viajan en el job para regenerar el CSV en el worker.
+// `format` viaja aquí también (ver ExportFormat).
 interface ExportFilters {
   storeId?: string;
   date?: string;
@@ -27,6 +33,7 @@ interface ExportFilters {
   userId?: string;
   familyId?: string;
   status?: SaleStatus;
+  format?: ExportFormat;
 }
 
 interface JobData {
@@ -92,10 +99,11 @@ export class SalesExportService implements OnModuleInit, OnModuleDestroy {
     filters: ExportFilters,
     requesterId: string,
     role: SaleRole,
+    format: ExportFormat = 'sales',
   ): Promise<{ id: string; status: string }> {
     const tenant = requireTenant();
-    // Guarda SOLO los campos de filtro (no page/pageSize) para trazabilidad y para
-    // que el worker regenere exactamente el mismo conjunto.
+    // Guarda SOLO los campos de filtro (no page/pageSize) + el formato, para
+    // trazabilidad y para que el worker regenere exactamente el mismo conjunto.
     const stored: ExportFilters = {
       ...(filters.storeId ? { storeId: filters.storeId } : {}),
       ...(filters.date ? { date: filters.date } : {}),
@@ -105,6 +113,7 @@ export class SalesExportService implements OnModuleInit, OnModuleDestroy {
       ...(filters.userId ? { userId: filters.userId } : {}),
       ...(filters.familyId ? { familyId: filters.familyId } : {}),
       ...(filters.status ? { status: filters.status } : {}),
+      format,
     };
     const created = await this.prisma.salesExport.create({
       data: {
@@ -147,11 +156,14 @@ export class SalesExportService implements OnModuleInit, OnModuleDestroy {
         data: { status: 'PROCESSING' },
       });
       try {
-        const { csv, rowCount } = await this.sales.generateExportCsv(
-          job.filters,
-          job.requesterId,
-          job.role,
-        );
+        // Despacha según el formato: 'accounting' → libro de IVA (#125); por
+        // defecto el historial de ventas (IT-05). Separa `format` de los filtros
+        // de BD para no pasarlo a buildSalesFilter (solo lee claves de filtro).
+        const { format, ...filterQuery } = job.filters;
+        const { csv, rowCount } =
+          format === 'accounting'
+            ? await this.sales.generateAccountingCsv(filterQuery, job.requesterId, job.role)
+            : await this.sales.generateExportCsv(filterQuery, job.requesterId, job.role);
         await this.prisma.salesExport.updateMany({
           where: { id: job.exportId, organizationId: job.organizationId },
           data: { status: 'COMPLETED', csv, rowCount, completedAt: new Date() },
@@ -197,12 +209,16 @@ export class SalesExportService implements OnModuleInit, OnModuleDestroy {
     return row;
   }
 
-  /** Devuelve el CSV de un export COMPLETED (para la descarga). 409 si aún no lo está. */
-  async downloadCsv(id: string): Promise<{ csv: string }> {
+  /**
+   * Devuelve el CSV de un export COMPLETED + el nombre de fichero sugerido según
+   * el formato (libro-iva.csv para 'accounting', ventas.csv para el resto). 409 si
+   * aún no está listo.
+   */
+  async downloadCsv(id: string): Promise<{ csv: string; filename: string }> {
     const tenant = requireTenant();
     const row = await this.prisma.salesExport.findFirst({
       where: { id, organizationId: tenant.organizationId },
-      select: { status: true, csv: true },
+      select: { status: true, csv: true, filters: true },
     });
     if (!row) {
       throw new NotFoundException('Export no encontrado');
@@ -210,6 +226,12 @@ export class SalesExportService implements OnModuleInit, OnModuleDestroy {
     if (row.status !== 'COMPLETED' || row.csv == null) {
       throw new ConflictException(`El export no está listo (estado ${row.status})`);
     }
-    return { csv: row.csv };
+    // filters es Json (cualquier estructura): guarda defensiva antes de leer format.
+    const stored =
+      row.filters !== null && typeof row.filters === 'object' && !Array.isArray(row.filters)
+        ? (row.filters as Record<string, unknown>)
+        : {};
+    const filename = stored.format === 'accounting' ? 'libro-iva.csv' : 'ventas.csv';
+    return { csv: row.csv, filename };
   }
 }

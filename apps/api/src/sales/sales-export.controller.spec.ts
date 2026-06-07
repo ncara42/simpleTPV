@@ -17,8 +17,16 @@ function makeService() {
       createdAt: new Date(),
       completedAt: new Date(),
     })),
-    downloadCsv: vi.fn(async (_id: string) => ({ csv: 'col1,col2\nv1,v2' })),
+    downloadCsv: vi.fn(async (_id: string) => ({
+      csv: 'col1,col2\nv1,v2',
+      filename: 'ventas.csv',
+    })),
   };
+}
+
+// Respuesta simulada para @Res({ passthrough: true }): solo necesitamos setHeader.
+function makeRes() {
+  return { setHeader: vi.fn() };
 }
 
 // Simula el req.user que NestJS inyectaría desde el JWT verificado.
@@ -61,14 +69,34 @@ describe('SalesExportController', () => {
     expect((res as { status: string }).status).toBe('COMPLETED');
   });
 
-  it('download delega en exports.downloadCsv() y devuelve la cadena CSV', async () => {
+  it('download delega en downloadCsv(), fija las cabeceras y devuelve el CSV', async () => {
     const svc = makeService();
     const ctrl = new SalesExportController(svc as never);
+    const res = makeRes();
 
-    const csv = await ctrl.download('exp-77');
+    const csv = await ctrl.download('exp-77', res as never);
 
     expect(svc.downloadCsv).toHaveBeenCalledWith('exp-77');
     expect(csv).toBe('col1,col2\nv1,v2');
+    expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/csv; charset=utf-8');
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'Content-Disposition',
+      'attachment; filename="ventas.csv"',
+    );
+  });
+
+  it('download usa el filename del servicio (libro-iva.csv para export contable)', async () => {
+    const svc = makeService();
+    svc.downloadCsv = vi.fn(async (_id: string) => ({ csv: 'x', filename: 'libro-iva.csv' }));
+    const ctrl = new SalesExportController(svc as never);
+    const res = makeRes();
+
+    await ctrl.download('exp-acc', res as never);
+
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'Content-Disposition',
+      'attachment; filename="libro-iva.csv"',
+    );
   });
 
   it('download propaga la excepción del servicio (ej. 409)', async () => {
@@ -78,7 +106,19 @@ describe('SalesExportController', () => {
     });
     const ctrl = new SalesExportController(svc as never);
 
-    await expect(ctrl.download('exp-not-ready')).rejects.toThrow('Export no listo');
+    await expect(ctrl.download('exp-not-ready', makeRes() as never)).rejects.toThrow(
+      'Export no listo',
+    );
+  });
+
+  it('requestAccountingExport delega con format "accounting"', async () => {
+    const svc = makeService();
+    const ctrl = new SalesExportController(svc as never);
+    const body = { from: '2026-06-01', to: '2026-06-30' } as never;
+
+    await ctrl.requestAccountingExport(body, makeReq('user-7', 'MANAGER') as never);
+
+    expect(svc.requestExport).toHaveBeenCalledWith(body, 'user-7', 'MANAGER', 'accounting');
   });
 
   it('requestExport devuelve el id y status que devuelve el servicio', async () => {
