@@ -21,6 +21,7 @@ test-results/
 
 # Entorno
 .env
+.env.local
 .env.*.local
 !.env.example
 
