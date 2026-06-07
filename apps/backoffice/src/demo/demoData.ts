@@ -21,6 +21,7 @@ import type {
   SalesTodayResponse,
   StockoutKpis,
 } from '../lib/dashboard.js';
+import { findNodePath } from '../lib/family-tree.js';
 
 // ─── Identidad demo ──────────────────────────────────────────
 export const DEMO_USER = { name: 'Ana Caravaca', email: 'admin@org1.test' };
@@ -200,24 +201,12 @@ export const DEMO_FAMILIES: DemoFamily[] = [
   fam('fam-infusiones', 'Infusiones', '#0e7c6b', 5, 7),
 ];
 
-// Localiza familia y (opcional) subfamilia por id; útil para mostrar la ruta jerárquica.
-export function findFamily(id: string | null): {
-  family: DemoFamily | null;
-  sub: DemoFamily | null;
-} {
-  if (!id) return { family: null, sub: null };
-  for (const root of DEMO_FAMILIES) {
-    if (root.id === id) return { family: root, sub: null };
-    const sub = root.children.find((c) => c.id === id);
-    if (sub) return { family: root, sub };
-  }
-  return { family: null, sub: null };
-}
-// Etiqueta "Familia › Subfamilia" (o solo familia). "—" si no se encuentra.
+// Etiqueta de la ruta completa del arquetipo: "Flores › Índica › …" (cualquier
+// profundidad). "—" si no se encuentra.
 export function familyPathLabel(id: string | null): string {
-  const { family, sub } = findFamily(id);
-  if (!family) return '—';
-  return sub ? `${family.name} › ${sub.name}` : family.name;
+  if (!id) return '—';
+  const path = findNodePath(DEMO_FAMILIES, id);
+  return path.length ? path.map((n) => n.name).join(' › ') : '—';
 }
 
 // ─── Productos (12, con SKU/IVA del mockup de Catálogo) ──────
@@ -308,8 +297,9 @@ export const DEMO_STOCK_IN_TRANSIT = 14;
 // Familia raíz de un producto (para el filtro por familia del Stock).
 export function productRootFamily(productId: string): { id: string; name: string } | null {
   const p = DEMO_PRODUCTS.find((x) => x.id === productId);
-  const { family } = findFamily(p?.familyId ?? null);
-  return family ? { id: family.id, name: family.name } : null;
+  const path = findNodePath(DEMO_FAMILIES, p?.familyId ?? '');
+  const root = path[0];
+  return root ? { id: root.id, name: root.name } : null;
 }
 
 // ─── Promociones (constructor de reglas: condición + acción) (#99) ───

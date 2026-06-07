@@ -28,16 +28,16 @@ test('Catálogo muestra los 12 productos demo', async ({ page }) => {
   await expect(page.getByTestId('catalog-table')).toBeVisible();
 });
 
-test('Catálogo: ruta de familia y selector dependiente de subfamilia (#97)', async ({ page }) => {
+test('Catálogo: ruta de arquetipo y selector jerárquico único (#97)', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-catalog').click();
-  // La tabla muestra la ruta jerárquica Familia › Subfamilia.
+  // La tabla muestra la ruta jerárquica del arquetipo (Flores › Índica).
   await expect(page.getByTestId('catalog-family').first()).toContainText('›');
-  // El modal tiene selector dependiente familia → subfamilia.
+  // El modal tiene un único selector jerárquico de arquetipo: se elige un nodo
+  // de cualquier nivel directamente (ya no hay cascada familia → subfamilia).
   await page.getByTestId('new-product').click();
-  await selectOption(page, 'form-family', 'fam-flores');
-  await expect(page.getByTestId('form-subfamily')).toBeEnabled();
-  await selectOption(page, 'form-subfamily', 'fam-flores-indica');
+  await selectOption(page, 'form-family', 'fam-flores-indica');
+  await expect(page.getByTestId('form-subfamily')).toHaveCount(0);
 });
 
 test('Catálogo: selección múltiple y edición en lote', async ({ page }) => {
