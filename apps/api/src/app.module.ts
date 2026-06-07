@@ -34,6 +34,7 @@ import { TimeClockModule } from './time-clock/time-clock.module.js';
 import { TransfersModule } from './transfers/transfers.module.js';
 import { UsersModule } from './users/users.module.js';
 import { VerifactuModule } from './verifactu/verifactu.module.js';
+import { ZReportModule } from './z-report/z-report.module.js';
 
 const throttle = throttleConfig(process.env);
 
@@ -66,6 +67,7 @@ const throttle = throttleConfig(process.env);
     VerifactuModule,
     CashSessionsModule,
     DashboardModule,
+    ZReportModule,
     MeModule,
     DevicesModule,
     TimeClockModule,

@@ -60,3 +60,204 @@
 .app-shell .sidebar-account-logout {
   border-radius: 8px;
 }
+
+/* ─── Cierre Z (#124) ──────────────────────────────────── */
+.zreport-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4);
+}
+
+.zreport-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+
+.zreport-date {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  font-size: var(--ui-text-base);
+}
+
+.zreport-print-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  margin-left: auto;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.zreport-print-btn:hover:not(:disabled) {
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-ink);
+}
+
+.zreport-print-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.zreport-empty {
+  color: var(--ui-text-muted);
+  padding: var(--ui-space-5);
+}
+
+.zreport {
+  max-width: 760px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-sm);
+  padding: var(--ui-space-6);
+}
+
+.zreport-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 2px solid var(--ui-brand);
+  padding-bottom: var(--ui-space-3);
+  margin-bottom: var(--ui-space-4);
+}
+
+.zreport-eyebrow {
+  margin: 0 0 0.2rem;
+  font-size: var(--ui-text-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-text-muted);
+}
+
+.zreport-store-name {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.zreport-code {
+  color: var(--ui-text-muted);
+  font-weight: 400;
+}
+
+.zreport-date-label {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.zreport-meta {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--ui-space-3);
+  margin-bottom: var(--ui-space-5);
+}
+
+.zreport-meta-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.zreport-meta-label {
+  font-size: var(--ui-text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ui-text-muted);
+}
+
+.zreport-meta-value {
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.zreport-section {
+  margin-bottom: var(--ui-space-5);
+}
+
+.zreport-section h3 {
+  margin: 0 0 var(--ui-space-2);
+  font-size: var(--ui-text-base);
+}
+
+.zreport-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.zreport-table th,
+.zreport-table td {
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+
+.zreport-table thead th {
+  border-bottom: 1px solid var(--ui-border);
+  font-size: var(--ui-text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ui-text-muted);
+}
+
+.zreport-table tbody td {
+  border-bottom: 1px solid var(--ui-surface-subtle);
+}
+
+.zreport-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.zreport-muted {
+  color: var(--ui-text-muted);
+}
+
+.zreport-totals {
+  margin-left: auto;
+  width: 300px;
+}
+
+.zreport-total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.25rem 0.6rem;
+}
+
+.zreport-total-row.grand {
+  border-top: 2px solid var(--ui-border-strong);
+  margin-top: 0.3rem;
+  padding-top: 0.55rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.zreport-total-row .num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Impresión: aísla el documento Z del resto del shell (sidebar/topbar). */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .zreport,
+  .zreport * {
+    visibility: visible;
+  }
+
+  .zreport {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border: none;
+    box-shadow: none;
+    max-width: none;
+  }
+}
