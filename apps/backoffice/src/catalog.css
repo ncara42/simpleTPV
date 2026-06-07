@@ -1927,7 +1927,8 @@
    toda la zona de chrome quede diferenciada de las filas de datos en blanco. */
 .table-panel > .sales-filters,
 .table-panel > .users-toolbar,
-.table-panel > .table-toolbar {
+.table-panel > .table-toolbar,
+.table-panel > .stock-filters {
   margin: 0;
   /* Altura mínima homogénea: TODA cabecera mide lo mismo tenga los controles
      que tenga. En las tablas con filtros la altura la fija la pill/búsqueda
@@ -2321,4 +2322,88 @@
   color: var(--ui-text-muted);
   font-size: var(--ui-text-base);
   line-height: 1.5;
+}
+
+/* ── Stock: filtros agrupados (producto vs tienda) + lista por tienda (UX) ───── */
+.stock-filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--ui-space-5);
+}
+.stock-filter-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+}
+/* Separador sutil entre el grupo "Producto" y el grupo "Tienda". */
+.stock-filter-group + .stock-filter-group {
+  padding-left: var(--ui-space-5);
+  border-left: 1px solid var(--ui-border);
+}
+.stock-filter-label {
+  font-size: var(--ui-text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ui-text-soft);
+}
+
+/* Lista compacta de existencias por tienda: punto de nivel + nombre + cantidad.
+   Apilado vertical → escala a muchas tiendas sin desbordar la celda. */
+.stock-store-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+  min-width: 12rem;
+}
+.stock-store-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--ui-space-2);
+  width: 100%;
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.12s var(--ui-ease),
+    border-color 0.12s var(--ui-ease);
+}
+.stock-store-item:hover {
+  background: var(--ui-surface-subtle);
+  border-color: var(--ui-border);
+}
+.stock-store-item:focus-visible {
+  outline: none;
+  border-color: var(--ui-primary);
+  box-shadow: var(--ui-focus);
+}
+.stock-store-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-success);
+}
+.stock-store-dot.sb-yellow {
+  background: var(--ui-warning);
+}
+.stock-store-dot.sb-red {
+  background: var(--ui-danger);
+}
+.stock-store-item-name {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stock-store-item-qty {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ui-text);
 }

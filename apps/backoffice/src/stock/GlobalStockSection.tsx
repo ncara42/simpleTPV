@@ -74,51 +74,59 @@ export function GlobalStockSection() {
   return (
     <>
       <div className="table-panel">
-        <div className="sales-filters">
-          <span className="search-field">
-            <input
+        {/* Filtros separados por aquello que acotan: el PRODUCTO (qué se busca) y
+            la TIENDA (dónde se mira). Antes estaban mezclados en una sola barra. */}
+        <div className="stock-filters">
+          <div className="stock-filter-group">
+            <span className="stock-filter-label">Producto</span>
+            <span className="search-field">
+              <input
+                className="catalog-search"
+                placeholder="Buscar producto…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                data-testid="stock-search"
+              />
+            </span>
+            <Select
               className="catalog-search"
-              placeholder="Buscar producto…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              data-testid="stock-search"
+              value={familyId}
+              onChange={(value) => setFamilyId(value)}
+              ariaLabel="Filtrar por arquetipo"
+              data-testid="stock-family"
+              options={[
+                { value: '', label: 'Todos los arquetipos' },
+                ...DEMO_FAMILIES.map((f) => ({ value: f.id, label: f.name })),
+              ]}
             />
-          </span>
-          <Select
-            className="catalog-search"
-            value={familyId}
-            onChange={(value) => setFamilyId(value)}
-            ariaLabel="Filtrar por arquetipo"
-            data-testid="stock-family"
-            options={[
-              { value: '', label: 'Todos los arquetipos' },
-              ...DEMO_FAMILIES.map((f) => ({ value: f.id, label: f.name })),
-            ]}
-          />
-          <Select
-            className="catalog-search"
-            value={storeId}
-            onChange={(value) => setStoreId(value)}
-            ariaLabel="Filtrar por tienda"
-            data-testid="stock-store"
-            options={[
-              { value: '', label: 'Todas las tiendas' },
-              ...storeOptions.map((s) => ({ value: s.id, label: s.name })),
-            ]}
-          />
-          <Select
-            className="catalog-search"
-            value={rotation}
-            onChange={(value) => setRotation(value)}
-            ariaLabel="Filtrar por rotación"
-            data-testid="stock-rotation"
-            options={[
-              { value: '', label: 'Toda rotación' },
-              { value: 'alta', label: 'Rotación alta' },
-              { value: 'media', label: 'Rotación media' },
-              { value: 'baja', label: 'Rotación baja' },
-            ]}
-          />
+            <Select
+              className="catalog-search"
+              value={rotation}
+              onChange={(value) => setRotation(value)}
+              ariaLabel="Filtrar por rotación"
+              data-testid="stock-rotation"
+              options={[
+                { value: '', label: 'Toda rotación' },
+                { value: 'alta', label: 'Rotación alta' },
+                { value: 'media', label: 'Rotación media' },
+                { value: 'baja', label: 'Rotación baja' },
+              ]}
+            />
+          </div>
+          <div className="stock-filter-group">
+            <span className="stock-filter-label">Tienda</span>
+            <Select
+              className="catalog-search"
+              value={storeId}
+              onChange={(value) => setStoreId(value)}
+              ariaLabel="Filtrar por tienda"
+              data-testid="stock-store"
+              options={[
+                { value: '', label: 'Todas las tiendas' },
+                ...storeOptions.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+            />
+          </div>
         </div>
 
         {isLoading ? (
@@ -163,12 +171,15 @@ export function GlobalStockSection() {
                       </span>
                     </td>
                     <td>
-                      <span className="stock-badges">
+                      {/* Lista compacta por tienda: punto de nivel + nombre + cantidad.
+                          Escala a muchas tiendas (apilado vertical) mejor que las
+                          píldoras anteriores. Cada fila abre el ajuste. */}
+                      <div className="stock-store-list">
                         {visibleStores.map((st) => (
                           <button
                             type="button"
                             key={st.storeId}
-                            className={`store-stock-badge sb-${st.level}`}
+                            className="stock-store-item"
                             onClick={() =>
                               setAdjusting({
                                 productId: row.productId,
@@ -182,11 +193,12 @@ export function GlobalStockSection() {
                             data-testid="stock-store-cell"
                             title={`${LEVEL_LABEL[st.level]} · mín ${st.minStock} · clic para ajustar`}
                           >
-                            <span className="store-stock-name">{st.storeName}</span>
-                            <span className="store-stock-qty">{st.quantity}</span>
+                            <span className={`stock-store-dot sb-${st.level}`} aria-hidden="true" />
+                            <span className="stock-store-item-name">{st.storeName}</span>
+                            <span className="stock-store-item-qty">{st.quantity}</span>
                           </button>
                         ))}
-                      </span>
+                      </div>
                     </td>
                     <td>
                       <strong>{storeId ? (visibleStores[0]?.quantity ?? 0) : row.total}</strong>
