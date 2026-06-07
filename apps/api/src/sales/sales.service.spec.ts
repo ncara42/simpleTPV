@@ -702,6 +702,36 @@ describe('SalesService.getReceiptHtml', () => {
   });
 });
 
+describe('SalesService.generateAccountingCsv', () => {
+  it('genera el CSV contable (libro de IVA) forzando status COMPLETED', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findMany = vi.fn(async () => [
+      {
+        ticketNumber: 'T01-000001',
+        createdAt: new Date('2026-06-02T10:00:00Z'),
+        paymentMethod: 'CASH',
+        subtotal: 121,
+        total: 121,
+        store: { name: 'Centro' },
+        lines: [{ taxRate: 21, lineTotal: 121 }],
+      },
+    ]);
+    const service = makeService(prisma);
+
+    const { csv, rowCount } = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.generateAccountingCsv({}, 'user-1', 'ADMIN'),
+    );
+
+    expect(csv).toContain('fecha,numero,tienda,metodo_pago,tipo_iva,base,cuota,total');
+    expect(csv).toContain('2026-06-02,T01-000001,Centro,CASH,21,100,21,121');
+    expect(rowCount).toBe(1);
+
+    // El libro de IVA solo incluye facturas COMPLETED (override del filtro).
+    const arg = prisma.sale.findMany.mock.calls[0]![0] as { where: { status: string } };
+    expect(arg.where.status).toBe('COMPLETED');
+  });
+});
+
 describe('SalesService.findByTicket', () => {
   it('lanza 404 si el ticket no existe en el tenant', async () => {
     const prisma = makePrisma();

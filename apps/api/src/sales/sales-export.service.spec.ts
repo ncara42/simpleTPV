@@ -19,9 +19,14 @@ function makePrisma() {
 function makeService(
   prisma: ReturnType<typeof makePrisma>,
   generateExportCsv = vi.fn(async () => ({ csv: 'h\nr1\nr2', rowCount: 2 })),
+  generateAccountingCsv = vi.fn(async () => ({ csv: 'acc\nr1', rowCount: 1 })),
 ) {
-  const sales = { generateExportCsv };
-  return { service: new SalesExportService(prisma as never, sales as never), generateExportCsv };
+  const sales = { generateExportCsv, generateAccountingCsv };
+  return {
+    service: new SalesExportService(prisma as never, sales as never),
+    generateExportCsv,
+    generateAccountingCsv,
+  };
 }
 
 describe('SalesExportService', () => {
@@ -39,8 +44,9 @@ describe('SalesExportService', () => {
     };
     expect(createArg.data.organizationId).toBe(ORG);
     expect(createArg.data.requestedById).toBe(USER);
-    expect(createArg.data.filters).toEqual({ storeId: 'store-1' });
-    // Genera el CSV con los mismos filtros/rol.
+    // Los filtros guardados incluyen el formato (por defecto 'sales').
+    expect(createArg.data.filters).toEqual({ storeId: 'store-1', format: 'sales' });
+    // Genera el CSV con los filtros de BD (sin `format`, que se separa antes).
     expect(generateExportCsv).toHaveBeenCalledWith({ storeId: 'store-1' }, USER, 'ADMIN');
     // PROCESSING + COMPLETED.
     expect(prisma.salesExport.updateMany).toHaveBeenCalledTimes(2);
@@ -81,7 +87,7 @@ describe('SalesExportService', () => {
     ).rejects.toThrow();
   });
 
-  it('downloadCsv devuelve el CSV cuando COMPLETED', async () => {
+  it('downloadCsv devuelve el CSV y filename ventas.csv (formato por defecto)', async () => {
     const prisma = makePrisma();
     prisma.salesExport.findFirst = vi.fn(async () => ({ status: 'COMPLETED', csv: 'h\nr' }));
     const { service } = makeService(prisma);
@@ -89,6 +95,8 @@ describe('SalesExportService', () => {
       service.downloadCsv('exp-1'),
     );
     expect(out.csv).toBe('h\nr');
+    // Sin format en filters (registro antiguo) → filename de ventas.
+    expect(out.filename).toBe('ventas.csv');
   });
 
   it('downloadCsv lanza 409 si aún no está listo', async () => {
@@ -172,12 +180,13 @@ describe('SalesExportService', () => {
     const createArg = prisma.salesExport.create.mock.calls[0]![0] as {
       data: { filters: Record<string, unknown> };
     };
-    // Solo los campos de filtro admitidos deben haberse guardado.
+    // Solo los campos de filtro admitidos (+ format) deben haberse guardado.
     expect(createArg.data.filters).toEqual({
       storeId: 'store-2',
       date: '2024-01-01',
       from: '2024-01-01',
       to: '2024-01-31',
+      format: 'sales',
     });
   });
 
@@ -190,6 +199,44 @@ describe('SalesExportService', () => {
     );
 
     expect(generateExportCsv).toHaveBeenCalledWith({ q: 'test' }, USER, 'MANAGER');
+  });
+
+  it('requestExport con format accounting genera el CSV contable (libro de IVA)', async () => {
+    const prisma = makePrisma();
+    const { service, generateAccountingCsv, generateExportCsv } = makeService(prisma);
+
+    const res = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.requestExport({ from: '2026-06-01', to: '2026-06-30' }, USER, 'ADMIN', 'accounting'),
+    );
+
+    // Despacha al generador contable (no al de ventas); el `format` se separa de
+    // los filtros de BD antes de llamar.
+    expect(generateAccountingCsv).toHaveBeenCalledWith(
+      { from: '2026-06-01', to: '2026-06-30' },
+      USER,
+      'ADMIN',
+    );
+    expect(generateExportCsv).not.toHaveBeenCalled();
+    // El formato se persiste en los filtros del registro.
+    const createArg = prisma.salesExport.create.mock.calls[0]![0] as {
+      data: { filters: Record<string, unknown> };
+    };
+    expect(createArg.data.filters).toMatchObject({ format: 'accounting' });
+    expect(res.status).toBe('COMPLETED');
+  });
+
+  it('downloadCsv usa filename libro-iva.csv para un export contable', async () => {
+    const prisma = makePrisma();
+    prisma.salesExport.findFirst = vi.fn(async () => ({
+      status: 'COMPLETED',
+      csv: 'h\nr',
+      filters: { format: 'accounting' },
+    }));
+    const { service } = makeService(prisma);
+    const out = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.downloadCsv('exp-1'),
+    );
+    expect(out.filename).toBe('libro-iva.csv');
   });
 
   it('requestExport marca PROCESSING antes de generar el CSV', async () => {

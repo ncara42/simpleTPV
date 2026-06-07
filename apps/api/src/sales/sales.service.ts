@@ -17,6 +17,7 @@ import { requireTenant } from '../prisma/tenant-context.js';
 import { withTenantTx } from '../prisma/with-tenant-tx.js';
 import { StockService } from '../stock/stock.service.js';
 import { VerifactuService } from '../verifactu/verifactu.service.js';
+import { type AccountingSale, buildAccountingCsv } from './accounting-export.js';
 import {
   assertDiscountWithinRoleLimit,
   buildTaxBreakdown,
@@ -665,6 +666,45 @@ export class SalesService {
       ].join(','),
     );
     return { csv: [header, ...lines].join('\n'), rowCount: rows.length };
+  }
+
+  /**
+   * Genera el CSV CONTABLE (libro de IVA repercutido, #125) que casa con `query`:
+   * mismo filtro que el listado/export, pero SOLO ventas COMPLETED (las facturas
+   * emitidas válidas) y en orden cronológico. Carga las líneas de cada venta para
+   * desglosar el IVA por tipo. Lo invoca el worker de SalesExport con format
+   * 'accounting'. `rowCount` = nº de facturas exportadas.
+   */
+  async generateAccountingCsv(
+    query: SalesFilterQuery,
+    requesterId: string,
+    role: SaleRole,
+  ): Promise<{ csv: string; rowCount: number }> {
+    const { where } = await this.buildSalesFilter(query, requesterId, role);
+    const rows = await this.prisma.sale.findMany({
+      // Libro de IVA: solo facturas COMPLETED (override del status del filtro).
+      where: { ...where, status: 'COMPLETED' },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        ticketNumber: true,
+        createdAt: true,
+        paymentMethod: true,
+        subtotal: true,
+        total: true,
+        store: { select: { name: true } },
+        lines: { select: { taxRate: true, lineTotal: true } },
+      },
+    });
+    const sales: AccountingSale[] = rows.map((r) => ({
+      ticketNumber: r.ticketNumber,
+      createdAt: r.createdAt,
+      storeName: r.store.name,
+      paymentMethod: r.paymentMethod,
+      subtotal: Number(r.subtotal),
+      total: Number(r.total),
+      lines: r.lines.map((l) => ({ taxRate: Number(l.taxRate), lineTotal: Number(l.lineTotal) })),
+    }));
+    return buildAccountingCsv(sales);
   }
 
   // Construye el WHERE (Prisma.Sql parametrizado) de los agregados sobre ventas
