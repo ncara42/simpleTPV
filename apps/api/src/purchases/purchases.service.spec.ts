@@ -302,7 +302,11 @@ describe('PurchasesService.exportCsv', () => {
 
 describe('PurchasesService.receive', () => {
   // tx con purchaseOrder + purchaseOrderLine; stock mockeado.
-  function makeReceiveSetup(order: unknown, freshLines: unknown[]) {
+  function makeReceiveSetup(
+    order: unknown,
+    freshLines: unknown[],
+    products: Array<{ id: string; tracksBatch: boolean }> = [{ id: 'p1', tracksBatch: false }],
+  ) {
     const stock = { applyMovement: vi.fn(async (_tx?: unknown, _input?: unknown) => 0) };
     const tx = {
       $executeRaw: vi.fn(async () => 1),
@@ -314,6 +318,10 @@ describe('PurchasesService.receive', () => {
       purchaseOrderLine: {
         update: vi.fn(async (_a?: unknown) => ({})),
         findMany: vi.fn(async () => freshLines),
+      },
+      // Lote (#126): receive carga tracksBatch de los productos de las líneas.
+      product: {
+        findMany: vi.fn(async () => products),
       },
     };
     const base = { $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)) };
@@ -362,6 +370,52 @@ describe('PurchasesService.receive', () => {
     expect(mv.quantity).toBe(10);
     const upd = tx.purchaseOrder.update.mock.calls[0]![0] as { data: { status: string } };
     expect(upd.data.status).toBe('RECEIVED');
+  });
+
+  it('400 si el producto exige lote (tracksBatch) y no se aporta lotCode (#126)', async () => {
+    const { service } = makeReceiveSetup(confirmed, [], [{ id: 'p1', tracksBatch: true }]);
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () =>
+        service.receive('po1', { lines: [{ lineId: 'l1', quantityReceived: 5 }] }, 'u'),
+      ),
+    ).rejects.toThrow(/requiere lote/);
+  });
+
+  it('pasa el lote (#126) a applyMovement para productos con tracksBatch', async () => {
+    const { service, stock } = makeReceiveSetup(
+      confirmed,
+      [{ quantityOrdered: 10, quantityReceived: 5 }],
+      [{ id: 'p1', tracksBatch: true }],
+    );
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.receive(
+        'po1',
+        {
+          lines: [{ lineId: 'l1', quantityReceived: 5, lotCode: 'L-1', expiryDate: '2027-03-01' }],
+        },
+        'u',
+      ),
+    );
+    const mv = stock.applyMovement.mock.calls[0]![1] as {
+      batch?: { lotCode: string; expiryDate: Date | null };
+    };
+    expect(mv.batch?.lotCode).toBe('L-1');
+    expect(mv.batch?.expiryDate).toEqual(new Date('2027-03-01'));
+  });
+
+  it('no exige lote si quantityReceived es 0 aunque el producto tenga tracksBatch (#126)', async () => {
+    const { service, stock } = makeReceiveSetup(
+      confirmed,
+      [{ quantityOrdered: 10, quantityReceived: 0 }],
+      [{ id: 'p1', tracksBatch: true }],
+    );
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () =>
+        service.receive('po1', { lines: [{ lineId: 'l1', quantityReceived: 0 }] }, 'u'),
+      ),
+    ).resolves.toBeDefined();
+    // No se aplica ningún movimiento (qty 0 se salta).
+    expect(stock.applyMovement).not.toHaveBeenCalled();
   });
 
   it('recepción parcial → PARTIALLY_RECEIVED', async () => {

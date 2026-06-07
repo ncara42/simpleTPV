@@ -18,6 +18,10 @@ function makeTx(resultingQuantity = 0, minStock = 0) {
     stockMovement: {
       create: vi.fn(async (_a?: unknown) => ({ id: 'mov-1' })),
     },
+    // Lote (#126): applyMovement hace upsert del StockBatch si llega `batch`.
+    stockBatch: {
+      upsert: vi.fn(async (_a?: unknown) => ({ id: 'batch-1' })),
+    },
     // applyMovement reevalúa la alerta tras el movimiento (#29).
     stockAlert: {
       findFirst: vi.fn(async () => null),
@@ -69,6 +73,70 @@ describe('StockService.applyMovement', () => {
 
     // devuelve la cantidad resultante del stock.
     expect(result).toBe(98);
+  });
+
+  it('con lote (#126): upsert del StockBatch y batchId en el movimiento', async () => {
+    const tx = makeTx(112);
+    const service = new StockService(
+      {} as never,
+      new MemoryCache(),
+      {} as never,
+      new InMemoryEventBus(),
+    );
+
+    await service.applyMovement(tx as never, {
+      organizationId: ORG,
+      productId: 'p1',
+      storeId: 'store-1',
+      type: 'PURCHASE_RECEIPT',
+      quantity: 10,
+      batch: { lotCode: 'L-2026-01', expiryDate: new Date('2027-01-01') },
+    });
+
+    // Upsert del lote por (producto, tienda, lotCode), incrementando por quantity.
+    const batchArg = tx.stockBatch.upsert.mock.calls[0]![0] as {
+      where: { productId_storeId_lotCode: { productId: string; storeId: string; lotCode: string } };
+      update: { quantity: { increment: number }; expiryDate?: Date };
+      create: {
+        organizationId: string;
+        lotCode: string;
+        quantity: number;
+        expiryDate: Date | null;
+      };
+    };
+    expect(batchArg.where.productId_storeId_lotCode).toEqual({
+      productId: 'p1',
+      storeId: 'store-1',
+      lotCode: 'L-2026-01',
+    });
+    expect(batchArg.update.quantity.increment).toBe(10);
+    expect(batchArg.create.lotCode).toBe('L-2026-01');
+
+    // El movimiento graba el batchId devuelto por el upsert.
+    const movArg = tx.stockMovement.create.mock.calls[0]![0] as { data: { batchId?: string } };
+    expect(movArg.data.batchId).toBe('batch-1');
+  });
+
+  it('sin lote: no toca StockBatch y el movimiento no lleva batchId', async () => {
+    const tx = makeTx(100);
+    const service = new StockService(
+      {} as never,
+      new MemoryCache(),
+      {} as never,
+      new InMemoryEventBus(),
+    );
+
+    await service.applyMovement(tx as never, {
+      organizationId: ORG,
+      productId: 'p1',
+      storeId: 'store-1',
+      type: 'SALE',
+      quantity: -1,
+    });
+
+    expect(tx.stockBatch.upsert).not.toHaveBeenCalled();
+    const movArg = tx.stockMovement.create.mock.calls[0]![0] as { data: { batchId?: string } };
+    expect(movArg.data.batchId).toBeUndefined();
   });
 
   it('entrada (reposición): increment positivo + movimiento RETURN', async () => {

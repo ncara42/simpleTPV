@@ -37,6 +37,11 @@ export interface ApplyMovementInput {
   referenceId?: string;
   reason?: string;
   userId?: string;
+  // Lote afectado (#126): para productos con tracksBatch. En ENTRADA (quantity>0,
+  // recepción) identifica/crea el StockBatch por (producto, tienda, lotCode) y lo
+  // incrementa; el batchId resultante se graba en el movimiento (trazabilidad
+  // lote → ticket). En SALIDA por FEFO (slice 3) se llama por lote ya elegido.
+  batch?: { lotCode: string; expiryDate?: Date | null };
 }
 
 @Injectable()
@@ -59,20 +64,59 @@ export class StockService {
    *
    * Devuelve la cantidad resultante en Stock tras el movimiento (útil para emitir
    * eventos / reevaluar alertas en issues posteriores).
+   *
+   * INVARIANTE (#126): para productos con tracksBatch, toda SALIDA (quantity<0)
+   * debe pasar `batch` (el lote elegido por FEFO, slice 3) para que Stock(agregado)
+   * y Σ StockBatch sigan cuadrando. Las ENTRADAS (recepción) pasan el lote recibido.
    */
   async applyMovement(
     tx: TxClient,
     input: ApplyMovementInput,
     afterCommit?: AfterCommit,
   ): Promise<number> {
-    const { organizationId, productId, storeId, type, quantity, referenceId, reason, userId } =
-      input;
+    const {
+      organizationId,
+      productId,
+      storeId,
+      type,
+      quantity,
+      referenceId,
+      reason,
+      userId,
+      batch,
+    } = input;
 
     const stock = await tx.stock.upsert({
       where: { productId_storeId: { productId, storeId } },
       update: { quantity: { increment: quantity } },
       create: { organizationId, productId, storeId, quantity },
     });
+
+    // Lote (#126): si el movimiento afecta a un lote, upsert del StockBatch por
+    // (producto, tienda, lotCode) incrementando por `quantity` (negativo si es
+    // salida de un lote ya elegido). El batchId se graba en el movimiento. Stock
+    // (agregado) y StockBatch se mueven juntos en la misma tx → Stock = Σ lotes.
+    let batchId: string | undefined;
+    if (batch) {
+      const row = await tx.stockBatch.upsert({
+        where: { productId_storeId_lotCode: { productId, storeId, lotCode: batch.lotCode } },
+        update: {
+          quantity: { increment: quantity },
+          // Solo actualiza la caducidad si llega una fecha real (`!= null`): una
+          // reposición del mismo lote sin fecha NO debe borrar la existente.
+          ...(batch.expiryDate != null ? { expiryDate: batch.expiryDate } : {}),
+        },
+        create: {
+          organizationId,
+          productId,
+          storeId,
+          lotCode: batch.lotCode,
+          expiryDate: batch.expiryDate ?? null,
+          quantity,
+        },
+      });
+      batchId = row.id;
+    }
 
     await tx.stockMovement.create({
       data: {
@@ -82,6 +126,7 @@ export class StockService {
         type,
         quantity,
         ...(referenceId !== undefined ? { referenceId } : {}),
+        ...(batchId !== undefined ? { batchId } : {}),
         ...(reason !== undefined ? { reason } : {}),
         ...(userId !== undefined ? { userId } : {}),
       },

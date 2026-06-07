@@ -257,7 +257,16 @@ export class PurchasesService {
       }
 
       const linesById = new Map(order.lines.map((l) => [l.id, l]));
-      // Valida que las líneas del dto pertenecen al pedido y no exceden lo pedido.
+      // Productos con trazabilidad por lote (#126): la recepción de un producto con
+      // tracksBatch exige lote (se valida abajo) y crea/incrementa su StockBatch.
+      const productIds = [...new Set(order.lines.map((l) => l.productId))];
+      const products = await tx.product.findMany({
+        where: { id: { in: productIds }, organizationId: tenant.organizationId },
+        select: { id: true, tracksBatch: true },
+      });
+      const tracksById = new Map(products.map((p) => [p.id, p.tracksBatch]));
+      // Valida que las líneas del dto pertenecen al pedido, no exceden lo pedido y,
+      // si el producto exige lote, que se aporte lotCode.
       for (const r of dto.lines) {
         const line = linesById.get(r.lineId);
         if (!line) {
@@ -268,6 +277,11 @@ export class PurchasesService {
         if (already + r.quantityReceived > ordered) {
           throw new BadRequestException(
             `La línea ${r.lineId} recibiría más de lo pedido (pedido ${ordered}, ya ${already})`,
+          );
+        }
+        if (r.quantityReceived > 0 && tracksById.get(line.productId) && !r.lotCode?.trim()) {
+          throw new BadRequestException(
+            `La línea ${r.lineId} requiere lote: el producto exige trazabilidad por lote`,
           );
         }
       }
@@ -283,6 +297,18 @@ export class PurchasesService {
           where: { id: line.id },
           data: { quantityReceived: { increment: r.quantityReceived } },
         });
+
+        // Lote (#126): solo para productos con trazabilidad y con lotCode aportado.
+        // El regex del DTO valida la FORMA de expiryDate, no el valor (p.ej.
+        // 2026-13-45) → rechazamos una fecha imposible como 400, no como 500.
+        const lotCode = r.lotCode?.trim();
+        const expiryDate = r.expiryDate ? new Date(r.expiryDate) : null;
+        if (expiryDate && Number.isNaN(expiryDate.getTime())) {
+          throw new BadRequestException(`La línea ${r.lineId}: fecha de caducidad inválida`);
+        }
+        const batchInput =
+          tracksById.get(line.productId) && lotCode ? { batch: { lotCode, expiryDate } } : {};
+
         await this.stock.applyMovement(
           tx,
           {
@@ -293,6 +319,7 @@ export class PurchasesService {
             quantity: r.quantityReceived,
             referenceId: order.id,
             userId,
+            ...batchInput,
           },
           afterCommit,
         );
