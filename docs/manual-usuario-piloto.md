@@ -28,6 +28,8 @@ Cada una tiene su propia URL. El selector de la barra superior permite saltar de
 
 ### 2.1 Iniciar sesión
 
+![Pantalla de inicio de sesión del TPV](img/manual/tpv/01-login.png)
+
 1. Abre la URL del TPV en el navegador.
 2. Introduce tu **correo** y tu **contraseña** en los campos del formulario de acceso.
 3. Pulsa **Iniciar sesión**.
@@ -38,6 +40,8 @@ Para cerrar sesión: pulsa el **menú de cuenta** (parte inferior del sidebar) y
 ---
 
 ### 2.2 Pantalla de venta: buscar un producto
+
+![Pantalla de venta: buscador, chips de familia, cuadrícula de productos y ticket en curso](img/manual/tpv/02-venta.png)
 
 El campo de búsqueda está activo por defecto al entrar en la pantalla de venta.
 
@@ -80,6 +84,8 @@ Los productos sin stock aparecen **atenuados** al final de la cuadrícula y mues
 ---
 
 ### 2.6 Carrito: añadir, ajustar cantidad y vaciar
+
+![Ticket actual con líneas, cantidades, base imponible, IVA y total](img/manual/tpv/03-carrito.png)
 
 - **Añadir**: pulsa una tarjeta de producto o escanea su código. Cada pulsación añade una unidad; si el producto ya está en el carrito, la cantidad aumenta.
 - **Ajustar cantidad**: en la línea del carrito puedes editar directamente el campo de cantidad.
@@ -137,6 +143,8 @@ El sidebar incluye la vista **Tickets emitidos** (icono de historial).
 
 ### 2.10 Caja: abrir turno y cerrar caja
 
+![Panel de caja: apertura de turno y cierre con conteo por denominaciones](img/manual/tpv/04-caja.png)
+
 Accede a la vista de caja pulsando **Caja** en el sidebar.
 
 **Abrir la caja (inicio de turno):**
@@ -157,6 +165,8 @@ Accede a la vista de caja pulsando **Caja** en el sidebar.
 ---
 
 ### 2.11 Fichaje: entrada, pausa y salida
+
+![Control horario: estado actual, botones de fichaje e historial de jornadas](img/manual/tpv/05-fichaje.png)
 
 Accede al control horario pulsando **Fichaje** en el sidebar.
 
@@ -211,6 +221,8 @@ Para cambiar el rol de un usuario, ve a **Usuarios** (sección 3.9).
 
 ### 3.2 Dashboard
 
+![Dashboard del backoffice: KPIs, ventas hoy vs ayer, rankings de producto y rotación](img/manual/backoffice/01-dashboard.png)
+
 Vista de inicio del backoffice. Muestra:
 
 - **7 tarjetas KPI**: ventas de hoy, ticket medio, unidades por ticket, margen, beneficio, descuento medio y devoluciones.
@@ -234,6 +246,8 @@ Lista completa de ventas con filtros, paginación y exportación.
 
 ### 3.4 Catálogo
 
+![Catálogo de productos del backoffice](img/manual/backoffice/02-catalogo.png)
+
 Gestión de productos.
 
 - La tabla muestra todos los productos con su ruta de arquetipo (p. ej. `Flores › Índica`).
@@ -253,6 +267,8 @@ Organización jerárquica del catálogo.
 ---
 
 ### 3.6 Stock
+
+![Vista de stock por producto y tienda](img/manual/backoffice/03-stock.png)
 
 Vista global del stock por producto y tienda.
 
@@ -274,6 +290,8 @@ Movimientos de stock entre tiendas.
 
 ### 3.8 Tiendas
 
+![Vista de tiendas del backoffice](img/manual/backoffice/04-tiendas.png)
+
 Vista en cuadrícula con todas las tiendas de la organización.
 
 - Cada tarjeta muestra el nombre de la tienda, ventas del día, estado operativo (**Abierta** / **Cerrada**) y accesos directos.
@@ -284,6 +302,8 @@ Vista en cuadrícula con todas las tiendas de la organización.
 ---
 
 ### 3.9 Usuarios y permisos
+
+![Gestión de usuarios y roles](img/manual/backoffice/05-usuarios.png)
 
 Gestión de las cuentas de acceso.
 
@@ -315,6 +335,8 @@ Gestión de descuentos y promociones automáticas.
 ---
 
 ### 3.12 Mayorista (B2B)
+
+![Mayorista (B2B): clientes, tarifas y pedidos en sub-pestañas](img/manual/backoffice/06-mayorista.png)
 
 Gestión de clientes mayoristas, tarifas y pedidos. La vista tiene tres sub-pestañas:
 
