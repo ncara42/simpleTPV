@@ -302,6 +302,13 @@ function makePrisma() {
       ),
       updateMany: vi.fn(async (_a?: unknown): Promise<{ count: number }> => ({ count: 1 })),
       findFirstOrThrow: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'sale-1' })),
+      create: vi.fn(
+        async (a?: unknown): Promise<unknown> => ({
+          id: 'sale-1',
+          ...((a as { data?: Record<string, unknown> })?.data ?? {}),
+          lines: [],
+        }),
+      ),
     },
     product: {
       findMany: vi.fn(async (_a?: unknown): Promise<unknown[]> => []),
@@ -338,6 +345,10 @@ function makePrisma() {
         { margin: '0', revenue: '0' },
       ],
     ),
+    // VeriFactu lee el NIF de la org dentro de la tx de la venta (SEC-02).
+    organization: {
+      findFirst: vi.fn(async (_a?: unknown): Promise<unknown> => ({ nif: 'B11111111' })),
+    },
   };
 }
 
@@ -387,6 +398,75 @@ describe('SalesService.create — idempotencia offline (S2)', () => {
       .where;
     expect(where.clientId).toBe('33333333-3333-3333-3333-333333333333');
     expect(where.organizationId).toBe(ORG);
+  });
+});
+
+describe('SalesService.reserveTicketBlock — bloques de ticket offline (S2)', () => {
+  it('incrementa el contador en N y devuelve el rango [from, to] + code', async () => {
+    const prisma = makePrisma();
+    const tx = {
+      $executeRaw: vi.fn(async () => 0),
+      $queryRaw: vi.fn(async () => [{ code: 'CENTRO', ticketCounter: 62 }]),
+    };
+    const base = { $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)) };
+    const service = makeService(prisma, base);
+
+    const res = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.reserveTicketBlock('22222222-2222-2222-2222-222222222222', 20, 'user-1', 'ADMIN'),
+    );
+
+    // contador a 62 tras +20 → el bloque reservado es [43, 62].
+    expect(res).toEqual({ code: 'CENTRO', from: 43, to: 62 });
+  });
+});
+
+describe('SalesService.create — camino completo (online vs offline S2)', () => {
+  function withProduct(prisma: ReturnType<typeof makePrisma>) {
+    prisma.product.findMany = vi.fn(async () => [
+      { id: 'p1', salePrice: '10', taxRate: '21', costPrice: '4', active: true },
+    ]);
+  }
+  const dtoBase = {
+    storeId: '22222222-2222-2222-2222-222222222222',
+    lines: [{ productId: 'p1', qty: 1 }],
+    paymentMethod: 'CASH' as const,
+    cashGiven: 100,
+  };
+
+  it('online: incrementa el contador de la tienda y asigna el ticketNumber', async () => {
+    const prisma = makePrisma();
+    withProduct(prisma);
+    // formatTicket antepone "T" al code → code '01' produce 'T01-000005'.
+    prisma.$queryRaw = vi.fn(async () => [{ code: '01', ticketCounter: 5 }]) as never;
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.create(dtoBase as never, 'user-1', 'ADMIN'),
+    );
+
+    expect(prisma.$queryRaw).toHaveBeenCalled(); // UPDATE del contador (online)
+    const created = (prisma.sale.create as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
+      data: { ticketNumber: string };
+    };
+    expect(created.data.ticketNumber).toBe('T01-000005');
+  });
+
+  it('offline (S2): usa el ticketNumber pre-asignado y NO incrementa el contador', async () => {
+    const prisma = makePrisma();
+    withProduct(prisma);
+    const counterUpdate = vi.fn(async () => [{ code: '01', ticketCounter: 5 }]);
+    prisma.$queryRaw = counterUpdate as never;
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.create({ ...dtoBase, ticketNumber: 'T01-000043' } as never, 'user-1', 'ADMIN'),
+    );
+
+    expect(counterUpdate).not.toHaveBeenCalled(); // NO incrementa el contador
+    const created = (prisma.sale.create as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
+      data: { ticketNumber: string };
+    };
+    expect(created.data.ticketNumber).toBe('T01-000043');
   });
 });
 

@@ -13,7 +13,7 @@ import {
 import type { JwtPayload } from '../auth/jwt-payload.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { SaleRole } from './sales.domain.js';
-import { CreateSaleDto, ListSalesQueryDto } from './sales.dto.js';
+import { CreateSaleDto, ListSalesQueryDto, ReserveTicketBlockDto } from './sales.dto.js';
 import { SalesService } from './sales.service.js';
 
 @Controller('sales')
@@ -24,6 +24,19 @@ export class SalesController {
   @Roles('ADMIN', 'MANAGER', 'CLERK')
   create(@Body() body: CreateSaleDto, @Req() req: { user: JwtPayload }) {
     return this.sales.create(body, req.user.sub, req.user.role as SaleRole);
+  }
+
+  // Reserva un bloque de números de ticket para que el TPV venda offline
+  // (offline slice 2). Path fijo 'ticket-block': no colisiona con ':id/void'.
+  @Post('ticket-block')
+  @Roles('ADMIN', 'MANAGER', 'CLERK')
+  reserveTicketBlock(@Body() body: ReserveTicketBlockDto, @Req() req: { user: JwtPayload }) {
+    return this.sales.reserveTicketBlock(
+      body.storeId,
+      body.size,
+      req.user.sub,
+      req.user.role as SaleRole,
+    );
   }
 
   // Historial de ventas paginado con totales (#14). Visibilidad de central:

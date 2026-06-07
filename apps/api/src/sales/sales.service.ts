@@ -143,16 +143,27 @@ export class SalesService {
     // aplicado. Pasar el extendido anidaría transacciones y rompería la
     // atomicidad (contador incrementado aunque la venta falle).
     return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
-      const updated = await tx.$queryRaw<Array<{ code: string; ticketCounter: number }>>`
-        UPDATE "Store" SET "ticketCounter" = "ticketCounter" + 1
-        WHERE id = ${dto.storeId}::uuid
-        RETURNING code, "ticketCounter"
-      `;
-      const store = updated[0];
-      if (!store) {
-        throw new NotFoundException(`Tienda ${dto.storeId} no encontrada`);
+      let ticketNumber: string;
+      if (dto.ticketNumber) {
+        // Venta offline sincronizada (offline slice 2): usa el nº de ticket
+        // pre-asignado de su bloque reservado (el contador ya se incrementó al
+        // reservar el bloque). NO vuelve a incrementar el contador. El índice
+        // único (organizationId, ticketNumber) evita colisiones.
+        ticketNumber = dto.ticketNumber;
+      } else {
+        // Venta online: incremento atómico del contador de la tienda dentro de
+        // la misma tx (el contador y la venta se confirman o revierten juntos).
+        const updated = await tx.$queryRaw<Array<{ code: string; ticketCounter: number }>>`
+          UPDATE "Store" SET "ticketCounter" = "ticketCounter" + 1
+          WHERE id = ${dto.storeId}::uuid
+          RETURNING code, "ticketCounter"
+        `;
+        const store = updated[0];
+        if (!store) {
+          throw new NotFoundException(`Tienda ${dto.storeId} no encontrada`);
+        }
+        ticketNumber = formatTicket(store.code, store.ticketCounter);
       }
-      const ticketNumber = formatTicket(store.code, store.ticketCounter);
 
       const sale = await tx.sale.create({
         data: {
@@ -243,6 +254,34 @@ export class SalesService {
       });
 
       return sale;
+    });
+  }
+
+  // Reserva un bloque de N números de ticket para un dispositivo (offline slice 2):
+  // incrementa el contador de la tienda en N de forma atómica y devuelve el rango
+  // [from, to] + el code de la tienda. El TPV consume estos números offline y los
+  // sincroniza luego en POST /sales (con ticketNumber pre-asignado + clientId).
+  // Puede dejar huecos si el bloque no se agota — gaps justificados por reserva
+  // (trade-off de la numeración offline por bloques).
+  async reserveTicketBlock(
+    storeId: string,
+    size: number,
+    userId: string,
+    role: SaleRole,
+  ): Promise<{ code: string; from: number; to: number }> {
+    const tenant = requireTenant();
+    await assertStoreAccess(this.prisma, { userId, role, storeId });
+    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+      const rows = await tx.$queryRaw<Array<{ code: string; ticketCounter: number }>>`
+        UPDATE "Store" SET "ticketCounter" = "ticketCounter" + ${size}
+        WHERE id = ${storeId}::uuid
+        RETURNING code, "ticketCounter"
+      `;
+      const store = rows[0];
+      if (!store) {
+        throw new NotFoundException(`Tienda ${storeId} no encontrada`);
+      }
+      return { code: store.code, from: store.ticketCounter - size + 1, to: store.ticketCounter };
     });
   }
 
