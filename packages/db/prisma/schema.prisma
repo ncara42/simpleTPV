@@ -16,36 +16,37 @@ model Organization {
   currency  String   @default("EUR")
   createdAt DateTime @default(now())
 
-  stores             Store[]
-  users              User[]
-  products           Product[]
-  productFamilies    ProductFamily[]
-  auditLogs          AuditLog[]
-  sales              Sale[]
-  saleLines          SaleLine[]
-  cashSessions       CashSession[]
-  cashMovements      CashMovement[]
-  officialDevices    OfficialDevice[]
-  timeClockEntries   TimeClockEntry[]
-  returns            Return[]
-  returnLines        ReturnLine[]
-  stock              Stock[]
-  stockMovements     StockMovement[]
-  stockAlerts        StockAlert[]
-  transfers          Transfer[]
-  transferLines      TransferLine[]
-  suppliers          Supplier[]
-  purchaseOrders     PurchaseOrder[]
-  purchaseOrderLines PurchaseOrderLine[]
-  verifactuRecords   VerifactuRecord[]
-  salesExports       SalesExport[]
-  userPreferences    UserPreference[]
-  customers          Customer[]
-  priceLists         PriceList[]
-  priceListItems     PriceListItem[]
-  wholesaleOrders    WholesaleOrder[]
+  stores              Store[]
+  users               User[]
+  products            Product[]
+  productFamilies     ProductFamily[]
+  auditLogs           AuditLog[]
+  sales               Sale[]
+  saleLines           SaleLine[]
+  cashSessions        CashSession[]
+  cashMovements       CashMovement[]
+  officialDevices     OfficialDevice[]
+  timeClockEntries    TimeClockEntry[]
+  returns             Return[]
+  returnLines         ReturnLine[]
+  stock               Stock[]
+  stockBatches        StockBatch[]
+  stockMovements      StockMovement[]
+  stockAlerts         StockAlert[]
+  transfers           Transfer[]
+  transferLines       TransferLine[]
+  suppliers           Supplier[]
+  purchaseOrders      PurchaseOrder[]
+  purchaseOrderLines  PurchaseOrderLine[]
+  verifactuRecords    VerifactuRecord[]
+  salesExports        SalesExport[]
+  userPreferences     UserPreference[]
+  customers           Customer[]
+  priceLists          PriceList[]
+  priceListItems      PriceListItem[]
+  wholesaleOrders     WholesaleOrder[]
   wholesaleOrderLines WholesaleOrderLine[]
-  apiKeys            ApiKey[]
+  apiKeys             ApiKey[]
 }
 
 // Personalización por usuario (IT-16): preferencias clave-valor (JSON) por usuario.
@@ -84,6 +85,7 @@ model Store {
   cashMovements    CashMovement[]
   returns          Return[]
   stock            Stock[]
+  stockBatches     StockBatch[]
   stockMovements   StockMovement[]
   stockAlerts      StockAlert[]
   officialDevices  OfficialDevice[]
@@ -167,19 +169,23 @@ model Product {
   taxRate        Decimal  @default(21) @db.Decimal(5, 2)
   imageUrl       String?
   active         Boolean  @default(true)
+  // Trazabilidad por lote/caducidad opt-in (#126): solo los productos con
+  // tracksBatch=true exigen lote+caducidad en recepción y se venden por FEFO.
+  tracksBatch    Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization       Organization        @relation(fields: [organizationId], references: [id])
-  family             ProductFamily?      @relation(fields: [familyId], references: [id])
-  saleLines          SaleLine[]
-  returnLines        ReturnLine[]
-  stock              Stock[]
-  stockMovements     StockMovement[]
-  stockAlerts        StockAlert[]
-  transferLines      TransferLine[]
-  purchaseOrderLines PurchaseOrderLine[]
-  priceListItems     PriceListItem[]
+  organization        Organization         @relation(fields: [organizationId], references: [id])
+  family              ProductFamily?       @relation(fields: [familyId], references: [id])
+  saleLines           SaleLine[]
+  returnLines         ReturnLine[]
+  stock               Stock[]
+  stockBatches        StockBatch[]
+  stockMovements      StockMovement[]
+  stockAlerts         StockAlert[]
+  transferLines       TransferLine[]
+  purchaseOrderLines  PurchaseOrderLine[]
+  priceListItems      PriceListItem[]
   wholesaleOrderLines WholesaleOrderLine[]
 
   @@index([organizationId, active])
@@ -254,27 +260,27 @@ model Sale {
 }
 
 model SaleLine {
-  id             String  @id @default(uuid()) @db.Uuid
-  organizationId String  @db.Uuid
-  saleId         String  @db.Uuid
-  productId      String  @db.Uuid
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @db.Uuid
+  saleId         String         @db.Uuid
+  productId      String         @db.Uuid
   name           String
-  unitPrice      Decimal @db.Decimal(10, 4)
-  qty            Decimal @db.Decimal(10, 3)
-  discountPct    Decimal @default(0) @db.Decimal(5, 2)
-  discountAmt    Decimal @default(0) @db.Decimal(12, 2)
+  unitPrice      Decimal        @db.Decimal(10, 4)
+  qty            Decimal        @db.Decimal(10, 3)
+  discountPct    Decimal        @default(0) @db.Decimal(5, 2)
+  discountAmt    Decimal        @default(0) @db.Decimal(12, 2)
   // IVA congelado en el momento de la venta (copiado de product.taxRate) para un
   // desglose histórico fiable aunque el producto cambie de tipo después.
-  taxRate        Decimal @default(21) @db.Decimal(5, 2)
+  taxRate        Decimal        @default(21) @db.Decimal(5, 2)
   // Coste unitario del producto congelado en el momento de la venta (copiado de
   // product.costPrice) para una rentabilidad histórica fiable aunque el coste
   // cambie después (IT-03). Antes el margen se calculaba con el coste ACTUAL.
-  costPrice      Decimal @default(0) @db.Decimal(10, 4)
+  costPrice      Decimal        @default(0) @db.Decimal(10, 4)
   // Origen del descuento de la línea: VOLUNTARY (manual del vendedor) o PROMOTION
   // (regla programada). Hoy todos los descuentos son manuales → default VOLUNTARY.
   // Permite analizar el descuento voluntario por empleado (STAT-04) sin re-migrar.
   discountSource DiscountSource @default(VOLUNTARY)
-  lineTotal      Decimal @db.Decimal(12, 2)
+  lineTotal      Decimal        @db.Decimal(12, 2)
 
   organization Organization @relation(fields: [organizationId], references: [id])
   sale         Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
@@ -365,6 +371,9 @@ model StockMovement {
   type           MovementType
   quantity       Decimal      @db.Decimal(12, 3)
   referenceId    String?      @db.Uuid
+  // Lote afectado por el movimiento (#126): trazabilidad lote → movimiento →
+  // documento (referenceId). Null para productos sin lote o faltante FEFO sin lote.
+  batchId        String?      @db.Uuid
   reason         String?
   createdAt      DateTime     @default(now())
 
@@ -372,10 +381,37 @@ model StockMovement {
   product      Product      @relation(fields: [productId], references: [id])
   store        Store        @relation(fields: [storeId], references: [id])
   user         User?        @relation(fields: [userId], references: [id])
+  batch        StockBatch?  @relation(fields: [batchId], references: [id])
 
   @@index([organizationId, productId, createdAt])
   @@index([organizationId, storeId, createdAt])
   @@index([organizationId, storeId, type, createdAt])
+}
+
+// Lote de stock (#126): cantidad de un producto en una tienda para un nº de lote y
+// su caducidad. Capa granular bajo Stock (Stock.quantity = Σ de sus lotes). Solo se
+// usa para productos con tracksBatch=true. FEFO consume por expiryDate ascendente.
+// RLS por tenant.
+model StockBatch {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  productId      String    @db.Uuid
+  storeId        String    @db.Uuid
+  lotCode        String
+  expiryDate     DateTime? @db.Date
+  quantity       Decimal   @default(0) @db.Decimal(12, 3)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  product      Product         @relation(fields: [productId], references: [id])
+  store        Store           @relation(fields: [storeId], references: [id])
+  movements    StockMovement[]
+
+  // Un lote por (producto, tienda, nº de lote): la recepción del mismo lote suma.
+  @@unique([productId, storeId, lotCode])
+  // FEFO (consumo por caducidad) y barrido de próximos a caducar.
+  @@index([organizationId, storeId, expiryDate])
 }
 
 // Alerta de stock bajo/agotado de un producto en una tienda. Se genera/resuelve
