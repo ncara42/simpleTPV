@@ -88,10 +88,10 @@ export function GlobalStockSection() {
             className="catalog-search"
             value={familyId}
             onChange={(value) => setFamilyId(value)}
-            ariaLabel="Filtrar por familia"
+            ariaLabel="Filtrar por arquetipo"
             data-testid="stock-family"
             options={[
-              { value: '', label: 'Todas las familias' },
+              { value: '', label: 'Todos los arquetipos' },
               ...DEMO_FAMILIES.map((f) => ({ value: f.id, label: f.name })),
             ]}
           />
@@ -132,7 +132,7 @@ export function GlobalStockSection() {
             <thead>
               <tr>
                 <th>Producto</th>
-                <th>Familia</th>
+                <th>Arquetipo</th>
                 <th>Rotación</th>
                 <th>{storeId ? storeOptions.find((s) => s.id === storeId)?.name : 'Por tienda'}</th>
                 <th>Total</th>

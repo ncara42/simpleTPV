@@ -51,7 +51,7 @@ function toQuery(filters: Filters): SalesQueryInput {
 }
 
 function downloadCsv(items: DemoSaleRow[]): void {
-  const header = 'Nº ticket,Hora,Tienda,Vendedor,Familia,Importe (€),Método,Estado';
+  const header = 'Nº ticket,Hora,Tienda,Vendedor,Arquetipo,Importe (€),Método,Estado';
   const rows = items.map((s) =>
     [
       s.ticketNumber,
@@ -77,7 +77,7 @@ const columns: DataTableColumn<DemoSaleRow>[] = [
   { key: 'ticketNumber', header: 'Ticket' },
   { key: 'storeName', header: 'Tienda' },
   { key: 'sellerName', header: 'Vendedor' },
-  { key: 'familyName', header: 'Familia' },
+  { key: 'familyName', header: 'Arquetipo' },
   {
     key: 'paymentMethod',
     header: 'Pago',
@@ -210,10 +210,10 @@ export function SalesHistoryPage() {
           className="catalog-search"
           value={filters.familyId}
           onChange={(value) => setFilter({ familyId: value })}
-          ariaLabel="Filtrar por familia"
+          ariaLabel="Filtrar por arquetipo"
           data-testid="sales-family"
           options={[
-            { value: '', label: 'Todas las familias' },
+            { value: '', label: 'Todos los arquetipos' },
             ...DEMO_FAMILIES.map((f) => ({ value: f.id, label: f.name })),
           ]}
         />

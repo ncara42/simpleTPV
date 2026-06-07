@@ -491,7 +491,7 @@ export function DashboardPage() {
           <p className="dash-panel-sub">
             {PERIOD_SUBTITLE[period]} ·{' '}
             {rotationLevel === 'archetype'
-              ? 'por arquetipo (familia) · media/día sobre días con tienda abierta'
+              ? 'por arquetipo · media/día sobre días con tienda abierta'
               : 'por producto · unidades, días sin venta y evolución'}
           </p>
           <ul className="dash-rotation-list">

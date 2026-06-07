@@ -316,7 +316,7 @@ export function CatalogPage() {
               <tr>
                 <th className="users-select-col" aria-label="Selección" />
                 <th>Nombre</th>
-                <th>Familia</th>
+                <th>Arquetipo</th>
                 <th>SKU</th>
                 <th>Precio</th>
                 <th>IVA</th>

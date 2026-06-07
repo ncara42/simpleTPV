@@ -27,8 +27,8 @@ const FAQ: Faq[] = [
     a: 'En Catálogo › «Nuevo producto». Para cargar muchos a la vez, usa «Importar CSV» con las columnas name, salePrice, sku, barcode.',
   },
   {
-    q: '¿Cómo organizo el catálogo por familias y subfamilias?',
-    a: 'En Familias puedes crear familias raíz e hijas, reordenarlas arrastrando y mover productos entre ellas.',
+    q: '¿Cómo organizo el catálogo en arquetipos?',
+    a: 'En Arquetipos puedes crear arquetipos y subniveles (con la profundidad que necesites), reordenarlos arrastrando y mover productos entre ellos.',
   },
   {
     q: '¿Cómo cargo el stock inicial de cada tienda?',

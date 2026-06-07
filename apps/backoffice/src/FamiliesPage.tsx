@@ -136,7 +136,7 @@ function FamilyRow({
               />
             )}
             <button onClick={() => actions.onAddChild(node.id)} data-testid="fam-add-child">
-              + Hija
+              + Subnivel
             </button>
             <button onClick={() => actions.onEdit(node)}>Editar</button>
             <button className="danger" onClick={() => void actions.onDelete(node)}>
@@ -273,8 +273,8 @@ export function FamiliesPage() {
     const n = countDescendants(node);
     if (n > 0) {
       const ok = await confirm({
-        title: 'Borrar familia',
-        message: `"${node.name}" tiene ${n} subfamilia(s). ¿Borrar todo el grupo?`,
+        title: 'Borrar arquetipo',
+        message: `"${node.name}" tiene ${n} subnivel(es). ¿Borrar todo el grupo?`,
         confirmLabel: 'Borrar',
         danger: true,
       });
@@ -302,7 +302,7 @@ export function FamiliesPage() {
     onDelete,
   };
 
-  usePageHeader('Familias', 'Selecciona las familias e hijas para editar');
+  usePageHeader('Arquetipos', 'Agrupa los productos en arquetipos y subniveles');
 
   return (
     <section className="catalog">
@@ -312,7 +312,7 @@ export function FamiliesPage() {
             <span className="search-field">
               <input
                 className="catalog-search"
-                placeholder="Buscar familia…"
+                placeholder="Buscar arquetipo…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 data-testid="fam-search"
@@ -325,7 +325,7 @@ export function FamiliesPage() {
               ariaLabel="Filtrar por familia"
               data-testid="fam-filter"
               options={[
-                { value: '', label: 'Todas las familias' },
+                { value: '', label: 'Todos los arquetipos' },
                 ...view.map((r) => ({ value: r.id, label: r.name })),
               ]}
             />
@@ -335,7 +335,7 @@ export function FamiliesPage() {
             onClick={() => setForm({ name: '', parentId: null })}
             data-testid="new-family"
           >
-            Nueva familia
+            Nuevo arquetipo
           </button>
         </div>
 
@@ -343,11 +343,11 @@ export function FamiliesPage() {
           <p className="catalog-empty">Cargando…</p>
         ) : view.length === 0 ? (
           <p className="catalog-empty" data-testid="families-empty">
-            Sin familias. Crea la primera.
+            Sin arquetipos. Crea el primero.
           </p>
         ) : filtered.length === 0 ? (
           <p className="catalog-empty" data-testid="fam-empty">
-            Sin familias para la búsqueda.
+            Sin arquetipos para la búsqueda.
           </p>
         ) : (
           <div className="fam-tree" data-testid="fam-tree" ref={treeRef}>
@@ -369,11 +369,7 @@ export function FamiliesPage() {
           }}
         >
           <h3>
-            {form.id
-              ? 'Editar familia'
-              : form.parentId
-                ? 'Nueva familia hija'
-                : 'Nueva familia raíz'}
+            {form.id ? 'Editar arquetipo' : form.parentId ? 'Nuevo subnivel' : 'Nuevo arquetipo'}
           </h3>
           <label>
             Nombre
