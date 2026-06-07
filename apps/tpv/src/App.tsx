@@ -11,6 +11,7 @@ import { Banknote, ClipboardCheck, Clock, ReceiptText, ShoppingBag, Truck } from
 import { useEffect, useState } from 'react';
 
 import { CashPanel } from './CashPanel.js';
+import { ConnectivityBanner } from './ConnectivityBanner.js';
 import { DEMO_CART_LINES, DEMO_USER } from './demo/demoData.js';
 import { InventoryPanel } from './InventoryPanel.js';
 import { isDemo } from './lib/api-config.js';
@@ -93,6 +94,7 @@ function Home() {
         onLogout={logout}
       />
       <div className="app-content">
+        <ConnectivityBanner />
         <PageHeaderProvider>
           <ShellTopBar />
           <main className="app-main">

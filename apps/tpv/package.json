@@ -15,7 +15,9 @@
     "@sentry/react": "^10.55.0",
     "@simpletpv/auth": "workspace:*",
     "@simpletpv/ui": "workspace:*",
+    "@tanstack/query-sync-storage-persister": "^5.101.0",
     "@tanstack/react-query": "^5.100.14",
+    "@tanstack/react-query-persist-client": "^5.101.0",
     "lucide-react": "^1.17.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
@@ -32,6 +34,7 @@
     "jsdom": "^29.1.1",
     "tailwindcss": "^4.0.0",
     "vite": "^8.0.16",
+    "vite-plugin-pwa": "^1.3.0",
     "vitest": "^4.1.7"
   }
 }
