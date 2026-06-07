@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { type CSSProperties, useSyncExternalStore } from 'react';
 
 function subscribe(onChange: () => void): () => void {
   window.addEventListener('online', onChange);
@@ -9,34 +9,42 @@ function subscribe(onChange: () => void): () => void {
   };
 }
 
-// Indicador de conexión del TPV. Muestra una banda cuando el terminal pierde
-// internet. La app sigue cargando (PWA app-shell) y el catálogo se ve desde la
-// caché de TanStack Query; la venta offline (cola + sync) llega en la slice 2.
-export function ConnectivityBanner() {
+const bannerStyle = (bg: string): CSSProperties => ({
+  background: bg,
+  color: '#fff',
+  padding: '6px 16px',
+  fontSize: '14px',
+  fontWeight: 600,
+  textAlign: 'center',
+});
+
+// Indicador de conexión del TPV. Sin internet, muestra una banda naranja: la app
+// sigue cargando (PWA app-shell), el catálogo se ve desde caché y las ventas se
+// encolan (offline slice 2c). Con conexión pero con ventas en cola, muestra una
+// banda azul de "pendientes de sincronizar".
+export function ConnectivityBanner({ queuedCount = 0 }: { queuedCount?: number }) {
   const isOnline = useSyncExternalStore(
     subscribe,
     () => navigator.onLine,
     () => true, // valor inicial (sin window): asumir con conexión
   );
 
-  if (isOnline) {
-    return null;
+  if (!isOnline) {
+    const cola = queuedCount > 0 ? ` · ${queuedCount} venta(s) en cola` : '';
+    return (
+      <div data-testid="offline-banner" role="status" style={bannerStyle('#b45309')}>
+        Sin conexión — modo offline. El catálogo se muestra desde caché{cola}.
+      </div>
+    );
   }
 
-  return (
-    <div
-      data-testid="offline-banner"
-      role="status"
-      style={{
-        background: '#b45309',
-        color: '#fff',
-        padding: '6px 16px',
-        fontSize: '14px',
-        fontWeight: 600,
-        textAlign: 'center',
-      }}
-    >
-      Sin conexión — modo offline. El catálogo se muestra desde caché.
-    </div>
-  );
+  if (queuedCount > 0) {
+    return (
+      <div data-testid="sync-banner" role="status" style={bannerStyle('#1d4ed8')}>
+        Sincronizando {queuedCount} venta(s) pendiente(s)…
+      </div>
+    );
+  }
+
+  return null;
 }

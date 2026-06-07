@@ -95,7 +95,9 @@ describe('cableado API real (VITE_DEMO_MODE=false)', () => {
       paymentMethod: 'CASH' as const,
     };
     await sales.createSale(input);
-    expect(post).toHaveBeenCalledWith('/sales', input);
+    // createSale añade un clientId (idempotencia de reintentos); el resto del
+    // payload debe ir tal cual.
+    expect(post).toHaveBeenCalledWith('/sales', expect.objectContaining(input));
     await sales.getTicket('sale-1');
     expect(get).toHaveBeenCalledWith('/sales/sale-1/ticket');
     await sales.voidSale('sale-1');

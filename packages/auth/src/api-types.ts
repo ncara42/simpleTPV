@@ -189,6 +189,11 @@ export interface CreateSaleInput {
   cashGiven?: number;
   ticketDiscountPct?: number;
   ticketDiscountAmt?: number;
+  // Venta offline (offline slice 2): clientId para idempotencia y ticketNumber
+  // pre-asignado de un bloque reservado. En ventas online normales se omiten
+  // (clientId puede enviarse igualmente como salvaguarda de reintentos).
+  clientId?: string;
+  ticketNumber?: string;
 }
 
 // Sesión de caja (apertura/cierre con cuadre). Los Decimal de Prisma viajan

@@ -41,7 +41,10 @@ export function createSale(input: CreateSaleInput): Promise<Sale> {
       lines: [],
     });
   }
-  return api.post<Sale>('/sales', input);
+  // clientId también online: salvaguarda de idempotencia ante un reintento por
+  // red inestable (el backend deduplica por clientId). El camino offline se
+  // gestiona en el flujo de cobro (CartPanel) vía la cola de ventas.
+  return api.post<Sale>('/sales', { ...input, clientId: input.clientId ?? crypto.randomUUID() });
 }
 
 export function listSales(query: SalesQueryInput): Promise<SalesPage> {

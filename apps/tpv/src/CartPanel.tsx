@@ -6,6 +6,7 @@ import { CartLines } from './cart/CartLines.js';
 import { CartSummary } from './cart/CartSummary.js';
 import { DiscountModal } from './DiscountModal.js';
 import { useCart } from './lib/cart.js';
+import { enqueueSale, ticketsRemaining } from './lib/offline-sales.js';
 import { createSale } from './lib/sales.js';
 import { type PaymentData, PaymentModal } from './PaymentModal.js';
 
@@ -51,24 +52,41 @@ export function CartPanel({
     if (!storeId || items.length === 0) return;
     setBusy(true);
     setError(null);
+    const input = {
+      storeId,
+      lines: items.map((i) => ({
+        productId: i.productId,
+        qty: i.qty,
+        // El importe fijo tiene precedencia sobre el % (igual que el servidor).
+        ...(i.discountAmt > 0
+          ? { discountAmt: i.discountAmt }
+          : i.discountPct > 0
+            ? { discountPct: i.discountPct }
+            : {}),
+      })),
+      paymentMethod: payment.paymentMethod,
+      ...(payment.cashGiven !== undefined ? { cashGiven: payment.cashGiven } : {}),
+      ...(ticketDiscountAmt > 0 ? { ticketDiscountAmt } : {}),
+      ...(ticketDiscountAmt === 0 && ticketDiscountPct > 0 ? { ticketDiscountPct } : {}),
+    };
     try {
-      const sale = await createSale({
-        storeId,
-        lines: items.map((i) => ({
-          productId: i.productId,
-          qty: i.qty,
-          // El importe fijo tiene precedencia sobre el % (igual que el servidor).
-          ...(i.discountAmt > 0
-            ? { discountAmt: i.discountAmt }
-            : i.discountPct > 0
-              ? { discountPct: i.discountPct }
-              : {}),
-        })),
-        paymentMethod: payment.paymentMethod,
-        ...(payment.cashGiven !== undefined ? { cashGiven: payment.cashGiven } : {}),
-        ...(ticketDiscountAmt > 0 ? { ticketDiscountAmt } : {}),
-        ...(ticketDiscountAmt === 0 && ticketDiscountPct > 0 ? { ticketDiscountPct } : {}),
-      });
+      // Sin conexión: encola la venta con un nº del bloque reservado y confirma en
+      // el momento (offline slice 2c). Se sincroniza al reconectar (idempotente).
+      if (!navigator.onLine) {
+        const queued = enqueueSale(input, total.toFixed(2));
+        if (!queued) {
+          setError(
+            'Sin conexión y sin bloque de tickets reservado. Conéctate un momento para reservar números.',
+          );
+          return;
+        }
+        setModalOpen(false);
+        clear();
+        onSaleConfirmed?.({ ticketNumber: queued.ticketNumber, total: queued.total });
+        return;
+      }
+
+      const sale = await createSale(input);
       setModalOpen(false);
       clear();
       onSaleConfirmed?.({ ticketNumber: sale.ticketNumber, total: sale.total });
@@ -87,7 +105,10 @@ export function CartPanel({
     }
   }
 
-  const canCheckout = items.length > 0 && !!storeId && cashOpen && apiHealthy;
+  // Se puede cobrar si la API está sana (online) o, sin conexión, si hay un
+  // bloque de tickets reservado para vender offline (offline slice 2c).
+  const offlineCapable = !!storeId && ticketsRemaining(storeId) > 0;
+  const canCheckout = items.length > 0 && !!storeId && cashOpen && (apiHealthy || offlineCapable);
 
   // Desglose de IVA (21%) desde el total, calculado en cliente para el mockup.
   const base = total > 0 ? total / 1.21 : 0;
