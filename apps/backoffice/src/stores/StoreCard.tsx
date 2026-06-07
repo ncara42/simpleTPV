@@ -7,14 +7,16 @@ export function StoreCard({
   sales,
   periodLabel,
   onSelect,
-  onToggleActive,
+  onOpenStock,
+  onOpenSales,
 }: {
   store: Store;
   active: boolean;
   sales: number;
   periodLabel: string;
   onSelect: () => void;
-  onToggleActive: () => void;
+  onOpenStock: () => void;
+  onOpenSales: () => void;
 }) {
   return (
     <div
@@ -76,19 +78,30 @@ export function StoreCard({
         <span className={`store-status-text${active ? '' : ' muted'}`} data-testid="store-status">
           {active ? 'Activa' : 'Dormida'}
         </span>
-        <button
-          type="button"
-          className={`store-switch${active ? ' on' : ''}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleActive();
-          }}
-          data-testid="store-toggle"
-          aria-label={active ? 'Dormir tienda' : 'Despertar tienda'}
-          aria-pressed={active}
-        >
-          <span className="store-switch-knob" />
-        </button>
+        <span className="store-card-actions">
+          <button
+            type="button"
+            className="link-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenStock();
+            }}
+            data-testid="store-open-stock"
+          >
+            Stock
+          </button>
+          <button
+            type="button"
+            className="link-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenSales();
+            }}
+            data-testid="store-open-sales"
+          >
+            Ventas
+          </button>
+        </span>
       </div>
     </div>
   );

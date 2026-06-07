@@ -156,7 +156,7 @@ Patrón de uso: **`-soft` como fondo + `ink` como texto/icono** (píldoras de es
 
 ---
 
-## 5. Forma (radios)
+## 5. Forma y espaciado
 
 Escala única por rol (`--ui-radius-*`). En la **Fundación Apple** se sobre-escriben tres a 8/12/18:
 
@@ -175,6 +175,24 @@ Escala única por rol (`--ui-radius-*`). En la **Fundación Apple** se sobre-esc
 - **TPV:** la cápsula se aplica **selectivamente** (lista explícita: `.btn-primary`, `.cart-*`, `.pay-*`, `.cash-*`, `.scan-btn`, `.tpv-tab`, inputs de búsqueda…) porque es un POS: la **cuadrícula de producto** (`.prod-card` es un `<button>`) y los **steppers +/-** conservan su radio propio; los `<textarea>` quedan fuera.
 
 **Altura de control estándar del backoffice:** `--bo-control-height: calc(30px + 0.36rem + 2px)` (≈ 39.76px). Iguala la altura exterior de las pills de periodo/tab para que toda cabecera de control alinee.
+
+### 5.1 Espaciado (tokens `--ui-space-*`)
+
+Escala base **0.25rem (4px)**. Es la **paleta de espaciados** de la UI: usar SIEMPRE estos tokens para `padding`, `margin` y `gap`. **No hardcodear medidas**; si falta un paso, añadirlo a `theme.css`, no al componente.
+
+| Token           | Valor   | px  | Uso                                   |
+| --------------- | ------- | --- | ------------------------------------- |
+| `--ui-space-1`  | 0.25rem | 4   | micro: gaps de iconos, chips          |
+| `--ui-space-2`  | 0.5rem  | 8   | gaps de controles, padding de badge   |
+| `--ui-space-3`  | 0.75rem | 12  | gaps de formulario, padding compacto  |
+| `--ui-space-4`  | 1rem    | 16  | **padding estándar de panel / celda** |
+| `--ui-space-5`  | 1.25rem | 20  | padding cómodo de tarjeta             |
+| `--ui-space-6`  | 1.5rem  | 24  | separación entre secciones            |
+| `--ui-space-7`  | 1.75rem | 28  | padding de modal                      |
+| `--ui-space-8`  | 2rem    | 32  | padding amplio / superficies grandes  |
+| `--ui-space-10` | 2.5rem  | 40  | separaciones de página                |
+
+Convención: el **padding interior de un panel de contenido** es `--ui-space-4` (cómodo `--ui-space-5`); el **gap entre secciones de formulario**, `--ui-space-6`; el **padding de badge/píldora**, `--ui-space-1`/`--ui-space-2`.
 
 ---
 

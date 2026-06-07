@@ -2,6 +2,7 @@ import type { PurchaseOrder } from '@simpletpv/auth';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { Modal } from '../components/Modal.js';
 import {
   confirmPurchaseOrder,
   getPurchaseOrder,
@@ -67,7 +68,7 @@ export function OrdersSection() {
                 <td className="muted">{new Date(o.createdAt).toLocaleDateString('es-ES')}</td>
                 <td>{o.lines.length}</td>
                 <td>
-                  <span className="stock-tag" data-testid="order-status">
+                  <span className="status-badge" data-testid="order-status">
                     {STATUS_LABEL[o.status]}
                   </span>
                 </td>
@@ -124,70 +125,68 @@ function OrderDetailModal({ id, onClose }: { id: string; onClose: () => void }) 
   });
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="order-modal">
-        <h3>Pedido</h3>
-        {isLoading || !order ? (
-          <p className="catalog-empty">Cargando…</p>
-        ) : (
-          <>
-            <p className="muted" data-testid="order-kpis">
-              Estado: {STATUS_LABEL[order.status]} · Fill rate:{' '}
-              {order.kpis?.fillRate != null ? `${Math.round(order.kpis.fillRate * 100)}%` : '—'} ·
-              Lead time: {order.kpis?.leadTimeDays != null ? `${order.kpis.leadTimeDays} d` : '—'}
-            </p>
-            <table className="catalog-table" data-testid="order-lines">
-              <thead>
-                <tr>
-                  <th>Pedido</th>
-                  <th>Recibido</th>
+    <Modal onClose={onClose} testId="order-modal" ariaLabel="Detalle del pedido">
+      <h3>Pedido</h3>
+      {isLoading || !order ? (
+        <p className="catalog-empty">Cargando…</p>
+      ) : (
+        <>
+          <p className="muted" data-testid="order-kpis">
+            Estado: {STATUS_LABEL[order.status]} · Fill rate:{' '}
+            {order.kpis?.fillRate != null ? `${Math.round(order.kpis.fillRate * 100)}%` : '—'} ·
+            Lead time: {order.kpis?.leadTimeDays != null ? `${order.kpis.leadTimeDays} d` : '—'}
+          </p>
+          <table className="catalog-table" data-testid="order-lines">
+            <thead>
+              <tr>
+                <th>Pedido</th>
+                <th>Recibido</th>
+                {(order.status === 'CONFIRMED' || order.status === 'PARTIALLY_RECEIVED') && (
+                  <th>Recibir ahora</th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {order.lines.map((l) => (
+                <tr key={l.id} data-testid="order-line">
+                  <td>{l.quantityOrdered}</td>
+                  <td>{l.quantityReceived}</td>
                   {(order.status === 'CONFIRMED' || order.status === 'PARTIALLY_RECEIVED') && (
-                    <th>Recibir ahora</th>
+                    <td>
+                      <input
+                        type="number"
+                        min={0}
+                        value={received[l.id] ?? ''}
+                        onChange={(e) => setReceived({ ...received, [l.id]: e.target.value })}
+                        data-testid="receive-input"
+                        style={{ width: '5rem' }}
+                      />
+                    </td>
                   )}
                 </tr>
-              </thead>
-              <tbody>
-                {order.lines.map((l) => (
-                  <tr key={l.id} data-testid="order-line">
-                    <td>{l.quantityOrdered}</td>
-                    <td>{l.quantityReceived}</td>
-                    {(order.status === 'CONFIRMED' || order.status === 'PARTIALLY_RECEIVED') && (
-                      <td>
-                        <input
-                          type="number"
-                          min={0}
-                          value={received[l.id] ?? ''}
-                          onChange={(e) => setReceived({ ...received, [l.id]: e.target.value })}
-                          data-testid="receive-input"
-                          style={{ width: '5rem' }}
-                        />
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {(order.status === 'CONFIRMED' || order.status === 'PARTIALLY_RECEIVED') && (
-              <div className="modal-foot">
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={receiveMut.isPending}
-                  onClick={() => receiveMut.mutate(order)}
-                  data-testid="receive-confirm"
-                >
-                  Confirmar recepción
-                </button>
-              </div>
-            )}
-          </>
-        )}
-        <div className="modal-foot">
-          <button type="button" onClick={onClose}>
-            Cerrar
-          </button>
-        </div>
+              ))}
+            </tbody>
+          </table>
+          {(order.status === 'CONFIRMED' || order.status === 'PARTIALLY_RECEIVED') && (
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={receiveMut.isPending}
+                onClick={() => receiveMut.mutate(order)}
+                data-testid="receive-confirm"
+              >
+                Confirmar recepción
+              </button>
+            </div>
+          )}
+        </>
+      )}
+      <div className="modal-foot">
+        <button type="button" onClick={onClose}>
+          Cerrar
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }

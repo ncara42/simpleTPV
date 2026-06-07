@@ -2,13 +2,9 @@ import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
-import {
-  DEMO_FAMILIES,
-  DEMO_PRODUCT_STOCK,
-  familyPathLabel,
-  findFamily,
-  stockLevel,
-} from './demo/demoData.js';
+import { Modal } from './components/Modal.js';
+import { DEMO_FAMILIES, DEMO_PRODUCT_STOCK, familyPathLabel, stockLevel } from './demo/demoData.js';
+import { flattenTree, isDescendantOf } from './lib/family-tree.js';
 import { usePageHeader } from './lib/pageHeader.js';
 import {
   createProduct,
@@ -27,8 +23,9 @@ interface FormState {
   barcode: string | null;
   costPrice: number;
   taxRate: number;
-  familyId: string | null; // familia raíz seleccionada
-  subfamilyId: string | null; // subfamilia seleccionada (opcional, dentro de la familia)
+  // Arquetipo efectivo del producto: el id del nodo elegido en el selector
+  // jerárquico, a cualquier profundidad (raíz, sub o sub-sub…).
+  familyId: string | null;
 }
 
 // Asistente de edición en lote: cola de productos seleccionados + paso actual.
@@ -45,11 +42,9 @@ const EMPTY: FormState = {
   costPrice: 0,
   taxRate: 21,
   familyId: null,
-  subfamilyId: null,
 };
 
 function toForm(p: Product): FormState {
-  const { family, sub } = findFamily(p.familyId);
   return {
     id: p.id,
     name: p.name,
@@ -58,8 +53,7 @@ function toForm(p: Product): FormState {
     barcode: p.barcode,
     costPrice: Number(p.costPrice),
     taxRate: Number(p.taxRate),
-    familyId: family?.id ?? null,
-    subfamilyId: sub?.id ?? null,
+    familyId: p.familyId,
   };
 }
 
@@ -71,8 +65,7 @@ function toPayload(f: FormState): ProductInput {
     barcode: f.barcode || null,
     costPrice: Number(f.costPrice ?? 0),
     taxRate: Number(f.taxRate ?? 21),
-    // La familia efectiva del producto es la subfamilia si se eligió; si no, la raíz.
-    familyId: f.subfamilyId ?? f.familyId,
+    familyId: f.familyId,
   };
 }
 
@@ -85,9 +78,16 @@ function toPatch(f: FormState): Partial<Product> {
     barcode: f.barcode || null,
     costPrice: String(f.costPrice ?? 0),
     taxRate: String(f.taxRate ?? 21),
-    familyId: f.subfamilyId ?? f.familyId,
+    familyId: f.familyId,
   };
 }
+
+// Opciones jerárquicas de arquetipo (todos los niveles, con sangría por profundidad).
+const archetypeOptions = (): { value: string; label: string }[] =>
+  flattenTree(DEMO_FAMILIES).map((f) => ({
+    value: f.node.id,
+    label: `${'– '.repeat(f.depth)}${f.node.name}`,
+  }));
 
 export function CatalogPage() {
   const qc = useQueryClient();
@@ -114,11 +114,14 @@ export function CatalogPage() {
     return [...base, ...extras].filter((p) => !deleted.includes(p.id));
   }, [products, overrides, extras, deleted]);
 
-  // Filtro por familia raíz (la búsqueda por texto ya la resuelve listProducts).
+  // Filtro por arquetipo: el nodo elegido y todo su subárbol (la búsqueda por
+  // texto ya la resuelve listProducts).
   const filtered = useMemo<Product[]>(
     () =>
       allProducts.filter(
-        (p) => !familyFilter || findFamily(p.familyId).family?.id === familyFilter,
+        (p) =>
+          !familyFilter ||
+          (p.familyId != null && isDescendantOf(DEMO_FAMILIES, familyFilter, p.familyId)),
       ),
     [allProducts, familyFilter],
   );
@@ -210,11 +213,6 @@ export function CatalogPage() {
     }
   };
 
-  // Subfamilias disponibles para la familia raíz elegida (selector dependiente).
-  const subfamilies = form?.familyId
-    ? (DEMO_FAMILIES.find((fam) => fam.id === form.familyId)?.children ?? [])
-    : [];
-
   // Etiqueta del botón primario: "Siguiente (n / total)" mientras quedan productos
   // en la cola; "Guardar" en el último paso (o en alta/edición única).
   const total = wizard?.queue.length ?? 0;
@@ -248,12 +246,9 @@ export function CatalogPage() {
               className="catalog-search"
               value={familyFilter}
               onChange={setFamilyFilter}
-              ariaLabel="Filtrar por familia"
+              ariaLabel="Filtrar por arquetipo"
               data-testid="catalog-family-filter"
-              options={[
-                { value: '', label: 'Todas las familias' },
-                ...DEMO_FAMILIES.map((fam) => ({ value: fam.id, label: fam.name })),
-              ]}
+              options={[{ value: '', label: 'Todos los arquetipos' }, ...archetypeOptions()]}
             />
             {selected.length > 0 && (
               <>
@@ -321,7 +316,7 @@ export function CatalogPage() {
               <tr>
                 <th className="users-select-col" aria-label="Selección" />
                 <th>Nombre</th>
-                <th>Familia</th>
+                <th>Arquetipo</th>
                 <th>SKU</th>
                 <th>Precio</th>
                 <th>IVA</th>
@@ -374,115 +369,88 @@ export function CatalogPage() {
       </div>
 
       {form && (
-        <div className="modal-backdrop" onClick={closeModal}>
-          <form
-            className="modal modal--form"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={(e) => {
-              e.preventDefault();
-              submitForm();
-            }}
-            data-testid="product-form"
-          >
-            <h3>{wizard ? 'Editar producto' : 'Nuevo producto'}</h3>
+        <Modal
+          onClose={closeModal}
+          className="modal--form"
+          testId="product-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submitForm();
+          }}
+        >
+          <h3>{wizard ? 'Editar producto' : 'Nuevo producto'}</h3>
+          <label>
+            Nombre
+            <input
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              data-testid="form-name"
+            />
+          </label>
+          <label>
+            Arquetipo
+            <Select
+              value={form.familyId ?? ''}
+              onChange={(value) => setForm({ ...form, familyId: value || null })}
+              options={[{ value: '', label: '— Sin arquetipo —' }, ...archetypeOptions()]}
+              ariaLabel="Arquetipo"
+              data-testid="form-family"
+            />
+          </label>
+          <div className="modal-row">
             <label>
-              Nombre
+              Precio venta (€)
               <input
+                type="number"
+                step="0.01"
                 required
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                data-testid="form-name"
+                value={form.salePrice}
+                onChange={(e) => setForm({ ...form, salePrice: Number(e.target.value) })}
+                data-testid="form-price"
               />
             </label>
-            <div className="modal-row">
-              <label>
-                Familia
-                <Select
-                  value={form.familyId ?? ''}
-                  onChange={(value) =>
-                    setForm({ ...form, familyId: value || null, subfamilyId: null })
-                  }
-                  options={[
-                    { value: '', label: '— Sin familia —' },
-                    ...DEMO_FAMILIES.map((fam) => ({ value: fam.id, label: fam.name })),
-                  ]}
-                  ariaLabel="Familia"
-                  data-testid="form-family"
-                />
-              </label>
-              <label>
-                Subfamilia
-                <Select
-                  value={form.subfamilyId ?? ''}
-                  disabled={subfamilies.length === 0}
-                  onChange={(value) => setForm({ ...form, subfamilyId: value || null })}
-                  options={[
-                    {
-                      value: '',
-                      label:
-                        subfamilies.length === 0 ? '— Sin subfamilias —' : '— Toda la familia —',
-                    },
-                    ...subfamilies.map((sub) => ({ value: sub.id, label: sub.name })),
-                  ]}
-                  ariaLabel="Subfamilia"
-                  data-testid="form-subfamily"
-                />
-              </label>
-            </div>
-            <div className="modal-row">
-              <label>
-                Precio venta (€)
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={form.salePrice}
-                  onChange={(e) => setForm({ ...form, salePrice: Number(e.target.value) })}
-                  data-testid="form-price"
-                />
-              </label>
-              <label>
-                IVA (%)
-                <input
-                  type="number"
-                  step="1"
-                  value={form.taxRate}
-                  onChange={(e) => setForm({ ...form, taxRate: Number(e.target.value) })}
-                />
-              </label>
-            </div>
-            <div className="modal-row">
-              <label>
-                SKU
-                <input
-                  value={form.sku ?? ''}
-                  onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                />
-              </label>
-              <label>
-                Código de barras
-                <input
-                  value={form.barcode ?? ''}
-                  onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-                />
-              </label>
-            </div>
-            {createMut.isError && <p className="form-error">No se pudo guardar.</p>}
-            <div className="modal-foot">
-              <button type="button" onClick={closeModal}>
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={createMut.isPending}
-                data-testid="form-save"
-              >
-                {primaryLabel}
-              </button>
-            </div>
-          </form>
-        </div>
+            <label>
+              IVA (%)
+              <input
+                type="number"
+                step="1"
+                value={form.taxRate}
+                onChange={(e) => setForm({ ...form, taxRate: Number(e.target.value) })}
+              />
+            </label>
+          </div>
+          <div className="modal-row">
+            <label>
+              SKU
+              <input
+                value={form.sku ?? ''}
+                onChange={(e) => setForm({ ...form, sku: e.target.value })}
+              />
+            </label>
+            <label>
+              Código de barras
+              <input
+                value={form.barcode ?? ''}
+                onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+              />
+            </label>
+          </div>
+          {createMut.isError && <p className="form-error">No se pudo guardar.</p>}
+          <div className="modal-foot">
+            <button type="button" onClick={closeModal}>
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={createMut.isPending}
+              data-testid="form-save"
+            >
+              {primaryLabel}
+            </button>
+          </div>
+        </Modal>
       )}
     </section>
   );

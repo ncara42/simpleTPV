@@ -3,11 +3,13 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { SentryGlobalFilter } from '@sentry/nestjs/setup';
 
+import { ApiKeysModule } from './api-keys/api-keys.module.js';
 import { AuditInterceptor } from './audit/audit.interceptor.js';
 import { AuthGuard } from './auth/auth.guard.js';
 import { AuthModule } from './auth/auth.module.js';
 import { RolesGuard } from './auth/roles.guard.js';
 import { TenantContextInterceptor } from './auth/tenant-context.interceptor.js';
+import { B2bModule } from './b2b/b2b.module.js';
 import { CacheModule } from './cache/cache.module.js';
 import { CashSessionsModule } from './cash-sessions/cash-sessions.module.js';
 import { throttleConfig } from './config/security.js';
@@ -20,6 +22,7 @@ import { MeModule } from './me/me.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProductFamiliesModule } from './product-families/product-families.module.js';
 import { ProductsModule } from './products/products.module.js';
+import { PublicModule } from './public/public.module.js';
 import { PurchasesModule } from './purchases/purchases.module.js';
 import { ReturnsModule } from './returns/returns.module.js';
 import { SalesModule } from './sales/sales.module.js';
@@ -46,6 +49,7 @@ const throttle = throttleConfig(process.env);
     HealthModule,
     ProductsModule,
     ProductFamiliesModule,
+    B2bModule,
     UsersModule,
     StoresModule,
     SalesModule,
@@ -61,6 +65,8 @@ const throttle = throttleConfig(process.env);
     MeModule,
     DevicesModule,
     TimeClockModule,
+    ApiKeysModule,
+    PublicModule,
   ],
   // Orden de guards: AuthGuard primero (popula request.user desde el JWT),
   // luego RolesGuard (lee user.role). Los APP_GUARD corren en orden de registro.

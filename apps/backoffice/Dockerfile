@@ -26,6 +26,12 @@ FROM deps AS builder
 # build arg. Pásalo solo si los dominios no siguen el patrón admin/tpv.
 ARG VITE_TPV_URL
 ENV VITE_TPV_URL=$VITE_TPV_URL
+# Modo demo OPT-IN (A-02): por defecto la imagen se hornea en modo REAL (exige login
+# real contra la API). NUNCA debe ser el default — sería un panel de administración
+# con login ADMIN falso sin autenticación. Para presentaciones con datos demo, pasar
+# EXPLÍCITAMENTE --build-arg VITE_DEMO_MODE=true.
+ARG VITE_DEMO_MODE
+ENV VITE_DEMO_MODE=$VITE_DEMO_MODE
 COPY . .
 RUN pnpm --filter @simpletpv/backoffice run build
 

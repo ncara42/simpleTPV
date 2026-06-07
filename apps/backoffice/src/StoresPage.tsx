@@ -1,4 +1,3 @@
-import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
@@ -14,20 +13,6 @@ import { StoreCard } from './stores/StoreCard.js';
 import { StoreDetailModal } from './stores/StoreDetailModal.js';
 import { type StoreForm, StoreFormModal } from './stores/StoreFormModal.js';
 
-type StatusFilter = 'all' | 'activa' | 'dormida';
-
-const PERIODS: { id: StoreSalesPeriod; label: string }[] = [
-  { id: 'today', label: 'Hoy' },
-  { id: 'week', label: '7 días' },
-  { id: 'month', label: 'Mes' },
-];
-
-const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
-  { id: 'all', label: 'Todas' },
-  { id: 'activa', label: 'Activas' },
-  { id: 'dormida', label: 'Dormidas' },
-];
-
 // Etiqueta de la cifra de ventas en lenguaje natural (la card es para no técnicos).
 const SALES_LABEL: Record<StoreSalesPeriod, string> = {
   today: 'Ventas de hoy',
@@ -39,13 +24,15 @@ function salesOf(storeId: string, period: StoreSalesPeriod): number {
   return DEMO_STORE_SALES[storeId]?.[period] ?? 0;
 }
 
-export function StoresPage() {
+export function StoresPage({
+  onOpenStoreView,
+}: {
+  onOpenStoreView: (view: 'stock' | 'sales', storeId: string) => void;
+}) {
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
-  const [period, setPeriod] = useState<StoreSalesPeriod>('today');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  // Override local del estado activa/dormida (demo: no hay backend que persista).
-  const [activeOverrides, setActiveOverrides] = useState<Record<string, boolean>>({});
+  // El panel solo observa el estado (no lo modifica) y ordena por ventas de hoy.
+  const period: StoreSalesPeriod = 'today';
   // Estado operativo (fichaje) y dispositivo por tienda; editable en local (demo).
   const [ops, setOps] = useState<Record<string, StoreOps>>(() =>
     Object.fromEntries(Object.entries(DEMO_STORE_OPS).map(([k, v]) => [k, { ...v }])),
@@ -74,49 +61,21 @@ export function StoresPage() {
   // Tiendas no muestra el botón Borrar en las cards.
   void deleteStore;
 
-  const isActive = (s: Store): boolean => activeOverrides[s.id] ?? s.active;
-  const toggleActive = (s: Store): void =>
-    setActiveOverrides((prev) => ({ ...prev, [s.id]: !(prev[s.id] ?? s.active) }));
-
   const opsOf = (id: string): StoreOps | undefined => ops[id];
   const patchOps = (id: string, patch: Partial<StoreOps>): void =>
     setOps((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
 
-  // Orden por ventas del periodo (desc) + filtro por estado administrativo (#101, #103).
-  const visibleStores = useMemo(() => {
-    return [...stores]
-      .filter((s) => {
-        const active = activeOverrides[s.id] ?? s.active;
-        if (statusFilter === 'activa') return active;
-        if (statusFilter === 'dormida') return !active;
-        return true;
-      })
-      .sort((a, b) => salesOf(b.id, period) - salesOf(a.id, period));
-  }, [stores, statusFilter, period, activeOverrides]);
+  // Orden por ventas de hoy (desc). Sin filtros: el panel solo crea y observa.
+  const visibleStores = useMemo(
+    () => [...stores].sort((a, b) => salesOf(b.id, period) - salesOf(a.id, period)),
+    [stores, period],
+  );
 
   usePageHeader('Tiendas', `${stores.length} ubicaciones`);
 
   return (
     <section className="catalog">
       <div className="stores-toolbar">
-        <div className="stores-filters">
-          <Select
-            className="stores-filter-select"
-            value={statusFilter}
-            onChange={(v) => setStatusFilter(v as StatusFilter)}
-            ariaLabel="Filtrar por estado"
-            data-testid="store-status-filter"
-            options={STATUS_FILTERS.map((f) => ({ value: f.id, label: f.label }))}
-          />
-          <Select
-            className="stores-filter-select"
-            value={period}
-            onChange={(v) => setPeriod(v as StoreSalesPeriod)}
-            ariaLabel="Ordenar por ventas del periodo"
-            data-testid="store-period"
-            options={PERIODS.map((p) => ({ value: p.id, label: p.label }))}
-          />
-        </div>
         <button
           className="btn-primary stock-tabs-action"
           onClick={() => setCreating(true)}
@@ -132,21 +91,18 @@ export function StoresPage() {
         <p className="catalog-empty" data-testid="stores-empty">
           Sin tiendas. Crea la primera.
         </p>
-      ) : visibleStores.length === 0 ? (
-        <p className="catalog-empty" data-testid="stores-filter-empty">
-          Ninguna tienda con ese estado.
-        </p>
       ) : (
         <div className="store-grid" data-testid="stores-grid">
           {visibleStores.map((s) => (
             <StoreCard
               key={s.id}
               store={s}
-              active={isActive(s)}
+              active={s.active}
               sales={salesOf(s.id, period)}
               periodLabel={SALES_LABEL[period]}
               onSelect={() => setDetail(s)}
-              onToggleActive={() => toggleActive(s)}
+              onOpenStock={() => onOpenStoreView('stock', s.id)}
+              onOpenSales={() => onOpenStoreView('sales', s.id)}
             />
           ))}
         </div>

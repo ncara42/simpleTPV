@@ -119,8 +119,8 @@ export function LoginForm({ onSubmit, initialEmail = '', initialPassword = '' }:
         <div className="login-brand-grain" aria-hidden="true" />
 
         <div className="login-brand-logo">
-          <span className="login-brand-name">qrush</span>
-          <span className="login-brand-suffix">retail</span>
+          <span className="login-brand-name">simple</span>
+          <span className="login-brand-suffix">TPV</span>
         </div>
 
         <div className="login-brand-copy">

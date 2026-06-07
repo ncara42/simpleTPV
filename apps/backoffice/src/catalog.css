@@ -31,11 +31,40 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Píldora de estado canónica: fondo -soft + texto ink (patrón del design system).
+   Variantes por tono; neutral por defecto. Unifica los badges de estado del
+   backoffice (traspasos, compras, etc.). El <Badge> de packages/ui rinde igual. */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border-radius: var(--ui-radius-pill);
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.status-badge--success {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.status-badge--warning {
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
+}
+.status-badge--danger {
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+}
+
+/* Rol de usuario: misma píldora, tono de marca/éxito fijo. */
 .role-badge {
-  display: inline-block;
-  padding: 0.15rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.78rem;
+  display: inline-flex;
+  align-items: center;
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border-radius: var(--ui-radius-pill);
+  font-size: var(--ui-text-xs);
   font-weight: 600;
   background: var(--ui-success-soft);
   color: var(--ui-success);
@@ -1728,12 +1757,24 @@
 .sales-view-remove:hover {
   color: var(--ui-danger, #c0392b);
 }
-.sales-sentinel,
-.sales-end {
-  padding: 1rem;
-  text-align: center;
+/* Botón de export: empuja a la derecha del toolbar del DataTable (IT-06). */
+.sales-export {
+  margin-left: auto;
+}
+
+/* Pie de agregados del historial (count, total, margen y descuento medios). */
+.sales-totals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 1.25rem;
   font-size: 0.85rem;
   color: var(--ui-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.sales-totals strong {
+  color: var(--ui-text);
+  font-weight: 600;
 }
 
 .modal select {
@@ -1785,6 +1826,13 @@
 .stock-tag.stock-green {
   background: none;
   color: inherit;
+}
+/* Anti-rotura por arquetipo (IT-13): nota de que hay sustituto en la familia →
+   la rotura está degradada (no crítica). */
+.alert-substitute {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--ui-text-muted);
 }
 
 /* ─── Stock: banda de métricas, panel envolvente y etiqueta de rotación (#96) ─── */
@@ -1868,12 +1916,19 @@
   overflow: hidden;
   box-shadow: var(--ui-shadow-sm);
 }
+/* Variante para paneles de CONTENIDO libre (no tabla): Ayuda, etc. La base
+   .table-panel no lleva padding porque en las tablas lo aportan la cabecera y las
+   celdas; cuando el panel contiene contenido suelto necesita padding propio. */
+.table-panel--content {
+  padding: var(--ui-space-5);
+}
 /* La barra de filtros/acciones es la cabecera del panel: separada por hairline
    y con el mismo tinte sutil que la fila de cabeceras de la tabla, para que
    toda la zona de chrome quede diferenciada de las filas de datos en blanco. */
 .table-panel > .sales-filters,
 .table-panel > .users-toolbar,
-.table-panel > .table-toolbar {
+.table-panel > .table-toolbar,
+.table-panel > .stock-filters {
   margin: 0;
   /* Altura mínima homogénea: TODA cabecera mide lo mismo tenga los controles
      que tenga. En las tablas con filtros la altura la fija la pill/búsqueda
@@ -2065,4 +2120,333 @@
 .link-btn:hover {
   background: var(--ui-surface-subtle);
   text-decoration: none;
+}
+
+/* ── B2B mayorista (IT-17) ──────────────────────────────────────────────────
+   Fila de alta de precio (tarifa) y de línea de pedido: selector + número +
+   acción, alineados horizontalmente. */
+.b2b-item-form {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+.b2b-item-form > .ui-select {
+  flex: 1 1 auto;
+  min-width: 10rem;
+}
+.b2b-item-form input[type='number'] {
+  width: 7rem;
+}
+.b2b-status-actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+/* ── API keys (IT-18) ───────────────────────────────────────────────────────
+   Banner de la key recién creada (visible una sola vez) + control de revelado. */
+.apikey-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-space-3);
+  /* Margen en los 4 lados: separa el banner de la cabecera y de los bordes del
+     panel (el .table-panel no lleva padding propio). */
+  margin: var(--ui-space-4);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  border: 1px solid var(--ui-warning);
+  background: var(--ui-warning-soft);
+  border-radius: var(--ui-radius-lg);
+}
+.apikey-banner-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  flex: 1 1 auto;
+}
+.apikey-reveal {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  flex-wrap: wrap;
+}
+.apikey-reveal-code {
+  padding: var(--ui-space-1) var(--ui-space-2);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  font-size: var(--ui-text-sm);
+  word-break: break-all;
+}
+.apikey-revoked {
+  margin: var(--ui-space-4);
+}
+.apikey-revoked summary {
+  cursor: pointer;
+  padding: var(--ui-space-2) 0;
+}
+
+/* ── Limpieza UX (IT-19) ────────────────────────────────────────────────────
+   Botón de acción destructiva (confirmar borrado/revocación) y modal de
+   confirmación estrecho. */
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--ui-danger);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-danger);
+  color: #fff;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s var(--ui-ease);
+}
+.btn-danger:hover {
+  opacity: 0.9;
+}
+.btn-danger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.modal--confirm {
+  max-width: 26rem;
+}
+
+/* ── Toasts (IT-19) ─────────────────────────────────────────────────────────
+   Notificaciones efímeras apiladas abajo a la derecha. */
+.toast-stack {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+.toast {
+  min-width: 14rem;
+  max-width: 24rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--ui-border);
+  border-left-width: 3px;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+  font-size: 0.9rem;
+  color: var(--ui-text);
+  animation: toast-in 0.18s var(--ui-ease);
+}
+.toast--success {
+  border-left-color: var(--ui-success);
+}
+.toast--error {
+  border-left-color: var(--ui-danger);
+}
+.toast--info {
+  border-left-color: var(--ui-primary);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.4rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Centro de ayuda / soporte (IT-20) ──────────────────────────────────────
+   Canales de contacto en tarjetas + FAQ en acordeón. */
+.help-title {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  margin: 0 0 var(--ui-space-2);
+}
+.help-intro {
+  margin: 0 0 var(--ui-space-5);
+}
+.help-channels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--ui-space-3);
+}
+.help-channel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ui-space-1);
+  padding: var(--ui-space-4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  text-decoration: none;
+  transition:
+    border-color 0.15s var(--ui-ease),
+    background 0.15s var(--ui-ease);
+}
+.help-channel:hover {
+  border-color: var(--ui-primary);
+  background: var(--ui-surface-subtle);
+}
+.help-channel-label {
+  font-weight: 600;
+}
+.help-channel-value {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
+}
+.help-faq {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}
+.help-faq-item {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  padding: 0 var(--ui-space-4);
+}
+.help-faq-item > summary {
+  cursor: pointer;
+  padding: var(--ui-space-3) 0;
+  font-weight: 500;
+  list-style: revert;
+}
+.help-faq-item > p {
+  margin: 0 0 var(--ui-space-3);
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-base);
+  line-height: 1.5;
+}
+
+/* ── Stock: filtros agrupados (producto vs tienda) + lista por tienda (UX) ───── */
+.stock-filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--ui-space-5);
+}
+.stock-filter-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+}
+/* Separador sutil entre el grupo "Producto" y el grupo "Tienda". */
+.stock-filter-group + .stock-filter-group {
+  padding-left: var(--ui-space-5);
+  border-left: 1px solid var(--ui-border);
+}
+.stock-filter-label {
+  font-size: var(--ui-text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ui-text-soft);
+}
+
+/* Lista compacta de existencias por tienda: punto de nivel + nombre + cantidad.
+   Apilado vertical → escala a muchas tiendas sin desbordar la celda. */
+.stock-store-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+  min-width: 12rem;
+}
+.stock-store-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--ui-space-2);
+  width: 100%;
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.12s var(--ui-ease),
+    border-color 0.12s var(--ui-ease);
+}
+.stock-store-item:hover {
+  background: var(--ui-surface-subtle);
+  border-color: var(--ui-border);
+}
+.stock-store-item:focus-visible {
+  outline: none;
+  border-color: var(--ui-primary);
+  box-shadow: var(--ui-focus);
+}
+.stock-store-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-success);
+}
+.stock-store-dot.sb-yellow {
+  background: var(--ui-warning);
+}
+.stock-store-dot.sb-red {
+  background: var(--ui-danger);
+}
+.stock-store-item-name {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stock-store-item-qty {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+
+/* ── Tiendas: accesos directos en la card + token de fichaje (UX) ───────────── */
+.store-card-actions {
+  display: inline-flex;
+  gap: var(--ui-space-2);
+}
+.store-device-token {
+  margin-top: var(--ui-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}
+
+/* ── Vista unificada Dashboard + Ventas (IT-19) ─────────────────────────────── */
+.overview-sales {
+  margin-top: var(--ui-space-6);
+}
+
+/* ── Promociones: chips de filtro por grupo (UX) ────────────────────────────── */
+.promo-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+}
+.promo-chip {
+  padding: var(--ui-space-1) var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.12s var(--ui-ease),
+    color 0.12s var(--ui-ease),
+    border-color 0.12s var(--ui-ease);
+}
+.promo-chip.is-on {
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg);
+  border-color: var(--ui-primary);
 }

@@ -9,24 +9,27 @@ vi.mock('./lib/families.js', () => ({
   deleteFamily: vi.fn(),
 }));
 
+import { ConfirmProvider } from './components/ConfirmProvider.js';
 import { FamiliesPage } from './FamiliesPage.js';
 
 function renderPage(): void {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <FamiliesPage />
+      <ConfirmProvider>
+        <FamiliesPage />
+      </ConfirmProvider>
     </QueryClientProvider>,
   );
 }
 
 describe('FamiliesPage', () => {
-  it('renderiza la cabecera y el botón de nueva familia', () => {
+  it('renderiza la cabecera y el botón de nuevo arquetipo', () => {
     renderPage();
     expect(screen.getByTestId('new-family')).toBeInTheDocument();
   });
 
-  it('muestra el vacío cuando no hay familias', async () => {
+  it('muestra el vacío cuando no hay arquetipos', async () => {
     renderPage();
     await waitFor(() => expect(screen.getByTestId('families-empty')).toBeInTheDocument());
   });

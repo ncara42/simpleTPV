@@ -7,9 +7,12 @@ import {
   IsNumber,
   IsString,
   IsUUID,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
+
+import { MAX_QUANTITY } from '../common/limits.js';
 
 // Configuración del stock mínimo de un producto en una tienda (#29).
 export class SetMinStockDto {
@@ -19,8 +22,10 @@ export class SetMinStockDto {
   @IsUUID()
   storeId!: string;
 
-  // El mínimo no puede ser negativo. 0 = sin umbral (solo alerta al agotarse).
+  // El mínimo no puede ser negativo. 0 = sin umbral (solo alerta al agotarse). Decimal(12,3).
+  @IsNumber({ maxDecimalPlaces: 3 })
   @Min(0)
+  @Max(MAX_QUANTITY)
   minStock!: number;
 }
 
@@ -33,9 +38,10 @@ export class AdjustStockDto {
   storeId!: string;
 
   // Cantidad nueva absoluta tras el recuento. No negativa. El servicio calcula
-  // el delta (newQuantity - actual) y lo aplica como movimiento ADJUSTMENT.
-  @IsNumber()
+  // el delta (newQuantity - actual) y lo aplica como movimiento ADJUSTMENT. Decimal(12,3).
+  @IsNumber({ maxDecimalPlaces: 3 })
   @Min(0)
+  @Max(MAX_QUANTITY)
   newQuantity!: number;
 
   // Motivo obligatorio del ajuste (recuento, merma, rotura...). Auditoría.
@@ -48,8 +54,9 @@ export class InventoryCountLineDto {
   @IsUUID()
   productId!: string;
 
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 3 })
   @Min(0)
+  @Max(MAX_QUANTITY)
   countedQuantity!: number;
 }
 

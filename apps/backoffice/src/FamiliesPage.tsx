@@ -2,6 +2,8 @@ import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
+import { useConfirm } from './components/ConfirmProvider.js';
+import { Modal } from './components/Modal.js';
 import {
   createFamily,
   deleteFamily,
@@ -9,7 +11,16 @@ import {
   listFamilies,
   updateFamily,
 } from './lib/families.js';
-import { countDescendants, moveToParent, removeNode } from './lib/family-tree.js';
+import {
+  countDescendants,
+  type DropPosition,
+  flattenTree,
+  insertChild,
+  isDescendantOf,
+  moveToParent,
+  removeNode,
+  reorderSiblings,
+} from './lib/family-tree.js';
 import { usePageHeader } from './lib/pageHeader.js';
 
 interface FormState {
@@ -18,8 +29,6 @@ interface FormState {
   parentId: string | null;
 }
 
-type DropPosition = 'before' | 'after';
-
 // Normaliza para buscar sin distinguir mayúsculas ni acentos.
 const norm = (s: string): string =>
   s
@@ -27,28 +36,6 @@ const norm = (s: string): string =>
     .toLowerCase()
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '');
-
-function reorderSiblings(
-  tree: FamilyNode[],
-  parentId: string | null,
-  fromId: string,
-  toId: string,
-  position: DropPosition,
-): FamilyNode[] {
-  const move = (list: FamilyNode[]): FamilyNode[] => {
-    const from = list.findIndex((n) => n.id === fromId);
-    const to = list.findIndex((n) => n.id === toId);
-    if (from < 0 || to < 0 || from === to) return list;
-    const next = [...list];
-    const [moved] = next.splice(from, 1);
-    const targetIndex = next.findIndex((n) => n.id === toId);
-    const insertAt = position === 'after' ? targetIndex + 1 : targetIndex;
-    next.splice(insertAt, 0, moved!);
-    return next;
-  };
-  if (parentId === null) return move(tree);
-  return tree.map((n) => (n.id === parentId ? { ...n, children: move(n.children) } : n));
-}
 
 interface RowActions {
   roots: FamilyNode[];
@@ -64,7 +51,7 @@ interface RowActions {
   onMoveTo: (childId: string, toParentId: string) => void;
   onEdit: (n: FamilyNode) => void;
   onAddChild: (parentId: string) => void;
-  onDelete: (n: FamilyNode) => void;
+  onDelete: (n: FamilyNode) => void | Promise<void>;
 }
 
 function FamilyRow({
@@ -81,6 +68,11 @@ function FamilyRow({
   const dragging = actions.dragId === node.id;
   const drop = actions.dropTarget?.id === node.id ? actions.dropTarget.position : null;
   const selected = actions.selectedId === node.id;
+  // Destinos válidos para "Mover": cualquier arquetipo salvo el propio subárbol y
+  // el padre actual. La sangría del label indica la profundidad del destino.
+  const moveOptions = flattenTree(actions.roots)
+    .filter((f) => !isDescendantOf(actions.roots, node.id, f.node.id) && f.node.id !== parentId)
+    .map((f) => ({ value: f.node.id, label: `${'– '.repeat(f.depth)}${f.node.name}` }));
   return (
     <>
       <div
@@ -130,23 +122,24 @@ function FamilyRow({
         </span>
         {selected && (
           <span className="fam-actions" onClick={(e) => e.stopPropagation()}>
-            {depth > 0 && parentId && (
+            {moveOptions.length > 0 && (
               <Select
                 className="fam-move-select"
-                value={parentId}
-                onChange={(value) => actions.onMoveTo(node.id, value)}
+                value=""
+                onChange={(value) => {
+                  if (value) actions.onMoveTo(node.id, value);
+                }}
                 triggerLabel="Mover"
-                options={actions.roots.map((r) => ({
-                  value: r.id,
-                  label: r.id === parentId ? r.name : `Mover a: ${r.name}`,
-                }))}
-                ariaLabel="Mover a otra familia"
+                options={[{ value: '', label: 'Mover bajo…' }, ...moveOptions]}
+                ariaLabel="Mover bajo otro arquetipo"
                 data-testid="fam-move-to"
               />
             )}
-            {depth === 0 && <button onClick={() => actions.onAddChild(node.id)}>+ Hija</button>}
+            <button onClick={() => actions.onAddChild(node.id)} data-testid="fam-add-child">
+              + Subnivel
+            </button>
             <button onClick={() => actions.onEdit(node)}>Editar</button>
-            <button className="danger" onClick={() => actions.onDelete(node)}>
+            <button className="danger" onClick={() => void actions.onDelete(node)}>
               Borrar
             </button>
           </span>
@@ -161,6 +154,7 @@ function FamilyRow({
 
 export function FamiliesPage() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [form, setForm] = useState<FormState | null>(null);
   // Toolbar de la tabla: búsqueda por nombre + filtro por familia raíz.
   const [search, setSearch] = useState('');
@@ -234,23 +228,15 @@ export function FamiliesPage() {
       setTree((prev) => {
         const base = prev ?? view;
         if (f.id) {
-          // Renombrar en el árbol (raíz o hija).
-          return base.map((n) =>
-            n.id === f.id
-              ? { ...n, name: f.name }
-              : {
-                  ...n,
-                  children: n.children.map((c) => (c.id === f.id ? { ...c, name: f.name } : c)),
-                },
-          );
+          // Renombrar en el árbol a cualquier profundidad.
+          const rename = (list: FamilyNode[]): FamilyNode[] =>
+            list.map((n) =>
+              n.id === f.id ? { ...n, name: f.name } : { ...n, children: rename(n.children) },
+            );
+          return rename(base);
         }
         const node: FamilyNode = { ...saved, children: [] };
-        if (f.parentId) {
-          return base.map((n) =>
-            n.id === f.parentId ? { ...n, children: [...n.children, node] } : n,
-          );
-        }
-        return [...base, node];
+        return f.parentId ? insertChild(base, f.parentId, node) : [...base, node];
       });
       setForm(null);
       invalidate();
@@ -283,13 +269,16 @@ export function FamiliesPage() {
   const onMoveTo = (childId: string, toParentId: string): void =>
     setTree((prev) => moveToParent(prev ?? view, childId, toParentId));
 
-  const onDelete = (node: FamilyNode): void => {
+  const onDelete = async (node: FamilyNode): Promise<void> => {
     const n = countDescendants(node);
-    if (
-      n > 0 &&
-      !window.confirm(`"${node.name}" tiene ${n} subfamilia(s). ¿Borrar todo el grupo?`)
-    ) {
-      return;
+    if (n > 0) {
+      const ok = await confirm({
+        title: 'Borrar arquetipo',
+        message: `"${node.name}" tiene ${n} subnivel(es). ¿Borrar todo el grupo?`,
+        confirmLabel: 'Borrar',
+        danger: true,
+      });
+      if (!ok) return;
     }
     delMut.mutate(node.id);
     setTree((prev) => removeNode(prev ?? view, node.id));
@@ -313,7 +302,7 @@ export function FamiliesPage() {
     onDelete,
   };
 
-  usePageHeader('Familias', 'Selecciona las familias e hijas para editar');
+  usePageHeader('Arquetipos', 'Agrupa los productos en arquetipos y subniveles');
 
   return (
     <section className="catalog">
@@ -323,7 +312,7 @@ export function FamiliesPage() {
             <span className="search-field">
               <input
                 className="catalog-search"
-                placeholder="Buscar familia…"
+                placeholder="Buscar arquetipo…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 data-testid="fam-search"
@@ -336,7 +325,7 @@ export function FamiliesPage() {
               ariaLabel="Filtrar por familia"
               data-testid="fam-filter"
               options={[
-                { value: '', label: 'Todas las familias' },
+                { value: '', label: 'Todos los arquetipos' },
                 ...view.map((r) => ({ value: r.id, label: r.name })),
               ]}
             />
@@ -346,7 +335,7 @@ export function FamiliesPage() {
             onClick={() => setForm({ name: '', parentId: null })}
             data-testid="new-family"
           >
-            Nueva familia
+            Nuevo arquetipo
           </button>
         </div>
 
@@ -354,11 +343,11 @@ export function FamiliesPage() {
           <p className="catalog-empty">Cargando…</p>
         ) : view.length === 0 ? (
           <p className="catalog-empty" data-testid="families-empty">
-            Sin familias. Crea la primera.
+            Sin arquetipos. Crea el primero.
           </p>
         ) : filtered.length === 0 ? (
           <p className="catalog-empty" data-testid="fam-empty">
-            Sin familias para la búsqueda.
+            Sin arquetipos para la búsqueda.
           </p>
         ) : (
           <div className="fam-tree" data-testid="fam-tree" ref={treeRef}>
@@ -370,49 +359,43 @@ export function FamiliesPage() {
       </div>
 
       {form && (
-        <div className="modal-backdrop" onClick={() => setForm(null)}>
-          <form
-            className="modal modal--form"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={(e) => {
-              e.preventDefault();
-              saveMut.mutate(form);
-            }}
-            data-testid="family-form"
-          >
-            <h3>
-              {form.id
-                ? 'Editar familia'
-                : form.parentId
-                  ? 'Nueva familia hija'
-                  : 'Nueva familia raíz'}
-            </h3>
-            <label>
-              Nombre
-              <input
-                required
-                autoFocus
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                data-testid="family-name"
-              />
-            </label>
-            {saveMut.isError && <p className="form-error">No se pudo guardar.</p>}
-            <div className="modal-foot">
-              <button type="button" onClick={() => setForm(null)}>
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={saveMut.isPending}
-                data-testid="family-save"
-              >
-                {saveMut.isPending ? 'Guardando…' : 'Guardar'}
-              </button>
-            </div>
-          </form>
-        </div>
+        <Modal
+          onClose={() => setForm(null)}
+          className="modal--form"
+          testId="family-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            saveMut.mutate(form);
+          }}
+        >
+          <h3>
+            {form.id ? 'Editar arquetipo' : form.parentId ? 'Nuevo subnivel' : 'Nuevo arquetipo'}
+          </h3>
+          <label>
+            Nombre
+            <input
+              required
+              autoFocus
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              data-testid="family-name"
+            />
+          </label>
+          {saveMut.isError && <p className="form-error">No se pudo guardar.</p>}
+          <div className="modal-foot">
+            <button type="button" onClick={() => setForm(null)}>
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={saveMut.isPending}
+              data-testid="family-save"
+            >
+              {saveMut.isPending ? 'Guardando…' : 'Guardar'}
+            </button>
+          </div>
+        </Modal>
       )}
     </section>
   );

@@ -1,0 +1,148 @@
+/* Sparkline + Chart — data-viz reutilizable. Sigue DESIGN_SYSTEM.md §10.15/§10.16:
+   un único acento (marca) + tintes `-soft` para severidad, línea base con hairline
+   marcado y "enfocar atenuando el resto". Hereda el tema vía --ui-*. */
+
+/* ── Sparkline (SVG full-bleed) ─────────────────────────────────────────────── */
+.ui-spark {
+  display: block;
+  width: 100%;
+}
+.ui-spark-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.ui-spark-area {
+  stroke: none;
+}
+.ui-spark-brand {
+  color: var(--ui-brand);
+}
+.ui-spark-brand .ui-spark-area {
+  fill: var(--ui-brand-soft);
+}
+.ui-spark-up {
+  color: var(--ui-success);
+}
+.ui-spark-up .ui-spark-area {
+  fill: var(--ui-success-soft);
+}
+.ui-spark-down {
+  color: var(--ui-danger);
+}
+.ui-spark-down .ui-spark-area {
+  fill: var(--ui-danger-soft);
+}
+
+/* ── Chart (barras verticales con comparación) ──────────────────────────────── */
+.ui-chart {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  gap: 0.75rem;
+}
+.ui-chart-group {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+  transition: opacity 0.18s var(--ui-ease, ease);
+  /* reset de <button> cuando la columna es interactiva (onSelect) */
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: default;
+}
+button.ui-chart-group {
+  cursor: pointer;
+}
+button.ui-chart-group:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: 2px;
+  border-radius: var(--ui-radius-sm, 6px);
+}
+/* Al enfocar/seleccionar una columna, las demás se atenúan; el hover siempre manda. */
+.ui-chart:hover .ui-chart-group:not(:hover) {
+  opacity: 0.4;
+}
+.ui-chart.has-selection .ui-chart-group:not(.is-selected) {
+  opacity: 0.4;
+}
+.ui-chart:hover .ui-chart-group:hover {
+  opacity: 1;
+}
+.ui-chart-pair {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.4rem;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border-bottom: 1px solid var(--ui-border-strong); /* línea base */
+}
+.ui-chart-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 26px;
+  max-width: 40%;
+  min-height: 4px;
+  padding-bottom: 0.4rem;
+  border-radius: 7px 7px 0 0;
+  overflow: hidden; /* recorta la cifra a la barra */
+  transform-origin: bottom;
+  animation: ui-bar-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+.ui-chart-bar-compare {
+  background: var(--ui-border-strong);
+}
+.ui-chart-bar-value {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ui-brand) 82%, #fff), var(--ui-brand));
+}
+@keyframes ui-bar-rise {
+  from {
+    transform: scaleY(0);
+  }
+}
+/* Cifra dentro de la barra, en vertical (lee de abajo arriba). */
+.ui-chart-bar-text {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  line-height: 1;
+}
+.ui-chart-bar-compare .ui-chart-bar-text {
+  color: var(--ui-text);
+}
+.ui-chart-bar-value .ui-chart-bar-text {
+  color: #fff;
+}
+.ui-chart-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--ui-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-chart-bar {
+    animation: none;
+  }
+}

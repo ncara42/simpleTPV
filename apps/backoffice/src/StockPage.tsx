@@ -5,7 +5,7 @@ import { api } from './lib/auth.js';
 import { usePageHeader } from './lib/pageHeader.js';
 import { GlobalStockSection } from './stock/GlobalStockSection.js';
 
-export function StockPage() {
+export function StockPage({ initialStoreId }: { initialStoreId?: string | null }) {
   const qc = useQueryClient();
 
   // Tiempo real (#33): el SSE invalida las queries de stock al recibir los
@@ -25,7 +25,7 @@ export function StockPage() {
 
   return (
     <section className="catalog" data-testid="stock-page">
-      <GlobalStockSection />
+      <GlobalStockSection initialStoreId={initialStoreId ?? null} />
     </section>
   );
 }

@@ -77,11 +77,15 @@ describe('Dashboard — integración', () => {
       qty: number;
       lineTotal: number;
       discountAmt?: number;
+      discountSource?: 'VOLUNTARY' | 'PROMOTION';
     }>,
     opts?: { discountTotal?: number },
   ): Promise<string> {
     const subtotal = lines.reduce((a, l) => a + l.lineTotal, 0);
-    const discountTotal = opts?.discountTotal ?? 0;
+    // discountTotal incluye los descuentos de línea (como en el TPV real); si el test
+    // pasa uno explícito (descuento de ticket) tiene precedencia.
+    const discountTotal =
+      opts?.discountTotal ?? lines.reduce((a, l) => a + (l.discountAmt ?? 0), 0);
     const total = subtotal - discountTotal;
     const rows = await admin.$queryRaw<Array<{ id: string }>>`
       INSERT INTO "Sale" ("id","organizationId","storeId","userId","ticketNumber","subtotal","discountTotal","total","paymentMethod","status","createdAt")
@@ -92,10 +96,15 @@ describe('Dashboard — integración', () => {
     `;
     const saleId = rows[0]!.id;
     for (const l of lines) {
+      // IT-03: el dashboard ahora calcula el margen con el coste CONGELADO en la
+      // línea (SaleLine.costPrice), no con el join a Product.costPrice. Sembrando
+      // directo (sin pasar por SalesService) hay que congelarlo a mano; el subquery
+      // copia el coste actual del producto, igual que SalesService al vender.
       await admin.$executeRaw`
-        INSERT INTO "SaleLine" ("id","organizationId","saleId","productId","name","unitPrice","qty","discountAmt","discountPct","taxRate","lineTotal")
+        INSERT INTO "SaleLine" ("id","organizationId","saleId","productId","name","unitPrice","qty","discountAmt","discountPct","discountSource","taxRate","costPrice","lineTotal")
         VALUES (gen_random_uuid(), ${orgId}::uuid, ${saleId}::uuid, ${l.productId}::uuid, ${TAG},
-                ${l.unitPrice}, ${l.qty}, ${l.discountAmt ?? 0}, 0, 21, ${l.lineTotal})
+                ${l.unitPrice}, ${l.qty}, ${l.discountAmt ?? 0}, 0, ${l.discountSource ?? 'VOLUNTARY'}::"DiscountSource", 21,
+                (SELECT "costPrice" FROM "Product" WHERE id = ${l.productId}::uuid), ${l.lineTotal})
       `;
     }
     return saleId;
@@ -166,9 +175,11 @@ describe('Dashboard — integración', () => {
     `;
     prodBId = pb[0]!.id;
 
-    // Ventas para sales-today (hoy vs ayer, reloj real) en la tienda exclusiva:
-    //  - HOY: prodA 2×100 = 200; prodB 1×50 = 50 con descuento ticket 5 → 45.
-    //  - AYER: prodA 1×100 = 100.
+    // Ventas para sales-today (hoy vs ayer, comparativa a la misma hora) en la
+    // tienda exclusiva. El test inyecta now = hoy 12:00:
+    //  - HOY (a las 9 y 11, ambas < 12): 200 + 45 (50 − 5 ticket) = 245.
+    //  - AYER a las 10 (< 12 → cuenta): 100.
+    //  - AYER a las 23 (> 12 → NO cuenta, prueba el cap "misma hora").
     await seedSale(org1Id, storeOwnId, todayAt(9), [
       { productId: prodAId, unitPrice: 100, qty: 2, lineTotal: 200 },
     ]);
@@ -180,6 +191,9 @@ describe('Dashboard — integración', () => {
       { discountTotal: 5 },
     );
     await seedSale(org1Id, storeOwnId, yesterdayAt(10), [
+      { productId: prodAId, unitPrice: 100, qty: 1, lineTotal: 100 },
+    ]);
+    await seedSale(org1Id, storeOwnId, yesterdayAt(23), [
       { productId: prodAId, unitPrice: 100, qty: 1, lineTotal: 100 },
     ]);
 
@@ -213,18 +227,27 @@ describe('Dashboard — integración', () => {
     await base.onModuleDestroy();
   });
 
-  it('sales-today: total de hoy, de ayer y delta % correctos', async () => {
+  it('sales-today: comparativa a la misma hora (STAT-01) + serie intradía', async () => {
+    // now inyectado a las 12:00 → ayer se capa a las 12:00 (la venta de ayer a las
+    // 23h NO cuenta). Determinista: no depende de la hora real del run.
     const res = await tenantStorage.run({ organizationId: org1Id }, async () =>
-      service.salesToday(storeOwnId),
+      service.salesToday(storeOwnId, todayAt(12)),
     );
-    // Hoy: 200 + 45 (50 − 5 ticket) = 245. Ayer: 100.
+    // Hoy: 200 + 45 (50 − 5 ticket) = 245. Ayer hasta las 12: solo la de las 10 = 100
+    // (la de las 23 queda fuera por el cap de misma hora).
     expect(res.today.total).toBeCloseTo(245, 2);
     expect(res.yesterday.total).toBeCloseTo(100, 2);
     expect(res.today.count).toBe(2);
-    expect(res.yesterday.count).toBe(1);
+    expect(res.yesterday.count).toBe(1); // la venta de ayer a las 23 NO se cuenta
     expect(res.deltaPct).toBeCloseTo(145, 1); // (245-100)/100*100
     const store = res.byStore.find((s) => s.storeId === storeOwnId);
     expect(store?.today).toBeCloseTo(245, 2);
+    // Intradía: acumulado por hora con ventas (9→200, 11→245), termina en today.total.
+    expect(res.intraday.length).toBeGreaterThanOrEqual(2);
+    expect(res.intraday.at(-1)).toBeCloseTo(245, 2);
+    for (let i = 1; i < res.intraday.length; i++) {
+      expect(res.intraday[i]!).toBeGreaterThanOrEqual(res.intraday[i - 1]!); // no decreciente
+    }
   });
 
   it('sales-by-family: agrupa por familia y suma el neto de líneas', async () => {
@@ -235,6 +258,154 @@ describe('Dashboard — integración', () => {
     // prodA: 200 + 100 = 300; prodB: 50 → 350 en la familia (neto de líneas).
     expect(fam?.total).toBeCloseTo(350, 2);
     expect(fam?.familyName).toBe(`${TAG}-fam`);
+  });
+
+  it('sales-by-hour: agrupa tickets e importe por hora del día (STAT-02)', async () => {
+    // Las ventas del periodo se sembraron a las 9, 11 y 13 (UTC).
+    const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.salesByHour(periodQuery()),
+    );
+    const byHour = new Map(rows.map((r) => [r.hour, r]));
+    expect(byHour.get(9)!.count).toBe(1);
+    expect(byHour.get(9)!.revenue).toBeCloseTo(200, 2);
+    expect(byHour.get(11)!.revenue).toBeCloseTo(45, 2); // 50 − 5 de descuento de ticket
+    expect(byHour.get(13)!.revenue).toBeCloseTo(100, 2);
+    // Solo devuelve horas con ventas (no las 24 del día).
+    expect(rows.every((r) => [9, 11, 13].includes(r.hour))).toBe(true);
+  });
+
+  it('discount-by-employee: descuento medio por vendedor (STAT-04)', async () => {
+    const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.discountByEmployee(periodQuery()),
+    );
+    // Todas las ventas del periodo las hizo el mismo vendedor (3 ventas).
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.salesCount).toBe(3);
+    // Σ descuento de ticket 5 / (Σ subtotal 350 + 5) ≈ 0.0141. (Sin promociones en el
+    // periodo, el voluntario coincide con el total.)
+    expect(rows[0]!.avgDiscountPct).toBeCloseTo(5 / 355, 4);
+  });
+
+  it('discount-by-employee: excluye promociones, solo cuenta el descuento voluntario (IT-11)', async () => {
+    // Ventana aislada (2150) para no mezclar con el periodo (año 2200+).
+    const day = '2150-07-22';
+    const at = new Date(`${day}T10:00:00.000Z`);
+    // Venta 1: descuento VOLUNTARIO 20 (bruto 100 → lineTotal 80).
+    await seedSale(org1Id, storeOwnId, at, [
+      {
+        productId: prodAId,
+        unitPrice: 100,
+        qty: 1,
+        lineTotal: 80,
+        discountAmt: 20,
+        discountSource: 'VOLUNTARY',
+      },
+    ]);
+    // Venta 2: descuento de PROMOCIÓN 30 (bruto 100 → lineTotal 70) → NO debe contar.
+    await seedSale(org1Id, storeOwnId, at, [
+      {
+        productId: prodAId,
+        unitPrice: 100,
+        qty: 1,
+        lineTotal: 70,
+        discountAmt: 30,
+        discountSource: 'PROMOTION',
+      },
+    ]);
+    const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.discountByEmployee({ period: 'custom', from: day, to: day, storeId: storeOwnId }),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.salesCount).toBe(2);
+    // Voluntario 20 / tarifa (subtotal 150 + descuentos 50) = 0.10. La promoción 30 fuera.
+    expect(rows[0]!.avgDiscountPct).toBeCloseTo(0.1, 4);
+  });
+
+  it('product-rotation: unidades por producto + días sin venta + tendencia (STAT-05/06)', async () => {
+    const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.productRotation(periodQuery()),
+    );
+    const a = rows.find((r) => r.productId === prodAId);
+    const b = rows.find((r) => r.productId === prodBId);
+    // prodA: qty 2 (9h) + 1 (13h) = 3; prodB: qty 1 (11h).
+    expect(a?.units).toBe(3);
+    expect(b?.units).toBe(1);
+    // Hubo última venta → daysSinceLastSale es un número (el periodo es un día único).
+    expect(typeof a?.daysSinceLastSale).toBe('number');
+    // Tendencia: al menos el día con ventas del periodo.
+    expect(a!.trend.length).toBeGreaterThanOrEqual(1);
+    expect(a!.trend.reduce((s, n) => s + n, 0)).toBe(3); // suma de la tendencia = unidades
+  });
+
+  it('archetype-rotation: agrega la rotación por arquetipo (familia) (IT-13)', async () => {
+    const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.archetypeRotation(periodQuery()),
+    );
+    const fam = rows.find((r) => r.familyId === familyId);
+    expect(fam).toBeTruthy();
+    // El arquetipo agrega sus 2 productos: prodA 3 + prodB 1 = 4 unidades.
+    expect(fam!.units).toBe(4);
+    expect(fam!.productCount).toBe(2);
+    // Tendencia = suma de unidades por día del arquetipo (un solo día en el periodo).
+    expect(fam!.trend.reduce((s, n) => s + n, 0)).toBe(4);
+  });
+
+  it('archetype-rotation: la media diaria usa días con tienda abierta, no naturales (IT-14)', async () => {
+    // Ventana de 5 días pero la tienda solo abre caja 2 días → la media usa 2, no 5.
+    const d1 = new Date('2199-05-01T10:00:00.000Z');
+    const d3 = new Date('2199-05-03T10:00:00.000Z');
+    for (const d of [d1, d3]) {
+      await seedSale(org1Id, storeOwnId, d, [
+        { productId: prodAId, unitPrice: 100, qty: 10, lineTotal: 1000 },
+      ]);
+      await admin.$executeRaw`
+        INSERT INTO "CashSession" ("id","organizationId","storeId","userId","openingAmount","status","openedAt")
+        VALUES (gen_random_uuid(), ${org1Id}::uuid, ${storeOwnId}::uuid, ${user1Id}::uuid, 0, 'CLOSED', ${d})
+      `;
+    }
+    try {
+      const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.archetypeRotation({
+          period: 'custom',
+          from: '2199-05-01',
+          to: '2199-05-05',
+          storeId: storeOwnId,
+        }),
+      );
+      const fam = rows.find((r) => r.familyId === familyId);
+      expect(fam!.units).toBe(20);
+      // 20 ud / 2 días con caja abierta = 10 (no 20/5 = 4 con días naturales).
+      expect(fam!.ventaMediaDiaria).toBeCloseTo(10, 3);
+    } finally {
+      await admin.$executeRaw`DELETE FROM "CashSession" WHERE "storeId" = ${storeOwnId}::uuid AND "openedAt" >= '2199-01-01'`;
+    }
+  });
+
+  it('product-rotation: marca el producto nuevo y le da la referencia de su arquetipo (IT-15)', async () => {
+    // Producto nuevo (creado hace 4 días) en TAG-fam con 5 ud en el periodo.
+    const [np] = await admin.$queryRaw<Array<{ id: string }>>`
+      INSERT INTO "Product" ("id","organizationId","familyId","name","salePrice","costPrice","taxRate","saleUnit","unitSymbol","active","createdAt","updatedAt")
+      VALUES (gen_random_uuid(), ${org1Id}::uuid, ${familyId}::uuid, ${`${TAG}-new`}, 100, 60, 21, 'UNIT', 'ud', true, now() - interval '4 days', now())
+      RETURNING id::text
+    `;
+    const newId = np!.id;
+    const saleId = await seedSale(org1Id, storeOwnId, periodAt(10), [
+      { productId: newId, unitPrice: 100, qty: 5, lineTotal: 500 },
+    ]);
+    try {
+      const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.productRotation(periodQuery()),
+      );
+      const row = rows.find((r) => r.productId === newId);
+      expect(row).toBeTruthy();
+      expect(row!.isNew).toBe(true);
+      // Arquetipo TAG-fam: (prodA 3 + prodB 1 + nuevo 5 = 9 ud / 1 día) / 3 productos = 3.
+      expect(row!.archetypeAvgDaily).toBeCloseTo(3, 3);
+    } finally {
+      await admin.$executeRaw`DELETE FROM "SaleLine" WHERE "saleId" = ${saleId}::uuid`;
+      await admin.$executeRaw`DELETE FROM "Sale" WHERE id = ${saleId}::uuid`;
+      await admin.$executeRaw`DELETE FROM "Product" WHERE id = ${newId}::uuid`;
+    }
   });
 
   it('sales-kpis: ticket medio, UPT, tasa de descuento y de devolución', async () => {

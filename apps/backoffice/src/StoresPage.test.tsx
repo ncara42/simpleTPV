@@ -21,26 +21,18 @@ function renderPage(): void {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <StoresPage />
+      <StoresPage onOpenStoreView={vi.fn()} />
     </QueryClientProvider>,
   );
 }
 
 describe('StoresPage', () => {
-  it('renderiza la cabecera, filtros y las tarjetas de tienda', async () => {
+  it('renderiza la cabecera y las tarjetas de tienda (sin filtros)', async () => {
     renderPage();
     expect(screen.getByTestId('new-store')).toBeInTheDocument();
-    expect(screen.getByTestId('store-status-filter')).toBeInTheDocument();
-    expect(screen.getByTestId('store-period')).toBeInTheDocument();
+    // Ya no hay filtros de estado/periodo: el panel solo crea y observa.
+    expect(screen.queryByTestId('store-status-filter')).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getAllByTestId('store-card')).toHaveLength(2));
-  });
-
-  it('filtra por estado (dormidas deja solo una)', async () => {
-    renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('store-card')).toHaveLength(2));
-    fireEvent.click(screen.getByTestId('store-status-filter'));
-    fireEvent.click(screen.getByRole('option', { name: 'Dormidas' }));
-    expect(screen.getAllByTestId('store-card')).toHaveLength(1);
   });
 
   it('abre el detalle al pulsar una tarjeta', async () => {

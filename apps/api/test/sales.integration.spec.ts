@@ -20,6 +20,7 @@ import { InMemoryEventBus } from '../src/events/in-memory-event-bus.js';
 import { applyTenantExtension, PrismaService } from '../src/prisma/prisma.service.js';
 import { tenantStorage } from '../src/prisma/tenant-context.js';
 import { SalesService } from '../src/sales/sales.service.js';
+import { SalesExportService } from '../src/sales/sales-export.service.js';
 import { StockService } from '../src/stock/stock.service.js';
 import { stubVerifactu } from './helpers/stub-verifactu.js';
 
@@ -161,6 +162,25 @@ describe('Ventas — integración', () => {
     expect(sale.paymentMethod).toBe('CASH');
     expect(Number(sale.cashGiven)).toBe(1000);
     expect(Number(sale.cashChange)).toBeCloseTo(1000 - Number(sale.total), 2);
+  });
+
+  it('IT-03: congela costPrice y discountSource en la línea de venta', async () => {
+    const [prod] = await admin.$queryRaw<Array<{ costPrice: string }>>`
+      SELECT "costPrice"::text AS "costPrice" FROM "Product" WHERE id = ${product1Id}::uuid
+    `;
+    const sale = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.create(
+        { storeId: store1Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
+        user1Id,
+        'ADMIN',
+      );
+    });
+    const line = sale.lines[0]!;
+    // El coste del producto queda congelado en la línea → rentabilidad histórica
+    // fiable aunque Product.costPrice cambie después.
+    expect(Number(line.costPrice)).toBeCloseTo(Number(prod!.costPrice), 4);
+    // Descuento manual del vendedor → origen VOLUNTARY por defecto (STAT-04).
+    expect(line.discountSource).toBe('VOLUNTARY');
   });
 
   it('numera tickets secuencialmente por tienda', async () => {
@@ -670,6 +690,239 @@ describe('Ventas — integración', () => {
         return service.findSales({ storeId: store1Id, date: day });
       });
       expect(seenByOrg1.totalItems).toBeGreaterThanOrEqual(1);
+    });
+
+    // ── IT-04: filtros nuevos (rango, vendedor, familia, estado) + agregados ──
+
+    it('rango from/to: filtra por rango de días con `to` inclusivo', async () => {
+      const d1 = uniqueDay();
+      const d2 = uniqueDay();
+      const d3 = uniqueDay();
+      await createSaleAt(store1Id, `${d1}T09:00:00.000Z`);
+      await createSaleAt(store1Id, `${d2}T09:00:00.000Z`);
+      await createSaleAt(store1Id, `${d3}T09:00:00.000Z`);
+
+      const count = async (q: { from?: string; to?: string }): Promise<number> =>
+        (
+          await tenantStorage.run({ organizationId: org1Id }, async () =>
+            service.findSales({ storeId: store1Id, ...q }),
+          )
+        ).totalItems;
+
+      expect(await count({ from: d1, to: d2 })).toBe(2); // d1, d2 (d3 fuera)
+      expect(await count({ from: d2, to: d3 })).toBe(2); // d2, d3 (d1 fuera)
+      expect(await count({ from: d1, to: d3 })).toBe(3); // los tres
+      expect(await count({ from: d2, to: d2 })).toBe(1); // `to` inclusivo: solo d2
+    });
+
+    it('filtra por estado; los agregados siguen contando solo COMPLETED', async () => {
+      const day = uniqueDay();
+      await createSaleAt(store1Id, `${day}T09:00:00.000Z`);
+      await createSaleAt(store1Id, `${day}T10:00:00.000Z`);
+      const voidedId = await createSaleAt(store1Id, `${day}T11:00:00.000Z`);
+      await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.voidSale(voidedId, user1Id),
+      );
+
+      const onlyVoided = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.findSales({ storeId: store1Id, date: day, status: 'VOIDED' }),
+      );
+      expect(onlyVoided.items).toHaveLength(1);
+      expect(onlyVoided.items[0]!.status).toBe('VOIDED');
+      // Los agregados ignoran el status pedido: cuentan las 2 COMPLETED del día.
+      expect(onlyVoided.totals.count).toBe(2);
+
+      const onlyCompleted = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.findSales({ storeId: store1Id, date: day, status: 'COMPLETED' }),
+      );
+      expect(onlyCompleted.items).toHaveLength(2);
+      expect(onlyCompleted.items.every((i) => i.status === 'COMPLETED')).toBe(true);
+    });
+
+    it('filtra por vendedor (userId)', async () => {
+      const day = uniqueDay();
+      await createSaleAt(store1Id, `${day}T09:00:00.000Z`);
+
+      const mine = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.findSales({ storeId: store1Id, date: day, userId: user1Id }),
+      );
+      expect(mine.totalItems).toBe(1); // la registró user1Id
+
+      const other = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.findSales({
+          storeId: store1Id,
+          date: day,
+          userId: '00000000-0000-0000-0000-0000000000ab',
+        }),
+      );
+      expect(other.totalItems).toBe(0);
+    });
+
+    it('filtra por familia de producto', async () => {
+      const day = uniqueDay();
+      // Familia + producto propios del test (el seed de org1 no enlaza familias).
+      const tag = `it04-fam-${day}`;
+      const [fam] = await admin.$queryRaw<Array<{ id: string }>>`
+        INSERT INTO "ProductFamily" ("id","organizationId","name","color","sortOrder","createdAt","updatedAt")
+        VALUES (gen_random_uuid(), ${org1Id}::uuid, ${tag}, '#abc', 0, now(), now())
+        RETURNING id::text
+      `;
+      const [prod] = await admin.$queryRaw<Array<{ id: string }>>`
+        INSERT INTO "Product" ("id","organizationId","familyId","name","salePrice","costPrice","taxRate","saleUnit","unitSymbol","active","createdAt","updatedAt")
+        VALUES (gen_random_uuid(), ${org1Id}::uuid, ${fam!.id}::uuid, ${tag}, 100, 60, 21, 'UNIT', 'ud', true, now(), now())
+        RETURNING id::text
+      `;
+      const sale = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.create(
+          { storeId: store1Id, lines: [{ productId: prod!.id, qty: 1 }], paymentMethod: 'CARD' },
+          user1Id,
+          'ADMIN',
+        ),
+      );
+      await admin.$executeRaw`UPDATE "Sale" SET "createdAt" = ${new Date(`${day}T09:00:00.000Z`)} WHERE id = ${sale.id}::uuid`;
+
+      const inFamily = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.findSales({ storeId: store1Id, date: day, familyId: fam!.id }),
+      );
+      expect(inFamily.totalItems).toBe(1);
+
+      const otherFamily = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.findSales({
+          storeId: store1Id,
+          date: day,
+          familyId: '00000000-0000-0000-0000-0000000000fa',
+        }),
+      );
+      expect(otherFamily.totalItems).toBe(0);
+    });
+
+    it('agregados: avgMarginPct y avgDiscountPct coherentes con las ventas del filtro', async () => {
+      const day = uniqueDay();
+      const start = new Date(`${day}T00:00:00.000Z`);
+      const end = new Date(start.getTime() + 86400000);
+      // 2 ventas COMPLETED con descuentos conocidos (línea 10% + ticket 5%) y sin descuento.
+      const a = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.create(
+          {
+            storeId: store1Id,
+            lines: [{ productId: product1Id, qty: 2, discountPct: 10 }],
+            paymentMethod: 'CARD',
+            ticketDiscountPct: 5,
+          },
+          user1Id,
+          'ADMIN',
+        ),
+      );
+      const b = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.create(
+          { storeId: store1Id, lines: [{ productId: product1Id, qty: 1 }], paymentMethod: 'CARD' },
+          user1Id,
+          'ADMIN',
+        ),
+      );
+      for (const id of [a.id, b.id]) {
+        await admin.$executeRaw`UPDATE "Sale" SET "createdAt" = ${new Date(`${day}T10:00:00.000Z`)} WHERE id = ${id}::uuid`;
+      }
+
+      // Esperado, calculado de las filas reales (independiente de los precios del seed)
+      // y sobre el MISMO conjunto que agregará findSales (día único + store1 + COMPLETED).
+      const [lns] = await admin.$queryRaw<Array<{ revenue: string; margin: string }>>`
+        SELECT COALESCE(SUM(sl."lineTotal"), 0)::text AS revenue,
+               COALESCE(SUM(sl."lineTotal" - sl."costPrice" * sl.qty), 0)::text AS margin
+        FROM "SaleLine" sl JOIN "Sale" sa ON sa.id = sl."saleId"
+        WHERE sa."organizationId" = ${org1Id}::uuid AND sa."storeId" = ${store1Id}::uuid
+          AND sa.status = 'COMPLETED' AND sa."createdAt" >= ${start} AND sa."createdAt" < ${end}
+      `;
+      const [head] = await admin.$queryRaw<
+        Array<{ subtotal: string; discount: string; total: string }>
+      >`
+        SELECT COALESCE(SUM(sa.subtotal), 0)::text AS subtotal,
+               COALESCE(SUM(sa."discountTotal"), 0)::text AS discount,
+               COALESCE(SUM(sa.total), 0)::text AS total
+        FROM "Sale" sa
+        WHERE sa."organizationId" = ${org1Id}::uuid AND sa."storeId" = ${store1Id}::uuid
+          AND sa.status = 'COMPLETED' AND sa."createdAt" >= ${start} AND sa."createdAt" < ${end}
+      `;
+      const revenue = Number(lns!.revenue);
+      const margin = Number(lns!.margin);
+      const subtotal = Number(head!.subtotal);
+      const discount = Number(head!.discount);
+      const expMarginPct = revenue > 0 ? margin / revenue : 0;
+      const expDiscountPct = subtotal + discount > 0 ? discount / (subtotal + discount) : 0;
+
+      const res = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.findSales({ storeId: store1Id, date: day }),
+      );
+      expect(res.totals.count).toBe(2);
+      expect(Number(res.totals.totalAmount)).toBeCloseTo(Number(head!.total), 2);
+      expect(res.totals.avgMarginPct).toBeCloseTo(expMarginPct, 4);
+      expect(res.totals.avgDiscountPct).toBeCloseTo(expDiscountPct, 4);
+      // Sanity: hubo descuento real → la tasa es > 0 (no un falso 0 trivial).
+      expect(expDiscountPct).toBeGreaterThan(0);
+    });
+  });
+
+  describe('SalesExport — export asíncrono a CSV (IT-05)', () => {
+    let exporter: SalesExportService;
+    // Días únicos propios (base distinta de findSales para no colisionar).
+    let dayCursor = new Date(Date.UTC(2300, 0, 1) + (Date.now() % (365 * 100)) * 86400000);
+    function uniqueDay(): string {
+      const d = dayCursor.toISOString().slice(0, 10);
+      dayCursor = new Date(dayCursor.getTime() + 86400000);
+      return d;
+    }
+
+    beforeAll(() => {
+      // Sin onModuleInit → sin cola → requestExport procesa en el momento (determinista).
+      exporter = new SalesExportService(prisma as unknown as PrismaService, service);
+    });
+
+    it('genera el CSV del filtro y se descarga (sin Redis → síncrono)', async () => {
+      const day = uniqueDay();
+      const aId = await createSaleAt(store1Id, `${day}T09:00:00.000Z`);
+      const bId = await createSaleAt(store1Id, `${day}T10:00:00.000Z`);
+      const tickets = await admin.$queryRaw<Array<{ ticketNumber: string }>>`
+        SELECT "ticketNumber" FROM "Sale" WHERE id IN (${aId}::uuid, ${bId}::uuid)
+      `;
+
+      const req = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        exporter.requestExport({ storeId: store1Id, date: day }, user1Id, 'ADMIN'),
+      );
+      expect(req.status).toBe('COMPLETED');
+
+      const meta = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        exporter.getExport(req.id),
+      );
+      expect(meta.status).toBe('COMPLETED');
+      expect(meta.rowCount).toBe(2);
+
+      const { csv } = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        exporter.downloadCsv(req.id),
+      );
+      const lines = csv.split('\n');
+      expect(lines[0]).toBe(
+        'ticket,fecha,tienda,vendedor,estado,metodo_pago,subtotal,descuento,total',
+      );
+      expect(lines).toHaveLength(3); // cabecera + 2 ventas
+      for (const t of tickets) {
+        expect(csv).toContain(t.ticketNumber);
+      }
+    });
+
+    it('aísla por tenant: org2 no ve el export de org1', async () => {
+      const day = uniqueDay();
+      await createSaleAt(store1Id, `${day}T09:00:00.000Z`);
+      const req = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        exporter.requestExport({ storeId: store1Id, date: day }, user1Id, 'ADMIN'),
+      );
+
+      // org2 no puede consultar ni descargar el export de org1 (RLS → 404).
+      await expect(
+        tenantStorage.run({ organizationId: org2Id }, async () => exporter.getExport(req.id)),
+      ).rejects.toThrow();
+      await expect(
+        tenantStorage.run({ organizationId: org2Id }, async () => exporter.downloadCsv(req.id)),
+      ).rejects.toThrow();
     });
   });
 });

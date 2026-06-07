@@ -142,39 +142,13 @@
 
 /* Sparkline al pie de la card: empujada abajo (margin-top:auto) y a full-bleed,
    cancelando con márgenes negativos el padding de la card (1.15rem / 1.25rem). */
+/* Wrapper a sangre de la sparkline reutilizable (@simpletpv/ui, clases .ui-spark-*)
+   al pie de la KPI card. El trazo/relleno los aporta @simpletpv/ui/chart.css; aquí
+   solo el sangrado (cancela el padding de la card) y se evita el hueco inline. */
 .dash-card-spark {
-  display: block;
   margin: auto -1.25rem -1.15rem;
   width: calc(100% + 2.5rem);
-  height: 44px;
-}
-.dash-spark-line {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-.dash-spark-area {
-  stroke: none;
-}
-.dash-spark-brand {
-  color: var(--ui-brand);
-}
-.dash-spark-brand .dash-spark-area {
-  fill: var(--ui-brand-soft);
-}
-.dash-spark-up {
-  color: var(--ui-success);
-}
-.dash-spark-up .dash-spark-area {
-  fill: var(--ui-success-soft);
-}
-.dash-spark-down {
-  color: var(--ui-danger);
-}
-.dash-spark-down .dash-spark-area {
-  fill: var(--ui-danger-soft);
+  line-height: 0;
 }
 .dash-delta-up {
   color: var(--ui-success);
@@ -745,4 +719,167 @@
 .dash-stat-warn {
   border-color: var(--ui-warning);
   background: var(--ui-warning-soft);
+}
+
+/* Rotación de producto (IT-12): fila con nombre, unidades, días sin venta y la
+   sparkline de evolución a la derecha. */
+.dash-rotation-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dash-rotation-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto 120px;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--ui-border);
+}
+.dash-rotation-row:last-child {
+  border-bottom: none;
+}
+.dash-rotation-name {
+  font-weight: 500;
+  letter-spacing: -0.012em;
+}
+.dash-rotation-units {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.dash-rotation-days {
+  color: var(--ui-text-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.dash-rotation-spark {
+  width: 120px;
+  color: var(--ui-brand);
+}
+/* Subetiqueta del arquetipo (nº de productos) en la fila de rotación (IT-13). */
+.dash-rotation-arch {
+  color: var(--ui-text-muted);
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+/* Conmutador Arquetipo/Producto: píldora segmentada anclada en la esquina del panel. */
+.dash-toggle {
+  position: absolute;
+  top: 1.4rem;
+  right: 1.5rem;
+  display: inline-flex;
+  gap: 0.15rem;
+  padding: 0.18rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface-subtle);
+}
+.dash-toggle button {
+  border: none;
+  background: none;
+  padding: 0.18rem 0.7rem;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.dash-toggle button.is-active {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+/* Marca "nuevo" (IT-15): producto con poca historia; se lee contra su arquetipo. */
+.dash-new-tag {
+  margin-left: 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ui-brand);
+  border: 1px solid var(--ui-brand);
+  border-radius: 0.5rem;
+  padding: 0.02rem 0.4rem;
+  vertical-align: middle;
+}
+
+/* Personalización de KPI cards (IT-16): botón + editor de visibilidad/orden. */
+.dash-cards-head {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.6rem;
+}
+.dash-customize {
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  border-radius: 9999px;
+  padding: 0.25rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+}
+.dash-customize:hover {
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
+.dash-cards-editor {
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: var(--ui-surface);
+  padding: 1rem 1.2rem;
+  margin-bottom: 1rem;
+}
+.dash-cards-editor-title {
+  margin: 0 0 0.6rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ui-text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.dash-cards-editor ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.3rem 1.5rem;
+}
+.dash-cards-editor li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+.dash-cards-editor label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.dash-cards-editor-move {
+  display: inline-flex;
+  gap: 0.2rem;
+}
+.dash-cards-editor-move button {
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  border-radius: 6px;
+  width: 1.5rem;
+  height: 1.5rem;
+  cursor: pointer;
+  color: var(--ui-text-muted);
+  line-height: 1;
+}
+.dash-cards-editor-move button:disabled {
+  opacity: 0.35;
+  cursor: default;
 }

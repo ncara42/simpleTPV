@@ -3,23 +3,33 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsNumber,
   IsOptional,
   IsPositive,
   IsString,
   IsUUID,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
+
+import { MAX_PRICE, MAX_QUANTITY } from '../common/limits.js';
 
 export class CreatePurchaseOrderLineDto {
   @IsUUID()
   productId!: string;
 
+  // Cantidad pedida — Decimal(12,3): hasta 3 decimales y acotada (A-03).
+  @IsNumber({ maxDecimalPlaces: 3 })
   @IsPositive()
+  @Max(MAX_QUANTITY)
   quantityOrdered!: number;
 
+  // Coste unitario — Decimal(10,4).
   @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 4 })
   @Min(0)
+  @Max(MAX_PRICE)
   unitCost?: number;
 }
 
@@ -47,8 +57,10 @@ export class ReceivePurchaseOrderLineDto {
   @IsUUID()
   lineId!: string;
 
-  // Cantidad recibida en esta recepción (>= 0). Se acumula a lo ya recibido.
+  // Cantidad recibida en esta recepción (>= 0). Se acumula a lo ya recibido. Decimal(12,3).
+  @IsNumber({ maxDecimalPlaces: 3 })
   @Min(0)
+  @Max(MAX_QUANTITY)
   quantityReceived!: number;
 }
 

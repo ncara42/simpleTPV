@@ -2,6 +2,8 @@ export { type ApiClient, ApiError, createApiClient, type QueryParams } from './a
 export type {
   AdjustStockInput,
   AlertType,
+  ApiKey,
+  ApiKeyCreated,
   AppEvent,
   AppEventType,
   CashMovement,
@@ -10,6 +12,7 @@ export type {
   CashSessionStatus,
   CloseCashSessionInput,
   ConfirmInventoryCountInput,
+  CreateApiKeyInput,
   CreateBlindReturnInput,
   CreateCashMovementInput,
   CreateOfficialDeviceInput,
@@ -18,6 +21,9 @@ export type {
   CreateSaleInput,
   CreateStoreOrderInput,
   CreateTransferInput,
+  CreateWholesaleOrderInput,
+  Customer,
+  CustomerInput,
   FamilyInput,
   FamilyNode,
   InventoryCountLine,
@@ -27,6 +33,9 @@ export type {
   OfficialDeviceStatus,
   OpenCashSessionInput,
   PairDeviceInput,
+  PriceListDetail,
+  PriceListItem,
+  PriceListSummary,
   Product,
   ProductInput,
   PurchaseOrder,
@@ -74,6 +83,11 @@ export type {
   UserRole,
   VerifactuRecord,
   VerifactuStatus,
+  WholesaleOrderDetail,
+  WholesaleOrderLine,
+  WholesaleOrdersPage,
+  WholesaleOrderStatus,
+  WholesaleOrderSummary,
 } from './api-types.js';
 export { type AuthState, type AuthStore, type AuthTokens, createAuthStore } from './auth-store.js';
 export { type AuthSetup, setupAuth } from './setup.js';

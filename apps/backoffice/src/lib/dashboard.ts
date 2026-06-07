@@ -1,11 +1,17 @@
 import {
+  DEMO_ARCHETYPE_ROTATION,
+  DEMO_DISCOUNT_BY_EMPLOYEE,
   DEMO_MARGIN_KPIS,
   DEMO_RANKINGS,
+  DEMO_ROTATION_STATS,
   DEMO_SALES_BY_FAMILY,
+  DEMO_SALES_BY_HOUR,
   DEMO_SALES_KPIS,
   DEMO_SALES_TODAY,
   DEMO_STOCKOUT_KPIS,
 } from '../demo/demoData.js';
+import { isDemo } from './api-config.js';
+import { api } from './auth.js';
 
 // Tipos espejo de las respuestas de la API de dashboards (#70). Se definen aquí
 // (no en @simpletpv/auth) porque solo los consume el backoffice.
@@ -26,6 +32,9 @@ export interface SalesTodayResponse {
   // la rellena el modo demo; cuando se cablee la API real habrá que añadir el
   // GROUP BY DATE_TRUNC en dashboard.service.ts.
   series?: number[];
+  // Acumulado de facturación de HOY por hora (STAT-01): la sparkline intradía de
+  // la card "Facturación hoy". El backend ya lo devuelve (salesToday.intraday).
+  intraday?: number[];
 }
 
 export interface FamilySales {
@@ -56,8 +65,10 @@ export interface MarginKpis {
   realMargin: number;
   marginPct: number;
   revenue: number;
-  // Serie diaria de marginPct para la sparkline (ver nota en SalesTodayResponse).
+  // Serie diaria de marginPct para la sparkline de "% Margen".
   series?: number[];
+  // Serie diaria de beneficio (€, realMargin) para la sparkline de "Beneficio" (STAT-03).
+  realMarginSeries?: number[];
 }
 
 export interface StockoutKpis {
@@ -75,36 +86,125 @@ export interface ProductRankings {
   worstRotation: Array<{ productId: string; name: string; units: number }>;
 }
 
-// Modo demo: las funciones devuelven datos hardcodeados calcados a los mockups.
-export function getSalesToday(_storeId?: string): Promise<SalesTodayResponse> {
-  return Promise.resolve(DEMO_SALES_TODAY);
+// Ventas por hora del día (STAT-02): tickets e importe por hora con ventas.
+export interface SalesByHour {
+  hour: number;
+  count: number;
+  revenue: number;
+}
+
+// Descuento medio por vendedor (STAT-04): tasa de descuento de ticket por usuario.
+export interface DiscountByEmployee {
+  userId: string;
+  userName: string;
+  salesCount: number;
+  avgDiscountPct: number;
+}
+
+// Rotación + evolución de producto (STAT-05/06): unidades del periodo, días desde
+// la última venta y tendencia de unidades por día (sparkline).
+export interface ProductRotation {
+  productId: string;
+  name: string;
+  units: number;
+  daysSinceLastSale: number | null;
+  trend: number[];
+  // IT-15: producto con poca historia; se apoya en la media de su arquetipo.
+  isNew: boolean;
+  archetypeAvgDaily: number | null;
+}
+
+// Rotación agregada por arquetipo (= familia, IT-13): vista por defecto, más sólida
+// estadísticamente que por SKU concreto. El detalle por producto es el drill-down.
+export interface ArchetypeRotation {
+  familyId: string | null;
+  familyName: string;
+  productCount: number;
+  units: number;
+  // Media diaria sobre días con tienda abierta (IT-14), no naturales.
+  ventaMediaDiaria: number;
+  daysSinceLastSale: number | null;
+  trend: number[];
+}
+
+// Dashboard (IT-09): en demo devuelve los datos calcados al mockup; en real va
+// contra /dashboard/*. NOTA: el backend devuelve los KPIs y el intradía (STAT-01),
+// pero AÚN NO las series diarias de las sparklines de las cards (series/
+// realMarginSeries) — al ser opcionales, en real esas mini-gráficas no se pintan.
+const periodQuery = (period: DashboardPeriod, storeId?: string): Record<string, string> => ({
+  period,
+  ...(storeId ? { storeId } : {}),
+});
+
+export function getSalesToday(storeId?: string): Promise<SalesTodayResponse> {
+  if (isDemo()) return Promise.resolve(DEMO_SALES_TODAY);
+  return api.get<SalesTodayResponse>('/dashboard/sales-today', {
+    ...(storeId ? { storeId } : {}),
+  });
 }
 
 export function getSalesByFamily(
-  _period: DashboardPeriod,
-  _storeId?: string,
+  period: DashboardPeriod,
+  storeId?: string,
 ): Promise<FamilySales[]> {
-  return Promise.resolve(DEMO_SALES_BY_FAMILY);
+  if (isDemo()) return Promise.resolve(DEMO_SALES_BY_FAMILY);
+  return api.get<FamilySales[]>('/dashboard/sales-by-family', periodQuery(period, storeId));
 }
 
-export function getSalesKpis(_period: DashboardPeriod, _storeId?: string): Promise<SalesKpis> {
-  return Promise.resolve(DEMO_SALES_KPIS);
+export function getSalesByHour(period: DashboardPeriod, storeId?: string): Promise<SalesByHour[]> {
+  if (isDemo()) return Promise.resolve(DEMO_SALES_BY_HOUR);
+  return api.get<SalesByHour[]>('/dashboard/sales-by-hour', periodQuery(period, storeId));
 }
 
-export function getMarginKpis(_period: DashboardPeriod, _storeId?: string): Promise<MarginKpis> {
-  return Promise.resolve(DEMO_MARGIN_KPIS);
+export function getDiscountByEmployee(
+  period: DashboardPeriod,
+  storeId?: string,
+): Promise<DiscountByEmployee[]> {
+  if (isDemo()) return Promise.resolve(DEMO_DISCOUNT_BY_EMPLOYEE);
+  return api.get<DiscountByEmployee[]>(
+    '/dashboard/discount-by-employee',
+    periodQuery(period, storeId),
+  );
 }
 
-export function getStockoutKpis(
-  _period: DashboardPeriod,
-  _storeId?: string,
-): Promise<StockoutKpis> {
-  return Promise.resolve(DEMO_STOCKOUT_KPIS);
+export function getProductRotation(
+  period: DashboardPeriod,
+  storeId?: string,
+): Promise<ProductRotation[]> {
+  if (isDemo()) return Promise.resolve(DEMO_ROTATION_STATS);
+  return api.get<ProductRotation[]>('/dashboard/product-rotation', periodQuery(period, storeId));
+}
+
+export function getArchetypeRotation(
+  period: DashboardPeriod,
+  storeId?: string,
+): Promise<ArchetypeRotation[]> {
+  if (isDemo()) return Promise.resolve(DEMO_ARCHETYPE_ROTATION);
+  return api.get<ArchetypeRotation[]>(
+    '/dashboard/archetype-rotation',
+    periodQuery(period, storeId),
+  );
+}
+
+export function getSalesKpis(period: DashboardPeriod, storeId?: string): Promise<SalesKpis> {
+  if (isDemo()) return Promise.resolve(DEMO_SALES_KPIS);
+  return api.get<SalesKpis>('/dashboard/sales-kpis', periodQuery(period, storeId));
+}
+
+export function getMarginKpis(period: DashboardPeriod, storeId?: string): Promise<MarginKpis> {
+  if (isDemo()) return Promise.resolve(DEMO_MARGIN_KPIS);
+  return api.get<MarginKpis>('/dashboard/margin-kpis', periodQuery(period, storeId));
+}
+
+export function getStockoutKpis(period: DashboardPeriod, storeId?: string): Promise<StockoutKpis> {
+  if (isDemo()) return Promise.resolve(DEMO_STOCKOUT_KPIS);
+  return api.get<StockoutKpis>('/dashboard/stockout-kpis', periodQuery(period, storeId));
 }
 
 export function getProductRankings(
-  _period: DashboardPeriod,
-  _storeId?: string,
+  period: DashboardPeriod,
+  storeId?: string,
 ): Promise<ProductRankings> {
-  return Promise.resolve(DEMO_RANKINGS);
+  if (isDemo()) return Promise.resolve(DEMO_RANKINGS);
+  return api.get<ProductRankings>('/dashboard/product-rankings', periodQuery(period, storeId));
 }

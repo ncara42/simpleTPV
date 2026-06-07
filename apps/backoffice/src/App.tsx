@@ -1,18 +1,22 @@
+import '@simpletpv/ui/chart.css';
+import '@simpletpv/ui/datatable.css';
 import '@simpletpv/ui/login.css';
 import '@simpletpv/ui/select.css';
 import '@simpletpv/ui/topbar.css';
 import './catalog.css';
 import './styles.css';
 
-import { LoginForm, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { LoginForm, type NavGroup, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
 import {
   ArrowLeftRight,
   BarChart2,
   Bell,
   CheckSquare,
   Clock,
+  Handshake,
+  KeyRound,
   LayoutDashboard,
+  LifeBuoy,
   Package,
   Percent,
   Receipt,
@@ -21,20 +25,21 @@ import {
   Tag,
   Users,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
+import { ApiKeysPage } from './ApiKeysPage.js';
+import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
-import { DashboardPage } from './DashboardPage.js';
 import { DEMO_USER } from './demo/demoData.js';
 import { FamiliesPage } from './FamiliesPage.js';
+import { HelpPage } from './HelpPage.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { switchApp } from './lib/nav.js';
 import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
-import { listAlerts } from './lib/stock.js';
 import { NotificationsPage } from './NotificationsPage.js';
+import { OverviewPage } from './OverviewPage.js';
 import { PromotionsPage } from './PromotionsPage.js';
 import { PurchasesPage } from './PurchasesPage.js';
-import { SalesHistoryPage } from './SalesHistoryPage.js';
 import { StockPage } from './StockPage.js';
 import { StoresPage } from './StoresPage.js';
 import { TimeClockPage } from './TimeClockPage.js';
@@ -55,22 +60,38 @@ type Tab =
   | 'stores'
   | 'sales'
   | 'purchases'
-  | 'verifactu';
+  | 'verifactu'
+  | 'b2b'
+  | 'apikeys'
+  | 'help';
+
+// Navegación agrupada por tipo de tarea para no saturar el lateral. Dashboard va
+// suelto arriba; Ayuda (Soporte) queda separada al final. "Ventas y clientes"
+// reúne lo comercial (ventas, mayorista, API) frente a la gestión de la operación.
+const NAV_GROUPS: NavGroup[] = [
+  { id: 'inventory', label: 'Catálogo e inventario' },
+  { id: 'commercial', label: 'Ventas y clientes' },
+  { id: 'org', label: 'Organización' },
+  { id: 'support', label: 'Soporte' },
+];
 
 const ALL_NAV: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-  { id: 'notifications', label: 'Notificaciones', icon: <Bell size={18} /> },
-  { id: 'catalog', label: 'Catálogo', icon: <Package size={18} /> },
-  { id: 'families', label: 'Familias', icon: <Tag size={18} /> },
-  { id: 'stock', label: 'Stock', icon: <BarChart2 size={18} /> },
-  { id: 'transfers', label: 'Traspasos', icon: <ArrowLeftRight size={18} /> },
-  { id: 'promotions', label: 'Promociones', icon: <Percent size={18} /> },
-  { id: 'users', label: 'Usuarios', icon: <Users size={18} /> },
-  { id: 'timeclock', label: 'Control horario', icon: <Clock size={18} /> },
-  { id: 'stores', label: 'Tiendas', icon: <Store size={18} /> },
-  { id: 'sales', label: 'Ventas', icon: <Receipt size={18} /> },
-  { id: 'purchases', label: 'Compras', icon: <ShoppingCart size={18} /> },
-  { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} /> },
+  { id: 'notifications', label: 'Notificaciones', icon: <Bell size={18} />, group: 'inventory' },
+  { id: 'catalog', label: 'Catálogo', icon: <Package size={18} />, group: 'inventory' },
+  { id: 'families', label: 'Arquetipos', icon: <Tag size={18} />, group: 'inventory' },
+  { id: 'stock', label: 'Stock', icon: <BarChart2 size={18} />, group: 'inventory' },
+  { id: 'transfers', label: 'Traspasos', icon: <ArrowLeftRight size={18} />, group: 'inventory' },
+  { id: 'promotions', label: 'Promociones', icon: <Percent size={18} />, group: 'inventory' },
+  { id: 'sales', label: 'Ventas', icon: <Receipt size={18} />, group: 'commercial' },
+  { id: 'b2b', label: 'Mayorista', icon: <Handshake size={18} />, group: 'commercial' },
+  { id: 'apikeys', label: 'API Keys', icon: <KeyRound size={18} />, group: 'commercial' },
+  { id: 'stores', label: 'Tiendas', icon: <Store size={18} />, group: 'org' },
+  { id: 'users', label: 'Usuarios', icon: <Users size={18} />, group: 'org' },
+  { id: 'timeclock', label: 'Control horario', icon: <Clock size={18} />, group: 'org' },
+  { id: 'purchases', label: 'Compras', icon: <ShoppingCart size={18} />, group: 'commercial' },
+  { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'org' },
+  { id: 'help', label: 'Ayuda', icon: <LifeBuoy size={18} />, group: 'support' },
 ];
 
 // #106: Compras y VeriFactu se retiran del menú (decisión informe UX 2026-06-02).
@@ -84,17 +105,10 @@ const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab)
 // La TopBar refleja el título y la descripción de la vista activa (publicados por
 // cada página vía usePageHeader). Sustituye al antiguo eyebrow fijo «Administración»:
 // el contexto de área ya lo da el conmutador Backoffice/TPV de la derecha.
-// La campana de notificaciones lleva al portal de Notificaciones (mismo destino
-// que la entrada del sidebar) y comparte su badge de contador.
-function ShellTopBar({
-  notificationCount,
-  notificationsActive,
-  onNotifications,
-}: {
-  notificationCount: number;
-  notificationsActive: boolean;
-  onNotifications: () => void;
-}) {
+// La campana de notificaciones se retiró (informe §10): la rotura de stock ya se
+// refuerza en varias zonas, así que el badge global era ruido. Sin onNotifications,
+// la TopBar no renderiza la campana.
+function ShellTopBar() {
   const { title, description, descriptionTestId } = usePageHeaderValue();
   return (
     <TopBar
@@ -103,66 +117,59 @@ function ShellTopBar({
       subtitleTestId={descriptionTestId}
       activeApp="backoffice"
       onSwitchApp={switchApp}
-      onNotifications={onNotifications}
-      notificationCount={notificationCount}
-      notificationsActive={notificationsActive}
     />
   );
 }
 
 function Home() {
   const logout = useAuthStore((s) => s.clear);
-  const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('dashboard');
-
-  // Contador de notificaciones (alertas de stock): alimenta el badge de la campana
-  // de la TopBar. Comparte queryKey con NotificationsPage.
-  const { data: alerts = [] } = useQuery({
-    queryKey: ['stock-alerts'],
-    queryFn: () => listAlerts(),
-  });
-  const alertCount = alerts.length;
-
-  // Tiempo real (#33): el SSE refresca el contador aunque no estés en Notificaciones.
-  useEffect(() => {
-    const unsubscribe = api.subscribeEvents((event) => {
-      if (event.type === 'alert.created') {
-        void qc.invalidateQueries({ queryKey: ['stock-alerts'] });
-      }
-    });
-    return unsubscribe;
-  }, [qc]);
+  // Filtro de tienda preseleccionado al usar un acceso directo desde Tiendas
+  // ("Ver stock"/"Ver ventas"). Se aplica al montar Stock/Ventas; la navegación
+  // manual por el sidebar lo limpia para no arrastrar el filtro.
+  const [navStoreId, setNavStoreId] = useState<string | null>(null);
+  const openStoreView = (view: 'stock' | 'sales', storeId: string): void => {
+    setNavStoreId(storeId);
+    setTab(view);
+  };
 
   return (
     <div className="app-shell">
       <Sidebar
         items={NAV}
+        groups={NAV_GROUPS}
         activeItem={tab}
-        onSelect={(id) => setTab(id as Tab)}
+        onSelect={(id) => {
+          setNavStoreId(null);
+          setTab(id as Tab);
+        }}
         account={{ name: DEMO_USER.name, subtitle: 'Central · Admin' }}
         onLogout={logout}
       />
       <div className="app-content">
         <PageHeaderProvider>
-          <ShellTopBar
-            notificationCount={alertCount}
-            notificationsActive={tab === 'notifications'}
-            onNotifications={() => setTab('notifications')}
-          />
+          <ShellTopBar />
           <main className="bo-main">
-            {tab === 'dashboard' && <DashboardPage />}
+            {(tab === 'dashboard' || tab === 'sales') && (
+              <OverviewPage
+                scrollTo={tab === 'sales' ? 'sales' : null}
+                initialStoreId={navStoreId}
+              />
+            )}
             {tab === 'notifications' && <NotificationsPage />}
             {tab === 'catalog' && <CatalogPage />}
             {tab === 'families' && <FamiliesPage />}
-            {tab === 'stock' && <StockPage />}
+            {tab === 'stock' && <StockPage initialStoreId={navStoreId} />}
             {tab === 'transfers' && <TransfersPage />}
             {tab === 'promotions' && <PromotionsPage />}
             {tab === 'users' && <UsersPage />}
             {tab === 'timeclock' && <TimeClockPage />}
-            {tab === 'stores' && <StoresPage />}
-            {tab === 'sales' && <SalesHistoryPage />}
+            {tab === 'stores' && <StoresPage onOpenStoreView={openStoreView} />}
             {tab === 'purchases' && <PurchasesPage />}
             {tab === 'verifactu' && <VerifactuPage />}
+            {tab === 'b2b' && <B2bPage />}
+            {tab === 'apikeys' && <ApiKeysPage />}
+            {tab === 'help' && <HelpPage />}
           </main>
         </PageHeaderProvider>
       </div>

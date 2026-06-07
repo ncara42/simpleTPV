@@ -1,6 +1,7 @@
 import { Select } from '@simpletpv/ui';
 import { useMemo, useState } from 'react';
 
+import { Modal } from './components/Modal.js';
 import {
   DEMO_PROMOTIONS,
   type DemoPromotion,
@@ -17,13 +18,18 @@ const STATUS_LABEL: Record<PromoStatus, string> = {
   expirada: 'Expirada',
   pausada: 'Pausada',
 };
-const STATUS_FILTERS: { id: 'all' | PromoStatus; label: string }[] = [
-  { id: 'all', label: 'Todas' },
+// Tres grupos de filtrado (informe §5): activas, programadas e inactivas
+// (expiradas + pausadas). Se muestran todos por defecto y cada chip los alterna.
+type PromoGroup = 'activa' | 'programada' | 'inactiva';
+const PROMO_GROUPS: { id: PromoGroup; label: string }[] = [
   { id: 'activa', label: 'Activas' },
   { id: 'programada', label: 'Programadas' },
-  { id: 'expirada', label: 'Expiradas' },
-  { id: 'pausada', label: 'Pausadas' },
+  { id: 'inactiva', label: 'Inactivas' },
 ];
+function promoGroup(p: DemoPromotion): PromoGroup {
+  const s = promoStatus(p);
+  return s === 'activa' || s === 'programada' ? s : 'inactiva';
+}
 function conditionText(p: { conditionType: PromoConditionType; threshold: number }): string {
   return p.conditionType === 'min_qty'
     ? `Si el ticket lleva ${p.threshold} o más productos`
@@ -79,14 +85,21 @@ const EMPTY: PromoForm = {
 
 export function PromotionsPage() {
   const [promos, setPromos] = useState<DemoPromotion[]>(DEMO_PROMOTIONS);
-  const [filter, setFilter] = useState<'all' | PromoStatus>('all');
+  // Grupos visibles: los tres activos por defecto (se ven todas las promociones).
+  const [groups, setGroups] = useState<Set<PromoGroup>>(
+    () => new Set<PromoGroup>(['activa', 'programada', 'inactiva']),
+  );
+  const toggleGroup = (g: PromoGroup): void =>
+    setGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(g)) next.delete(g);
+      else next.add(g);
+      return next;
+    });
   const [form, setForm] = useState<PromoForm | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
 
-  const visible = useMemo(
-    () => promos.filter((p) => filter === 'all' || promoStatus(p) === filter),
-    [promos, filter],
-  );
+  const visible = useMemo(() => promos.filter((p) => groups.has(promoGroup(p))), [promos, groups]);
 
   // ── Selección múltiple + acciones en lote (mismo patrón que Usuarios) ──
   const selectedSet = useMemo(() => new Set(selected), [selected]);
@@ -137,14 +150,20 @@ export function PromotionsPage() {
       <div className="table-panel">
         <div className="users-toolbar">
           <div className="sales-filters">
-            <Select
-              className="promo-filter-select"
-              value={filter}
-              onChange={(value) => setFilter(value as 'all' | PromoStatus)}
-              ariaLabel="Filtrar por estado"
-              data-testid="promo-filters"
-              options={STATUS_FILTERS.map((f) => ({ value: f.id, label: f.label }))}
-            />
+            <div className="promo-chips" role="group" aria-label="Filtrar por estado">
+              {PROMO_GROUPS.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  className={`promo-chip${groups.has(g.id) ? ' is-on' : ''}`}
+                  aria-pressed={groups.has(g.id)}
+                  onClick={() => toggleGroup(g.id)}
+                  data-testid={`promo-group-${g.id}`}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
             {selected.length > 0 && (
               <>
                 {!allVisibleSelected && (
@@ -305,127 +324,123 @@ function PromoModal({
     form.startDate <= form.endDate;
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <form
-        className="modal modal--form"
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault();
-          onSave(form);
-        }}
-        data-testid="promo-form"
-      >
-        <h3>{form.id ? 'Editar promoción' : 'Nueva promoción'}</h3>
+    <Modal
+      onClose={onClose}
+      className="modal--form"
+      testId="promo-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave(form);
+      }}
+    >
+      <h3>{form.id ? 'Editar promoción' : 'Nueva promoción'}</h3>
+      <label>
+        Nombre
+        <input
+          required
+          value={form.name}
+          onChange={(e) => onChange({ ...form, name: e.target.value })}
+          data-testid="promo-name"
+        />
+      </label>
+      <div className="modal-row">
         <label>
-          Nombre
-          <input
-            required
-            value={form.name}
-            onChange={(e) => onChange({ ...form, name: e.target.value })}
-            data-testid="promo-name"
+          Condición
+          <Select
+            value={form.conditionType}
+            onChange={(value) => onChange({ ...form, conditionType: value as PromoConditionType })}
+            ariaLabel="Condición de la promoción"
+            data-testid="promo-condition"
+            options={[
+              { value: 'min_qty', label: 'Nº de productos ≥' },
+              { value: 'min_ticket', label: 'Importe del ticket ≥ (€)' },
+            ]}
           />
         </label>
-        <div className="modal-row">
-          <label>
-            Condición
-            <Select
-              value={form.conditionType}
-              onChange={(value) =>
-                onChange({ ...form, conditionType: value as PromoConditionType })
-              }
-              ariaLabel="Condición de la promoción"
-              data-testid="promo-condition"
-              options={[
-                { value: 'min_qty', label: 'Nº de productos ≥' },
-                { value: 'min_ticket', label: 'Importe del ticket ≥ (€)' },
-              ]}
-            />
-          </label>
-          <label>
-            Umbral
-            <input
-              type="number"
-              min={1}
-              value={form.threshold}
-              onChange={(e) => onChange({ ...form, threshold: Number(e.target.value) })}
-              data-testid="promo-threshold"
-            />
-          </label>
-        </div>
-        <div className="modal-row">
-          <label>
-            Acción
-            <Select
-              value={form.discountType}
-              onChange={(value) => onChange({ ...form, discountType: value as PromoDiscountType })}
-              ariaLabel="Tipo de descuento"
-              data-testid="promo-discount-type"
-              options={[
-                { value: 'percent', label: 'Descuento %' },
-                { value: 'amount', label: 'Descuento €' },
-              ]}
-            />
-          </label>
-          <label>
-            Valor
-            <input
-              type="number"
-              min={1}
-              value={form.discountValue}
-              onChange={(e) => onChange({ ...form, discountValue: Number(e.target.value) })}
-              data-testid="promo-discount-value"
-            />
-          </label>
-        </div>
-        <div className="modal-row">
-          <label>
-            Inicio
-            <input
-              type="date"
-              value={form.startDate}
-              onChange={(e) => onChange({ ...form, startDate: e.target.value })}
-              data-testid="promo-start"
-            />
-          </label>
-          <label>
-            Fin
-            <input
-              type="date"
-              value={form.endDate}
-              onChange={(e) => onChange({ ...form, endDate: e.target.value })}
-              data-testid="promo-end"
-            />
-          </label>
-        </div>
-        <label className="user-active-check">
+        <label>
+          Umbral
           <input
-            type="checkbox"
-            checked={form.active}
-            onChange={(e) => onChange({ ...form, active: e.target.checked })}
-            data-testid="promo-active"
+            type="number"
+            min={1}
+            value={form.threshold}
+            onChange={(e) => onChange({ ...form, threshold: Number(e.target.value) })}
+            data-testid="promo-threshold"
           />
-          Activa
         </label>
+      </div>
+      <div className="modal-row">
+        <label>
+          Acción
+          <Select
+            value={form.discountType}
+            onChange={(value) => onChange({ ...form, discountType: value as PromoDiscountType })}
+            ariaLabel="Tipo de descuento"
+            data-testid="promo-discount-type"
+            options={[
+              { value: 'percent', label: 'Descuento %' },
+              { value: 'amount', label: 'Descuento €' },
+            ]}
+          />
+        </label>
+        <label>
+          Valor
+          <input
+            type="number"
+            min={1}
+            value={form.discountValue}
+            onChange={(e) => onChange({ ...form, discountValue: Number(e.target.value) })}
+            data-testid="promo-discount-value"
+          />
+        </label>
+      </div>
+      <div className="modal-row">
+        <label>
+          Inicio
+          <input
+            type="date"
+            value={form.startDate}
+            onChange={(e) => onChange({ ...form, startDate: e.target.value })}
+            data-testid="promo-start"
+          />
+        </label>
+        <label>
+          Fin
+          <input
+            type="date"
+            value={form.endDate}
+            onChange={(e) => onChange({ ...form, endDate: e.target.value })}
+            data-testid="promo-end"
+          />
+        </label>
+      </div>
+      <label className="user-active-check">
+        <input
+          type="checkbox"
+          checked={form.active}
+          onChange={(e) => onChange({ ...form, active: e.target.checked })}
+          data-testid="promo-active"
+        />
+        Activa
+      </label>
 
-        <div className="promo-preview" data-testid="promo-preview">
-          <span className="promo-preview-title">Previsualización del impacto</span>
-          <p>
-            {conditionText(form)} → <strong>{actionText(form)}</strong>.
-          </p>
-          <p className="muted">
-            Vigente del {form.startDate} al {form.endDate}.
-          </p>
-        </div>
+      <div className="promo-preview" data-testid="promo-preview">
+        <span className="promo-preview-title">Previsualización del impacto</span>
+        <p>
+          {conditionText(form)} → <strong>{actionText(form)}</strong>.
+        </p>
+        <p className="muted">
+          Vigente del {form.startDate} al {form.endDate}.
+        </p>
+      </div>
 
-        <div className="modal-foot">
-          <button type="button" onClick={onClose}>
-            Cancelar
-          </button>
-          <button type="submit" className="btn-primary" disabled={!valid} data-testid="promo-save">
-            {form.id ? 'Guardar' : 'Crear'}
-          </button>
-        </div>
-      </form>
-    </div>
+      <div className="modal-foot">
+        <button type="button" onClick={onClose}>
+          Cancelar
+        </button>
+        <button type="submit" className="btn-primary" disabled={!valid} data-testid="promo-save">
+          {form.id ? 'Guardar' : 'Crear'}
+        </button>
+      </div>
+    </Modal>
   );
 }

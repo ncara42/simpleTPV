@@ -1,21 +1,32 @@
 import './dashboard.css';
 
-import { Select } from '@simpletpv/ui';
+import { Chart, Select, Sparkline } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { DEMO_STOCKOUT_KPIS, DEMO_STOCKOUTS } from './demo/demoData.js';
 import { listStores } from './lib/admin.js';
 import {
   type DashboardPeriod,
+  getArchetypeRotation,
+  getDiscountByEmployee,
   getMarginKpis,
   getProductRankings,
+  getProductRotation,
   getSalesByFamily,
+  getSalesByHour,
   getSalesKpis,
   getSalesToday,
 } from './lib/dashboard.js';
 import { deltaTone, fmtDelta, fmtEur, fmtEurCompact, fmtNum, fmtRate } from './lib/format.js';
 import { usePageHeader } from './lib/pageHeader.js';
+import { readPref, usePreferences } from './lib/preferences.js';
+
+// Personalización de las KPI cards (IT-16): orden + visibilidad por usuario.
+interface CardsPref {
+  order: string[];
+  hidden: string[];
+}
 
 const PERIODS: Array<{ id: DashboardPeriod; label: string }> = [
   { id: 'today', label: 'Hoy' },
@@ -66,6 +77,29 @@ export function DashboardPage() {
     queryFn: () => getSalesByFamily(period, store),
     placeholderData: keepPreviousData,
   });
+  const byHour = useQuery({
+    queryKey: ['dash-hour', period, store],
+    queryFn: () => getSalesByHour(period, store),
+    placeholderData: keepPreviousData,
+  });
+  const discountByEmp = useQuery({
+    queryKey: ['dash-discount-emp', period, store],
+    queryFn: () => getDiscountByEmployee(period, store),
+    placeholderData: keepPreviousData,
+  });
+  const rotation = useQuery({
+    queryKey: ['dash-rotation', period, store],
+    queryFn: () => getProductRotation(period, store),
+    placeholderData: keepPreviousData,
+  });
+  // Rotación: por defecto AGREGADA POR ARQUETIPO (más sólida); 'product' es el
+  // drill-down al SKU concreto (IT-13).
+  const [rotationLevel, setRotationLevel] = useState<'archetype' | 'product'>('archetype');
+  const archetypeRotation = useQuery({
+    queryKey: ['dash-arch-rotation', period, store],
+    queryFn: () => getArchetypeRotation(period, store),
+    placeholderData: keepPreviousData,
+  });
   const rankings = useQuery({
     queryKey: ['dash-rankings', period, store],
     queryFn: () => getProductRankings(period, store),
@@ -74,6 +108,146 @@ export function DashboardPage() {
 
   usePageHeader('Resumen', 'Actualizado hace 2 min');
 
+  // KPI cards personalizables (IT-16): cada usuario elige cuáles ve y en qué orden.
+  const { prefs, setPref, loaded: prefsLoaded } = usePreferences();
+  const [cardsEditorOpen, setCardsEditorOpen] = useState(false);
+
+  // Periodo y tienda por defecto (IT-16): el dashboard recuerda el último elegido. Se
+  // aplica UNA vez tras cargar las preferencias; los cambios del usuario lo reescriben.
+  const defaultsApplied = useRef(false);
+  useEffect(() => {
+    if (!prefsLoaded || defaultsApplied.current) return;
+    defaultsApplied.current = true;
+    const d = readPref<{ period?: DashboardPeriod; storeId?: string }>(
+      prefs,
+      'dashboard.defaults',
+      {},
+    );
+    if (d.period && PERIODS.some((p) => p.id === d.period)) setPeriod(d.period);
+    if (typeof d.storeId === 'string') setStoreId(d.storeId);
+  }, [prefsLoaded, prefs]);
+  const saveDashboardDefault = (patch: { period?: DashboardPeriod; storeId?: string }): void => {
+    const cur = readPref<{ period?: DashboardPeriod; storeId?: string }>(
+      prefs,
+      'dashboard.defaults',
+      {},
+    );
+    setPref('dashboard.defaults', { ...cur, ...patch });
+  };
+  const cardDefs: Array<{ id: string; label: string; node: React.ReactNode }> = [
+    {
+      id: 'kpi-today',
+      label: 'Facturación hoy',
+      node: (
+        <KpiCard
+          key="kpi-today"
+          label="Facturación hoy"
+          value={fmtEur(salesToday.data?.today.total)}
+          delta={salesToday.data?.deltaPct ?? null}
+          series={salesToday.data?.intraday}
+          sparkTone={deltaTone(salesToday.data?.deltaPct ?? null) === 'down' ? 'down' : 'up'}
+          testid="kpi-today"
+        />
+      ),
+    },
+    {
+      id: 'kpi-avg-ticket',
+      label: 'Ticket medio',
+      node: (
+        <KpiCard
+          key="kpi-avg-ticket"
+          label="Ticket medio"
+          value={fmtEur(salesKpis.data?.avgTicket)}
+          series={salesKpis.data?.series?.avgTicket}
+          testid="kpi-avg-ticket"
+        />
+      ),
+    },
+    {
+      id: 'kpi-upt',
+      label: 'UPT',
+      node: (
+        <KpiCard
+          key="kpi-upt"
+          label="UPT"
+          value={fmtNum(salesKpis.data?.upt)}
+          series={salesKpis.data?.series?.upt}
+          testid="kpi-upt"
+        />
+      ),
+    },
+    {
+      id: 'kpi-margin',
+      label: '% Margen',
+      node: (
+        <KpiCard
+          key="kpi-margin"
+          label="% Margen"
+          value={fmtRate(marginKpis.data?.marginPct)}
+          series={marginKpis.data?.series}
+          testid="kpi-margin"
+        />
+      ),
+    },
+    {
+      id: 'kpi-profit',
+      label: 'Beneficio',
+      node: (
+        <KpiCard
+          key="kpi-profit"
+          label="Beneficio"
+          value={fmtEur(marginKpis.data?.realMargin)}
+          series={marginKpis.data?.realMarginSeries}
+          testid="kpi-profit"
+        />
+      ),
+    },
+    {
+      id: 'kpi-discount',
+      label: 'Tasa descuento',
+      node: (
+        <KpiCard
+          key="kpi-discount"
+          label="Tasa descuento"
+          value={fmtRate(salesKpis.data?.discountRate)}
+          series={salesKpis.data?.series?.discountRate}
+          testid="kpi-discount"
+        />
+      ),
+    },
+    {
+      id: 'kpi-return',
+      label: 'Tasa devolución',
+      node: (
+        <KpiCard
+          key="kpi-return"
+          label="Tasa devolución"
+          value={fmtRate(salesKpis.data?.returnRate)}
+          series={salesKpis.data?.series?.returnRate}
+          testid="kpi-return"
+        />
+      ),
+    },
+  ];
+  const allCardIds = cardDefs.map((c) => c.id);
+  const cardsPref = readPref<CardsPref>(prefs, 'dashboard.cards', {
+    order: allCardIds,
+    hidden: [],
+  });
+  // Saneado: respeta el orden guardado, añade al final las cards nuevas y descarta ids
+  // desconocidos (robusto ante versiones viejas del pref).
+  const savedOrder = (Array.isArray(cardsPref.order) ? cardsPref.order : []).filter((id) =>
+    allCardIds.includes(id),
+  );
+  const cardOrder = [...savedOrder, ...allCardIds.filter((id) => !savedOrder.includes(id))];
+  const cardHidden = (Array.isArray(cardsPref.hidden) ? cardsPref.hidden : []).filter((id) =>
+    allCardIds.includes(id),
+  );
+  const visibleCards = cardOrder
+    .filter((id) => !cardHidden.includes(id))
+    .map((id) => cardDefs.find((c) => c.id === id))
+    .filter((c): c is (typeof cardDefs)[number] => Boolean(c));
+
   return (
     <section className="catalog" data-testid="dashboard">
       <header className="catalog-head is-actions-only">
@@ -81,7 +255,10 @@ export function DashboardPage() {
           <Select
             className="dash-period-select"
             value={period}
-            onChange={(value) => setPeriod(value as DashboardPeriod)}
+            onChange={(value) => {
+              setPeriod(value as DashboardPeriod);
+              saveDashboardDefault({ period: value as DashboardPeriod });
+            }}
             ariaLabel="Periodo"
             data-testid="dash-period"
             options={PERIODS.map((p) => ({ value: p.id, label: p.label }))}
@@ -89,7 +266,10 @@ export function DashboardPage() {
           <Select
             className="dash-store"
             value={storeId}
-            onChange={setStoreId}
+            onChange={(value) => {
+              setStoreId(value);
+              saveDashboardDefault({ storeId: value });
+            }}
             ariaLabel="Tienda"
             data-testid="dash-store"
             options={[
@@ -100,46 +280,28 @@ export function DashboardPage() {
         </div>
       </header>
 
-      {/* KPI cards */}
+      {/* KPI cards personalizables (IT-16): el usuario elige cuáles y en qué orden. */}
+      <div className="dash-cards-head">
+        <button
+          type="button"
+          className="dash-customize"
+          onClick={() => setCardsEditorOpen((o) => !o)}
+          data-testid="dash-customize"
+          aria-expanded={cardsEditorOpen}
+        >
+          Personalizar tarjetas
+        </button>
+      </div>
+      {cardsEditorOpen && (
+        <CardsEditor
+          defs={cardDefs}
+          order={cardOrder}
+          hidden={cardHidden}
+          onChange={(next) => setPref('dashboard.cards', next)}
+        />
+      )}
       <div className="dash-cards" data-testid="dash-cards">
-        <KpiCard
-          label="Facturación hoy"
-          value={fmtEur(salesToday.data?.today.total)}
-          delta={salesToday.data?.deltaPct ?? null}
-          series={salesToday.data?.series}
-          sparkTone={deltaTone(salesToday.data?.deltaPct ?? null) === 'down' ? 'down' : 'up'}
-          testid="kpi-today"
-        />
-        <KpiCard
-          label="Ticket medio"
-          value={fmtEur(salesKpis.data?.avgTicket)}
-          series={salesKpis.data?.series?.avgTicket}
-          testid="kpi-avg-ticket"
-        />
-        <KpiCard
-          label="UPT"
-          value={fmtNum(salesKpis.data?.upt)}
-          series={salesKpis.data?.series?.upt}
-          testid="kpi-upt"
-        />
-        <KpiCard
-          label="% Margen"
-          value={fmtRate(marginKpis.data?.marginPct)}
-          series={marginKpis.data?.series}
-          testid="kpi-margin"
-        />
-        <KpiCard
-          label="Tasa descuento"
-          value={fmtRate(salesKpis.data?.discountRate)}
-          series={salesKpis.data?.series?.discountRate}
-          testid="kpi-discount"
-        />
-        <KpiCard
-          label="Tasa devolución"
-          value={fmtRate(salesKpis.data?.returnRate)}
-          series={salesKpis.data?.series?.returnRate}
-          testid="kpi-return"
-        />
+        {visibleCards.map((c) => c.node)}
       </div>
 
       <div className="dash-grid">
@@ -258,8 +420,195 @@ export function DashboardPage() {
         <div className="dash-panel span-7" data-testid="dash-rankings">
           <Rankings data={rankings.data} loading={rankings.isLoading} />
         </div>
+
+        {/* Ventas por hora (STAT-02): barras con el Chart reutilizable (IT-02) */}
+        <div className="dash-panel span-7" data-testid="dash-hour">
+          <h3>Ventas por hora</h3>
+          <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]} · importe por franja</p>
+          <Chart
+            data={(byHour.data ?? []).map((h) => ({ label: `${h.hour}h`, value: h.revenue }))}
+            height={200}
+            formatValue={fmtEurCompact}
+            ariaLabel="Ventas por hora"
+          />
+        </div>
+
+        {/* Descuento medio por empleado (STAT-04) */}
+        <div className="dash-panel span-5" data-testid="dash-discount-emp">
+          <h3>Descuento por empleado</h3>
+          <p className="dash-panel-sub">
+            {PERIOD_SUBTITLE[period]} · descuento voluntario medio (sin promociones)
+          </p>
+          {(() => {
+            const emps = discountByEmp.data ?? [];
+            const max = Math.max(0.0001, ...emps.map((e) => e.avgDiscountPct));
+            return (
+              <ul className="dash-family-list">
+                {emps.map((e, i) => (
+                  <li key={e.userId} style={{ '--i': i } as React.CSSProperties}>
+                    <span className="dash-family-name">{e.userName}</span>
+                    <span className="dash-family-track">
+                      <span
+                        className="dash-family-fill"
+                        style={{ width: `${(e.avgDiscountPct / max) * 100}%` }}
+                      >
+                        <span className="dash-family-pct">{fmtRate(e.avgDiscountPct)}</span>
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            );
+          })()}
+        </div>
+
+        {/* Rotación (STAT-05/06): por defecto AGREGADA POR ARQUETIPO (familia) — más
+            sólida estadísticamente; el conmutador baja al detalle por producto (IT-13). */}
+        <div className="dash-panel" data-testid="dash-rotation">
+          <div className="dash-toggle" role="tablist" aria-label="Nivel de rotación">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={rotationLevel === 'archetype'}
+              className={rotationLevel === 'archetype' ? 'is-active' : ''}
+              onClick={() => setRotationLevel('archetype')}
+              data-testid="rotation-by-archetype"
+            >
+              Arquetipo
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={rotationLevel === 'product'}
+              className={rotationLevel === 'product' ? 'is-active' : ''}
+              onClick={() => setRotationLevel('product')}
+              data-testid="rotation-by-product"
+            >
+              Producto
+            </button>
+          </div>
+          <h3>Rotación</h3>
+          <p className="dash-panel-sub">
+            {PERIOD_SUBTITLE[period]} ·{' '}
+            {rotationLevel === 'archetype'
+              ? 'por arquetipo · media/día sobre días con tienda abierta'
+              : 'por producto · unidades, días sin venta y evolución'}
+          </p>
+          <ul className="dash-rotation-list">
+            {(rotationLevel === 'archetype'
+              ? (archetypeRotation.data ?? []).map((a) => ({
+                  key: a.familyId ?? 'none',
+                  label: a.familyName,
+                  sub: `${a.productCount} productos · ${fmtNum(a.ventaMediaDiaria, 1)} ud/día`,
+                  units: a.units,
+                  days: a.daysSinceLastSale,
+                  trend: a.trend,
+                  isNew: false,
+                  archeAvg: null as number | null,
+                }))
+              : (rotation.data ?? []).map((p) => ({
+                  key: p.productId,
+                  label: p.name,
+                  sub: null as string | null,
+                  units: p.units,
+                  days: p.daysSinceLastSale,
+                  trend: p.trend,
+                  isNew: p.isNew,
+                  archeAvg: p.archetypeAvgDaily,
+                }))
+            ).map((r) => (
+              <li key={r.key} className="dash-rotation-row">
+                <span className="dash-rotation-name">
+                  {r.label}
+                  {r.sub && <span className="dash-rotation-arch"> · {r.sub}</span>}
+                  {r.isNew && <span className="dash-new-tag">nuevo</span>}
+                </span>
+                <span className="dash-rotation-units">{fmtNum(r.units, 0)} ud</span>
+                <span className="dash-rotation-days">
+                  {/* Producto nuevo: su día-a-día propio es poco fiable → mostramos la
+                      referencia de su arquetipo (IT-15). */}
+                  {r.isNew && r.archeAvg != null
+                    ? `~${fmtNum(r.archeAvg, 1)}/día · arquetipo`
+                    : r.days == null
+                      ? 'sin ventas'
+                      : r.days <= 0
+                        ? 'hoy'
+                        : `hace ${r.days} d`}
+                </span>
+                <span className="dash-rotation-spark">
+                  {r.trend.length > 1 && (
+                    <Sparkline data={r.trend} tone="brand" height={28} ariaLabel="Evolución" />
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </section>
+  );
+}
+
+// Editor de las KPI cards (IT-16): casilla de visibilidad + flechas de orden por card.
+function CardsEditor(props: {
+  defs: Array<{ id: string; label: string }>;
+  order: string[];
+  hidden: string[];
+  onChange: (next: { order: string[]; hidden: string[] }) => void;
+}) {
+  const labelOf = (id: string): string => props.defs.find((d) => d.id === id)?.label ?? id;
+  const move = (i: number, dir: -1 | 1): void => {
+    const j = i + dir;
+    if (j < 0 || j >= props.order.length) return;
+    const order = [...props.order];
+    const tmp = order[i]!;
+    order[i] = order[j]!;
+    order[j] = tmp;
+    props.onChange({ order, hidden: props.hidden });
+  };
+  const toggle = (id: string): void => {
+    const hidden = props.hidden.includes(id)
+      ? props.hidden.filter((h) => h !== id)
+      : [...props.hidden, id];
+    props.onChange({ order: props.order, hidden });
+  };
+  return (
+    <div className="dash-cards-editor" data-testid="dash-cards-editor">
+      <p className="dash-cards-editor-title">Tarjetas del panel</p>
+      <ul>
+        {props.order.map((id, i) => (
+          <li key={id}>
+            <label>
+              <input
+                type="checkbox"
+                checked={!props.hidden.includes(id)}
+                onChange={() => toggle(id)}
+                data-testid={`card-toggle-${id}`}
+              />
+              {labelOf(id)}
+            </label>
+            <span className="dash-cards-editor-move">
+              <button
+                type="button"
+                onClick={() => move(i, -1)}
+                disabled={i === 0}
+                aria-label={`Subir ${labelOf(id)}`}
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                onClick={() => move(i, 1)}
+                disabled={i === props.order.length - 1}
+                aria-label={`Bajar ${labelOf(id)}`}
+              >
+                ↓
+              </button>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -283,40 +632,14 @@ function KpiCard(props: {
         <span className="dash-card-label">{props.label}</span>
         <span className="dash-card-value">{props.value}</span>
         {props.series && props.series.length > 1 && (
-          <Sparkline data={props.series} tone={props.sparkTone ?? 'brand'} />
+          // Sparkline reutilizable de @simpletpv/ui (IT-02), a sangre al pie de la
+          // card vía el wrapper .dash-card-spark.
+          <div className="dash-card-spark">
+            <Sparkline data={props.series} tone={props.sparkTone ?? 'brand'} height={44} />
+          </div>
         )}
       </div>
     </div>
-  );
-}
-
-// Mini-gráfica de tendencia para la card. SVG a mano (como las barras del dashboard),
-// estirado a todo el ancho con preserveAspectRatio="none"; el trazo se mantiene fino
-// gracias a vector-effect. El color (línea + relleno) lo fija la clase de tono.
-function Sparkline(props: { data: number[]; tone?: SparkTone }) {
-  const { data } = props;
-  if (data.length < 2) return null;
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const pad = 3; // margen vertical para que el trazo no toque los bordes
-  const span = max - min || 1;
-  const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * 100;
-    const y = pad + (1 - (v - min) / span) * (32 - 2 * pad);
-    return [x, y] as const;
-  });
-  const line = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
-  const area = `M ${points[0]![0].toFixed(2)},${points[0]![1].toFixed(2)} L ${line} L 100,32 L 0,32 Z`;
-  return (
-    <svg
-      className={`dash-card-spark dash-spark-${props.tone ?? 'brand'}`}
-      viewBox="0 0 100 32"
-      preserveAspectRatio="none"
-      aria-hidden
-    >
-      <path className="dash-spark-area" d={area} />
-      <polyline className="dash-spark-line" points={line} vectorEffect="non-scaling-stroke" />
-    </svg>
   );
 }
 

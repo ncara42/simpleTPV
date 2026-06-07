@@ -121,17 +121,30 @@ export interface SaleSummary {
 
 // Página de ventas con metadatos de paginación y totales del día. `totals`
 // agrega SOLO ventas COMPLETED (las VOIDED se listan en items pero no suman).
+// avgDiscountPct/avgMarginPct son tasas (0..1) sobre el conjunto filtrado (IT-04).
 export interface SalesPage {
   items: SaleSummary[];
   page: number;
   pageSize: number;
   totalItems: number;
-  totals: { count: number; totalAmount: string };
+  totals: {
+    count: number;
+    totalAmount: string;
+    avgDiscountPct: number;
+    avgMarginPct: number;
+  };
 }
 
+// Filtros del historial (#14 + IT-04). Todos opcionales. `userId` filtra por
+// vendedor; `from`/`to` (YYYY-MM-DD) acotan por rango; `status` por estado.
 export interface SalesQueryInput {
   storeId?: string;
   date?: string;
+  from?: string;
+  to?: string;
+  userId?: string;
+  familyId?: string;
+  status?: string;
   q?: string;
   page?: number;
   pageSize?: number;
@@ -314,6 +327,10 @@ export interface StockAlert {
   storeId: string;
   storeName: string;
   alertType: AlertType;
+  // Anti-rotura por arquetipo (IT-13): hay sustituto de la misma familia con stock.
+  hasSubstituteStock: boolean;
+  // 'soft' si hay sustituto (rotura no crítica, el cliente sustituye); 'critical' si no.
+  severity: 'soft' | 'critical';
   resolved: boolean;
   createdAt: string;
 }
@@ -573,4 +590,118 @@ export interface SuggestionRow {
   rotacion: number | null;
   coberturaDias: number | null;
   cantidadSugerida: number;
+}
+
+// API keys (IT-18).
+export interface ApiKey {
+  id: string;
+  name: string;
+  prefix: string;
+  priceListId: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface ApiKeyCreated extends ApiKey {
+  key: string;
+}
+
+export interface CreateApiKeyInput {
+  name: string;
+  priceListId?: string;
+}
+
+// ── B2B mayorista saliente (IT-17) ───────────────────────────────────────────
+export interface Customer {
+  id: string;
+  name: string;
+  nif: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  priceListId: string | null;
+  active: boolean;
+  // En list/update la API incluye la tarifa asignada (id + nombre).
+  priceList?: { id: string; name: string } | null;
+}
+
+export interface CustomerInput {
+  name: string;
+  nif?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  priceListId?: string | null;
+  active?: boolean;
+}
+
+// Resumen de tarifa (lista). itemCount = precios fijados; customerCount = clientes que la usan.
+export interface PriceListSummary {
+  id: string;
+  name: string;
+  active: boolean;
+  itemCount: number;
+  customerCount: number;
+}
+
+// Precio de un producto dentro de una tarifa. price/salePrice son Decimal → string.
+export interface PriceListItem {
+  id: string;
+  productId: string;
+  price: string;
+  product?: { name: string; salePrice: string };
+}
+
+export interface PriceListDetail {
+  id: string;
+  name: string;
+  active: boolean;
+  items: PriceListItem[];
+}
+
+export type WholesaleOrderStatus = 'DRAFT' | 'CONFIRMED' | 'SHIPPED' | 'CANCELLED';
+
+export interface WholesaleOrderLine {
+  id: string;
+  productId: string;
+  qty: string;
+  unitPrice: string;
+  lineTotal: string;
+  product?: { name: string };
+}
+
+// Fila del listado de pedidos mayoristas (paginado).
+export interface WholesaleOrderSummary {
+  id: string;
+  customerId: string;
+  customerName: string;
+  status: WholesaleOrderStatus;
+  total: string;
+  lineCount: number;
+  createdAt: string;
+}
+
+export interface WholesaleOrdersPage {
+  items: WholesaleOrderSummary[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+}
+
+export interface WholesaleOrderDetail {
+  id: string;
+  customerId: string;
+  status: WholesaleOrderStatus;
+  total: string;
+  notes: string | null;
+  createdAt: string;
+  customer: { name: string; nif: string | null };
+  lines: WholesaleOrderLine[];
+}
+
+export interface CreateWholesaleOrderInput {
+  customerId: string;
+  notes?: string;
+  lines: { productId: string; qty: number }[];
 }

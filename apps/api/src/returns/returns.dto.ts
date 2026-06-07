@@ -4,19 +4,25 @@ import {
   ArrayMinSize,
   IsArray,
   IsNotEmpty,
+  IsNumber,
   IsPositive,
   IsString,
   IsUUID,
+  Max,
   ValidateNested,
 } from 'class-validator';
+
+import { MAX_QUANTITY } from '../common/limits.js';
 
 export class CreateReturnLineDto {
   @IsUUID()
   saleLineId!: string;
 
   // Cantidad a devolver de esta línea (> 0). El servicio valida además que no
-  // exceda lo disponible (vendido − ya devuelto).
+  // exceda lo disponible (vendido − ya devuelto). Decimal(10,3): 3 decimales (A-03).
+  @IsNumber({ maxDecimalPlaces: 3 })
   @IsPositive()
+  @Max(MAX_QUANTITY)
   qty!: number;
 }
 
@@ -43,7 +49,10 @@ export class BlindReturnLineDto {
   @IsUUID()
   productId!: string;
 
+  // Cantidad — Decimal(10,3): 3 decimales y acotada (A-03).
+  @IsNumber({ maxDecimalPlaces: 3 })
   @IsPositive()
+  @Max(MAX_QUANTITY)
   qty!: number;
 }
 

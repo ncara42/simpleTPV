@@ -1,7 +1,6 @@
 import type {
   FamilyNode,
   Product,
-  SalesPage,
   SaleSummary,
   StockAlert,
   StockGlobalRow,
@@ -11,13 +10,18 @@ import type {
 } from '@simpletpv/auth';
 
 import type {
+  ArchetypeRotation,
+  DiscountByEmployee,
   FamilySales,
   MarginKpis,
   ProductRankings,
+  ProductRotation,
+  SalesByHour,
   SalesKpis,
   SalesTodayResponse,
   StockoutKpis,
 } from '../lib/dashboard.js';
+import { findNodePath } from '../lib/family-tree.js';
 
 // ─── Identidad demo ──────────────────────────────────────────
 export const DEMO_USER = { name: 'Ana Caravaca', email: 'admin@org1.test' };
@@ -197,24 +201,12 @@ export const DEMO_FAMILIES: DemoFamily[] = [
   fam('fam-infusiones', 'Infusiones', '#0e7c6b', 5, 7),
 ];
 
-// Localiza familia y (opcional) subfamilia por id; útil para mostrar la ruta jerárquica.
-export function findFamily(id: string | null): {
-  family: DemoFamily | null;
-  sub: DemoFamily | null;
-} {
-  if (!id) return { family: null, sub: null };
-  for (const root of DEMO_FAMILIES) {
-    if (root.id === id) return { family: root, sub: null };
-    const sub = root.children.find((c) => c.id === id);
-    if (sub) return { family: root, sub };
-  }
-  return { family: null, sub: null };
-}
-// Etiqueta "Familia › Subfamilia" (o solo familia). "—" si no se encuentra.
+// Etiqueta de la ruta completa del arquetipo: "Flores › Índica › …" (cualquier
+// profundidad). "—" si no se encuentra.
 export function familyPathLabel(id: string | null): string {
-  const { family, sub } = findFamily(id);
-  if (!family) return '—';
-  return sub ? `${family.name} › ${sub.name}` : family.name;
+  if (!id) return '—';
+  const path = findNodePath(DEMO_FAMILIES, id);
+  return path.length ? path.map((n) => n.name).join(' › ') : '—';
 }
 
 // ─── Productos (12, con SKU/IVA del mockup de Catálogo) ──────
@@ -305,8 +297,9 @@ export const DEMO_STOCK_IN_TRANSIT = 14;
 // Familia raíz de un producto (para el filtro por familia del Stock).
 export function productRootFamily(productId: string): { id: string; name: string } | null {
   const p = DEMO_PRODUCTS.find((x) => x.id === productId);
-  const { family } = findFamily(p?.familyId ?? null);
-  return family ? { id: family.id, name: family.name } : null;
+  const path = findNodePath(DEMO_FAMILIES, p?.familyId ?? '');
+  const root = path[0];
+  return root ? { id: root.id, name: root.name } : null;
 }
 
 // ─── Promociones (constructor de reglas: condición + acción) (#99) ───
@@ -489,6 +482,8 @@ export const DEMO_ALERTS: StockAlert[] = [
     storeId: 's-centro',
     storeName: 'Centro',
     alertType: 'OUT_OF_STOCK',
+    hasSubstituteStock: true,
+    severity: 'soft',
     resolved: false,
     createdAt: '2026-06-02T08:00:00.000Z',
   },
@@ -499,84 +494,14 @@ export const DEMO_ALERTS: StockAlert[] = [
     storeId: 's-centro',
     storeName: 'Centro',
     alertType: 'OUT_OF_STOCK',
+    hasSubstituteStock: false,
+    severity: 'critical',
     resolved: false,
     createdAt: '2026-06-02T08:05:00.000Z',
   },
 ];
 
-// ─── Ventas (5 tickets del mockup) ───────────────────────────
-// `storeName` y `lines` son campos demo extra; SalesHistoryPage los lee opcional.
-export interface DemoSale extends SaleSummary {
-  storeName: string;
-  lines: number;
-}
-const DEMO_SALE_ITEMS: DemoSale[] = [
-  {
-    id: 'v-1042',
-    ticketNumber: '#A-1042',
-    createdAt: '2026-06-02T12:41:00.000Z',
-    total: '53.90',
-    paymentMethod: 'CASH',
-    status: 'COMPLETED',
-    storeId: 's-centro',
-    storeName: 'Centro',
-    lines: 3,
-  },
-  {
-    id: 'v-1041',
-    ticketNumber: '#A-1041',
-    createdAt: '2026-06-02T12:30:00.000Z',
-    total: '24.90',
-    paymentMethod: 'CARD',
-    status: 'COMPLETED',
-    storeId: 's-centro',
-    storeName: 'Centro',
-    lines: 1,
-  },
-  {
-    id: 'v-1040',
-    ticketNumber: '#A-1040',
-    createdAt: '2026-06-02T12:18:00.000Z',
-    total: '88.40',
-    paymentMethod: 'CARD',
-    status: 'VOIDED',
-    storeId: 's-norte',
-    storeName: 'Norte',
-    lines: 5,
-  },
-  {
-    id: 'v-1039',
-    ticketNumber: '#A-1039',
-    createdAt: '2026-06-02T11:57:00.000Z',
-    total: '34.40',
-    paymentMethod: 'CASH',
-    status: 'COMPLETED',
-    storeId: 's-sur',
-    storeName: 'Sur',
-    lines: 2,
-  },
-  {
-    id: 'v-1038',
-    ticketNumber: '#A-1038',
-    createdAt: '2026-06-02T11:40:00.000Z',
-    total: '61.20',
-    paymentMethod: 'CARD',
-    status: 'COMPLETED',
-    storeId: 's-granvia',
-    storeName: 'Gran Vía',
-    lines: 4,
-  },
-];
-export const DEMO_SALES_PAGE: SalesPage = {
-  items: DEMO_SALE_ITEMS,
-  page: 1,
-  pageSize: 20,
-  totalItems: DEMO_SALE_ITEMS.length,
-  // totals agrega solo COMPLETED (las VOIDED no suman): 53.90+24.90+34.40+61.20 = 174.40 (4 tickets).
-  totals: { count: 4, totalAmount: '174.40' },
-};
-
-// ─── Ventas: dataset enriquecido para el historial con scroll infinito y filtros (#95) ───
+// ─── Ventas: dataset del historial paginado con DataTable y filtros (#95 / IT-06) ───
 // Cada venta lleva vendedor y familia (raíz) dominante para poder filtrar por ambos.
 export interface DemoSaleRow extends SaleSummary {
   storeName: string;
@@ -649,6 +574,9 @@ export const DEMO_SALES_TODAY: SalesTodayResponse = {
     { storeId: 's-online', storeName: 'Online', today: 154, yesterday: 162, deltaPct: -4.9 },
   ],
   series: [980, 1040, 1010, 1120, 1075, 1150, 1190, 1130, 1210, 1240, 1142, 1284],
+  // Acumulado intradía de hoy por hora (termina en today.total = 1284). Comparativa
+  // "a la misma hora": ayer (1142) es ayer hasta este mismo instante, no el día entero.
+  intraday: [95, 240, 410, 560, 705, 880, 1010, 1140, 1284],
 };
 export const DEMO_SALES_KPIS: SalesKpis = {
   salesCount: 68,
@@ -670,6 +598,8 @@ export const DEMO_MARGIN_KPIS: MarginKpis = {
   marginPct: 0.41,
   revenue: 1284,
   series: [0.38, 0.39, 0.385, 0.4, 0.395, 0.405, 0.4, 0.41, 0.405, 0.415, 0.402, 0.41],
+  // Beneficio diario en € (termina en realMargin = 500) para la card "Beneficio".
+  realMarginSeries: [372, 405, 389, 448, 425, 466, 476, 463, 490, 515, 459, 500],
 };
 export const DEMO_SALES_BY_FAMILY: FamilySales[] = [
   { familyId: 'fam-flores', familyName: 'Flores CBD', color: '#16734f', total: 488 },
@@ -677,6 +607,134 @@ export const DEMO_SALES_BY_FAMILY: FamilySales[] = [
   { familyId: 'fam-cosmetica', familyName: 'Cosmética', color: '#7c3aed', total: 220 },
   { familyId: 'fam-vapeo', familyName: 'Vapeo', color: '#2563eb', total: 152 },
   { familyId: 'fam-infusiones', familyName: 'Infusiones', color: '#0e7c6b', total: 80 },
+];
+// Ventas por hora (STAT-02): jornada 9–20h con pico de mediodía y de tarde.
+export const DEMO_SALES_BY_HOUR: SalesByHour[] = [
+  { hour: 9, count: 4, revenue: 86 },
+  { hour: 10, count: 7, revenue: 142 },
+  { hour: 11, count: 9, revenue: 188 },
+  { hour: 12, count: 12, revenue: 246 },
+  { hour: 13, count: 10, revenue: 205 },
+  { hour: 14, count: 5, revenue: 98 },
+  { hour: 16, count: 6, revenue: 124 },
+  { hour: 17, count: 9, revenue: 176 },
+  { hour: 18, count: 11, revenue: 224 },
+  { hour: 19, count: 8, revenue: 162 },
+  { hour: 20, count: 3, revenue: 61 },
+];
+// Descuento medio por vendedor (STAT-04), ordenado de mayor a menor (quién regala más).
+export const DEMO_DISCOUNT_BY_EMPLOYEE: DiscountByEmployee[] = [
+  { userId: 'u-jon', userName: 'Jon Aguirre', salesCount: 22, avgDiscountPct: 0.094 },
+  { userId: 'u-luis', userName: 'Luis Pérez', salesCount: 31, avgDiscountPct: 0.071 },
+  { userId: 'u-ana', userName: 'Ana Caravaca', salesCount: 28, avgDiscountPct: 0.052 },
+  { userId: 'u-marta', userName: 'Marta Ruiz', salesCount: 19, avgDiscountPct: 0.038 },
+];
+// Rotación + evolución (STAT-05/06): top por unidades; los de cola llevan más días
+// sin venta (stock muerto). `trend` = unidades por día (sparkline de evolución).
+// Rotación por arquetipo (IT-13): agrega los productos de cada familia → vista por
+// defecto, más sólida que por SKU. (En demo, números calcados de los productos.)
+export const DEMO_ARCHETYPE_ROTATION: ArchetypeRotation[] = [
+  {
+    familyId: 'fam-aceites',
+    familyName: 'Aceites',
+    productCount: 12,
+    units: 262,
+    ventaMediaDiaria: 11.9,
+    daysSinceLastSale: 0,
+    trend: [30, 42, 38, 51, 47, 60, 66],
+  },
+  {
+    familyId: 'fam-flores',
+    familyName: 'Flores CBD',
+    productCount: 24,
+    units: 208,
+    ventaMediaDiaria: 9.5,
+    daysSinceLastSale: 0,
+    trend: [24, 30, 28, 36, 33, 40, 44],
+  },
+  {
+    familyId: 'fam-cosmetica',
+    familyName: 'Cosmética',
+    productCount: 18,
+    units: 96,
+    ventaMediaDiaria: 4.4,
+    daysSinceLastSale: 1,
+    trend: [12, 15, 13, 17, 14, 18, 16],
+  },
+  {
+    familyId: 'fam-vapeo',
+    familyName: 'Vapeo',
+    productCount: 9,
+    units: 41,
+    ventaMediaDiaria: 1.9,
+    daysSinceLastSale: 4,
+    trend: [8, 6, 5, 7, 5, 6, 4],
+  },
+  {
+    familyId: 'fam-infusiones',
+    familyName: 'Infusiones',
+    productCount: 7,
+    units: 12,
+    ventaMediaDiaria: 0.5,
+    daysSinceLastSale: 12,
+    trend: [3, 2, 2, 2, 1, 1, 1],
+  },
+];
+export const DEMO_ROTATION_STATS: ProductRotation[] = [
+  {
+    productId: 'p-aceite-cbd-10',
+    name: 'Aceite CBD 10%',
+    units: 142,
+    daysSinceLastSale: 0,
+    trend: [12, 18, 15, 22, 19, 26, 30],
+    isNew: false,
+    archetypeAvgDaily: 0.99,
+  },
+  {
+    productId: 'p-flor-premium',
+    name: 'Flor Premium 3,5g',
+    units: 120,
+    daysSinceLastSale: 0,
+    trend: [10, 14, 12, 18, 16, 20, 22],
+    isNew: false,
+    archetypeAvgDaily: 0.39,
+  },
+  {
+    productId: 'p-resina-premium',
+    name: 'Resina Premium 1g',
+    units: 88,
+    daysSinceLastSale: 1,
+    trend: [8, 11, 9, 13, 12, 16, 14],
+    isNew: false,
+    archetypeAvgDaily: 0.39,
+  },
+  {
+    productId: 'p-crema-regeneradora',
+    name: 'Crema regeneradora 50ml',
+    units: 60,
+    daysSinceLastSale: 2,
+    trend: [6, 8, 7, 10, 9, 11, 9],
+    isNew: false,
+    archetypeAvgDaily: 0.24,
+  },
+  {
+    productId: 'p-vapeador-pro',
+    name: 'Vapeador Pro',
+    units: 12,
+    daysSinceLastSale: 9,
+    trend: [3, 2, 1, 2, 1, 2, 1],
+    isNew: false,
+    archetypeAvgDaily: 0.21,
+  },
+  {
+    productId: 'p-liquido-vape',
+    name: 'Líquido vape 10ml',
+    units: 4,
+    daysSinceLastSale: 21,
+    trend: [1, 0, 1, 0, 1, 0, 1],
+    isNew: true,
+    archetypeAvgDaily: 0.21,
+  },
 ];
 export const DEMO_STOCKOUT_KPIS: StockoutKpis = {
   events: 4,

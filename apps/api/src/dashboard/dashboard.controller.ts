@@ -25,6 +25,16 @@ export class DashboardController {
     return this.dashboard.salesByFamily(query);
   }
 
+  @Get('sales-by-hour')
+  salesByHour(@Query() query: DashboardPeriodQueryDto) {
+    return this.dashboard.salesByHour(query);
+  }
+
+  @Get('discount-by-employee')
+  discountByEmployee(@Query() query: DashboardPeriodQueryDto) {
+    return this.dashboard.discountByEmployee(query);
+  }
+
   @Get('sales-kpis')
   salesKpis(@Query() query: DashboardPeriodQueryDto) {
     return this.dashboard.salesKpis(query);
@@ -43,5 +53,15 @@ export class DashboardController {
   @Get('product-rankings')
   productRankings(@Query() query: ProductRankingsQueryDto) {
     return this.dashboard.productRankings(query);
+  }
+
+  @Get('product-rotation')
+  productRotation(@Query() query: DashboardPeriodQueryDto) {
+    return this.dashboard.productRotation(query);
+  }
+
+  @Get('archetype-rotation')
+  archetypeRotation(@Query() query: DashboardPeriodQueryDto) {
+    return this.dashboard.archetypeRotation(query);
   }
 }
