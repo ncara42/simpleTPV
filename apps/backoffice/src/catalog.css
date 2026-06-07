@@ -2407,3 +2407,15 @@
   font-weight: 600;
   color: var(--ui-text);
 }
+
+/* ── Tiendas: accesos directos en la card + token de fichaje (UX) ───────────── */
+.store-card-actions {
+  display: inline-flex;
+  gap: var(--ui-space-2);
+}
+.store-device-token {
+  margin-top: var(--ui-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}

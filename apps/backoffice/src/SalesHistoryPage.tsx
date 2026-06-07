@@ -97,8 +97,10 @@ const columns: DataTableColumn<DemoSaleRow>[] = [
   { key: 'createdAt', header: 'Hora', render: (r) => hour.format(new Date(r.createdAt)) },
 ];
 
-export function SalesHistoryPage() {
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string | null }) {
+  const [filters, setFilters] = useState<Filters>(
+    initialStoreId ? { ...NO_FILTERS, storeId: initialStoreId } : NO_FILTERS,
+  );
   const [page, setPage] = useState(1);
   const [views, setViews] = useState<SavedView[]>(() => loadViews());
 

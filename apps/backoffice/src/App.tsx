@@ -138,6 +138,14 @@ function Home() {
   const logout = useAuthStore((s) => s.clear);
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('dashboard');
+  // Filtro de tienda preseleccionado al usar un acceso directo desde Tiendas
+  // ("Ver stock"/"Ver ventas"). Se aplica al montar Stock/Ventas; la navegación
+  // manual por el sidebar lo limpia para no arrastrar el filtro.
+  const [navStoreId, setNavStoreId] = useState<string | null>(null);
+  const openStoreView = (view: 'stock' | 'sales', storeId: string): void => {
+    setNavStoreId(storeId);
+    setTab(view);
+  };
 
   // Contador de notificaciones (alertas de stock): alimenta el badge de la campana
   // de la TopBar. Comparte queryKey con NotificationsPage.
@@ -165,7 +173,10 @@ function Home() {
         items={NAV}
         groups={NAV_GROUPS}
         activeItem={tab}
-        onSelect={(id) => setTab(id as Tab)}
+        onSelect={(id) => {
+          setNavStoreId(null);
+          setTab(id as Tab);
+        }}
         account={{ name: DEMO_USER.name, subtitle: 'Central · Admin' }}
         onLogout={logout}
       />
@@ -181,13 +192,13 @@ function Home() {
             {tab === 'notifications' && <NotificationsPage />}
             {tab === 'catalog' && <CatalogPage />}
             {tab === 'families' && <FamiliesPage />}
-            {tab === 'stock' && <StockPage />}
+            {tab === 'stock' && <StockPage initialStoreId={navStoreId} />}
             {tab === 'transfers' && <TransfersPage />}
             {tab === 'promotions' && <PromotionsPage />}
             {tab === 'users' && <UsersPage />}
             {tab === 'timeclock' && <TimeClockPage />}
-            {tab === 'stores' && <StoresPage />}
-            {tab === 'sales' && <SalesHistoryPage />}
+            {tab === 'stores' && <StoresPage onOpenStoreView={openStoreView} />}
+            {tab === 'sales' && <SalesHistoryPage initialStoreId={navStoreId} />}
             {tab === 'purchases' && <PurchasesPage />}
             {tab === 'verifactu' && <VerifactuPage />}
             {tab === 'b2b' && <B2bPage />}

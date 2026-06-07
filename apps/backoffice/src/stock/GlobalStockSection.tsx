@@ -17,11 +17,13 @@ interface AdjustState {
   min: string;
 }
 
-export function GlobalStockSection() {
+export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string | null }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [familyId, setFamilyId] = useState('');
-  const [storeId, setStoreId] = useState('');
+  // Filtro de tienda; puede venir preseleccionado al llegar desde un acceso
+  // directo de la página de Tiendas.
+  const [storeId, setStoreId] = useState(initialStoreId ?? '');
   const [rotation, setRotation] = useState('');
   const [adjusting, setAdjusting] = useState<AdjustState | null>(null);
   const [movementsFor, setMovementsFor] = useState<string | null>(null);

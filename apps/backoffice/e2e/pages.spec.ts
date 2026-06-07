@@ -63,18 +63,17 @@ test('Tiendas muestra el grid de 6 ubicaciones', async ({ page }) => {
   await expect(page.getByTestId('store-card')).toHaveCount(6);
 });
 
-test('Tiendas: orden por ventas y filtro de estado (#101, #103)', async ({ page }) => {
+test('Tiendas: orden por ventas y accesos directos a stock/ventas (UX)', async ({ page }) => {
   await login(page);
   await page.getByTestId('nav-stores').click();
-  // Métrica de ventas visible en las cards.
   await expect(page.getByTestId('store-sales').first()).toBeVisible();
   // Orden por defecto = ventas de hoy desc → Gran Vía (360 €) primera.
   await expect(page.getByTestId('store-card').first()).toContainText('Gran Vía');
-  // Filtro "Dormidas" → solo el Almacén (active: false).
-  await page.getByTestId('store-status-filter').click();
-  await page.getByRole('option', { name: 'Dormidas' }).click();
-  await expect(page.getByTestId('store-card')).toHaveCount(1);
-  await expect(page.getByTestId('store-card')).toContainText('Almacén');
+  // El panel ya no tiene filtros (solo crea y observa).
+  await expect(page.getByTestId('store-status-filter')).toHaveCount(0);
+  // Acceso directo "Stock" → lleva a la página de Stock.
+  await page.getByTestId('store-card').first().getByTestId('store-open-stock').click();
+  await expect(page.getByTestId('stock-page')).toBeVisible();
 });
 
 test('Tiendas: abierta/cerrada y dispositivo autorizado (#100, #102)', async ({ page }) => {
@@ -96,6 +95,9 @@ test('Tiendas: abierta/cerrada y dispositivo autorizado (#100, #102)', async ({ 
   await expect(page.getByTestId('store-device-warn')).toBeVisible();
   await page.getByTestId('store-device-authorize').click();
   await expect(page.getByTestId('store-device-ok')).toBeVisible();
+  // Token de fichaje para habilitar el dispositivo.
+  await page.getByTestId('store-gen-token').click();
+  await expect(page.getByTestId('store-token-value')).toContainText('FICHA-');
 });
 
 test('Usuarios muestra 4 usuarios con badge de rol', async ({ page }) => {

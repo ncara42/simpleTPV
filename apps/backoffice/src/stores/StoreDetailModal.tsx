@@ -21,6 +21,9 @@ export function StoreDetailModal({
   onClose: () => void;
 }) {
   const [logOpen, setLogOpen] = useState(false);
+  // Token de fichaje generado (one-shot): habilita a un dispositivo a registrar
+  // turnos. En demo es un valor mock; en real lo emitiría el backend.
+  const [token, setToken] = useState<string | null>(null);
   const log = DEMO_STORE_LOG[store.id] ?? [];
   // El registro está ordenado de más reciente a más antiguo: el primero de cada tipo
   // es el último movimiento de ese tipo.
@@ -114,6 +117,21 @@ export function StoreDetailModal({
                 Autorizar dispositivo
               </button>
             )}
+            <div className="store-device-token">
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => setToken(`FICHA-${store.code}-2K7P9X`)}
+                data-testid="store-gen-token"
+              >
+                Generar token de fichaje
+              </button>
+              {token && (
+                <p className="muted" data-testid="store-token-value">
+                  Token para habilitar el fichaje en el dispositivo: <code>{token}</code>
+                </p>
+              )}
+            </div>
           </section>
         </div>
 
