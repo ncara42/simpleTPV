@@ -634,6 +634,74 @@ describe('SalesService.getTicket', () => {
   });
 });
 
+describe('SalesService.getReceiptHtml', () => {
+  it('lanza 404 si la venta no existe', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findFirst = vi.fn(async () => null);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.getReceiptHtml('nope')),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('devuelve el documento HTML de la factura con los datos fiscales', async () => {
+    const prisma = makePrisma();
+    prisma.sale.findFirst = vi.fn(async () => ({
+      id: 'sale-1',
+      ticketNumber: 'T01-000001',
+      createdAt: new Date('2026-05-28T10:00:00Z'),
+      subtotal: 231,
+      discountTotal: 0,
+      total: 231,
+      paymentMethod: 'CASH',
+      cashGiven: 250,
+      cashChange: 19,
+      organization: { name: 'Org SL', nif: 'B00000000' },
+      store: { name: 'Tienda Centro', code: '01' },
+      lines: [
+        {
+          name: 'A',
+          qty: 1,
+          unitPrice: 121,
+          discountPct: 0,
+          discountAmt: 0,
+          taxRate: 21,
+          lineTotal: 121,
+        },
+        {
+          name: 'B',
+          qty: 1,
+          unitPrice: 110,
+          discountPct: 0,
+          discountAmt: 0,
+          taxRate: 10,
+          lineTotal: 110,
+        },
+      ],
+    }));
+    const service = makeService(prisma);
+
+    const html = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.getReceiptHtml('sale-1'),
+    );
+
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('Factura simplificada');
+    expect(html).toContain('Org SL');
+    expect(html).toContain('NIF B00000000');
+    expect(html).toContain('T01-000001');
+    expect(html).toContain('IVA 21%');
+    expect(html).toContain('IVA 10%');
+    // Filtra por id + organizationId (defensa en profundidad, igual que getTicket).
+    const arg = prisma.sale.findFirst.mock.calls[0]![0] as {
+      where: { id: string; organizationId: string };
+    };
+    expect(arg.where.id).toBe('sale-1');
+    expect(arg.where.organizationId).toBe(ORG);
+  });
+});
+
 describe('SalesService.findByTicket', () => {
   it('lanza 404 si el ticket no existe en el tenant', async () => {
     const prisma = makePrisma();

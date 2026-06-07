@@ -1,15 +1,17 @@
-import type {
-  CreateSaleInput,
-  Sale,
-  SalesPage,
-  SalesQueryInput,
-  SaleTicket,
-  Store,
+import {
+  ApiError,
+  type CreateSaleInput,
+  type Sale,
+  type SalesPage,
+  type SalesQueryInput,
+  type SaleTicket,
+  type Store,
 } from '@simpletpv/auth';
 
 import { DEMO_STORES } from '../demo/demoData.js';
 import { isDemo } from './api-config.js';
 import { api } from './auth.js';
+import { renderReceiptHtml } from './receipt.js';
 
 export type { Sale, SaleTicket, Store };
 
@@ -120,6 +122,21 @@ export function getTicket(id: string): Promise<SaleTicket> {
     });
   }
   return api.get<SaleTicket>(`/sales/${id}/ticket`);
+}
+
+// Documento fiscal imprimible/descargable de la venta (#123). En modo real
+// descarga el HTML que genera el servidor (fuente de verdad); en demo lo replica
+// en cliente desde el ticket-resumen (sin backend). Devuelve el HTML como string.
+export async function getReceiptHtml(id: string): Promise<string> {
+  if (isDemo()) {
+    const ticket = await getTicket(id);
+    return renderReceiptHtml(ticket);
+  }
+  const res = await api.fetch(`/sales/${id}/receipt`);
+  if (!res.ok) {
+    throw new ApiError(res.status, 'No se pudo generar la factura');
+  }
+  return res.text();
 }
 
 export function voidSale(id: string): Promise<Sale> {

@@ -29,6 +29,7 @@ import {
   type TicketDiscount,
 } from './sales.domain.js';
 import type { CreateSaleDto } from './sales.dto.js';
+import { type ReceiptData, renderReceiptHtml } from './sales-receipt.js';
 
 // Los Decimal de Postgres llegan como string por el driver pg (y como Decimal por
 // Prisma en los aggregate). `num` los normaliza a number con fallback a 0.
@@ -286,12 +287,13 @@ export class SalesService {
   }
 
   /**
-   * Carga una venta del tenant y devuelve el ticket-resumen para impresión.
-   * RLS aísla por tenant: una venta de otra organización no es visible aquí
-   * (findFirst → null) → NotFoundException (404). El desglose de IVA se calcula
-   * al vuelo desde el taxRate congelado de cada línea.
+   * Carga una venta del tenant y construye el ticket-resumen (datos + IVA
+   * desglosado). RLS aísla por tenant: una venta de otra organización no es
+   * visible aquí (findFirst → null) → NotFoundException (404). El desglose de IVA
+   * se calcula al vuelo desde el taxRate congelado de cada línea. Compartido por
+   * `getTicket` (resumen JSON) y `getReceiptHtml` (documento fiscal imprimible).
    */
-  async getTicket(id: string) {
+  private async loadTicketData(id: string) {
     // Defensa en profundidad: además de RLS (que ya filtra por tenant), filtramos
     // explícitamente por organizationId. El id es un UUID del cliente, así que no
     // dependemos solo de la policy para evitar IDOR entre tenants.
@@ -334,6 +336,43 @@ export class SalesService {
       cashChange: sale.cashChange,
       taxBreakdown,
     };
+  }
+
+  /** Ticket-resumen JSON para el detalle/impresión del TPV (GET /sales/:id/ticket). */
+  async getTicket(id: string) {
+    return this.loadTicketData(id);
+  }
+
+  /**
+   * Documento fiscal imprimible/descargable de la venta (#123): factura
+   * simplificada en HTML autocontenido (NIF, fecha, nº ticket, líneas, desglose
+   * de IVA, total, método de pago). El servidor es la fuente de verdad del
+   * documento. Reutiliza `loadTicketData` (mismos datos que `getTicket`) y el
+   * renderizado puro de `sales-receipt.ts`.
+   *
+   * Normaliza los Decimal de Prisma a number con `num()` en la frontera (mapeo
+   * explícito y type-safe) para no acoplar el renderer puro al tipo Decimal ni
+   * recurrir a un cast inseguro.
+   */
+  async getReceiptHtml(id: string): Promise<string> {
+    const t = await this.loadTicketData(id);
+    const data: ReceiptData = {
+      ...t,
+      lines: t.lines.map((l) => ({
+        name: l.name,
+        qty: num(l.qty),
+        unitPrice: num(l.unitPrice),
+        discountPct: num(l.discountPct),
+        discountAmt: l.discountAmt === null ? null : num(l.discountAmt),
+        lineTotal: num(l.lineTotal),
+      })),
+      subtotal: num(t.subtotal),
+      discountTotal: num(t.discountTotal),
+      total: num(t.total),
+      cashGiven: t.cashGiven === null ? null : num(t.cashGiven),
+      cashChange: t.cashChange === null ? null : num(t.cashChange),
+    };
+    return renderReceiptHtml(data);
   }
 
   /**

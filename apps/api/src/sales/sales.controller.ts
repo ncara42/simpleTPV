@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   Param,
   ParseUUIDPipe,
@@ -61,6 +62,25 @@ export class SalesController {
   @Roles('ADMIN', 'MANAGER', 'CLERK')
   getTicket(@Param('id', ParseUUIDPipe) id: string) {
     return this.sales.getTicket(id);
+  }
+
+  // Documento fiscal imprimible/descargable de la venta (#123): factura
+  // simplificada en HTML autocontenido. text/html para que el TPV pueda abrirlo
+  // en un iframe e imprimirlo, o descargarlo como .html, sin tocar el CSS del TPV.
+  // CSP scoped a esta ruta HTML: permite SOLO los estilos embebidos (no scripts,
+  // no recursos externos, no framing) — sobrescribe la CSP global default-src
+  // 'none' que rompería el <style> si el documento se abre directamente. nosniff
+  // evita que el navegador reinterprete el tipo MIME.
+  @Get(':id/receipt')
+  @Roles('ADMIN', 'MANAGER', 'CLERK')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  @Header(
+    'Content-Security-Policy',
+    "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+  )
+  @Header('X-Content-Type-Options', 'nosniff')
+  getReceipt(@Param('id', ParseUUIDPipe) id: string): Promise<string> {
+    return this.sales.getReceiptHtml(id);
   }
 
   // Anulación de venta: solo MANAGER/ADMIN (un CLERK recibe 403 por el RolesGuard
