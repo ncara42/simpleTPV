@@ -11,6 +11,7 @@ function makeController() {
   const service = {
     create: vi.fn(async (_dto: unknown, _userId: string, _role: string) => ({ id: 'sale-1' })),
     getTicket: vi.fn(async (_id: string) => ({ ticketNumber: 'T01-000001' })),
+    getReceiptHtml: vi.fn(async (_id: string) => '<!DOCTYPE html><html lang="es"></html>'),
     findByTicket: vi.fn(async (_t: string) => ({ id: 'sale-1', ticketNumber: 'T01-000001' })),
     voidSale: vi.fn(async (_id: string, _userId: string) => ({ id: 'sale-1', status: 'VOIDED' })),
     reserveTicketBlock: vi.fn(async (_s: string, _n: number, _u: string, _r: string) => ({
@@ -67,6 +68,15 @@ describe('SalesController', () => {
 
     expect(service.getTicket).toHaveBeenCalledWith('sale-1');
     expect(res.ticketNumber).toBe('T01-000001');
+  });
+
+  it('GET /sales/:id/receipt devuelve el documento HTML de la factura', async () => {
+    const { controller, service } = makeController();
+
+    const res = await controller.getReceipt('sale-1');
+
+    expect(service.getReceiptHtml).toHaveBeenCalledWith('sale-1');
+    expect(res).toContain('<!DOCTYPE html>');
   });
 
   it('GET /sales/by-ticket/:ticketNumber pasa el nº de ticket al servicio', async () => {

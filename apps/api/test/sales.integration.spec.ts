@@ -463,6 +463,49 @@ describe('Ventas — integración', () => {
     ).rejects.toThrow();
   });
 
+  it('getReceiptHtml genera el documento fiscal con NIF, nº ticket, IVA y total (#123)', async () => {
+    const sale = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.create(
+        {
+          storeId: store1Id,
+          lines: [{ productId: product1Id, qty: 2 }],
+          paymentMethod: 'CASH',
+          cashGiven: 1000,
+        },
+        user1Id,
+        'ADMIN',
+      );
+    });
+
+    const ticket = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.getTicket(sale.id);
+    });
+    const html = await tenantStorage.run({ organizationId: org1Id }, async () => {
+      return service.getReceiptHtml(sale.id);
+    });
+
+    // Documento HTML completo y autocontenido (estilos de impresión embebidos).
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('Factura simplificada');
+    expect(html).toContain('@media print');
+    // Datos fiscales: nº ticket, tienda y total formateado (coma decimal).
+    expect(html).toContain(sale.ticketNumber);
+    expect(html).toContain(ticket.store.code);
+    expect(html).toContain(`${Number(sale.total).toFixed(2).replace('.', ',')} €`);
+    // Desglose de IVA presente (al menos un tipo del seed).
+    expect(html).toMatch(/IVA \d+%/);
+    // Enlace de cotejo VeriFactu con el nº de serie de la venta.
+    expect(html).toContain(`numserie=${sale.ticketNumber}`);
+  });
+
+  it('getReceiptHtml de un id inexistente lanza NotFound', async () => {
+    await expect(
+      tenantStorage.run({ organizationId: org1Id }, async () => {
+        return service.getReceiptHtml('00000000-0000-0000-0000-000000000000');
+      }),
+    ).rejects.toThrow();
+  });
+
   it('aísla por tenant: org2 no puede leer el ticket de una venta de org1', async () => {
     const sale = await tenantStorage.run({ organizationId: org1Id }, async () => {
       return service.create(

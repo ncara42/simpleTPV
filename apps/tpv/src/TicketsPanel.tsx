@@ -1,12 +1,13 @@
 import { ApiError, type Sale, type SaleTicket } from '@simpletpv/auth';
 import { Button, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Check, Printer, RotateCcw } from 'lucide-react';
+import { Ban, Check, Download, Printer, RotateCcw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { usePageHeader } from './lib/pageHeader.js';
+import { downloadReceiptHtml, printReceiptHtml } from './lib/receipt.js';
 import { createReturn, listReturns } from './lib/returns.js';
-import { findSaleByTicket, getTicket, listSales } from './lib/sales.js';
+import { findSaleByTicket, getReceiptHtml, getTicket, listSales } from './lib/sales.js';
 
 export function TicketsPanel({ storeId }: { storeId: string | null }) {
   usePageHeader('Tickets emitidos', 'Histórico de ventas de la tienda activa');
@@ -84,6 +85,25 @@ export function TicketsPanel({ storeId }: { storeId: string | null }) {
     },
   });
 
+  // Documento fiscal (#123): genera la factura imprimible/descargable de la venta
+  // seleccionada. En real descarga el HTML del servidor; en demo lo replica.
+  const [docError, setDocError] = useState<string | null>(null);
+  const docMutation = useMutation({
+    mutationFn: async (mode: 'print' | 'download') => {
+      if (!selectedId) throw new Error('Ticket no seleccionado');
+      const html = await getReceiptHtml(selectedId);
+      if (mode === 'print') {
+        printReceiptHtml(html);
+      } else {
+        downloadReceiptHtml(html, `factura-${ticket.data?.ticketNumber ?? selectedId}.html`);
+      }
+    },
+    onSuccess: () => setDocError(null),
+    onError: (e) => {
+      setDocError(e instanceof ApiError ? e.body || 'No se pudo generar la factura' : String(e));
+    },
+  });
+
   function setQty(lineId: string, qty: number) {
     setQtys((prev) => ({ ...prev, [lineId]: Math.max(0, qty) }));
   }
@@ -113,7 +133,10 @@ export function TicketsPanel({ storeId }: { storeId: string | null }) {
               reason={reason}
               busy={returnMutation.isPending}
               error={error}
-              onPrint={() => window.print()}
+              docBusy={docMutation.isPending}
+              docError={docError}
+              onPrint={() => docMutation.mutate('print')}
+              onDownload={() => docMutation.mutate('download')}
               onStartReturn={() => setReturning(true)}
               onCancelReturn={() => setReturning(false)}
               onReason={setReason}
@@ -238,7 +261,10 @@ function TicketDetail({
   reason,
   busy,
   error,
+  docBusy,
+  docError,
   onPrint,
+  onDownload,
   onStartReturn,
   onCancelReturn,
   onReason,
@@ -252,7 +278,10 @@ function TicketDetail({
   reason: string;
   busy: boolean;
   error: string | null;
+  docBusy: boolean;
+  docError: string | null;
   onPrint: () => void;
+  onDownload: () => void;
   onStartReturn: () => void;
   onCancelReturn: () => void;
   onReason: (v: string) => void;
@@ -279,9 +308,25 @@ function TicketDetail({
         ))}
       </ul>
       <div className="ticket-actions">
-        <Button variant="secondary" size="sm" onClick={onPrint} data-testid="ticket-reprint">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onPrint}
+          disabled={docBusy}
+          data-testid="ticket-print"
+        >
           <Printer size={14} />
-          Reimprimir
+          {docBusy ? 'Generando…' : 'Imprimir factura'}
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onDownload}
+          disabled={docBusy}
+          data-testid="ticket-download"
+        >
+          <Download size={14} />
+          Descargar
         </Button>
         {!returning && sale?.status !== 'VOIDED' && (
           <Button size="sm" onClick={onStartReturn} data-testid="ticket-return-start">
@@ -290,6 +335,11 @@ function TicketDetail({
           </Button>
         )}
       </div>
+      {docError && (
+        <p className="cash-error" data-testid="ticket-doc-error">
+          {docError}
+        </p>
+      )}
       {returning && sale && (
         <div className="ticket-return" data-testid="ticket-return">
           <h4>Devolver líneas</h4>
