@@ -144,7 +144,14 @@ flags** por tienda/org. Ver memoria `cbd-anchor-business-model`.
 - **#63** VeriFactu real AEAT: diferido a 2027 (obligatorio 1-ene-2027 Sociedades /
   1-jul-2027 resto).
 
-## 5. Issues
+## 5. Issues (GitHub ncara42/simpleTPV)
 
-Issue paraguas (epic) `roadmap:post-mvp` con el seguimiento, más un issue por bloque.
-Ver la lista en GitHub filtrando por `label:roadmap:post-mvp`.
+Punto de entrada: **EPIC #130** (todo enlazado). Filtro: `label:roadmap:post-mvp`.
+
+- **#130** — EPIC roadmap post-MVP (seguimiento)
+- Fiscal (#2): **#123** factura/ticket imprimible · **#124** cierre Z · **#125** export contable
+- Trazabilidad (#4): **#126** lote + caducidad (FEFO)
+- Control plane (#5): **#127** central + pricing por tienda + feature flags
+- Hardware (#3): **#64** impresora ESC/POS (existente) · **#128** báscula/venta por peso
+- Piloto: **#84** formación · **#85** acompañamiento · **#86** manual + feedback
+- Menores: **#129** dependabot dev-deps (upstream #34) · **#63** VeriFactu AEAT (diferido 2027)
