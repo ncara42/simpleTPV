@@ -12,6 +12,7 @@ import {
   BarChart2,
   Bell,
   CheckSquare,
+  ClipboardCheck,
   Clock,
   Handshake,
   KeyRound,
@@ -46,6 +47,7 @@ import { TimeClockPage } from './TimeClockPage.js';
 import { TransfersPage } from './TransfersPage.js';
 import { UsersPage } from './UsersPage.js';
 import { VerifactuPage } from './VerifactuPage.js';
+import { ZReportPage } from './ZReportPage.js';
 
 type Tab =
   | 'dashboard'
@@ -59,6 +61,7 @@ type Tab =
   | 'timeclock'
   | 'stores'
   | 'sales'
+  | 'zreport'
   | 'purchases'
   | 'verifactu'
   | 'b2b'
@@ -84,6 +87,7 @@ const ALL_NAV: NavItem[] = [
   { id: 'transfers', label: 'Traspasos', icon: <ArrowLeftRight size={18} />, group: 'inventory' },
   { id: 'promotions', label: 'Promociones', icon: <Percent size={18} />, group: 'inventory' },
   { id: 'sales', label: 'Ventas', icon: <Receipt size={18} />, group: 'commercial' },
+  { id: 'zreport', label: 'Cierre Z', icon: <ClipboardCheck size={18} />, group: 'commercial' },
   { id: 'b2b', label: 'Mayorista', icon: <Handshake size={18} />, group: 'commercial' },
   { id: 'apikeys', label: 'API Keys', icon: <KeyRound size={18} />, group: 'commercial' },
   { id: 'stores', label: 'Tiendas', icon: <Store size={18} />, group: 'org' },
@@ -165,6 +169,7 @@ function Home() {
             {tab === 'users' && <UsersPage />}
             {tab === 'timeclock' && <TimeClockPage />}
             {tab === 'stores' && <StoresPage onOpenStoreView={openStoreView} />}
+            {tab === 'zreport' && <ZReportPage />}
             {tab === 'purchases' && <PurchasesPage />}
             {tab === 'verifactu' && <VerifactuPage />}
             {tab === 'b2b' && <B2bPage />}
