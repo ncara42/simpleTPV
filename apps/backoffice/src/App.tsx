@@ -7,7 +7,6 @@ import './catalog.css';
 import './styles.css';
 
 import { LoginForm, type NavGroup, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeftRight,
   BarChart2,
@@ -26,7 +25,7 @@ import {
   Tag,
   Users,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { ApiKeysPage } from './ApiKeysPage.js';
 import { B2bPage } from './B2bPage.js';
@@ -37,7 +36,6 @@ import { HelpPage } from './HelpPage.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { switchApp } from './lib/nav.js';
 import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
-import { listAlerts } from './lib/stock.js';
 import { NotificationsPage } from './NotificationsPage.js';
 import { OverviewPage } from './OverviewPage.js';
 import { PromotionsPage } from './PromotionsPage.js';
@@ -107,17 +105,10 @@ const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab)
 // La TopBar refleja el título y la descripción de la vista activa (publicados por
 // cada página vía usePageHeader). Sustituye al antiguo eyebrow fijo «Administración»:
 // el contexto de área ya lo da el conmutador Backoffice/TPV de la derecha.
-// La campana de notificaciones lleva al portal de Notificaciones (mismo destino
-// que la entrada del sidebar) y comparte su badge de contador.
-function ShellTopBar({
-  notificationCount,
-  notificationsActive,
-  onNotifications,
-}: {
-  notificationCount: number;
-  notificationsActive: boolean;
-  onNotifications: () => void;
-}) {
+// La campana de notificaciones se retiró (informe §10): la rotura de stock ya se
+// refuerza en varias zonas, así que el badge global era ruido. Sin onNotifications,
+// la TopBar no renderiza la campana.
+function ShellTopBar() {
   const { title, description, descriptionTestId } = usePageHeaderValue();
   return (
     <TopBar
@@ -126,16 +117,12 @@ function ShellTopBar({
       subtitleTestId={descriptionTestId}
       activeApp="backoffice"
       onSwitchApp={switchApp}
-      onNotifications={onNotifications}
-      notificationCount={notificationCount}
-      notificationsActive={notificationsActive}
     />
   );
 }
 
 function Home() {
   const logout = useAuthStore((s) => s.clear);
-  const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('dashboard');
   // Filtro de tienda preseleccionado al usar un acceso directo desde Tiendas
   // ("Ver stock"/"Ver ventas"). Se aplica al montar Stock/Ventas; la navegación
@@ -145,26 +132,6 @@ function Home() {
     setNavStoreId(storeId);
     setTab(view);
   };
-
-  // Contador de notificaciones (alertas de stock): alimenta el badge de la campana
-  // de la TopBar. Comparte queryKey con NotificationsPage.
-  const { data: alerts = [] } = useQuery({
-    queryKey: ['stock-alerts'],
-    queryFn: () => listAlerts(),
-  });
-  // Anti-rotura por arquetipo (IT-13): el badge de la campana cuenta solo roturas
-  // CRÍTICAS (sin sustituto en la familia). Las degradadas (hay sustituto) no alarman.
-  const alertCount = alerts.filter((a) => a.severity === 'critical').length;
-
-  // Tiempo real (#33): el SSE refresca el contador aunque no estés en Notificaciones.
-  useEffect(() => {
-    const unsubscribe = api.subscribeEvents((event) => {
-      if (event.type === 'alert.created') {
-        void qc.invalidateQueries({ queryKey: ['stock-alerts'] });
-      }
-    });
-    return unsubscribe;
-  }, [qc]);
 
   return (
     <div className="app-shell">
@@ -181,11 +148,7 @@ function Home() {
       />
       <div className="app-content">
         <PageHeaderProvider>
-          <ShellTopBar
-            notificationCount={alertCount}
-            notificationsActive={tab === 'notifications'}
-            onNotifications={() => setTab('notifications')}
-          />
+          <ShellTopBar />
           <main className="bo-main">
             {(tab === 'dashboard' || tab === 'sales') && (
               <OverviewPage

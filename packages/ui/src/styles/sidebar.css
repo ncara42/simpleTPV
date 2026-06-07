@@ -193,60 +193,45 @@
    hacen el mismo gesto. Si falta la variable, cae a `hop`. */
 .sidebar-item:hover .sidebar-item-icon,
 .sidebar-logout:hover .sidebar-item-icon {
-  animation: var(--sidebar-icon-anim, sidebar-icon-hop) 0.45s cubic-bezier(0.2, 0, 0, 1);
+  animation: var(--sidebar-icon-anim, sidebar-icon-hop) 0.3s cubic-bezier(0.2, 0, 0, 1);
 }
 
-/* Saltito vertical con un guiño de giro. */
+/* Gestos deliberadamente sutiles: un guiño, no un baile. */
 @keyframes sidebar-icon-hop {
   0% {
     transform: translateY(0) rotate(0);
   }
-  30% {
-    transform: translateY(-3px) rotate(-8deg);
-  }
-  55% {
-    transform: translateY(0) rotate(6deg);
-  }
-  78% {
-    transform: translateY(-1px) rotate(-3deg);
+  40% {
+    transform: translateY(-1.5px) rotate(-3deg);
   }
   100% {
     transform: translateY(0) rotate(0);
   }
 }
 
-/* Meneo lateral: solo giro, como negando con la cabeza. */
+/* Meneo lateral mínimo. */
 @keyframes sidebar-icon-wiggle {
   0% {
     transform: rotate(0);
   }
-  20% {
-    transform: rotate(-11deg);
+  35% {
+    transform: rotate(-4deg);
   }
-  40% {
-    transform: rotate(9deg);
-  }
-  60% {
-    transform: rotate(-6deg);
-  }
-  80% {
-    transform: rotate(3deg);
+  70% {
+    transform: rotate(2deg);
   }
   100% {
     transform: rotate(0);
   }
 }
 
-/* Latido: solo escala, un bombeo muy sutil (apenas un guiño). */
+/* Latido apenas perceptible. */
 @keyframes sidebar-icon-pulse {
   0% {
     transform: scale(1);
   }
   45% {
-    transform: scale(1.1);
-  }
-  70% {
-    transform: scale(0.98);
+    transform: scale(1.04);
   }
   100% {
     transform: scale(1);
