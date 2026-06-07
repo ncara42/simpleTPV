@@ -14,13 +14,17 @@ function makeTx(resultingQuantity = 0, minStock = 0) {
   return {
     stock: {
       upsert: vi.fn(async (_a?: unknown) => ({ quantity: resultingQuantity, minStock })),
+      // applyFefoOutflow lee el agregado de partida (#126).
+      findFirst: vi.fn(async (_a?: unknown) => ({ quantity: resultingQuantity })),
     },
     stockMovement: {
       create: vi.fn(async (_a?: unknown) => ({ id: 'mov-1' })),
     },
-    // Lote (#126): applyMovement hace upsert del StockBatch si llega `batch`.
+    // Lote (#126): applyMovement hace upsert del StockBatch si llega `batch`;
+    // applyFefoOutflow lee los lotes con stock por FEFO.
     stockBatch: {
       upsert: vi.fn(async (_a?: unknown) => ({ id: 'batch-1' })),
+      findMany: vi.fn(async (_a?: unknown): Promise<unknown[]> => []),
     },
     // applyMovement reevalúa la alerta tras el movimiento (#29).
     stockAlert: {
@@ -211,6 +215,86 @@ describe('StockService.applyMovement', () => {
 
     // Clave stock:{org}:{store}:{product} con la quantity resultante (98).
     expect(await cache.get(`stock:${ORG}:store-1:p1`)).toBe('98');
+  });
+});
+
+describe('StockService.applyFefoOutflow', () => {
+  function makeService() {
+    return new StockService({} as never, new MemoryCache(), {} as never, new InMemoryEventBus());
+  }
+
+  it('consume lotes por FEFO: un movimiento por lote con su upsert (decremento)', async () => {
+    const tx = makeTx(0);
+    tx.stockBatch.findMany = vi.fn(async () => [
+      { lotCode: 'A', quantity: 3 },
+      { lotCode: 'B', quantity: 10 },
+    ]);
+
+    await makeService().applyFefoOutflow(tx as never, {
+      organizationId: ORG,
+      productId: 'p1',
+      storeId: 'store-1',
+      type: 'SALE',
+      quantity: 5,
+      referenceId: 'sale-1',
+      userId: 'u',
+    });
+
+    // Lote A agotado (−3) y lote B parcial (−2): dos upserts y dos movimientos.
+    expect(tx.stockBatch.upsert).toHaveBeenCalledTimes(2);
+    const a = tx.stockBatch.upsert.mock.calls[0]![0] as {
+      where: { productId_storeId_lotCode: { lotCode: string } };
+      update: { quantity: { increment: number } };
+    };
+    expect(a.where.productId_storeId_lotCode.lotCode).toBe('A');
+    expect(a.update.quantity.increment).toBe(-3);
+    const b = tx.stockBatch.upsert.mock.calls[1]![0] as {
+      update: { quantity: { increment: number } };
+    };
+    expect(b.update.quantity.increment).toBe(-2);
+    expect(tx.stockMovement.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('faltante (vender más de lo recibido): el sobrante sale SIN lote', async () => {
+    const tx = makeTx(0);
+    tx.stockBatch.findMany = vi.fn(async () => [{ lotCode: 'A', quantity: 2 }]);
+
+    await makeService().applyFefoOutflow(tx as never, {
+      organizationId: ORG,
+      productId: 'p1',
+      storeId: 'store-1',
+      type: 'SALE',
+      quantity: 5,
+    });
+
+    // Un movimiento por el lote A (−2) y otro por el faltante (−3) sin lote.
+    expect(tx.stockBatch.upsert).toHaveBeenCalledTimes(1);
+    expect(tx.stockMovement.create).toHaveBeenCalledTimes(2);
+    const movs = tx.stockMovement.create.mock.calls.map(
+      (c) => (c[0] as { data: { batchId?: string; quantity: number } }).data,
+    );
+    // El movimiento del faltante no lleva batchId y es −3.
+    const shortfall = movs.find((m) => m.batchId === undefined);
+    expect(shortfall?.quantity).toBe(-3);
+  });
+
+  it('sin lotes: toda la salida va sin lote (no bloquea)', async () => {
+    const tx = makeTx(0);
+    // findMany por defecto devuelve [] (sin lotes).
+    await makeService().applyFefoOutflow(tx as never, {
+      organizationId: ORG,
+      productId: 'p1',
+      storeId: 'store-1',
+      type: 'SALE',
+      quantity: 4,
+    });
+    expect(tx.stockBatch.upsert).not.toHaveBeenCalled();
+    expect(tx.stockMovement.create).toHaveBeenCalledTimes(1);
+    const mov = tx.stockMovement.create.mock.calls[0]![0] as {
+      data: { quantity: number; batchId?: string };
+    };
+    expect(mov.data.quantity).toBe(-4);
+    expect(mov.data.batchId).toBeUndefined();
   });
 });
 

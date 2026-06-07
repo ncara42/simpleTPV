@@ -11,6 +11,7 @@ import { type AfterCommit, withTenantTx } from '../prisma/with-tenant-tx.js';
 import {
   ALERT_URGENCY,
   alertTypeFor,
+  allocateFefo,
   stockCacheKey,
   type StockLevel,
   stockLevel,
@@ -170,6 +171,79 @@ export class StockService {
       });
     }
 
+    return resulting;
+  }
+
+  /**
+   * Salida de stock por FEFO (#126) para un producto con lote: consume de los
+   * lotes con stock por caducidad ASCENDENTE (más próxima a caducar primero), un
+   * movimiento por lote (con su batchId). Si los lotes no cubren la cantidad, el
+   * faltante sale SIN lote — la venta no se bloquea (decisión Q3), igual que el
+   * stock agregado puede quedar negativo. DEBE correr dentro de un withTenantTx.
+   * `quantity` es la cantidad POSITIVA a retirar. Devuelve el stock agregado final.
+   *
+   * Concurrencia: lee los lotes sin lock (coherente con el flujo de venta actual,
+   * que tampoco bloquea); dos ventas simultáneas del mismo producto podrían
+   * sobre-consumir un lote (quedaría negativo), aceptable bajo la filosofía
+   * no-bloqueante y poco frecuente.
+   */
+  async applyFefoOutflow(
+    tx: TxClient,
+    input: {
+      organizationId: string;
+      productId: string;
+      storeId: string;
+      type: MovementType;
+      quantity: number;
+      referenceId?: string;
+      userId?: string;
+    },
+    afterCommit?: AfterCommit,
+  ): Promise<number> {
+    const { organizationId, productId, storeId, type, quantity, referenceId, userId } = input;
+    const common = {
+      organizationId,
+      productId,
+      storeId,
+      type,
+      ...(referenceId !== undefined ? { referenceId } : {}),
+      ...(userId !== undefined ? { userId } : {}),
+    };
+
+    // Lotes con stock, en orden FEFO (caducidad asc, NULLs al final; desempate por
+    // antigüedad de creación).
+    const batches = await tx.stockBatch.findMany({
+      where: { organizationId, productId, storeId, quantity: { gt: 0 } },
+      orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
+    });
+    const allocation = allocateFefo(
+      batches.map((b) => ({ lotCode: b.lotCode, quantity: Number(b.quantity) })),
+      quantity,
+    );
+
+    // Cantidad agregada de partida (por si quantity fuese 0 y no hubiese movimientos).
+    const current = await tx.stock.findFirst({
+      where: { productId, storeId, organizationId },
+      select: { quantity: true },
+    });
+    let resulting = Number(current?.quantity ?? 0);
+
+    // Un movimiento por lote consumido (salida, con su lote).
+    for (const a of allocation.consumed) {
+      resulting = await this.applyMovement(
+        tx,
+        { ...common, quantity: -a.qty, batch: { lotCode: a.lotCode } },
+        afterCommit,
+      );
+    }
+    // Faltante (vender más de lo recibido): salida sin lote, no bloquea.
+    if (allocation.shortfall > 0) {
+      resulting = await this.applyMovement(
+        tx,
+        { ...common, quantity: -allocation.shortfall },
+        afterCommit,
+      );
+    }
     return resulting;
   }
 
