@@ -1887,6 +1887,12 @@
   overflow: hidden;
   box-shadow: var(--ui-shadow-sm);
 }
+/* Variante para paneles de CONTENIDO libre (no tabla): Ayuda, etc. La base
+   .table-panel no lleva padding porque en las tablas lo aportan la cabecera y las
+   celdas; cuando el panel contiene contenido suelto necesita padding propio. */
+.table-panel--content {
+  padding: var(--ui-space-5);
+}
 /* La barra de filtros/acciones es la cabecera del panel: separada por hairline
    y con el mismo tinte sutil que la fila de cabeceras de la tabla, para que
    toda la zona de chrome quede diferenciada de las filas de datos en blanco. */
@@ -2113,9 +2119,11 @@
 .apikey-banner {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.85rem 1rem;
-  margin-bottom: 1rem;
+  gap: var(--ui-space-3);
+  /* Margen en los 4 lados: separa el banner de la cabecera y de los bordes del
+     panel (el .table-panel no lleva padding propio). */
+  margin: var(--ui-space-4);
+  padding: var(--ui-space-3) var(--ui-space-4);
   border: 1px solid var(--ui-warning);
   background: var(--ui-warning-soft);
   border-radius: var(--ui-radius-lg);
@@ -2123,29 +2131,29 @@
 .apikey-banner-body {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--ui-space-2);
   flex: 1 1 auto;
 }
 .apikey-reveal {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--ui-space-2);
   flex-wrap: wrap;
 }
 .apikey-reveal-code {
-  padding: 0.3rem 0.55rem;
+  padding: var(--ui-space-1) var(--ui-space-2);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-sm);
-  font-size: 0.82rem;
+  font-size: var(--ui-text-sm);
   word-break: break-all;
 }
 .apikey-revoked {
-  margin-top: 1rem;
+  margin: var(--ui-space-4);
 }
 .apikey-revoked summary {
   cursor: pointer;
-  padding: 0.4rem 0;
+  padding: var(--ui-space-2) 0;
 }
 
 /* ── Limpieza UX (IT-19) ────────────────────────────────────────────────────
@@ -2226,23 +2234,23 @@
 .help-title {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0 0 0.4rem;
+  gap: var(--ui-space-2);
+  margin: 0 0 var(--ui-space-2);
 }
 .help-intro {
-  margin: 0 0 1rem;
+  margin: 0 0 var(--ui-space-5);
 }
 .help-channels {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: 0.75rem;
+  gap: var(--ui-space-3);
 }
 .help-channel {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.3rem;
-  padding: 1rem;
+  gap: var(--ui-space-1);
+  padding: var(--ui-space-4);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
@@ -2260,28 +2268,28 @@
   font-weight: 600;
 }
 .help-channel-value {
-  font-size: 0.85rem;
+  font-size: var(--ui-text-sm);
   color: var(--ui-text-muted);
 }
 .help-faq {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: var(--ui-space-2);
 }
 .help-faq-item {
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-sm);
-  padding: 0.2rem 0.85rem;
+  padding: 0 var(--ui-space-4);
 }
 .help-faq-item > summary {
   cursor: pointer;
-  padding: 0.6rem 0;
+  padding: var(--ui-space-3) 0;
   font-weight: 500;
   list-style: revert;
 }
 .help-faq-item > p {
-  margin: 0 0 0.7rem;
+  margin: 0 0 var(--ui-space-3);
   color: var(--ui-text-muted);
-  font-size: 0.92rem;
+  font-size: var(--ui-text-base);
   line-height: 1.5;
 }

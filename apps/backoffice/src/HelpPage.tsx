@@ -61,7 +61,7 @@ export function HelpPage() {
 
   return (
     <section className="catalog" data-testid="help-page">
-      <div className="table-panel">
+      <div className="table-panel table-panel--content">
         <h3 className="help-title">
           <LifeBuoy size={18} aria-hidden="true" /> ¿Necesitas ayuda?
         </h3>
@@ -93,7 +93,7 @@ export function HelpPage() {
         </div>
       </div>
 
-      <div className="table-panel">
+      <div className="table-panel table-panel--content">
         <h3 className="help-title">Preguntas frecuentes</h3>
         <div className="help-faq" data-testid="help-faq">
           {FAQ.map((f) => (
