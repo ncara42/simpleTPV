@@ -6,7 +6,7 @@ import '@simpletpv/ui/topbar.css';
 import './catalog.css';
 import './styles.css';
 
-import { LoginForm, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
+import { LoginForm, type NavGroup, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeftRight,
@@ -68,23 +68,33 @@ type Tab =
   | 'apikeys'
   | 'help';
 
+// Navegación agrupada por tipo de tarea para no saturar el lateral. Dashboard va
+// suelto arriba; Ayuda (Soporte) queda separada al final. "Ventas y clientes"
+// reúne lo comercial (ventas, mayorista, API) frente a la gestión de la operación.
+const NAV_GROUPS: NavGroup[] = [
+  { id: 'inventory', label: 'Catálogo e inventario' },
+  { id: 'commercial', label: 'Ventas y clientes' },
+  { id: 'org', label: 'Organización' },
+  { id: 'support', label: 'Soporte' },
+];
+
 const ALL_NAV: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-  { id: 'notifications', label: 'Notificaciones', icon: <Bell size={18} /> },
-  { id: 'catalog', label: 'Catálogo', icon: <Package size={18} /> },
-  { id: 'families', label: 'Familias', icon: <Tag size={18} /> },
-  { id: 'stock', label: 'Stock', icon: <BarChart2 size={18} /> },
-  { id: 'transfers', label: 'Traspasos', icon: <ArrowLeftRight size={18} /> },
-  { id: 'promotions', label: 'Promociones', icon: <Percent size={18} /> },
-  { id: 'users', label: 'Usuarios', icon: <Users size={18} /> },
-  { id: 'timeclock', label: 'Control horario', icon: <Clock size={18} /> },
-  { id: 'stores', label: 'Tiendas', icon: <Store size={18} /> },
-  { id: 'sales', label: 'Ventas', icon: <Receipt size={18} /> },
-  { id: 'purchases', label: 'Compras', icon: <ShoppingCart size={18} /> },
-  { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} /> },
-  { id: 'b2b', label: 'Mayorista', icon: <Handshake size={18} /> },
-  { id: 'apikeys', label: 'API Keys', icon: <KeyRound size={18} /> },
-  { id: 'help', label: 'Ayuda', icon: <LifeBuoy size={18} /> },
+  { id: 'notifications', label: 'Notificaciones', icon: <Bell size={18} />, group: 'inventory' },
+  { id: 'catalog', label: 'Catálogo', icon: <Package size={18} />, group: 'inventory' },
+  { id: 'families', label: 'Familias', icon: <Tag size={18} />, group: 'inventory' },
+  { id: 'stock', label: 'Stock', icon: <BarChart2 size={18} />, group: 'inventory' },
+  { id: 'transfers', label: 'Traspasos', icon: <ArrowLeftRight size={18} />, group: 'inventory' },
+  { id: 'promotions', label: 'Promociones', icon: <Percent size={18} />, group: 'inventory' },
+  { id: 'sales', label: 'Ventas', icon: <Receipt size={18} />, group: 'commercial' },
+  { id: 'b2b', label: 'Mayorista', icon: <Handshake size={18} />, group: 'commercial' },
+  { id: 'apikeys', label: 'API Keys', icon: <KeyRound size={18} />, group: 'commercial' },
+  { id: 'stores', label: 'Tiendas', icon: <Store size={18} />, group: 'org' },
+  { id: 'users', label: 'Usuarios', icon: <Users size={18} />, group: 'org' },
+  { id: 'timeclock', label: 'Control horario', icon: <Clock size={18} />, group: 'org' },
+  { id: 'purchases', label: 'Compras', icon: <ShoppingCart size={18} />, group: 'commercial' },
+  { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'org' },
+  { id: 'help', label: 'Ayuda', icon: <LifeBuoy size={18} />, group: 'support' },
 ];
 
 // #106: Compras y VeriFactu se retiran del menú (decisión informe UX 2026-06-02).
@@ -153,6 +163,7 @@ function Home() {
     <div className="app-shell">
       <Sidebar
         items={NAV}
+        groups={NAV_GROUPS}
         activeItem={tab}
         onSelect={(id) => setTab(id as Tab)}
         account={{ name: DEMO_USER.name, subtitle: 'Central · Admin' }}
