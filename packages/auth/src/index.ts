@@ -85,6 +85,7 @@ export type {
   TicketLine,
   TimeClockEntry,
   TimeClockHistoryRow,
+  TimeClockLogRow,
   TimeClockStatus,
   TimeClockSummary,
   TimeClockType,

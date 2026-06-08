@@ -31,6 +31,13 @@ export class TimeClockController {
     return this.timeClock.history(query, req.user.role, req.user.sub);
   }
 
+  // Log en bruto de fichajes de una tienda (alimenta el detalle de tienda del backoffice).
+  @Get('entries')
+  @Roles('ADMIN', 'MANAGER')
+  entries(@Query() query: TimeClockHistoryQueryDto, @Req() req: { user: JwtPayload }) {
+    return this.timeClock.entries(query, req.user.role, req.user.sub);
+  }
+
   // Histórico del propio empleado (lo consume el TPV). El `userId` se fuerza al del
   // token, nunca llega del cliente, así un CLERK solo ve sus jornadas. Ventana por
   // defecto de 30 días (el default de 7 del backoffice vive en el service intacto).

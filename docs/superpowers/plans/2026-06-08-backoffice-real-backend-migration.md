@@ -89,6 +89,31 @@ contra ese backend real. Decomisar el modo demo (datos y login) del backoffice.
 - **Fase G — Decomiso demo**: borrar `demoData.ts`, `api-config.ts` (isDemo) y plumbing
   `VITE_DEMO_MODE` del backoffice cuando nada los referencie. `dev` script → API real.
 
+## ALCANCE REAL: AMBAS APPS (confirmado 2026-06-08)
+
+El trabajo previo retiró el modo demo también del **TPV** (`apps/tpv/src/lib/*` perdió
+las ramas `isDemo()`; `auth.ts` perdió el override de login demo). → el e2e del TPV
+(`apps/tpv/e2e/*`) FALLA igual que el del backoffice. La migración cubre las DOS apps:
+
+- **TPV**: completar decomiso demo en libs/páginas + el e2e del TPV (login real, datos
+  sembrados). Su e2e hoy: login "cualquier credencial" + tickets/caja de fixture.
+- Seed (Fase E) y reescritura e2e (Fase F) aplican a AMBOS suites (tpv + backoffice).
+
+**Decisión (usuario, 2026-06-08): seguir la migración completa dual-app.** PR #149
+(`feat/backoffice-real-backend-migration`, en origin+upstream) queda ROJO y SIN mergear
+hasta que TODO esté verde. `main` auto-despliega a prod (job `deploy` tras e2e) → no
+mergear nada a medias.
+
+### Estado CI (run más reciente del PR #149)
+
+- **quality ✓** (lint/typecheck/API tests+cobertura/build). Cobertura 90.41% ≥ floor 90.2
+  (se arregló añadiendo `promotions.module.spec.ts` + `promotions.controller.spec.ts` +
+  rama 'media' de rotación; el floor lo sube github-actions vía ratchet `[skip ci]`).
+- **e2e ✗** (paso TPV; el backoffice ni corre porque el step TPV va primero). deploy skipped.
+- Gotcha CI: el gate de cobertura mide SOLO unit sobre todo `apps/api/src`; el código
+  cubierto solo por integración baja el %. Patrón del repo: `*.module.spec.ts` triviales
+  (devices/store-orders/time-clock ya los tienen) para cubrir módulos.
+
 ## Verificación end-to-end (cuando aplique)
 
 - DB local viva: Docker `simpletpv-postgres` healthy en `:5434`; `.env.local` con las 4

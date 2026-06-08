@@ -246,4 +246,34 @@ describe('Control horario — integración', () => {
       ),
     ).rejects.toThrow(/No tienes acceso a esa tienda/);
   });
+
+  it('entries: log en bruto de la tienda, lo más reciente primero; org2 no lo ve (RLS)', async () => {
+    await clearEntries();
+    await insertAt(user1Id, 'CLOCK_IN', new Date('2026-06-04T08:00:00.000Z'));
+    await insertAt(user1Id, 'CLOCK_OUT', new Date('2026-06-04T16:00:00.000Z'));
+
+    const rows = await tenantStorage.run({ organizationId: org1Id }, () =>
+      service.entries(
+        { storeId: store1Id, from: '2026-06-01', to: '2026-06-30' },
+        'ADMIN',
+        user1Id,
+      ),
+    );
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.type).toBe('CLOCK_OUT'); // 16:00 antes que 08:00 (orden desc)
+    expect(rows[1]!.type).toBe('CLOCK_IN');
+    expect(rows[0]!.userName).toBeTruthy();
+    expect(typeof rows[0]!.createdAt).toBe('string');
+
+    // RLS: desde org2 no se ven los fichajes de org1.
+    const fromOrg2 = await tenantStorage.run({ organizationId: org2Id }, () =>
+      service.entries(
+        { storeId: store1Id, from: '2026-06-01', to: '2026-06-30' },
+        'ADMIN',
+        user1Id,
+      ),
+    );
+    expect(fromOrg2).toHaveLength(0);
+  });
 });

@@ -522,6 +522,16 @@ export interface TimeClockHistoryRow {
   breakMs: number;
 }
 
+// Fila del log en bruto de fichajes de una tienda (GET /time-clock/entries): cada
+// entrada individual con el nombre del empleado, lo más reciente primero.
+export interface TimeClockLogRow {
+  id: string;
+  userId: string;
+  userName: string;
+  type: TimeClockType;
+  createdAt: string;
+}
+
 // Evento del canal SSE GET /events (semana 3). El cliente filtra por `type`.
 export type AppEventType = 'stock.changed' | 'sale.completed' | 'alert.created';
 export interface AppEvent {

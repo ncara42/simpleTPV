@@ -203,4 +203,48 @@ export class TimeClockService {
       };
     });
   }
+
+  // Log de fichajes en BRUTO de una tienda (cada entrada individual con el nombre del
+  // empleado), lo más reciente primero. A diferencia de history() (resumen por jornada),
+  // alimenta el log del detalle de tienda del backoffice. Mismo control de acceso
+  // (assertStoreAccess) y aislamiento por tenant que history.
+  async entries(
+    params: { storeId: string; userId?: string; from?: string; to?: string },
+    role: string,
+    requestingUserId: string,
+  ): Promise<
+    Array<{ id: string; userId: string; userName: string; type: TimeClockType; createdAt: string }>
+  > {
+    const tenant = requireTenant();
+    await assertStoreAccess(this.prisma, {
+      userId: requestingUserId,
+      role,
+      storeId: params.storeId,
+    });
+
+    const now = new Date();
+    const from = params.from
+      ? startOfLocalDay(new Date(params.from))
+      : startOfLocalDay(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
+    const to = params.to ? endOfLocalDay(new Date(params.to)) : endOfLocalDay(now);
+
+    const rows = await this.prisma.timeClockEntry.findMany({
+      where: {
+        organizationId: tenant.organizationId,
+        storeId: params.storeId,
+        ...(params.userId ? { userId: params.userId } : {}),
+        createdAt: { gte: from, lte: to },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: { user: { select: { name: true } } },
+    });
+
+    return rows.map((e) => ({
+      id: e.id,
+      userId: e.userId,
+      userName: e.user.name,
+      type: e.type,
+      createdAt: e.createdAt.toISOString(),
+    }));
+  }
 }

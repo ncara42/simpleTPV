@@ -295,4 +295,43 @@ describe('TimeClockService', () => {
       ),
     ).rejects.toThrow(ForbiddenException);
   });
+
+  // --- Log en bruto de fichajes (detalle de tienda del backoffice) ---
+
+  it('entries devuelve el log en bruto mapeado, lo más reciente primero, acotado por tienda/tenant', async () => {
+    const prisma = makePrisma();
+    prisma.timeClockEntry.findMany = vi.fn(async () => [
+      histEntry('CLOCK_IN', '09:00', { userName: 'Marta' }),
+      histEntry('CLOCK_OUT', '14:00', { userName: 'Marta' }),
+    ]);
+    const service = makeService(prisma);
+
+    const rows = (await tenantStorage.run({ organizationId: ORG }, () =>
+      service.entries({ storeId: STORE }, 'MANAGER', 'mgr-1'),
+    )) as Array<{ userName: string; type: string; createdAt: string }>;
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.userName).toBe('Marta');
+    expect(rows[0]!.type).toBe('CLOCK_IN');
+    expect(typeof rows[0]!.createdAt).toBe('string'); // ISO, no Date
+
+    const arg = prisma.timeClockEntry.findMany.mock.calls[0]![0] as {
+      where: { organizationId: string; storeId: string };
+      orderBy: { createdAt: string };
+    };
+    expect(arg.where).toMatchObject({ organizationId: ORG, storeId: STORE });
+    expect(arg.orderBy).toEqual({ createdAt: 'desc' }); // lo más reciente primero
+  });
+
+  it('entries lanza 403 para un CLERK sin acceso a la tienda', async () => {
+    const prisma = makePrisma();
+    prisma.userStore.findFirst = vi.fn(async () => null);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () =>
+        service.entries({ storeId: STORE }, 'CLERK', 'clerk-1'),
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
 });
