@@ -1,75 +1,57 @@
 import { expect, test } from '@playwright/test';
 
-async function login(page: import('@playwright/test').Page): Promise<void> {
-  await page.goto('/');
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
-  await page.getByTestId('login-email').fill('marta@centro.demo');
-  await page.getByTestId('login-password').fill('demo');
-  await page.getByTestId('login-submit').click();
-  await page.getByTestId('sale-search').waitFor({ timeout: 10000 });
-}
+import { gotoApp } from './helpers.js';
 
-test('tras login se ven los productos demo', async ({ page }) => {
-  await login(page);
-  await expect(page.getByTestId('sale-grid')).toBeVisible({ timeout: 10000 });
-  // 36 productos demo.
-  expect(await page.getByTestId('prod-card').count()).toBe(36);
+// Búsqueda y cuadrícula de productos contra backend real (seed-demo). Conteos
+// tolerantes (el catálogo del seed no es el de los fixtures demo).
+test.beforeEach(async ({ page }) => {
+  await gotoApp(page);
+});
+
+test('tras login se ven los productos del seed', async ({ page }) => {
+  await expect(page.getByTestId('sale-grid')).toBeVisible();
+  expect(await page.getByTestId('prod-card').count()).toBeGreaterThan(0);
 });
 
 test('la búsqueda en vivo filtra los productos (debounce)', async ({ page }) => {
-  await login(page);
-  await page.getByTestId('sale-grid').waitFor({ timeout: 10000 });
   const total = await page.getByTestId('prod-card').count();
-
   await page.getByTestId('sale-search').fill('CBD');
   await page.waitForTimeout(400); // > debounce 200ms
   const filtered = await page.getByTestId('prod-card').count();
-
   expect(filtered).toBeGreaterThan(0);
-  expect(filtered).toBeLessThan(total);
+  expect(filtered).toBeLessThanOrEqual(total);
   const names = await page.getByTestId('prod-card').locator('.prod-name').allTextContents();
   expect(names.every((n) => /cbd/i.test(n))).toBe(true);
 });
 
-test('el chip "Todas" muestra el total demo (112)', async ({ page }) => {
-  await login(page);
-  await expect(page.getByTestId('fam-chip-all')).toContainText('112');
+test('el chip "Todas" está presente para ver todo el catálogo', async ({ page }) => {
+  await expect(page.getByTestId('fam-chip-all')).toContainText('Todas');
 });
 
 test('los productos agotados muestran "0", se atenúan y van al final', async ({ page }) => {
-  await login(page);
-  await page.getByTestId('sale-grid').waitFor({ timeout: 10000 });
   // Ya no se muestra el texto "Sin stock".
   await expect(page.getByText('Sin stock')).toHaveCount(0);
-  // "Vapeador Pro" (stock 0) muestra "0", queda atenuado (.is-out) pero NO
-  // deshabilitado: la venta nunca se bloquea por falta de stock.
-  const agotado = page.getByTestId('prod-card').filter({ hasText: 'Vapeador Pro' });
-  await expect(agotado.getByTestId('prod-stock')).toHaveText('0');
-  await expect(agotado).toHaveClass(/is-out/);
-  await expect(agotado).not.toBeDisabled();
-  // Los agotados se ordenan al final: la última tarjeta de la cuadrícula está atenuada.
+  // Hay al menos un producto agotado en el seed (Flor CBD Gorilla 15%, stock 0):
+  // muestra "0", queda atenuado (.is-out) pero NO deshabilitado (la venta nunca se
+  // bloquea por falta de stock).
+  const out = page.locator('[data-testid="prod-card"].is-out').first();
+  await expect(out).toBeVisible();
+  await expect(out.getByTestId('prod-stock')).toHaveText('0');
+  await expect(out).not.toBeDisabled();
+  // Los agotados se ordenan al final: la última tarjeta está atenuada.
   await expect(page.getByTestId('prod-card').last()).toHaveClass(/is-out/);
 });
 
-test('familia con subfamilias → desplegable → producto', async ({ page }) => {
-  await login(page);
-  await page.getByTestId('sale-grid').waitFor({ timeout: 10000 });
-  const families = page.getByTestId('sale-families');
-
-  // "Aceites" tiene subfamilias → es un desplegable. Abrirlo y elegir
-  // "Todo · Aceites" filtra a sus 8 productos (todo el subárbol).
-  await families.getByRole('button', { name: 'Familia Aceites' }).click();
-  await page.getByRole('option', { name: 'Todo · Aceites' }).click();
-  await expect(page.getByTestId('prod-card')).toHaveCount(8);
-
-  // Reabrir y elegir la subfamilia "CBD 10%": filtra a sus 3 productos.
-  await families.getByRole('button', { name: 'Familia Aceites' }).click();
-  await page.getByRole('option', { name: 'CBD 10%' }).click();
-  await expect(page.getByTestId('prod-card')).toHaveCount(3);
-  await expect(page.getByTestId('prod-card').first()).toContainText('Aceite CBD 10%');
-
+test('filtrar por una familia reduce los productos y "Todas" los restaura', async ({ page }) => {
+  const total = await page.getByTestId('prod-card').count();
+  // "Accesorios" no tiene subfamilias → es un chip directo (las familias con
+  // subfamilias se prueban como desplegable en los unit de FamilyChips).
+  await page.getByTestId('fam-chip').filter({ hasText: 'Accesorios' }).click();
+  // Espera a que la cuadrícula se re-renderice con la familia filtrada (evita la
+  // carrera de leer .count() antes del re-render).
+  await expect.poll(() => page.getByTestId('prod-card').count()).toBeLessThan(total);
+  expect(await page.getByTestId('prod-card').count()).toBeGreaterThan(0);
   // "Todas" vuelve a todos los productos.
-  await families.getByTestId('fam-chip-all').click();
-  await expect(page.getByTestId('prod-card')).toHaveCount(36);
+  await page.getByTestId('fam-chip-all').click();
+  await expect(page.getByTestId('prod-card')).toHaveCount(total);
 });
