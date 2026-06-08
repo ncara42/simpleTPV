@@ -747,9 +747,20 @@ describe('StockService.global', () => {
           product: { name: 'Té' },
           store: { name: 'Centro' },
         },
+        {
+          productId: 'p3',
+          storeId: 's1',
+          quantity: 20,
+          minStock: 5,
+          product: { name: 'Vape' },
+          store: { name: 'Centro' },
+        },
       ],
-      // p1 vendió 40 uds (≥30 → alta); p2 sin ventas → baja.
-      [{ productId: 'p1', _sum: { qty: 40 } }],
+      // p1 vendió 40 uds (≥30 → alta); p3 vendió 10 (∈[6,30) → media); p2 sin ventas → baja.
+      [
+        { productId: 'p1', _sum: { qty: 40 } },
+        { productId: 'p3', _sum: { qty: 10 } },
+      ],
     );
     const service = new StockService(
       prisma as never,
@@ -762,10 +773,12 @@ describe('StockService.global', () => {
 
     const cafe = rows.find((r) => r.productId === 'p1')!;
     const te = rows.find((r) => r.productId === 'p2')!;
+    const vape = rows.find((r) => r.productId === 'p3')!;
     expect(cafe.total).toBe(13);
     expect(cafe.stores).toHaveLength(2);
     expect(cafe.stores.find((s) => s.storeId === 's2')!.level).toBe('yellow');
     expect(cafe.rotation).toBe('alta'); // 40 uds vendidas
+    expect(vape.rotation).toBe('media'); // 10 uds vendidas (∈ [6,30))
     expect(te.rotation).toBe('baja'); // sin ventas en la ventana
   });
 });
