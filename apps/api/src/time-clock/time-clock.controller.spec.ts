@@ -9,6 +9,7 @@ function makeController() {
     current: vi.fn(async (_storeId: string, _userId: string) => ({ id: 'tc-1', type: 'CLOCK_IN' })),
     today: vi.fn(async (_storeId: string, _userId: string) => ({ status: 'IN', entries: [] })),
     history: vi.fn(async (_q: unknown, _role: string, _userId: string) => [{ userId: 'u1' }]),
+    historyAll: vi.fn(async (_q: unknown) => [{ userId: 'u1', storeId: 's1' }]),
     entries: vi.fn(async (_q: unknown, _role: string, _userId: string) => [{ id: 'e1' }]),
     create: vi.fn(async (_dto: unknown, _userId: string) => ({ id: 'tc-2', type: 'CLOCK_OUT' })),
   } as unknown as TimeClockService;
@@ -52,6 +53,16 @@ describe('TimeClockController', () => {
 
     expect(service.history).toHaveBeenCalledWith(query, 'MANAGER', 'user-1');
     expect(res[0]!.userId).toBe('u1');
+  });
+
+  it('GET /time-clock/history-all delega la query (cross-tienda, sin role/sub)', async () => {
+    const { controller, service } = makeController();
+    const query = { storeId: 'store-1', userId: 'u1' };
+
+    const res = (await controller.historyAll(query)) as Array<{ userId: string; storeId: string }>;
+
+    expect(service.historyAll).toHaveBeenCalledWith(query);
+    expect(res[0]!.storeId).toBe('s1');
   });
 
   it('GET /time-clock/entries delega query, role y sub', async () => {

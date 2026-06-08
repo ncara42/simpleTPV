@@ -80,8 +80,26 @@ contra ese backend real. Decomisar el modo demo (datos y login) del backoffice.
     (estado React puro): son demo-theater que ya funcionan contra backend real sin endpoint
     (la UI no muestra "sesión abierta en vivo", usa el log para aperturas/cierres). No se
     construyó endpoint de dispositivos por tienda (YAGNI); se revisará en Fase F si el e2e lo pide.
-- **Fase D — Migrar páginas restantes off demoData**: CatalogPage, DashboardPage,
-  TimeClockPage, VerifactuPage (endpoint `/verifactu/records` existe; oculta hoy).
+- **Fase D — Migrar páginas restantes off demoData**: ✅ **HECHA 2026-06-08**.
+  CatalogPage migrada antes (commit 62bf2f3). Ahora las 3 restantes:
+  - **DashboardPage**: panel "Roturas de stock" deja `DEMO_STOCKOUTS`/`DEMO_STOCKOUT_KPIS`
+    → `listAlerts(store)` (GET /stock/alerts, activas) para la lista (nivel red/yellow
+    desde `alertType`, etiqueta vía `ALERT_LABEL`) + `getStockoutKpis(period, store)`
+    (GET /dashboard/stockout-kpis) para la venta perdida estimada. Estado vacío
+    "Sin roturas ahora.". Testids `dash-stockout`/`dash-lost` intactos.
+  - **TimeClockPage**: deja `DEMO_TIME_CLOCK` → `listHistoryAll()` (nuevo endpoint
+    cross-tienda). Filtros tienda/empleado/fecha derivados de los datos; totales en ms→min;
+    Entrada/Salida por corte de ISO; testids intactos.
+  - **VerifactuPage**: deja `DEMO_VERIFACTU_STATS` → `listVerifactuRecords()`
+    (GET /verifactu/records) + `summarizeVerifactu` puro (sentToday/queued/failed/lastSentAt).
+    Conector derivado (Operativo si failed=0; "último envío hace N"). Testids intactos.
+  - **Backend nuevo**: `GET /time-clock/history-all` (ADMIN/MANAGER, org-wide, sin storeId
+    obligatorio) — `TimeClockService.historyAll` agrega jornadas por usuario+tienda+día de
+    TODAS las tiendas de la org (RLS acota); `aggregateJornadas` extraído y compartido con
+    `history`. Unit (service+controller) + integración (cross-store + RLS) + `wiring.test`.
+  - Gate: typecheck 7/7, backoffice unit 69/69, API unit 784/784 (cobertura 90.47% ≥ 90.07),
+    integración time-clock 9/9, lint limpio. Las KPI cards/`api-config.ts` (isDemo) siguen
+    hasta Fase G; `demoData.ts` ya no lo referencia ninguna página (solo plumbing en api-config).
 - **Fase E — Seed-demo determinista**: alinear login (crear `admin@org1.test`/`demo` o
   cambiar el helper del e2e), nombres (Ana/Marta/Luis/Jon), conteos coherentes,
   CashSession OPEN, TimeClockEntry, OfficialDevice, 4 promociones en 3 grupos,

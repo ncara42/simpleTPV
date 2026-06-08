@@ -19,6 +19,7 @@ import * as purchases from './purchases.js';
 import * as stock from './stock.js';
 import * as storePrices from './store-prices.js';
 import * as timeClock from './time-clock.js';
+import * as verifactu from './verifactu.js';
 
 const get = vi.mocked(api.get);
 const post = vi.mocked(api.post);
@@ -295,5 +296,29 @@ describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
       { name: 'Marta', date: '2026-06-04', time: '08:00', type: 'apertura' },
       { name: 'Marta', date: '2026-06-04', time: '16:00', type: 'cierre' },
     ]);
+  });
+
+  it('time-clock: histórico cross-tienda contra /time-clock/history-all (Fase D)', async () => {
+    await timeClock.listHistoryAll();
+    expect(get).toHaveBeenCalledWith('/time-clock/history-all', {});
+    await timeClock.listHistoryAll({
+      storeId: 'st1',
+      userId: 'u1',
+      from: '2026-06-01',
+      to: '2026-06-02',
+    });
+    expect(get).toHaveBeenLastCalledWith('/time-clock/history-all', {
+      storeId: 'st1',
+      userId: 'u1',
+      from: '2026-06-01',
+      to: '2026-06-02',
+    });
+  });
+
+  it('verifactu: registros contra /verifactu/records con estado opcional (Fase D)', async () => {
+    await verifactu.listVerifactuRecords();
+    expect(get).toHaveBeenCalledWith('/verifactu/records', {});
+    await verifactu.listVerifactuRecords('FAILED');
+    expect(get).toHaveBeenLastCalledWith('/verifactu/records', { status: 'FAILED' });
   });
 });

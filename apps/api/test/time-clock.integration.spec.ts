@@ -28,6 +28,7 @@ describe('Control horario — integración', () => {
   let org1Id: string;
   let org2Id: string;
   let store1Id: string;
+  let store2Id: string;
   let user1Id: string;
   let user2Id: string;
   let deviceId: string;
@@ -47,10 +48,15 @@ describe('Control horario — integración', () => {
   // usando el cliente superusuario: evita la validación de secuencia y la RLS en
   // el setup. La LECTURA del historial sí se ejercita por el servicio con tenant.
   function insertAt(userId: string, type: string, createdAt: Date) {
+    return insertAtStore(userId, store1Id, type, createdAt);
+  }
+
+  // Variante con tienda explícita: para historiales cross-tienda (historyAll).
+  function insertAtStore(userId: string, storeId: string, type: string, createdAt: Date) {
     return admin.timeClockEntry.create({
       data: {
         organizationId: org1Id,
-        storeId: store1Id,
+        storeId,
         userId,
         deviceId,
         type: type as never,
@@ -107,6 +113,8 @@ describe('Control horario — integración', () => {
       SELECT id::text, code FROM "Store" WHERE "organizationId" = ${org1Id}::uuid ORDER BY code
     `;
     store1Id = stores[0]!.id;
+    // Segunda tienda de la org para los historiales cross-tienda (historyAll).
+    store2Id = stores[1]!.id;
 
     const u1 = await admin.$queryRaw<Array<{ id: string }>>`
       SELECT id::text FROM "User" WHERE email = 'clerk@org1.test'
@@ -209,6 +217,32 @@ describe('Control horario — integración', () => {
     expect(byUser.get(user1Id)!.workedMs).toBe(8 * HOUR);
     expect(byUser.get(user2Id)!.workedMs).toBe(4 * HOUR);
     expect(byUser.get(user1Id)!.userName).toBeTruthy();
+  });
+
+  it('historyAll agrega jornadas de TODAS las tiendas de la org; org2 no las ve (RLS)', async () => {
+    await clearEntries();
+    // El mismo empleado ficha 8h en store1 y 2h en store2 el mismo día → dos jornadas
+    // distintas (la clave de agrupación incluye la tienda).
+    await insertAt(user1Id, 'CLOCK_IN', new Date('2026-06-04T08:00:00.000Z'));
+    await insertAt(user1Id, 'CLOCK_OUT', new Date('2026-06-04T16:00:00.000Z'));
+    await insertAtStore(user1Id, store2Id, 'CLOCK_IN', new Date('2026-06-04T18:00:00.000Z'));
+    await insertAtStore(user1Id, store2Id, 'CLOCK_OUT', new Date('2026-06-04T20:00:00.000Z'));
+
+    const rows = await tenantStorage.run({ organizationId: org1Id }, () =>
+      service.historyAll({ from: '2026-01-01', to: '2026-12-31' }),
+    );
+
+    const mine = rows.filter((r) => r.userId === user1Id);
+    expect(mine).toHaveLength(2);
+    const byStore = new Map(mine.map((r) => [r.storeId, r]));
+    expect(byStore.get(store1Id)!.workedMs).toBe(8 * HOUR);
+    expect(byStore.get(store2Id)!.workedMs).toBe(2 * HOUR);
+
+    // RLS: desde org2 no se ve ninguna jornada de org1.
+    const fromOrg2 = await tenantStorage.run({ organizationId: org2Id }, () =>
+      service.historyAll({ from: '2026-01-01', to: '2026-12-31' }),
+    );
+    expect(fromOrg2).toHaveLength(0);
   });
 
   it('history/me: un CLERK con acceso a la tienda lee SOLO sus propias jornadas', async () => {
