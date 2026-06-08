@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 
 import { requireOwned } from '../common/tenant-scope.js';
+import { FeatureFlagService } from '../feature-flags/feature-flags.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import type { CreatePriceListDto, SetPriceListItemDto, UpdatePriceListDto } from './b2b.dto.js';
@@ -8,7 +9,12 @@ import type { CreatePriceListDto, SetPriceListItemDto, UpdatePriceListDto } from
 // Tarifas (listas de precios) y sus precios por producto (IT-17). RLS por tenant.
 @Injectable()
 export class PriceListsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Feature flags (#127 B): gatea el módulo mayorista B2B a nivel org. @Optional
+    // para no romper construcciones directas en tests; DI lo provee en producción.
+    @Optional() private readonly features?: FeatureFlagService,
+  ) {}
 
   async list() {
     const { organizationId } = requireTenant();
@@ -41,6 +47,8 @@ export class PriceListsService {
 
   async create(dto: CreatePriceListDto) {
     const { organizationId } = requireTenant();
+    // Feature flag (#127 B): módulo B2B apagable a nivel org → 403 si está apagado.
+    await this.features?.assertEnabled('b2b');
     return this.prisma.priceList.create({ data: { organizationId, name: dto.name } });
   }
 

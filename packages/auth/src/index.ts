@@ -27,6 +27,7 @@ export type {
   ExpiringBatch,
   FamilyInput,
   FamilyNode,
+  FeatureFlags,
   InventoryCountLine,
   MovementType,
   NewUser,

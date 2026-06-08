@@ -48,6 +48,7 @@ model Organization {
   wholesaleOrders     WholesaleOrder[]
   wholesaleOrderLines WholesaleOrderLine[]
   apiKeys             ApiKey[]
+  featureFlags        FeatureFlag[]
 }
 
 // Personalización por usuario (IT-16): preferencias clave-valor (JSON) por usuario.
@@ -95,6 +96,7 @@ model Store {
   transfersOut     Transfer[]       @relation("TransferOrigin")
   transfersIn      Transfer[]       @relation("TransferDest")
   purchaseOrders   PurchaseOrder[]
+  featureFlags     FeatureFlag[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -382,6 +384,30 @@ model StorePrice {
   // Un override por (producto, tienda). El lookup en la venta filtra por tienda.
   @@unique([productId, storeId])
   @@index([organizationId, storeId])
+}
+
+// Feature flag por tienda/organización (#127 B): activa/desactiva un módulo (key del
+// catálogo en código) en una org o una tienda. storeId null = default de la org;
+// storeId set = override de esa tienda. Resolución: tienda ?? org ?? default del
+// código. Sin fila → default del código = comportamiento ACTUAL (nunca "apagado");
+// solo un enabled=false explícito apaga. RLS por tenant.
+model FeatureFlag {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  storeId        String?  @db.Uuid
+  key            String
+  enabled        Boolean
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  store        Store?       @relation(fields: [storeId], references: [id])
+
+  // Un override por (org, key, tienda) y un único default por (org, key). El índice
+  // se crea con NULLS NOT DISTINCT en la migración a mano para que storeId NULL sea
+  // único (sin él, Postgres permitiría dos defaults de org para la misma key).
+  @@unique([organizationId, key, storeId])
+  @@index([organizationId, key])
 }
 
 // Movimiento de stock: cada entrada/salida deja rastro auditado. quantity es

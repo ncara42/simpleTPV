@@ -1,7 +1,14 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import type { TimeClockType } from '@simpletpv/db';
 
 import { assertStoreAccess } from '../auth/store-access.js';
+import { FeatureFlagService } from '../feature-flags/feature-flags.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
@@ -23,6 +30,9 @@ export class TimeClockService {
     private readonly prisma: PrismaService,
     // Base: para withTenantTx (lectura+validación+inserción atómicas con lock).
     @Inject(PRISMA_BASE) private readonly base: PrismaService,
+    // Feature flags (#127 B): gatea el fichaje por org/tienda. @Optional para no
+    // romper construcciones directas en tests; en producción DI lo provee.
+    @Optional() private readonly features?: FeatureFlagService,
   ) {}
 
   async current(storeId: string, userId: string) {
@@ -41,6 +51,9 @@ export class TimeClockService {
     const tenant = requireTenant();
     // Aislamiento por tienda (SEC-01): un CLERK solo ficha en sus tiendas.
     await assertStoreAccess(this.prisma, { userId, role, storeId: input.storeId });
+    // Feature flag (#127 B): el control horario puede estar apagado en esta tienda
+    // u org → 403. Sin flag → comportamiento actual (activo).
+    await this.features?.assertEnabled('time_clock', input.storeId);
 
     // S-12: la lectura del último fichaje, la validación de secuencia y la
     // inserción deben ser atómicas y serializadas por (usuario, tienda). Sin

@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 
 import { requireFound, requireOwned } from '../common/tenant-scope.js';
+import { FeatureFlagService } from '../feature-flags/feature-flags.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import type { CreateWholesaleOrderDto, ListWholesaleOrdersQueryDto } from './b2b.dto.js';
@@ -15,10 +16,17 @@ const round2 = (n: number): number => Math.round(n * 100) / 100;
 // tenant; se verifica que cliente y productos sean del propio tenant.
 @Injectable()
 export class WholesaleOrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Feature flags (#127 B): gatea el módulo mayorista B2B a nivel org. @Optional
+    // para no romper construcciones directas en tests; DI lo provee en producción.
+    @Optional() private readonly features?: FeatureFlagService,
+  ) {}
 
   async create(dto: CreateWholesaleOrderDto) {
     const { organizationId } = requireTenant();
+    // Feature flag (#127 B): módulo B2B apagable a nivel org → 403 si está apagado.
+    await this.features?.assertEnabled('b2b');
     const customer = await requireOwned(
       this.prisma.customer.findFirst({
         where: { id: dto.customerId, organizationId },

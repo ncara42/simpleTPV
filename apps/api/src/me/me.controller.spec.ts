@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { JwtPayload } from '../auth/jwt-payload.js';
+import type { FeatureFlagService } from '../feature-flags/feature-flags.service.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { StoresService } from '../stores/stores.service.js';
 import { MeController } from './me.controller.js';
@@ -23,16 +24,26 @@ function makeController() {
     getAll: vi.fn(async () => ({ 'dashboard.cards': { hidden: ['kpi-upt'] } })),
     set: vi.fn(async (_u: string, key: string, value: unknown) => ({ key, value })),
   };
+  const features = {
+    resolveAll: vi.fn(async (_storeId?: string) => ({
+      blind_returns: true,
+      time_clock: false,
+      data_export: true,
+      b2b: true,
+    })),
+  };
 
   return {
     controller: new MeController(
       stores as unknown as StoresService,
       prisma as unknown as PrismaService,
       prefs as unknown as PreferencesService,
+      features as unknown as FeatureFlagService,
     ),
     prisma,
     stores,
     prefs,
+    features,
   };
 }
 
@@ -62,6 +73,23 @@ describe('MeController', () => {
       select: { storeId: true },
     });
     expect(res).toEqual({ role: 'MANAGER', storeIds: [STORE_1, STORE_2] });
+  });
+
+  it('GET /me/features delega en FeatureFlagService.resolveAll con el storeId', async () => {
+    const { controller, features } = makeController();
+
+    const res = await controller.getFeatures(STORE_1);
+
+    expect(features.resolveAll).toHaveBeenCalledWith(STORE_1);
+    expect(res).toEqual({ blind_returns: true, time_clock: false, data_export: true, b2b: true });
+  });
+
+  it('GET /me/features sin storeId resuelve solo los defaults de la org', async () => {
+    const { controller, features } = makeController();
+
+    await controller.getFeatures(undefined);
+
+    expect(features.resolveAll).toHaveBeenCalledWith(undefined);
   });
 
   it('GET /me/preferences delega en PreferencesService con el sub del usuario', async () => {

@@ -17,6 +17,7 @@ import { TestAwareThrottlerGuard } from './config/test-aware-throttler.guard.js'
 import { DashboardModule } from './dashboard/dashboard.module.js';
 import { DevicesModule } from './devices/devices.module.js';
 import { EventsModule } from './events/events.module.js';
+import { FeatureFlagsModule } from './feature-flags/feature-flags.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MeModule } from './me/me.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
@@ -50,6 +51,7 @@ const throttle = throttleConfig(process.env);
     PrismaModule,
     CacheModule,
     EventsModule,
+    FeatureFlagsModule,
     AuthModule,
     HealthModule,
     ProductsModule,

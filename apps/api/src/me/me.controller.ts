@@ -1,7 +1,19 @@
-import { BadRequestException, Body, Controller, Get, Param, Put, Req } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Put,
+  Query,
+  Req,
+} from '@nestjs/common';
 import type { Store } from '@simpletpv/db';
 
 import type { JwtPayload } from '../auth/jwt-payload.js';
+import { type FeatureKey } from '../feature-flags/feature-flags.catalog.js';
+import { FeatureFlagService } from '../feature-flags/feature-flags.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { StoresService } from '../stores/stores.service.js';
 import { SetPreferenceDto } from './preferences.dto.js';
@@ -21,11 +33,23 @@ export class MeController {
     private readonly stores: StoresService,
     private readonly prisma: PrismaService,
     private readonly prefs: PreferencesService,
+    private readonly features: FeatureFlagService,
   ) {}
 
   @Get('stores')
   findStores(): Promise<Store[]> {
     return this.stores.findAll();
+  }
+
+  // Estado efectivo de los feature flags (#127 B) para que el frontend oculte/
+  // des­habilite UI. Con storeId resuelve los overrides de esa tienda; sin él, solo
+  // los defaults de la org. El backend sigue siendo la fuente de verdad (los
+  // endpoints devuelven 403 si el módulo está apagado, aunque la UI lo muestre).
+  @Get('features')
+  getFeatures(
+    @Query('storeId', new ParseUUIDPipe({ optional: true })) storeId?: string,
+  ): Promise<Record<FeatureKey, boolean>> {
+    return this.features.resolveAll(storeId);
   }
 
   // Personalización (IT-16): preferencias del usuario autenticado. Cada uno solo ve

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { FeatureFlagsModule } from '../feature-flags/feature-flags.module.js';
 import { CustomersController } from './customers.controller.js';
 import { CustomersService } from './customers.service.js';
 import { PriceListsController } from './price-lists.controller.js';
@@ -9,6 +10,7 @@ import { WholesaleOrdersService } from './wholesale-orders.service.js';
 
 // B2B mayorista saliente (IT-17): clientes, tarifas y pedidos mayoristas.
 @Module({
+  imports: [FeatureFlagsModule],
   controllers: [CustomersController, PriceListsController, WholesaleOrdersController],
   providers: [CustomersService, PriceListsService, WholesaleOrdersService],
 })

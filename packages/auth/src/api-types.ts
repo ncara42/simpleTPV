@@ -693,6 +693,18 @@ export interface StorePriceOverride {
   product: { name: string; salePrice: string };
 }
 
+// Estado efectivo de los feature flags (#127 B) para una tienda/org: cada módulo →
+// activo (true) / apagado (false). Lo sirve GET /me/features (resuelto: override de
+// tienda ?? default de org ?? default del código). El backend es la fuente de verdad
+// (los endpoints devuelven 403 si el módulo está apagado); el frontend lo usa solo
+// para ocultar/des­habilitar UI. Las claves coinciden con el catálogo del backend.
+export interface FeatureFlags {
+  blind_returns: boolean;
+  time_clock: boolean;
+  data_export: boolean;
+  b2b: boolean;
+}
+
 export type WholesaleOrderStatus = 'DRAFT' | 'CONFIRMED' | 'SHIPPED' | 'CANCELLED';
 
 export interface WholesaleOrderLine {
