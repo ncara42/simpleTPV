@@ -15,6 +15,8 @@ import {
   MovementType,
   PaymentMethod,
   PrismaClient,
+  PromoConditionType,
+  PromoDiscountType,
   SaleStatus,
   TimeClockType,
   UserRole,
@@ -1061,6 +1063,72 @@ async function seedStorePrices(orgId: string): Promise<void> {
   }
 }
 
+// Promociones demo (#143): 4 reglas que cubren los 3 grupos del backoffice
+// (Activas / Programadas / Inactivas). Fechas relativas a hoy para que la
+// clasificación promoStatus() sea estable se ejecute cuando se ejecute el seed.
+// Idempotente por [organizationId, name].
+async function seedPromotions(orgId: string): Promise<void> {
+  const day = (offset: number): Date => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + offset);
+    return d;
+  };
+  const promos = [
+    // Activa: en rango y active
+    {
+      name: '2 o más Flores: -15%',
+      conditionType: PromoConditionType.min_qty,
+      threshold: 2,
+      discountType: PromoDiscountType.percent,
+      discountValue: 15,
+      startDate: day(-10),
+      endDate: day(20),
+      active: true,
+    },
+    // Activa: por importe de ticket
+    {
+      name: 'Ahorra 10€ en compras de 50€+',
+      conditionType: PromoConditionType.min_ticket,
+      threshold: 50,
+      discountType: PromoDiscountType.amount,
+      discountValue: 10,
+      startDate: day(-5),
+      endDate: day(25),
+      active: true,
+    },
+    // Programada: empieza en el futuro
+    {
+      name: 'Campaña verano CBD',
+      conditionType: PromoConditionType.min_ticket,
+      threshold: 40,
+      discountType: PromoDiscountType.percent,
+      discountValue: 10,
+      startDate: day(5),
+      endDate: day(35),
+      active: true,
+    },
+    // Inactiva: en rango pero pausada (active=false)
+    {
+      name: 'Black Friday (pausada)',
+      conditionType: PromoConditionType.min_qty,
+      threshold: 3,
+      discountType: PromoDiscountType.percent,
+      discountValue: 20,
+      startDate: day(-10),
+      endDate: day(20),
+      active: false,
+    },
+  ];
+  for (const p of promos) {
+    await prisma.promotion.upsert({
+      where: { organizationId_name: { organizationId: orgId, name: p.name } },
+      update: {},
+      create: { organizationId: orgId, ...p },
+    });
+  }
+}
+
 async function main(): Promise<void> {
   assertNotProduction();
 
@@ -1111,6 +1179,7 @@ async function main(): Promise<void> {
   await seedB2B(org.id);
   await seedFeatureFlags(org.id);
   await seedStorePrices(org.id);
+  await seedPromotions(org.id);
 
   console.log(`Seed demo completado: organización ${org.nif} con catálogo, usuarios e histórico.`);
 }
