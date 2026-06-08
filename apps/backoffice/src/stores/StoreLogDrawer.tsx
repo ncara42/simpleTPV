@@ -1,5 +1,5 @@
-import type { StoreLogEntry } from '../demo/demoData.js';
 import { fmtDayMonth } from '../lib/format.js';
+import type { StoreLogEntry } from '../lib/time-clock.js';
 
 // Pop-up lateral (derecha) con el registro de fichajes de una tienda: tabla con
 // empleado, fecha, hora y movimiento (apertura/cierre). Presentacional.

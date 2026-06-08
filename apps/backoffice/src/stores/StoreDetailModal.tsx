@@ -1,8 +1,10 @@
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
 import type { Store } from '../lib/admin.js';
 import { fmtDayMonth } from '../lib/format.js';
+import { listStoreLog } from '../lib/time-clock.js';
 import type { StoreOps } from '../StoresPage.js';
 import { StoreLogDrawer } from './StoreLogDrawer.js';
 
@@ -19,7 +21,12 @@ export function StoreDetailModal({
 }) {
   const [logOpen, setLogOpen] = useState(false);
   const [token, setToken] = useState<string | null>(null);
-  const log: Array<{ name: string; date: string; time: string; type: 'apertura' | 'cierre' }> = [];
+  // Registro de fichajes real de la tienda (GET /time-clock/entries, lo más reciente
+  // primero) → resumen de última apertura/cierre + drawer.
+  const { data: log = [] } = useQuery({
+    queryKey: ['store-log', store.id],
+    queryFn: () => listStoreLog(store.id),
+  });
   const lastOpen = log.find((e) => e.type === 'apertura') ?? null;
   const lastClose = log.find((e) => e.type === 'cierre') ?? null;
 

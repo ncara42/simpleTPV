@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
 import { createStore, deleteStore, listStores, type Store } from './lib/admin.js';
+import { getSalesToday } from './lib/dashboard.js';
 import { usePageHeader } from './lib/pageHeader.js';
 import { StoreCard } from './stores/StoreCard.js';
 import { StoreDetailModal } from './stores/StoreDetailModal.js';
@@ -41,6 +42,15 @@ export function StoresPage({
     queryKey: ['stores'],
     queryFn: listStores,
   });
+  // Ventas de hoy por tienda (GET /dashboard/sales-today) → métrica de la card + orden.
+  const { data: salesToday } = useQuery({
+    queryKey: ['dashboard-sales-today'],
+    queryFn: () => getSalesToday(),
+  });
+  const salesByStore = useMemo(
+    () => new Map((salesToday?.byStore ?? []).map((b) => [b.storeId, b.today])),
+    [salesToday],
+  );
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['stores'] });
 
   const createMut = useMutation({
@@ -61,7 +71,16 @@ export function StoresPage({
   const patchOps = (id: string, patch: Partial<StoreOps>): void =>
     setOps((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
 
-  const visibleStores = useMemo(() => [...stores], [stores]);
+  // Orden por ventas de hoy (desc); empate o sin ventas → por nombre estable.
+  const visibleStores = useMemo(
+    () =>
+      [...stores].sort(
+        (a, b) =>
+          (salesByStore.get(b.id) ?? 0) - (salesByStore.get(a.id) ?? 0) ||
+          a.name.localeCompare(b.name),
+      ),
+    [stores, salesByStore],
+  );
 
   usePageHeader('Tiendas', `${stores.length} ubicaciones`);
 
@@ -90,7 +109,7 @@ export function StoresPage({
               key={s.id}
               store={s}
               active={s.active}
-              sales={0}
+              sales={salesByStore.get(s.id) ?? 0}
               periodLabel={SALES_LABEL[period]}
               onSelect={() => setDetail(s)}
               onOpenStock={() => onOpenStoreView('stock', s.id)}

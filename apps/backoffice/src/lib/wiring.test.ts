@@ -18,6 +18,7 @@ import * as promotions from './promotions.js';
 import * as purchases from './purchases.js';
 import * as stock from './stock.js';
 import * as storePrices from './store-prices.js';
+import * as timeClock from './time-clock.js';
 
 const get = vi.mocked(api.get);
 const post = vi.mocked(api.post);
@@ -259,5 +260,40 @@ describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
     expect(patch).toHaveBeenCalledWith('/promotions/promo-1', { active: false });
     await promotions.deletePromotion('promo-1');
     expect(del).toHaveBeenCalledWith('/promotions/promo-1');
+  });
+
+  it('time-clock: log de tienda contra /time-clock/entries (Fase C)', async () => {
+    get.mockResolvedValueOnce([
+      {
+        id: 'e1',
+        userId: 'u1',
+        userName: 'Marta',
+        type: 'CLOCK_IN',
+        createdAt: '2026-06-04T08:00:00.000Z',
+      },
+      {
+        id: 'e2',
+        userId: 'u1',
+        userName: 'Marta',
+        type: 'BREAK_START',
+        createdAt: '2026-06-04T10:00:00.000Z',
+      },
+      {
+        id: 'e3',
+        userId: 'u1',
+        userName: 'Marta',
+        type: 'CLOCK_OUT',
+        createdAt: '2026-06-04T16:00:00.000Z',
+      },
+    ] as never);
+
+    const log = await timeClock.listStoreLog('st1');
+
+    expect(get).toHaveBeenCalledWith('/time-clock/entries', { storeId: 'st1' });
+    // Filtra pausas; mapea CLOCK_IN→apertura / CLOCK_OUT→cierre con fecha/hora locales.
+    expect(log).toEqual([
+      { name: 'Marta', date: '2026-06-04', time: '08:00', type: 'apertura' },
+      { name: 'Marta', date: '2026-06-04', time: '16:00', type: 'cierre' },
+    ]);
   });
 });

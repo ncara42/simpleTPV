@@ -69,10 +69,17 @@ contra ese backend real. Decomisar el modo demo (datos y login) del backoffice.
   bandas: <6 baja, ≥30 alta, media entre medias). Filtro `stock-rotation` activado +
   render real en `GlobalStockSection.tsx`. `DEMO_STOCK_GLOBAL` borrado. Verde: API unit
   772/772 + integración stock 10/10, backoffice unit 63/63, typecheck 7/7.
-- **Fase C — Estado de tienda / dispositivos / token / log / orden por ventas**:
-  endpoints (open/closed desde CashSession; device authorize/ok; `POST .../token`
-  `FICHA-`; log desde TimeClockEntry; orden por `salesToday`). Wiring de `StoresPage`/
-  `StoreDetailModal`/`StoreLogDrawer`. Reubicar tipo `StoreLogEntry` fuera de demoData.
+- **Fase C — Estado de tienda / dispositivos / token / log / orden por ventas**: ✅ **HECHA**.
+  - **Backend log**: `GET /time-clock/entries` (`TimeClockService.entries` + tipo
+    `TimeClockLogRow`) — entradas crudas con nombre, RLS + assertStoreAccess. Unit+integración.
+  - **Frontend**: `StoresPage` ordena por ventas-hoy reales (`GET /dashboard/sales-today`
+    byStore) + métrica real en la card; `StoreDetailModal` trae el log real (`listStoreLog`
+    → `/time-clock/entries`) para última apertura/cierre + drawer; `StoreLogEntry` reubicado
+    a `lib/time-clock.ts`. Wiring test del endpoint. Verde: typecheck 7/7, backoffice unit 64/64.
+  - **Decisión**: dispositivo (warn/authorize/ok) y token `FICHA-` se quedan CLIENT-SIDE
+    (estado React puro): son demo-theater que ya funcionan contra backend real sin endpoint
+    (la UI no muestra "sesión abierta en vivo", usa el log para aperturas/cierres). No se
+    construyó endpoint de dispositivos por tienda (YAGNI); se revisará en Fase F si el e2e lo pide.
 - **Fase D — Migrar páginas restantes off demoData**: CatalogPage, DashboardPage,
   TimeClockPage, VerifactuPage (endpoint `/verifactu/records` existe; oculta hoy).
 - **Fase E — Seed-demo determinista**: alinear login (crear `admin@org1.test`/`demo` o
