@@ -131,6 +131,7 @@ describe('FeatureFlagService.resolveAll', () => {
 // ── Gestión (#127 B slice 2) ──────────────────────────────────────────────────
 
 const ADMIN = { userId: 'user-admin', role: 'ADMIN' };
+const MANAGER = { userId: 'user-manager', role: 'MANAGER' };
 const CLERK = { userId: 'user-clerk', role: 'CLERK' };
 
 function makeMgmtPrisma(
@@ -204,6 +205,26 @@ describe('FeatureFlagService.setFlag', () => {
     expect(prisma.featureFlag.create).not.toHaveBeenCalled();
     expect(prisma.featureFlag.update).not.toHaveBeenCalled();
   });
+
+  it('un MANAGER NO puede cambiar un flag a nivel org (sin storeId) → 403 (least privilege)', async () => {
+    const prisma = makeMgmtPrisma({ existing: null });
+    const service = new FeatureFlagService(prisma as never);
+
+    await expect(run(() => service.setFlag('b2b', false, undefined, MANAGER))).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(prisma.featureFlag.create).not.toHaveBeenCalled();
+    expect(prisma.featureFlag.update).not.toHaveBeenCalled();
+  });
+
+  it('un MANAGER SÍ puede gestionar un flag de tienda (org-wide para tiendas, SEC-01)', async () => {
+    const prisma = makeMgmtPrisma({ existing: null });
+    const service = new FeatureFlagService(prisma as never);
+
+    await run(() => service.setFlag('blind_returns', false, STORE, MANAGER));
+
+    expect(prisma.featureFlag.create).toHaveBeenCalled();
+  });
 });
 
 describe('FeatureFlagService.clearFlag', () => {
@@ -224,6 +245,16 @@ describe('FeatureFlagService.clearFlag', () => {
     const service = new FeatureFlagService(prisma as never);
 
     await expect(run(() => service.clearFlag('time_clock', STORE, CLERK))).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(prisma.featureFlag.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('un MANAGER NO puede quitar un flag a nivel org (sin storeId) → 403', async () => {
+    const prisma = makeMgmtPrisma();
+    const service = new FeatureFlagService(prisma as never);
+
+    await expect(run(() => service.clearFlag('b2b', undefined, MANAGER))).rejects.toThrow(
       ForbiddenException,
     );
     expect(prisma.featureFlag.deleteMany).not.toHaveBeenCalled();

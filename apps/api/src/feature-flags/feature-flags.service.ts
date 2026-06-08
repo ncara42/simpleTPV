@@ -75,6 +75,18 @@ export class FeatureFlagService {
 
   // ── Gestión (#127 B slice 2): ADMIN/MANAGER fijan/quitan flags por org/tienda ──
 
+  // Un flag a NIVEL ORG (sin storeId) afecta a TODAS las tiendas de la organización
+  // → es un cambio de control-plane org-wide y se restringe a ADMIN (menor privilegio).
+  // Los flags de tienda los gestiona ADMIN/MANAGER acotado por assertStoreAccess
+  // (SEC-01). Defensa en profundidad sobre el @Roles('ADMIN','MANAGER') del controller.
+  private assertOrgLevelAllowed(actor: Actor): void {
+    if (actor.role !== 'ADMIN') {
+      throw new ForbiddenException(
+        'Solo un ADMIN puede cambiar el valor de un módulo a nivel de organización.',
+      );
+    }
+  }
+
   // Catálogo (clave + etiqueta + default del código) + las filas explícitas del tenant
   // (defaults de org con storeId null + overrides de tienda) para pintar la matriz.
   async list(): Promise<{
@@ -97,6 +109,8 @@ export class FeatureFlagService {
     const { organizationId } = requireTenant();
     if (storeId) {
       await assertStoreAccess(this.prisma, { userId: actor.userId, role: actor.role, storeId });
+    } else {
+      this.assertOrgLevelAllowed(actor);
     }
     const existing = await this.prisma.featureFlag.findFirst({
       where: { organizationId, key, storeId: storeId ?? null },
@@ -116,6 +130,8 @@ export class FeatureFlagService {
     const { organizationId } = requireTenant();
     if (storeId) {
       await assertStoreAccess(this.prisma, { userId: actor.userId, role: actor.role, storeId });
+    } else {
+      this.assertOrgLevelAllowed(actor);
     }
     await this.prisma.featureFlag.deleteMany({
       where: { organizationId, key, storeId: storeId ?? null },
