@@ -162,6 +162,12 @@ el flag está apagado. `@Roles('ADMIN','MANAGER','CLERK')` (todos lo consultan).
   es el `assertEnabled` (403) en el servidor.
 - **Aislamiento por tienda** en la gestión (slice 2): `assertStoreAccess` al fijar un
   flag de tienda (un MANAGER no apaga módulos de la tienda de otro).
+- **Org-level solo ADMIN** (slice 2, least privilege): un flag a nivel org (sin
+  `storeId`) afecta a TODAS las tiendas → es un cambio de control-plane org-wide y se
+  restringe a `ADMIN` en `setFlag`/`clearFlag`. El `MANAGER` solo gestiona flags de
+  tienda (acotado por `assertStoreAccess`). Defensa en profundidad sobre el
+  `@Roles('ADMIN','MANAGER')` del controller (cierra escalada de privilegio: un MANAGER
+  no podía apagar un módulo para toda la organización).
 
 ## 8. Riesgos
 

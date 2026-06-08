@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ConfigEditor, type OrderHidden, resolveConfig } from './components/ConfigEditor.js';
 import { DEMO_FAMILIES, DEMO_SALES, type DemoSaleRow, SALE_SELLERS } from './demo/demoData.js';
 import { listSales, type SalesQueryInput } from './lib/admin.js';
+import { useFeatures } from './lib/features.js';
 import { fmtEur, fmtRate } from './lib/format.js';
 import { usePageHeader } from './lib/pageHeader.js';
 import { readPref, usePreferences } from './lib/preferences.js';
@@ -103,6 +104,8 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
   );
   const [page, setPage] = useState(1);
   const [views, setViews] = useState<SavedView[]>(() => loadViews());
+  // Feature flag (#127 B): oculta el export si el módulo está apagado a nivel org.
+  const features = useFeatures();
 
   // Al cambiar un filtro se vuelve a la primera página.
   const setFilter = (patch: Partial<Filters>): void => {
@@ -255,13 +258,15 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
           </>
         )}
       </div>
-      <button
-        className="btn-primary sales-export"
-        onClick={() => void exportCsv()}
-        data-testid="sales-export-csv"
-      >
-        Exportar CSV
-      </button>
+      {features.data_export && (
+        <button
+          className="btn-primary sales-export"
+          onClick={() => void exportCsv()}
+          data-testid="sales-export-csv"
+        >
+          Exportar CSV
+        </button>
+      )}
     </>
   );
 

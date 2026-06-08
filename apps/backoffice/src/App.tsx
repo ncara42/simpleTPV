@@ -22,6 +22,7 @@ import {
   Percent,
   Receipt,
   ShoppingCart,
+  SlidersHorizontal,
   Store,
   Tag,
   Users,
@@ -35,8 +36,10 @@ import { DEMO_USER } from './demo/demoData.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { HelpPage } from './HelpPage.js';
 import { api, useAuthStore } from './lib/auth.js';
+import { useFeatures } from './lib/features.js';
 import { switchApp } from './lib/nav.js';
 import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
+import { ModulesPage } from './ModulesPage.js';
 import { NotificationsPage } from './NotificationsPage.js';
 import { OverviewPage } from './OverviewPage.js';
 import { PromotionsPage } from './PromotionsPage.js';
@@ -66,6 +69,7 @@ type Tab =
   | 'verifactu'
   | 'b2b'
   | 'apikeys'
+  | 'modules'
   | 'help';
 
 // Navegación agrupada por tipo de tarea para no saturar el lateral. Dashboard va
@@ -93,6 +97,7 @@ const ALL_NAV: NavItem[] = [
   { id: 'stores', label: 'Tiendas', icon: <Store size={18} />, group: 'org' },
   { id: 'users', label: 'Usuarios', icon: <Users size={18} />, group: 'org' },
   { id: 'timeclock', label: 'Control horario', icon: <Clock size={18} />, group: 'org' },
+  { id: 'modules', label: 'Módulos', icon: <SlidersHorizontal size={18} />, group: 'org' },
   { id: 'purchases', label: 'Compras', icon: <ShoppingCart size={18} />, group: 'commercial' },
   { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'org' },
   { id: 'help', label: 'Ayuda', icon: <LifeBuoy size={18} />, group: 'support' },
@@ -128,6 +133,14 @@ function ShellTopBar() {
 function Home() {
   const logout = useAuthStore((s) => s.clear);
   const [tab, setTab] = useState<Tab>('dashboard');
+  // Feature flags (#127 B): oculta del menú los módulos apagados a nivel org (el
+  // backoffice es central → resolución de org). El backend sigue bloqueando con 403.
+  const features = useFeatures();
+  const navItems = NAV.filter((item) => {
+    if (item.id === 'b2b') return features.b2b;
+    if (item.id === 'timeclock') return features.time_clock;
+    return true;
+  });
   // Filtro de tienda preseleccionado al usar un acceso directo desde Tiendas
   // ("Ver stock"/"Ver ventas"). Se aplica al montar Stock/Ventas; la navegación
   // manual por el sidebar lo limpia para no arrastrar el filtro.
@@ -140,7 +153,7 @@ function Home() {
   return (
     <div className="app-shell">
       <Sidebar
-        items={NAV}
+        items={navItems}
         groups={NAV_GROUPS}
         activeItem={tab}
         onSelect={(id) => {
@@ -174,6 +187,7 @@ function Home() {
             {tab === 'verifactu' && <VerifactuPage />}
             {tab === 'b2b' && <B2bPage />}
             {tab === 'apikeys' && <ApiKeysPage />}
+            {tab === 'modules' && <ModulesPage />}
             {tab === 'help' && <HelpPage />}
           </main>
         </PageHeaderProvider>

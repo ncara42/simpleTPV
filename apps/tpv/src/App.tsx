@@ -17,6 +17,7 @@ import { InventoryPanel } from './InventoryPanel.js';
 import { isDemo } from './lib/api-config.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { useCart } from './lib/cart.js';
+import { useFeatures } from './lib/features.js';
 import { formatDuration } from './lib/format.js';
 import { switchApp } from './lib/nav.js';
 import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
@@ -65,13 +66,18 @@ function Home() {
   // no hay backend, así que se desactiva (storeId null → no-op).
   const queuedCount = useOfflineSync(isDemo() ? null : activeStore);
 
+  // Feature flags (#127 B): resuelve a nivel de la tienda activa. Oculta 'Fichaje'
+  // si el control horario está apagado (el backend también bloquea con 403).
+  const features = useFeatures(activeStore);
+
   // El item "Fichaje" del sidebar muestra el temporizador del turno en vivo
   // mientras hay jornada activa; si no, solo su icono y etiqueta.
   const { status, liveWorkedMs } = useTimeClock(activeStore);
-  const navItems = TPV_NAV.map((item) =>
-    item.id === 'clock' && status !== 'OUT'
-      ? { ...item, counter: formatDuration(liveWorkedMs) }
-      : item,
+  const navItems = TPV_NAV.filter((item) => item.id !== 'clock' || features.time_clock).map(
+    (item) =>
+      item.id === 'clock' && status !== 'OUT'
+        ? { ...item, counter: formatDuration(liveWorkedMs) }
+        : item,
   );
 
   // Precarga del carrito demo: solo la primera vez (al montar) para que

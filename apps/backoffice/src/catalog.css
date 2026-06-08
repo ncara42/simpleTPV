@@ -2500,3 +2500,21 @@
   color: var(--ui-primary-fg);
   border-color: var(--ui-primary);
 }
+
+/* Matriz de Módulos (#127 B): scroll horizontal si hay muchas tiendas + selects de
+   celda tri-estado. Layout funcional reusando .catalog-table del catálogo. */
+.modules-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+}
+.modules-matrix-scroll {
+  overflow-x: auto;
+}
+.modules-cell {
+  min-width: 7rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--border, #d6d6da);
+  border-radius: 0.4rem;
+  background: var(--surface, #fff);
+  font: inherit;
+}
