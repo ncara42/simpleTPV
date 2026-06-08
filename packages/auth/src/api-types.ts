@@ -340,6 +340,24 @@ export interface StockAlert {
   createdAt: string;
 }
 
+// Fila de GET /stock/expiring (#126 slice 4): un lote caducado o por caducar.
+// Caducidad computada on-read; ordenadas por expiryDate ascendente (más urgente
+// primero). 'expired' si ya caducó, 'expiring' si caduca dentro de la ventana.
+export interface ExpiringBatch {
+  id: string;
+  productId: string;
+  productName: string;
+  storeId: string;
+  storeName: string;
+  lotCode: string;
+  // Caducidad en formato YYYY-MM-DD (columna @db.Date, sin hora).
+  expiryDate: string;
+  quantity: number;
+  // Días hasta la caducidad: negativo si ya caducó, 0 si caduca hoy.
+  daysToExpiry: number;
+  status: 'expired' | 'expiring';
+}
+
 export interface SetMinStockInput {
   productId: string;
   storeId: string;

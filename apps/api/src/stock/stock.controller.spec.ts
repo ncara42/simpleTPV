@@ -12,6 +12,7 @@ function makeController() {
     global: vi.fn(async () => [{ productId: PRODUCT, total: 10 }]),
     byProduct: vi.fn(async (_productId: string) => [{ storeId: STORE, quantity: 5 }]),
     alerts: vi.fn(async (_opts: unknown) => [{ id: 'a1', alertType: 'OUT_OF_STOCK' }]),
+    expiringBatches: vi.fn(async (_opts: unknown) => [{ id: 'b1', status: 'expired' }]),
     setMin: vi.fn(async (_p: string, _s: string, _m: number) => ({ minStock: 5, level: 'yellow' })),
     adjust: vi.fn(async (_input: unknown) => ({ quantity: 50, level: 'green' })),
     confirmInventoryCount: vi.fn(async (_input: unknown, _userId: string) => ({
@@ -65,6 +66,18 @@ describe('StockController', () => {
     const { controller, service } = makeController();
     await controller.alerts(undefined, undefined);
     expect(service.alerts).toHaveBeenCalledWith({ resolved: false });
+  });
+
+  it('GET /stock/expiring pasa storeId y convierte withinDays a número', async () => {
+    const { controller, service } = makeController();
+    await controller.expiring(STORE, '15');
+    expect(service.expiringBatches).toHaveBeenCalledWith({ storeId: STORE, withinDays: 15 });
+  });
+
+  it('GET /stock/expiring sin params: delega sin filtros (usa default del servicio)', async () => {
+    const { controller, service } = makeController();
+    await controller.expiring(undefined, undefined);
+    expect(service.expiringBatches).toHaveBeenCalledWith({});
   });
 
   it('PUT /stock/min delega productId/storeId/minStock', async () => {

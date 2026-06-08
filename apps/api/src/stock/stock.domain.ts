@@ -89,3 +89,48 @@ export function allocateFefo(batches: FefoBatch[], qty: number): FefoAllocation 
   }
   return { consumed, shortfall: remaining > 0 ? remaining : 0 };
 }
+
+// Caducidad (#126 slice 4) — alerta de caducidad computada on-read (sin cron).
+
+// Ventana por defecto de "por caducar": un lote que caduca dentro de estos días se
+// considera próximo a caducar. Constante (configurable por org más adelante, Q5).
+export const EXPIRY_THRESHOLD_DAYS = 30;
+
+const MS_PER_DAY = 86_400_000;
+
+// Estado de caducidad de un lote relativo a hoy:
+//   - expired:  ya caducó (la fecha quedó atrás).
+//   - expiring: caduca hoy o dentro de la ventana (0 <= días <= withinDays).
+//   - ok:       caduca más allá de la ventana (no requiere atención).
+export type ExpiryStatus = 'expired' | 'expiring' | 'ok';
+
+// Trunca una fecha a su día en UTC (medianoche). Las caducidades viven en columnas
+// `@db.Date` (sin hora), así el cálculo de días no depende de la hora del reloj.
+function startOfDayUtc(d: Date): number {
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+// Días enteros desde hoy hasta la caducidad (negativo si ya caducó, 0 si caduca
+// hoy). Ambas fechas se truncan a día UTC. Función pura, testeable.
+export function daysUntil(expiry: Date, today: Date): number {
+  return Math.round((startOfDayUtc(expiry) - startOfDayUtc(today)) / MS_PER_DAY);
+}
+
+// Clasifica un lote por su caducidad vs hoy y la ventana `withinDays`. Función pura.
+export function expiryStatus(expiry: Date, today: Date, withinDays: number): ExpiryStatus {
+  const days = daysUntil(expiry, today);
+  if (days < 0) {
+    return 'expired';
+  }
+  if (days <= withinDays) {
+    return 'expiring';
+  }
+  return 'ok';
+}
+
+// Fecha límite (día UTC, medianoche) del barrido de caducidad: hoy + withinDays
+// días. Un lote con expiryDate <= cutoff está caducado o por caducar dentro de la
+// ventana → filtro de la query. Función pura.
+export function expiryCutoff(today: Date, withinDays: number): Date {
+  return new Date(startOfDayUtc(today) + withinDays * MS_PER_DAY);
+}

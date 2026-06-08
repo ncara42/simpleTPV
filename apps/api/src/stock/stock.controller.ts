@@ -42,6 +42,18 @@ export class StockController {
     });
   }
 
+  // Lotes caducados o próximos a caducar (#126 slice 4). Ventana en días vía
+  // ?withinDays (default 30). Filtro opcional por tienda. Para Notificaciones.
+  // Ruta estática: debe ir antes de las rutas con parámetro (:productId).
+  @Get('expiring')
+  @Roles('ADMIN', 'MANAGER', 'CLERK')
+  expiring(@Query('storeId') storeId?: string, @Query('withinDays') withinDays?: string) {
+    return this.stock.expiringBatches({
+      ...(storeId ? { storeId } : {}),
+      ...(withinDays ? { withinDays: Number(withinDays) } : {}),
+    });
+  }
+
   // Configurar el stock mínimo de un producto en una tienda. Reevalúa la alerta.
   @Put('min')
   @Roles('ADMIN', 'MANAGER')

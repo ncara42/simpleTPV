@@ -1,5 +1,6 @@
 import type {
   CreateTransferInput,
+  ExpiringBatch,
   SetMinStockInput,
   StockAlert,
   StockGlobalRow,
@@ -7,11 +8,11 @@ import type {
   Transfer,
 } from '@simpletpv/auth';
 
-import { DEMO_ALERTS, DEMO_STOCK_GLOBAL } from '../demo/demoData.js';
+import { DEMO_ALERTS, DEMO_EXPIRING, DEMO_STOCK_GLOBAL } from '../demo/demoData.js';
 import { isDemo } from './api-config.js';
 import { api } from './auth.js';
 
-export type { StockAlert, StockGlobalRow, Transfer };
+export type { ExpiringBatch, StockAlert, StockGlobalRow, Transfer };
 
 // Stock y traspasos (IT-09). adjustStock ya iba a la API; el resto se cablea aquí.
 export function getGlobalStock(): Promise<StockGlobalRow[]> {
@@ -21,6 +22,11 @@ export function getGlobalStock(): Promise<StockGlobalRow[]> {
 export function listAlerts(storeId?: string): Promise<StockAlert[]> {
   if (isDemo()) return Promise.resolve(DEMO_ALERTS);
   return api.get<StockAlert[]>('/stock/alerts', { ...(storeId ? { storeId } : {}) });
+}
+// Lotes caducados / por caducar (#126 slice 4) para Notificaciones.
+export function listExpiringBatches(storeId?: string): Promise<ExpiringBatch[]> {
+  if (isDemo()) return Promise.resolve(DEMO_EXPIRING);
+  return api.get<ExpiringBatch[]>('/stock/expiring', { ...(storeId ? { storeId } : {}) });
 }
 export function setMinStock(input: SetMinStockInput): Promise<unknown> {
   if (isDemo()) return Promise.resolve({ ok: true });

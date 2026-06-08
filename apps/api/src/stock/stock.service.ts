@@ -12,6 +12,10 @@ import {
   ALERT_URGENCY,
   alertTypeFor,
   allocateFefo,
+  daysUntil,
+  EXPIRY_THRESHOLD_DAYS,
+  expiryCutoff,
+  expiryStatus,
   stockCacheKey,
   type StockLevel,
   stockLevel,
@@ -521,6 +525,68 @@ export class StockService {
         const byUrgency = ALERT_URGENCY[a.alertType] - ALERT_URGENCY[b.alertType];
         return byUrgency !== 0 ? byUrgency : a.createdAt.getTime() - b.createdAt.getTime();
       });
+  }
+
+  /**
+   * Lotes caducados o próximos a caducar del tenant (#126 slice 4). Caducidad
+   * computada ON-READ (sin cron ni tabla de alertas persistida, decisión Q2):
+   * devuelve los StockBatch con stock (`quantity > 0`) y con fecha cuya caducidad
+   * cae dentro de la ventana `withinDays` (incluye los YA caducados). Ordenados
+   * por caducidad ascendente (lo más urgente primero). Surfaced en la vista de
+   * Notificaciones del backoffice junto a las alertas de stock. RLS +
+   * organizationId explícito (defensa en profundidad). Filtro opcional por tienda.
+   */
+  async expiringBatches({
+    storeId,
+    withinDays,
+  }: {
+    storeId?: string;
+    withinDays?: number;
+  } = {}) {
+    const tenant = requireTenant();
+    // Saneamos la ventana (la controla el cliente vía query): no finita o negativa
+    // → default 30 días (Q5). Sin tope superior: una ventana grande solo amplía el
+    // barrido de lotes con caducidad, acotado de por sí por el volumen del tenant.
+    const days =
+      withinDays !== undefined && Number.isFinite(withinDays) && withinDays >= 0
+        ? Math.floor(withinDays)
+        : EXPIRY_THRESHOLD_DAYS;
+    const today = new Date();
+    const cutoff = expiryCutoff(today, days);
+
+    const rows = await this.prisma.stockBatch.findMany({
+      where: {
+        organizationId: tenant.organizationId,
+        quantity: { gt: 0 },
+        // expiryDate <= hoy+N captura caducados (pasado) y por-caducar (ventana).
+        // Los lotes sin caducidad (null) quedan fuera: no tienen riesgo temporal.
+        expiryDate: { not: null, lte: cutoff },
+        ...(storeId ? { storeId } : {}),
+      },
+      include: {
+        product: { select: { name: true } },
+        store: { select: { name: true } },
+      },
+      orderBy: [{ expiryDate: 'asc' }, { lotCode: 'asc' }],
+    });
+
+    return rows.map((r) => {
+      // expiryDate no es null aquí (filtrado arriba); el `!` es seguro.
+      const expiry = r.expiryDate!;
+      return {
+        id: r.id,
+        productId: r.productId,
+        productName: r.product.name,
+        storeId: r.storeId,
+        storeName: r.store.name,
+        lotCode: r.lotCode,
+        expiryDate: expiry.toISOString().slice(0, 10),
+        quantity: Number(r.quantity),
+        daysToExpiry: daysUntil(expiry, today),
+        // 'expired' | 'expiring' (la query excluye 'ok').
+        status: expiryStatus(expiry, today, days),
+      };
+    });
   }
 
   /**

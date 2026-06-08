@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { alertTypeFor, allocateFefo, stockLevel } from './stock.domain.js';
+import {
+  alertTypeFor,
+  allocateFefo,
+  daysUntil,
+  expiryCutoff,
+  expiryStatus,
+  stockLevel,
+} from './stock.domain.js';
 
 describe('stockLevel', () => {
   it('red sin stock, yellow en/bajo mínimo, green por encima', () => {
@@ -87,5 +94,48 @@ describe('allocateFefo', () => {
       { lotCode: 'B', qty: 0.75 },
     ]);
     expect(r.shortfall).toBe(0);
+  });
+});
+
+describe('daysUntil', () => {
+  const today = new Date('2026-06-08T00:00:00.000Z');
+
+  it('positivo en el futuro, 0 hoy, negativo en el pasado', () => {
+    expect(daysUntil(new Date('2026-06-18'), today)).toBe(10);
+    expect(daysUntil(new Date('2026-06-08'), today)).toBe(0);
+    expect(daysUntil(new Date('2026-06-01'), today)).toBe(-7);
+  });
+
+  it('ignora la hora del día (trunca a día UTC)', () => {
+    // Hoy a las 23:59 sigue siendo "0 días" hasta una caducidad de hoy 00:00.
+    const lateToday = new Date('2026-06-08T23:59:59.000Z');
+    expect(daysUntil(new Date('2026-06-08'), lateToday)).toBe(0);
+    expect(daysUntil(new Date('2026-06-09'), lateToday)).toBe(1);
+  });
+});
+
+describe('expiryStatus', () => {
+  const today = new Date('2026-06-08T00:00:00.000Z');
+
+  it('expired si la fecha quedó atrás', () => {
+    expect(expiryStatus(new Date('2026-06-07'), today, 30)).toBe('expired');
+  });
+
+  it('expiring hoy y dentro de la ventana (límite inclusivo)', () => {
+    expect(expiryStatus(new Date('2026-06-08'), today, 30)).toBe('expiring'); // hoy
+    expect(expiryStatus(new Date('2026-06-18'), today, 30)).toBe('expiring'); // +10
+    expect(expiryStatus(new Date('2026-07-08'), today, 30)).toBe('expiring'); // +30 exacto
+  });
+
+  it('ok más allá de la ventana', () => {
+    expect(expiryStatus(new Date('2026-07-09'), today, 30)).toBe('ok'); // +31
+  });
+});
+
+describe('expiryCutoff', () => {
+  it('devuelve hoy + withinDays a medianoche UTC', () => {
+    const today = new Date('2026-06-08T15:30:00.000Z');
+    expect(expiryCutoff(today, 30).toISOString()).toBe('2026-07-08T00:00:00.000Z');
+    expect(expiryCutoff(today, 0).toISOString()).toBe('2026-06-08T00:00:00.000Z');
   });
 });

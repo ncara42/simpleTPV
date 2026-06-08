@@ -147,6 +147,10 @@ describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
     expect(get).toHaveBeenCalledWith('/stock/global');
     await stock.listAlerts('st1');
     expect(get).toHaveBeenCalledWith('/stock/alerts', { storeId: 'st1' });
+    await stock.listExpiringBatches('st1');
+    expect(get).toHaveBeenCalledWith('/stock/expiring', { storeId: 'st1' });
+    await stock.listExpiringBatches();
+    expect(get).toHaveBeenLastCalledWith('/stock/expiring', {});
     await stock.setMinStock({ productId: 'p1', storeId: 'st1', minStock: 5 } as never);
     expect(put).toHaveBeenCalledWith('/stock/min', {
       productId: 'p1',
