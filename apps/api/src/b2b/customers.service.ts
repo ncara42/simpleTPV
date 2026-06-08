@@ -50,6 +50,7 @@ export class CustomersService {
         phone: dto.phone ?? null,
         address: dto.address ?? null,
         priceListId: dto.priceListId ?? null,
+        active: dto.active ?? true,
       },
     });
   }

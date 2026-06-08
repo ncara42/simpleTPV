@@ -10,8 +10,9 @@ export default defineConfig({
     baseURL: 'http://localhost:4173',
     trace: 'on-first-retry',
   },
-  // Demo es opt-in (A-01): se construye el bundle con VITE_DEMO_MODE=true para que
-  // los e2e corran en demo sin backend (antes era el default del build).
+  // E2E contra backend real: el bundle se construye sin modo demo y el proxy
+  // /api → :3001 (packages/web-config/vite.base.ts) lo conecta a la API real.
+  // En CI el job de e2e provisiona Postgres + migrate + bootstrap + seed:demo + API.
   webServer: {
     command: 'pnpm exec vite build && pnpm exec vite preview --port 4173',
     url: 'http://localhost:4173',
@@ -19,6 +20,6 @@ export default defineConfig({
     timeout: 120000,
     // PWA desactivada en e2e: el service worker (precache/registro) no debe
     // interferir con los tests deterministas; el offline se prueba aparte.
-    env: { VITE_DEMO_MODE: 'true', VITE_PWA_DISABLED: 'true' },
+    env: { VITE_PWA_DISABLED: 'true' },
   },
 });
