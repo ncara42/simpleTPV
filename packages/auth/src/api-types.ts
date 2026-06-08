@@ -705,6 +705,30 @@ export interface FeatureFlags {
   b2b: boolean;
 }
 
+export type FeatureKey = keyof FeatureFlags;
+
+// Entrada del catálogo de módulos (#127 B): clave, etiqueta legible y default del
+// código (comportamiento actual). La sirve GET /feature-flags para la UI de gestión.
+export interface FeatureFlagCatalogEntry {
+  key: FeatureKey;
+  label: string;
+  default: boolean;
+}
+
+// Fila explícita de flag: un default de org (storeId null) o un override de tienda.
+export interface FeatureFlagRow {
+  key: FeatureKey;
+  storeId: string | null;
+  enabled: boolean;
+}
+
+// Respuesta de gestión (GET /feature-flags): catálogo + filas explícitas del tenant,
+// con las que el backoffice pinta la matriz módulos × [org + tiendas] tri-estado.
+export interface FeatureFlagsAdmin {
+  catalog: FeatureFlagCatalogEntry[];
+  flags: FeatureFlagRow[];
+}
+
 export type WholesaleOrderStatus = 'DRAFT' | 'CONFIRMED' | 'SHIPPED' | 'CANCELLED';
 
 export interface WholesaleOrderLine {
