@@ -3,73 +3,134 @@ import { useEffect } from 'react';
 
 import { api } from './lib/auth.js';
 import { usePageHeader } from './lib/pageHeader.js';
-import { listAlerts } from './lib/stock.js';
-import { ALERT_LABEL } from './stock/labels.js';
+import { listAlerts, listExpiringBatches } from './lib/stock.js';
+import { ALERT_LABEL, df, EXPIRY_LABEL, expiryDaysText } from './stock/labels.js';
 
-// Portal de notificaciones: centraliza las alertas de stock (antes vivían en un
-// subtab de Stock). El badge de la campana (TopBar) y el del sidebar comparten
-// la queryKey ['stock-alerts'] con esta vista.
+// Portal de notificaciones: centraliza las alertas de stock y la caducidad de
+// lotes (#126 slice 4). El badge de la campana (TopBar) y el del sidebar comparten
+// la queryKey ['stock-alerts'] con esta vista. La caducidad se computa on-read
+// (sin cron): GET /stock/expiring devuelve lotes caducados o por caducar.
 export function NotificationsPage() {
   const qc = useQueryClient();
-  const { data: alerts = [], isLoading } = useQuery({
+  const { data: alerts = [], isLoading: loadingAlerts } = useQuery({
     queryKey: ['stock-alerts'],
     queryFn: () => listAlerts(),
   });
+  const { data: expiring = [], isLoading: loadingExpiring } = useQuery({
+    queryKey: ['expiring-batches'],
+    queryFn: () => listExpiringBatches(),
+  });
 
-  // Tiempo real (#33): el SSE refresca la lista al crearse nuevas alertas.
+  // Tiempo real (#33): el SSE refresca las alertas al crearse, y los lotes por
+  // caducar cuando cambia el stock (una venta/recepción mueve cantidades de lote).
   useEffect(() => {
     const unsubscribe = api.subscribeEvents((event) => {
       if (event.type === 'alert.created') {
         void qc.invalidateQueries({ queryKey: ['stock-alerts'] });
       }
+      if (event.type === 'stock.changed') {
+        void qc.invalidateQueries({ queryKey: ['expiring-batches'] });
+      }
     });
     return unsubscribe;
   }, [qc]);
 
-  usePageHeader('Notificaciones', 'Alertas de stock en tiempo real');
+  usePageHeader('Notificaciones', 'Alertas de stock y caducidad de lotes en tiempo real');
 
   return (
     <section className="catalog" data-testid="notifications-page">
-      <div className="table-panel">
-        {isLoading ? (
-          <p className="catalog-empty">Cargando…</p>
-        ) : alerts.length === 0 ? (
-          <p className="catalog-empty" data-testid="alerts-empty">
-            No hay notificaciones.
-          </p>
-        ) : (
-          <table className="catalog-table" data-testid="alerts-table">
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Tienda</th>
-                <th>Alerta</th>
-              </tr>
-            </thead>
-            <tbody>
-              {alerts.map((a) => (
-                <tr key={a.id} data-testid="alert-row">
-                  <td>{a.productName}</td>
-                  <td>{a.storeName}</td>
-                  <td>
-                    {/* Degradación por arquetipo: una rotura con sustituto en la
-                        familia se pinta como aviso (amarillo), no como crítica (rojo). */}
-                    <span
-                      className={`stock-tag stock-${a.severity === 'critical' ? 'red' : 'yellow'}`}
-                    >
-                      {ALERT_LABEL[a.alertType] ?? a.alertType}
-                    </span>
-                    {a.hasSubstituteStock && (
-                      <span className="alert-substitute" data-testid="alert-substitute">
-                        · hay sustituto
-                      </span>
-                    )}
-                  </td>
+      <div className="notif-section">
+        <div className="notif-section-head">
+          <h2 className="notif-section-title">Alertas de stock</h2>
+          {alerts.length > 0 && <span className="notif-section-count">{alerts.length}</span>}
+        </div>
+        <div className="table-panel">
+          {loadingAlerts ? (
+            <p className="catalog-empty">Cargando…</p>
+          ) : alerts.length === 0 ? (
+            <p className="catalog-empty" data-testid="alerts-empty">
+              No hay alertas de stock.
+            </p>
+          ) : (
+            <table className="catalog-table" data-testid="alerts-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Tienda</th>
+                  <th>Alerta</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {alerts.map((a) => (
+                  <tr key={a.id} data-testid="alert-row">
+                    <td>{a.productName}</td>
+                    <td>{a.storeName}</td>
+                    <td>
+                      {/* Degradación por arquetipo: una rotura con sustituto en la
+                          familia se pinta como aviso (amarillo), no como crítica (rojo). */}
+                      <span
+                        className={`stock-tag stock-${a.severity === 'critical' ? 'red' : 'yellow'}`}
+                      >
+                        {ALERT_LABEL[a.alertType] ?? a.alertType}
+                      </span>
+                      {a.hasSubstituteStock && (
+                        <span className="alert-substitute" data-testid="alert-substitute">
+                          · hay sustituto
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      <div className="notif-section">
+        <div className="notif-section-head">
+          <h2 className="notif-section-title">Caducidad de lotes</h2>
+          {expiring.length > 0 && <span className="notif-section-count">{expiring.length}</span>}
+        </div>
+        <div className="table-panel">
+          {loadingExpiring ? (
+            <p className="catalog-empty">Cargando…</p>
+          ) : expiring.length === 0 ? (
+            <p className="catalog-empty" data-testid="expiring-empty">
+              No hay lotes caducados ni próximos a caducar.
+            </p>
+          ) : (
+            <table className="catalog-table" data-testid="expiring-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Tienda</th>
+                  <th>Lote</th>
+                  <th>Caducidad</th>
+                  <th>Cantidad</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expiring.map((b) => (
+                  <tr key={b.id} data-testid="expiring-row">
+                    <td>{b.productName}</td>
+                    <td>{b.storeName}</td>
+                    <td>{b.lotCode}</td>
+                    <td>{df.format(new Date(b.expiryDate))}</td>
+                    <td>{b.quantity}</td>
+                    <td>
+                      <span className={`expiry-tag expiry-${b.status}`}>
+                        {EXPIRY_LABEL[b.status] ?? b.status}
+                      </span>
+                      <span className="expiry-when">· {expiryDaysText(b.daysToExpiry)}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </section>
   );

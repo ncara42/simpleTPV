@@ -833,3 +833,126 @@ describe('StockService.movements', () => {
     expect(arg.where.createdAt).toBeUndefined();
   });
 });
+
+describe('StockService.expiringBatches', () => {
+  type ExpiringWhere = {
+    organizationId: string;
+    quantity: { gt: number };
+    expiryDate: { not: null; lte: Date };
+    storeId?: string;
+  };
+
+  function makeBatchPrisma(rows: unknown[]) {
+    return { stockBatch: { findMany: vi.fn(async (_a?: unknown) => rows) } };
+  }
+
+  it('mapea/clasifica los lotes y construye el where (tenant, stock>0, caducidad, tienda)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-08T10:00:00Z'));
+    try {
+      const prisma = makeBatchPrisma([
+        {
+          id: 'b1',
+          productId: 'p1',
+          storeId: 's1',
+          lotCode: 'L-OLD',
+          expiryDate: new Date('2026-06-01'),
+          quantity: 8,
+          product: { name: 'Flores CBD' },
+          store: { name: 'Centro' },
+        },
+        {
+          id: 'b2',
+          productId: 'p2',
+          storeId: 's1',
+          lotCode: 'L-SOON',
+          expiryDate: new Date('2026-06-20'),
+          quantity: 12,
+          product: { name: 'Aceite CBD' },
+          store: { name: 'Centro' },
+        },
+      ]);
+      const service = new StockService(
+        prisma as never,
+        new MemoryCache(),
+        {} as never,
+        new InMemoryEventBus(),
+      );
+
+      const rows = await tenantStorage.run({ organizationId: ORG }, () =>
+        service.expiringBatches({ storeId: 's1' }),
+      );
+
+      // Caducado: status expired y días negativos; enriquecido con nombres y cantidad.
+      expect(rows[0]).toMatchObject({
+        lotCode: 'L-OLD',
+        status: 'expired',
+        productName: 'Flores CBD',
+        storeName: 'Centro',
+        quantity: 8,
+        expiryDate: '2026-06-01',
+      });
+      expect(rows[0]!.daysToExpiry).toBe(-7);
+      // Por caducar dentro de la ventana por defecto (30 días).
+      expect(rows[1]).toMatchObject({ lotCode: 'L-SOON', status: 'expiring' });
+      expect(rows[1]!.daysToExpiry).toBe(12);
+
+      const arg = prisma.stockBatch.findMany.mock.calls[0]![0] as { where: ExpiringWhere };
+      expect(arg.where.organizationId).toBe(ORG);
+      expect(arg.where.quantity).toEqual({ gt: 0 });
+      expect(arg.where.expiryDate.not).toBeNull();
+      expect(arg.where.storeId).toBe('s1');
+      // cutoff = hoy (medianoche UTC) + 30 días.
+      expect(arg.where.expiryDate.lte.toISOString()).toBe('2026-07-08T00:00:00.000Z');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('respeta withinDays válido (acota la ventana) y omite storeId si no se pasa', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-08T10:00:00Z'));
+    try {
+      const prisma = makeBatchPrisma([]);
+      const service = new StockService(
+        prisma as never,
+        new MemoryCache(),
+        {} as never,
+        new InMemoryEventBus(),
+      );
+
+      await tenantStorage.run({ organizationId: ORG }, () =>
+        service.expiringBatches({ withinDays: 10 }),
+      );
+
+      const arg = prisma.stockBatch.findMany.mock.calls[0]![0] as { where: ExpiringWhere };
+      expect(arg.where.expiryDate.lte.toISOString()).toBe('2026-06-18T00:00:00.000Z');
+      expect(arg.where.storeId).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('withinDays inválido (negativo) cae al default de 30 días', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-08T10:00:00Z'));
+    try {
+      const prisma = makeBatchPrisma([]);
+      const service = new StockService(
+        prisma as never,
+        new MemoryCache(),
+        {} as never,
+        new InMemoryEventBus(),
+      );
+
+      await tenantStorage.run({ organizationId: ORG }, () =>
+        service.expiringBatches({ withinDays: -5 }),
+      );
+
+      const arg = prisma.stockBatch.findMany.mock.calls[0]![0] as { where: ExpiringWhere };
+      expect(arg.where.expiryDate.lte.toISOString()).toBe('2026-07-08T00:00:00.000Z');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

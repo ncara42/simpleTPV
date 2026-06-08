@@ -24,6 +24,7 @@ export type {
   CreateWholesaleOrderInput,
   Customer,
   CustomerInput,
+  ExpiringBatch,
   FamilyInput,
   FamilyNode,
   InventoryCountLine,

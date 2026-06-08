@@ -1835,6 +1835,56 @@
   color: var(--ui-text-muted);
 }
 
+/* ─── Notificaciones: secciones (alertas de stock + caducidad de lotes, #126) ─── */
+/* Cada bloque de Notificaciones lleva su propio encabezado para dar jerarquía a la
+   vista (alertas vs caducidad), en vez de una única tabla sin contexto. */
+.notif-section + .notif-section {
+  margin-top: 1.5rem;
+}
+.notif-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0 0.25rem 0.75rem;
+}
+.notif-section-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.notif-section-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+}
+
+/* Caducidad: pill con color semántico real (rojo = caducado, ámbar = por caducar).
+   Va más allá del texto plano de las alertas para que el estado salte a la vista. */
+.expiry-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.expiry-tag.expiry-expired {
+  background: color-mix(in oklab, #dc2626 14%, transparent);
+  color: #b91c1c;
+}
+.expiry-tag.expiry-expiring {
+  background: color-mix(in oklab, #d97706 16%, transparent);
+  color: #b45309;
+}
+.expiry-when {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--ui-text-muted);
+}
+
 /* ─── Stock: banda de métricas, panel envolvente y etiqueta de rotación (#96) ─── */
 /* Banda de KPIs compacta y visual: chip de icono + valor + etiqueta en una fila. */
 .stock-metrics {

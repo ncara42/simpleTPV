@@ -1,4 +1,5 @@
 import type {
+  ExpiringBatch,
   FamilyNode,
   Product,
   SaleSummary,
@@ -498,6 +499,47 @@ export const DEMO_ALERTS: StockAlert[] = [
     severity: 'critical',
     resolved: false,
     createdAt: '2026-06-02T08:05:00.000Z',
+  },
+];
+
+// Lotes caducados / por caducar (#126 slice 4) para la vista de Notificaciones en
+// modo demo. Relativos a DEMO_TODAY (2026-06-03): uno ya caducado, dos en ventana.
+export const DEMO_EXPIRING: ExpiringBatch[] = [
+  {
+    id: 'b-1',
+    productId: 'p-flores-cbd',
+    productName: 'Flores CBD Lemon',
+    storeId: 's-centro',
+    storeName: 'Centro',
+    lotCode: 'LOT-2405-A',
+    expiryDate: '2026-05-28',
+    quantity: 8,
+    daysToExpiry: -6,
+    status: 'expired',
+  },
+  {
+    id: 'b-2',
+    productId: 'p-aceite-cbd-10',
+    productName: 'Aceite CBD 10%',
+    storeId: 's-centro',
+    storeName: 'Centro',
+    lotCode: 'LOT-2601-C',
+    expiryDate: '2026-06-12',
+    quantity: 15,
+    daysToExpiry: 9,
+    status: 'expiring',
+  },
+  {
+    id: 'b-3',
+    productId: 'p-crema-cbd',
+    productName: 'Crema CBD Relax',
+    storeId: 's-norte',
+    storeName: 'Norte',
+    lotCode: 'LOT-2603-B',
+    expiryDate: '2026-06-30',
+    quantity: 22,
+    daysToExpiry: 27,
+    status: 'expiring',
   },
 ];
 
