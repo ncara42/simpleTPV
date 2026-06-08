@@ -14,6 +14,7 @@ import {
   type ProductInput,
   updateProduct,
 } from './lib/products.js';
+import { getGlobalStock } from './lib/stock.js';
 
 function familyPathLabel(families: FamilyNode[], id: string | null): string {
   if (!id) return '—';
@@ -115,6 +116,16 @@ export function CatalogPage() {
     queryFn: listFamilies,
   });
 
+  // Stock total por producto (suma de todas las tiendas) para el tag de la tabla.
+  const { data: stockRows = [] } = useQuery({
+    queryKey: ['stock-global'],
+    queryFn: getGlobalStock,
+  });
+  const stockByProduct = useMemo(
+    () => new Map(stockRows.map((r) => [r.productId, r.total])),
+    [stockRows],
+  );
+
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['products'] });
 
   const allProducts = useMemo<Product[]>(() => {
@@ -138,9 +149,9 @@ export function CatalogPage() {
       allProducts.filter(
         (p) =>
           !familyFilter ||
-          (p.familyId != null && isDescendantOf(DEMO_FAMILIES, familyFilter, p.familyId)),
+          (p.familyId != null && isDescendantOf(families, familyFilter, p.familyId)),
       ),
-    [allProducts, familyFilter],
+    [allProducts, familyFilter, families],
   );
 
   usePageHeader('Catálogo', `${filtered.length} productos activos`, 'catalog-count');
@@ -265,7 +276,7 @@ export function CatalogPage() {
               onChange={setFamilyFilter}
               ariaLabel="Filtrar por arquetipo"
               data-testid="catalog-family-filter"
-              options={[{ value: '', label: 'Todos los arquetipos' }, ...archetypeOptions()]}
+              options={[{ value: '', label: 'Todos los arquetipos' }, ...archetypeOptions]}
             />
             {selected.length > 0 && (
               <>
@@ -343,7 +354,7 @@ export function CatalogPage() {
             <tbody>
               {filtered.map((p) => {
                 const isSel = selectedSet.has(p.id);
-                const qty = DEMO_PRODUCT_STOCK[p.id] ?? 0;
+                const qty = stockByProduct.get(p.id) ?? 0;
                 return (
                   <tr
                     key={p.id}
@@ -364,7 +375,7 @@ export function CatalogPage() {
                     </td>
                     <td>{p.name}</td>
                     <td className="muted" data-testid="catalog-family">
-                      {familyPathLabel(p.familyId)}
+                      {familyPathLabel(families, p.familyId)}
                     </td>
                     <td className="muted">{p.sku ?? '—'}</td>
                     <td>{Number(p.salePrice).toFixed(2).replace('.', ',')} €</td>
@@ -410,7 +421,7 @@ export function CatalogPage() {
             <Select
               value={form.familyId ?? ''}
               onChange={(value) => setForm({ ...form, familyId: value || null })}
-              options={[{ value: '', label: '— Sin arquetipo —' }, ...archetypeOptions()]}
+              options={[{ value: '', label: '— Sin arquetipo —' }, ...archetypeOptions]}
               ariaLabel="Arquetipo"
               data-testid="form-family"
             />
