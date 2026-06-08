@@ -4,17 +4,6 @@ import { expect, type Page } from '@playwright/test';
 // dependiente (CLERK), asignado a todas las tiendas → activeStore = la primera.
 export const CLERK = { email: 'clerk@demo.simpletpv', password: 'demo1234' };
 
-// Login real contra la API (proxy /api → :3001). Deja la pantalla de venta lista.
-export async function login(page: Page): Promise<void> {
-  await page.goto('/');
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
-  await page.getByTestId('login-email').fill(CLERK.email);
-  await page.getByTestId('login-password').fill(CLERK.password);
-  await page.getByTestId('login-submit').click();
-  await expect(page.getByTestId('sale-grid')).toBeVisible({ timeout: 15000 });
-}
-
 // Para specs que parten autenticados vía storageState (auth.setup.ts): navega a la
 // app y espera la pantalla de venta, sin repetir login (rate limit /auth/login 5/min).
 export async function gotoApp(page: Page): Promise<void> {

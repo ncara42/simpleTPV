@@ -44,17 +44,3 @@ export async function selectByLabel(
   await page.getByTestId(triggerTestId).click();
   await page.locator('[role="option"]', { hasText: label }).first().click();
 }
-
-// Elige la primera opción "real" del select (saltando `skip` opciones iniciales,
-// normalmente un placeholder tipo "Todos"). Devuelve su texto para aserciones.
-export async function selectNthOption(
-  page: Page,
-  triggerTestId: string,
-  index: number,
-): Promise<string> {
-  await page.getByTestId(triggerTestId).click();
-  const opt = page.locator('[role="option"]').nth(index);
-  const text = (await opt.textContent())?.trim() ?? '';
-  await opt.click();
-  return text;
-}
