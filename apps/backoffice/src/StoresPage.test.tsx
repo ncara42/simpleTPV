@@ -15,6 +15,17 @@ vi.mock('./lib/admin.js', () => ({
   deleteStore: vi.fn(),
 }));
 
+// El modal de precios por tienda (#127 A) consulta overrides y productos; los
+// mockeamos para que no toquen la API real al abrirse.
+vi.mock('./lib/store-prices.js', () => ({
+  listStorePrices: vi.fn(() => Promise.resolve([])),
+  setStorePrice: vi.fn(),
+  removeStorePrice: vi.fn(),
+}));
+vi.mock('./lib/products.js', () => ({
+  listProducts: vi.fn(() => Promise.resolve([])),
+}));
+
 import { StoresPage } from './StoresPage.js';
 
 function renderPage(): void {
@@ -40,5 +51,16 @@ describe('StoresPage', () => {
     await waitFor(() => expect(screen.getAllByTestId('store-card').length).toBeGreaterThan(0));
     fireEvent.click(screen.getAllByTestId('store-card')[0]!);
     expect(screen.getByTestId('store-detail')).toBeInTheDocument();
+  });
+
+  it('abre el modal de precios por tienda al pulsar "Precios" (#127 A)', async () => {
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getAllByTestId('store-open-prices').length).toBeGreaterThan(0),
+    );
+    fireEvent.click(screen.getAllByTestId('store-open-prices')[0]!);
+    // El enlace lleva stopPropagation: abre precios, no el detalle de la tienda.
+    expect(await screen.findByTestId('store-prices-detail')).toBeInTheDocument();
+    expect(screen.queryByTestId('store-detail')).not.toBeInTheDocument();
   });
 });

@@ -105,6 +105,22 @@ export class SalesService {
     const products = await this.prisma.product.findMany({ where: { id: { in: ids } } });
     const byId = new Map(products.map((p) => [p.id, p]));
 
+    // Precio retail por tienda (#127 A): override del PVP del producto para ESTA
+    // tienda. UN único findMany por (tienda, productos del ticket) evita el N+1.
+    // Sin fila para un producto → cae al Product.salePrice (comportamiento por
+    // defecto, tiendas sin pricing por tienda no notan nada). Mismo patrón que el
+    // B2B (tarifa ?? salePrice). El precio lo SIGUE fijando el servidor: el cliente
+    // nunca manda unitPrice; esto solo cambia DE DÓNDE sale.
+    const overrides = await this.prisma.storePrice.findMany({
+      where: {
+        storeId: dto.storeId,
+        productId: { in: ids },
+        organizationId: tenant.organizationId,
+      },
+      select: { productId: true, price: true },
+    });
+    const priceByProduct = new Map(overrides.map((o) => [o.productId, Number(o.price)]));
+
     const priced: PricedLine[] = dto.lines.map((l) => {
       const product = byId.get(l.productId);
       if (!product) {
@@ -113,7 +129,7 @@ export class SalesService {
       return {
         productId: l.productId,
         name: product.name,
-        unitPrice: Number(product.salePrice),
+        unitPrice: priceByProduct.get(product.id) ?? Number(product.salePrice),
         qty: l.qty,
         // Mutuamente excluyentes: si llega importe fijo (>0) ignoramos el %, para
         // no persistir un discountPct que no se aplicó (el importe tiene precedencia).
