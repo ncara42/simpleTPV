@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   alertTypeFor,
   allocateFefo,
+  allocateReturnToBatches,
   daysUntil,
   expiryCutoff,
   expiryStatus,
@@ -94,6 +95,96 @@ describe('allocateFefo', () => {
       { lotCode: 'B', qty: 0.75 },
     ]);
     expect(r.shortfall).toBe(0);
+  });
+});
+
+describe('allocateReturnToBatches', () => {
+  it('devolución total: revierte exactamente el consumo de la venta', () => {
+    const r = allocateReturnToBatches(
+      [
+        { batchId: 'A', qty: 3 },
+        { batchId: 'B', qty: 2 },
+      ],
+      {},
+      5,
+    );
+    expect(r.perBatch).toEqual([
+      { batchId: 'A', qty: 3 },
+      { batchId: 'B', qty: 2 },
+    ]);
+    expect(r.noLot).toBe(0);
+  });
+
+  it('devolución parcial: reingresa por orden de consumo (espejo FEFO)', () => {
+    const r = allocateReturnToBatches(
+      [
+        { batchId: 'A', qty: 3 },
+        { batchId: 'B', qty: 10 },
+      ],
+      {},
+      4,
+    );
+    // Llena A (3) y el resto al siguiente (1), sin tocar el resto de B.
+    expect(r.perBatch).toEqual([
+      { batchId: 'A', qty: 3 },
+      { batchId: 'B', qty: 1 },
+    ]);
+    expect(r.noLot).toBe(0);
+  });
+
+  it('capa por lote descontando lo ya reingresado (parciales encadenadas, D3)', () => {
+    // De A salieron 3 pero ya se devolvieron 3 (capacidad 0) → salta A; va a B.
+    const r = allocateReturnToBatches(
+      [
+        { batchId: 'A', qty: 3 },
+        { batchId: 'B', qty: 5 },
+      ],
+      { A: 3, B: 1 },
+      2,
+    );
+    expect(r.perBatch).toEqual([{ batchId: 'B', qty: 2 }]);
+    expect(r.noLot).toBe(0);
+  });
+
+  it('faltante: lo que excede la capacidad de los lotes cae en noLot (sin lote)', () => {
+    // La venta tuvo faltante (se vendió más de lo que cubrían los lotes): solo 2+1
+    // salieron con lote; devolver 5 reingresa 3 a lotes y 2 sin lote.
+    const r = allocateReturnToBatches(
+      [
+        { batchId: 'A', qty: 2 },
+        { batchId: 'B', qty: 1 },
+      ],
+      {},
+      5,
+    );
+    expect(r.perBatch).toEqual([
+      { batchId: 'A', qty: 2 },
+      { batchId: 'B', qty: 1 },
+    ]);
+    expect(r.noLot).toBe(2);
+  });
+
+  it('sin lotes consumidos (venta sin lote): todo es noLot', () => {
+    const r = allocateReturnToBatches([], {}, 3);
+    expect(r.perBatch).toEqual([]);
+    expect(r.noLot).toBe(3);
+  });
+
+  it('cantidades decimales: redondea a 3 decimales sin descuadre', () => {
+    const r = allocateReturnToBatches(
+      [
+        { batchId: 'A', qty: 1.5 },
+        { batchId: 'B', qty: 2 },
+      ],
+      { A: 0.25 },
+      2,
+    );
+    // Capacidad de A = 1.5 - 0.25 = 1.25; resto 0.75 a B.
+    expect(r.perBatch).toEqual([
+      { batchId: 'A', qty: 1.25 },
+      { batchId: 'B', qty: 0.75 },
+    ]);
+    expect(r.noLot).toBe(0);
   });
 });
 

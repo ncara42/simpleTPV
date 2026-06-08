@@ -74,6 +74,11 @@ function makeBase(
     returnLine: {
       findMany: vi.fn(async () => opts.previous ?? []),
     },
+    // applyBatchedReturn (#137) consulta tracksBatch del producto; los productos de
+    // estos tests no llevan lote → reingreso sin lote (flujo de siempre).
+    product: {
+      findFirst: vi.fn(async () => ({ tracksBatch: false })),
+    },
     return: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
         id: 'new-return',

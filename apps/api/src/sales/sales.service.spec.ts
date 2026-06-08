@@ -312,6 +312,9 @@ function makePrisma() {
     },
     product: {
       findMany: vi.fn(async (_a?: unknown): Promise<unknown[]> => []),
+      // applyBatchedReturn (#137) consulta tracksBatch en la anulación; los productos
+      // de estos tests no llevan lote → reingreso sin lote (flujo de siempre).
+      findFirst: vi.fn(async (_a?: unknown): Promise<unknown> => ({ tracksBatch: false })),
     },
     return: {
       count: vi.fn(async (_a?: unknown): Promise<number> => 0),
