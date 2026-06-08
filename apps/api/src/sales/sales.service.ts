@@ -198,24 +198,29 @@ export class SalesService {
         include: { lines: true },
       });
 
-      // Decrementa el stock de cada línea (salida tipo SALE, quantity negativo),
-      // dentro de la MISMA transacción de la venta → atómico. referenceId = saleId
-      // para trazar el movimiento. El stock puede quedar negativo (no bloquea).
-      // afterCommit propaga la emisión de stock.changed/alert.created tras commit.
+      // Decrementa el stock de cada línea (salida tipo SALE), dentro de la MISMA
+      // transacción de la venta → atómico. referenceId = saleId para trazar el
+      // movimiento. El stock puede quedar negativo (no bloquea). afterCommit
+      // propaga la emisión de stock.changed/alert.created tras commit.
+      //
+      // Lote (#126): los productos con tracksBatch salen por FEFO (consumo del lote
+      // más próximo a caducar, con su batchId); el resto, salida directa. La
+      // detección usa el producto ya cargado (byId), sin queries extra.
       for (const l of lines) {
-        await this.stock.applyMovement(
-          tx,
-          {
-            organizationId: tenant.organizationId,
-            productId: l.productId,
-            storeId: dto.storeId,
-            type: 'SALE',
-            quantity: -l.qty,
-            referenceId: sale.id,
-            userId,
-          },
-          afterCommit,
-        );
+        const out = {
+          organizationId: tenant.organizationId,
+          productId: l.productId,
+          storeId: dto.storeId,
+          type: 'SALE' as const,
+          quantity: l.qty,
+          referenceId: sale.id,
+          userId,
+        };
+        if (byId.get(l.productId)?.tracksBatch) {
+          await this.stock.applyFefoOutflow(tx, out, afterCommit);
+          continue;
+        }
+        await this.stock.applyMovement(tx, { ...out, quantity: -l.qty }, afterCommit);
       }
 
       // Evento sale.completed tras commit (#32): payload mínimo de la venta.

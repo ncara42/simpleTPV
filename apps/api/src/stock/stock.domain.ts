@@ -48,3 +48,44 @@ export const ALERT_URGENCY: Record<AlertType, number> = {
   OUT_OF_STOCK: 0,
   LOW_STOCK: 1,
 };
+
+// Redondeo a 3 decimales (la cantidad de stock es Decimal(12,3)).
+function round3(n: number): number {
+  return Math.round(n * 1000) / 1000;
+}
+
+export interface FefoBatch {
+  lotCode: string;
+  quantity: number;
+}
+
+export interface FefoAllocation {
+  // Cuánto consumir de cada lote, en el orden FEFO de entrada (qty > 0).
+  consumed: Array<{ lotCode: string; qty: number }>;
+  // Cantidad que los lotes NO cubren (vender más de lo recibido): el caller la
+  // aplica como salida SIN lote — no bloquea (decisión Q3). 0 si los lotes cubren.
+  shortfall: number;
+}
+
+/**
+ * Reparto FEFO (first-expired-first-out, #126) de una salida de `qty` unidades
+ * sobre `batches` YA ORDENADOS por caducidad ascendente (el caller los lee así, con
+ * NULLs al final). Consume de cada lote hasta cubrir la cantidad; si los lotes no
+ * llegan, devuelve el faltante en `shortfall`. Función pura. `qty` se asume > 0.
+ */
+export function allocateFefo(batches: FefoBatch[], qty: number): FefoAllocation {
+  let remaining = round3(qty);
+  const consumed: Array<{ lotCode: string; qty: number }> = [];
+  for (const b of batches) {
+    if (remaining <= 0) {
+      break;
+    }
+    if (b.quantity <= 0) {
+      continue;
+    }
+    const take = round3(Math.min(remaining, b.quantity));
+    consumed.push({ lotCode: b.lotCode, qty: take });
+    remaining = round3(remaining - take);
+  }
+  return { consumed, shortfall: remaining > 0 ? remaining : 0 };
+}
