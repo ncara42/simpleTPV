@@ -1,8 +1,6 @@
 import type { StockLevel } from '@simpletpv/auth';
 
-import type { Rotation } from '../demo/demoData.js';
-
-// Etiquetas y formateadores compartidos por las secciones de Stock.
+export type Rotation = 'alta' | 'media' | 'baja';
 
 export const ROTATION_LABEL: Record<Rotation, string> = {
   alta: 'Alta',
@@ -21,13 +19,11 @@ export const ALERT_LABEL: Record<string, string> = {
   LOW_STOCK: 'Stock bajo',
 };
 
-// Estado de caducidad de un lote (#126 slice 4).
 export const EXPIRY_LABEL: Record<string, string> = {
   expired: 'Caducado',
   expiring: 'Por caducar',
 };
 
-// Texto relativo a la caducidad a partir de los días restantes (negativo = pasado).
 export function expiryDaysText(daysToExpiry: number): string {
   if (daysToExpiry < 0) {
     const d = Math.abs(daysToExpiry);
@@ -57,6 +53,4 @@ export const MOVEMENT_LABEL: Record<string, string> = {
 
 export const dt = new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' });
 
-// Fecha sin hora (p.ej. caducidad de lote, columna @db.Date). UTC para no desplazar
-// el día según la zona del navegador.
 export const df = new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium', timeZone: 'UTC' });

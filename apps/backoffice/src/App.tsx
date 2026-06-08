@@ -32,7 +32,6 @@ import { useState } from 'react';
 import { ApiKeysPage } from './ApiKeysPage.js';
 import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
-import { DEMO_USER } from './demo/demoData.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { HelpPage } from './HelpPage.js';
 import { api, useAuthStore } from './lib/auth.js';
@@ -160,7 +159,7 @@ function Home() {
           setNavStoreId(null);
           setTab(id as Tab);
         }}
-        account={{ name: DEMO_USER.name, subtitle: 'Central · Admin' }}
+        account={{ name: 'Administrador', subtitle: 'Central · Admin' }}
         onLogout={logout}
       />
       <div className="app-content">

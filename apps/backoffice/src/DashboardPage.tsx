@@ -4,7 +4,6 @@ import { Chart, Select, Sparkline } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 
-import { DEMO_STOCKOUT_KPIS, DEMO_STOCKOUTS } from './demo/demoData.js';
 import { listStores } from './lib/admin.js';
 import {
   type DashboardPeriod,
@@ -17,10 +16,13 @@ import {
   getSalesByHour,
   getSalesKpis,
   getSalesToday,
+  getStockoutKpis,
 } from './lib/dashboard.js';
 import { deltaTone, fmtDelta, fmtEur, fmtEurCompact, fmtNum, fmtRate } from './lib/format.js';
 import { usePageHeader } from './lib/pageHeader.js';
 import { readPref, usePreferences } from './lib/preferences.js';
+import { listAlerts } from './lib/stock.js';
+import { ALERT_LABEL } from './stock/labels.js';
 
 // Personalización de las KPI cards (IT-16): orden + visibilidad por usuario.
 interface CardsPref {
@@ -103,6 +105,17 @@ export function DashboardPage() {
   const rankings = useQuery({
     queryKey: ['dash-rankings', period, store],
     queryFn: () => getProductRankings(period, store),
+    placeholderData: keepPreviousData,
+  });
+  // Roturas de stock: lista de alertas activas + KPI de venta perdida estimada.
+  const stockoutKpis = useQuery({
+    queryKey: ['dash-stockout-kpis', period, store],
+    queryFn: () => getStockoutKpis(period, store),
+    placeholderData: keepPreviousData,
+  });
+  const alerts = useQuery({
+    queryKey: ['dash-alerts', store],
+    queryFn: () => listAlerts(store),
     placeholderData: keepPreviousData,
   });
 
@@ -395,24 +408,35 @@ export function DashboardPage() {
           })()}
         </div>
 
-        {/* Panel de roturas */}
+        {/* Panel de roturas: alertas activas (GET /stock/alerts) + venta perdida est. */}
         <div className="dash-panel span-5" data-testid="dash-stockout">
           <h3>Roturas de stock</h3>
           <p className="dash-panel-sub">Productos en alerta ahora</p>
-          <ul className="dash-stockout-list">
-            {DEMO_STOCKOUTS.map((s) => (
-              <li key={`${s.name}-${s.store}`} className={`dash-stockout-item lvl-${s.level}`}>
-                <span className="dash-stockout-info">
-                  <span className="dash-stockout-name">{s.name}</span>
-                  <span className="dash-stockout-store">{s.store}</span>
-                </span>
-                <span className="dash-stockout-tag">{s.qty} ud</span>
-              </li>
-            ))}
-          </ul>
+          {(() => {
+            const items = alerts.data ?? [];
+            if (items.length === 0) {
+              return <p className="catalog-empty">Sin roturas ahora.</p>;
+            }
+            return (
+              <ul className="dash-stockout-list">
+                {items.map((a) => (
+                  <li
+                    key={a.id}
+                    className={`dash-stockout-item lvl-${a.alertType === 'OUT_OF_STOCK' ? 'red' : 'yellow'}`}
+                  >
+                    <span className="dash-stockout-info">
+                      <span className="dash-stockout-name">{a.productName}</span>
+                      <span className="dash-stockout-store">{a.storeName}</span>
+                    </span>
+                    <span className="dash-stockout-tag">{ALERT_LABEL[a.alertType]}</span>
+                  </li>
+                ))}
+              </ul>
+            );
+          })()}
           <div className="dash-stockout-foot">
             <span>Venta perdida est.</span>
-            <strong className="dash-lost">{fmtEur(DEMO_STOCKOUT_KPIS.estimatedLostSales)}</strong>
+            <strong className="dash-lost">{fmtEur(stockoutKpis.data?.estimatedLostSales)}</strong>
           </div>
         </div>
 

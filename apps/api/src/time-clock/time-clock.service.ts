@@ -158,19 +158,71 @@ export class TimeClockService {
       },
     });
 
-    // Agrupa por usuario + día (jornada).
+    return this.aggregateJornadas(entries, now);
+  }
+
+  /**
+   * Historial cross-tienda para gestión (backoffice): las mismas jornadas que
+   * history() pero agregando TODAS las tiendas de la organización (la RLS ya acota
+   * por tenant). Solo ADMIN/MANAGER — lo gatea @Roles en el controller; aquí NO hay
+   * assertStoreAccess porque no se opera sobre una tienda concreta (ambos roles son
+   * org-wide, igual que salesStoreFilter). Ventana por defecto de 30 días; admite
+   * filtros opcionales de tienda, empleado y rango.
+   */
+  async historyAll(params: { storeId?: string; userId?: string; from?: string; to?: string }) {
+    const tenant = requireTenant();
+    const now = new Date();
+    const from = params.from
+      ? startOfLocalDay(new Date(params.from))
+      : startOfLocalDay(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
+    const to = params.to ? endOfLocalDay(new Date(params.to)) : endOfLocalDay(now);
+
+    const entries = await this.prisma.timeClockEntry.findMany({
+      where: {
+        organizationId: tenant.organizationId,
+        ...(params.storeId ? { storeId: params.storeId } : {}),
+        ...(params.userId ? { userId: params.userId } : {}),
+        createdAt: { gte: from, lte: to },
+      },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        user: { select: { name: true } },
+        store: { select: { name: true } },
+      },
+    });
+
+    return this.aggregateJornadas(entries, now);
+  }
+
+  /**
+   * Agrupa fichajes en jornadas (usuario + tienda + día) y calcula horas trabajadas
+   * y de pausa. Compartido por history() (acotado a una tienda) y historyAll() (todas
+   * las tiendas de la org). Incluir la tienda en la clave evita mezclar las jornadas
+   * de un mismo empleado en dos tiendas el mismo día.
+   */
+  private aggregateJornadas(
+    entries: ReadonlyArray<{
+      type: TimeClockType;
+      createdAt: Date;
+      userId: string;
+      storeId: string;
+      user: { name: string };
+      store: { name: string };
+    }>,
+    now: Date,
+  ) {
     type Group = {
       userId: string;
       userName: string;
       storeId: string;
       storeName: string;
       date: string;
-      rows: typeof entries;
+      rows: Array<{ type: TimeClockType; createdAt: Date }>;
     };
     const groups = new Map<string, Group>();
     for (const e of entries) {
       const date = localDayKey(e.createdAt);
-      const key = `${e.userId}__${date}`;
+      const key = `${e.userId}__${e.storeId}__${date}`;
       let group = groups.get(key);
       if (!group) {
         group = {
@@ -183,7 +235,7 @@ export class TimeClockService {
         };
         groups.set(key, group);
       }
-      group.rows.push(e);
+      group.rows.push({ type: e.type, createdAt: e.createdAt });
     }
 
     return [...groups.values()].map((g) => {
@@ -202,5 +254,49 @@ export class TimeClockService {
         breakMs: totals.breakMs,
       };
     });
+  }
+
+  // Log de fichajes en BRUTO de una tienda (cada entrada individual con el nombre del
+  // empleado), lo más reciente primero. A diferencia de history() (resumen por jornada),
+  // alimenta el log del detalle de tienda del backoffice. Mismo control de acceso
+  // (assertStoreAccess) y aislamiento por tenant que history.
+  async entries(
+    params: { storeId: string; userId?: string; from?: string; to?: string },
+    role: string,
+    requestingUserId: string,
+  ): Promise<
+    Array<{ id: string; userId: string; userName: string; type: TimeClockType; createdAt: string }>
+  > {
+    const tenant = requireTenant();
+    await assertStoreAccess(this.prisma, {
+      userId: requestingUserId,
+      role,
+      storeId: params.storeId,
+    });
+
+    const now = new Date();
+    const from = params.from
+      ? startOfLocalDay(new Date(params.from))
+      : startOfLocalDay(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
+    const to = params.to ? endOfLocalDay(new Date(params.to)) : endOfLocalDay(now);
+
+    const rows = await this.prisma.timeClockEntry.findMany({
+      where: {
+        organizationId: tenant.organizationId,
+        storeId: params.storeId,
+        ...(params.userId ? { userId: params.userId } : {}),
+        createdAt: { gte: from, lte: to },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: { user: { select: { name: true } } },
+    });
+
+    return rows.map((e) => ({
+      id: e.id,
+      userId: e.userId,
+      userName: e.user.name,
+      type: e.type,
+      createdAt: e.createdAt.toISOString(),
+    }));
   }
 }

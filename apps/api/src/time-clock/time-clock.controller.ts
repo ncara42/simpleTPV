@@ -4,6 +4,7 @@ import type { JwtPayload } from '../auth/jwt-payload.js';
 import { Roles } from '../auth/roles.decorator.js';
 import {
   CreateTimeClockEntryDto,
+  TimeClockHistoryAllQueryDto,
   TimeClockHistoryMeQueryDto,
   TimeClockHistoryQueryDto,
 } from './time-clock.dto.js';
@@ -29,6 +30,21 @@ export class TimeClockController {
   @Roles('ADMIN', 'MANAGER')
   history(@Query() query: TimeClockHistoryQueryDto, @Req() req: { user: JwtPayload }) {
     return this.timeClock.history(query, req.user.role, req.user.sub);
+  }
+
+  // Histórico cross-tienda agregado por jornada (alimenta la vista Control horario del
+  // backoffice). Org-wide (ADMIN/MANAGER); no requiere storeId. Filtros opcionales.
+  @Get('history-all')
+  @Roles('ADMIN', 'MANAGER')
+  historyAll(@Query() query: TimeClockHistoryAllQueryDto) {
+    return this.timeClock.historyAll(query);
+  }
+
+  // Log en bruto de fichajes de una tienda (alimenta el detalle de tienda del backoffice).
+  @Get('entries')
+  @Roles('ADMIN', 'MANAGER')
+  entries(@Query() query: TimeClockHistoryQueryDto, @Req() req: { user: JwtPayload }) {
+    return this.timeClock.entries(query, req.user.role, req.user.sub);
   }
 
   // Histórico del propio empleado (lo consume el TPV). El `userId` se fuerza al del

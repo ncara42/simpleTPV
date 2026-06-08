@@ -14,9 +14,12 @@ import * as families from './families.js';
 import * as features from './features.js';
 import { getPreferences, setPreference } from './preferences.js';
 import * as products from './products.js';
+import * as promotions from './promotions.js';
 import * as purchases from './purchases.js';
 import * as stock from './stock.js';
 import * as storePrices from './store-prices.js';
+import * as timeClock from './time-clock.js';
+import * as verifactu from './verifactu.js';
 
 const get = vi.mocked(api.get);
 const post = vi.mocked(api.post);
@@ -240,19 +243,82 @@ describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
       value: { hidden: ['kpi-upt'] },
     });
   });
-});
 
-describe('modo demo (opt-in, VITE_DEMO_MODE=true): no llama a la API', () => {
-  beforeEach(() => {
-    vi.stubEnv('VITE_DEMO_MODE', 'true');
-    vi.clearAllMocks();
+  it('promotions: CRUD contra /promotions (#99)', async () => {
+    await promotions.listPromotions();
+    expect(get).toHaveBeenCalledWith('/promotions');
+    await promotions.createPromotion({
+      name: '3x2',
+      conditionType: 'min_qty',
+      threshold: 3,
+      discountType: 'percent',
+      discountValue: 33,
+      startDate: '2026-06-01',
+      endDate: '2026-06-30',
+    });
+    expect(post).toHaveBeenCalledWith('/promotions', expect.objectContaining({ name: '3x2' }));
+    await promotions.updatePromotion('promo-1', { active: false });
+    expect(patch).toHaveBeenCalledWith('/promotions/promo-1', { active: false });
+    await promotions.deletePromotion('promo-1');
+    expect(del).toHaveBeenCalledWith('/promotions/promo-1');
   });
-  afterEach(() => vi.unstubAllEnvs());
 
-  it('families/products devuelven demo sin tocar la api', async () => {
-    const fams = await families.listFamilies();
-    expect(Array.isArray(fams)).toBe(true);
-    await products.listProducts('cbd');
-    expect(get).not.toHaveBeenCalled();
+  it('time-clock: log de tienda contra /time-clock/entries (Fase C)', async () => {
+    get.mockResolvedValueOnce([
+      {
+        id: 'e1',
+        userId: 'u1',
+        userName: 'Marta',
+        type: 'CLOCK_IN',
+        createdAt: '2026-06-04T08:00:00.000Z',
+      },
+      {
+        id: 'e2',
+        userId: 'u1',
+        userName: 'Marta',
+        type: 'BREAK_START',
+        createdAt: '2026-06-04T10:00:00.000Z',
+      },
+      {
+        id: 'e3',
+        userId: 'u1',
+        userName: 'Marta',
+        type: 'CLOCK_OUT',
+        createdAt: '2026-06-04T16:00:00.000Z',
+      },
+    ] as never);
+
+    const log = await timeClock.listStoreLog('st1');
+
+    expect(get).toHaveBeenCalledWith('/time-clock/entries', { storeId: 'st1' });
+    // Filtra pausas; mapea CLOCK_IN→apertura / CLOCK_OUT→cierre con fecha/hora locales.
+    expect(log).toEqual([
+      { name: 'Marta', date: '2026-06-04', time: '08:00', type: 'apertura' },
+      { name: 'Marta', date: '2026-06-04', time: '16:00', type: 'cierre' },
+    ]);
+  });
+
+  it('time-clock: histórico cross-tienda contra /time-clock/history-all (Fase D)', async () => {
+    await timeClock.listHistoryAll();
+    expect(get).toHaveBeenCalledWith('/time-clock/history-all', {});
+    await timeClock.listHistoryAll({
+      storeId: 'st1',
+      userId: 'u1',
+      from: '2026-06-01',
+      to: '2026-06-02',
+    });
+    expect(get).toHaveBeenLastCalledWith('/time-clock/history-all', {
+      storeId: 'st1',
+      userId: 'u1',
+      from: '2026-06-01',
+      to: '2026-06-02',
+    });
+  });
+
+  it('verifactu: registros contra /verifactu/records con estado opcional (Fase D)', async () => {
+    await verifactu.listVerifactuRecords();
+    expect(get).toHaveBeenCalledWith('/verifactu/records', {});
+    await verifactu.listVerifactuRecords('FAILED');
+    expect(get).toHaveBeenLastCalledWith('/verifactu/records', { status: 'FAILED' });
   });
 });

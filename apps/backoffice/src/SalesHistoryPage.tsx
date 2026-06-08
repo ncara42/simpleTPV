@@ -3,8 +3,14 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { ConfigEditor, type OrderHidden, resolveConfig } from './components/ConfigEditor.js';
-import { DEMO_FAMILIES, DEMO_SALES, type DemoSaleRow, SALE_SELLERS } from './demo/demoData.js';
-import { listSales, type SalesQueryInput } from './lib/admin.js';
+import {
+  listSales,
+  listStores,
+  listUsers,
+  type SalesQueryInput,
+  type SalesViewRow,
+} from './lib/admin.js';
+import { type FamilyNode, listFamilies } from './lib/families.js';
 import { useFeatures } from './lib/features.js';
 import { fmtEur, fmtRate } from './lib/format.js';
 import { usePageHeader } from './lib/pageHeader.js';
@@ -37,8 +43,14 @@ function loadViews(): SavedView[] {
   }
 }
 
-// Tiendas con venta (para poblar el selector).
-const STORE_OPTIONS = Array.from(new Map(DEMO_SALES.map((s) => [s.storeId, s.storeName])));
+// Aplana el árbol de familias a una lista plana {id, name} para el selector,
+// indentando los hijos para reflejar la jerarquía.
+function flattenFamilies(nodes: FamilyNode[], depth = 0): { id: string; name: string }[] {
+  return nodes.flatMap((n) => [
+    { id: n.id, name: depth > 0 ? `${'  '.repeat(depth)}${n.name}` : n.name },
+    ...flattenFamilies(n.children, depth + 1),
+  ]);
+}
 
 // Mapea los filtros de la UI a la query de listSales (sellerId → userId, igual que
 // findSales): solo se incluyen los activos.
@@ -51,7 +63,7 @@ function toQuery(filters: Filters): SalesQueryInput {
   };
 }
 
-function downloadCsv(items: DemoSaleRow[]): void {
+function downloadCsv(items: SalesViewRow[]): void {
   const header = 'Nº ticket,Hora,Tienda,Vendedor,Arquetipo,Importe (€),Método,Estado';
   const rows = items.map((s) =>
     [
@@ -74,7 +86,7 @@ function downloadCsv(items: DemoSaleRow[]): void {
   URL.revokeObjectURL(url);
 }
 
-const columns: DataTableColumn<DemoSaleRow>[] = [
+const columns: DataTableColumn<SalesViewRow>[] = [
   { key: 'ticketNumber', header: 'Ticket' },
   { key: 'storeName', header: 'Tienda' },
   { key: 'sellerName', header: 'Vendedor' },
@@ -121,6 +133,12 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
   const data = query.data;
   const totals = data?.totals;
 
+  // Opciones de los filtros, desde la API real (IT-09): tiendas, vendedores y familias.
+  const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
+  const { data: sellers = [] } = useQuery({ queryKey: ['users'], queryFn: listUsers });
+  const { data: families = [] } = useQuery({ queryKey: ['families'], queryFn: listFamilies });
+  const familyOptions = flattenFamilies(families);
+
   usePageHeader('Ventas', 'Historial de tickets');
 
   // Columnas configurables por usuario (IT-16): visibilidad + orden, persistido en
@@ -159,9 +177,9 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
     if (!hasFilters) return;
     const name =
       [
-        STORE_OPTIONS.find(([id]) => id === filters.storeId)?.[1],
-        SALE_SELLERS.find((s) => s.id === filters.sellerId)?.name,
-        DEMO_FAMILIES.find((f) => f.id === filters.familyId)?.name,
+        stores.find((s) => s.id === filters.storeId)?.name,
+        sellers.find((s) => s.id === filters.sellerId)?.name,
+        familyOptions.find((f) => f.id === filters.familyId)?.name.trim(),
         STATUS_LABEL[filters.status],
       ]
         .filter(Boolean)
@@ -197,7 +215,7 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
           data-testid="sales-store"
           options={[
             { value: '', label: 'Todas las tiendas' },
-            ...STORE_OPTIONS.map(([id, name]) => ({ value: id, label: name })),
+            ...stores.map((s) => ({ value: s.id, label: s.name })),
           ]}
         />
         <Select
@@ -208,7 +226,7 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
           data-testid="sales-seller"
           options={[
             { value: '', label: 'Todos los vendedores' },
-            ...SALE_SELLERS.map((s) => ({ value: s.id, label: s.name })),
+            ...sellers.map((s) => ({ value: s.id, label: s.name })),
           ]}
         />
         <Select
@@ -219,7 +237,7 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
           data-testid="sales-family"
           options={[
             { value: '', label: 'Todos los arquetipos' },
-            ...DEMO_FAMILIES.map((f) => ({ value: f.id, label: f.name })),
+            ...familyOptions.map((f) => ({ value: f.id, label: f.name })),
           ]}
         />
         <Select

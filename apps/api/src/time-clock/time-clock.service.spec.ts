@@ -7,6 +7,7 @@ import { TimeClockService } from './time-clock.service.js';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const STORE = '22222222-2222-2222-2222-222222222222';
+const STORE2 = '33333333-3333-3333-3333-333333333333';
 
 function makePrisma() {
   return {
@@ -26,16 +27,21 @@ function makePrisma() {
 
 // Fichaje tal como lo devuelve history (con user/store incluidos), a una hora del
 // 2026-06-05 en hora local para que localDayKey agrupe igual en cualquier zona.
-function histEntry(type: string, hhmm: string, opts: { userId?: string; userName?: string } = {}) {
+function histEntry(
+  type: string,
+  hhmm: string,
+  opts: { userId?: string; userName?: string; storeId?: string; storeName?: string } = {},
+) {
   const userId = opts.userId ?? 'user-1';
+  const storeId = opts.storeId ?? STORE;
   return {
-    id: `${type}-${hhmm}-${userId}`,
+    id: `${type}-${hhmm}-${userId}-${storeId}`,
     type,
     createdAt: new Date(`2026-06-05T${hhmm}:00`),
     userId,
-    storeId: STORE,
+    storeId,
     user: { name: opts.userName ?? 'Ana' },
-    store: { name: 'Centro' },
+    store: { name: opts.storeName ?? 'Centro' },
   };
 }
 
@@ -292,6 +298,101 @@ describe('TimeClockService', () => {
     await expect(
       tenantStorage.run({ organizationId: ORG }, () =>
         service.history({ storeId: STORE }, 'CLERK', 'clerk-1'),
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('historyAll agrega jornadas de TODAS las tiendas sin exigir storeId, agrupando por usuario+tienda+día', async () => {
+    const prisma = makePrisma();
+    prisma.timeClockEntry.findMany = vi.fn(async () => [
+      histEntry('CLOCK_IN', '08:00'),
+      histEntry('CLOCK_OUT', '12:00'),
+      // Mismo empleado, mismo día, OTRA tienda → jornada distinta.
+      histEntry('CLOCK_IN', '13:00', { storeId: STORE2, storeName: 'Norte' }),
+      histEntry('CLOCK_OUT', '17:00', { storeId: STORE2, storeName: 'Norte' }),
+    ]);
+    const service = makeService(prisma);
+
+    const rows = (await tenantStorage.run({ organizationId: ORG }, () =>
+      service.historyAll({}),
+    )) as Array<{ storeId: string; storeName: string; workedMs: number }>;
+
+    // No filtra por tienda: el where solo lleva tenant + rango (sin storeId/userId).
+    const arg = prisma.timeClockEntry.findMany.mock.calls[0]![0] as {
+      where: { storeId?: string; userId?: string; createdAt: { gte: Date; lte: Date } };
+    };
+    expect(arg.where.storeId).toBeUndefined();
+    expect(arg.where.userId).toBeUndefined();
+
+    expect(rows).toHaveLength(2);
+    const centro = rows.find((r) => r.storeId === STORE)!;
+    const norte = rows.find((r) => r.storeId === STORE2)!;
+    expect(centro.storeName).toBe('Centro');
+    expect(centro.workedMs).toBe(4 * 60 * 60 * 1000);
+    expect(norte.storeName).toBe('Norte');
+    expect(norte.workedMs).toBe(4 * 60 * 60 * 1000);
+  });
+
+  it('historyAll aplica filtros opcionales de tienda, empleado y rango', async () => {
+    const prisma = makePrisma();
+    prisma.timeClockEntry.findMany = vi.fn(async () => []);
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.historyAll({
+        storeId: STORE,
+        userId: 'user-1',
+        from: '2026-06-01',
+        to: '2026-06-03',
+      }),
+    );
+
+    const arg = prisma.timeClockEntry.findMany.mock.calls[0]![0] as {
+      where: { storeId?: string; userId?: string; createdAt: { gte: Date; lte: Date } };
+    };
+    expect(arg.where.storeId).toBe(STORE);
+    expect(arg.where.userId).toBe('user-1');
+    expect(arg.where.createdAt.gte.getTime()).toBe(
+      startOfLocalDay(new Date('2026-06-01')).getTime(),
+    );
+    expect(arg.where.createdAt.lte.getTime()).toBe(endOfLocalDay(new Date('2026-06-03')).getTime());
+  });
+
+  // --- Log en bruto de fichajes (detalle de tienda del backoffice) ---
+
+  it('entries devuelve el log en bruto mapeado, lo más reciente primero, acotado por tienda/tenant', async () => {
+    const prisma = makePrisma();
+    prisma.timeClockEntry.findMany = vi.fn(async () => [
+      histEntry('CLOCK_IN', '09:00', { userName: 'Marta' }),
+      histEntry('CLOCK_OUT', '14:00', { userName: 'Marta' }),
+    ]);
+    const service = makeService(prisma);
+
+    const rows = (await tenantStorage.run({ organizationId: ORG }, () =>
+      service.entries({ storeId: STORE }, 'MANAGER', 'mgr-1'),
+    )) as Array<{ userName: string; type: string; createdAt: string }>;
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.userName).toBe('Marta');
+    expect(rows[0]!.type).toBe('CLOCK_IN');
+    expect(typeof rows[0]!.createdAt).toBe('string'); // ISO, no Date
+
+    const arg = prisma.timeClockEntry.findMany.mock.calls[0]![0] as {
+      where: { organizationId: string; storeId: string };
+      orderBy: { createdAt: string };
+    };
+    expect(arg.where).toMatchObject({ organizationId: ORG, storeId: STORE });
+    expect(arg.orderBy).toEqual({ createdAt: 'desc' }); // lo más reciente primero
+  });
+
+  it('entries lanza 403 para un CLERK sin acceso a la tienda', async () => {
+    const prisma = makePrisma();
+    prisma.userStore.findFirst = vi.fn(async () => null);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () =>
+        service.entries({ storeId: STORE }, 'CLERK', 'clerk-1'),
       ),
     ).rejects.toThrow(ForbiddenException);
   });

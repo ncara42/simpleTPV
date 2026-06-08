@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
 import { Modal } from './components/Modal.js';
-import { DEMO_FAMILIES, DEMO_PRODUCT_STOCK, familyPathLabel, stockLevel } from './demo/demoData.js';
-import { flattenTree, isDescendantOf } from './lib/family-tree.js';
+import { type FamilyNode, listFamilies } from './lib/families.js';
+import { findNodePath, flattenTree, isDescendantOf } from './lib/family-tree.js';
 import { usePageHeader } from './lib/pageHeader.js';
 import {
   createProduct,
@@ -14,6 +14,19 @@ import {
   type ProductInput,
   updateProduct,
 } from './lib/products.js';
+import { getGlobalStock } from './lib/stock.js';
+
+function familyPathLabel(families: FamilyNode[], id: string | null): string {
+  if (!id) return '—';
+  const path = findNodePath(families, id);
+  return path.length ? path.map((n) => n.name).join(' › ') : '—';
+}
+
+function stockLevel(qty: number): 'red' | 'yellow' | 'green' {
+  if (qty === 0) return 'red';
+  if (qty <= 5) return 'yellow';
+  return 'green';
+}
 
 interface FormState {
   id?: string;
@@ -82,23 +95,13 @@ function toPatch(f: FormState): Partial<Product> {
   };
 }
 
-// Opciones jerárquicas de arquetipo (todos los niveles, con sangría por profundidad).
-const archetypeOptions = (): { value: string; label: string }[] =>
-  flattenTree(DEMO_FAMILIES).map((f) => ({
-    value: f.node.id,
-    label: `${'– '.repeat(f.depth)}${f.node.name}`,
-  }));
-
 export function CatalogPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [familyFilter, setFamilyFilter] = useState('');
   const [form, setForm] = useState<FormState | null>(null);
-  // Modo asistente (edición en lote). null → alta de un producto nuevo.
   const [wizard, setWizard] = useState<EditWizard | null>(null);
-  // Selección múltiple por fila (ids marcados).
   const [selected, setSelected] = useState<string[]>([]);
-  // Overlays locales (demo: las mutaciones stub no persisten en backend).
   const [overrides, setOverrides] = useState<Record<string, Partial<Product>>>({});
   const [extras, setExtras] = useState<Product[]>([]);
   const [deleted, setDeleted] = useState<string[]>([]);
@@ -107,12 +110,37 @@ export function CatalogPage() {
     queryKey: ['products', search],
     queryFn: () => listProducts(search),
   });
+
+  const { data: families = [] } = useQuery({
+    queryKey: ['families'],
+    queryFn: listFamilies,
+  });
+
+  // Stock total por producto (suma de todas las tiendas) para el tag de la tabla.
+  const { data: stockRows = [] } = useQuery({
+    queryKey: ['stock-global'],
+    queryFn: getGlobalStock,
+  });
+  const stockByProduct = useMemo(
+    () => new Map(stockRows.map((r) => [r.productId, r.total])),
+    [stockRows],
+  );
+
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['products'] });
 
   const allProducts = useMemo<Product[]>(() => {
     const base = products.map((p) => ({ ...p, ...overrides[p.id] }));
     return [...base, ...extras].filter((p) => !deleted.includes(p.id));
   }, [products, overrides, extras, deleted]);
+
+  const archetypeOptions = useMemo(
+    () =>
+      flattenTree(families).map((f) => ({
+        value: f.node.id,
+        label: `${'– '.repeat(f.depth)}${f.node.name}`,
+      })),
+    [families],
+  );
 
   // Filtro por arquetipo: el nodo elegido y todo su subárbol (la búsqueda por
   // texto ya la resuelve listProducts).
@@ -121,9 +149,9 @@ export function CatalogPage() {
       allProducts.filter(
         (p) =>
           !familyFilter ||
-          (p.familyId != null && isDescendantOf(DEMO_FAMILIES, familyFilter, p.familyId)),
+          (p.familyId != null && isDescendantOf(families, familyFilter, p.familyId)),
       ),
-    [allProducts, familyFilter],
+    [allProducts, familyFilter, families],
   );
 
   usePageHeader('Catálogo', `${filtered.length} productos activos`, 'catalog-count');
@@ -248,7 +276,7 @@ export function CatalogPage() {
               onChange={setFamilyFilter}
               ariaLabel="Filtrar por arquetipo"
               data-testid="catalog-family-filter"
-              options={[{ value: '', label: 'Todos los arquetipos' }, ...archetypeOptions()]}
+              options={[{ value: '', label: 'Todos los arquetipos' }, ...archetypeOptions]}
             />
             {selected.length > 0 && (
               <>
@@ -326,7 +354,7 @@ export function CatalogPage() {
             <tbody>
               {filtered.map((p) => {
                 const isSel = selectedSet.has(p.id);
-                const qty = DEMO_PRODUCT_STOCK[p.id] ?? 0;
+                const qty = stockByProduct.get(p.id) ?? 0;
                 return (
                   <tr
                     key={p.id}
@@ -347,7 +375,7 @@ export function CatalogPage() {
                     </td>
                     <td>{p.name}</td>
                     <td className="muted" data-testid="catalog-family">
-                      {familyPathLabel(p.familyId)}
+                      {familyPathLabel(families, p.familyId)}
                     </td>
                     <td className="muted">{p.sku ?? '—'}</td>
                     <td>{Number(p.salePrice).toFixed(2).replace('.', ',')} €</td>
@@ -393,7 +421,7 @@ export function CatalogPage() {
             <Select
               value={form.familyId ?? ''}
               onChange={(value) => setForm({ ...form, familyId: value || null })}
-              options={[{ value: '', label: '— Sin arquetipo —' }, ...archetypeOptions()]}
+              options={[{ value: '', label: '— Sin arquetipo —' }, ...archetypeOptions]}
               ariaLabel="Arquetipo"
               data-testid="form-family"
             />

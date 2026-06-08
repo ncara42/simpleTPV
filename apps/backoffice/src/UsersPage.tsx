@@ -4,8 +4,14 @@ import { Check, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Modal } from './components/Modal.js';
-import { DEMO_STORES, type DemoUser, ROLE_LABEL } from './demo/demoData.js';
-import { createUser, deleteUser, listUsers, type NewUser } from './lib/admin.js';
+import {
+  createUser,
+  deleteUser,
+  listStores,
+  listUsers,
+  type NewUser,
+  type User,
+} from './lib/admin.js';
 import { usePageHeader } from './lib/pageHeader.js';
 
 type Role = NewUser['role'];
@@ -20,11 +26,20 @@ interface UserForm {
   active: boolean;
 }
 
-// Asistente de edición en lote: cola de usuarios seleccionados + paso actual.
 interface EditWizard {
-  queue: DemoUser[];
+  queue: UserWithStores[];
   step: number;
 }
+
+interface UserWithStores extends User {
+  storeIds: string[];
+}
+
+const ROLE_LABEL: Record<Role, string> = {
+  ADMIN: 'Admin',
+  MANAGER: 'Responsable',
+  CLERK: 'Dependiente',
+};
 
 const EMPTY: UserForm = {
   name: '',
@@ -42,16 +57,7 @@ const ROLES: { value: Role; label: string }[] = [
   { value: 'CLERK', label: 'Dependiente' },
 ];
 
-function storeName(id: string): string {
-  return DEMO_STORES.find((s) => s.id === id)?.name ?? id;
-}
-
-function storesLabel(role: Role, storeIds: string[]): string {
-  if (role === 'ADMIN') return 'Todas';
-  return storeIds.length ? storeIds.map(storeName).join(', ') : '—';
-}
-
-function toForm(u: DemoUser): UserForm {
+function toForm(u: UserWithStores): UserForm {
   return {
     id: u.id,
     name: u.name,
@@ -74,21 +80,29 @@ export function UsersPage() {
   // Selección múltiple por fila (ids marcados).
   const [selected, setSelected] = useState<string[]>([]);
   // Overlays locales (demo: no hay backend que persista los cambios).
-  const [overrides, setOverrides] = useState<Record<string, Partial<DemoUser>>>({});
-  const [extras, setExtras] = useState<DemoUser[]>([]);
+  const [overrides, setOverrides] = useState<Record<string, Partial<UserWithStores>>>({});
+  const [extras, setExtras] = useState<UserWithStores[]>([]);
   const [deleted, setDeleted] = useState<string[]>([]);
 
   const { data: users = [], isLoading } = useQuery({ queryKey: ['users'], queryFn: listUsers });
+  const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['users'] });
 
-  const allUsers = useMemo<DemoUser[]>(() => {
-    const base = (users as DemoUser[]).map((u) => ({ ...u, ...overrides[u.id] }));
+  // Etiqueta de tiendas de un usuario, resuelta contra las tiendas reales (IT-09).
+  const storeName = (id: string): string => stores.find((s) => s.id === id)?.name ?? id;
+  const storesLabel = (role: Role, storeIds: string[]): string => {
+    if (role === 'ADMIN') return 'Todas';
+    return storeIds.length ? storeIds.map(storeName).join(', ') : '—';
+  };
+
+  const allUsers = useMemo<UserWithStores[]>(() => {
+    const base = (users as UserWithStores[]).map((u) => ({ ...u, ...overrides[u.id] }));
     return [...base, ...extras].filter((u) => !deleted.includes(u.id));
   }, [users, overrides, extras, deleted]);
 
   // Búsqueda por nombre + filtro por tienda. Los ADMIN acceden a todas las
   // tiendas (storeIds vacío), así que aparecen en cualquier filtro de tienda.
-  const filtered = useMemo<DemoUser[]>(
+  const filtered = useMemo<UserWithStores[]>(
     () =>
       allUsers.filter((u) => {
         if (search && !u.name.toLowerCase().includes(search.toLowerCase())) return false;
@@ -143,7 +157,7 @@ export function UsersPage() {
   // Aplica la edición de un usuario existente sobre los overlays locales.
   const applyEdit = (f: UserForm): void => {
     if (!f.id) return;
-    const patch: Partial<DemoUser> = {
+    const patch: Partial<UserWithStores> = {
       name: f.name,
       email: f.email,
       role: f.role,
@@ -267,7 +281,7 @@ export function UsersPage() {
               data-testid="users-store"
               options={[
                 { value: '', label: 'Todas las tiendas' },
-                ...DEMO_STORES.map((s) => ({ value: s.id, label: s.name })),
+                ...stores.map((s) => ({ value: s.id, label: s.name })),
               ]}
             />
             {selected.length > 0 && (
@@ -487,7 +501,7 @@ export function UsersPage() {
                 </p>
               ) : (
                 <div className="store-chips" data-testid="user-stores">
-                  {DEMO_STORES.map((s) => {
+                  {stores.map((s) => {
                     const on = form.storeIds.includes(s.id);
                     return (
                       <button

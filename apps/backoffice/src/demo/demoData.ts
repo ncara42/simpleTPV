@@ -4,7 +4,6 @@ import type {
   Product,
   SaleSummary,
   StockAlert,
-  StockGlobalRow,
   Store,
   User,
   VerifactuRecord,
@@ -421,59 +420,6 @@ export const ROLE_LABEL: Record<User['role'], string> = {
   CLERK: 'Dependiente',
 };
 
-// ─── Stock global (5 productos × 3 tiendas) ──────────────────
-export const DEMO_STOCK_GLOBAL: StockGlobalRow[] = [
-  {
-    productId: 'p-aceite-cbd-10',
-    productName: 'Aceite CBD 10%',
-    total: 42,
-    stores: [
-      { storeId: 's-centro', storeName: 'Centro', quantity: 0, minStock: 5, level: 'red' },
-      { storeId: 's-norte', storeName: 'Norte', quantity: 18, minStock: 5, level: 'green' },
-      { storeId: 's-sur', storeName: 'Sur', quantity: 24, minStock: 5, level: 'green' },
-    ],
-  },
-  {
-    productId: 'p-flor-lemon-haze',
-    productName: 'Flor Lemon Haze',
-    total: 19,
-    stores: [
-      { storeId: 's-centro', storeName: 'Centro', quantity: 8, minStock: 5, level: 'green' },
-      { storeId: 's-norte', storeName: 'Norte', quantity: 3, minStock: 5, level: 'yellow' },
-      { storeId: 's-sur', storeName: 'Sur', quantity: 8, minStock: 5, level: 'green' },
-    ],
-  },
-  {
-    productId: 'p-vapeador-pro',
-    productName: 'Vapeador Pro',
-    total: 7,
-    stores: [
-      { storeId: 's-centro', storeName: 'Centro', quantity: 0, minStock: 5, level: 'red' },
-      { storeId: 's-norte', storeName: 'Norte', quantity: 4, minStock: 5, level: 'yellow' },
-      { storeId: 's-sur', storeName: 'Sur', quantity: 3, minStock: 5, level: 'yellow' },
-    ],
-  },
-  {
-    productId: 'p-crema-regeneradora',
-    productName: 'Crema regeneradora',
-    total: 33,
-    stores: [
-      { storeId: 's-centro', storeName: 'Centro', quantity: 11, minStock: 5, level: 'green' },
-      { storeId: 's-norte', storeName: 'Norte', quantity: 14, minStock: 5, level: 'green' },
-      { storeId: 's-sur', storeName: 'Sur', quantity: 8, minStock: 5, level: 'green' },
-    ],
-  },
-  {
-    productId: 'p-infusion-relax',
-    productName: 'Infusión relax',
-    total: 12,
-    stores: [
-      { storeId: 's-centro', storeName: 'Centro', quantity: 6, minStock: 5, level: 'green' },
-      { storeId: 's-norte', storeName: 'Norte', quantity: 2, minStock: 5, level: 'yellow' },
-      { storeId: 's-sur', storeName: 'Sur', quantity: 4, minStock: 5, level: 'yellow' },
-    ],
-  },
-];
 // 2 alertas (el subtab "Alertas" muestra el contador 2).
 export const DEMO_ALERTS: StockAlert[] = [
   {

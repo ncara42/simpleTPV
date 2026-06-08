@@ -8,15 +8,12 @@ import './styles.css';
 import { LoginForm, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 import { Banknote, ClipboardCheck, Clock, ReceiptText, ShoppingBag, Truck } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { CashPanel } from './CashPanel.js';
 import { ConnectivityBanner } from './ConnectivityBanner.js';
-import { DEMO_CART_LINES, DEMO_USER } from './demo/demoData.js';
 import { InventoryPanel } from './InventoryPanel.js';
-import { isDemo } from './lib/api-config.js';
 import { api, useAuthStore } from './lib/auth.js';
-import { useCart } from './lib/cart.js';
 import { useFeatures } from './lib/features.js';
 import { formatDuration } from './lib/format.js';
 import { switchApp } from './lib/nav.js';
@@ -40,8 +37,6 @@ const TPV_NAV: NavItem[] = [
   { id: 'clock', label: 'Fichaje', icon: <Clock size={18} /> },
 ];
 
-// La TopBar refleja el título y la descripción de la vista activa (publicados por
-// cada vista vía usePageHeader, igual que el backoffice).
 function ShellTopBar() {
   const { title, description, descriptionTestId } = usePageHeaderValue();
   return (
@@ -61,17 +56,10 @@ function Home() {
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
   const activeStore = stores[0]?.id ?? null;
 
-  // Venta offline (offline slice 2c): reserva bloque de tickets con conexión,
-  // sincroniza la cola al reconectar y expone el nº de ventas pendientes. En demo
-  // no hay backend, así que se desactiva (storeId null → no-op).
-  const queuedCount = useOfflineSync(isDemo() ? null : activeStore);
+  const queuedCount = useOfflineSync(activeStore);
 
-  // Feature flags (#127 B): resuelve a nivel de la tienda activa. Oculta 'Fichaje'
-  // si el control horario está apagado (el backend también bloquea con 403).
   const features = useFeatures(activeStore);
 
-  // El item "Fichaje" del sidebar muestra el temporizador del turno en vivo
-  // mientras hay jornada activa; si no, solo su icono y etiqueta.
   const { status, liveWorkedMs } = useTimeClock(activeStore);
   const navItems = TPV_NAV.filter((item) => item.id !== 'clock' || features.time_clock).map(
     (item) =>
@@ -80,21 +68,6 @@ function Home() {
         : item,
   );
 
-  // Precarga del carrito demo: solo la primera vez (al montar) para que
-  // "Ticket actual" aparezca con las 3 líneas del mockup al entrar. Lee el
-  // estado actual de la store directamente para no depender de `items`.
-  useEffect(() => {
-    // Solo en modo demo: en real el carrito arranca vacío (los productId demo no
-    // existen en el backend y romperían la venta).
-    if (isDemo() && useCart.getState().items.length === 0) {
-      useCart.setState({
-        items: DEMO_CART_LINES.map((l) => ({ ...l, discountPct: 0, discountAmt: 0 })),
-        ticketDiscountPct: 0,
-        ticketDiscountAmt: 0,
-      });
-    }
-  }, []);
-
   return (
     <div className="app-shell">
       <Sidebar
@@ -102,7 +75,7 @@ function Home() {
         activeItem={view}
         onSelect={(id) => setView(id as View)}
         brand={{ title: 'SimpleTPV', subtitle: 'Punto de venta' }}
-        account={{ name: DEMO_USER.name, subtitle: 'Centro · Dependiente' }}
+        account={{ name: 'Usuario', subtitle: 'Dependiente' }}
         onLogout={logout}
       />
       <div className="app-content">
@@ -126,12 +99,7 @@ function Home() {
 export default function App() {
   const isAuthed = useAuthStore((s) => s.accessToken !== null);
   if (!isAuthed) {
-    return (
-      <LoginForm
-        onSubmit={api.login}
-        {...(isDemo() ? { initialEmail: 'demo@simpletpv.com', initialPassword: 'demo' } : {})}
-      />
-    );
+    return <LoginForm onSubmit={api.login} />;
   }
   return <Home />;
 }
