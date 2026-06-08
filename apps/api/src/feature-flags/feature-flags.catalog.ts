@@ -14,3 +14,14 @@ export const FEATURE_FLAGS = {
 export type FeatureKey = keyof typeof FEATURE_FLAGS;
 
 export const FEATURE_KEYS = Object.keys(FEATURE_FLAGS) as FeatureKey[];
+
+export function isFeatureKey(value: string): value is FeatureKey {
+  return Object.prototype.hasOwnProperty.call(FEATURE_FLAGS, value);
+}
+
+// Catálogo serializable para la UI de gestión (clave + etiqueta + default del código).
+export const FEATURE_FLAG_CATALOG = FEATURE_KEYS.map((key) => ({
+  key,
+  label: FEATURE_FLAGS[key].label,
+  default: FEATURE_FLAGS[key].default,
+}));

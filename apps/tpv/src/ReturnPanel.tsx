@@ -3,6 +3,7 @@ import { Button } from '@simpletpv/ui';
 import { useState } from 'react';
 
 import { BlindReturnPanel } from './BlindReturnPanel.js';
+import { useFeatures } from './lib/features.js';
 import { createReturn, listReturns } from './lib/returns.js';
 import { findSaleByTicket } from './lib/sales.js';
 import { returnedBySaleLine } from './return/aggregate.js';
@@ -180,6 +181,12 @@ export function ReturnPanel() {
 export function ReturnsView() {
   const [mode, setMode] = useState<'ticket' | 'blind'>('ticket');
   const [query, setQuery] = useState('');
+  // Feature flag (#127 B): si la devolución ciega está apagada, no se ofrece el modo
+  // "Sin ticket" (el backend además lo bloquea con 403). org-level: la vista no tiene
+  // tienda fija. `blind` efectivo solo si el flag está activo.
+  const features = useFeatures();
+  const blindOn = features.blind_returns;
+  const showBlind = blindOn && mode === 'blind';
 
   return (
     <div className="return-view" data-testid="return-view">
@@ -196,16 +203,18 @@ export function ReturnsView() {
         >
           Con ticket
         </button>
-        <button
-          className={`return-toggle-btn${mode === 'blind' ? ' active' : ''}`}
-          onClick={() => setMode('blind')}
-          data-testid="return-mode-blind"
-        >
-          Sin ticket
-        </button>
+        {blindOn && (
+          <button
+            className={`return-toggle-btn${mode === 'blind' ? ' active' : ''}`}
+            onClick={() => setMode('blind')}
+            data-testid="return-mode-blind"
+          >
+            Sin ticket
+          </button>
+        )}
       </div>
 
-      {mode === 'ticket' ? (
+      {!showBlind ? (
         <>
           <div className="return-view-search">
             <svg

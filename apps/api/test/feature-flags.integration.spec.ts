@@ -149,4 +149,37 @@ describe('Feature flags (#127 B) — integración', () => {
       ),
     ).rejects.toThrow(/Cliente no encontrado/);
   });
+
+  it('gestión real: setFlag (crea/actualiza), list y clearFlag (vuelve al default)', async () => {
+    const actor = { userId: 'admin-1', role: 'ADMIN' };
+    await tenantStorage.run({ organizationId: org1Id }, async () => {
+      expect(await features.isEnabled('b2b')).toBe(true); // sin fila → default código
+      await features.setFlag('b2b', false, undefined, actor); // crea org default false
+      expect(await features.isEnabled('b2b')).toBe(false);
+      await features.setFlag('b2b', true, undefined, actor); // actualiza la misma fila
+      expect(await features.isEnabled('b2b')).toBe(true);
+
+      const listed = await features.list();
+      expect(listed.catalog).toHaveLength(4);
+      expect(
+        listed.flags.some((f) => f.key === 'b2b' && f.storeId === null && f.enabled === true),
+      ).toBe(true);
+
+      await features.clearFlag('b2b', undefined, actor); // quita → vuelve al default código
+      expect(await features.isEnabled('b2b')).toBe(true);
+      const after = await features.list();
+      expect(after.flags.some((f) => f.key === 'b2b')).toBe(false);
+    });
+  });
+
+  it('gestión real: override de tienda con setFlag(storeId) no afecta a otra tienda', async () => {
+    const actor = { userId: 'admin-1', role: 'ADMIN' };
+    await tenantStorage.run({ organizationId: org1Id }, async () => {
+      await features.setFlag('blind_returns', false, store1Id, actor);
+      expect(await features.isEnabled('blind_returns', store1Id)).toBe(false);
+      expect(await features.isEnabled('blind_returns', store2Id)).toBe(true); // store2 intacto
+      await features.clearFlag('blind_returns', store1Id, actor);
+      expect(await features.isEnabled('blind_returns', store1Id)).toBe(true);
+    });
+  });
 });
