@@ -1,12 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
-import {
-  DEMO_STORE_OPS,
-  DEMO_STORE_SALES,
-  type StoreOps,
-  type StoreSalesPeriod,
-} from './demo/demoData.js';
 import { createStore, deleteStore, listStores, type Store } from './lib/admin.js';
 import { usePageHeader } from './lib/pageHeader.js';
 import { StoreCard } from './stores/StoreCard.js';
@@ -14,16 +8,22 @@ import { StoreDetailModal } from './stores/StoreDetailModal.js';
 import { type StoreForm, StoreFormModal } from './stores/StoreFormModal.js';
 import { StorePricesModal } from './stores/StorePricesModal.js';
 
-// Etiqueta de la cifra de ventas en lenguaje natural (la card es para no técnicos).
+export type StoreSalesPeriod = 'today' | 'week' | 'month';
+
+export interface StoreOps {
+  open: boolean;
+  openedBy: string | null;
+  openedSince: string | null;
+  deviceType: 'ip' | 'token';
+  deviceValue: string;
+  deviceVerified: boolean;
+}
+
 const SALES_LABEL: Record<StoreSalesPeriod, string> = {
   today: 'Ventas de hoy',
   week: 'Ventas · últimos 7 días',
   month: 'Ventas de este mes',
 };
-
-function salesOf(storeId: string, period: StoreSalesPeriod): number {
-  return DEMO_STORE_SALES[storeId]?.[period] ?? 0;
-}
 
 export function StoresPage({
   onOpenStoreView,
@@ -32,14 +32,9 @@ export function StoresPage({
 }) {
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
-  // El panel solo observa el estado (no lo modifica) y ordena por ventas de hoy.
   const period: StoreSalesPeriod = 'today';
-  // Estado operativo (fichaje) y dispositivo por tienda; editable en local (demo).
-  const [ops, setOps] = useState<Record<string, StoreOps>>(() =>
-    Object.fromEntries(Object.entries(DEMO_STORE_OPS).map(([k, v]) => [k, { ...v }])),
-  );
+  const [ops, setOps] = useState<Record<string, StoreOps>>({});
   const [detail, setDetail] = useState<Store | null>(null);
-  // Precios retail por tienda (#127 A): la tienda cuyos overrides se están editando.
   const [pricesFor, setPricesFor] = useState<Store | null>(null);
 
   const { data: stores = [], isLoading } = useQuery({
@@ -60,19 +55,13 @@ export function StoresPage({
       invalidate();
     },
   });
-  // La eliminación se conserva en lib (deleteStore) para el futuro; el mockup de
-  // Tiendas no muestra el botón Borrar en las cards.
   void deleteStore;
 
   const opsOf = (id: string): StoreOps | undefined => ops[id];
   const patchOps = (id: string, patch: Partial<StoreOps>): void =>
     setOps((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
 
-  // Orden por ventas de hoy (desc). Sin filtros: el panel solo crea y observa.
-  const visibleStores = useMemo(
-    () => [...stores].sort((a, b) => salesOf(b.id, period) - salesOf(a.id, period)),
-    [stores, period],
-  );
+  const visibleStores = useMemo(() => [...stores], [stores]);
 
   usePageHeader('Tiendas', `${stores.length} ubicaciones`);
 
@@ -101,7 +90,7 @@ export function StoresPage({
               key={s.id}
               store={s}
               active={s.active}
-              sales={salesOf(s.id, period)}
+              sales={0}
               periodLabel={SALES_LABEL[period]}
               onSelect={() => setDetail(s)}
               onOpenStock={() => onOpenStoreView('stock', s.id)}

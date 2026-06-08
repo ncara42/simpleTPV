@@ -23,6 +23,7 @@ import { MeModule } from './me/me.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProductFamiliesModule } from './product-families/product-families.module.js';
 import { ProductsModule } from './products/products.module.js';
+import { PromotionsModule } from './promotions/promotions.module.js';
 import { PublicModule } from './public/public.module.js';
 import { PurchasesModule } from './purchases/purchases.module.js';
 import { ReturnsModule } from './returns/returns.module.js';
@@ -56,6 +57,7 @@ const throttle = throttleConfig(process.env);
     HealthModule,
     ProductsModule,
     ProductFamiliesModule,
+    PromotionsModule,
     B2bModule,
     UsersModule,
     StoresModule,

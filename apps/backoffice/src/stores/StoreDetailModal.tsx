@@ -1,14 +1,11 @@
 import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
-import { DEMO_STORE_LOG, type StoreOps } from '../demo/demoData.js';
 import type { Store } from '../lib/admin.js';
 import { fmtDayMonth } from '../lib/format.js';
+import type { StoreOps } from '../StoresPage.js';
 import { StoreLogDrawer } from './StoreLogDrawer.js';
 
-// Detalle de una tienda: historial de aperturas/cierres (quién y cuándo) y dispositivo
-// autorizado. El estado abierta/cerrada y activa/dormida se ven y gestionan en la card.
-// Presentacional: el estado vive en el padre y se modifica vía callbacks.
 export function StoreDetailModal({
   store,
   ops,
@@ -21,12 +18,8 @@ export function StoreDetailModal({
   onClose: () => void;
 }) {
   const [logOpen, setLogOpen] = useState(false);
-  // Token de fichaje generado (one-shot): habilita a un dispositivo a registrar
-  // turnos. En demo es un valor mock; en real lo emitiría el backend.
   const [token, setToken] = useState<string | null>(null);
-  const log = DEMO_STORE_LOG[store.id] ?? [];
-  // El registro está ordenado de más reciente a más antiguo: el primero de cada tipo
-  // es el último movimiento de ese tipo.
+  const log: Array<{ name: string; date: string; time: string; type: 'apertura' | 'cierre' }> = [];
   const lastOpen = log.find((e) => e.type === 'apertura') ?? null;
   const lastClose = log.find((e) => e.type === 'cierre') ?? null;
 

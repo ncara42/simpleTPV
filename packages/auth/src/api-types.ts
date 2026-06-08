@@ -302,10 +302,15 @@ export interface StockRow {
 }
 
 // Entrada de GET /stock/global (por producto, su stock en cada tienda + total).
+// Rotación de un producto (velocidad de venta): alta/media/baja según las unidades
+// vendidas en una ventana reciente. La calcula el backend en GET /stock/global.
+export type Rotation = 'alta' | 'media' | 'baja';
+
 export interface StockGlobalRow {
   productId: string;
   productName: string;
   total: number;
+  rotation: Rotation;
   stores: Array<{
     storeId: string;
     storeName: string;
@@ -774,3 +779,36 @@ export interface CreateWholesaleOrderInput {
   notes?: string;
   lines: { productId: string; qty: number }[];
 }
+
+export type PromoConditionType = 'min_qty' | 'min_ticket';
+export type PromoDiscountType = 'percent' | 'amount';
+
+// Promoción tal y como la serializa la API (#99). discountValue es Decimal → string;
+// startDate/endDate son columnas DATE → string ISO. La lib del frontend las normaliza
+// a number / 'YYYY-MM-DD' para la UI.
+export interface Promotion {
+  id: string;
+  name: string;
+  conditionType: PromoConditionType;
+  threshold: number;
+  discountType: PromoDiscountType;
+  discountValue: string;
+  startDate: string;
+  endDate: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePromotionInput {
+  name: string;
+  conditionType: PromoConditionType;
+  threshold: number;
+  discountType: PromoDiscountType;
+  discountValue: number;
+  startDate: string;
+  endDate: string;
+  active?: boolean;
+}
+
+export type UpdatePromotionInput = Partial<CreatePromotionInput>;

@@ -14,6 +14,7 @@ import * as families from './families.js';
 import * as features from './features.js';
 import { getPreferences, setPreference } from './preferences.js';
 import * as products from './products.js';
+import * as promotions from './promotions.js';
 import * as purchases from './purchases.js';
 import * as stock from './stock.js';
 import * as storePrices from './store-prices.js';
@@ -240,19 +241,23 @@ describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
       value: { hidden: ['kpi-upt'] },
     });
   });
-});
 
-describe('modo demo (opt-in, VITE_DEMO_MODE=true): no llama a la API', () => {
-  beforeEach(() => {
-    vi.stubEnv('VITE_DEMO_MODE', 'true');
-    vi.clearAllMocks();
-  });
-  afterEach(() => vi.unstubAllEnvs());
-
-  it('families/products devuelven demo sin tocar la api', async () => {
-    const fams = await families.listFamilies();
-    expect(Array.isArray(fams)).toBe(true);
-    await products.listProducts('cbd');
-    expect(get).not.toHaveBeenCalled();
+  it('promotions: CRUD contra /promotions (#99)', async () => {
+    await promotions.listPromotions();
+    expect(get).toHaveBeenCalledWith('/promotions');
+    await promotions.createPromotion({
+      name: '3x2',
+      conditionType: 'min_qty',
+      threshold: 3,
+      discountType: 'percent',
+      discountValue: 33,
+      startDate: '2026-06-01',
+      endDate: '2026-06-30',
+    });
+    expect(post).toHaveBeenCalledWith('/promotions', expect.objectContaining({ name: '3x2' }));
+    await promotions.updatePromotion('promo-1', { active: false });
+    expect(patch).toHaveBeenCalledWith('/promotions/promo-1', { active: false });
+    await promotions.deletePromotion('promo-1');
+    expect(del).toHaveBeenCalledWith('/promotions/promo-1');
   });
 });

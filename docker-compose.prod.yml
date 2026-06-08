@@ -1,0 +1,17 @@
+# Compose de producción para Dokploy.
+# Crea una red externa compartida para que los frontends (TPV, backoffice)
+# puedan comunicarse con la API por hostname fijo.
+#
+# USO:
+#   1. docker network create simpletpv-network
+#   2. En Dokploy, asignar cada servicio a la red "simpletpv-network"
+#      y configurar API_URL en los frontends como:
+#        API_URL=http://simpletpv-api:3001
+#
+# Dokploy gestiona cada contenedor de forma independiente (build, deploy, env),
+# pero todos deben compartir esta red para que nginx pueda proxear /api/* a la API.
+
+networks:
+  simpletpv:
+    name: simpletpv-network
+    external: true

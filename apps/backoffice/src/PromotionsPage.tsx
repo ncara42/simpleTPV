@@ -1,16 +1,22 @@
 import { Select } from '@simpletpv/ui';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
 import { Modal } from './components/Modal.js';
+import { usePageHeader } from './lib/pageHeader.js';
 import {
-  DEMO_PROMOTIONS,
-  type DemoPromotion,
+  createPromotion,
+  type CreatePromotionInput,
+  deletePromotion,
+  listPromotions,
   type PromoConditionType,
   type PromoDiscountType,
   type PromoStatus,
   promoStatus,
-} from './demo/demoData.js';
-import { usePageHeader } from './lib/pageHeader.js';
+  type Promotion,
+  updatePromotion,
+  type UpdatePromotionInput,
+} from './lib/promotions.js';
 
 const STATUS_LABEL: Record<PromoStatus, string> = {
   activa: 'Activa',
@@ -26,7 +32,7 @@ const PROMO_GROUPS: { id: PromoGroup; label: string }[] = [
   { id: 'programada', label: 'Programadas' },
   { id: 'inactiva', label: 'Inactivas' },
 ];
-function promoGroup(p: DemoPromotion): PromoGroup {
+function promoGroup(p: Promotion): PromoGroup {
   const s = promoStatus(p);
   return s === 'activa' || s === 'programada' ? s : 'inactiva';
 }
@@ -71,7 +77,7 @@ function dateRange(start: string, end: string): string {
   return `${startLabel} – ${fmtDMY.format(e)}`;
 }
 
-type PromoForm = Omit<DemoPromotion, 'id'> & { id?: string };
+type PromoForm = Omit<Promotion, 'id'> & { id?: string };
 const EMPTY: PromoForm = {
   name: '',
   conditionType: 'min_qty',
@@ -83,8 +89,23 @@ const EMPTY: PromoForm = {
   active: true,
 };
 
+function toInput(f: PromoForm): CreatePromotionInput {
+  return {
+    name: f.name,
+    conditionType: f.conditionType,
+    threshold: f.threshold,
+    discountType: f.discountType,
+    discountValue: f.discountValue,
+    startDate: f.startDate,
+    endDate: f.endDate,
+    active: f.active,
+  };
+}
+
 export function PromotionsPage() {
-  const [promos, setPromos] = useState<DemoPromotion[]>(DEMO_PROMOTIONS);
+  const qc = useQueryClient();
+  const { data: promos = [] } = useQuery({ queryKey: ['promotions'], queryFn: listPromotions });
+  const invalidate = (): void => void qc.invalidateQueries({ queryKey: ['promotions'] });
   // Grupos visibles: los tres activos por defecto (se ven todas las promociones).
   const [groups, setGroups] = useState<Set<PromoGroup>>(
     () => new Set<PromoGroup>(['activa', 'programada', 'inactiva']),
@@ -118,29 +139,54 @@ export function PromotionsPage() {
   const activeSel = selectedPromos.filter((p) => promoStatus(p) === 'activa');
   const pausedSel = selectedPromos.filter((p) => promoStatus(p) === 'pausada');
 
+  const createMut = useMutation({
+    mutationFn: (f: PromoForm) => createPromotion(toInput(f)),
+    onSuccess: () => {
+      setForm(null);
+      clearSelection();
+      invalidate();
+    },
+  });
+  const updateMut = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdatePromotionInput }) =>
+      updatePromotion(id, input),
+    onSuccess: invalidate,
+  });
+
   const save = (f: PromoForm): void => {
     if (f.id) {
-      const id = f.id;
-      setPromos((prev) => prev.map((p) => (p.id === id ? { ...(f as DemoPromotion) } : p)));
+      updateMut.mutate(
+        { id: f.id, input: toInput(f) },
+        {
+          onSuccess: () => {
+            setForm(null);
+            clearSelection();
+            invalidate();
+          },
+        },
+      );
     } else {
-      setPromos((prev) => [{ ...(f as DemoPromotion), id: `promo-${prev.length + 1}` }, ...prev]);
+      createMut.mutate(f);
     }
-    setForm(null);
-    clearSelection();
   };
   const editSelected = (): void => {
     const target = selectedPromos[0];
     if (target) setForm({ ...target });
   };
+  // Acciones en lote: una mutación por id (sin endpoint bulk) + invalidación al final.
   const setActiveFor = (ids: Set<string>, active: boolean): void => {
-    setPromos((prev) => prev.map((p) => (ids.has(p.id) ? { ...p, active } : p)));
-    clearSelection();
+    void Promise.all([...ids].map((id) => updatePromotion(id, { active }))).then(() => {
+      clearSelection();
+      invalidate();
+    });
   };
   const pauseSelected = (): void => setActiveFor(new Set(activeSel.map((p) => p.id)), false);
   const activateSelected = (): void => setActiveFor(new Set(pausedSel.map((p) => p.id)), true);
   const removeSelected = (): void => {
-    setPromos((prev) => prev.filter((p) => !selectedSet.has(p.id)));
-    clearSelection();
+    void Promise.all(selected.map((id) => deletePromotion(id))).then(() => {
+      clearSelection();
+      invalidate();
+    });
   };
 
   usePageHeader('Promociones', 'Descuentos y reglas programables');

@@ -657,10 +657,14 @@ describe('stockLevel', () => {
 });
 
 // Mock del cliente extendido para las consultas (stock.findMany con include).
-function makeQueryPrisma(rows: unknown[]) {
+function makeQueryPrisma(rows: unknown[], sold: unknown[] = []) {
   return {
     stock: {
       findMany: vi.fn(async (_a?: unknown) => rows),
+    },
+    // Unidades vendidas por producto (groupBy de SaleLine) para la rotación de global().
+    saleLine: {
+      groupBy: vi.fn(async (_a?: unknown) => sold),
     },
   };
 }
@@ -716,25 +720,37 @@ describe('StockService.toReorder', () => {
 });
 
 describe('StockService.global', () => {
-  it('agrega por producto el stock de cada tienda y el total', async () => {
-    const prisma = makeQueryPrisma([
-      {
-        productId: 'p1',
-        storeId: 's1',
-        quantity: 10,
-        minStock: 5,
-        product: { name: 'Café' },
-        store: { name: 'Centro' },
-      },
-      {
-        productId: 'p1',
-        storeId: 's2',
-        quantity: 3,
-        minStock: 5,
-        product: { name: 'Café' },
-        store: { name: 'Sur' },
-      },
-    ]);
+  it('agrega por producto el stock de cada tienda, el total y la rotación', async () => {
+    const prisma = makeQueryPrisma(
+      [
+        {
+          productId: 'p1',
+          storeId: 's1',
+          quantity: 10,
+          minStock: 5,
+          product: { name: 'Café' },
+          store: { name: 'Centro' },
+        },
+        {
+          productId: 'p1',
+          storeId: 's2',
+          quantity: 3,
+          minStock: 5,
+          product: { name: 'Café' },
+          store: { name: 'Sur' },
+        },
+        {
+          productId: 'p2',
+          storeId: 's1',
+          quantity: 50,
+          minStock: 5,
+          product: { name: 'Té' },
+          store: { name: 'Centro' },
+        },
+      ],
+      // p1 vendió 40 uds (≥30 → alta); p2 sin ventas → baja.
+      [{ productId: 'p1', _sum: { qty: 40 } }],
+    );
     const service = new StockService(
       prisma as never,
       new MemoryCache(),
@@ -744,10 +760,13 @@ describe('StockService.global', () => {
 
     const rows = await tenantStorage.run({ organizationId: ORG }, () => service.global());
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.total).toBe(13);
-    expect(rows[0]!.stores).toHaveLength(2);
-    expect(rows[0]!.stores.find((s) => s.storeId === 's2')!.level).toBe('yellow');
+    const cafe = rows.find((r) => r.productId === 'p1')!;
+    const te = rows.find((r) => r.productId === 'p2')!;
+    expect(cafe.total).toBe(13);
+    expect(cafe.stores).toHaveLength(2);
+    expect(cafe.stores.find((s) => s.storeId === 's2')!.level).toBe('yellow');
+    expect(cafe.rotation).toBe('alta'); // 40 uds vendidas
+    expect(te.rotation).toBe('baja'); // sin ventas en la ventana
   });
 });
 

@@ -10,12 +10,16 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcryptjs';
 
 import {
+  AlertType,
   CashSessionStatus,
   MovementType,
   PaymentMethod,
   PrismaClient,
   SaleStatus,
+  TimeClockType,
   UserRole,
+  VerifactuStatus,
+  VerifactuType,
 } from '../generated/client/index.js';
 
 const DEMO_NIF = 'B99999999';
@@ -51,6 +55,66 @@ const FAMILIES: FamilySeed[] = [
   { key: 'aceites', name: 'Aceites', color: '#FFC107', icon: '💧', sortOrder: 2 },
   { key: 'cosmetica', name: 'Cosmética', color: '#E91E63', icon: '🧴', sortOrder: 3 },
   { key: 'accesorios', name: 'Accesorios', color: '#607D8B', icon: '🛍️', sortOrder: 4 },
+];
+
+interface SubfamilySeed {
+  key: string;
+  parentKey: string;
+  name: string;
+  color: string;
+  icon: string;
+  sortOrder: number;
+}
+
+const SUBFAMILIES: SubfamilySeed[] = [
+  {
+    key: 'flores-indica',
+    parentKey: 'flores',
+    name: 'Índica',
+    color: '#4CAF50',
+    icon: '🌿',
+    sortOrder: 1,
+  },
+  {
+    key: 'flores-sativa',
+    parentKey: 'flores',
+    name: 'Sativa',
+    color: '#4CAF50',
+    icon: '🌿',
+    sortOrder: 2,
+  },
+  {
+    key: 'aceites-suave',
+    parentKey: 'aceites',
+    name: 'Suaves (≤5%)',
+    color: '#FFC107',
+    icon: '💧',
+    sortOrder: 1,
+  },
+  {
+    key: 'aceites-fuerte',
+    parentKey: 'aceites',
+    name: 'Fuertes (≥10%)',
+    color: '#FFC107',
+    icon: '💧',
+    sortOrder: 2,
+  },
+  {
+    key: 'cosmetica-facial',
+    parentKey: 'cosmetica',
+    name: 'Facial',
+    color: '#E91E63',
+    icon: '🧴',
+    sortOrder: 1,
+  },
+  {
+    key: 'cosmetica-corporal',
+    parentKey: 'cosmetica',
+    name: 'Corporal',
+    color: '#E91E63',
+    icon: '🧴',
+    sortOrder: 2,
+  },
 ];
 
 interface ProductSeed {
@@ -296,6 +360,13 @@ const STORES = [
   { code: '02', name: 'Tienda Demo Norte' },
 ];
 
+const MORE_STORES = [
+  { code: '03', name: 'Tienda Demo Sur', address: 'Pza. Sur 3', active: true },
+  { code: '04', name: 'Tienda Demo Gran Vía', address: 'Gran Vía 41', active: true },
+  { code: '05', name: 'Tienda Demo Online', address: 'eCommerce', active: true },
+  { code: '06', name: 'Almacén Demo', address: 'Pol. Ind. 7', active: false },
+];
+
 /** Crea tiendas, familias, productos y stock inicial variado. Idempotente. */
 async function seedCatalog(orgId: string): Promise<void> {
   for (const s of STORES) {
@@ -361,6 +432,56 @@ async function seedCatalog(orgId: string): Promise<void> {
   }
 }
 
+/** Crea subfamilias (jerarquía de 2 niveles) para familias existentes. Idempotente. */
+async function seedSubfamilies(orgId: string): Promise<void> {
+  const familyIdByKey = new Map<string, string>();
+  const families = await prisma.productFamily.findMany({
+    where: { organizationId: orgId, parentId: null },
+  });
+  for (const f of families) {
+    const key = FAMILIES.find((fam) => fam.name === f.name)?.key;
+    if (key) familyIdByKey.set(key, f.id);
+  }
+
+  for (const sf of SUBFAMILIES) {
+    const parentId = familyIdByKey.get(sf.parentKey);
+    if (!parentId) continue;
+
+    const existing = await prisma.productFamily.findFirst({
+      where: { organizationId: orgId, name: sf.name, parentId },
+    });
+    if (!existing) {
+      await prisma.productFamily.create({
+        data: {
+          organizationId: orgId,
+          parentId,
+          name: sf.name,
+          color: sf.color,
+          icon: sf.icon,
+          sortOrder: sf.sortOrder,
+        },
+      });
+    }
+  }
+}
+
+/** Crea tiendas adicionales (Sur, Gran Vía, Online, Almacén). Idempotente. */
+async function seedMoreStores(orgId: string): Promise<void> {
+  for (const s of MORE_STORES) {
+    await prisma.store.upsert({
+      where: { organizationId_code: { organizationId: orgId, code: s.code } },
+      update: { name: s.name, address: s.address, active: s.active },
+      create: {
+        organizationId: orgId,
+        code: s.code,
+        name: s.name,
+        address: s.address,
+        active: s.active,
+      },
+    });
+  }
+}
+
 interface UserSeed {
   email: string;
   name: string;
@@ -371,6 +492,10 @@ const USERS: UserSeed[] = [
   { email: 'admin@demo.simpletpv', name: 'Admin Demo', role: UserRole.ADMIN },
   { email: 'manager@demo.simpletpv', name: 'Encargada Demo', role: UserRole.MANAGER },
   { email: 'clerk@demo.simpletpv', name: 'Dependiente Demo', role: UserRole.CLERK },
+];
+
+const MORE_USERS: UserSeed[] = [
+  { email: 'jon@demo.simpletpv', name: 'Jon Aguirre', role: UserRole.CLERK },
 ];
 
 /** Crea usuarios demo y los asigna a TODAS las tiendas de la org. Idempotente. */
@@ -393,6 +518,33 @@ async function seedUsers(orgId: string, passwordHash: string): Promise<void> {
         where: { userId_storeId: { userId: user.id, storeId: store.id } },
         update: {},
         create: { userId: user.id, storeId: store.id },
+      });
+    }
+  }
+}
+
+/** Crea usuarios adicionales con asignación específica de tienda. Idempotente. */
+async function seedMoreUsers(orgId: string, passwordHash: string): Promise<void> {
+  const stores = await prisma.store.findMany({ where: { organizationId: orgId } });
+  const surStore = stores.find((s) => s.code === '03');
+
+  for (const u of MORE_USERS) {
+    const user = await prisma.user.upsert({
+      where: { email: u.email },
+      update: {},
+      create: {
+        organizationId: orgId,
+        email: u.email,
+        name: u.name,
+        passwordHash,
+        role: u.role,
+      },
+    });
+    if (surStore) {
+      await prisma.userStore.upsert({
+        where: { userId_storeId: { userId: user.id, storeId: surStore.id } },
+        update: {},
+        create: { userId: user.id, storeId: surStore.id },
       });
     }
   }
@@ -595,6 +747,320 @@ async function seedHistory(
   }
 }
 
+/** Crea fichajes (CLOCK_IN/CLOCK_OUT) de los últimos 5 días. Idempotente. */
+async function seedTimeClock(orgId: string): Promise<void> {
+  const users = await prisma.user.findMany({
+    where: { organizationId: orgId, role: { in: [UserRole.MANAGER, UserRole.CLERK] } },
+  });
+  const stores = await prisma.store.findMany({ where: { organizationId: orgId, active: true } });
+
+  for (let daysAgo = 4; daysAgo >= 0; daysAgo--) {
+    for (const user of users) {
+      const store = stores[daysAgo % stores.length];
+      if (!store) continue;
+
+      const clockInTime = dateDaysAgo(daysAgo, 9, 0);
+      const clockOutTime = dateDaysAgo(daysAgo, 17, 30);
+
+      const existingIn = await prisma.timeClockEntry.findFirst({
+        where: {
+          organizationId: orgId,
+          userId: user.id,
+          storeId: store.id,
+          type: TimeClockType.CLOCK_IN,
+          createdAt: { gte: clockInTime, lt: dateDaysAgo(daysAgo, 10, 0) },
+        },
+      });
+      if (!existingIn) {
+        await prisma.timeClockEntry.create({
+          data: {
+            organizationId: orgId,
+            userId: user.id,
+            storeId: store.id,
+            type: TimeClockType.CLOCK_IN,
+            createdAt: clockInTime,
+          },
+        });
+      }
+
+      const existingOut = await prisma.timeClockEntry.findFirst({
+        where: {
+          organizationId: orgId,
+          userId: user.id,
+          storeId: store.id,
+          type: TimeClockType.CLOCK_OUT,
+          createdAt: { gte: dateDaysAgo(daysAgo, 17, 0), lt: dateDaysAgo(daysAgo, 18, 0) },
+        },
+      });
+      if (!existingOut) {
+        await prisma.timeClockEntry.create({
+          data: {
+            organizationId: orgId,
+            userId: user.id,
+            storeId: store.id,
+            type: TimeClockType.CLOCK_OUT,
+            createdAt: clockOutTime,
+          },
+        });
+      }
+    }
+  }
+}
+
+/** Crea registros VeriFactu encadenados (hash + previousHash). Idempotente. */
+async function seedVerifactu(orgId: string): Promise<void> {
+  const sales = await prisma.sale.findMany({
+    where: { organizationId: orgId },
+    orderBy: { createdAt: 'desc' },
+    take: 6,
+  });
+
+  let previousHash: string | null = null;
+  for (let i = 0; i < sales.length; i++) {
+    const sale = sales[i];
+    if (!sale) continue;
+    const hash = `hash-demo-${i}-${sale.id.slice(0, 8)}`;
+
+    const existing = await prisma.verifactuRecord.findFirst({
+      where: { organizationId: orgId, saleId: sale.id },
+    });
+    if (existing) {
+      previousHash = hash;
+      continue;
+    }
+
+    await prisma.verifactuRecord.create({
+      data: {
+        organizationId: orgId,
+        saleId: sale.id,
+        type: VerifactuType.INVOICE,
+        status: VerifactuStatus.SENT,
+        hash,
+        previousHash,
+        payload: {
+          total: Number(sale.total),
+          ticketNumber: sale.ticketNumber,
+        },
+        attempts: 1,
+        sentAt: sale.createdAt,
+      },
+    });
+    previousHash = hash;
+  }
+}
+
+/** Crea lotes con caducidad (1 caducado, 2 por caducar). Idempotente. */
+async function seedBatches(orgId: string): Promise<void> {
+  const products = await prisma.product.findMany({
+    where: { organizationId: orgId },
+    take: 3,
+  });
+  const stores = await prisma.store.findMany({
+    where: { organizationId: orgId, active: true },
+    take: 2,
+  });
+
+  const batches = [
+    { productIndex: 0, storeIndex: 0, lotCode: 'LOT-2405-A', daysFromNow: -6, quantity: 8 },
+    { productIndex: 1, storeIndex: 0, lotCode: 'LOT-2601-C', daysFromNow: 9, quantity: 15 },
+    { productIndex: 2, storeIndex: 1, lotCode: 'LOT-2603-B', daysFromNow: 27, quantity: 22 },
+  ];
+
+  for (const b of batches) {
+    const product = products[b.productIndex];
+    const store = stores[b.storeIndex];
+    if (!product || !store) continue;
+
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + b.daysFromNow);
+
+    await prisma.stockBatch.upsert({
+      where: {
+        productId_storeId_lotCode: {
+          productId: product.id,
+          storeId: store.id,
+          lotCode: b.lotCode,
+        },
+      },
+      update: {},
+      create: {
+        organizationId: orgId,
+        productId: product.id,
+        storeId: store.id,
+        lotCode: b.lotCode,
+        expiryDate,
+        quantity: b.quantity,
+      },
+    });
+
+    if (product) {
+      await prisma.product.update({
+        where: { id: product.id },
+        data: { tracksBatch: true },
+      });
+    }
+  }
+}
+
+/** Crea alertas de stock (OUT_OF_STOCK). Idempotente. */
+async function seedAlerts(orgId: string): Promise<void> {
+  const products = await prisma.product.findMany({
+    where: { organizationId: orgId },
+    take: 2,
+  });
+  const centroStore = await prisma.store.findFirst({
+    where: { organizationId: orgId, code: '01' },
+  });
+
+  if (!centroStore) return;
+
+  for (const product of products) {
+    const existing = await prisma.stockAlert.findFirst({
+      where: {
+        organizationId: orgId,
+        productId: product.id,
+        storeId: centroStore.id,
+        resolved: false,
+      },
+    });
+    if (existing) continue;
+
+    await prisma.stockAlert.create({
+      data: {
+        organizationId: orgId,
+        productId: product.id,
+        storeId: centroStore.id,
+        alertType: AlertType.OUT_OF_STOCK,
+      },
+    });
+  }
+}
+
+/** Crea clientes B2B, lista de precios y pedidos mayoristas. Idempotente. */
+async function seedB2B(orgId: string): Promise<void> {
+  const priceList = await prisma.priceList.upsert({
+    where: { organizationId_name: { organizationId: orgId, name: 'Tarifa Mayorista Demo' } },
+    update: {},
+    create: { organizationId: orgId, name: 'Tarifa Mayorista Demo' },
+  });
+
+  const products = await prisma.product.findMany({
+    where: { organizationId: orgId },
+    take: 5,
+  });
+
+  for (const p of products) {
+    await prisma.priceListItem.upsert({
+      where: { priceListId_productId: { priceListId: priceList.id, productId: p.id } },
+      update: {},
+      create: {
+        organizationId: orgId,
+        priceListId: priceList.id,
+        productId: p.id,
+        price: Number(p.salePrice) * 0.7,
+      },
+    });
+  }
+
+  const customers = [
+    { name: 'Herbolario Natural SL', nif: 'B12345678', email: 'compras@herbolario.com' },
+    { name: 'Farmacia Centro', nif: 'B87654321', email: 'pedidos@farmaciacentro.com' },
+  ];
+
+  for (const c of customers) {
+    let customer = await prisma.customer.findFirst({
+      where: { organizationId: orgId, nif: c.nif },
+    });
+    if (!customer) {
+      customer = await prisma.customer.create({
+        data: {
+          organizationId: orgId,
+          name: c.name,
+          nif: c.nif,
+          email: c.email,
+          priceListId: priceList.id,
+        },
+      });
+    }
+
+    const existingOrder = await prisma.wholesaleOrder.findFirst({
+      where: { organizationId: orgId, customerId: customer.id },
+    });
+    if (existingOrder) continue;
+
+    const orderProducts = products.slice(0, 3);
+    const lines = orderProducts.map((p) => ({
+      organizationId: orgId,
+      productId: p.id,
+      qty: 10,
+      unitPrice: Number(p.salePrice) * 0.7,
+      lineTotal: Number(p.salePrice) * 0.7 * 10,
+    }));
+
+    await prisma.wholesaleOrder.create({
+      data: {
+        organizationId: orgId,
+        customerId: customer.id,
+        status: 'CONFIRMED',
+        total: lines.reduce((sum, l) => sum + l.lineTotal, 0),
+        lines: { create: lines },
+      },
+    });
+  }
+}
+
+/** Crea feature flags demo. Idempotente. */
+async function seedFeatureFlags(orgId: string): Promise<void> {
+  const flags = [
+    { key: 'module.b2b', enabled: true },
+    { key: 'module.timeclock', enabled: true },
+    { key: 'module.verifactu', enabled: false },
+  ];
+
+  for (const f of flags) {
+    const existing = await prisma.featureFlag.findFirst({
+      where: { organizationId: orgId, key: f.key, storeId: null },
+    });
+    if (existing) continue;
+
+    await prisma.featureFlag.create({
+      data: {
+        organizationId: orgId,
+        key: f.key,
+        enabled: f.enabled,
+      },
+    });
+  }
+}
+
+/** Crea overrides de precio por tienda. Idempotente. */
+async function seedStorePrices(orgId: string): Promise<void> {
+  const products = await prisma.product.findMany({
+    where: { organizationId: orgId },
+    take: 3,
+  });
+  const stores = await prisma.store.findMany({
+    where: { organizationId: orgId, active: true },
+    take: 2,
+  });
+
+  for (const product of products) {
+    for (const store of stores) {
+      const overridePrice = Number(product.salePrice) * 0.95;
+      await prisma.storePrice.upsert({
+        where: { productId_storeId: { productId: product.id, storeId: store.id } },
+        update: {},
+        create: {
+          organizationId: orgId,
+          productId: product.id,
+          storeId: store.id,
+          price: overridePrice,
+        },
+      });
+    }
+  }
+}
+
 async function main(): Promise<void> {
   assertNotProduction();
 
@@ -605,9 +1071,12 @@ async function main(): Promise<void> {
   });
 
   await seedCatalog(org.id);
+  await seedSubfamilies(org.id);
+  await seedMoreStores(org.id);
 
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
   await seedUsers(org.id, passwordHash);
+  await seedMoreUsers(org.id, passwordHash);
 
   const stores = await prisma.store.findMany({
     where: { organizationId: org.id },
@@ -634,6 +1103,14 @@ async function main(): Promise<void> {
     })),
     clerk.id,
   );
+
+  await seedTimeClock(org.id);
+  await seedVerifactu(org.id);
+  await seedBatches(org.id);
+  await seedAlerts(org.id);
+  await seedB2B(org.id);
+  await seedFeatureFlags(org.id);
+  await seedStorePrices(org.id);
 
   console.log(`Seed demo completado: organización ${org.nif} con catálogo, usuarios e histórico.`);
 }

@@ -630,7 +630,29 @@ export class StockService {
       });
     }
 
-    return [...byProduct.values()].sort((a, b) => a.productName.localeCompare(b.productName));
+    // Rotación (velocidad de venta) por producto: unidades vendidas (COMPLETED) en la
+    // ventana reciente, clasificadas en bandas. groupBy va por el cliente extendido →
+    // RLS aplicada (no $queryRaw crudo, que sin contexto de tenant devolvería 0 filas).
+    const ROTATION_WINDOW_DAYS = 30;
+    const ROTATION_BAJA_MAX = 6; // < 6 uds/30 d → baja (movimiento lento)
+    const ROTATION_ALTA_MIN = 30; // ≥ 30 uds/30 d → alta
+    const since = new Date(Date.now() - ROTATION_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const sold = await this.prisma.saleLine.groupBy({
+      by: ['productId'],
+      where: { sale: { status: 'COMPLETED', createdAt: { gte: since } } },
+      _sum: { qty: true },
+    });
+    const unitsByProduct = new Map(sold.map((s) => [s.productId, Number(s._sum.qty ?? 0)]));
+    const rotationOf = (productId: string): 'alta' | 'media' | 'baja' => {
+      const units = unitsByProduct.get(productId) ?? 0;
+      if (units >= ROTATION_ALTA_MIN) return 'alta';
+      if (units < ROTATION_BAJA_MAX) return 'baja';
+      return 'media';
+    };
+
+    return [...byProduct.values()]
+      .map((e) => ({ ...e, rotation: rotationOf(e.productId) }))
+      .sort((a, b) => a.productName.localeCompare(b.productName));
   }
 
   /**

@@ -49,6 +49,7 @@ model Organization {
   wholesaleOrderLines WholesaleOrderLine[]
   apiKeys             ApiKey[]
   featureFlags        FeatureFlag[]
+  promotions          Promotion[]
 }
 
 // Personalización por usuario (IT-16): preferencias clave-valor (JSON) por usuario.
@@ -408,6 +409,40 @@ model FeatureFlag {
   // único (sin él, Postgres permitiría dos defaults de org para la misma key).
   @@unique([organizationId, key, storeId])
   @@index([organizationId, key])
+}
+
+// Promoción de descuento programable (#99): regla simple condición → descuento, con
+// vigencia (startDate/endDate) y activación manual. Org-wide (sin storeId): el catálogo
+// de promociones es de central. El estado (activa/programada/expirada/pausada) se deriva
+// de las fechas + `active` en el cliente. RLS por tenant.
+enum PromoConditionType {
+  min_qty // nº mínimo de productos en el ticket
+  min_ticket // importe mínimo del ticket (€)
+}
+
+enum PromoDiscountType {
+  percent // descuento porcentual (0–100)
+  amount // descuento en € sobre el ticket
+}
+
+model Promotion {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @db.Uuid
+  name           String
+  conditionType  PromoConditionType
+  threshold      Int // nº de productos (min_qty) o € de ticket (min_ticket)
+  discountType   PromoDiscountType
+  discountValue  Decimal            @db.Decimal(10, 4) // % o € según discountType
+  startDate      DateTime           @db.Date
+  endDate        DateTime           @db.Date
+  active         Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
 }
 
 // Movimiento de stock: cada entrada/salida deja rastro auditado. quantity es

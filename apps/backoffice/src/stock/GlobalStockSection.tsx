@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
-import { DEMO_FAMILIES, DEMO_PRODUCT_ROTATION, productRootFamily } from '../demo/demoData.js';
+import { listFamilies } from '../lib/families.js';
 import { getGlobalStock, listMovements, setMinStock } from '../lib/stock.js';
 import { dt, LEVEL_LABEL, MOVEMENT_LABEL, ROTATION_LABEL } from './labels.js';
 
@@ -21,13 +21,10 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [familyId, setFamilyId] = useState('');
-  // Filtro de tienda; puede venir preseleccionado al llegar desde un acceso
-  // directo de la página de Tiendas.
   const [storeId, setStoreId] = useState(initialStoreId ?? '');
   const [rotation, setRotation] = useState('');
   const [adjusting, setAdjusting] = useState<AdjustState | null>(null);
   const [movementsFor, setMovementsFor] = useState<string | null>(null);
-  // Overlay local de existencias ajustadas (demo: sin backend que persista).
   const [qtyOverlay, setQtyOverlay] = useState<Record<string, number>>({});
 
   const { data: rawRows = [], isLoading } = useQuery({
@@ -35,12 +32,16 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
     queryFn: getGlobalStock,
   });
 
+  const { data: families = [] } = useQuery({
+    queryKey: ['families'],
+    queryFn: listFamilies,
+  });
+
   const minMutation = useMutation({
     mutationFn: setMinStock,
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['stock-alerts'] }),
   });
 
-  // Aplica los ajustes locales y recalcula nivel/total.
   const rows = rawRows.map((row) => {
     const stores = row.stores.map((st) => {
       const q = qtyOverlay[`${row.productId}:${st.storeId}`] ?? st.quantity;
@@ -53,9 +54,8 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
 
   const filtered = rows.filter((row) => {
     if (search && !row.productName.toLowerCase().includes(search.toLowerCase())) return false;
-    if (familyId && productRootFamily(row.productId)?.id !== familyId) return false;
-    if (rotation && (DEMO_PRODUCT_ROTATION[row.productId] ?? 'media') !== rotation) return false;
     if (storeId && !row.stores.some((s) => s.storeId === storeId)) return false;
+    if (rotation && row.rotation !== rotation) return false;
     return true;
   });
 
@@ -76,8 +76,6 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
   return (
     <>
       <div className="table-panel">
-        {/* Filtros separados por aquello que acotan: el PRODUCTO (qué se busca) y
-            la TIENDA (dónde se mira). Antes estaban mezclados en una sola barra. */}
         <div className="stock-filters">
           <div className="stock-filter-group">
             <span className="stock-filter-label">Producto</span>
@@ -98,7 +96,7 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
               data-testid="stock-family"
               options={[
                 { value: '', label: 'Todos los arquetipos' },
-                ...DEMO_FAMILIES.map((f) => ({ value: f.id, label: f.name })),
+                ...families.map((f) => ({ value: f.id, label: f.name })),
               ]}
             />
             <Select
@@ -154,11 +152,11 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
                 const visibleStores = storeId
                   ? row.stores.filter((s) => s.storeId === storeId)
                   : row.stores;
-                const rot = DEMO_PRODUCT_ROTATION[row.productId] ?? 'media';
+                const rot = row.rotation;
                 return (
                   <tr key={row.productId} data-testid="stock-row">
                     <td>{row.productName}</td>
-                    <td className="muted">{productRootFamily(row.productId)?.name ?? '—'}</td>
+                    <td className="muted">—</td>
                     <td>
                       <span
                         className={`rotation-meter rotation-${rot}`}
@@ -173,9 +171,6 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
                       </span>
                     </td>
                     <td>
-                      {/* Lista compacta por tienda: punto de nivel + nombre + cantidad.
-                          Escala a muchas tiendas (apilado vertical) mejor que las
-                          píldoras anteriores. Cada fila abre el ajuste. */}
                       <div className="stock-store-list">
                         {visibleStores.map((st) => (
                           <button

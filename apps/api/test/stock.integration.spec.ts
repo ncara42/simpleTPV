@@ -316,4 +316,25 @@ describe('Stock — integración', () => {
     );
     expect(fromOrg2.totalItems).toBe(0);
   });
+
+  it('global: expone la rotación; una venta grande sube el producto a "alta" (#96)', async () => {
+    // Vende 30+ uds de product1 (sobre lo que ya vendieron los tests previos) → su
+    // rotación (uds vendidas COMPLETED en 30 d) cae en la banda alta (≥ 30).
+    await tenantStorage.run({ organizationId: org1Id }, async () =>
+      sales.create(
+        { storeId: store1Id, lines: [{ productId: product1Id, qty: 30 }], paymentMethod: 'CARD' },
+        user1Id,
+        'ADMIN',
+      ),
+    );
+
+    const rows = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      stockService.global(),
+    );
+    const row = rows.find((r) => r.productId === product1Id);
+    expect(row).toBeDefined();
+    expect(row!.rotation).toBe('alta');
+    // Toda fila trae una rotación válida calculada por el backend (no hardcode).
+    expect(rows.every((r) => ['alta', 'media', 'baja'].includes(r.rotation))).toBe(true);
+  });
 });
