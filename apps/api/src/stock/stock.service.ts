@@ -388,6 +388,114 @@ export class StockService {
   }
 
   /**
+   * Entrada en destino de un traspaso de un producto con lote (#138): el lote +
+   * caducidad VIAJA del origen al destino. Reconstruye los lotes que salieron del
+   * origen leyendo los movimientos TRANSFER_OUT del traspaso (su batchId), reparte
+   * lo realmente RECIBIDO sobre esos lotes por orden de envío (capado por lo enviado
+   * de cada lote) y crea/incrementa el MISMO lote (lotCode + expiryDate del origen)
+   * en la tienda destino. El exceso (recibido > enviado) entra SIN lote (no
+   * atribuible a un lote enviado), igual que el faltante FEFO. `quantityReceived` es
+   * POSITIVO. Devuelve el stock agregado final del destino. DEBE correr en withTenantTx.
+   *
+   * Productos sin lote: sus TRANSFER_OUT no llevan batchId → todo cae en "sin lote"
+   * → una entrada TRANSFER_IN directa (flujo de siempre), sin necesidad de gating.
+   */
+  async applyTransferReceipt(
+    tx: TxClient,
+    input: {
+      organizationId: string;
+      productId: string;
+      destStoreId: string;
+      // Traspaso de origen (para leer sus movimientos TRANSFER_OUT).
+      transferId: string;
+      quantityReceived: number;
+      referenceId?: string;
+      userId?: string;
+    },
+    afterCommit?: AfterCommit,
+  ): Promise<number> {
+    const {
+      organizationId,
+      productId,
+      destStoreId,
+      transferId,
+      quantityReceived,
+      referenceId,
+      userId,
+    } = input;
+    const common = {
+      organizationId,
+      productId,
+      storeId: destStoreId,
+      type: 'TRANSFER_IN' as const,
+      ...(referenceId !== undefined ? { referenceId } : {}),
+      ...(userId !== undefined ? { userId } : {}),
+    };
+
+    // Lotes enviados desde el origen (movimientos TRANSFER_OUT del traspaso con
+    // batchId), en orden de envío (= FEFO del origen). Agrega lo enviado por lote.
+    const outMovs = await tx.stockMovement.findMany({
+      where: { organizationId, productId, type: 'TRANSFER_OUT', referenceId: transferId },
+      orderBy: { createdAt: 'asc' },
+      select: { batchId: true, quantity: true },
+    });
+    const sentByBatch = new Map<string, number>();
+    for (const m of outMovs) {
+      if (m.batchId == null) {
+        continue; // faltante enviado sin lote → no atribuible a lote.
+      }
+      sentByBatch.set(m.batchId, (sentByBatch.get(m.batchId) ?? 0) + Math.abs(Number(m.quantity)));
+    }
+    const consumed: ConsumedBatch[] = [...sentByBatch].map(([batchId, qty]) => ({ batchId, qty }));
+
+    // Reparte lo recibido sobre los lotes enviados (capado, orden de envío); el
+    // exceso cae en noLot → entra sin lote (D4). Sin idempotencia (se recibe una vez).
+    const allocation = allocateReturnToBatches(consumed, {}, quantityReceived);
+
+    // batchId (lote ORIGEN) → lotCode + expiryDate: el lote viaja con su caducidad.
+    const batchIds = allocation.perBatch.map((p) => p.batchId);
+    const batchRows = batchIds.length
+      ? await tx.stockBatch.findMany({
+          where: { id: { in: batchIds } },
+          select: { id: true, lotCode: true, expiryDate: true },
+        })
+      : [];
+    const originById = new Map(batchRows.map((b) => [b.id, b]));
+
+    // Stock agregado de partida del destino (por si quantityReceived fuese 0).
+    const current = await tx.stock.findFirst({
+      where: { productId, storeId: destStoreId, organizationId },
+      select: { quantity: true },
+    });
+    let resulting = Number(current?.quantity ?? 0);
+
+    for (const p of allocation.perBatch) {
+      const origin = originById.get(p.batchId);
+      if (origin === undefined) {
+        continue; // defensivo: el lote origen debería existir.
+      }
+      resulting = await this.applyMovement(
+        tx,
+        // El lote se recrea en destino con su MISMA caducidad (lot travels).
+        {
+          ...common,
+          quantity: p.qty,
+          batch: { lotCode: origin.lotCode, expiryDate: origin.expiryDate },
+        },
+        afterCommit,
+      );
+    }
+    if (allocation.noLot > 0) {
+      resulting = await this.applyMovement(
+        tx,
+        { ...common, quantity: allocation.noLot },
+        afterCommit,
+      );
+    }
+    return resulting;
+  }
+
+  /**
    * Dispara, actualiza o resuelve la alerta de stock de un par producto+tienda
    * según la cantidad resultante vs su mínimo. Idempotente y seguro frente al
    * índice único parcial (una activa por par): usa updateMany condicional para no
