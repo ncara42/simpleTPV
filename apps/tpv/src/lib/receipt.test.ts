@@ -44,7 +44,7 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('renderReceiptHtml (demo mirror)', () => {
+describe('renderReceiptHtml', () => {
   it('genera un documento HTML completo con los datos fiscales', () => {
     const html = renderReceiptHtml(makeTicket());
     expect(html).toContain('<!DOCTYPE html>');
