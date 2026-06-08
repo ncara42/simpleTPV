@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 
 import { requireOwned } from '../common/tenant-scope.js';
+import { FeatureFlagService } from '../feature-flags/feature-flags.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import type { CreateCustomerDto, UpdateCustomerDto } from './b2b.dto.js';
@@ -9,7 +10,12 @@ import type { CreateCustomerDto, UpdateCustomerDto } from './b2b.dto.js';
 // asignada sea del propio tenant (la FK solo comprueba que el id exista).
 @Injectable()
 export class CustomersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Feature flags (#127 B): gatea el módulo mayorista B2B a nivel org. @Optional
+    // para no romper construcciones directas en tests; DI lo provee en producción.
+    @Optional() private readonly features?: FeatureFlagService,
+  ) {}
 
   private assertPriceListInOrg(priceListId: string, organizationId: string): Promise<unknown> {
     return requireOwned(
@@ -32,6 +38,8 @@ export class CustomersService {
 
   async create(dto: CreateCustomerDto) {
     const { organizationId } = requireTenant();
+    // Feature flag (#127 B): módulo B2B apagable a nivel org → 403 si está apagado.
+    await this.features?.assertEnabled('b2b');
     if (dto.priceListId) await this.assertPriceListInOrg(dto.priceListId, organizationId);
     return this.prisma.customer.create({
       data: {

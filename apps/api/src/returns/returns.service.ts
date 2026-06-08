@@ -4,11 +4,13 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 
 import { assertStoreAccess } from '../auth/store-access.js';
 import { round2 } from '../common/money.js';
+import { FeatureFlagService } from '../feature-flags/feature-flags.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
@@ -30,6 +32,10 @@ export class ReturnsService {
     // VeriFactu: registro rectificativo de cada devolución (SEC-07), creado en la
     // misma tx que la devolución (atómico) y enviado tras commit.
     private readonly verifactu: VerifactuService,
+    // Feature flags (#127 B): gatea la devolución ciega por org/tienda. @Optional
+    // para no romper construcciones directas en tests; en producción DI lo provee
+    // (FeatureFlagsModule importado por ReturnsModule) y el enforcement es real.
+    @Optional() private readonly features?: FeatureFlagService,
   ) {}
 
   /**
@@ -268,6 +274,9 @@ export class ReturnsService {
     // Aislamiento por tienda (SEC-01): un CLERK solo hace devoluciones ciegas en
     // sus tiendas. Se comprueba antes que el PIN para fallar cuanto antes.
     await assertStoreAccess(this.prisma, { userId, role, storeId: dto.storeId });
+    // Feature flag (#127 B): la devolución ciega puede estar apagada en esta tienda
+    // u org → 403 antes de tocar nada. Sin flag → comportamiento actual (activa).
+    await this.features?.assertEnabled('blind_returns', dto.storeId);
     // Autorización por PIN ANTES de abrir la tx (si falla, no toca nada), con
     // lockout anti-fuerza-bruta por usuario iniciador + tenant (SEC-19).
     const pinKey = `${tenant.organizationId}:${userId}`;

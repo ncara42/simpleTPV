@@ -5,10 +5,12 @@ import {
   NotFoundException,
   type OnModuleDestroy,
   type OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { type SaleStatus } from '@simpletpv/db';
 import { Queue, type RedisOptions, Worker } from 'bullmq';
 
+import { FeatureFlagService } from '../feature-flags/feature-flags.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant, tenantStorage } from '../prisma/tenant-context.js';
 import type { SaleRole } from './sales.domain.js';
@@ -57,6 +59,9 @@ export class SalesExportService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sales: SalesService,
+    // Feature flags (#127 B): gatea la exportación (ventas y contable) a nivel org.
+    // @Optional para no romper construcciones directas en tests; DI lo provee en prod.
+    @Optional() private readonly features?: FeatureFlagService,
   ) {}
 
   onModuleInit(): void {
@@ -102,6 +107,9 @@ export class SalesExportService implements OnModuleInit, OnModuleDestroy {
     format: ExportFormat = 'sales',
   ): Promise<{ id: string; status: string }> {
     const tenant = requireTenant();
+    // Feature flag (#127 B): la exportación (ventas y contable) es de central; se
+    // gatea a nivel org → 403 si está apagada. Sin flag → comportamiento actual.
+    await this.features?.assertEnabled('data_export');
     // Guarda SOLO los campos de filtro (no page/pageSize) + el formato, para
     // trazabilidad y para que el worker regenere exactamente el mismo conjunto.
     const stored: ExportFilters = {

@@ -11,6 +11,7 @@ import * as admin from './admin.js';
 import { api } from './auth.js';
 import * as dashboard from './dashboard.js';
 import * as families from './families.js';
+import * as features from './features.js';
 import { getPreferences, setPreference } from './preferences.js';
 import * as products from './products.js';
 import * as purchases from './purchases.js';
@@ -177,6 +178,13 @@ describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
     });
     await stock.sendTransfer('t1');
     expect(post).toHaveBeenCalledWith('/transfers/t1/send');
+  });
+
+  it('features: GET /me/features con storeId opcional (#127 B)', async () => {
+    await features.getFeatures('st1');
+    expect(get).toHaveBeenCalledWith('/me/features', { storeId: 'st1' });
+    await features.getFeatures();
+    expect(get).toHaveBeenLastCalledWith('/me/features', {});
   });
 
   it('store-prices: overrides retail por tienda contra /stores/:id/prices', async () => {
