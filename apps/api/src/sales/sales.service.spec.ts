@@ -316,6 +316,12 @@ function makePrisma() {
       // de estos tests no llevan lote → reingreso sin lote (flujo de siempre).
       findFirst: vi.fn(async (_a?: unknown): Promise<unknown> => ({ tracksBatch: false })),
     },
+    // Precio retail por tienda (#127 A): create lee los overrides por (tienda,
+    // productos del ticket). Por defecto sin overrides → cada línea cae al PVP del
+    // producto; los tests del override sobrescriben este findMany.
+    storePrice: {
+      findMany: vi.fn(async (_a?: unknown): Promise<unknown[]> => []),
+    },
     return: {
       count: vi.fn(async (_a?: unknown): Promise<number> => 0),
     },
@@ -470,6 +476,59 @@ describe('SalesService.create — camino completo (online vs offline S2)', () =>
       data: { ticketNumber: string };
     };
     expect(created.data.ticketNumber).toBe('T01-000043');
+  });
+
+  // Precio retail por tienda (#127 A): el corazón money-safe del slice. La venta
+  // resuelve el unitPrice como `override de la tienda ?? PVP del producto`. El
+  // override solo cambia DE DÓNDE sale el precio; el resto (taxRate/costPrice
+  // congelados, descuentos/totales) opera sobre el unitPrice ya resuelto.
+  function firstLine(prisma: ReturnType<typeof makePrisma>): {
+    unitPrice: number;
+    lineTotal: number;
+  } {
+    const created = (prisma.sale.create as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
+      data: { lines: { create: Array<{ unitPrice: number; lineTotal: number }> } };
+    };
+    return created.data.lines.create[0]!;
+  }
+
+  it('aplica el override de precio de la tienda al unitPrice de la línea', async () => {
+    const prisma = makePrisma();
+    withProduct(prisma); // PVP del producto = 10
+    // Override de la tienda para p1: 7.50 € (el price llega como Decimal/string del driver).
+    prisma.storePrice.findMany = vi.fn(async () => [{ productId: 'p1', price: '7.5' }]);
+    prisma.$queryRaw = vi.fn(async () => [{ code: '01', ticketCounter: 5 }]) as never;
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.create(dtoBase as never, 'user-1', 'ADMIN'),
+    );
+
+    const line = firstLine(prisma);
+    expect(line.unitPrice).toBe(7.5); // usa el precio de la tienda, no el PVP (10)
+    expect(line.lineTotal).toBe(7.5); // qty 1 → total sobre el precio resuelto
+    // El lookup de overrides filtra por la tienda de la venta y los productos del ticket.
+    const where = (
+      prisma.storePrice.findMany.mock.calls[0]![0] as { where: Record<string, unknown> }
+    ).where;
+    expect(where.storeId).toBe(dtoBase.storeId);
+    expect(where.organizationId).toBe(ORG);
+    expect(where.productId).toEqual({ in: ['p1'] });
+  });
+
+  it('sin override para el producto, el unitPrice cae al PVP del producto', async () => {
+    const prisma = makePrisma();
+    withProduct(prisma); // PVP del producto = 10
+    // storePrice.findMany por defecto → [] (sin overrides): se usa el PVP.
+    prisma.$queryRaw = vi.fn(async () => [{ code: '01', ticketCounter: 5 }]) as never;
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.create(dtoBase as never, 'user-1', 'ADMIN'),
+    );
+
+    const line = firstLine(prisma);
+    expect(line.unitPrice).toBe(10); // PVP intacto: tiendas sin pricing no notan nada
   });
 });
 

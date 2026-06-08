@@ -15,6 +15,7 @@ import { getPreferences, setPreference } from './preferences.js';
 import * as products from './products.js';
 import * as purchases from './purchases.js';
 import * as stock from './stock.js';
+import * as storePrices from './store-prices.js';
 
 const get = vi.mocked(api.get);
 const post = vi.mocked(api.post);
@@ -176,6 +177,15 @@ describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
     });
     await stock.sendTransfer('t1');
     expect(post).toHaveBeenCalledWith('/transfers/t1/send');
+  });
+
+  it('store-prices: overrides retail por tienda contra /stores/:id/prices', async () => {
+    await storePrices.listStorePrices('st1');
+    expect(get).toHaveBeenCalledWith('/stores/st1/prices');
+    await storePrices.setStorePrice('st1', 'p1', 7.5);
+    expect(put).toHaveBeenCalledWith('/stores/st1/prices', { productId: 'p1', price: 7.5 });
+    await storePrices.removeStorePrice('st1', 'p1');
+    expect(del).toHaveBeenCalledWith('/stores/st1/prices/p1');
   });
 
   it('purchases: pedidos de compra contra /purchase-orders', async () => {

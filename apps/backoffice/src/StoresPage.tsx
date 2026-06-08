@@ -12,6 +12,7 @@ import { usePageHeader } from './lib/pageHeader.js';
 import { StoreCard } from './stores/StoreCard.js';
 import { StoreDetailModal } from './stores/StoreDetailModal.js';
 import { type StoreForm, StoreFormModal } from './stores/StoreFormModal.js';
+import { StorePricesModal } from './stores/StorePricesModal.js';
 
 // Etiqueta de la cifra de ventas en lenguaje natural (la card es para no técnicos).
 const SALES_LABEL: Record<StoreSalesPeriod, string> = {
@@ -38,6 +39,8 @@ export function StoresPage({
     Object.fromEntries(Object.entries(DEMO_STORE_OPS).map(([k, v]) => [k, { ...v }])),
   );
   const [detail, setDetail] = useState<Store | null>(null);
+  // Precios retail por tienda (#127 A): la tienda cuyos overrides se están editando.
+  const [pricesFor, setPricesFor] = useState<Store | null>(null);
 
   const { data: stores = [], isLoading } = useQuery({
     queryKey: ['stores'],
@@ -103,6 +106,7 @@ export function StoresPage({
               onSelect={() => setDetail(s)}
               onOpenStock={() => onOpenStoreView('stock', s.id)}
               onOpenSales={() => onOpenStoreView('sales', s.id)}
+              onOpenPrices={() => setPricesFor(s)}
             />
           ))}
         </div>
@@ -125,6 +129,8 @@ export function StoresPage({
           onClose={() => setDetail(null)}
         />
       )}
+
+      {pricesFor && <StorePricesModal store={pricesFor} onClose={() => setPricesFor(null)} />}
     </section>
   );
 }

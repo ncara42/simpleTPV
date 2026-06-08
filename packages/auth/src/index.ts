@@ -66,6 +66,7 @@ export type {
   StoreOrder,
   StoreOrderLine,
   StoreOrderStatus,
+  StorePriceOverride,
   SuggestionRow,
   SuggestPurchaseInput,
   Supplier,

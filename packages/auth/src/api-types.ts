@@ -683,6 +683,16 @@ export interface PriceListDetail {
   items: PriceListItem[];
 }
 
+// Override de precio retail de un producto en una tienda (#127 A). price/salePrice son
+// Decimal → string. Sin override para (producto, tienda) → el producto usa su PVP en esa
+// tienda. Solo afecta a la venta retail del TPV; el mayorista B2B mantiene su tarifa.
+export interface StorePriceOverride {
+  id: string;
+  productId: string;
+  price: string;
+  product: { name: string; salePrice: string };
+}
+
 export type WholesaleOrderStatus = 'DRAFT' | 'CONFIRMED' | 'SHIPPED' | 'CANCELLED';
 
 export interface WholesaleOrderLine {

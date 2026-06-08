@@ -9,6 +9,7 @@ export function StoreCard({
   onSelect,
   onOpenStock,
   onOpenSales,
+  onOpenPrices,
 }: {
   store: Store;
   active: boolean;
@@ -17,6 +18,7 @@ export function StoreCard({
   onSelect: () => void;
   onOpenStock: () => void;
   onOpenSales: () => void;
+  onOpenPrices: () => void;
 }) {
   return (
     <div
@@ -100,6 +102,17 @@ export function StoreCard({
             data-testid="store-open-sales"
           >
             Ventas
+          </button>
+          <button
+            type="button"
+            className="link-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenPrices();
+            }}
+            data-testid="store-open-prices"
+          >
+            Precios
           </button>
         </span>
       </div>
