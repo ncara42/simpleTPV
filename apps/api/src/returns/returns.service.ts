@@ -165,16 +165,19 @@ export class ReturnsService {
         include: { lines: true },
       });
 
-      // 6. Repone el stock de cada línea devuelta (entrada tipo RETURN, positivo)
-      //    dentro de la misma tx. referenceId = returnId para trazabilidad.
+      // 6. Repone el stock de cada línea devuelta dentro de la misma tx. Para
+      //    productos con lote (#137) reingresa al LOTE ORIGINAL del que salió la
+      //    venta (reconstruido desde sus movimientos SALE), capando por lote y
+      //    descontando devoluciones previas; el resto, RETURN sin lote. referenceId
+      //    = returnId para trazabilidad.
       for (const l of returnLines) {
-        await this.stock.applyMovement(
+        await this.stock.applyBatchedReturn(
           tx,
           {
             organizationId: tenant.organizationId,
             productId: l.productId,
             storeId: sale.storeId,
-            type: 'RETURN',
+            originSaleId: sale.id,
             quantity: l.qty,
             referenceId: created.id,
             userId,
@@ -313,15 +316,16 @@ export class ReturnsService {
         include: { lines: true },
       });
 
-      // Repone el stock de cada producto devuelto (RETURN, positivo).
+      // Repone el stock de cada producto devuelto. Devolución ciega: NO hay venta de
+      // origen → reingreso SIN lote (#137 D6a), no se conoce el lote original.
       for (const l of returnLines) {
-        await this.stock.applyMovement(
+        await this.stock.applyBatchedReturn(
           tx,
           {
             organizationId: tenant.organizationId,
             productId: l.productId,
             storeId: dto.storeId,
-            type: 'RETURN',
+            originSaleId: null,
             quantity: l.qty,
             referenceId: created.id,
             userId,

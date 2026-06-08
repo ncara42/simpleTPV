@@ -12,6 +12,8 @@ import {
   ALERT_URGENCY,
   alertTypeFor,
   allocateFefo,
+  allocateReturnToBatches,
+  type ConsumedBatch,
   daysUntil,
   EXPIRY_THRESHOLD_DAYS,
   expiryCutoff,
@@ -245,6 +247,140 @@ export class StockService {
       resulting = await this.applyMovement(
         tx,
         { ...common, quantity: -allocation.shortfall },
+        afterCommit,
+      );
+    }
+    return resulting;
+  }
+
+  /**
+   * Reingreso a lote(s) original(es) de una salida previa (#137): la imagen espejo
+   * de applyFefoOutflow. Para un producto con lote, reconstruye de qué lote salió la
+   * mercancía leyendo los movimientos SALE de la venta de origen (su batchId), y
+   * reingresa la cantidad devuelta a esos lotes por orden de consumo (FEFO), capando
+   * cada lote por lo que de él salió menos lo ya reingresado en devoluciones previas
+   * de ESA venta (idempotencia de parciales encadenadas). El faltante (vendido sin
+   * lote) y las devoluciones SIN venta de origen (ciegas) reingresan SIN lote (D6a).
+   * `quantity` es la cantidad POSITIVA a reingresar. Devuelve el stock agregado final.
+   * DEBE correr dentro de un withTenantTx (tenant fijado).
+   *
+   * Productos sin tracksBatch: atajo a un único RETURN sin lote (flujo de siempre).
+   */
+  async applyBatchedReturn(
+    tx: TxClient,
+    input: {
+      organizationId: string;
+      productId: string;
+      storeId: string;
+      // Venta de la que salió la mercancía (para leer sus movimientos SALE). null en
+      // devoluciones sin ticket (ciegas): no hay lote original conocido → sin lote.
+      originSaleId: string | null;
+      quantity: number;
+      referenceId?: string;
+      userId?: string;
+    },
+    afterCommit?: AfterCommit,
+  ): Promise<number> {
+    const { organizationId, productId, storeId, originSaleId, quantity, referenceId, userId } =
+      input;
+    const common = {
+      organizationId,
+      productId,
+      storeId,
+      type: 'RETURN' as const,
+      ...(referenceId !== undefined ? { referenceId } : {}),
+      ...(userId !== undefined ? { userId } : {}),
+    };
+
+    // Devolución ciega (sin venta de origen): no hay lote original conocido →
+    // reingreso SIN lote (D6a). No consulta el producto ni los movimientos.
+    if (!originSaleId) {
+      return this.applyMovement(tx, { ...common, quantity }, afterCommit);
+    }
+
+    const product = await tx.product.findFirst({
+      where: { id: productId },
+      select: { tracksBatch: true },
+    });
+
+    // Producto sin tracking de lote: reingreso SIN lote (flujo de siempre). No
+    // descuadra: no salió ni entra a ningún StockBatch.
+    if (!product?.tracksBatch) {
+      return this.applyMovement(tx, { ...common, quantity }, afterCommit);
+    }
+
+    // Lotes que la venta consumió (movimientos SALE con batchId), en orden FEFO
+    // (orden de creación). Agregamos lo consumido por lote.
+    const saleMovs = await tx.stockMovement.findMany({
+      where: { organizationId, productId, type: 'SALE', referenceId: originSaleId },
+      orderBy: { createdAt: 'asc' },
+      select: { batchId: true, quantity: true },
+    });
+    const consumedMap = new Map<string, number>();
+    for (const m of saleMovs) {
+      if (m.batchId == null) {
+        continue; // faltante vendido sin lote → no atribuible a lote.
+      }
+      consumedMap.set(m.batchId, (consumedMap.get(m.batchId) ?? 0) + Math.abs(Number(m.quantity)));
+    }
+    const consumed: ConsumedBatch[] = [...consumedMap].map(([batchId, qty]) => ({ batchId, qty }));
+
+    // Ya reingresado por lote en devoluciones previas de ESTA venta: devoluciones con
+    // ticket (referenceId = returnId de un Return con saleId = originSaleId) y la
+    // anulación (referenceId = originSaleId). Evita reingresar dos veces al mismo lote
+    // al encadenar devoluciones parciales (D3).
+    const priorReturns = await tx.return.findMany({
+      where: { saleId: originSaleId, organizationId },
+      select: { id: true },
+    });
+    const refIds = [...priorReturns.map((r) => r.id), originSaleId];
+    const retMovs = await tx.stockMovement.findMany({
+      where: { organizationId, productId, type: 'RETURN', referenceId: { in: refIds } },
+      select: { batchId: true, quantity: true },
+    });
+    const alreadyReturned: Record<string, number> = {};
+    for (const m of retMovs) {
+      if (m.batchId == null) {
+        continue;
+      }
+      alreadyReturned[m.batchId] = (alreadyReturned[m.batchId] ?? 0) + Number(m.quantity);
+    }
+
+    const allocation = allocateReturnToBatches(consumed, alreadyReturned, quantity);
+
+    // batchId → lotCode: applyMovement reingresa por (producto, tienda, lotCode),
+    // reactivando el lote existente (upsert) sin tocar su caducidad (D7).
+    const batchIds = allocation.perBatch.map((p) => p.batchId);
+    const batchRows = batchIds.length
+      ? await tx.stockBatch.findMany({
+          where: { id: { in: batchIds } },
+          select: { id: true, lotCode: true },
+        })
+      : [];
+    const lotById = new Map(batchRows.map((b) => [b.id, b.lotCode]));
+
+    // Stock agregado de partida (por si quantity fuese 0 / sin reingresos).
+    const current = await tx.stock.findFirst({
+      where: { productId, storeId, organizationId },
+      select: { quantity: true },
+    });
+    let resulting = Number(current?.quantity ?? 0);
+
+    for (const p of allocation.perBatch) {
+      const lotCode = lotById.get(p.batchId);
+      if (lotCode === undefined) {
+        continue; // defensivo: el lote debería existir (no se borran al llegar a 0).
+      }
+      resulting = await this.applyMovement(
+        tx,
+        { ...common, quantity: p.qty, batch: { lotCode } },
+        afterCommit,
+      );
+    }
+    if (allocation.noLot > 0) {
+      resulting = await this.applyMovement(
+        tx,
+        { ...common, quantity: allocation.noLot },
         afterCommit,
       );
     }

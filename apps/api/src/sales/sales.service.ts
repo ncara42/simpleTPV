@@ -457,16 +457,19 @@ export class SalesService {
         throw new BadRequestException('La venta ya está anulada');
       }
 
-      // Repone el stock de cada línea (entrada tipo RETURN, quantity positivo),
-      // dentro de la misma tx que la anulación. referenceId = saleId.
+      // Repone el stock de cada línea dentro de la misma tx que la anulación. Para
+      // productos con lote (#137) revierte el consumo al LOTE ORIGINAL (reconstruido
+      // desde los movimientos SALE de esta venta); el resto, RETURN sin lote. La
+      // anulación solo procede si la venta no tiene devoluciones previas (validado
+      // arriba), así que revierte el 100% del consumo. referenceId = saleId.
       for (const l of sale.lines) {
-        await this.stock.applyMovement(
+        await this.stock.applyBatchedReturn(
           tx,
           {
             organizationId: tenant.organizationId,
             productId: l.productId,
             storeId: sale.storeId,
-            type: 'RETURN',
+            originSaleId: sale.id,
             quantity: Number(l.qty),
             referenceId: sale.id,
             userId,

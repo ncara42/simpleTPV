@@ -90,6 +90,52 @@ export function allocateFefo(batches: FefoBatch[], qty: number): FefoAllocation 
   return { consumed, shortfall: remaining > 0 ? remaining : 0 };
 }
 
+// Lote del que salió una venta, con lo consumido de él (qty > 0). En orden de
+// consumo (FEFO: caducidad ascendente, = orden de los movimientos SALE).
+export interface ConsumedBatch {
+  batchId: string;
+  qty: number;
+}
+
+export interface ReturnAllocation {
+  // Cuánto reingresar a cada lote, en el orden de consumo (qty > 0).
+  perBatch: Array<{ batchId: string; qty: number }>;
+  // Cantidad que NO se atribuye a ningún lote (la venta tuvo faltante sin lote, o
+  // los lotes ya recibieron todo lo que salió de ellos): se reingresa SIN lote.
+  noLot: number;
+}
+
+/**
+ * Reparto del reingreso de una devolución (#137) sobre los lotes que la venta
+ * consumió. Espejo de allocateFefo: recorre `consumed` (lotes de la venta en orden
+ * de consumo) y reingresa hasta `qty`, **capando** cada lote por lo que salió de él
+ * menos lo ya reingresado en devoluciones previas (`alreadyReturned[batchId]`), para
+ * no devolver a un lote más de lo que de él salió. Lo que exceda la capacidad de los
+ * lotes (faltante vendido sin lote) cae en `noLot`. Función pura. `qty` se asume > 0.
+ */
+export function allocateReturnToBatches(
+  consumed: ConsumedBatch[],
+  alreadyReturned: Record<string, number>,
+  qty: number,
+): ReturnAllocation {
+  let remaining = round3(qty);
+  const perBatch: Array<{ batchId: string; qty: number }> = [];
+  for (const c of consumed) {
+    if (remaining <= 0) {
+      break;
+    }
+    const already = alreadyReturned[c.batchId] ?? 0;
+    const capacity = round3(c.qty - already);
+    if (capacity <= 0) {
+      continue;
+    }
+    const take = round3(Math.min(remaining, capacity));
+    perBatch.push({ batchId: c.batchId, qty: take });
+    remaining = round3(remaining - take);
+  }
+  return { perBatch, noLot: remaining > 0 ? remaining : 0 };
+}
+
 // Caducidad (#126 slice 4) — alerta de caducidad computada on-read (sin cron).
 
 // Ventana por defecto de "por caducar": un lote que caduca dentro de estos días se

@@ -298,6 +298,181 @@ describe('StockService.applyFefoOutflow', () => {
   });
 });
 
+describe('StockService.applyBatchedReturn', () => {
+  // Mock de tx con todo lo que toca applyBatchedReturn: lectura del producto, de los
+  // movimientos SALE/RETURN, de los Return de la venta, del mapeo batchId→lotCode y
+  // las escrituras de applyMovement (upserts + movimiento + alerta).
+  function makeReturnTx(opts: {
+    tracksBatch?: boolean;
+    saleMovs?: Array<{ batchId: string | null; quantity: number }>;
+    retMovs?: Array<{ batchId: string | null; quantity: number }>;
+    priorReturns?: Array<{ id: string }>;
+    batchRows?: Array<{ id: string; lotCode: string }>;
+    currentQty?: number;
+  }) {
+    const movementCreate = vi.fn(async (_a?: unknown) => ({ id: 'mov' }));
+    const batchUpsert = vi.fn(async (_a?: unknown) => ({ id: 'b' }));
+    const movementFindMany = vi.fn(async (a: { where: { type: string } }) =>
+      a.where.type === 'SALE' ? (opts.saleMovs ?? []) : (opts.retMovs ?? []),
+    );
+    const tx = {
+      product: { findFirst: vi.fn(async () => ({ tracksBatch: opts.tracksBatch ?? true })) },
+      return: { findMany: vi.fn(async () => opts.priorReturns ?? []) },
+      stockMovement: { findMany: movementFindMany, create: movementCreate },
+      stockBatch: { findMany: vi.fn(async () => opts.batchRows ?? []), upsert: batchUpsert },
+      stock: {
+        upsert: vi.fn(async () => ({ quantity: opts.currentQty ?? 0, minStock: 0 })),
+        findFirst: vi.fn(async () => ({ quantity: opts.currentQty ?? 0 })),
+      },
+      stockAlert: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async () => ({ id: 'a' })),
+        update: vi.fn(async () => ({})),
+      },
+    };
+    return { tx, movementCreate, batchUpsert, movementFindMany };
+  }
+
+  function makeService() {
+    return new StockService({} as never, new MemoryCache(), {} as never, new InMemoryEventBus());
+  }
+
+  // Lote por lotCode reingresado (where.productId_storeId_lotCode.lotCode) → increment.
+  function batchUpsertsByLot(batchUpsert: ReturnType<typeof vi.fn>) {
+    return batchUpsert.mock.calls.map((c) => {
+      const a = c[0] as {
+        where: { productId_storeId_lotCode: { lotCode: string } };
+        update: { quantity: { increment: number } };
+      };
+      return {
+        lotCode: a.where.productId_storeId_lotCode.lotCode,
+        inc: a.update.quantity.increment,
+      };
+    });
+  }
+
+  it('producto con lote: reingresa al lote original (devolución total revierte el consumo)', async () => {
+    const { tx, batchUpsert, movementCreate } = makeReturnTx({
+      saleMovs: [
+        { batchId: 'bid-A', quantity: -3 },
+        { batchId: 'bid-B', quantity: -2 },
+      ],
+      batchRows: [
+        { id: 'bid-A', lotCode: 'L-A' },
+        { id: 'bid-B', lotCode: 'L-B' },
+      ],
+    });
+
+    await makeService().applyBatchedReturn(tx as never, {
+      organizationId: ORG,
+      productId: 'p1',
+      storeId: 's1',
+      originSaleId: 'sale-1',
+      quantity: 5,
+      referenceId: 'ret-1',
+    });
+
+    expect(batchUpsertsByLot(batchUpsert)).toEqual([
+      { lotCode: 'L-A', inc: 3 },
+      { lotCode: 'L-B', inc: 2 },
+    ]);
+    // Dos movimientos RETURN (uno por lote), ninguno sin lote.
+    expect(movementCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it('devolución parcial con reingreso previo: capa el lote agotado y pasa al siguiente', async () => {
+    const { tx, batchUpsert } = makeReturnTx({
+      saleMovs: [
+        { batchId: 'bid-A', quantity: -3 },
+        { batchId: 'bid-B', quantity: -5 },
+      ],
+      // Ya se reingresaron 3 al lote A en una devolución previa de esta venta.
+      priorReturns: [{ id: 'ret-prev' }],
+      retMovs: [{ batchId: 'bid-A', quantity: 3 }],
+      batchRows: [{ id: 'bid-B', lotCode: 'L-B' }],
+    });
+
+    await makeService().applyBatchedReturn(tx as never, {
+      organizationId: ORG,
+      productId: 'p1',
+      storeId: 's1',
+      originSaleId: 'sale-1',
+      quantity: 2,
+      referenceId: 'ret-2',
+    });
+
+    // A está capado (3/3) → todo va a B.
+    expect(batchUpsertsByLot(batchUpsert)).toEqual([{ lotCode: 'L-B', inc: 2 }]);
+  });
+
+  it('faltante: lo no atribuible a lote se reingresa SIN lote', async () => {
+    const { tx, batchUpsert, movementCreate } = makeReturnTx({
+      saleMovs: [
+        { batchId: 'bid-A', quantity: -2 },
+        { batchId: null, quantity: -3 }, // faltante vendido sin lote
+      ],
+      batchRows: [{ id: 'bid-A', lotCode: 'L-A' }],
+    });
+
+    await makeService().applyBatchedReturn(tx as never, {
+      organizationId: ORG,
+      productId: 'p1',
+      storeId: 's1',
+      originSaleId: 'sale-1',
+      quantity: 5,
+      referenceId: 'ret-3',
+    });
+
+    expect(batchUpsertsByLot(batchUpsert)).toEqual([{ lotCode: 'L-A', inc: 2 }]);
+    // Un movimiento con lote (L-A, +2) + uno sin lote por el faltante (+3).
+    const noLotMov = movementCreate.mock.calls
+      .map((c) => (c[0] as { data: { batchId?: string; quantity: number } }).data)
+      .find((d) => d.batchId === undefined);
+    expect(noLotMov?.quantity).toBe(3);
+  });
+
+  it('devolución ciega (sin venta de origen): reingreso SIN lote, no consulta movimientos', async () => {
+    const { tx, batchUpsert, movementCreate, movementFindMany } = makeReturnTx({});
+
+    await makeService().applyBatchedReturn(tx as never, {
+      organizationId: ORG,
+      productId: 'p1',
+      storeId: 's1',
+      originSaleId: null,
+      quantity: 4,
+      referenceId: 'ret-blind',
+    });
+
+    expect(movementFindMany).not.toHaveBeenCalled();
+    expect(batchUpsert).not.toHaveBeenCalled();
+    expect(movementCreate).toHaveBeenCalledTimes(1);
+    const mov = movementCreate.mock.calls[0]![0] as {
+      data: { quantity: number; batchId?: string };
+    };
+    expect(mov.data.quantity).toBe(4);
+    expect(mov.data.batchId).toBeUndefined();
+  });
+
+  it('producto sin tracksBatch: atajo a un RETURN sin lote', async () => {
+    const { tx, batchUpsert, movementCreate, movementFindMany } = makeReturnTx({
+      tracksBatch: false,
+    });
+
+    await makeService().applyBatchedReturn(tx as never, {
+      organizationId: ORG,
+      productId: 'p1',
+      storeId: 's1',
+      originSaleId: 'sale-1',
+      quantity: 3,
+      referenceId: 'ret-4',
+    });
+
+    expect(movementFindMany).not.toHaveBeenCalled();
+    expect(batchUpsert).not.toHaveBeenCalled();
+    expect(movementCreate).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('stockLevel', () => {
   it('rojo si quantity <= 0', () => {
     expect(stockLevel(0, 5)).toBe('red');
