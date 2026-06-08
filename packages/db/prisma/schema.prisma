@@ -31,6 +31,7 @@ model Organization {
   returnLines         ReturnLine[]
   stock               Stock[]
   stockBatches        StockBatch[]
+  storePrices         StorePrice[]
   stockMovements      StockMovement[]
   stockAlerts         StockAlert[]
   transfers           Transfer[]
@@ -86,6 +87,7 @@ model Store {
   returns          Return[]
   stock            Stock[]
   stockBatches     StockBatch[]
+  storePrices      StorePrice[]
   stockMovements   StockMovement[]
   stockAlerts      StockAlert[]
   officialDevices  OfficialDevice[]
@@ -181,6 +183,7 @@ model Product {
   returnLines         ReturnLine[]
   stock               Stock[]
   stockBatches        StockBatch[]
+  storePrices         StorePrice[]
   stockMovements      StockMovement[]
   stockAlerts         StockAlert[]
   transferLines       TransferLine[]
@@ -355,6 +358,28 @@ model Stock {
   product      Product      @relation(fields: [productId], references: [id])
   store        Store        @relation(fields: [storeId], references: [id])
 
+  @@unique([productId, storeId])
+  @@index([organizationId, storeId])
+}
+
+// Precio retail por tienda (#127 A): override del PVP del producto (Product.salePrice)
+// para una tienda concreta. Sin fila para (producto, tienda) → se usa el PVP del
+// producto (comportamiento por defecto). Solo afecta a la venta retail del TPV; el
+// mayorista (B2B) mantiene su tarifa por cliente. RLS por tenant.
+model StorePrice {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  productId      String   @db.Uuid
+  storeId        String   @db.Uuid
+  price          Decimal  @db.Decimal(10, 4)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  product      Product      @relation(fields: [productId], references: [id])
+  store        Store        @relation(fields: [storeId], references: [id])
+
+  // Un override por (producto, tienda). El lookup en la venta filtra por tienda.
   @@unique([productId, storeId])
   @@index([organizationId, storeId])
 }
