@@ -473,6 +473,168 @@ describe('StockService.applyBatchedReturn', () => {
   });
 });
 
+describe('StockService.applyTransferReceipt', () => {
+  // Mock de tx para applyTransferReceipt: lee los TRANSFER_OUT del traspaso, mapea
+  // batchId→lotCode/expiryDate del lote origen y recrea los lotes en destino.
+  function makeReceiptTx(opts: {
+    outMovs?: Array<{ batchId: string | null; quantity: number }>;
+    batchRows?: Array<{ id: string; lotCode: string; expiryDate: Date | null }>;
+    currentQty?: number;
+  }) {
+    const movementCreate = vi.fn(async (_a?: unknown) => ({ id: 'mov' }));
+    const batchUpsert = vi.fn(async (_a?: unknown) => ({ id: 'b' }));
+    const tx = {
+      stockMovement: {
+        findMany: vi.fn(async () => opts.outMovs ?? []),
+        create: movementCreate,
+      },
+      stockBatch: { findMany: vi.fn(async () => opts.batchRows ?? []), upsert: batchUpsert },
+      stock: {
+        upsert: vi.fn(async () => ({ quantity: opts.currentQty ?? 0, minStock: 0 })),
+        findFirst: vi.fn(async () => ({ quantity: opts.currentQty ?? 0 })),
+      },
+      stockAlert: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async () => ({ id: 'a' })),
+        update: vi.fn(async () => ({})),
+      },
+    };
+    return { tx, movementCreate, batchUpsert };
+  }
+
+  function makeService() {
+    return new StockService({} as never, new MemoryCache(), {} as never, new InMemoryEventBus());
+  }
+
+  // Reingresos a lote: lotCode, increment y la caducidad que viaja (create.expiryDate).
+  function inboundLots(batchUpsert: ReturnType<typeof vi.fn>) {
+    return batchUpsert.mock.calls.map((c) => {
+      const a = c[0] as {
+        where: { productId_storeId_lotCode: { lotCode: string } };
+        update: { quantity: { increment: number } };
+        create: { expiryDate: Date | null };
+      };
+      return {
+        lotCode: a.where.productId_storeId_lotCode.lotCode,
+        inc: a.update.quantity.increment,
+        expiry: a.create.expiryDate,
+      };
+    });
+  }
+
+  it('recrea en destino los lotes enviados con su MISMA caducidad (recibido == enviado)', async () => {
+    const expA = new Date('2026-06-01');
+    const expB = new Date('2027-01-01');
+    const { tx, batchUpsert, movementCreate } = makeReceiptTx({
+      outMovs: [
+        { batchId: 'bo-A', quantity: -3 },
+        { batchId: 'bo-B', quantity: -2 },
+      ],
+      batchRows: [
+        { id: 'bo-A', lotCode: 'L-A', expiryDate: expA },
+        { id: 'bo-B', lotCode: 'L-B', expiryDate: expB },
+      ],
+    });
+
+    await makeService().applyTransferReceipt(tx as never, {
+      organizationId: ORG,
+      productId: 'p1',
+      destStoreId: 'dest-1',
+      transferId: 'tr-1',
+      quantityReceived: 5,
+      referenceId: 'tr-1',
+    });
+
+    expect(inboundLots(batchUpsert)).toEqual([
+      { lotCode: 'L-A', inc: 3, expiry: expA },
+      { lotCode: 'L-B', inc: 2, expiry: expB },
+    ]);
+    // Movimientos TRANSFER_IN al destino, uno por lote, ninguno sin lote.
+    const types = movementCreate.mock.calls.map(
+      (c) => (c[0] as { data: { type: string } }).data.type,
+    );
+    expect(types).toEqual(['TRANSFER_IN', 'TRANSFER_IN']);
+  });
+
+  it('merma (recibido < enviado): reparte lo recibido por orden de envío, capado', async () => {
+    const { tx, batchUpsert } = makeReceiptTx({
+      outMovs: [
+        { batchId: 'bo-A', quantity: -3 },
+        { batchId: 'bo-B', quantity: -2 },
+      ],
+      batchRows: [
+        { id: 'bo-A', lotCode: 'L-A', expiryDate: new Date('2026-06-01') },
+        { id: 'bo-B', lotCode: 'L-B', expiryDate: new Date('2027-01-01') },
+      ],
+    });
+
+    await makeService().applyTransferReceipt(tx as never, {
+      organizationId: ORG,
+      productId: 'p1',
+      destStoreId: 'dest-1',
+      transferId: 'tr-1',
+      quantityReceived: 4,
+    });
+
+    // L-A recupera sus 3, L-B solo 1 (la merma se queda en tránsito).
+    expect(inboundLots(batchUpsert).map((x) => ({ lotCode: x.lotCode, inc: x.inc }))).toEqual([
+      { lotCode: 'L-A', inc: 3 },
+      { lotCode: 'L-B', inc: 1 },
+    ]);
+  });
+
+  it('exceso (recibido > enviado): el sobrante entra SIN lote', async () => {
+    const { tx, batchUpsert, movementCreate } = makeReceiptTx({
+      outMovs: [
+        { batchId: 'bo-A', quantity: -3 },
+        { batchId: 'bo-B', quantity: -2 },
+      ],
+      batchRows: [
+        { id: 'bo-A', lotCode: 'L-A', expiryDate: new Date('2026-06-01') },
+        { id: 'bo-B', lotCode: 'L-B', expiryDate: new Date('2027-01-01') },
+      ],
+    });
+
+    await makeService().applyTransferReceipt(tx as never, {
+      organizationId: ORG,
+      productId: 'p1',
+      destStoreId: 'dest-1',
+      transferId: 'tr-1',
+      quantityReceived: 6, // 5 enviados + 1 de exceso
+    });
+
+    // Los dos lotes recuperan lo enviado (3 + 2)…
+    expect(inboundLots(batchUpsert).map((x) => x.inc)).toEqual([3, 2]);
+    // …y el exceso (1) entra como TRANSFER_IN sin lote.
+    const noLotMov = movementCreate.mock.calls
+      .map((c) => (c[0] as { data: { batchId?: string; quantity: number } }).data)
+      .find((d) => d.batchId === undefined);
+    expect(noLotMov?.quantity).toBe(1);
+  });
+
+  it('producto sin lote (TRANSFER_OUT sin batchId): entrada directa sin lote', async () => {
+    const { tx, batchUpsert, movementCreate } = makeReceiptTx({
+      outMovs: [{ batchId: null, quantity: -5 }],
+    });
+
+    await makeService().applyTransferReceipt(tx as never, {
+      organizationId: ORG,
+      productId: 'p1',
+      destStoreId: 'dest-1',
+      transferId: 'tr-1',
+      quantityReceived: 5,
+    });
+
+    expect(batchUpsert).not.toHaveBeenCalled();
+    expect(movementCreate).toHaveBeenCalledTimes(1);
+    const mov = movementCreate.mock.calls[0]![0] as {
+      data: { quantity: number; batchId?: string };
+    };
+    expect(mov.data.quantity).toBe(5);
+    expect(mov.data.batchId).toBeUndefined();
+  });
+});
+
 describe('stockLevel', () => {
   it('rojo si quantity <= 0', () => {
     expect(stockLevel(0, 5)).toBe('red');

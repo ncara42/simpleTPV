@@ -153,7 +153,8 @@ describe('TransfersService.send', () => {
       id: 't1',
       status: 'DRAFT',
       originStoreId: STORE_A,
-      lines: [{ id: 'l1', productId: 'p1', quantitySent: 30 }],
+      // Producto sin lote (#138) → salida directa (TRANSFER_OUT), no FEFO.
+      lines: [{ id: 'l1', productId: 'p1', quantitySent: 30, product: { tracksBatch: false } }],
     });
     const stock = makeStock();
     const service = withBase(tx, stock);
@@ -184,7 +185,8 @@ describe('TransfersService.receive', () => {
     id: 't1',
     status: 'SENT',
     destStoreId: STORE_B,
-    lines: [{ id: 'l1', productId: 'p1', quantitySent: 30 }],
+    // Producto sin lote (#138) → entrada directa (TRANSFER_IN), no recrea lotes.
+    lines: [{ id: 'l1', productId: 'p1', quantitySent: 30, product: { tracksBatch: false } }],
   };
 
   it('409 si no está en SENT', async () => {

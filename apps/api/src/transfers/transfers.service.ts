@@ -21,7 +21,11 @@ export function computeDiscrepancy(quantitySent: number, quantityReceived: numbe
 }
 
 function includeLinesWithProduct() {
-  return { lines: { include: { product: { select: { name: true, barcode: true } } } } };
+  // tracksBatch (#138): decide si la salida/entrada del traspaso viaja por lote (FEFO
+  // del origen + recrear el lote en destino) o es un movimiento directo sin lote.
+  return {
+    lines: { include: { product: { select: { name: true, barcode: true, tracksBatch: true } } } },
+  };
 }
 
 @Injectable()
@@ -101,21 +105,32 @@ export class TransfersService {
         throw new ConflictException('El traspaso ya fue enviado');
       }
 
-      // Decrementa el stock del origen por lo enviado (TRANSFER_OUT, negativo).
+      // Decrementa el stock del origen por lo enviado (TRANSFER_OUT). Para productos
+      // con lote (#138) sale por FEFO (consume el lote que caduca antes, con su
+      // batchId, para que el lote pueda viajar al destino en la recepción); el resto,
+      // salida directa sin lote.
       for (const line of transfer.lines) {
-        await this.stock.applyMovement(
-          tx,
-          {
-            organizationId: tenant.organizationId,
-            productId: line.productId,
-            storeId: transfer.originStoreId,
-            type: 'TRANSFER_OUT',
-            quantity: -Number(line.quantitySent),
-            referenceId: transfer.id,
-            userId,
-          },
-          afterCommit,
-        );
+        const out = {
+          organizationId: tenant.organizationId,
+          productId: line.productId,
+          storeId: transfer.originStoreId,
+          type: 'TRANSFER_OUT' as const,
+          referenceId: transfer.id,
+          userId,
+        };
+        if (line.product.tracksBatch) {
+          await this.stock.applyFefoOutflow(
+            tx,
+            { ...out, quantity: Number(line.quantitySent) },
+            afterCommit,
+          );
+        } else {
+          await this.stock.applyMovement(
+            tx,
+            { ...out, quantity: -Number(line.quantitySent) },
+            afterCommit,
+          );
+        }
       }
 
       return tx.transfer.findFirstOrThrow({
@@ -175,21 +190,40 @@ export class TransfersService {
             ...(r.discrepancyNote !== undefined ? { discrepancyNote: r.discrepancyNote } : {}),
           },
         });
-        // Incrementa el stock del destino por lo RECIBIDO (no por lo enviado).
+        // Incrementa el stock del destino por lo RECIBIDO (no por lo enviado). Para
+        // productos con lote (#138) recrea en destino los MISMOS lotes que salieron
+        // del origen (lotCode + caducidad), repartiendo lo recibido por lote; el
+        // exceso entra sin lote. El resto, entrada directa sin lote.
         if (r.quantityReceived > 0) {
-          await this.stock.applyMovement(
-            tx,
-            {
-              organizationId: tenant.organizationId,
-              productId: line.productId,
-              storeId: transfer.destStoreId,
-              type: 'TRANSFER_IN',
-              quantity: r.quantityReceived,
-              referenceId: transfer.id,
-              userId,
-            },
-            afterCommit,
-          );
+          if (line.product.tracksBatch) {
+            await this.stock.applyTransferReceipt(
+              tx,
+              {
+                organizationId: tenant.organizationId,
+                productId: line.productId,
+                destStoreId: transfer.destStoreId,
+                transferId: transfer.id,
+                quantityReceived: r.quantityReceived,
+                referenceId: transfer.id,
+                userId,
+              },
+              afterCommit,
+            );
+          } else {
+            await this.stock.applyMovement(
+              tx,
+              {
+                organizationId: tenant.organizationId,
+                productId: line.productId,
+                storeId: transfer.destStoreId,
+                type: 'TRANSFER_IN',
+                quantity: r.quantityReceived,
+                referenceId: transfer.id,
+                userId,
+              },
+              afterCommit,
+            );
+          }
         }
       }
 
