@@ -35,6 +35,7 @@ import { CatalogPage } from './CatalogPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { HelpPage } from './HelpPage.js';
 import { api, useAuthStore } from './lib/auth.js';
+import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { switchApp } from './lib/nav.js';
 import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
@@ -215,6 +216,7 @@ function AccessDenied() {
 export default function App() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const getRole = useAuthStore((s) => s.getRole);
+  useDevAutoLogin(accessToken === null);
   if (accessToken === null) {
     return <LoginForm onSubmit={api.login} />;
   }
