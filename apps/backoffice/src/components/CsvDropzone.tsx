@@ -57,6 +57,12 @@ export function CsvDropzone({
   async function handleFile(file: File): Promise<void> {
     setError(null);
     setResult(null);
+    // Mismo límite que el body JSON de la API (512kb): rechazar aquí da un error
+    // claro en vez del 413 genérico del servidor.
+    if (file.size > 512 * 1024) {
+      setError('El archivo supera 512 KB. Divide el CSV en lotes más pequeños.');
+      return;
+    }
     const csv = await file.text();
     const missing = missingColumns(csv);
     if (missing.length > 0) {

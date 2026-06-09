@@ -165,7 +165,12 @@ export class SupplierPricesService {
         errors.push({ row, message: 'Precio inválido' });
         continue;
       }
-      const product = await this.prisma.product.findFirst({ where: { sku }, select: { id: true } });
+      // organizationId explícito además de la RLS (defensa en profundidad, mismo
+      // patrón que store-prices): el SKU nunca resuelve a un producto de otra org.
+      const product = await this.prisma.product.findFirst({
+        where: { sku, organizationId },
+        select: { id: true },
+      });
       if (!product) {
         errors.push({ row, message: `Sin producto con SKU "${sku}"` });
         continue;
