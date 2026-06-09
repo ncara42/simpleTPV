@@ -15,3 +15,12 @@ export function setStorePrice(storeId: string, productId: string, price: number)
 export function removeStorePrice(storeId: string, productId: string): Promise<void> {
   return api.del(`/stores/${storeId}/prices/${productId}`);
 }
+
+export interface ImportResult {
+  inserted: number;
+  errors: Array<{ row: number; message: string }>;
+}
+
+export function importStorePricesCsv(storeId: string, csv: string): Promise<ImportResult> {
+  return api.post<ImportResult>(`/stores/${storeId}/prices/import`, { csv });
+}

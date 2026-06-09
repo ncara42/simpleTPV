@@ -145,6 +145,34 @@ describe('StorePricesService.setPrice', () => {
   });
 });
 
+describe('StorePricesService.importCsv', () => {
+  it('resuelve por SKU, upserta las válidas y reporta errores por fila', async () => {
+    const prisma = makePrisma();
+    // Resolver por SKU: BOL-1 existe, SIN-SKU no.
+    prisma.product.findFirst = vi.fn(async (args: unknown) =>
+      (args as { where: { sku: string } }).where.sku === 'BOL-1' ? { id: PRODUCT } : null,
+    );
+    const service = new StorePricesService(prisma as never);
+    const csv = ['sku,price', 'BOL-1,5.50', ',1.00', 'SIN-SKU,9.99'].join('\n');
+
+    const res = await run(() => service.importCsv(STORE, csv, ADMIN));
+
+    expect(res.inserted).toBe(1);
+    expect(res.errors.map((e) => e.row)).toEqual([3, 4]); // sin sku + sku inexistente
+    expect(prisma.storePrice.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('un CLERK sin asignación a la tienda recibe 403 antes de importar (SEC-01)', async () => {
+    const prisma = makePrisma({ membership: null });
+    const service = new StorePricesService(prisma as never);
+
+    await expect(run(() => service.importCsv(STORE, 'sku,price\nA,1', CLERK))).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(prisma.storePrice.upsert).not.toHaveBeenCalled();
+  });
+});
+
 describe('StorePricesService.removePrice', () => {
   it('borra el override de (tienda, producto) filtrando por organización', async () => {
     const prisma = makePrisma();

@@ -2,10 +2,16 @@ import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
 import type { Store } from '../lib/admin.js';
 import { listProducts } from '../lib/products.js';
-import { listStorePrices, removeStorePrice, setStorePrice } from '../lib/store-prices.js';
+import {
+  importStorePricesCsv,
+  listStorePrices,
+  removeStorePrice,
+  setStorePrice,
+} from '../lib/store-prices.js';
 
 function eur(n: number | string): string {
   return `${Number(n).toFixed(2)} €`;
@@ -19,6 +25,7 @@ export function StorePricesModal({ store, onClose }: { store: Store; onClose: ()
   const qc = useQueryClient();
   const [productId, setProductId] = useState('');
   const [price, setPrice] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: overrides = [] } = useQuery({
     queryKey: ['store-prices', store.id],
@@ -126,6 +133,34 @@ export function StorePricesModal({ store, onClose }: { store: Store; onClose: ()
               Añadir
             </button>
           </div>
+        </section>
+
+        <section className="form-section">
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => setImportOpen((o) => !o)}
+            aria-expanded={importOpen}
+            data-testid="store-price-import-toggle"
+          >
+            {importOpen ? 'Ocultar importación CSV' : 'Importar precios por CSV'}
+          </button>
+          {importOpen && (
+            <CsvDropzone
+              columns={['sku', 'price']}
+              example={['SKU-001', '8.50']}
+              templateName="plantilla_precios_tienda.csv"
+              testId="store-price-csv"
+              help={
+                <>
+                  Columnas: <code>sku,price</code>. Cada fila fija el precio del producto con ese
+                  SKU en <strong>{store.name}</strong>.
+                </>
+              }
+              onImport={(csv) => importStorePricesCsv(store.id, csv)}
+              onImported={invalidate}
+            />
+          )}
         </section>
       </div>
       <div className="modal-foot modal-foot-actions">

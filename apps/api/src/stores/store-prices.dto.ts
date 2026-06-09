@@ -1,4 +1,4 @@
-import { IsNumber, IsUUID, Max, Min } from 'class-validator';
+import { IsNumber, IsString, IsUUID, Max, Min } from 'class-validator';
 
 import { MAX_PRICE } from '../common/limits.js';
 
@@ -15,4 +15,10 @@ export class SetStorePriceDto {
   @Min(0)
   @Max(MAX_PRICE)
   price!: number;
+}
+
+// Importación en lote de precios por tienda (CSV con cabecera `sku,price`).
+export class ImportStorePricesDto {
+  @IsString()
+  csv!: string;
 }
