@@ -79,6 +79,54 @@ describe('DashboardService — mapeos y cálculos (unit)', () => {
     }
   });
 
+  it('salesKpis: construye las series intra-periodo por bucket', async () => {
+    const bA = new Date('2026-06-09T09:00:00Z');
+    const bB = new Date('2026-06-09T10:00:00Z');
+    // Orden de queries: agg, devoluciones, ventas-bucket, unidades-bucket, devol-bucket.
+    const fake = withFakeRows([
+      [{ sales_count: 5n, revenue: '800', subtotal: '750', discount: '50', units: '18' }],
+      [{ returns_total: '10' }],
+      [
+        { bucket: bA, count: 2n, revenue: '200', subtotal: '180', discount: '20' },
+        { bucket: bB, count: 3n, revenue: '600', subtotal: '570', discount: '30' },
+      ],
+      [
+        { bucket: bA, units: '6' },
+        { bucket: bB, units: '12' },
+      ],
+      [{ bucket: bA, returns: '10' }], // bB sin devoluciones
+    ]);
+    try {
+      const k = await run(() => makeService().salesKpis({}));
+      expect(k.series.avgTicket).toEqual([100, 200]); // 200/2, 600/3
+      expect(k.series.upt).toEqual([3, 4]); // 6/2, 12/3
+      expect(k.series.discountRate).toEqual([0.1, 0.05]); // 20/200, 30/600
+      expect(k.series.returnRate).toEqual([0.05, 0]); // 10/200, sin devol
+    } finally {
+      fake.restore();
+    }
+  });
+
+  it('marginKpis: construye series de % margen y margen real por bucket', async () => {
+    const bA = new Date('2026-06-09T09:00:00Z');
+    const bB = new Date('2026-06-09T10:00:00Z');
+    // Orden de queries: agg de margen, margen-bucket.
+    const fake = withFakeRows([
+      [{ gross: '200', real: '150', revenue: '350' }],
+      [
+        { bucket: bA, real: '50', revenue: '100' },
+        { bucket: bB, real: '200', revenue: '500' },
+      ],
+    ]);
+    try {
+      const m = await run(() => makeService().marginKpis({}));
+      expect(m.realMarginSeries).toEqual([50, 200]);
+      expect(m.series).toEqual([0.5, 0.4]); // 50/100, 200/500
+    } finally {
+      fake.restore();
+    }
+  });
+
   it('stockoutKpis: convierte segundos→horas y calcula tasa', async () => {
     const fake = withFakeRows([
       [{ events: 3n, resolved: 2n, open: 1n, avg_seconds: '7200' }], // 2h
