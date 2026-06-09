@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
+import { listStores } from '../lib/admin.js';
 import { listFamilies } from '../lib/families.js';
 import { getGlobalStock, listMovements, setMinStock } from '../lib/stock.js';
 import { dt, LEVEL_LABEL, MOVEMENT_LABEL, ROTATION_LABEL } from './labels.js';
@@ -37,6 +38,14 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
     queryFn: listFamilies,
   });
 
+  // Las opciones del filtro de tienda salen de TODAS las tiendas (no solo de las que
+  // tienen stock del primer producto): así el filtro preseleccionado al llegar desde
+  // "Ver stock" de Tiendas se muestra siempre, en vez de quedar en "Seleccionar…".
+  const { data: stores = [] } = useQuery({
+    queryKey: ['stores'],
+    queryFn: listStores,
+  });
+
   const minMutation = useMutation({
     mutationFn: setMinStock,
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['stock-alerts'] }),
@@ -50,7 +59,7 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
     return { ...row, stores, total: stores.reduce((acc, s) => acc + s.quantity, 0) };
   });
 
-  const storeOptions = rows[0]?.stores.map((s) => ({ id: s.storeId, name: s.storeName })) ?? [];
+  const storeOptions = stores.map((s) => ({ id: s.id, name: s.name }));
 
   const filtered = rows.filter((row) => {
     if (search && !row.productName.toLowerCase().includes(search.toLowerCase())) return false;

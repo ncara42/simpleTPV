@@ -2460,8 +2460,10 @@
 
 /* ── Tiendas: accesos directos en la card + token de fichaje (UX) ───────────── */
 .store-card-actions {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--ui-space-2);
+  min-width: 0;
 }
 .store-device-token {
   margin-top: var(--ui-space-3);
