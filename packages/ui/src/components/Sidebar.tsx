@@ -28,7 +28,7 @@ export interface NavGroup {
   label: string;
 }
 
-export interface SidebarAccount {
+interface SidebarAccount {
   name: string;
   subtitle?: string;
 }

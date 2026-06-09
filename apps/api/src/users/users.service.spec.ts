@@ -11,7 +11,7 @@ function makePrisma() {
     user: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'u1', ...data })),
       createMany: vi.fn(async ({ data }: { data: unknown[] }) => ({ count: data.length })),
-      findMany: vi.fn(async (): Promise<unknown[]> => [{ id: 'u1' }]),
+      findMany: vi.fn(async (): Promise<unknown[]> => [{ id: 'u1', stores: [{ storeId: 's1' }] }]),
       findFirst: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'u1', email: 'a@b.test' })),
       update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'u1', ...data })),
       delete: vi.fn(async () => ({ id: 'u1' })),
@@ -49,6 +49,14 @@ describe('UsersService', () => {
     expect(arg.data.passwordHash).toBeTruthy();
     expect(arg.data.password).toBeUndefined(); // no se guarda en claro
     expect(bcrypt.compareSync('secreto', arg.data.passwordHash)).toBe(true);
+  });
+
+  it('findAll aplana las tiendas asignadas a storeIds', async () => {
+    const prisma = makePrisma();
+    const service = new UsersService(prisma as never);
+    const res = await service.findAll();
+    expect(res[0]).toMatchObject({ id: 'u1', storeIds: ['s1'] });
+    expect((res[0] as { stores?: unknown }).stores).toBeUndefined();
   });
 
   it('importCsv crea las filas válidas y reporta errores por fila', async () => {

@@ -4,7 +4,7 @@ import { eur } from './lib/format.js';
 
 // Denominaciones EUR de mayor a menor, en CÉNTIMOS (enteros) para evitar errores
 // de coma flotante al sumar (0.1 + 0.2 ≠ 0.3). El total se divide entre 100.
-export const CASH_DENOMINATIONS: ReadonlyArray<{ cents: number; label: string }> = [
+const CASH_DENOMINATIONS: ReadonlyArray<{ cents: number; label: string }> = [
   { cents: 50000, label: '500 €' },
   { cents: 20000, label: '200 €' },
   { cents: 10000, label: '100 €' },

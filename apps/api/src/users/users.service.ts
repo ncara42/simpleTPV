@@ -42,8 +42,18 @@ export class UsersService {
     });
   }
 
-  async findAll(): Promise<PublicUser[]> {
-    return this.prisma.user.findMany({ orderBy: { name: 'asc' }, select: PUBLIC_SELECT });
+  // Lista con las tiendas asignadas (storeIds) para que el backoffice muestre y
+  // edite el acceso por tienda sin estado local. Un ADMIN accede a todas y lo
+  // lleva vacío por convención.
+  async findAll(): Promise<Array<PublicUser & { storeIds: string[] }>> {
+    const rows = await this.prisma.user.findMany({
+      orderBy: { name: 'asc' },
+      select: { ...PUBLIC_SELECT, stores: { select: { storeId: true } } },
+    });
+    return rows.map(({ stores, ...user }) => ({
+      ...user,
+      storeIds: stores.map((s) => s.storeId),
+    }));
   }
 
   // Alta de usuarios en lote desde CSV (columnas: email,name,password,role).

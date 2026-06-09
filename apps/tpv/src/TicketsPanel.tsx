@@ -8,6 +8,7 @@ import { usePageHeader } from './lib/pageHeader.js';
 import { downloadReceiptHtml, printReceiptHtml } from './lib/receipt.js';
 import { createReturn, listReturns } from './lib/returns.js';
 import { findSaleByTicket, getReceiptHtml, getTicket, listSales } from './lib/sales.js';
+import { returnedBySaleLine } from './return/aggregate.js';
 
 export function TicketsPanel({ storeId }: { storeId: string | null }) {
   usePageHeader('Tickets emitidos', 'Histórico de ventas de la tienda activa');
@@ -56,12 +57,7 @@ export function TicketsPanel({ storeId }: { storeId: string | null }) {
     mutationFn: async () => {
       if (!sale) throw new Error('Ticket no seleccionado');
       const previous = await listReturns(sale.id);
-      const returnedByLine = new Map<string, number>();
-      for (const r of previous) {
-        for (const l of r.lines) {
-          returnedByLine.set(l.saleLineId, (returnedByLine.get(l.saleLineId) ?? 0) + Number(l.qty));
-        }
-      }
+      const returnedByLine = returnedBySaleLine(previous);
       const lines = sale.lines
         .map((line) => ({
           saleLineId: line.id,

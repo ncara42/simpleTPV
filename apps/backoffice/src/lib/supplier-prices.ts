@@ -1,10 +1,8 @@
+import type { ImportResult } from '@simpletpv/auth';
+
 import { api } from './auth.js';
 
-// Resultado de import en lote (espeja el ImportResult del backend).
-export interface ImportResult {
-  inserted: number;
-  errors: Array<{ row: number; message: string }>;
-}
+export type { ImportResult };
 
 export interface SupplierPriceRow {
   id: string;

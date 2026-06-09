@@ -1,8 +1,8 @@
-import type { StorePriceOverride } from '@simpletpv/auth';
+import type { ImportResult, StorePriceOverride } from '@simpletpv/auth';
 
 import { api } from './auth.js';
 
-export type { StorePriceOverride };
+export type { ImportResult, StorePriceOverride };
 
 export function listStorePrices(storeId: string): Promise<StorePriceOverride[]> {
   return api.get<StorePriceOverride[]>(`/stores/${storeId}/prices`);
@@ -14,11 +14,6 @@ export function setStorePrice(storeId: string, productId: string, price: number)
 
 export function removeStorePrice(storeId: string, productId: string): Promise<void> {
   return api.del(`/stores/${storeId}/prices/${productId}`);
-}
-
-export interface ImportResult {
-  inserted: number;
-  errors: Array<{ row: number; message: string }>;
 }
 
 export function importStorePricesCsv(storeId: string, csv: string): Promise<ImportResult> {

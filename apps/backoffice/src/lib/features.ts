@@ -5,7 +5,7 @@ import { api } from './auth.js';
 
 export type { FeatureFlags };
 
-export const ALL_ENABLED: FeatureFlags = {
+const ALL_ENABLED: FeatureFlags = {
   blind_returns: true,
   time_clock: true,
   data_export: true,

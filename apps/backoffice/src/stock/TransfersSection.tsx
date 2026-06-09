@@ -1,10 +1,12 @@
+import type { ImportResult } from '@simpletpv/auth';
 import { Select } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { CsvDropzone, type CsvImportResult } from '../components/CsvDropzone.js';
+import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
 import { listStores } from '../lib/admin.js';
+import { parseCsvRows } from '../lib/csv.js';
 import { listProducts } from '../lib/products.js';
 import { createTransfer, listTransfers, sendTransfer } from '../lib/stock.js';
 import { dt, STATUS_LABEL } from './labels.js';
@@ -12,26 +14,6 @@ import { dt, STATUS_LABEL } from './labels.js';
 interface DraftLine {
   productId: string;
   qty: number;
-}
-
-// Parser CSV mínimo cliente (cabecera + filas, separador coma). Para el alta en
-// lote de líneas de traspaso por SKU sin tocar red (se resuelve contra el catálogo
-// ya cargado).
-function parseCsvRows(csv: string): Array<Record<string, string>> {
-  const lines = csv
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-  if (lines.length < 2) return [];
-  const header = lines[0]!.split(',').map((h) => h.trim().toLowerCase());
-  return lines.slice(1).map((line) => {
-    const cells = line.split(',');
-    const obj: Record<string, string> = {};
-    header.forEach((h, i) => {
-      obj[h] = (cells[i] ?? '').trim();
-    });
-    return obj;
-  });
 }
 
 export function TransfersSection() {
@@ -170,11 +152,11 @@ function CreateTransferModal({
 
   // Import CSV (sku,qty) en cliente: resuelve cada SKU contra el catálogo cargado y
   // acumula las líneas válidas, reportando errores por fila (mismo contrato que CsvDropzone).
-  const importLines = (csv: string): Promise<CsvImportResult> => {
+  const importLines = (csv: string): Promise<ImportResult> => {
     const bySku = new Map(
       products.filter((p) => p.sku).map((p) => [p.sku!.toLowerCase(), p] as const),
     );
-    const errors: CsvImportResult['errors'] = [];
+    const errors: ImportResult['errors'] = [];
     let inserted = 0;
     parseCsvRows(csv).forEach((cells, i) => {
       const row = i + 2;

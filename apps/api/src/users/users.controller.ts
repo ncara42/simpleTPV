@@ -29,7 +29,7 @@ export class UsersController {
   constructor(private readonly users: UsersService) {}
 
   @Get()
-  findAll(): Promise<PublicUser[]> {
+  findAll(): Promise<Array<PublicUser & { storeIds: string[] }>> {
     return this.users.findAll();
   }
 

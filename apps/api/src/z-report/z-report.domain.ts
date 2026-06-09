@@ -12,7 +12,7 @@
 import { round2 } from '../common/money.js';
 import { buildTaxBreakdown } from '../sales/sales.domain.js';
 
-export interface ZReportSaleLine {
+interface ZReportSaleLine {
   taxRate: number;
   lineTotal: number;
 }
@@ -29,13 +29,13 @@ export interface ZReportSale {
   lines: ZReportSaleLine[];
 }
 
-export interface ZReportTaxRow {
+interface ZReportTaxRow {
   taxRate: number;
   base: number;
   cuota: number;
 }
 
-export interface ZReportPaymentRow {
+interface ZReportPaymentRow {
   paymentMethod: string;
   count: number;
   total: number;

@@ -1,11 +1,5 @@
+import type { ImportResult } from '@simpletpv/auth';
 import { type ReactNode, useId, useRef, useState } from 'react';
-
-// Resultado de un import en lote: filas insertadas + errores por fila (espeja
-// el ImportResult del backend).
-export interface CsvImportResult {
-  inserted: number;
-  errors: Array<{ row: number; message: string }>;
-}
 
 interface Props {
   // Columnas esperadas en la cabecera (para validar y construir la plantilla).
@@ -17,7 +11,7 @@ interface Props {
   // Ayuda: qué columnas, cuáles obligatorias.
   help?: ReactNode;
   // Importa el CSV crudo y devuelve el resultado por filas.
-  onImport: (csv: string) => Promise<CsvImportResult>;
+  onImport: (csv: string) => Promise<ImportResult>;
   // Se invoca si se insertó al menos una fila (para refrescar la lista de origen).
   onImported?: () => void;
   testId?: string;
@@ -40,7 +34,7 @@ export function CsvDropzone({
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<CsvImportResult | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
 
   // Plantilla CSV como data URI (cabecera + fila de ejemplo).
   const templateHref = `data:text/csv;charset=utf-8,${encodeURIComponent(

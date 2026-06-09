@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
 import type { Store } from '../lib/admin.js';
+import { fmtEur } from '../lib/format.js';
 import { listProducts } from '../lib/products.js';
 import {
   importStorePricesCsv,
@@ -12,10 +13,6 @@ import {
   removeStorePrice,
   setStorePrice,
 } from '../lib/store-prices.js';
-
-function eur(n: number | string): string {
-  return `${Number(n).toFixed(2)} €`;
-}
 
 // Precios retail por tienda (#127 A): tabla de overrides del PVP para una tienda
 // concreta + alta/edición/borrado de cada override. Calcado del editor de tarifas
@@ -87,8 +84,8 @@ export function StorePricesModal({ store, onClose }: { store: Store; onClose: ()
               {overrides.map((o) => (
                 <tr key={o.id} data-testid="store-price-row">
                   <td>{o.product.name}</td>
-                  <td className="muted">{eur(o.product.salePrice)}</td>
-                  <td>{eur(o.price)}</td>
+                  <td className="muted">{fmtEur(Number(o.product.salePrice))}</td>
+                  <td>{fmtEur(Number(o.price))}</td>
                   <td>
                     <button
                       type="button"

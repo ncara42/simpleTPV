@@ -11,12 +11,14 @@
     },
     "apps/tpv": {
       "playwright": {
-        "config": ["playwright.config.ts"]
+        "config": ["playwright.config.ts"],
+        "entry": ["e2e/**/*.spec.ts", "e2e/**/*.setup.ts"]
       }
     },
     "apps/backoffice": {
       "playwright": {
-        "config": ["playwright.config.ts"]
+        "config": ["playwright.config.ts"],
+        "entry": ["e2e/**/*.spec.ts", "e2e/**/*.setup.ts"]
       }
     }
   }

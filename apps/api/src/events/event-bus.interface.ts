@@ -3,7 +3,7 @@ import type { Observable } from 'rxjs';
 // Tipos de evento que viajan por el canal en tiempo real (#32). El payload es
 // libre por tipo; el cliente filtra por `type`. Todos los eventos están acotados
 // a un tenant (organizationId) por el servidor — el cliente nunca elige el tenant.
-export type AppEventType = 'stock.changed' | 'sale.completed' | 'alert.created';
+type AppEventType = 'stock.changed' | 'sale.completed' | 'alert.created';
 
 export interface AppEvent {
   type: AppEventType;
