@@ -50,6 +50,7 @@ model Organization {
   apiKeys             ApiKey[]
   featureFlags        FeatureFlag[]
   promotions          Promotion[]
+  supplierPrices      SupplierPrice[]
 }
 
 // Personalización por usuario (IT-16): preferencias clave-valor (JSON) por usuario.
@@ -187,6 +188,7 @@ model Product {
   stock               Stock[]
   stockBatches        StockBatch[]
   storePrices         StorePrice[]
+  supplierPrices      SupplierPrice[]
   stockMovements      StockMovement[]
   stockAlerts         StockAlert[]
   transferLines       TransferLine[]
@@ -584,8 +586,30 @@ model Supplier {
 
   organization   Organization    @relation(fields: [organizationId], references: [id])
   purchaseOrders PurchaseOrder[]
+  supplierPrices SupplierPrice[]
 
   @@index([organizationId, active])
+}
+
+// Tarifa de compra por proveedor y producto (P1-B / D2). Precio al que un
+// proveedor sirve un producto; habilita la comparativa entre proveedores (mismo
+// arquetipo) y puede alimentar el coste de referencia. Una tarifa por
+// (proveedor, producto). RLS por tenant.
+model SupplierPrice {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  supplierId     String   @db.Uuid
+  productId      String   @db.Uuid
+  price          Decimal  @db.Decimal(10, 4)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  supplier     Supplier     @relation(fields: [supplierId], references: [id])
+  product      Product      @relation(fields: [productId], references: [id])
+
+  @@unique([supplierId, productId])
+  @@index([organizationId, productId])
 }
 
 // Pedido a proveedor (#44). Flujo de estados DRAFT → CONFIRMED →
