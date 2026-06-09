@@ -2511,6 +2511,152 @@
   color: var(--ui-text);
 }
 
+/* ── Stock escalable: heatmap por tienda + desglose plegable (P1-C) ── */
+/* Resumen compacto: una fila de puntos de color (uno por tienda) que escala con
+   N tiendas sin agrandar la fila; clic para expandir el desglose. */
+.stock-heatmap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  max-width: 100%;
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.12s var(--ui-ease),
+    border-color 0.12s var(--ui-ease);
+}
+.stock-heatmap:hover {
+  background: var(--ui-surface-subtle);
+  border-color: var(--ui-border);
+}
+.stock-heatmap:focus-visible {
+  outline: none;
+  border-color: var(--ui-primary);
+  box-shadow: var(--ui-focus);
+}
+.stock-heat-dots {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-width: 9rem;
+}
+.stock-heat-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-success);
+}
+.stock-heat-dot.sb-yellow {
+  background: var(--ui-warning);
+}
+.stock-heat-dot.sb-red {
+  background: var(--ui-danger);
+}
+.stock-heat-meta {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
+  white-space: nowrap;
+}
+.stock-heat-alert {
+  color: var(--ui-danger);
+  font-weight: 600;
+}
+.stock-heat-caret {
+  color: var(--ui-text-muted);
+  font-size: 0.7rem;
+}
+/* Vista de una sola tienda (filtro activo): punto + cantidad inline. */
+.stock-store-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+.stock-store-inline:hover {
+  background: var(--ui-surface-subtle);
+  border-color: var(--ui-border);
+}
+/* Fila de desglose expandida: contiene la mini-tabla por tienda. */
+.stock-detail-row > td {
+  padding: var(--ui-space-2) var(--ui-space-3);
+  background: var(--ui-surface-subtle);
+}
+
+/* ── Panel centralizado de roturas ── */
+.stock-alerts-panel {
+  margin: var(--ui-space-3) 0;
+  padding: var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md, 0.5rem);
+  background: var(--ui-surface);
+}
+.stock-alerts-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ui-space-2);
+  margin-bottom: var(--ui-space-2);
+}
+.stock-alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stock-alert-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border-left: 3px solid var(--ui-warning);
+  border-radius: var(--ui-radius-sm);
+}
+.stock-alert-item.sev-critical {
+  border-left-color: var(--ui-danger);
+  background: var(--ui-danger-soft);
+}
+.stock-alert-tag {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
+  white-space: nowrap;
+}
+.stock-alerts-more {
+  margin: var(--ui-space-2) 0 0;
+  font-size: var(--ui-text-sm);
+}
+/* Chip de filtro "solo en alerta". */
+.stock-alert-toggle {
+  padding: var(--ui-space-1) var(--ui-space-3);
+  border: 1px solid var(--ui-border-strong, var(--ui-border));
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface);
+  cursor: pointer;
+  font-size: var(--ui-text-sm);
+  transition:
+    background 0.12s var(--ui-ease),
+    border-color 0.12s var(--ui-ease),
+    color 0.12s var(--ui-ease);
+}
+.stock-alert-toggle:hover {
+  background: var(--ui-surface-subtle);
+}
+.stock-alert-toggle.is-on {
+  background: var(--ui-danger-soft);
+  border-color: var(--ui-danger);
+  color: var(--ui-danger);
+  font-weight: 600;
+}
+
 /* ── Tiendas: accesos directos en la card + token de fichaje (UX) ───────────── */
 .store-card-actions {
   display: flex;
