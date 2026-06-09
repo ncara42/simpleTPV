@@ -28,6 +28,12 @@ function stockLevel(qty: number): 'red' | 'yellow' | 'green' {
   return 'green';
 }
 
+// Importe en euros con coma decimal (es-ES).
+const eur = (n: number): string => n.toFixed(2).replace('.', ',');
+// Margen sobre PVP: (PVP − coste) / PVP en %. '—' si no hay PVP.
+const marginPct = (sale: number, cost: number): string =>
+  sale > 0 ? `${Math.round(((sale - cost) / sale) * 100)}%` : '—';
+
 interface FormState {
   id?: string;
   name: string;
@@ -346,7 +352,9 @@ export function CatalogPage() {
                 <th>Nombre</th>
                 <th>Arquetipo</th>
                 <th>SKU</th>
+                <th>Coste</th>
                 <th>Precio</th>
+                <th>Margen</th>
                 <th>IVA</th>
                 <th>Stock</th>
               </tr>
@@ -378,7 +386,15 @@ export function CatalogPage() {
                       {familyPathLabel(families, p.familyId)}
                     </td>
                     <td className="muted">{p.sku ?? '—'}</td>
-                    <td>{Number(p.salePrice).toFixed(2).replace('.', ',')} €</td>
+                    <td className="muted">{eur(Number(p.costPrice))} €</td>
+                    <td>{eur(Number(p.salePrice))} €</td>
+                    <td data-testid="catalog-margin">
+                      {eur(Number(p.salePrice) - Number(p.costPrice))} €
+                      <span className="muted">
+                        {' · '}
+                        {marginPct(Number(p.salePrice), Number(p.costPrice))}
+                      </span>
+                    </td>
                     <td className="muted">{Number(p.taxRate).toFixed(0)}%</td>
                     <td>
                       <span
