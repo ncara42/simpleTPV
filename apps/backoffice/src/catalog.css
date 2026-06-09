@@ -2511,6 +2511,31 @@
   color: var(--ui-text);
 }
 
+/* ── Comparativa de tarifas de compra entre proveedores (P1-B) ── */
+.sp-price-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+}
+.sp-price-chip {
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface-subtle);
+  font-size: var(--ui-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.sp-price-chip.is-best {
+  border-color: var(--tpv-teal-500, #14b8a6);
+  background: var(--ui-success-soft, #e8f6f2);
+  color: var(--tpv-teal-700, #0f766e);
+  font-weight: 600;
+}
+.sp-best {
+  color: var(--tpv-teal-700, #0f766e);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Zona de importación CSV reutilizable (CsvDropzone, P1-E) ── */
 .csv-dropzone {
   display: flex;
