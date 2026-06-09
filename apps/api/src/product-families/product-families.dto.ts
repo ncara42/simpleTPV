@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, IsUUID, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, Min, MinLength } from 'class-validator';
 
 export class CreateFamilyDto {
   @IsString()
@@ -21,6 +21,10 @@ export class CreateFamilyDto {
   @IsInt()
   @Min(0)
   sortOrder?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isArchetype?: boolean;
 }
 
 export class UpdateFamilyDto {
@@ -45,4 +49,8 @@ export class UpdateFamilyDto {
   @IsInt()
   @Min(0)
   sortOrder?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isArchetype?: boolean;
 }

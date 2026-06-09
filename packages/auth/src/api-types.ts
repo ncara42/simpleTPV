@@ -37,6 +37,9 @@ export interface FamilyNode {
   color: string | null;
   icon: string | null;
   sortOrder: number;
+  // Arquetipo: nodo que solo contiene productos (no subfamilias). Ver árbol de
+  // clasificación del informe de UX.
+  isArchetype: boolean;
   children: FamilyNode[];
 }
 
@@ -46,6 +49,7 @@ export interface FamilyInput {
   color?: string | null;
   icon?: string | null;
   sortOrder?: number;
+  isArchetype?: boolean;
 }
 
 export interface User {

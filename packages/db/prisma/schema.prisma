@@ -207,6 +207,10 @@ model ProductFamily {
   color          String?
   icon           String?
   sortOrder      Int      @default(0)
+  // Arquetipo (informe UX): nodo "hoja de clasificación" que agrupa productos casi
+  // idénticos (el mismo producto de distintas marcas). Un arquetipo SOLO contiene
+  // productos, nunca subfamilias. false = familia/subfamilia normal (puede anidar).
+  isArchetype    Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
