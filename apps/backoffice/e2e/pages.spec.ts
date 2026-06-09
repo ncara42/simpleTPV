@@ -215,6 +215,28 @@ test('Familias: árbol con raíz en orden y todas las filas (#98)', async ({ pag
   expect(await rows.count()).toBeGreaterThanOrEqual(10);
 });
 
+test('Arquetipos: marcar un subnivel como arquetipo lo distingue y oculta "+ Subnivel"', async ({
+  page,
+}) => {
+  await page.getByTestId('nav-families').click();
+  // Crear un subnivel bajo "Flores CBD" (no una raíz, para no alterar el orden de
+  // raíces en reruns) y marcarlo como arquetipo.
+  const flores = page.getByTestId('fam-row').filter({ hasText: 'Flores CBD' }).first();
+  await flores.click();
+  await flores.getByTestId('fam-add-child').click();
+  const name = `Arq E2E ${Date.now()}`;
+  await page.getByTestId('family-name').fill(name);
+  await page.getByTestId('family-archetype').check();
+  await page.getByTestId('family-save').click();
+  await expect(page.getByTestId('family-form')).toHaveCount(0);
+  // El nodo aparece con el distintivo "Arquetipo".
+  const row = page.getByTestId('fam-row').filter({ hasText: name });
+  await expect(row.getByTestId('fam-archetype-badge')).toBeVisible();
+  // Al seleccionarlo NO ofrece crear subniveles (un arquetipo solo contiene productos).
+  await row.click();
+  await expect(row.getByTestId('fam-add-child')).toHaveCount(0);
+});
+
 test('Control horario muestra la tabla de fichajes con totales', async ({ page }) => {
   await page.getByTestId('nav-timeclock').click();
   await expect(page.getByTestId('timeclock-table')).toBeVisible();

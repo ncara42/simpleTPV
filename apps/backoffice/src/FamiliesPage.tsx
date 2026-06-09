@@ -27,6 +27,10 @@ interface FormState {
   id?: string;
   name: string;
   parentId: string | null;
+  // Marcar el nodo como arquetipo (solo productos, sin subniveles).
+  isArchetype: boolean;
+  // Si el nodo editado ya tiene subniveles, no puede convertirse en arquetipo.
+  hasChildren: boolean;
 }
 
 // Normaliza para buscar sin distinguir mayúsculas ni acentos.
@@ -70,8 +74,15 @@ function FamilyRow({
   const selected = actions.selectedId === node.id;
   // Destinos válidos para "Mover": cualquier arquetipo salvo el propio subárbol y
   // el padre actual. La sangría del label indica la profundidad del destino.
+  // Destinos válidos: no el propio subárbol, no el padre actual, y NUNCA un
+  // arquetipo (un arquetipo solo contiene productos, no subniveles).
   const moveOptions = flattenTree(actions.roots)
-    .filter((f) => !isDescendantOf(actions.roots, node.id, f.node.id) && f.node.id !== parentId)
+    .filter(
+      (f) =>
+        !isDescendantOf(actions.roots, node.id, f.node.id) &&
+        f.node.id !== parentId &&
+        !f.node.isArchetype,
+    )
     .map((f) => ({ value: f.node.id, label: `${'– '.repeat(f.depth)}${f.node.name}` }));
   return (
     <>
@@ -116,6 +127,11 @@ function FamilyRow({
             style={{ background: node.color ?? 'var(--ui-text-soft)' }}
           />
           {node.name}
+          {node.isArchetype && (
+            <span className="fam-badge" data-testid="fam-archetype-badge">
+              Arquetipo
+            </span>
+          )}
         </span>
         <span className="fam-count" data-testid="fam-count">
           {(node as { productCount?: number }).productCount ?? 0} productos
@@ -135,9 +151,11 @@ function FamilyRow({
                 data-testid="fam-move-to"
               />
             )}
-            <button onClick={() => actions.onAddChild(node.id)} data-testid="fam-add-child">
-              + Subnivel
-            </button>
+            {!node.isArchetype && (
+              <button onClick={() => actions.onAddChild(node.id)} data-testid="fam-add-child">
+                + Subnivel
+              </button>
+            )}
             <button onClick={() => actions.onEdit(node)}>Editar</button>
             <button className="danger" onClick={() => void actions.onDelete(node)}>
               Borrar
@@ -222,16 +240,18 @@ export function FamiliesPage() {
   const saveMut = useMutation({
     mutationFn: (f: FormState) =>
       f.id
-        ? updateFamily(f.id, { name: f.name })
-        : createFamily({ name: f.name, parentId: f.parentId }),
+        ? updateFamily(f.id, { name: f.name, isArchetype: f.isArchetype })
+        : createFamily({ name: f.name, parentId: f.parentId, isArchetype: f.isArchetype }),
     onSuccess: (saved, f) => {
       setTree((prev) => {
         const base = prev ?? view;
         if (f.id) {
-          // Renombrar en el árbol a cualquier profundidad.
+          // Renombrar / actualizar el flag de arquetipo a cualquier profundidad.
           const rename = (list: FamilyNode[]): FamilyNode[] =>
             list.map((n) =>
-              n.id === f.id ? { ...n, name: f.name } : { ...n, children: rename(n.children) },
+              n.id === f.id
+                ? { ...n, name: f.name, isArchetype: f.isArchetype }
+                : { ...n, children: rename(n.children) },
             );
           return rename(base);
         }
@@ -297,8 +317,16 @@ export function FamiliesPage() {
     onDragOver,
     onDrop,
     onMoveTo,
-    onEdit: (node) => setForm({ id: node.id, name: node.name, parentId: node.parentId }),
-    onAddChild: (parentId) => setForm({ name: '', parentId }),
+    onEdit: (node) =>
+      setForm({
+        id: node.id,
+        name: node.name,
+        parentId: node.parentId,
+        isArchetype: node.isArchetype,
+        hasChildren: node.children.length > 0,
+      }),
+    onAddChild: (parentId) =>
+      setForm({ name: '', parentId, isArchetype: false, hasChildren: false }),
     onDelete,
   };
 
@@ -332,7 +360,9 @@ export function FamiliesPage() {
           </div>
           <button
             className="btn-primary"
-            onClick={() => setForm({ name: '', parentId: null })}
+            onClick={() =>
+              setForm({ name: '', parentId: null, isArchetype: false, hasChildren: false })
+            }
             data-testid="new-family"
           >
             Nuevo arquetipo
@@ -381,6 +411,19 @@ export function FamiliesPage() {
               data-testid="family-name"
             />
           </label>
+          <label className="fam-archetype-toggle">
+            <input
+              type="checkbox"
+              checked={form.isArchetype}
+              disabled={form.hasChildren}
+              onChange={(e) => setForm({ ...form, isArchetype: e.target.checked })}
+              data-testid="family-archetype"
+            />
+            <span>Es un arquetipo (agrupa productos casi idénticos; no admite subniveles)</span>
+          </label>
+          {form.hasChildren && (
+            <p className="muted">Tiene subniveles: vacíalos para poder convertirlo en arquetipo.</p>
+          )}
           {saveMut.isError && <p className="form-error">No se pudo guardar.</p>}
           <div className="modal-foot">
             <button type="button" onClick={() => setForm(null)}>

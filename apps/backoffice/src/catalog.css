@@ -1343,6 +1343,29 @@
   min-width: 0;
   font-weight: 600;
 }
+/* Distintivo del nodo arquetipo (hoja de clasificación: solo productos). */
+.fam-badge {
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-bg);
+  color: var(--ui-text-soft);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+/* Toggle "es arquetipo" del formulario: checkbox + texto en una fila. */
+.fam-archetype-toggle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+.fam-archetype-toggle input {
+  width: auto;
+}
 .fam-row:last-child {
   border-bottom: none;
 }

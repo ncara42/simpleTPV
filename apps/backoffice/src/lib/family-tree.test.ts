@@ -16,7 +16,16 @@ import {
 } from './family-tree.js';
 
 function node(id: string, children: FamilyNode[] = [], parentId: string | null = null): FamilyNode {
-  return { id, parentId, name: id, color: null, icon: null, sortOrder: 0, children };
+  return {
+    id,
+    parentId,
+    name: id,
+    color: null,
+    icon: null,
+    sortOrder: 0,
+    isArchetype: false,
+    children,
+  };
 }
 
 // Árbol base: A[A1, A2], B[]
