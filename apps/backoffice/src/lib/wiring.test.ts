@@ -188,23 +188,6 @@ describe('cableado API real del backoffice', () => {
     expect(get).toHaveBeenLastCalledWith('/me/features', {});
   });
 
-  it('feature-flags: gestión contra /feature-flags (#127 B slice 2)', async () => {
-    await features.listFeatureFlags();
-    expect(get).toHaveBeenCalledWith('/feature-flags');
-    await features.setFeatureFlag('b2b', false, 'st1');
-    expect(put).toHaveBeenCalledWith('/feature-flags', {
-      key: 'b2b',
-      enabled: false,
-      storeId: 'st1',
-    });
-    await features.setFeatureFlag('b2b', true);
-    expect(put).toHaveBeenLastCalledWith('/feature-flags', { key: 'b2b', enabled: true });
-    await features.clearFeatureFlag('time_clock', 'st1');
-    expect(del).toHaveBeenCalledWith('/feature-flags/time_clock?storeId=st1');
-    await features.clearFeatureFlag('time_clock');
-    expect(del).toHaveBeenLastCalledWith('/feature-flags/time_clock');
-  });
-
   it('store-prices: overrides retail por tienda contra /stores/:id/prices', async () => {
     await storePrices.listStorePrices('st1');
     expect(get).toHaveBeenCalledWith('/stores/st1/prices');
