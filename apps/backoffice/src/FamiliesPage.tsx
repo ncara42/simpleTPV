@@ -14,11 +14,13 @@ import {
 import {
   countDescendants,
   type DropPosition,
+  findNode,
   flattenTree,
   insertChild,
   isDescendantOf,
   moveToParent,
   removeNode,
+  renumberSiblings,
   reorderSiblings,
 } from './lib/family-tree.js';
 import { usePageHeader } from './lib/pageHeader.js';
@@ -41,10 +43,32 @@ const norm = (s: string): string =>
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '');
 
+// Plegado del árbol: se recuerda en el navegador (localStorage) entre sesiones.
+const COLLAPSE_KEY = 'simpletpv.families.collapsed';
+const EMPTY_COLLAPSE: ReadonlySet<string> = new Set();
+function loadCollapsed(): Set<string> {
+  try {
+    const raw = localStorage.getItem(COLLAPSE_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+function saveCollapsed(ids: Set<string>): void {
+  try {
+    localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...ids]));
+  } catch {
+    /* almacenamiento no disponible: el plegado no se recuerda esta sesión */
+  }
+}
+
 interface RowActions {
   roots: FamilyNode[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  // Nodos plegados (sus hijas no se muestran). Vacío mientras se busca.
+  collapsedIds: ReadonlySet<string>;
+  onToggleCollapse: (id: string) => void;
   dragId: string | null;
   dropTarget: { id: string; position: DropPosition } | null;
   onDragStart: (node: FamilyNode) => void;
@@ -72,6 +96,8 @@ function FamilyRow({
   const dragging = actions.dragId === node.id;
   const drop = actions.dropTarget?.id === node.id ? actions.dropTarget.position : null;
   const selected = actions.selectedId === node.id;
+  const hasChildren = node.children.length > 0;
+  const collapsed = actions.collapsedIds.has(node.id);
   // Destinos válidos para "Mover": cualquier arquetipo salvo el propio subárbol y
   // el padre actual. La sangría del label indica la profundidad del destino.
   // Destinos válidos: no el propio subárbol, no el padre actual, y NUNCA un
@@ -118,6 +144,23 @@ function FamilyRow({
           actions.onDrop(node);
         }}
       >
+        {hasChildren ? (
+          <button
+            type="button"
+            className="fam-toggle"
+            aria-label={collapsed ? 'Desplegar' : 'Plegar'}
+            aria-expanded={!collapsed}
+            data-testid="fam-toggle"
+            onClick={(e) => {
+              e.stopPropagation();
+              actions.onToggleCollapse(node.id);
+            }}
+          >
+            {collapsed ? '▸' : '▾'}
+          </button>
+        ) : (
+          <span className="fam-toggle fam-toggle--leaf" aria-hidden="true" />
+        )}
         <span className="fam-grip" aria-hidden="true" data-testid="fam-grip">
           ⠿
         </span>
@@ -163,9 +206,10 @@ function FamilyRow({
           </span>
         )}
       </div>
-      {node.children.map((c) => (
-        <FamilyRow key={c.id} node={c} depth={depth + 1} parentId={node.id} actions={actions} />
-      ))}
+      {!collapsed &&
+        node.children.map((c) => (
+          <FamilyRow key={c.id} node={c} depth={depth + 1} parentId={node.id} actions={actions} />
+        ))}
     </>
   );
 }
@@ -180,6 +224,16 @@ export function FamiliesPage() {
   // Fila activa: solo esa muestra sus botones (Mover / Editar / Borrar / + Hija).
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const toggleSelected = (id: string): void => setSelectedId((cur) => (cur === id ? null : id));
+  // Nodos plegados (sus hijas no se muestran), recordados en localStorage.
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(loadCollapsed);
+  useEffect(() => saveCollapsed(collapsedIds), [collapsedIds]);
+  const toggleCollapse = (id: string): void =>
+    setCollapsedIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const { data: serverTree = [], isLoading } = useQuery({
     queryKey: ['families'],
@@ -265,6 +319,19 @@ export function FamiliesPage() {
 
   const delMut = useMutation({ mutationFn: (id: string) => deleteFamily(id) });
 
+  // Persistir el nuevo orden de hermanos (sortOrder) tras un reordenado por arrastre.
+  const reorderMut = useMutation({
+    mutationFn: (changes: { id: string; sortOrder: number }[]) =>
+      Promise.all(changes.map((c) => updateFamily(c.id, { sortOrder: c.sortOrder }))),
+    onSuccess: invalidate,
+  });
+  // Persistir el nuevo padre y posición final tras "Mover bajo…".
+  const moveMut = useMutation({
+    mutationFn: (v: { id: string; parentId: string; sortOrder: number }) =>
+      updateFamily(v.id, { parentId: v.parentId, sortOrder: v.sortOrder }),
+    onSuccess: invalidate,
+  });
+
   // Reordenación por arrastre (solo entre hermanos del mismo nivel).
   const [dragNode, setDragNode] = useState<FamilyNode | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; position: DropPosition } | null>(null);
@@ -282,12 +349,35 @@ export function FamiliesPage() {
     if (!dragNode || !canDropOn(target)) return clearDrag();
     const from = dragNode;
     const position = dropTarget?.id === target.id ? dropTarget.position : 'before';
-    setTree((prev) => reorderSiblings(prev ?? view, target.parentId, from.id, target.id, position));
+    const base = tree ?? view;
+    const next = renumberSiblings(
+      reorderSiblings(base, target.parentId, from.id, target.id, position),
+      target.parentId,
+    );
+    setTree(next);
+    // Persistir solo los hermanos cuyo sortOrder ha cambiado.
+    const siblings =
+      target.parentId === null ? next : (findNode(next, target.parentId)?.children ?? []);
+    const changes = siblings
+      .map((n) => ({ id: n.id, sortOrder: n.sortOrder }))
+      .filter((c) => findNode(base, c.id)?.sortOrder !== c.sortOrder);
+    if (changes.length) reorderMut.mutate(changes);
     clearDrag();
   };
 
-  const onMoveTo = (childId: string, toParentId: string): void =>
-    setTree((prev) => moveToParent(prev ?? view, childId, toParentId));
+  const onMoveTo = (childId: string, toParentId: string): void => {
+    const base = tree ?? view;
+    const next = moveToParent(base, childId, toParentId);
+    if (next === base) return; // movimiento inválido (ciclo o nodo inexistente)
+    setTree(next);
+    // El nodo movido queda como último hijo del nuevo padre.
+    const siblings = findNode(next, toParentId)?.children ?? [];
+    moveMut.mutate({
+      id: childId,
+      parentId: toParentId,
+      sortOrder: Math.max(0, siblings.length - 1),
+    });
+  };
 
   const onDelete = async (node: FamilyNode): Promise<void> => {
     const n = countDescendants(node);
@@ -309,6 +399,9 @@ export function FamiliesPage() {
     roots: view,
     selectedId,
     onSelect: toggleSelected,
+    // Al buscar se ignora el plegado para que las coincidencias siempre se vean.
+    collapsedIds: q ? EMPTY_COLLAPSE : collapsedIds,
+    onToggleCollapse: toggleCollapse,
     dragId: dragNode?.id ?? null,
     dropTarget,
     onDragStart: setDragNode,

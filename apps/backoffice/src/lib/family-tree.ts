@@ -117,6 +117,20 @@ export function reorderSiblings(
   );
 }
 
+// Reasigna `sortOrder = posición` a los hermanos de `parentId` (raíces si es
+// `null`), dejando el resto del árbol intacto. Tras un reordenado, deja los
+// `sortOrder` consecutivos para poder persistir el orden en el backend.
+export function renumberSiblings(tree: FamilyNode[], parentId: string | null): FamilyNode[] {
+  const number = (list: FamilyNode[]): FamilyNode[] =>
+    list.map((n, i) => (n.sortOrder === i ? n : { ...n, sortOrder: i }));
+  if (parentId === null) return number(tree);
+  return tree.map((n) =>
+    n.id === parentId
+      ? { ...n, children: number(n.children) }
+      : { ...n, children: renumberSiblings(n.children, parentId) },
+  );
+}
+
 // Número total de descendientes de un nodo (recursivo).
 export function countDescendants(node: FamilyNode): number {
   return node.children.reduce((acc, c) => acc + 1 + countDescendants(c), 0);

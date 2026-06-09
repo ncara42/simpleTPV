@@ -1406,6 +1406,36 @@
   color: #c0392b;
 }
 
+/* Plegar/desplegar el subárbol. El espaciador de hoja mantiene la alineación
+   de los nodos sin hijas con los que sí la tienen. */
+.fam-toggle {
+  flex: 0 0 auto;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-right: -0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--ui-text-muted);
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color 0.12s,
+    background 0.12s;
+}
+.fam-toggle:hover {
+  color: var(--tpv-teal-700, #0f766e);
+  background: var(--ui-surface-subtle);
+}
+.fam-toggle--leaf {
+  cursor: default;
+}
+
 /* ─── Familias: reorganización (arrastrar + mover a) (#98) ─── */
 .fam-grip {
   cursor: grab;
