@@ -28,29 +28,38 @@ test('el chip "Todas" está presente para ver todo el catálogo', async ({ page 
   await expect(page.getByTestId('fam-chip-all')).toContainText('Todas');
 });
 
-test('los productos agotados muestran "0", se atenúan y van al final', async ({ page }) => {
+test('los productos agotados se atenúan, muestran su stock y van al final', async ({ page }) => {
   // Ya no se muestra el texto "Sin stock".
   await expect(page.getByText('Sin stock')).toHaveCount(0);
   // Hay al menos un producto agotado en el seed (Flor CBD Gorilla 15%, stock 0):
-  // muestra "0", queda atenuado (.is-out) pero NO deshabilitado (la venta nunca se
-  // bloquea por falta de stock).
+  // queda atenuado (.is-out) pero NO deshabilitado (la venta nunca se bloquea por
+  // falta de stock).
   const out = page.locator('[data-testid="prod-card"].is-out').first();
   await expect(out).toBeVisible();
-  await expect(out.getByTestId('prod-stock')).toHaveText('0');
+  // Stock 0 (o negativo si otros tests vendieron sin bloquear por falta de stock).
+  const stock = Number((await out.getByTestId('prod-stock').textContent())?.trim());
+  expect(stock).toBeLessThanOrEqual(0);
   await expect(out).not.toBeDisabled();
   // Los agotados se ordenan al final: la última tarjeta está atenuada.
   await expect(page.getByTestId('prod-card').last()).toHaveClass(/is-out/);
 });
 
 test('filtrar por una familia reduce los productos y "Todas" los restaura', async ({ page }) => {
+  // Espera a que la cuadrícula cargue antes de medir el total (React renderiza la
+  // lista completa de una vez al resolver la query, no incrementalmente).
+  await expect(page.getByTestId('prod-card').first()).toBeVisible();
   const total = await page.getByTestId('prod-card').count();
   // "Accesorios" no tiene subfamilias → es un chip directo (las familias con
   // subfamilias se prueban como desplegable en los unit de FamilyChips).
   await page.getByTestId('fam-chip').filter({ hasText: 'Accesorios' }).click();
-  // Espera a que la cuadrícula se re-renderice con la familia filtrada (evita la
-  // carrera de leer .count() antes del re-render).
-  await expect.poll(() => page.getByTestId('prod-card').count()).toBeLessThan(total);
-  expect(await page.getByTestId('prod-card').count()).toBeGreaterThan(0);
+  // Espera a que el filtro se ASIENTE (no vacío y menor que el total); evita el
+  // transitorio en que la cuadrícula se vacía un instante durante el re-render.
+  await expect
+    .poll(async () => {
+      const c = await page.getByTestId('prod-card').count();
+      return c > 0 && c < total;
+    })
+    .toBe(true);
   // "Todas" vuelve a todos los productos.
   await page.getByTestId('fam-chip-all').click();
   await expect(page.getByTestId('prod-card')).toHaveCount(total);
