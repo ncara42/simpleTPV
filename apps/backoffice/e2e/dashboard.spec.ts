@@ -47,6 +47,9 @@ test('personalización: ocultar una KPI card la quita y persiste (IT-16)', async
 test('preferencias por defecto: el dashboard recuerda el periodo elegido (IT-16)', async ({
   page,
 }) => {
+  // Espera a que carguen los KPIs antes de tocar el selector: si llega data a media
+  // interacción, un re-render cierra el desplegable y la selección se pierde.
+  await expect(page.getByTestId('kpi-today')).toContainText(/\d/);
   // Cambiar a Semana y comprobar que el periodo persiste tras recargar.
   await page.getByTestId('dash-period').click();
   await page.locator('[role="option"][data-value="week"]').click();

@@ -107,6 +107,21 @@ test('Usuarios: edición en lote avanza con "Siguiente (n / total)"', async ({ p
   await expect(page.getByTestId('user-form')).toHaveCount(0);
 });
 
+test('Usuarios: el foco no salta al teclear en el alta (regresión bug de foco)', async ({
+  page,
+}) => {
+  await page.getByTestId('nav-users').click();
+  await page.getByTestId('new-user').click();
+  await expect(page.getByTestId('user-form')).toBeVisible();
+  // Teclea carácter a carácter (cada tecla re-renderiza): el foco debe quedarse en el
+  // campo y conservar el valor completo (antes saltaba al primer campo en cada tecla).
+  const pw = page.getByTestId('user-password');
+  await pw.click();
+  await pw.pressSequentially('secret123', { delay: 20 });
+  await expect(pw).toBeFocused();
+  await expect(pw).toHaveValue('secret123');
+});
+
 test('Stock global muestra la tabla con filas por producto', async ({ page }) => {
   await page.getByTestId('nav-stock').click();
   await expect(page.getByTestId('stock-table')).toBeVisible();
@@ -247,6 +262,7 @@ test('Mayorista: clientes, tarifas y pedidos en sub-pestañas (IT-17)', async ({
   await expect(page.getByTestId('b2b-page')).toBeVisible();
 
   // Clientes: alta de uno nuevo (nombre único) que aparece en la tabla.
+  await expect(page.getByTestId('b2b-customer-row').first()).toBeVisible(); // esperar carga
   expect(await page.getByTestId('b2b-customer-row').count()).toBeGreaterThanOrEqual(2);
   const customerName = `Cliente E2E ${Date.now()}`;
   await page.getByTestId('b2b-new-customer').click();
