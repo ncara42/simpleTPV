@@ -3,10 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { CsvDropzone } from './components/CsvDropzone.js';
 import { Modal } from './components/Modal.js';
 import {
   createUser,
   deleteUser,
+  importUsersCsv,
   listStores,
   listUsers,
   type NewUser,
@@ -74,6 +76,8 @@ export function UsersPage() {
   const [form, setForm] = useState<UserForm | null>(null);
   // Modo asistente (edición en lote). null → alta de un usuario nuevo.
   const [wizard, setWizard] = useState<EditWizard | null>(null);
+  // Modal de importación de usuarios por CSV (alta en lote).
+  const [importing, setImporting] = useState(false);
   // Filtros de la barra superior (espejo de la toolbar de stock).
   const [search, setSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
@@ -327,9 +331,19 @@ export function UsersPage() {
               </button>
             </div>
           ) : (
-            <button className="btn-primary" onClick={openCreate} data-testid="new-user">
-              Nuevo usuario
-            </button>
+            <div className="users-toolbar-actions">
+              <button
+                type="button"
+                className="users-sel-btn"
+                onClick={() => setImporting(true)}
+                data-testid="users-import"
+              >
+                Importar CSV
+              </button>
+              <button className="btn-primary" onClick={openCreate} data-testid="new-user">
+                Nuevo usuario
+              </button>
+            </div>
           )}
         </div>
 
@@ -548,6 +562,36 @@ export function UsersPage() {
                 {primaryLabel}
               </button>
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {importing && (
+        <Modal
+          onClose={() => setImporting(false)}
+          className="modal--form"
+          testId="users-import-modal"
+          ariaLabel="Importar usuarios desde CSV"
+        >
+          <h3>Importar usuarios desde CSV</h3>
+          <CsvDropzone
+            columns={['email', 'name', 'password', 'role']}
+            example={['nuevo@tienda.com', 'Nombre Apellido', 'contrasena8', 'CLERK']}
+            templateName="plantilla_usuarios.csv"
+            testId="users-csv"
+            help={
+              <>
+                Columnas: <code>email,name,password,role</code>. El rol es <code>ADMIN</code>,{' '}
+                <code>MANAGER</code> o <code>CLERK</code>; la contraseña, mínimo 8 caracteres.
+              </>
+            }
+            onImport={importUsersCsv}
+            onImported={invalidate}
+          />
+          <div className="modal-foot">
+            <button type="button" onClick={() => setImporting(false)}>
+              Cerrar
+            </button>
           </div>
         </Modal>
       )}

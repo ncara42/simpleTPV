@@ -48,6 +48,11 @@ export class UpdateUserDto {
   password?: string;
 }
 
+export class ImportUsersDto {
+  @IsString()
+  csv!: string;
+}
+
 export class SetPinDto {
   @Matches(/^\d{4,8}$/, { message: 'El PIN debe tener entre 4 y 8 dígitos' })
   pin!: string;

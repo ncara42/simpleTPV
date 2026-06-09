@@ -33,6 +33,15 @@ export function createUser(input: NewUser): Promise<User> {
   return api.post<User>('/users', input);
 }
 
+export interface ImportResult {
+  inserted: number;
+  errors: Array<{ row: number; message: string }>;
+}
+
+export function importUsersCsv(csv: string): Promise<ImportResult> {
+  return api.post<ImportResult>('/users/import', { csv });
+}
+
 export function deleteUser(id: string): Promise<void> {
   return api.del(`/users/${id}`);
 }

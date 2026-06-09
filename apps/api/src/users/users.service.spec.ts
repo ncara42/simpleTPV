@@ -10,6 +10,7 @@ function makePrisma() {
   return {
     user: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'u1', ...data })),
+      createMany: vi.fn(async ({ data }: { data: unknown[] }) => ({ count: data.length })),
       findMany: vi.fn(async (): Promise<unknown[]> => [{ id: 'u1' }]),
       findFirst: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'u1', email: 'a@b.test' })),
       update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'u1', ...data })),
@@ -48,6 +49,30 @@ describe('UsersService', () => {
     expect(arg.data.passwordHash).toBeTruthy();
     expect(arg.data.password).toBeUndefined(); // no se guarda en claro
     expect(bcrypt.compareSync('secreto', arg.data.passwordHash)).toBe(true);
+  });
+
+  it('importCsv crea las filas válidas y reporta errores por fila', async () => {
+    const prisma = makePrisma();
+    const service = new UsersService(prisma as never);
+    const csv = [
+      'email,name,password,role',
+      'ok@org.test,Valido,password123,CLERK', // fila 2 · válida
+      'malo,Sin Email,password123,CLERK', // fila 3 · email inválido
+      'b@org.test,,password123,CLERK', // fila 4 · sin nombre
+      'c@org.test,Corta,short,CLERK', // fila 5 · password corta
+      'd@org.test,RolMalo,password123,JEFE', // fila 6 · rol inválido
+      'e@org.test,Otro,password123,manager', // fila 7 · rol en minúsculas → válido
+    ].join('\n');
+    const res = await tenantStorage.run({ organizationId: ORG }, () => service.importCsv(csv));
+    expect(res.inserted).toBe(2);
+    expect(res.errors.map((e) => e.row)).toEqual([3, 4, 5, 6]);
+    const createArg = prisma.user.createMany.mock.calls[0]![0] as {
+      data: Array<{ role: string; passwordHash: string; organizationId: string }>;
+    };
+    expect(createArg.data).toHaveLength(2);
+    expect(createArg.data[0]!.organizationId).toBe(ORG);
+    expect(createArg.data[0]!.passwordHash).toBeTruthy();
+    expect(createArg.data[1]!.role).toBe('MANAGER'); // normalizado a mayúsculas
   });
 
   it('setPin hashea el PIN', async () => {

@@ -2511,6 +2511,68 @@
   color: var(--ui-text);
 }
 
+/* ── Zona de importación CSV reutilizable (CsvDropzone, P1-E) ── */
+.csv-dropzone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}
+.csv-dropzone-help {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
+}
+.csv-dropzone-help code {
+  padding: 0.05rem 0.3rem;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-subtle);
+  font-size: 0.85em;
+}
+.csv-dropzone-template {
+  font-size: var(--ui-text-sm);
+  color: var(--tpv-teal-700, #0f766e);
+}
+.csv-dropzone-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.csv-dropzone-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: var(--ui-space-5, 1.5rem);
+  border: 2px dashed var(--ui-border-strong, var(--ui-border));
+  border-radius: var(--ui-radius-md, 0.5rem);
+  background: var(--ui-surface-subtle);
+  cursor: pointer;
+  text-align: center;
+  transition:
+    border-color 0.12s var(--ui-ease),
+    background 0.12s var(--ui-ease);
+}
+.csv-dropzone-area:hover,
+.csv-dropzone-area.is-dragover {
+  border-color: var(--ui-primary);
+  background: var(--ui-primary-soft, var(--ui-surface));
+}
+.csv-dropzone-result {
+  font-size: var(--ui-text-sm);
+}
+.csv-dropzone-ok {
+  color: var(--tpv-teal-700, #0f766e);
+  font-weight: 600;
+}
+.csv-dropzone-errors ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--ui-text-muted);
+}
+
 /* ── Stock escalable: heatmap por tienda + desglose plegable (P1-C) ── */
 /* Resumen compacto: una fila de puntos de color (uno por tienda) que escala con
    N tiendas sin agrandar la fila; clic para expandir el desglose. */
