@@ -1011,6 +1011,11 @@
   color: var(--ui-text-muted);
   margin-bottom: 0.9rem;
 }
+.modal input:not([type='checkbox']) {
+  /* Causa raíz de E-04: sin width, el input conserva su ancho intrínseco
+     (~250px) y desborda las columnas estrechas de .modal-row. */
+  width: 100%;
+}
 .modal input {
   height: 2.6rem;
   border: 1px solid var(--ui-border-strong);
@@ -1035,6 +1040,10 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.8rem;
+}
+/* Las celdas del grid pueden encoger por debajo del ancho intrínseco del input. */
+.modal-row label {
+  min-width: 0;
 }
 .form-error {
   color: #c0392b;
@@ -2834,4 +2843,16 @@
 }
 .store-device-state.is-ok {
   color: var(--tpv-teal-700, #0f766e);
+}
+
+/* Margen calculado en vivo del form de producto (I-11). */
+.product-form-margin {
+  display: block;
+  padding: 0.55rem 0.7rem;
+  border: 1px dashed var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-subtle);
+  font-variant-numeric: tabular-nums;
+  color: var(--tpv-teal-700, #0f766e);
+  font-weight: 600;
 }

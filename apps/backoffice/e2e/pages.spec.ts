@@ -25,6 +25,35 @@ test('Catálogo: selector jerárquico único de familia (#97)', async ({ page })
   await expect(page.getByTestId('form-subfamily')).toHaveCount(0);
 });
 
+test('Catálogo: el modal de producto no desborda en viewports bajos (I-11, E-04)', async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 1280, height: 720 },
+    { width: 1024, height: 640 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await navTo(page, 'catalog');
+    await page.getByTestId('new-product').click();
+    await expect(page.getByTestId('product-form')).toBeVisible();
+    // Ningún campo puede quedar fuera del rectángulo del modal (el cuerpo scrollea).
+    const fueraDelModal = await page.locator('[data-testid="product-form"]').evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const fields = Array.from(el.querySelectorAll('input, select, button, output'));
+      return fields.filter((f) => {
+        const fr = f.getBoundingClientRect();
+        return fr.right > r.right + 1 || fr.bottom > r.bottom + 1 || fr.left < r.left - 1;
+      }).length;
+    });
+    expect(fueraDelModal).toBe(0);
+    // Las tres secciones del rediseño están presentes.
+    await expect(page.getByText('Datos básicos')).toBeVisible();
+    await expect(page.getByText('Precios e IVA')).toBeVisible();
+    await expect(page.getByText('Clasificación')).toBeVisible();
+    await page.keyboard.press('Escape');
+  }
+});
+
 test('Catálogo: selección múltiple y edición en lote', async ({ page }) => {
   await navTo(page, 'catalog');
   const checks = page.getByTestId('product-select');

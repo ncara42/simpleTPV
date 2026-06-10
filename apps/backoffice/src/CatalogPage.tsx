@@ -4,6 +4,11 @@ import { useMemo, useState } from 'react';
 
 import { CsvDropzone } from './components/CsvDropzone.js';
 import { Modal } from './components/Modal.js';
+import {
+  EMPTY_PRODUCT_FORM,
+  ProductFormModal,
+  type ProductFormState,
+} from './components/ProductFormModal.js';
 import { useTableColumns } from './components/useTableColumns.js';
 import { type FamilyNode, listFamilies } from './lib/families.js';
 import { findNodePath, flattenTree, isDescendantOf } from './lib/family-tree.js';
@@ -37,18 +42,7 @@ function stockLevel(qty: number): 'red' | 'yellow' | 'green' {
 const marginPct = (sale: number, cost: number): string =>
   sale > 0 ? `${Math.round(((sale - cost) / sale) * 100)}%` : '—';
 
-interface FormState {
-  id?: string;
-  name: string;
-  salePrice: number;
-  sku: string | null;
-  barcode: string | null;
-  costPrice: number;
-  taxRate: number;
-  // Familia efectiva del producto: el id del nodo elegido en el selector
-  // jerárquico, a cualquier profundidad (raíz, sub o sub-sub…).
-  familyId: string | null;
-}
+type FormState = ProductFormState;
 
 // Asistente de edición en lote: cola de productos seleccionados + paso actual.
 interface EditWizard {
@@ -56,15 +50,7 @@ interface EditWizard {
   step: number;
 }
 
-const EMPTY: FormState = {
-  name: '',
-  salePrice: 0,
-  sku: '',
-  barcode: '',
-  costPrice: 0,
-  taxRate: 21,
-  familyId: null,
-};
+const EMPTY: FormState = EMPTY_PRODUCT_FORM;
 
 function toForm(p: Product): FormState {
   return {
@@ -496,90 +482,19 @@ export function CatalogPage() {
       </div>
 
       {form && (
-        <Modal
+        <ProductFormModal
+          form={form}
+          onChange={setForm}
+          onSubmit={submitForm}
           onClose={closeModal}
-          className="modal--form"
-          testId="product-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            submitForm();
-          }}
-        >
-          <h3>{wizard ? 'Editar producto' : 'Nuevo producto'}</h3>
-          <label>
-            Nombre
-            <input
-              required
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              data-testid="form-name"
-            />
-          </label>
-          <label>
-            Familia
-            <Select
-              value={form.familyId ?? ''}
-              onChange={(value) => setForm({ ...form, familyId: value || null })}
-              options={[{ value: '', label: '— Sin arquetipo —' }, ...archetypeOptions]}
-              ariaLabel="Familia"
-              data-testid="form-family"
-            />
-          </label>
-          <div className="modal-row">
-            <label>
-              Precio venta (€)
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={form.salePrice}
-                onChange={(e) => setForm({ ...form, salePrice: Number(e.target.value) })}
-                data-testid="form-price"
-              />
-            </label>
-            <label>
-              IVA (%)
-              <input
-                type="number"
-                step="1"
-                value={form.taxRate}
-                onChange={(e) => setForm({ ...form, taxRate: Number(e.target.value) })}
-              />
-            </label>
-          </div>
-          <div className="modal-row">
-            <label>
-              SKU
-              <input
-                value={form.sku ?? ''}
-                onChange={(e) => setForm({ ...form, sku: e.target.value })}
-              />
-            </label>
-            <label>
-              Código de barras
-              <input
-                value={form.barcode ?? ''}
-                onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-              />
-            </label>
-          </div>
-          {createMut.isError && (
-            <p className="form-error">{formErrorMessage(createMut.error, 'No se pudo guardar.')}</p>
-          )}
-          <div className="modal-foot">
-            <button type="button" onClick={closeModal}>
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={createMut.isPending}
-              data-testid="form-save"
-            >
-              {primaryLabel}
-            </button>
-          </div>
-        </Modal>
+          familyOptions={archetypeOptions}
+          pending={createMut.isPending}
+          errorMessage={
+            createMut.isError ? formErrorMessage(createMut.error, 'No se pudo guardar.') : null
+          }
+          title={wizard ? 'Editar producto' : 'Nuevo producto'}
+          primaryLabel={primaryLabel}
+        />
       )}
 
       {importing && (
