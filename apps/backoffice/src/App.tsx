@@ -28,6 +28,7 @@ import { useState } from 'react';
 
 import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
+import { DashboardPage } from './DashboardPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { HelpPage } from './HelpPage.js';
 import { api, useAuthStore } from './lib/auth.js';
@@ -36,8 +37,8 @@ import { useFeatures } from './lib/features.js';
 import { switchApp } from './lib/nav.js';
 import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
 import { NotificationsPage } from './NotificationsPage.js';
-import { OverviewPage } from './OverviewPage.js';
 import { PromotionsPage } from './PromotionsPage.js';
+import { SalesHistoryPage } from './SalesHistoryPage.js';
 import { StockPage } from './StockPage.js';
 import { StoresPage } from './StoresPage.js';
 import { SuppliersPage } from './SuppliersPage.js';
@@ -165,13 +166,10 @@ function Home() {
         <PageHeaderProvider>
           <ShellTopBar />
           <main className="bo-main">
-            {(tab === 'dashboard' || tab === 'sales') && (
-              <OverviewPage
-                scrollTo={tab === 'sales' ? 'sales' : null}
-                initialStoreId={navStoreId}
-                onNavigate={(t) => setTab(t)}
-              />
-            )}
+            {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
+                embebe la tabla — enlaza con "Ver todas las ventas →". */}
+            {tab === 'dashboard' && <DashboardPage onNavigate={(t) => setTab(t)} />}
+            {tab === 'sales' && <SalesHistoryPage initialStoreId={navStoreId} />}
             {tab === 'notifications' && <NotificationsPage />}
             {tab === 'catalog' && <CatalogPage initialFamilyId={navFamilyId} />}
             {tab === 'families' && <FamiliesPage onOpenCatalogFamily={openCatalogFamily} />}

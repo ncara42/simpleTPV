@@ -83,6 +83,13 @@ test('Tiendas: orden por ventas y acceso directo a stock (UX)', async ({ page })
   // Acceso directo "Stock" → lleva a la página de Stock.
   await page.getByTestId('store-card').first().getByTestId('store-open-stock').click();
   await expect(page.getByTestId('stock-page')).toBeVisible();
+  // Acceso directo "Ventas" → page de Ventas PREFILTRADA por la tienda (I-17).
+  await navTo(page, 'stores');
+  const card = page.getByTestId('store-card').first();
+  const storeName = (await card.locator('.store-card-name').textContent()) ?? '';
+  await card.getByTestId('store-open-sales').click();
+  await expect(page.getByTestId('sales-table')).toBeVisible();
+  await expect(page.getByTestId('sales-store')).toContainText(storeName);
 });
 
 test('Tiendas: detalle, estado operativo y registro de fichajes (#100, #102)', async ({ page }) => {

@@ -2767,11 +2767,6 @@
   gap: var(--ui-space-2);
 }
 
-/* ── Vista unificada Dashboard + Ventas (IT-19) ─────────────────────────────── */
-.overview-sales {
-  margin-top: var(--ui-space-6);
-}
-
 /* ── Promociones: chips de filtro por grupo (UX) ────────────────────────────── */
 .promo-chips {
   display: inline-flex;

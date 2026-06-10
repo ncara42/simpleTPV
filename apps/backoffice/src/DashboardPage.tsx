@@ -138,8 +138,8 @@ const toSparkTone = (tone: 'up' | 'down' | 'flat'): SparkTone => (tone === 'flat
 export function DashboardPage({
   onNavigate,
 }: {
-  // Links de los paneles a su page de gestión (I-16): Proveedores y Stock.
-  onNavigate?: ((tab: 'suppliers' | 'stock') => void) | undefined;
+  // Links a otras pages (I-16/I-17): paneles → Proveedores/Stock; pie → Ventas.
+  onNavigate?: ((tab: 'suppliers' | 'stock' | 'sales') => void) | undefined;
 } = {}) {
   const [period, setPeriod] = useState<DashboardPeriod>('today');
   const [storeId, setStoreId] = useState('');
@@ -1042,6 +1042,19 @@ export function DashboardPage({
           </div>
         )}
       </div>
+
+      {/* I-17/D-06: la tabla de ventas ya no se embebe — el dashboard cierra
+          con el acceso a la page de Ventas (DataTable completo). */}
+      <footer className="dash-foot">
+        <button
+          type="button"
+          className="link-btn"
+          onClick={() => onNavigate?.('sales')}
+          data-testid="dash-to-sales"
+        >
+          Ver todas las ventas →
+        </button>
+      </footer>
     </section>
   );
 }

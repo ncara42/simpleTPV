@@ -1019,3 +1019,11 @@
   color: var(--ui-text-muted);
   font-size: 0.8rem;
 }
+
+/* ── Pie del dashboard (I-17/D-06): acceso a la page de Ventas ── */
+.dash-foot {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+  padding: 0.5rem 0;
+}

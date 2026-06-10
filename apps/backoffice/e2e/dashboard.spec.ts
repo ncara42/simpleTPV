@@ -111,6 +111,18 @@ test('ocultar un panel solo afecta al preset activo y persiste (I-15, D-03)', as
   await page.getByTestId('dash-preset-ventas').click();
 });
 
+test('Ventas es page propia: el dashboard no embebe la tabla y enlaza al final (I-17, D-06)', async ({
+  page,
+}) => {
+  // El dashboard ya no contiene el historial de ventas (E-10: scroll eterno).
+  await expect(page.getByTestId('dashboard')).toBeVisible();
+  await expect(page.getByTestId('sales-table')).toHaveCount(0);
+  // El pie enlaza a la page de Ventas con su DataTable completo.
+  await page.getByTestId('dash-to-sales').click();
+  await expect(page.getByTestId('sales-table')).toBeVisible();
+  await expect(page.getByTestId('sales-totals')).toBeVisible();
+});
+
 test('personalización: ocultar una KPI card la quita y persiste (IT-16)', async ({ page }) => {
   await page.getByTestId('dash-preset-ventas').click();
   await expect(page.getByTestId('kpi-upt')).toBeVisible();
