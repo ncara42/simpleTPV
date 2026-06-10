@@ -5,7 +5,16 @@ import { describe, expect, it, vi } from 'vitest';
 import { FamilyChips } from './FamilyChips.js';
 
 function fam(id: string, children: FamilyNode[] = []): FamilyNode {
-  return { id, parentId: null, name: id, color: null, icon: null, sortOrder: 0, children };
+  return {
+    id,
+    parentId: null,
+    name: id,
+    color: null,
+    icon: null,
+    sortOrder: 0,
+    isArchetype: false,
+    children,
+  };
 }
 
 describe('FamilyChips', () => {

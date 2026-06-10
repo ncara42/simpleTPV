@@ -111,6 +111,18 @@ export function createApiClient(store: AuthStore, baseUrl = '/api'): ApiClient {
     body: JSON.stringify(body),
   });
 
+  // Parsea el body JSON tolerando respuestas sin contenido (204 o body vacío):
+  // endpoints como PUT /users/:id/stores responden 204 y `res.json()` lanzaría
+  // "Unexpected end of JSON input". En esos casos devuelve undefined (el caller
+  // tipa Promise<void>).
+  async function parseJson<T>(res: Response): Promise<T> {
+    if (res.status === 204) {
+      return undefined as T;
+    }
+    const text = await res.text();
+    return (text === '' ? undefined : JSON.parse(text)) as T;
+  }
+
   return {
     async login(email, password) {
       // credentials:include para que el navegador almacene la cookie httpOnly del
@@ -141,28 +153,28 @@ export function createApiClient(store: AuthStore, baseUrl = '/api'): ApiClient {
       if (!res.ok) {
         throw new ApiError(res.status, await readErrorBody(res));
       }
-      return (await res.json()) as T;
+      return parseJson<T>(res);
     },
     async post<T>(path: string, body?: unknown): Promise<T> {
       const res = await authedFetch(path, jsonInit(body));
       if (!res.ok) {
         throw new ApiError(res.status, await readErrorBody(res));
       }
-      return (await res.json()) as T;
+      return parseJson<T>(res);
     },
     async put<T>(path: string, body?: unknown): Promise<T> {
       const res = await authedFetch(path, { ...jsonInit(body), method: 'PUT' });
       if (!res.ok) {
         throw new ApiError(res.status, await readErrorBody(res));
       }
-      return (await res.json()) as T;
+      return parseJson<T>(res);
     },
     async patch<T>(path: string, body?: unknown): Promise<T> {
       const res = await authedFetch(path, { ...jsonInit(body), method: 'PATCH' });
       if (!res.ok) {
         throw new ApiError(res.status, await readErrorBody(res));
       }
-      return (await res.json()) as T;
+      return parseJson<T>(res);
     },
     async del(path: string): Promise<void> {
       const res = await authedFetch(path, { method: 'DELETE' });

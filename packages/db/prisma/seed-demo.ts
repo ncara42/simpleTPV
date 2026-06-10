@@ -15,6 +15,8 @@ import {
   MovementType,
   PaymentMethod,
   PrismaClient,
+  PromoConditionType,
+  PromoDiscountType,
   SaleStatus,
   TimeClockType,
   UserRole,
@@ -1061,6 +1063,122 @@ async function seedStorePrices(orgId: string): Promise<void> {
   }
 }
 
+// Promociones demo (#143): 4 reglas que cubren los 3 grupos del backoffice
+// (Activas / Programadas / Inactivas). Fechas relativas a hoy para que la
+// clasificación promoStatus() sea estable se ejecute cuando se ejecute el seed.
+// Idempotente por [organizationId, name].
+async function seedPromotions(orgId: string): Promise<void> {
+  const day = (offset: number): Date => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + offset);
+    return d;
+  };
+  const promos = [
+    // Activa: en rango y active
+    {
+      name: '2 o más Flores: -15%',
+      conditionType: PromoConditionType.min_qty,
+      threshold: 2,
+      discountType: PromoDiscountType.percent,
+      discountValue: 15,
+      startDate: day(-10),
+      endDate: day(20),
+      active: true,
+    },
+    // Activa: por importe de ticket
+    {
+      name: 'Ahorra 10€ en compras de 50€+',
+      conditionType: PromoConditionType.min_ticket,
+      threshold: 50,
+      discountType: PromoDiscountType.amount,
+      discountValue: 10,
+      startDate: day(-5),
+      endDate: day(25),
+      active: true,
+    },
+    // Programada: empieza en el futuro
+    {
+      name: 'Campaña verano CBD',
+      conditionType: PromoConditionType.min_ticket,
+      threshold: 40,
+      discountType: PromoDiscountType.percent,
+      discountValue: 10,
+      startDate: day(5),
+      endDate: day(35),
+      active: true,
+    },
+    // Inactiva: en rango pero pausada (active=false)
+    {
+      name: 'Black Friday (pausada)',
+      conditionType: PromoConditionType.min_qty,
+      threshold: 3,
+      discountType: PromoDiscountType.percent,
+      discountValue: 20,
+      startDate: day(-10),
+      endDate: day(20),
+      active: false,
+    },
+  ];
+  for (const p of promos) {
+    await prisma.promotion.upsert({
+      where: { organizationId_name: { organizationId: orgId, name: p.name } },
+      update: {},
+      create: { organizationId: orgId, ...p },
+    });
+  }
+}
+
+/**
+ * Crea proveedores demo + tarifas de compra por proveedor (P1-B). Asigna un SKU a
+ * los productos con tarifa (habilita el import CSV por SKU). Idempotente.
+ */
+async function seedSuppliers(orgId: string): Promise<void> {
+  const suppliers = [
+    { name: 'Distribuciones Norte', nif: 'B12121212', leadTimeDays: 5 },
+    { name: 'Mayorista Sur', nif: 'B34343434', leadTimeDays: 9 },
+    { name: 'Importaciones García', nif: 'B56565656', leadTimeDays: 14 },
+  ];
+  const created = [];
+  for (const s of suppliers) {
+    let sup = await prisma.supplier.findFirst({ where: { organizationId: orgId, nif: s.nif } });
+    if (!sup) {
+      sup = await prisma.supplier.create({ data: { organizationId: orgId, ...s } });
+    }
+    created.push(sup);
+  }
+
+  // Tarifas de compra para los primeros 8 productos: cada proveedor ofrece un
+  // precio distinto en torno al coste, para que la comparativa entre proveedores
+  // tenga sentido. Se dejan huecos (no todos sirven todos los productos).
+  const products = await prisma.product.findMany({
+    where: { organizationId: orgId },
+    take: 8,
+    orderBy: { name: 'asc' },
+  });
+  const factors = [0.95, 1.0, 1.08]; // por proveedor: más barato … más caro
+  for (let pi = 0; pi < products.length; pi++) {
+    const p = products[pi]!;
+    if (!p.sku) {
+      await prisma.product.update({
+        where: { id: p.id },
+        data: { sku: `SKU-${String(pi + 1).padStart(3, '0')}` },
+      });
+    }
+    const base = Number(p.costPrice) > 0 ? Number(p.costPrice) : Number(p.salePrice) * 0.5;
+    for (let si = 0; si < created.length; si++) {
+      if ((pi + si) % 4 === 3) continue; // hueco realista
+      const sup = created[si]!;
+      const price = Math.round(base * factors[si]! * 100) / 100;
+      await prisma.supplierPrice.upsert({
+        where: { supplierId_productId: { supplierId: sup.id, productId: p.id } },
+        update: { price },
+        create: { organizationId: orgId, supplierId: sup.id, productId: p.id, price },
+      });
+    }
+  }
+}
+
 async function main(): Promise<void> {
   assertNotProduction();
 
@@ -1109,8 +1227,10 @@ async function main(): Promise<void> {
   await seedBatches(org.id);
   await seedAlerts(org.id);
   await seedB2B(org.id);
+  await seedSuppliers(org.id);
   await seedFeatureFlags(org.id);
   await seedStorePrices(org.id);
+  await seedPromotions(org.id);
 
   console.log(`Seed demo completado: organización ${org.nif} con catálogo, usuarios e histórico.`);
 }

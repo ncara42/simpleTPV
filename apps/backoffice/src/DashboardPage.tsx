@@ -18,7 +18,16 @@ import {
   getSalesToday,
   getStockoutKpis,
 } from './lib/dashboard.js';
-import { deltaTone, fmtDelta, fmtEur, fmtEurCompact, fmtNum, fmtRate } from './lib/format.js';
+import {
+  deltaTone,
+  fmtDelta,
+  fmtEur,
+  fmtEurCompact,
+  fmtNum,
+  fmtRate,
+  invertTone,
+  seriesTrend,
+} from './lib/format.js';
 import { usePageHeader } from './lib/pageHeader.js';
 import { readPref, usePreferences } from './lib/preferences.js';
 import { listAlerts } from './lib/stock.js';
@@ -48,6 +57,10 @@ const PERIOD_SUBTITLE: Record<DashboardPeriod, string> = {
 // Tintes de respaldo (escala azul Apple + neutros) cuando una familia no
 // trae color propio. Mantiene el lienzo monocromo y sobrio.
 const PIE_FALLBACK = ['#0066cc', '#2997ff', '#5ac8fa', '#86868b', '#0a5ac4', '#1d1d1f', '#a1a1a6'];
+
+// La sparkline solo tiene tonos brand/up/down; 'flat' (sin tendencia) usa el
+// neutro 'brand'. Convierte el tono semántico de una métrica al de la sparkline.
+const toSparkTone = (tone: 'up' | 'down' | 'flat'): SparkTone => (tone === 'flat' ? 'brand' : tone);
 
 export function DashboardPage() {
   const [period, setPeriod] = useState<DashboardPeriod>('today');
@@ -172,6 +185,7 @@ export function DashboardPage() {
           label="Ticket medio"
           value={fmtEur(salesKpis.data?.avgTicket)}
           series={salesKpis.data?.series?.avgTicket}
+          sparkTone={toSparkTone(seriesTrend(salesKpis.data?.series?.avgTicket))}
           testid="kpi-avg-ticket"
         />
       ),
@@ -185,6 +199,7 @@ export function DashboardPage() {
           label="UPT"
           value={fmtNum(salesKpis.data?.upt)}
           series={salesKpis.data?.series?.upt}
+          sparkTone={toSparkTone(seriesTrend(salesKpis.data?.series?.upt))}
           testid="kpi-upt"
         />
       ),
@@ -198,6 +213,7 @@ export function DashboardPage() {
           label="% Margen"
           value={fmtRate(marginKpis.data?.marginPct)}
           series={marginKpis.data?.series}
+          sparkTone={toSparkTone(seriesTrend(marginKpis.data?.series))}
           testid="kpi-margin"
         />
       ),
@@ -211,6 +227,7 @@ export function DashboardPage() {
           label="Beneficio"
           value={fmtEur(marginKpis.data?.realMargin)}
           series={marginKpis.data?.realMarginSeries}
+          sparkTone={toSparkTone(seriesTrend(marginKpis.data?.realMarginSeries))}
           testid="kpi-profit"
         />
       ),
@@ -224,6 +241,8 @@ export function DashboardPage() {
           label="Tasa descuento"
           value={fmtRate(salesKpis.data?.discountRate)}
           series={salesKpis.data?.series?.discountRate}
+          // Más descuento es peor: el tono se invierte (subir → rojo).
+          sparkTone={toSparkTone(invertTone(seriesTrend(salesKpis.data?.series?.discountRate)))}
           testid="kpi-discount"
         />
       ),
@@ -237,6 +256,8 @@ export function DashboardPage() {
           label="Tasa devolución"
           value={fmtRate(salesKpis.data?.returnRate)}
           series={salesKpis.data?.series?.returnRate}
+          // Más devoluciones es peor: el tono se invierte (subir → rojo).
+          sparkTone={toSparkTone(invertTone(seriesTrend(salesKpis.data?.series?.returnRate)))}
           testid="kpi-return"
         />
       ),
@@ -655,13 +676,16 @@ function KpiCard(props: {
       <div className="dash-card" data-testid={props.testid}>
         <span className="dash-card-label">{props.label}</span>
         <span className="dash-card-value">{props.value}</span>
-        {props.series && props.series.length > 1 && (
-          // Sparkline reutilizable de @simpletpv/ui (IT-02), a sangre al pie de la
-          // card vía el wrapper .dash-card-spark.
-          <div className="dash-card-spark">
+        {/* Sparkline reutilizable de @simpletpv/ui (IT-02), a sangre al pie de la
+            card. Si aún no hay serie (<2 puntos) se muestra una línea base tenue
+            para que la tarjeta nunca quede vacía (render garantizado, P0-4). */}
+        <div className="dash-card-spark">
+          {props.series && props.series.length > 1 ? (
             <Sparkline data={props.series} tone={props.sparkTone ?? 'brand'} height={44} />
-          </div>
-        )}
+          ) : (
+            <span className="dash-spark-empty" aria-hidden="true" />
+          )}
+        </div>
       </div>
     </div>
   );

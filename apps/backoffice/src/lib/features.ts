@@ -1,23 +1,11 @@
-import type {
-  FeatureFlagCatalogEntry,
-  FeatureFlagRow,
-  FeatureFlags,
-  FeatureFlagsAdmin,
-  FeatureKey,
-} from '@simpletpv/auth';
+import type { FeatureFlags } from '@simpletpv/auth';
 import { useQuery } from '@tanstack/react-query';
 
 import { api } from './auth.js';
 
-export type {
-  FeatureFlagCatalogEntry,
-  FeatureFlagRow,
-  FeatureFlags,
-  FeatureFlagsAdmin,
-  FeatureKey,
-};
+export type { FeatureFlags };
 
-export const ALL_ENABLED: FeatureFlags = {
+const ALL_ENABLED: FeatureFlags = {
   blind_returns: true,
   time_clock: true,
   data_export: true,
@@ -28,6 +16,10 @@ export function getFeatures(storeId?: string): Promise<FeatureFlags> {
   return api.get<FeatureFlags>('/me/features', storeId ? { storeId } : {});
 }
 
+// Lee los módulos activos (resolución tienda ?? org ?? código en el backend) para
+// ocultar entradas del menú. La GESTIÓN de flags por UI se retiró con la página
+// "Módulos" (informe UX); el backend de feature-flags sigue activo y los flags se
+// fijan por seed/config.
 export function useFeatures(storeId?: string): FeatureFlags {
   const { data } = useQuery({
     queryKey: ['features', storeId ?? 'org'],
@@ -35,16 +27,4 @@ export function useFeatures(storeId?: string): FeatureFlags {
     staleTime: 5 * 60 * 1000,
   });
   return data ?? ALL_ENABLED;
-}
-
-export function listFeatureFlags(): Promise<FeatureFlagsAdmin> {
-  return api.get<FeatureFlagsAdmin>('/feature-flags');
-}
-
-export function setFeatureFlag(key: FeatureKey, enabled: boolean, storeId?: string): Promise<void> {
-  return api.put<void>('/feature-flags', { key, enabled, ...(storeId ? { storeId } : {}) });
-}
-
-export function clearFeatureFlag(key: FeatureKey, storeId?: string): Promise<void> {
-  return api.del(`/feature-flags/${key}${storeId ? `?storeId=${storeId}` : ''}`);
 }

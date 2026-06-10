@@ -39,6 +39,9 @@ packages/db/generated/
 backups/
 *.dump
 
+# Playwright auth storageState (tokens de sesión, nunca al repo)
+**/e2e/.auth/
+
 # Misc
 .claude/
 .worktrees/

@@ -47,6 +47,10 @@ export class CreateCustomerDto {
   @IsOptional()
   @IsUUID()
   priceListId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
 }
 
 export class UpdateCustomerDto {

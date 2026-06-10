@@ -11,6 +11,7 @@ interface FakeFamily {
   parentId: string | null;
   name: string;
   sortOrder: number;
+  isArchetype?: boolean;
 }
 
 function makePrisma(families: FakeFamily[] = []) {
@@ -24,6 +25,10 @@ function makePrisma(families: FakeFamily[] = []) {
       findFirst: vi.fn(
         async ({ where }: { where: { id: string } }) =>
           families.find((f) => f.id === where.id) ?? null,
+      ),
+      count: vi.fn(
+        async ({ where }: { where: { parentId: string } }) =>
+          families.filter((f) => f.parentId === where.parentId).length,
       ),
       update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'f1', ...data })),
       delete: vi.fn(async () => ({ id: 'f1' })),
@@ -103,6 +108,78 @@ describe('ProductFamiliesService.update (anti-ciclos)', () => {
     const prisma = makePrisma(fams);
     const service = new ProductFamiliesService(prisma as never);
     await service.update('r2', { parentId: 'r1' });
+    expect(prisma.productFamily.update).toHaveBeenCalledOnce();
+  });
+});
+
+describe('ProductFamiliesService (reglas de arquetipo)', () => {
+  it('rechaza crear una subfamilia bajo un arquetipo', async () => {
+    const fams: FakeFamily[] = [
+      {
+        id: 'arq',
+        organizationId: ORG,
+        parentId: null,
+        name: 'Crema camomila',
+        sortOrder: 0,
+        isArchetype: true,
+      },
+    ];
+    const prisma = makePrisma(fams);
+    const service = new ProductFamiliesService(prisma as never);
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () =>
+        service.create({ name: 'Sub', parentId: 'arq' }),
+      ),
+    ).rejects.toThrow(/arquetipo solo puede contener productos/i);
+    expect(prisma.productFamily.create).not.toHaveBeenCalled();
+  });
+
+  it('rechaza mover una familia bajo un arquetipo', async () => {
+    const fams: FakeFamily[] = [
+      {
+        id: 'arq',
+        organizationId: ORG,
+        parentId: null,
+        name: 'Arq',
+        sortOrder: 0,
+        isArchetype: true,
+      },
+      { id: 'f1', organizationId: ORG, parentId: null, name: 'F1', sortOrder: 1 },
+    ];
+    const prisma = makePrisma(fams);
+    const service = new ProductFamiliesService(prisma as never);
+    await expect(service.update('f1', { parentId: 'arq' })).rejects.toThrow(
+      /arquetipo solo puede contener productos/i,
+    );
+    expect(prisma.productFamily.update).not.toHaveBeenCalled();
+  });
+
+  it('rechaza marcar como arquetipo un nodo con subfamilias', async () => {
+    const fams: FakeFamily[] = [
+      { id: 'r1', organizationId: ORG, parentId: null, name: 'Cosmética', sortOrder: 0 },
+      { id: 'c1', organizationId: ORG, parentId: 'r1', name: 'Facial', sortOrder: 0 },
+    ];
+    const prisma = makePrisma(fams);
+    const service = new ProductFamiliesService(prisma as never);
+    await expect(service.update('r1', { isArchetype: true })).rejects.toThrow(
+      /arquetipo.*subfamilias|subfamilias.*arquetipo/i,
+    );
+    expect(prisma.productFamily.update).not.toHaveBeenCalled();
+  });
+
+  it('permite marcar como arquetipo un nodo hoja (sin subfamilias)', async () => {
+    const fams: FakeFamily[] = [
+      {
+        id: 'leaf',
+        organizationId: ORG,
+        parentId: null,
+        name: 'Crema camomila 100ml',
+        sortOrder: 0,
+      },
+    ];
+    const prisma = makePrisma(fams);
+    const service = new ProductFamiliesService(prisma as never);
+    await service.update('leaf', { isArchetype: true });
     expect(prisma.productFamily.update).toHaveBeenCalledOnce();
   });
 });

@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
 import { assertStoreAccess } from '../auth/store-access.js';
+import { type ImportResult, parseCsv, rowNumber } from '../common/csv.js';
+import { MAX_PRICE } from '../common/limits.js';
 import { requireOwned } from '../common/tenant-scope.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
@@ -65,6 +67,51 @@ export class StorePricesService {
       create: { organizationId, storeId, productId: dto.productId, price: dto.price },
       update: { price: dto.price },
     });
+  }
+
+  // Importa overrides de precio de una tienda desde CSV (columnas: sku,price).
+  // Resuelve el producto por SKU dentro del tenant; reporta errores por fila sin
+  // abortar el lote. Verifica acceso a la tienda igual que setPrice.
+  async importCsv(storeId: string, csv: string, actor: Actor): Promise<ImportResult> {
+    const { organizationId } = requireTenant();
+    await assertStoreAccess(this.prisma, { userId: actor.userId, role: actor.role, storeId });
+    await requireOwned(
+      this.prisma.store.findFirst({ where: { id: storeId, organizationId }, select: { id: true } }),
+      'Tienda no encontrada.',
+    );
+    const rows = parseCsv(csv);
+    const errors: ImportResult['errors'] = [];
+    let inserted = 0;
+
+    for (const [idx, cells] of rows.entries()) {
+      const row = rowNumber(idx);
+      const sku = (cells.sku ?? '').trim();
+      const priceRaw = (cells.price ?? '').trim();
+      const price = Number(priceRaw);
+      if (!sku) {
+        errors.push({ row, message: 'Falta el SKU' });
+        continue;
+      }
+      if (!priceRaw || Number.isNaN(price) || price < 0 || price > MAX_PRICE) {
+        errors.push({ row, message: 'Precio inválido' });
+        continue;
+      }
+      const product = await this.prisma.product.findFirst({
+        where: { sku, organizationId },
+        select: { id: true },
+      });
+      if (!product) {
+        errors.push({ row, message: `Sin producto con SKU "${sku}"` });
+        continue;
+      }
+      await this.prisma.storePrice.upsert({
+        where: { productId_storeId: { productId: product.id, storeId } },
+        create: { organizationId, storeId, productId: product.id, price },
+        update: { price },
+      });
+      inserted += 1;
+    }
+    return { inserted, errors };
   }
 
   // Quita el override → el producto vuelve a usar su PVP en esa tienda. deleteMany

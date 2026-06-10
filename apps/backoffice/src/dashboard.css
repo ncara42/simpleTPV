@@ -150,6 +150,18 @@
   width: calc(100% + 2.5rem);
   line-height: 0;
 }
+/* Línea base tenue cuando aún no hay serie: misma altura que la sparkline (44px)
+   para que la card no cambie de tamaño y nunca quede vacía. */
+.dash-spark-empty {
+  display: block;
+  height: 44px;
+  background: linear-gradient(
+    to bottom,
+    transparent calc(50% - 1px),
+    var(--ui-border) calc(50%),
+    transparent calc(50% + 1px)
+  );
+}
 .dash-delta-up {
   color: var(--ui-success);
   background: var(--ui-success-soft);

@@ -3,13 +3,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { CsvDropzone } from './components/CsvDropzone.js';
 import { Modal } from './components/Modal.js';
 import {
+  assignUserStores,
   createUser,
   deleteUser,
+  importUsersCsv,
   listStores,
   listUsers,
   type NewUser,
+  updateUser,
   type User,
 } from './lib/admin.js';
 import { usePageHeader } from './lib/pageHeader.js';
@@ -74,15 +78,13 @@ export function UsersPage() {
   const [form, setForm] = useState<UserForm | null>(null);
   // Modo asistente (edición en lote). null → alta de un usuario nuevo.
   const [wizard, setWizard] = useState<EditWizard | null>(null);
+  // Modal de importación de usuarios por CSV (alta en lote).
+  const [importing, setImporting] = useState(false);
   // Filtros de la barra superior (espejo de la toolbar de stock).
   const [search, setSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
   // Selección múltiple por fila (ids marcados).
   const [selected, setSelected] = useState<string[]>([]);
-  // Overlays locales (demo: no hay backend que persista los cambios).
-  const [overrides, setOverrides] = useState<Record<string, Partial<UserWithStores>>>({});
-  const [extras, setExtras] = useState<UserWithStores[]>([]);
-  const [deleted, setDeleted] = useState<string[]>([]);
 
   const { data: users = [], isLoading } = useQuery({ queryKey: ['users'], queryFn: listUsers });
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
@@ -95,10 +97,10 @@ export function UsersPage() {
     return storeIds.length ? storeIds.map(storeName).join(', ') : '—';
   };
 
-  const allUsers = useMemo<UserWithStores[]>(() => {
-    const base = (users as UserWithStores[]).map((u) => ({ ...u, ...overrides[u.id] }));
-    return [...base, ...extras].filter((u) => !deleted.includes(u.id));
-  }, [users, overrides, extras, deleted]);
+  const allUsers = useMemo<UserWithStores[]>(
+    () => users.map((u) => ({ ...u, storeIds: u.storeIds ?? [] })),
+    [users],
+  );
 
   // Búsqueda por nombre + filtro por tienda. Los ADMIN acceden a todas las
   // tiendas (storeIds vacío), así que aparecen en cualquier filtro de tienda.
@@ -131,69 +133,54 @@ export function UsersPage() {
     [allUsers, selectedSet],
   );
 
-  // ─── Mutaciones / overlays ─────────────────────────────────────────────
+  // ─── Mutaciones (persistencia real; la tabla se refresca por invalidate) ──
   const createMut = useMutation({
-    mutationFn: async (f: UserForm): Promise<UserForm> => {
-      await createUser({ name: f.name, email: f.email, password: f.password, role: f.role });
-      return f;
+    mutationFn: async (f: UserForm): Promise<void> => {
+      const created = await createUser({
+        name: f.name,
+        email: f.email,
+        password: f.password,
+        role: f.role,
+      });
+      // El alta no acepta estos campos: se aplican justo después de crear.
+      if (!f.active) await updateUser(created.id, { active: false });
+      if (f.role !== 'ADMIN' && f.storeIds.length > 0) {
+        await assignUserStores(created.id, f.storeIds);
+      }
     },
-    onSuccess: (f) => {
-      setExtras((prev) => [
-        ...prev,
-        {
-          id: `u-${f.email}`,
-          active: f.active,
-          role: f.role,
-          name: f.name,
-          email: f.email,
-          storeIds: f.role === 'ADMIN' ? [] : f.storeIds,
-        },
-      ]);
+    onSuccess: () => {
       closeModal();
       invalidate();
     },
   });
 
-  // Aplica la edición de un usuario existente sobre los overlays locales.
+  // Edita un usuario existente (datos + tiendas); el refetch refleja el cambio.
   const applyEdit = (f: UserForm): void => {
     if (!f.id) return;
-    const patch: Partial<UserWithStores> = {
-      name: f.name,
-      email: f.email,
-      role: f.role,
-      storeIds: f.role === 'ADMIN' ? [] : f.storeIds,
-      active: f.active,
-    };
-    if (extras.some((u) => u.id === f.id)) {
-      setExtras((prev) => prev.map((u) => (u.id === f.id ? { ...u, ...patch } : u)));
-    } else {
-      setOverrides((prev) => ({ ...prev, [f.id as string]: patch }));
-    }
+    const id = f.id;
+    void Promise.all([
+      updateUser(id, {
+        name: f.name,
+        email: f.email,
+        role: f.role,
+        active: f.active,
+        ...(f.password ? { password: f.password } : {}),
+      }),
+      assignUserStores(id, f.role === 'ADMIN' ? [] : f.storeIds),
+    ]).then(invalidate);
   };
 
-  // Activa/desactiva un usuario desde su badge en la tabla, conservando el
-  // resto del overlay local (demo: no hay backend que persista el cambio).
+  // Activa/desactiva un usuario desde su badge en la tabla.
   const toggleActive = (id: string): void => {
     const current = allUsers.find((u) => u.id === id);
     if (!current) return;
-    const active = !current.active;
-    if (extras.some((u) => u.id === id)) {
-      setExtras((prev) => prev.map((u) => (u.id === id ? { ...u, active } : u)));
-    } else {
-      setOverrides((prev) => ({ ...prev, [id]: { ...prev[id], active } }));
-    }
-    invalidate();
+    void updateUser(id, { active: !current.active }).then(invalidate);
   };
 
-  // Borrado en lote en local (demo: deleteUser es un stub sin backend).
+  // Borrado en lote: se refresca cuando terminan todos los DELETE.
   const removeSelected = (): void => {
-    const ids = new Set(selected);
-    const extraIds = new Set(extras.map((e) => e.id));
-    setExtras((prev) => prev.filter((u) => !ids.has(u.id)));
-    setDeleted((prev) => [...prev, ...selected.filter((id) => !extraIds.has(id))]);
-    selected.forEach((id) => void deleteUser(id));
+    void Promise.all(selected.map((id) => deleteUser(id))).then(invalidate);
     clearSelection();
-    invalidate();
   };
 
   // ─── Modal ─────────────────────────────────────────────────────────────
@@ -327,9 +314,19 @@ export function UsersPage() {
               </button>
             </div>
           ) : (
-            <button className="btn-primary" onClick={openCreate} data-testid="new-user">
-              Nuevo usuario
-            </button>
+            <div className="users-toolbar-actions">
+              <button
+                type="button"
+                className="users-sel-btn"
+                onClick={() => setImporting(true)}
+                data-testid="users-import"
+              >
+                Importar CSV
+              </button>
+              <button className="btn-primary" onClick={openCreate} data-testid="new-user">
+                Nuevo usuario
+              </button>
+            </div>
           )}
         </div>
 
@@ -548,6 +545,36 @@ export function UsersPage() {
                 {primaryLabel}
               </button>
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {importing && (
+        <Modal
+          onClose={() => setImporting(false)}
+          className="modal--form"
+          testId="users-import-modal"
+          ariaLabel="Importar usuarios desde CSV"
+        >
+          <h3>Importar usuarios desde CSV</h3>
+          <CsvDropzone
+            columns={['email', 'name', 'password', 'role']}
+            example={['nuevo@tienda.com', 'Nombre Apellido', 'contrasena8', 'CLERK']}
+            templateName="plantilla_usuarios.csv"
+            testId="users-csv"
+            help={
+              <>
+                Columnas: <code>email,name,password,role</code>. El rol es <code>ADMIN</code>,{' '}
+                <code>MANAGER</code> o <code>CLERK</code>; la contraseña, mínimo 8 caracteres.
+              </>
+            }
+            onImport={importUsersCsv}
+            onImported={invalidate}
+          />
+          <div className="modal-foot">
+            <button type="button" onClick={() => setImporting(false)}>
+              Cerrar
+            </button>
           </div>
         </Modal>
       )}

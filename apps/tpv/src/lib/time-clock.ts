@@ -12,7 +12,7 @@ import { api } from './auth.js';
 
 const TOKEN_KEY = 'tpv-device-pairing-token';
 
-export function getPairingToken(): string {
+function getPairingToken(): string {
   try {
     return localStorage.getItem(TOKEN_KEY) ?? '';
   } catch {
@@ -20,7 +20,7 @@ export function getPairingToken(): string {
   }
 }
 
-export function setPairingToken(token: string): void {
+function setPairingToken(token: string): void {
   try {
     localStorage.setItem(TOKEN_KEY, token);
   } catch {

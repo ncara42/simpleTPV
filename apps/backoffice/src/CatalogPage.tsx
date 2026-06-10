@@ -2,13 +2,16 @@ import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
+import { CsvDropzone } from './components/CsvDropzone.js';
 import { Modal } from './components/Modal.js';
 import { type FamilyNode, listFamilies } from './lib/families.js';
 import { findNodePath, flattenTree, isDescendantOf } from './lib/family-tree.js';
+import { fmtEur } from './lib/format.js';
 import { usePageHeader } from './lib/pageHeader.js';
 import {
   createProduct,
   deleteProduct,
+  importProductsCsv,
   listProducts,
   type Product,
   type ProductInput,
@@ -27,6 +30,10 @@ function stockLevel(qty: number): 'red' | 'yellow' | 'green' {
   if (qty <= 5) return 'yellow';
   return 'green';
 }
+
+// Margen sobre PVP: (PVP − coste) / PVP en %. '—' si no hay PVP.
+const marginPct = (sale: number, cost: number): string =>
+  sale > 0 ? `${Math.round(((sale - cost) / sale) * 100)}%` : '—';
 
 interface FormState {
   id?: string;
@@ -82,19 +89,6 @@ function toPayload(f: FormState): ProductInput {
   };
 }
 
-// Parche local (demo: el backend stub no persiste) con los campos editables.
-function toPatch(f: FormState): Partial<Product> {
-  return {
-    name: f.name,
-    salePrice: String(f.salePrice),
-    sku: f.sku || null,
-    barcode: f.barcode || null,
-    costPrice: String(f.costPrice ?? 0),
-    taxRate: String(f.taxRate ?? 21),
-    familyId: f.familyId,
-  };
-}
-
 export function CatalogPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
@@ -102,9 +96,8 @@ export function CatalogPage() {
   const [form, setForm] = useState<FormState | null>(null);
   const [wizard, setWizard] = useState<EditWizard | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
-  const [overrides, setOverrides] = useState<Record<string, Partial<Product>>>({});
-  const [extras, setExtras] = useState<Product[]>([]);
-  const [deleted, setDeleted] = useState<string[]>([]);
+  // Modal de importación de catálogo por CSV (POST /products/import).
+  const [importing, setImporting] = useState(false);
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products', search],
@@ -128,10 +121,7 @@ export function CatalogPage() {
 
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['products'] });
 
-  const allProducts = useMemo<Product[]>(() => {
-    const base = products.map((p) => ({ ...p, ...overrides[p.id] }));
-    return [...base, ...extras].filter((p) => !deleted.includes(p.id));
-  }, [products, overrides, extras, deleted]);
+  const allProducts = products;
 
   const archetypeOptions = useMemo(
     () =>
@@ -172,37 +162,25 @@ export function CatalogPage() {
     [filtered, selectedSet],
   );
 
-  // ─── Mutaciones / overlays ─────────────────────────────────────────────
+  // ─── Mutaciones (persistencia real; la tabla se refresca por invalidate) ──
   const createMut = useMutation({
     mutationFn: (f: FormState) => createProduct(toPayload(f)),
-    onSuccess: (created) => {
-      setExtras((prev) => [...prev, created]);
+    onSuccess: () => {
       closeModal();
       invalidate();
     },
   });
 
-  // Aplica la edición de un producto existente sobre los overlays locales.
+  // Edita un producto existente; el refetch tras invalidate refleja el cambio.
   const applyEdit = (f: FormState): void => {
     if (!f.id) return;
-    const patch = toPatch(f);
-    if (extras.some((p) => p.id === f.id)) {
-      setExtras((prev) => prev.map((p) => (p.id === f.id ? { ...p, ...patch } : p)));
-    } else {
-      setOverrides((prev) => ({ ...prev, [f.id as string]: patch }));
-    }
-    void updateProduct(f.id, toPayload(f)); // parity con futuro backend
+    void updateProduct(f.id, toPayload(f)).then(invalidate);
   };
 
-  // Borrado en lote en local (demo: deleteProduct es un stub sin backend).
+  // Borrado en lote: se refresca cuando terminan todos los DELETE.
   const removeSelected = (): void => {
-    const ids = new Set(selected);
-    const extraIds = new Set(extras.map((e) => e.id));
-    setExtras((prev) => prev.filter((p) => !ids.has(p.id)));
-    setDeleted((prev) => [...prev, ...selected.filter((id) => !extraIds.has(id))]);
-    selected.forEach((id) => void deleteProduct(id));
+    void Promise.all(selected.map((id) => deleteProduct(id))).then(invalidate);
     clearSelection();
-    invalidate();
   };
 
   // ─── Modal ─────────────────────────────────────────────────────────────
@@ -321,9 +299,19 @@ export function CatalogPage() {
               </button>
             </div>
           ) : (
-            <button className="btn-primary" onClick={openCreate} data-testid="new-product">
-              Nuevo producto
-            </button>
+            <div className="users-toolbar-actions">
+              <button
+                type="button"
+                className="users-sel-btn"
+                onClick={() => setImporting(true)}
+                data-testid="catalog-import"
+              >
+                Importar CSV
+              </button>
+              <button className="btn-primary" onClick={openCreate} data-testid="new-product">
+                Nuevo producto
+              </button>
+            </div>
           )}
         </div>
 
@@ -346,7 +334,9 @@ export function CatalogPage() {
                 <th>Nombre</th>
                 <th>Arquetipo</th>
                 <th>SKU</th>
+                <th>Coste</th>
                 <th>Precio</th>
+                <th>Margen</th>
                 <th>IVA</th>
                 <th>Stock</th>
               </tr>
@@ -378,7 +368,15 @@ export function CatalogPage() {
                       {familyPathLabel(families, p.familyId)}
                     </td>
                     <td className="muted">{p.sku ?? '—'}</td>
-                    <td>{Number(p.salePrice).toFixed(2).replace('.', ',')} €</td>
+                    <td className="muted">{fmtEur(Number(p.costPrice))}</td>
+                    <td>{fmtEur(Number(p.salePrice))}</td>
+                    <td data-testid="catalog-margin">
+                      {fmtEur(Number(p.salePrice) - Number(p.costPrice))}
+                      <span className="muted">
+                        {' · '}
+                        {marginPct(Number(p.salePrice), Number(p.costPrice))}
+                      </span>
+                    </td>
                     <td className="muted">{Number(p.taxRate).toFixed(0)}%</td>
                     <td>
                       <span
@@ -476,6 +474,36 @@ export function CatalogPage() {
               data-testid="form-save"
             >
               {primaryLabel}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {importing && (
+        <Modal
+          onClose={() => setImporting(false)}
+          className="modal--form"
+          testId="catalog-import-modal"
+          ariaLabel="Importar catálogo desde CSV"
+        >
+          <h3>Importar catálogo desde CSV</h3>
+          <CsvDropzone
+            columns={['name', 'salePrice', 'sku', 'barcode']}
+            example={['Producto ejemplo', '9.99', 'SKU-001', '8412345678901']}
+            templateName="plantilla_catalogo.csv"
+            testId="catalog-csv"
+            help={
+              <>
+                Columnas: <code>name,salePrice,sku,barcode</code>. Solo <code>name</code> y{' '}
+                <code>salePrice</code> son obligatorios.
+              </>
+            }
+            onImport={importProductsCsv}
+            onImported={invalidate}
+          />
+          <div className="modal-foot">
+            <button type="button" onClick={() => setImporting(false)}>
+              Cerrar
             </button>
           </div>
         </Modal>

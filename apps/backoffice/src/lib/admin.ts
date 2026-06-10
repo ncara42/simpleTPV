@@ -1,16 +1,18 @@
 import type {
+  ImportResult,
   NewUser,
   SalesPage,
   SalesQueryInput,
   SaleSummary,
   Store,
   StoreInput,
+  UpdateUserInput,
   User,
 } from '@simpletpv/auth';
 
 import { api } from './auth.js';
 
-export type { NewUser, SalesQueryInput, Store, StoreInput, User };
+export type { ImportResult, NewUser, SalesQueryInput, Store, StoreInput, UpdateUserInput, User };
 
 export interface SalesViewRow extends SaleSummary {
   storeName: string;
@@ -31,6 +33,19 @@ export function listUsers(): Promise<User[]> {
 
 export function createUser(input: NewUser): Promise<User> {
   return api.post<User>('/users', input);
+}
+
+export function importUsersCsv(csv: string): Promise<ImportResult> {
+  return api.post<ImportResult>('/users/import', { csv });
+}
+
+export function updateUser(id: string, input: UpdateUserInput): Promise<User> {
+  return api.patch<User>(`/users/${id}`, input);
+}
+
+// Reemplaza las tiendas asignadas del usuario (PUT /users/:id/stores).
+export function assignUserStores(id: string, storeIds: string[]): Promise<void> {
+  return api.put<void>(`/users/${id}/stores`, { storeIds });
 }
 
 export function deleteUser(id: string): Promise<void> {

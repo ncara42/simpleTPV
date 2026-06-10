@@ -30,6 +30,13 @@ export interface ProductInput {
   familyId?: string | null;
 }
 
+// Resultado de una importación CSV en lote (espejo del ImportResult del backend,
+// apps/api/src/common/csv.ts): filas insertadas + errores por número de fila.
+export interface ImportResult {
+  inserted: number;
+  errors: Array<{ row: number; message: string }>;
+}
+
 export interface FamilyNode {
   id: string;
   parentId: string | null;
@@ -37,6 +44,9 @@ export interface FamilyNode {
   color: string | null;
   icon: string | null;
   sortOrder: number;
+  // Arquetipo: nodo que solo contiene productos (no subfamilias). Ver árbol de
+  // clasificación del informe de UX.
+  isArchetype: boolean;
   children: FamilyNode[];
 }
 
@@ -46,6 +56,7 @@ export interface FamilyInput {
   color?: string | null;
   icon?: string | null;
   sortOrder?: number;
+  isArchetype?: boolean;
 }
 
 export interface User {
@@ -54,6 +65,9 @@ export interface User {
   name: string;
   role: UserRole;
   active: boolean;
+  // Tiendas asignadas (UserStore). Solo lo devuelve GET /users; un ADMIN accede a
+  // todas las tiendas y lo lleva vacío. Opcional: /auth/me no lo incluye.
+  storeIds?: string[];
 }
 
 export interface NewUser {
@@ -61,6 +75,16 @@ export interface NewUser {
   name: string;
   password: string;
   role: UserRole;
+}
+
+// Edición de usuario (PATCH /users/:id): todos los campos opcionales; la
+// contraseña solo se cambia si viene informada.
+export interface UpdateUserInput {
+  name?: string;
+  email?: string;
+  role?: UserRole;
+  active?: boolean;
+  password?: string;
 }
 
 export interface Store {

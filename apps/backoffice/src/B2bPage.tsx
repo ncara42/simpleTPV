@@ -7,11 +7,11 @@ import { usePageHeader } from './lib/pageHeader.js';
 
 type Section = 'customers' | 'pricelists' | 'orders';
 
-// B2B mayorista saliente (IT-17): clientes, tarifas y pedidos en una sola vista
-// con sub-pestañas (mismo patrón que Compras).
+// Clientes B2B (P1-B): lado VENTA del mayorista (clientes, tarifas de venta y
+// pedidos salientes), separado de Proveedores (lado compra).
 export function B2bPage() {
   const [section, setSection] = useState<Section>('customers');
-  usePageHeader('Mayorista', 'Clientes, tarifas y pedidos salientes (ventas a clientes B2B)');
+  usePageHeader('Clientes B2B', 'Clientes, tarifas de venta y pedidos salientes');
   return (
     <section className="catalog" data-testid="b2b-page">
       <nav className="bo-tabs" data-testid="b2b-subtabs">

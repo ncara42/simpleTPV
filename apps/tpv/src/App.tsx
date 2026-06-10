@@ -14,6 +14,7 @@ import { CashPanel } from './CashPanel.js';
 import { ConnectivityBanner } from './ConnectivityBanner.js';
 import { InventoryPanel } from './InventoryPanel.js';
 import { api, useAuthStore } from './lib/auth.js';
+import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { formatDuration } from './lib/format.js';
 import { switchApp } from './lib/nav.js';
@@ -98,6 +99,7 @@ function Home() {
 
 export default function App() {
   const isAuthed = useAuthStore((s) => s.accessToken !== null);
+  useDevAutoLogin(!isAuthed);
   if (!isAuthed) {
     return <LoginForm onSubmit={api.login} />;
   }

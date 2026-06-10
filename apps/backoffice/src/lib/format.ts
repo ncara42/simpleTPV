@@ -49,6 +49,25 @@ export function deltaTone(value: number | null | undefined): 'up' | 'down' | 'fl
   return value > 0 ? 'up' : 'down';
 }
 
+// Tendencia de una serie cronológica: compara el último punto con el primero.
+// Base de la sparkline para colorear según hacia dónde va el dato.
+export function seriesTrend(series: number[] | undefined | null): 'up' | 'down' | 'flat' {
+  if (!series || series.length < 2) {
+    return 'flat';
+  }
+  const first = series[0]!;
+  const last = series[series.length - 1]!;
+  if (last > first) return 'up';
+  if (last < first) return 'down';
+  return 'flat';
+}
+
+// Invierte el tono para métricas donde "más es peor" (tasa de descuento o de
+// devolución): subir es malo (rojo) y bajar es bueno (verde).
+export function invertTone(tone: 'up' | 'down' | 'flat'): 'up' | 'down' | 'flat' {
+  return tone === 'up' ? 'down' : tone === 'down' ? 'up' : 'flat';
+}
+
 // Número con decimales fijos (UPT, unidades). null → "—".
 export function fmtNum(value: number | null | undefined, decimals = 2): string {
   if (value === null || value === undefined || !Number.isFinite(value)) {

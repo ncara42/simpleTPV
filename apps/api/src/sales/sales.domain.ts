@@ -43,7 +43,7 @@ export interface ComputedLine extends PricedLine {
 }
 
 // Límite de % de descuento efectivo total del ticket por rol (null = sin límite).
-export const DISCOUNT_LIMITS: Record<SaleRole, number | null> = {
+const DISCOUNT_LIMITS: Record<SaleRole, number | null> = {
   ADMIN: null,
   MANAGER: 50,
   CLERK: 10,

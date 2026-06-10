@@ -14,11 +14,13 @@ import {
 import {
   countDescendants,
   type DropPosition,
+  findNode,
   flattenTree,
   insertChild,
   isDescendantOf,
   moveToParent,
   removeNode,
+  renumberSiblings,
   reorderSiblings,
 } from './lib/family-tree.js';
 import { usePageHeader } from './lib/pageHeader.js';
@@ -27,6 +29,10 @@ interface FormState {
   id?: string;
   name: string;
   parentId: string | null;
+  // Marcar el nodo como arquetipo (solo productos, sin subniveles).
+  isArchetype: boolean;
+  // Si el nodo editado ya tiene subniveles, no puede convertirse en arquetipo.
+  hasChildren: boolean;
 }
 
 // Normaliza para buscar sin distinguir mayúsculas ni acentos.
@@ -37,10 +43,32 @@ const norm = (s: string): string =>
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '');
 
+// Plegado del árbol: se recuerda en el navegador (localStorage) entre sesiones.
+const COLLAPSE_KEY = 'simpletpv.families.collapsed';
+const EMPTY_COLLAPSE: ReadonlySet<string> = new Set();
+function loadCollapsed(): Set<string> {
+  try {
+    const raw = localStorage.getItem(COLLAPSE_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+function saveCollapsed(ids: Set<string>): void {
+  try {
+    localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...ids]));
+  } catch {
+    /* almacenamiento no disponible: el plegado no se recuerda esta sesión */
+  }
+}
+
 interface RowActions {
   roots: FamilyNode[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  // Nodos plegados (sus hijas no se muestran). Vacío mientras se busca.
+  collapsedIds: ReadonlySet<string>;
+  onToggleCollapse: (id: string) => void;
   dragId: string | null;
   dropTarget: { id: string; position: DropPosition } | null;
   onDragStart: (node: FamilyNode) => void;
@@ -68,10 +96,19 @@ function FamilyRow({
   const dragging = actions.dragId === node.id;
   const drop = actions.dropTarget?.id === node.id ? actions.dropTarget.position : null;
   const selected = actions.selectedId === node.id;
+  const hasChildren = node.children.length > 0;
+  const collapsed = actions.collapsedIds.has(node.id);
   // Destinos válidos para "Mover": cualquier arquetipo salvo el propio subárbol y
   // el padre actual. La sangría del label indica la profundidad del destino.
+  // Destinos válidos: no el propio subárbol, no el padre actual, y NUNCA un
+  // arquetipo (un arquetipo solo contiene productos, no subniveles).
   const moveOptions = flattenTree(actions.roots)
-    .filter((f) => !isDescendantOf(actions.roots, node.id, f.node.id) && f.node.id !== parentId)
+    .filter(
+      (f) =>
+        !isDescendantOf(actions.roots, node.id, f.node.id) &&
+        f.node.id !== parentId &&
+        !f.node.isArchetype,
+    )
     .map((f) => ({ value: f.node.id, label: `${'– '.repeat(f.depth)}${f.node.name}` }));
   return (
     <>
@@ -107,6 +144,23 @@ function FamilyRow({
           actions.onDrop(node);
         }}
       >
+        {hasChildren ? (
+          <button
+            type="button"
+            className="fam-toggle"
+            aria-label={collapsed ? 'Desplegar' : 'Plegar'}
+            aria-expanded={!collapsed}
+            data-testid="fam-toggle"
+            onClick={(e) => {
+              e.stopPropagation();
+              actions.onToggleCollapse(node.id);
+            }}
+          >
+            {collapsed ? '▸' : '▾'}
+          </button>
+        ) : (
+          <span className="fam-toggle fam-toggle--leaf" aria-hidden="true" />
+        )}
         <span className="fam-grip" aria-hidden="true" data-testid="fam-grip">
           ⠿
         </span>
@@ -116,6 +170,11 @@ function FamilyRow({
             style={{ background: node.color ?? 'var(--ui-text-soft)' }}
           />
           {node.name}
+          {node.isArchetype && (
+            <span className="fam-badge" data-testid="fam-archetype-badge">
+              Arquetipo
+            </span>
+          )}
         </span>
         <span className="fam-count" data-testid="fam-count">
           {(node as { productCount?: number }).productCount ?? 0} productos
@@ -135,9 +194,11 @@ function FamilyRow({
                 data-testid="fam-move-to"
               />
             )}
-            <button onClick={() => actions.onAddChild(node.id)} data-testid="fam-add-child">
-              + Subnivel
-            </button>
+            {!node.isArchetype && (
+              <button onClick={() => actions.onAddChild(node.id)} data-testid="fam-add-child">
+                + Subnivel
+              </button>
+            )}
             <button onClick={() => actions.onEdit(node)}>Editar</button>
             <button className="danger" onClick={() => void actions.onDelete(node)}>
               Borrar
@@ -145,9 +206,10 @@ function FamilyRow({
           </span>
         )}
       </div>
-      {node.children.map((c) => (
-        <FamilyRow key={c.id} node={c} depth={depth + 1} parentId={node.id} actions={actions} />
-      ))}
+      {!collapsed &&
+        node.children.map((c) => (
+          <FamilyRow key={c.id} node={c} depth={depth + 1} parentId={node.id} actions={actions} />
+        ))}
     </>
   );
 }
@@ -162,6 +224,16 @@ export function FamiliesPage() {
   // Fila activa: solo esa muestra sus botones (Mover / Editar / Borrar / + Hija).
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const toggleSelected = (id: string): void => setSelectedId((cur) => (cur === id ? null : id));
+  // Nodos plegados (sus hijas no se muestran), recordados en localStorage.
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(loadCollapsed);
+  useEffect(() => saveCollapsed(collapsedIds), [collapsedIds]);
+  const toggleCollapse = (id: string): void =>
+    setCollapsedIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const { data: serverTree = [], isLoading } = useQuery({
     queryKey: ['families'],
@@ -222,16 +294,18 @@ export function FamiliesPage() {
   const saveMut = useMutation({
     mutationFn: (f: FormState) =>
       f.id
-        ? updateFamily(f.id, { name: f.name })
-        : createFamily({ name: f.name, parentId: f.parentId }),
+        ? updateFamily(f.id, { name: f.name, isArchetype: f.isArchetype })
+        : createFamily({ name: f.name, parentId: f.parentId, isArchetype: f.isArchetype }),
     onSuccess: (saved, f) => {
       setTree((prev) => {
         const base = prev ?? view;
         if (f.id) {
-          // Renombrar en el árbol a cualquier profundidad.
+          // Renombrar / actualizar el flag de arquetipo a cualquier profundidad.
           const rename = (list: FamilyNode[]): FamilyNode[] =>
             list.map((n) =>
-              n.id === f.id ? { ...n, name: f.name } : { ...n, children: rename(n.children) },
+              n.id === f.id
+                ? { ...n, name: f.name, isArchetype: f.isArchetype }
+                : { ...n, children: rename(n.children) },
             );
           return rename(base);
         }
@@ -244,6 +318,19 @@ export function FamiliesPage() {
   });
 
   const delMut = useMutation({ mutationFn: (id: string) => deleteFamily(id) });
+
+  // Persistir el nuevo orden de hermanos (sortOrder) tras un reordenado por arrastre.
+  const reorderMut = useMutation({
+    mutationFn: (changes: { id: string; sortOrder: number }[]) =>
+      Promise.all(changes.map((c) => updateFamily(c.id, { sortOrder: c.sortOrder }))),
+    onSuccess: invalidate,
+  });
+  // Persistir el nuevo padre y posición final tras "Mover bajo…".
+  const moveMut = useMutation({
+    mutationFn: (v: { id: string; parentId: string; sortOrder: number }) =>
+      updateFamily(v.id, { parentId: v.parentId, sortOrder: v.sortOrder }),
+    onSuccess: invalidate,
+  });
 
   // Reordenación por arrastre (solo entre hermanos del mismo nivel).
   const [dragNode, setDragNode] = useState<FamilyNode | null>(null);
@@ -262,12 +349,35 @@ export function FamiliesPage() {
     if (!dragNode || !canDropOn(target)) return clearDrag();
     const from = dragNode;
     const position = dropTarget?.id === target.id ? dropTarget.position : 'before';
-    setTree((prev) => reorderSiblings(prev ?? view, target.parentId, from.id, target.id, position));
+    const base = tree ?? view;
+    const next = renumberSiblings(
+      reorderSiblings(base, target.parentId, from.id, target.id, position),
+      target.parentId,
+    );
+    setTree(next);
+    // Persistir solo los hermanos cuyo sortOrder ha cambiado.
+    const siblings =
+      target.parentId === null ? next : (findNode(next, target.parentId)?.children ?? []);
+    const changes = siblings
+      .map((n) => ({ id: n.id, sortOrder: n.sortOrder }))
+      .filter((c) => findNode(base, c.id)?.sortOrder !== c.sortOrder);
+    if (changes.length) reorderMut.mutate(changes);
     clearDrag();
   };
 
-  const onMoveTo = (childId: string, toParentId: string): void =>
-    setTree((prev) => moveToParent(prev ?? view, childId, toParentId));
+  const onMoveTo = (childId: string, toParentId: string): void => {
+    const base = tree ?? view;
+    const next = moveToParent(base, childId, toParentId);
+    if (next === base) return; // movimiento inválido (ciclo o nodo inexistente)
+    setTree(next);
+    // El nodo movido queda como último hijo del nuevo padre.
+    const siblings = findNode(next, toParentId)?.children ?? [];
+    moveMut.mutate({
+      id: childId,
+      parentId: toParentId,
+      sortOrder: Math.max(0, siblings.length - 1),
+    });
+  };
 
   const onDelete = async (node: FamilyNode): Promise<void> => {
     const n = countDescendants(node);
@@ -289,6 +399,9 @@ export function FamiliesPage() {
     roots: view,
     selectedId,
     onSelect: toggleSelected,
+    // Al buscar se ignora el plegado para que las coincidencias siempre se vean.
+    collapsedIds: q ? EMPTY_COLLAPSE : collapsedIds,
+    onToggleCollapse: toggleCollapse,
     dragId: dragNode?.id ?? null,
     dropTarget,
     onDragStart: setDragNode,
@@ -297,8 +410,16 @@ export function FamiliesPage() {
     onDragOver,
     onDrop,
     onMoveTo,
-    onEdit: (node) => setForm({ id: node.id, name: node.name, parentId: node.parentId }),
-    onAddChild: (parentId) => setForm({ name: '', parentId }),
+    onEdit: (node) =>
+      setForm({
+        id: node.id,
+        name: node.name,
+        parentId: node.parentId,
+        isArchetype: node.isArchetype,
+        hasChildren: node.children.length > 0,
+      }),
+    onAddChild: (parentId) =>
+      setForm({ name: '', parentId, isArchetype: false, hasChildren: false }),
     onDelete,
   };
 
@@ -332,7 +453,9 @@ export function FamiliesPage() {
           </div>
           <button
             className="btn-primary"
-            onClick={() => setForm({ name: '', parentId: null })}
+            onClick={() =>
+              setForm({ name: '', parentId: null, isArchetype: false, hasChildren: false })
+            }
             data-testid="new-family"
           >
             Nuevo arquetipo
@@ -381,6 +504,19 @@ export function FamiliesPage() {
               data-testid="family-name"
             />
           </label>
+          <label className="fam-archetype-toggle">
+            <input
+              type="checkbox"
+              checked={form.isArchetype}
+              disabled={form.hasChildren}
+              onChange={(e) => setForm({ ...form, isArchetype: e.target.checked })}
+              data-testid="family-archetype"
+            />
+            <span>Es un arquetipo (agrupa productos casi idénticos; no admite subniveles)</span>
+          </label>
+          {form.hasChildren && (
+            <p className="muted">Tiene subniveles: vacíalos para poder convertirlo en arquetipo.</p>
+          )}
           {saveMut.isError && <p className="form-error">No se pudo guardar.</p>}
           <div className="modal-foot">
             <button type="button" onClick={() => setForm(null)}>

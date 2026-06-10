@@ -35,6 +35,10 @@ export class UpdateUserDto {
   name?: string;
 
   @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
 
@@ -46,6 +50,11 @@ export class UpdateUserDto {
   @IsString()
   @MinLength(8)
   password?: string;
+}
+
+export class ImportUsersDto {
+  @IsString()
+  csv!: string;
 }
 
 export class SetPinDto {

@@ -1,9 +1,8 @@
 import { ApiError } from '@simpletpv/auth';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mockeamos el cliente HTTP real para verificar QUÉ endpoint llama cada lib en
-// modo real, sin backend. isDemo() (api-config) NO se mockea: lee VITE_DEMO_MODE,
-// que stubeamos por test.
+// Mockeamos el cliente HTTP real para verificar QUÉ endpoint llama cada lib.
+// El data layer del TPV opera SIEMPRE contra el backend real (sin modo demo).
 vi.mock('./auth.js', () => ({
   api: { get: vi.fn(), post: vi.fn() },
   useAuthStore: { getState: () => ({ setTokens: vi.fn() }) },
@@ -21,9 +20,8 @@ import * as transfers from './transfers.js';
 const get = vi.mocked(api.get);
 const post = vi.mocked(api.post);
 
-describe('cableado API real (VITE_DEMO_MODE=false)', () => {
+describe('cableado API real', () => {
   beforeEach(() => {
-    vi.stubEnv('VITE_DEMO_MODE', 'false');
     vi.clearAllMocks();
     get.mockResolvedValue([] as never);
     post.mockResolvedValue({} as never);
@@ -157,24 +155,5 @@ describe('cableado API real (VITE_DEMO_MODE=false)', () => {
     expect(incoming.map((t) => t.id)).toEqual(['t1']);
     await transfers.receiveTransfer('t1', { lines: [] });
     expect(post).toHaveBeenCalledWith('/transfers/t1/receive', { lines: [] });
-  });
-});
-
-describe('modo demo (opt-in, VITE_DEMO_MODE=true): no llama a la API', () => {
-  beforeEach(() => {
-    vi.stubEnv('VITE_DEMO_MODE', 'true');
-    vi.clearAllMocks();
-  });
-  afterEach(() => vi.unstubAllEnvs());
-
-  it('catalog.listFamilies devuelve demo sin tocar api', async () => {
-    const fams = await catalog.listFamilies();
-    expect(Array.isArray(fams)).toBe(true);
-    expect(get).not.toHaveBeenCalled();
-  });
-
-  it('sales.listStores devuelve demo sin tocar api', async () => {
-    await sales.listStores();
-    expect(get).not.toHaveBeenCalled();
   });
 });

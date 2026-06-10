@@ -1,12 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@simpletpv/db';
+import { Prisma, UserRole } from '@simpletpv/db';
 import bcrypt from 'bcryptjs';
 
+import { type ImportResult, parseCsv, rowNumber } from '../common/csv.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import type { CreateUserDto, UpdateUserDto } from './users.dto.js';
 
 const SALT_ROUNDS = 10;
+// Email válido (mismo criterio laxo que class-validator @IsEmail para el alta manual).
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Campos seguros para devolver al cliente: NUNCA passwordHash ni pinHash.
 const PUBLIC_SELECT = {
@@ -39,8 +42,71 @@ export class UsersService {
     });
   }
 
-  async findAll(): Promise<PublicUser[]> {
-    return this.prisma.user.findMany({ orderBy: { name: 'asc' }, select: PUBLIC_SELECT });
+  // Lista con las tiendas asignadas (storeIds) para que el backoffice muestre y
+  // edite el acceso por tienda sin estado local. Un ADMIN accede a todas y lo
+  // lleva vacío por convención.
+  async findAll(): Promise<Array<PublicUser & { storeIds: string[] }>> {
+    const rows = await this.prisma.user.findMany({
+      orderBy: { name: 'asc' },
+      select: { ...PUBLIC_SELECT, stores: { select: { storeId: true } } },
+    });
+    return rows.map(({ stores, ...user }) => ({
+      ...user,
+      storeIds: stores.map((s) => s.storeId),
+    }));
+  }
+
+  // Alta de usuarios en lote desde CSV (columnas: email,name,password,role).
+  // Valida cada fila con el mismo criterio que el alta manual; las válidas se
+  // crean y las inválidas se reportan por número de fila sin abortar el lote.
+  async importCsv(csv: string): Promise<ImportResult> {
+    const tenant = requireTenant();
+    const rows = parseCsv(csv);
+    const errors: ImportResult['errors'] = [];
+
+    // Hash de contraseñas en paralelo solo para las filas válidas.
+    const prepared: Array<{ email: string; name: string; password: string; role: UserRole }> = [];
+    rows.forEach((cells, idx) => {
+      const row = rowNumber(idx);
+      const email = (cells.email ?? '').trim().toLowerCase();
+      const name = (cells.name ?? '').trim();
+      const password = cells.password ?? '';
+      const roleRaw = (cells.role ?? '').trim().toUpperCase();
+      if (!EMAIL_RE.test(email)) {
+        errors.push({ row, message: 'Email inválido' });
+        return;
+      }
+      if (!name) {
+        errors.push({ row, message: 'Falta el nombre' });
+        return;
+      }
+      if (password.length < 8) {
+        errors.push({ row, message: 'La contraseña debe tener al menos 8 caracteres' });
+        return;
+      }
+      if (!(roleRaw in UserRole)) {
+        errors.push({ row, message: 'Rol inválido (ADMIN, MANAGER o CLERK)' });
+        return;
+      }
+      prepared.push({ email, name, password, role: roleRaw as UserRole });
+    });
+
+    let inserted = 0;
+    if (prepared.length > 0) {
+      const data = await Promise.all(
+        prepared.map(async (u) => ({
+          organizationId: tenant.organizationId,
+          email: u.email,
+          name: u.name,
+          role: u.role,
+          passwordHash: await bcrypt.hash(u.password, SALT_ROUNDS),
+        })),
+      );
+      // skipDuplicates: un email ya existente no rompe el lote (cuenta como no insertado).
+      const res = await this.prisma.user.createMany({ data, skipDuplicates: true });
+      inserted = res.count;
+    }
+    return { inserted, errors };
   }
 
   // Guard interno de existencia (no se expone en ningún endpoint). Solo
