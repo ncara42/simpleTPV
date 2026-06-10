@@ -959,3 +959,63 @@
   font-weight: 600;
   font-size: 0.88rem;
 }
+
+/* ── Comparativa de proveedores (I-16) ── */
+.dash-suppliers-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dash-suppliers-row {
+  display: grid;
+  grid-template-columns: minmax(0, 16rem) 1fr;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--ui-border-subtle, var(--ui-border));
+}
+.dash-suppliers-row:last-child {
+  border-bottom: none;
+}
+.dash-suppliers-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Pedidos de compra pendientes (I-16) ── */
+.dash-po-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dash-po-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--ui-border-subtle, var(--ui-border));
+}
+.dash-po-row:last-child {
+  border-bottom: none;
+}
+.dash-po-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.dash-po-supplier {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.dash-po-meta {
+  color: var(--ui-text-muted);
+  font-size: 0.8rem;
+}

@@ -39,6 +39,11 @@ test('cambiar de preset cambia KPIs y paneles en 1 clic y se recuerda (I-15)', a
   await expect(page.getByTestId('kpi-today')).toHaveCount(0);
   await expect(page.getByTestId('rank-tabs')).toContainText('Top margen');
   await expect(page.getByTestId('dash-discount-emp')).toBeVisible();
+  // I-16: comparativa de proveedores con el mejor precio marcado (seed con tarifas).
+  await expect(page.getByTestId('dash-suppliers')).toBeVisible();
+  await expect(
+    page.locator('[data-testid="dash-suppliers"] .sp-price-chip.is-best').first(),
+  ).toBeVisible();
   // Persiste tras recargar (preferencia dashboard.layout en /me/preferences).
   await page.reload();
   await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
@@ -57,6 +62,9 @@ test('preset Inventario: roturas, rotación y peor rotación; Equipo: vendedores
   await expect(page.getByTestId('dash-stockout')).toBeVisible();
   await expect(page.getByTestId('dash-rotation')).toBeVisible();
   await expect(page.getByTestId('rank-tabs')).toContainText('Peor rotación');
+  // I-16: lotes por caducar y pedidos de compra pendientes, con datos del seed.
+  await expect(page.getByTestId('dash-expiring-row').first()).toBeVisible();
+  await expect(page.getByTestId('dash-po-row').first()).toBeVisible();
   // Rotación por arquetipo por defecto (IT-13) con conmutador a producto.
   await expect(page.getByTestId('rotation-by-archetype')).toHaveAttribute('aria-selected', 'true');
   await page.getByTestId('rotation-by-product').click();
@@ -70,7 +78,15 @@ test('preset Inventario: roturas, rotación y peor rotación; Equipo: vendedores
   await expect(page.getByTestId('dash-timeclock')).toBeVisible();
   // El seed tiene ventas: el panel de vendedores trae al menos una fila con cifra.
   await expect(page.getByTestId('dash-sales-emp')).toContainText(/\d/);
+
+  // I-16: los paneles enlazan a su page de gestión.
+  await page.getByTestId('dash-preset-inventario').click();
+  await page.getByTestId('dash-po-link').click();
+  await expect(page.getByTestId('suppliers-page')).toBeVisible();
+  // Volver y restaurar el preset por defecto.
+  await page.getByTestId('nav-dashboard').click();
   await page.getByTestId('dash-preset-ventas').click();
+  await expect(page.getByTestId('kpi-today')).toBeVisible();
 });
 
 test('ocultar un panel solo afecta al preset activo y persiste (I-15, D-03)', async ({ page }) => {

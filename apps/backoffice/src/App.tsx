@@ -169,6 +169,7 @@ function Home() {
               <OverviewPage
                 scrollTo={tab === 'sales' ? 'sales' : null}
                 initialStoreId={navStoreId}
+                onNavigate={(t) => setTab(t)}
               />
             )}
             {tab === 'notifications' && <NotificationsPage />}

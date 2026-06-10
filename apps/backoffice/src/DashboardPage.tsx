@@ -1,6 +1,6 @@
 import './dashboard.css';
 
-import { Chart, Select, Sparkline } from '@simpletpv/ui';
+import { Badge, Chart, Select, Sparkline } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 
@@ -31,9 +31,12 @@ import {
 } from './lib/format.js';
 import { usePageHeader } from './lib/pageHeader.js';
 import { readPref, usePreferences } from './lib/preferences.js';
-import { listAlerts } from './lib/stock.js';
+import { listPurchaseOrders } from './lib/purchases.js';
+import { listAlerts, listExpiringBatches } from './lib/stock.js';
+import { compareSupplierPrices } from './lib/supplier-prices.js';
 import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
-import { ALERT_LABEL } from './stock/labels.js';
+import { STATUS_LABEL } from './purchases/labels.js';
+import { ALERT_LABEL, df, EXPIRY_LABEL, expiryDaysText } from './stock/labels.js';
 
 // Personalización de las KPI cards (IT-16): orden + visibilidad por usuario.
 interface CardsPref {
@@ -81,13 +84,19 @@ const PRESETS: PresetDef[] = [
     id: 'beneficio',
     label: 'Beneficio',
     cards: ['kpi-margin', 'kpi-profit', 'kpi-discount', 'kpi-return'],
-    panels: ['rank-margin', 'dash-discount-emp'],
+    panels: ['rank-margin', 'dash-discount-emp', 'dash-suppliers'],
   },
   {
     id: 'inventario',
     label: 'Inventario',
     cards: ['kpi-lost-sales'],
-    panels: ['dash-stockout', 'dash-rotation', 'rank-rotation'],
+    panels: [
+      'dash-stockout',
+      'dash-rotation',
+      'rank-rotation',
+      'dash-expiring',
+      'dash-purchase-orders',
+    ],
   },
   {
     id: 'equipo',
@@ -110,6 +119,9 @@ const PANEL_LABEL: Record<string, string> = {
   'dash-rotation': 'Rotación',
   'dash-sales-emp': 'Ventas por vendedor',
   'dash-timeclock': 'Fichajes de hoy',
+  'dash-suppliers': 'Comparativa de proveedores',
+  'dash-expiring': 'Lotes por caducar',
+  'dash-purchase-orders': 'Pedidos de compra pendientes',
 };
 
 // Preferencia de layout (I-15): preset activo + ids ocultos POR preset —
@@ -123,7 +135,12 @@ interface LayoutPref {
 // neutro 'brand'. Convierte el tono semántico de una métrica al de la sparkline.
 const toSparkTone = (tone: 'up' | 'down' | 'flat'): SparkTone => (tone === 'flat' ? 'brand' : tone);
 
-export function DashboardPage() {
+export function DashboardPage({
+  onNavigate,
+}: {
+  // Links de los paneles a su page de gestión (I-16): Proveedores y Stock.
+  onNavigate?: ((tab: 'suppliers' | 'stock') => void) | undefined;
+} = {}) {
   const [period, setPeriod] = useState<DashboardPeriod>('today');
   const [storeId, setStoreId] = useState('');
   const store = storeId || undefined;
@@ -208,6 +225,28 @@ export function DashboardPage() {
       listHistoryAll({ from: todayIso, to: todayIso, ...(store ? { storeId: store } : {}) }),
     placeholderData: keepPreviousData,
     enabled: vis.has('dash-timeclock'),
+  });
+  // Comparativa de proveedores (I-16/D-08b, preset Beneficio).
+  const supplierComparison = useQuery({
+    queryKey: ['dash-supplier-comparison'],
+    queryFn: () => compareSupplierPrices(),
+    placeholderData: keepPreviousData,
+    enabled: vis.has('dash-suppliers'),
+  });
+  // Lotes por caducar (I-16/D-08b, preset Inventario).
+  const expiring = useQuery({
+    queryKey: ['dash-expiring', store],
+    queryFn: () => listExpiringBatches(store),
+    placeholderData: keepPreviousData,
+    enabled: vis.has('dash-expiring'),
+  });
+  // Pedidos de compra pendientes (I-16/D-08b, preset Inventario). El endpoint
+  // filtra por UN status y "pendiente" son tres → se trae todo y se filtra aquí.
+  const purchaseOrders = useQuery({
+    queryKey: ['dash-purchase-orders'],
+    queryFn: () => listPurchaseOrders(),
+    placeholderData: keepPreviousData,
+    enabled: vis.has('dash-purchase-orders'),
   });
   const rotation = useQuery({
     queryKey: ['dash-rotation', period, store],
@@ -653,6 +692,104 @@ export function DashboardPage() {
           </div>
         )}
 
+        {/* Lotes por caducar (I-16/D-08b, preset Inventario): reusa el lenguaje
+            de la lista de roturas (rojo caducado, amarillo por caducar). */}
+        {vis.has('dash-expiring') && (
+          <div className="dash-panel span-7" data-testid="dash-expiring">
+            <header className="dash-panel-head">
+              <h3>Lotes por caducar</h3>
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => onNavigate?.('stock')}
+                data-testid="dash-expiring-link"
+              >
+                Ver stock →
+              </button>
+            </header>
+            <p className="dash-panel-sub">Caducados y próximos a caducar</p>
+            {(() => {
+              const rows = (expiring.data ?? []).slice(0, 6);
+              if (rows.length === 0) {
+                return <p className="catalog-empty">Nada caduca pronto.</p>;
+              }
+              return (
+                <ul className="dash-stockout-list">
+                  {rows.map((b) => (
+                    <li
+                      key={b.id}
+                      className={`dash-stockout-item lvl-${b.status === 'expired' ? 'red' : 'yellow'}`}
+                      data-testid="dash-expiring-row"
+                    >
+                      <span className="dash-stockout-info">
+                        <span className="dash-stockout-name">{b.productName}</span>
+                        <span className="dash-stockout-store">
+                          {b.storeName} · lote {b.lotCode} · {b.quantity} ud
+                        </span>
+                      </span>
+                      <span className="dash-stockout-tag">
+                        {EXPIRY_LABEL[b.status]} · {expiryDaysText(b.daysToExpiry)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Pedidos de compra pendientes (I-16/D-08b, preset Inventario). */}
+        {vis.has('dash-purchase-orders') && (
+          <div className="dash-panel span-5" data-testid="dash-purchase-orders">
+            <header className="dash-panel-head">
+              <h3>Pedidos de compra</h3>
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => onNavigate?.('suppliers')}
+                data-testid="dash-po-link"
+              >
+                Ver proveedores →
+              </button>
+            </header>
+            <p className="dash-panel-sub">Pendientes de recibir</p>
+            {(() => {
+              const rows = (purchaseOrders.data ?? [])
+                .filter((o) => o.status !== 'RECEIVED')
+                .slice(0, 6);
+              if (rows.length === 0) {
+                return <p className="catalog-empty">Sin pedidos pendientes.</p>;
+              }
+              return (
+                <ul className="dash-po-list">
+                  {rows.map((o) => (
+                    <li key={o.id} className="dash-po-row" data-testid="dash-po-row">
+                      <span className="dash-po-info">
+                        <span className="dash-po-supplier">{o.supplier?.name ?? 'Proveedor'}</span>
+                        <span className="dash-po-meta">
+                          {df.format(new Date(o.createdAt))} · {o.lines.length}{' '}
+                          {o.lines.length === 1 ? 'línea' : 'líneas'}
+                        </span>
+                      </span>
+                      <Badge
+                        variant={
+                          o.status === 'DRAFT'
+                            ? 'muted'
+                            : o.status === 'PARTIALLY_RECEIVED'
+                              ? 'warning'
+                              : 'default'
+                        }
+                      >
+                        {STATUS_LABEL[o.status]}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+          </div>
+        )}
+
         {/* Ventas por hora (STAT-02): barras con el Chart reutilizable (IT-02) */}
         {vis.has('dash-hour') && (
           <div className="dash-panel span-7" data-testid="dash-hour">
@@ -724,6 +861,60 @@ export function DashboardPage() {
                         >
                           <span className="dash-family-pct">{fmtRate(e.avgDiscountPct)}</span>
                         </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Comparativa de proveedores (I-16/D-08b, preset Beneficio): mejor precio
+            de compra marcado por producto; reusa los chips de Proveedores. */}
+        {vis.has('dash-suppliers') && (
+          <div className="dash-panel" data-testid="dash-suppliers">
+            <header className="dash-panel-head">
+              <h3>Comparativa de proveedores</h3>
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => onNavigate?.('suppliers')}
+                data-testid="dash-suppliers-link"
+              >
+                Ver proveedores →
+              </button>
+            </header>
+            <p className="dash-panel-sub">Precios de compra por proveedor · mejor marcado</p>
+            {(() => {
+              const rows = (supplierComparison.data ?? [])
+                .filter((r) => r.prices.length > 0)
+                .slice(0, 6);
+              if (rows.length === 0) {
+                return (
+                  <p className="catalog-empty">
+                    Sin tarifas de proveedor todavía. Impórtalas en Proveedores.
+                  </p>
+                );
+              }
+              return (
+                <ul className="dash-suppliers-list">
+                  {rows.map((r) => (
+                    <li
+                      key={r.productId}
+                      className="dash-suppliers-row"
+                      data-testid="dash-suppliers-row"
+                    >
+                      <span className="dash-suppliers-name">{r.productName}</span>
+                      <span className="sp-price-chips">
+                        {r.prices.map((pr) => (
+                          <span
+                            key={pr.supplierId}
+                            className={`sp-price-chip${r.best?.supplierId === pr.supplierId ? ' is-best' : ''}`}
+                          >
+                            {pr.supplierName}: {fmtEur(pr.price)}
+                          </span>
+                        ))}
                       </span>
                     </li>
                   ))}

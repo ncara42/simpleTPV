@@ -12,9 +12,12 @@ import { SalesHistoryPage } from './SalesHistoryPage.js';
 export function OverviewPage({
   scrollTo,
   initialStoreId,
+  onNavigate,
 }: {
   scrollTo?: 'sales' | null;
   initialStoreId?: string | null;
+  // Links de los paneles del dashboard a su page de gestión (I-16).
+  onNavigate?: (tab: 'suppliers' | 'stock') => void;
 }) {
   usePageHeader('Resumen', 'Dashboard y ventas en una sola vista');
   const topRef = useRef<HTMLDivElement>(null);
@@ -27,7 +30,7 @@ export function OverviewPage({
 
   return (
     <div ref={topRef} data-testid="overview-page">
-      <DashboardPage />
+      <DashboardPage onNavigate={onNavigate} />
       <div ref={salesRef} className="overview-sales" data-testid="overview-sales">
         <SalesHistoryPage initialStoreId={initialStoreId ?? null} />
       </div>

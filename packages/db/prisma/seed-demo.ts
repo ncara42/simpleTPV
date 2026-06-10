@@ -1285,6 +1285,63 @@ async function seedSuppliers(orgId: string): Promise<void> {
   }
 }
 
+/**
+ * Pedidos de compra de ejemplo (I-16): uno en borrador y otro confirmado,
+ * pendientes de recibir, para que el panel "Pedidos de compra pendientes" del
+ * dashboard y la page de Proveedores tengan datos en demo. Idempotente: si la
+ * organización ya tiene pedidos, no crea más.
+ */
+async function seedPurchaseOrders(orgId: string): Promise<void> {
+  const existing = await prisma.purchaseOrder.count({ where: { organizationId: orgId } });
+  if (existing > 0) return;
+
+  const suppliers = await prisma.supplier.findMany({
+    where: { organizationId: orgId },
+    orderBy: { name: 'asc' },
+    take: 2,
+  });
+  const store = await prisma.store.findFirst({
+    where: { organizationId: orgId },
+    orderBy: { code: 'asc' },
+  });
+  const admin = await prisma.user.findFirst({
+    where: { organizationId: orgId, role: UserRole.ADMIN },
+  });
+  // Productos con tarifa de proveedor (seedSuppliers cubre los primeros 8).
+  const products = await prisma.product.findMany({
+    where: { organizationId: orgId },
+    orderBy: { name: 'asc' },
+    take: 4,
+  });
+  if (suppliers.length < 2 || !store || !admin || products.length < 4) return;
+
+  const orders = [
+    { supplier: suppliers[0]!, status: 'CONFIRMED' as const, lines: products.slice(0, 2) },
+    { supplier: suppliers[1]!, status: 'DRAFT' as const, lines: products.slice(2, 4) },
+  ];
+  for (const o of orders) {
+    await prisma.purchaseOrder.create({
+      data: {
+        organizationId: orgId,
+        supplierId: o.supplier.id,
+        storeId: store.id,
+        status: o.status,
+        createdBy: admin.id,
+        ...(o.status === 'CONFIRMED' ? { confirmedAt: new Date() } : {}),
+        notes: 'Pedido demo',
+        lines: {
+          create: o.lines.map((p, i) => ({
+            organizationId: orgId,
+            productId: p.id,
+            quantityOrdered: 10 + i * 5,
+            unitCost: Number(p.costPrice) > 0 ? Number(p.costPrice) : 5,
+          })),
+        },
+      },
+    });
+  }
+}
+
 async function main(): Promise<void> {
   assertNotProduction();
 
@@ -1333,6 +1390,7 @@ async function main(): Promise<void> {
   await seedAlerts(org.id);
   await seedB2B(org.id);
   await seedSuppliers(org.id);
+  await seedPurchaseOrders(org.id);
   await seedFeatureFlags(org.id);
   await seedStorePrices(org.id);
   await seedPromotions(org.id);
