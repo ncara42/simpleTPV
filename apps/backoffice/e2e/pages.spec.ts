@@ -148,6 +148,37 @@ test('Stock: filtro por rotación re-renderiza la tabla (#96)', async ({ page })
   expect(await page.getByTestId('stock-row').count()).toBeLessThanOrEqual(total);
 });
 
+test('Stock: ajustar existencias PERSISTE tras recargar (E-01)', async ({ page }) => {
+  await navTo(page, 'stock');
+  await expect(page.getByTestId('stock-row').first()).toBeVisible();
+  // Abrir el desglose del primer producto y su primera tienda.
+  const firstRow = page.getByTestId('stock-row').first();
+  const productName = (await firstRow.locator('td').first().innerText()).trim();
+  await firstRow.getByTestId('stock-heatmap').click();
+  await page.getByTestId('stock-store-cell').first().click();
+  await expect(page.getByTestId('stock-adjust-form')).toBeVisible();
+  const original = await page.getByTestId('stock-adjust-qty').inputValue();
+  const target = String(Number(original) + 7);
+  await page.getByTestId('stock-adjust-qty').fill(target);
+  await page.getByTestId('stock-adjust-reason').fill('e2e: anti-regresión E-01');
+  await page.getByTestId('stock-adjust-save').click();
+  await expect(page.getByTestId('stock-adjust-form')).toHaveCount(0);
+  // Recargar: la cantidad debe venir del backend, no de un overlay local.
+  await page.reload();
+  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
+  await navTo(page, 'stock');
+  const row = page.getByTestId('stock-row').filter({ hasText: productName }).first();
+  await expect(row).toBeVisible();
+  await row.getByTestId('stock-heatmap').click();
+  await expect(page.getByTestId('stock-store-cell').first()).toContainText(target);
+  // Restaurar el valor original para no contaminar el seed entre runs.
+  await page.getByTestId('stock-store-cell').first().click();
+  await page.getByTestId('stock-adjust-qty').fill(original);
+  await page.getByTestId('stock-adjust-reason').fill('e2e: restaurar');
+  await page.getByTestId('stock-adjust-save').click();
+  await expect(page.getByTestId('stock-adjust-form')).toHaveCount(0);
+});
+
 test('Ventas: DataTable con filtros, paginación y agregados (#95 / IT-06)', async ({ page }) => {
   await navTo(page, 'sales');
   await expect(page.getByTestId('sales-table')).toBeVisible();

@@ -7,7 +7,14 @@ import { Modal } from '../components/Modal.js';
 import { useTableColumns } from '../components/useTableColumns.js';
 import { listStores } from '../lib/admin.js';
 import { listFamilies } from '../lib/families.js';
-import { getGlobalStock, listAlerts, listMovements, setMinStock } from '../lib/stock.js';
+import { formErrorMessage } from '../lib/form-error.js';
+import {
+  adjustStock,
+  getGlobalStock,
+  listAlerts,
+  listMovements,
+  setMinStock,
+} from '../lib/stock.js';
 import { ALERT_LABEL, dt, LEVEL_LABEL, MOVEMENT_LABEL, ROTATION_LABEL } from './labels.js';
 
 interface AdjustState {
@@ -17,6 +24,8 @@ interface AdjustState {
   storeName: string;
   quantity: string;
   min: string;
+  // Motivo del ajuste (obligatorio en POST /stock/adjust; auditoría).
+  reason: string;
 }
 
 export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string | null }) {
@@ -27,7 +36,6 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
   const [rotation, setRotation] = useState('');
   const [adjusting, setAdjusting] = useState<AdjustState | null>(null);
   const [movementsFor, setMovementsFor] = useState<string | null>(null);
-  const [qtyOverlay, setQtyOverlay] = useState<Record<string, number>>({});
   // Solo productos con alguna tienda en alerta (rotura o bajo mínimo).
   const [alertsOnly, setAlertsOnly] = useState(false);
   const [sort, setSort] = useState<DataTableSort | undefined>(undefined);
@@ -67,18 +75,30 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
     queryFn: listStores,
   });
 
-  const minMutation = useMutation({
-    mutationFn: setMinStock,
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['stock-alerts'] }),
+  // Ajuste REAL (E-01): la cantidad va a POST /stock/adjust (movimiento
+  // ADJUSTMENT auditable) y el mínimo a PUT /stock/min; al terminar, refetch.
+  const adjustMutation = useMutation({
+    mutationFn: async (a: AdjustState) => {
+      await adjustStock({
+        productId: a.productId,
+        storeId: a.storeId,
+        newQuantity: Number(a.quantity),
+        reason: a.reason.trim() || 'Ajuste manual desde backoffice',
+      });
+      await setMinStock({ productId: a.productId, storeId: a.storeId, minStock: Number(a.min) });
+    },
+    onSuccess: () => {
+      setAdjusting(null);
+      void qc.invalidateQueries({ queryKey: ['stock-global'] });
+      void qc.invalidateQueries({ queryKey: ['stock-alerts'] });
+      void qc.invalidateQueries({ queryKey: ['stock-movements'] });
+    },
   });
 
-  const rows = rawRows.map((row) => {
-    const stores = row.stores.map((st) => {
-      const q = qtyOverlay[`${row.productId}:${st.storeId}`] ?? st.quantity;
-      return { ...st, quantity: q, level: stockLevel(q, st.minStock) };
-    });
-    return { ...row, stores, total: stores.reduce((acc, s) => acc + s.quantity, 0) };
-  });
+  const rows = rawRows.map((row) => ({
+    ...row,
+    stores: row.stores.map((st) => ({ ...st, level: stockLevel(st.quantity, st.minStock) })),
+  }));
 
   const storeOptions = stores.map((s) => ({ id: s.id, name: s.name }));
 
@@ -110,20 +130,12 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
       storeName: st.storeName,
       quantity: String(st.quantity),
       min: String(st.minStock),
+      reason: '',
     });
 
   const saveAdjust = (): void => {
-    if (!adjusting) return;
-    setQtyOverlay((prev) => ({
-      ...prev,
-      [`${adjusting.productId}:${adjusting.storeId}`]: Number(adjusting.quantity),
-    }));
-    minMutation.mutate({
-      productId: adjusting.productId,
-      storeId: adjusting.storeId,
-      minStock: Number(adjusting.min),
-    });
-    setAdjusting(null);
+    if (!adjusting || adjustMutation.isPending) return;
+    adjustMutation.mutate(adjusting);
   };
 
   // Columnas del DataTable. D-12: Producto · Por tienda · Total · Rotación (la
@@ -432,6 +444,20 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
               />
             </label>
           </div>
+          <label>
+            Motivo
+            <input
+              placeholder="Recuento, merma, rotura…"
+              value={adjusting.reason}
+              onChange={(e) => setAdjusting({ ...adjusting, reason: e.target.value })}
+              data-testid="stock-adjust-reason"
+            />
+          </label>
+          {adjustMutation.isError && (
+            <p className="form-error">
+              {formErrorMessage(adjustMutation.error, 'No se pudo guardar el ajuste.')}
+            </p>
+          )}
           <div className="modal-foot">
             <button type="button" onClick={() => setAdjusting(null)}>
               Cancelar
@@ -440,9 +466,10 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
               type="button"
               className="btn-primary"
               onClick={saveAdjust}
+              disabled={adjustMutation.isPending}
               data-testid="stock-adjust-save"
             >
-              Guardar
+              {adjustMutation.isPending ? 'Guardando…' : 'Guardar'}
             </button>
           </div>
         </Modal>
