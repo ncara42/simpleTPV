@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { gotoApp, selectByLabel, selectByValue } from './helpers.js';
+import { gotoApp, navTo, selectByLabel, selectByValue } from './helpers.js';
 
 // E2E del backoffice contra backend real (seed-demo). Patrón: descubrir datos por
 // etiqueta (los IDs son UUIDs, no se hardcodean) y aserciones alineadas al seed.
@@ -11,13 +11,13 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('Catálogo muestra los productos del seed', async ({ page }) => {
-  await page.getByTestId('nav-catalog').click();
+  await navTo(page, 'catalog');
   await expect(page.getByTestId('catalog-table')).toBeVisible();
   await expect(page.getByTestId('catalog-count')).toContainText(/\d/);
 });
 
 test('Catálogo: selector jerárquico único de familia (#97)', async ({ page }) => {
-  await page.getByTestId('nav-catalog').click();
+  await navTo(page, 'catalog');
   // El modal tiene un único selector jerárquico: se elige un nodo de cualquier
   // nivel (p. ej. la subfamilia "Aceites CBD") sin cascada familia → subfamilia.
   await page.getByTestId('new-product').click();
@@ -26,7 +26,7 @@ test('Catálogo: selector jerárquico único de familia (#97)', async ({ page })
 });
 
 test('Catálogo: selección múltiple y edición en lote', async ({ page }) => {
-  await page.getByTestId('nav-catalog').click();
+  await navTo(page, 'catalog');
   const checks = page.getByTestId('product-select');
   await checks.nth(0).check();
   await checks.nth(1).check();
@@ -41,13 +41,13 @@ test('Catálogo: selección múltiple y edición en lote', async ({ page }) => {
 });
 
 test('Tiendas muestra el grid de ubicaciones', async ({ page }) => {
-  await page.getByTestId('nav-stores').click();
+  await navTo(page, 'stores');
   await expect(page.getByTestId('stores-grid')).toBeVisible();
   await expect(page.getByTestId('store-card')).toHaveCount(6);
 });
 
 test('Tiendas: orden por ventas y acceso directo a stock (UX)', async ({ page }) => {
-  await page.getByTestId('nav-stores').click();
+  await navTo(page, 'stores');
   await expect(page.getByTestId('store-sales').first()).toBeVisible();
   // El panel ya no tiene filtros (solo crea y observa).
   await expect(page.getByTestId('store-status-filter')).toHaveCount(0);
@@ -57,7 +57,7 @@ test('Tiendas: orden por ventas y acceso directo a stock (UX)', async ({ page })
 });
 
 test('Tiendas: detalle, estado operativo y registro de fichajes (#100, #102)', async ({ page }) => {
-  await page.getByTestId('nav-stores').click();
+  await navTo(page, 'stores');
   await expect(page.getByTestId('store-open').first()).toBeVisible();
   // Detalle de "Sur" → operativo + registro de fichajes.
   await page.getByTestId('store-card').filter({ hasText: 'Sur' }).click();
@@ -74,27 +74,36 @@ test('Tiendas: detalle, estado operativo y registro de fichajes (#100, #102)', a
 });
 
 test('Usuarios muestra 4 usuarios con badge de rol', async ({ page }) => {
-  await page.getByTestId('nav-users').click();
+  await navTo(page, 'users');
   await expect(page.getByTestId('users-count')).toContainText('4');
   await expect(page.getByTestId('user-role-badge').first()).toBeVisible();
 });
 
 test('Usuarios: editar precarga datos y permite renombrar (#104)', async ({ page }) => {
-  await page.getByTestId('nav-users').click();
+  await navTo(page, 'users');
   await page.getByTestId('user-select').first().check();
   await expect(page.getByTestId('users-edit')).toBeVisible();
   await page.getByTestId('users-edit').click();
   // El nombre se precarga (no vacío); editarlo se refleja en la tabla.
   await expect(page.getByTestId('user-name')).not.toHaveValue('');
   await expect(page.getByTestId('user-role')).toBeVisible();
+  const original = await page.getByTestId('user-name').inputValue();
   const renamed = `Usuario Editado ${Date.now()}`;
   await page.getByTestId('user-name').fill(renamed);
   await page.getByTestId('user-save').click();
   await expect(page.getByTestId('users-table')).toContainText(renamed);
+  // La edición PERSISTE de verdad: restaurar el nombre original para no
+  // contaminar el seed entre runs (el filtro de Ventas depende de 'Dependiente').
+  const row = page.getByTestId('user-row').filter({ hasText: renamed });
+  await row.getByTestId('user-select').check();
+  await page.getByTestId('users-edit').click();
+  await page.getByTestId('user-name').fill(original);
+  await page.getByTestId('user-save').click();
+  await expect(page.getByTestId('users-table')).toContainText(original);
 });
 
 test('Usuarios: edición en lote avanza con "Siguiente (n / total)"', async ({ page }) => {
-  await page.getByTestId('nav-users').click();
+  await navTo(page, 'users');
   const checks = page.getByTestId('user-select');
   await checks.nth(0).check();
   await checks.nth(1).check();
@@ -110,7 +119,7 @@ test('Usuarios: edición en lote avanza con "Siguiente (n / total)"', async ({ p
 test('Usuarios: el foco no salta al teclear en el alta (regresión bug de foco)', async ({
   page,
 }) => {
-  await page.getByTestId('nav-users').click();
+  await navTo(page, 'users');
   await page.getByTestId('new-user').click();
   await expect(page.getByTestId('user-form')).toBeVisible();
   // Teclea carácter a carácter (cada tecla re-renderiza): el foco debe quedarse en el
@@ -123,13 +132,13 @@ test('Usuarios: el foco no salta al teclear en el alta (regresión bug de foco)'
 });
 
 test('Stock global muestra la tabla con filas por producto', async ({ page }) => {
-  await page.getByTestId('nav-stock').click();
+  await navTo(page, 'stock');
   await expect(page.getByTestId('stock-table')).toBeVisible();
   expect(await page.getByTestId('stock-row').count()).toBeGreaterThan(0);
 });
 
 test('Stock: filtro por rotación re-renderiza la tabla (#96)', async ({ page }) => {
-  await page.getByTestId('nav-stock').click();
+  await navTo(page, 'stock');
   await expect(page.getByTestId('stock-table')).toBeVisible();
   const total = await page.getByTestId('stock-row').count();
   // Filtrar por rotación baja: puede dejar 0 filas (estado vacío), nunca más que el total.
@@ -138,7 +147,7 @@ test('Stock: filtro por rotación re-renderiza la tabla (#96)', async ({ page })
 });
 
 test('Ventas: DataTable con filtros, paginación y agregados (#95 / IT-06)', async ({ page }) => {
-  await page.getByTestId('nav-sales').click();
+  await navTo(page, 'sales');
   await expect(page.getByTestId('sales-table')).toBeVisible();
   // Primera página del DataTable: 20 filas (hay histórico abundante).
   await expect(page.getByTestId('ui-dt-row')).toHaveCount(20);
@@ -163,7 +172,7 @@ test('Ventas: DataTable con filtros, paginación y agregados (#95 / IT-06)', asy
 });
 
 test('Ventas: columnas configurables ocultan una columna y persiste (IT-16)', async ({ page }) => {
-  await page.getByTestId('nav-sales').click();
+  await navTo(page, 'sales');
   await expect(page.getByRole('columnheader', { name: 'Vendedor' })).toBeVisible();
   await page.getByTestId('sales-columns-toggle').click();
   await expect(page.getByTestId('sales-columns-editor')).toBeVisible();
@@ -171,7 +180,7 @@ test('Ventas: columnas configurables ocultan una columna y persiste (IT-16)', as
   await expect(page.getByRole('columnheader', { name: 'Vendedor' })).toBeHidden();
   // Persiste tras recargar (preferencia en /me/preferences).
   await page.reload();
-  await page.getByTestId('nav-sales').click();
+  await navTo(page, 'sales');
   await expect(page.getByTestId('sales-table')).toBeVisible();
   await expect(page.getByRole('columnheader', { name: 'Vendedor' })).toBeHidden();
   // Restaura la columna para no dejar la preferencia sucia.
@@ -186,7 +195,7 @@ test('Compras y VeriFactu están retiradas del menú (#106)', async ({ page }) =
 });
 
 test('Familias muestra las raíz con subfamilias anidadas (#97)', async ({ page }) => {
-  await page.getByTestId('nav-families').click();
+  await navTo(page, 'families');
   // Árbol canónico del seed: 4 raíces + 2 subfamilias + 6 arquetipos = 12 nodos.
   // >= por si otros tests crean subniveles.
   expect(await page.getByTestId('fam-row').count()).toBeGreaterThanOrEqual(12);
@@ -195,7 +204,7 @@ test('Familias muestra las raíz con subfamilias anidadas (#97)', async ({ page 
 });
 
 test('Familias: crear un subnivel anidado (profundidad arbitraria, UX)', async ({ page }) => {
-  await page.getByTestId('nav-families').click();
+  await navTo(page, 'families');
   const aceitesCbd = page.getByTestId('fam-row').filter({ hasText: 'Aceites CBD' }).first();
   await aceitesCbd.click();
   await aceitesCbd.getByTestId('fam-add-child').click();
@@ -206,7 +215,7 @@ test('Familias: crear un subnivel anidado (profundidad arbitraria, UX)', async (
 });
 
 test('Familias: árbol con raíz en orden y todas las filas (#98)', async ({ page }) => {
-  await page.getByTestId('nav-families').click();
+  await navTo(page, 'families');
   const rows = page.getByTestId('fam-row');
   // Orden por defecto: la primera raíz es "Aceites" (sortOrder 1).
   await expect(rows.first()).toContainText('Aceites');
@@ -218,7 +227,7 @@ test('Familias: árbol con raíz en orden y todas las filas (#98)', async ({ pag
 test('Familias: marcar un subnivel como arquetipo lo distingue y oculta "+ Subnivel"', async ({
   page,
 }) => {
-  await page.getByTestId('nav-families').click();
+  await navTo(page, 'families');
   // Crear un subnivel bajo "Flores CBD" (no una raíz, para no alterar el orden de
   // raíces en reruns) y marcarlo como arquetipo.
   const flores = page.getByTestId('fam-row').filter({ hasText: 'Flores CBD' }).first();
@@ -238,14 +247,14 @@ test('Familias: marcar un subnivel como arquetipo lo distingue y oculta "+ Subni
 });
 
 test('Control horario muestra la tabla de fichajes con totales', async ({ page }) => {
-  await page.getByTestId('nav-timeclock').click();
+  await navTo(page, 'timeclock');
   await expect(page.getByTestId('timeclock-table')).toBeVisible();
   expect(await page.getByTestId('timeclock-row').count()).toBeGreaterThan(0);
   await expect(page.getByTestId('timeclock-totals')).toContainText('jornada');
 });
 
 test('Control horario: filtro por empleado reduce las jornadas', async ({ page }) => {
-  await page.getByTestId('nav-timeclock').click();
+  await navTo(page, 'timeclock');
   await expect(page.getByTestId('timeclock-table')).toBeVisible();
   // Filtrar por la encargada (tiene jornadas en el seed): solo aparecen las suyas.
   await selectByLabel(page, 'timeclock-employee', 'Encargada');
@@ -258,7 +267,7 @@ test('Control horario: filtro por empleado reduce las jornadas', async ({ page }
 });
 
 test('Promociones: filtro por 3 grupos y constructor de reglas (#99)', async ({ page }) => {
-  await page.getByTestId('nav-promotions').click();
+  await navTo(page, 'promotions');
   const cards = page.getByTestId('promo-card');
   await expect(cards.first()).toBeVisible(); // esperar a que cargue la lista
   // Por defecto se ven todas las promos (el seed crea 2 activas, 1 programada, 1 inactiva).
@@ -280,7 +289,7 @@ test('Promociones: filtro por 3 grupos y constructor de reglas (#99)', async ({ 
 });
 
 test('Mayorista: clientes, tarifas y pedidos en sub-pestañas (IT-17)', async ({ page }) => {
-  await page.getByTestId('nav-b2b').click();
+  await navTo(page, 'b2b');
   await expect(page.getByTestId('b2b-page')).toBeVisible();
 
   // Clientes: alta de uno nuevo (nombre único) que aparece en la tabla.
@@ -317,7 +326,7 @@ test('Mayorista: clientes, tarifas y pedidos en sub-pestañas (IT-17)', async ({
 });
 
 test('Traspasos: modal de nuevo traspaso con el patrón estándar (UX)', async ({ page }) => {
-  await page.getByTestId('nav-transfers').click();
+  await navTo(page, 'transfers');
   await page.getByTestId('new-transfer').click();
   const form = page.getByTestId('transfer-form');
   await expect(form).toBeVisible();
@@ -328,7 +337,7 @@ test('Traspasos: modal de nuevo traspaso con el patrón estándar (UX)', async (
 });
 
 test('Ayuda: canales de contacto y FAQ (IT-20)', async ({ page }) => {
-  await page.getByTestId('nav-help').click();
+  await navTo(page, 'help');
   await expect(page.getByTestId('help-page')).toBeVisible();
   await expect(page.getByTestId('help-whatsapp')).toHaveAttribute('href', /^https:\/\/wa\.me\//);
   await expect(page.getByTestId('help-email')).toHaveAttribute('href', /^mailto:/);
@@ -339,7 +348,7 @@ test('Ayuda: canales de contacto y FAQ (IT-20)', async ({ page }) => {
 });
 
 test('Confirmación: borrar cliente usa el diálogo del design system (IT-19)', async ({ page }) => {
-  await page.getByTestId('nav-b2b').click();
+  await navTo(page, 'b2b');
   const victim = `Cliente a borrar ${Date.now()}`;
   await page.getByTestId('b2b-new-customer').click();
   await page.getByTestId('b2b-customer-name').fill(victim);
@@ -358,7 +367,7 @@ test('Confirmación: borrar cliente usa el diálogo del design system (IT-19)', 
 });
 
 test('Modal: accesible (role dialog) y se cierra con Escape (IT-19)', async ({ page }) => {
-  await page.getByTestId('nav-b2b').click();
+  await navTo(page, 'b2b');
   await page.getByTestId('b2b-new-customer').click();
   const form = page.getByTestId('b2b-customer-form');
   await expect(form).toHaveAttribute('role', 'dialog');
@@ -367,8 +376,11 @@ test('Modal: accesible (role dialog) y se cierra con Escape (IT-19)', async ({ p
   await expect(form).toHaveCount(0);
 });
 
-test('API Keys: lista, alta y banner de un solo uso (IT-18)', async ({ page }) => {
-  await page.getByTestId('nav-apikeys').click();
+test('API Keys (en Ayuda → Integraciones): lista, alta y banner de un solo uso (IT-18)', async ({
+  page,
+}) => {
+  await navTo(page, 'help');
+  await expect(page.getByTestId('help-integrations')).toBeVisible();
   await expect(page.getByTestId('apikeys-page')).toBeVisible();
   // Sin keys la tabla puede no existir (estado vacío): al crear una debe aparecer.
   const keyName = `Key E2E ${Date.now()}`;

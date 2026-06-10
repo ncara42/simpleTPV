@@ -1,6 +1,7 @@
 import { LifeBuoy, Mail, MessageCircle, Phone } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { ApiKeysSection } from './ApiKeysPage.js';
 import { usePageHeader } from './lib/pageHeader.js';
 
 // Canales de soporte. Configurables por despliegue (VITE_SUPPORT_*) con defaults
@@ -102,6 +103,16 @@ export function HelpPage() {
               <p>{f.a}</p>
             </details>
           ))}
+        </div>
+
+        {/* Integraciones (D-09b): la gestión de claves API vive aquí — una page
+            propia en el menú era overkill para una función que se toca poco. */}
+        <div className="help-integrations" id="integraciones" data-testid="help-integrations">
+          <h3>Integraciones · Claves API</h3>
+          <p className="muted">
+            Acceso externo de solo lectura al stock para integraciones (webs, ERPs…).
+          </p>
+          <ApiKeysSection />
         </div>
       </div>
     </section>
