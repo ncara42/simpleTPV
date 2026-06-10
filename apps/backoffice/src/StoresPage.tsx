@@ -13,15 +13,6 @@ import { StorePricesModal } from './stores/StorePricesModal.js';
 
 export type StoreSalesPeriod = 'today' | 'week' | 'month';
 
-export interface StoreOps {
-  open: boolean;
-  openedBy: string | null;
-  openedSince: string | null;
-  deviceType: 'ip' | 'token';
-  deviceValue: string;
-  deviceVerified: boolean;
-}
-
 const SALES_LABEL: Record<StoreSalesPeriod, string> = {
   today: 'Ventas de hoy',
   week: 'Ventas · últimos 7 días',
@@ -38,7 +29,6 @@ export function StoresPage({
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Store | null>(null);
   const period: StoreSalesPeriod = 'today';
-  const [ops, setOps] = useState<Record<string, StoreOps>>({});
   const [detail, setDetail] = useState<Store | null>(null);
   const [pricesFor, setPricesFor] = useState<Store | null>(null);
 
@@ -99,10 +89,6 @@ export function StoresPage({
     });
     if (ok) deleteMut.mutate(s.id);
   };
-
-  const opsOf = (id: string): StoreOps | undefined => ops[id];
-  const patchOps = (id: string, patch: Partial<StoreOps>): void =>
-    setOps((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
 
   // Orden por ventas de hoy (desc); empate o sin ventas → por nombre estable.
   const visibleStores = useMemo(
@@ -165,8 +151,6 @@ export function StoresPage({
       {detail && (
         <StoreDetailModal
           store={detail}
-          ops={opsOf(detail.id)}
-          onPatchOps={(patch) => patchOps(detail.id, patch)}
           onEdit={() => setEditing(detail)}
           onDelete={() => void askDelete(detail)}
           deleteError={

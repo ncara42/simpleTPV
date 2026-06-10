@@ -2806,3 +2806,32 @@
   background: var(--surface, #fff);
   font: inherit;
 }
+
+/* ── Dispositivos de fichaje reales en el detalle de tienda (I-08) ── */
+.store-device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 var(--ui-space-2);
+  padding: 0;
+  list-style: none;
+}
+.store-device-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+}
+.store-device-name {
+  font-weight: 600;
+}
+.store-device-state {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-warning, #b45309);
+}
+.store-device-state.is-ok {
+  color: var(--tpv-teal-700, #0f766e);
+}

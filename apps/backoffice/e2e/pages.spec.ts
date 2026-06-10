@@ -68,9 +68,14 @@ test('Tiendas: detalle, estado operativo y registro de fichajes (#100, #102)', a
   await expect(page.getByTestId('store-log-table')).toBeVisible();
   await page.getByTestId('store-log-close').click();
   await expect(page.getByTestId('store-log-drawer')).toBeHidden();
-  // Token de fichaje para habilitar el dispositivo.
+  // Token de fichaje REAL (I-08): generar crea un dispositivo y muestra el token
+  // una sola vez; el dispositivo aparece en la lista como pendiente y se revoca.
   await page.getByTestId('store-gen-token').click();
-  await expect(page.getByTestId('store-token-value')).toContainText('FICHA-');
+  await expect(page.getByTestId('store-token-value')).toContainText('una sola vez');
+  await expect(page.getByTestId('store-device-item').first()).toContainText('Pendiente');
+  await page.getByTestId('store-device-revoke').first().click();
+  await page.getByRole('button', { name: 'Revocar' }).last().click();
+  await expect(page.getByTestId('store-device-item')).toHaveCount(0);
 });
 
 test('Tiendas: crear, editar y borrar persisten (I-10)', async ({ page }) => {
