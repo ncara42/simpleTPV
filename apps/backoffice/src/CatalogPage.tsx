@@ -78,10 +78,10 @@ function toPayload(f: FormState): ProductInput {
   };
 }
 
-export function CatalogPage() {
+export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | null } = {}) {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
-  const [familyFilter, setFamilyFilter] = useState('');
+  const [familyFilter, setFamilyFilter] = useState(initialFamilyId ?? '');
   const [form, setForm] = useState<FormState | null>(null);
   const [wizard, setWizard] = useState<EditWizard | null>(null);
   const [selected, setSelected] = useState<string[]>([]);

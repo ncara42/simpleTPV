@@ -2900,3 +2900,89 @@
   border-color: var(--tpv-teal-500, #14b8a6);
   background: var(--ui-success-soft, #e8f6f2);
 }
+
+/* ── Panel de productos del nodo en Familias (I-13) ── */
+.fam-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+.fam-layout.has-panel {
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: var(--ui-space-3);
+  align-items: start;
+}
+.fam-products-panel {
+  position: sticky;
+  top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md, 0.5rem);
+  background: var(--ui-surface);
+}
+.fam-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ui-space-2);
+}
+.fam-panel-head h4 {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+}
+.fam-subtree-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
+}
+.fam-subtree-toggle input {
+  width: auto;
+}
+.fam-product-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+.fam-product-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: 0.3rem 0.45rem;
+  border-radius: var(--ui-radius-sm);
+}
+.fam-product-item:hover {
+  background: var(--ui-surface-subtle);
+}
+.fam-product-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+}
+.fam-product-price {
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-muted);
+  font-size: 0.85rem;
+}
+.fam-panel-add {
+  margin-top: var(--ui-space-1);
+}
+@media (max-width: 900px) {
+  .fam-layout.has-panel {
+    grid-template-columns: 1fr;
+  }
+  .fam-products-panel {
+    position: static;
+  }
+}

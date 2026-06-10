@@ -5,6 +5,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useConfirm } from './components/ConfirmProvider.js';
 import { Modal } from './components/Modal.js';
 import {
+  EMPTY_PRODUCT_FORM,
+  ProductFormModal,
+  type ProductFormState,
+} from './components/ProductFormModal.js';
+import {
   createFamily,
   deleteFamily,
   type FamilyNode,
@@ -24,7 +29,9 @@ import {
   reorderSiblings,
 } from './lib/family-tree.js';
 import { formErrorMessage } from './lib/form-error.js';
+import { fmtEur } from './lib/format.js';
 import { usePageHeader } from './lib/pageHeader.js';
+import { createProduct, listProducts, updateProduct } from './lib/products.js';
 
 interface FormState {
   id?: string;
@@ -81,6 +88,8 @@ function saveCollapsed(ids: Set<string>): void {
 
 interface RowActions {
   roots: FamilyNode[];
+  // Contador real de productos del subárbol del nodo (E-16).
+  productCountOf: (node: FamilyNode) => number;
   selectedId: string | null;
   onSelect: (id: string) => void;
   // Nodos plegados (sus hijas no se muestran). Vacío mientras se busca.
@@ -193,7 +202,7 @@ function FamilyRow({
           )}
         </span>
         <span className="fam-count" data-testid="fam-count">
-          {(node as { productCount?: number }).productCount ?? 0} productos
+          {actions.productCountOf(node)} productos
         </span>
         {selected && (
           <span className="fam-actions" onClick={(e) => e.stopPropagation()}>
@@ -230,7 +239,12 @@ function FamilyRow({
   );
 }
 
-export function FamiliesPage() {
+export function FamiliesPage({
+  onOpenCatalogFamily,
+}: {
+  // Atajo del contador "X productos": navega a Catálogo filtrado por el nodo.
+  onOpenCatalogFamily?: (familyId: string) => void;
+} = {}) {
   const qc = useQueryClient();
   const confirm = useConfirm();
   const [form, setForm] = useState<FormState | null>(null);
@@ -263,6 +277,19 @@ export function FamiliesPage() {
     }
   }, [serverTree, tree]);
   const view = tree ?? serverTree;
+
+  // Productos completos: alimentan el panel del nodo (I-13) y el contador REAL
+  // por subárbol de cada fila (E-16), coherente con el filtro de Catálogo.
+  const { data: allProducts = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => listProducts(),
+  });
+  const directCount = new Map<string, number>();
+  for (const p of allProducts) {
+    if (p.familyId) directCount.set(p.familyId, (directCount.get(p.familyId) ?? 0) + 1);
+  }
+  const subtreeCount = (n: FamilyNode): number =>
+    (directCount.get(n.id) ?? 0) + n.children.reduce((acc, c) => acc + subtreeCount(c), 0);
 
   // Vista filtrada por la toolbar (no muta el árbol: el reordenado y "Mover a"
   // siguen operando sobre `view`). Una raíz que coincide se muestra entera; si solo
@@ -424,6 +451,7 @@ export function FamiliesPage() {
 
   const actions: RowActions = {
     roots: view,
+    productCountOf: subtreeCount,
     selectedId,
     onSelect: toggleSelected,
     // Al buscar se ignora el plegado para que las coincidencias siempre se vean.
@@ -460,6 +488,52 @@ export function FamiliesPage() {
   };
 
   usePageHeader('Familias', 'Organiza el catálogo en familias, subfamilias y arquetipos');
+
+  // ── Panel de productos del nodo seleccionado (I-13 / D-11) ──
+  const selectedNode = selectedId ? findNode(view, selectedId) : null;
+  // En familias/subfamilias, alternar entre productos directos y todo el subárbol.
+  const [includeSubtree, setIncludeSubtree] = useState(false);
+  const panelProducts = selectedNode
+    ? allProducts.filter((p) =>
+        p.familyId == null
+          ? false
+          : includeSubtree && !selectedNode.isArchetype
+            ? isDescendantOf(view, selectedNode.id, p.familyId)
+            : p.familyId === selectedNode.id,
+      )
+    : [];
+  // Destinos de "mover producto": cualquier nodo del árbol (sangría por profundidad).
+  const productMoveOptions = flattenTree(view).map((f) => ({
+    value: f.node.id,
+    label: `${'– '.repeat(f.depth)}${f.node.name}`,
+  }));
+  const invalidateProducts = () => {
+    void qc.invalidateQueries({ queryKey: ['products'] });
+    void qc.invalidateQueries({ queryKey: ['families'] }); // contadores
+  };
+  const moveProductMut = useMutation({
+    mutationFn: ({ id, familyId }: { id: string; familyId: string }) =>
+      updateProduct(id, { familyId }),
+    onSuccess: invalidateProducts,
+  });
+  // Alta de producto con el nodo precargado (reusa el ProductFormModal de I-11).
+  const [productForm, setProductForm] = useState<ProductFormState | null>(null);
+  const createProductMut = useMutation({
+    mutationFn: (f: ProductFormState) =>
+      createProduct({
+        name: f.name,
+        salePrice: Number(f.salePrice),
+        sku: f.sku || null,
+        barcode: f.barcode || null,
+        costPrice: Number(f.costPrice ?? 0),
+        taxRate: Number(f.taxRate ?? 21),
+        familyId: f.familyId,
+      }),
+    onSuccess: () => {
+      setProductForm(null);
+      invalidateProducts();
+    },
+  });
 
   return (
     <section className="catalog">
@@ -516,13 +590,100 @@ export function FamiliesPage() {
             Sin familias para la búsqueda.
           </p>
         ) : (
-          <div className="fam-tree" data-testid="fam-tree" ref={treeRef}>
-            {filtered.map((n) => (
-              <FamilyRow key={n.id} node={n} depth={0} parentId={null} actions={actions} />
-            ))}
+          <div className={`fam-layout${selectedNode ? ' has-panel' : ''}`}>
+            <div className="fam-tree" data-testid="fam-tree" ref={treeRef}>
+              {filtered.map((n) => (
+                <FamilyRow key={n.id} node={n} depth={0} parentId={null} actions={actions} />
+              ))}
+            </div>
+
+            {/* Panel de productos del nodo (I-13/D-11): ver, añadir aquí y mover. */}
+            {selectedNode && (
+              <aside className="fam-products-panel" data-testid="fam-products-panel">
+                <header className="fam-panel-head">
+                  <h4>
+                    {selectedNode.name}
+                    {selectedNode.isArchetype && <span className="fam-badge">Arquetipo</span>}
+                  </h4>
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() => onOpenCatalogFamily?.(selectedNode.id)}
+                    data-testid="fam-panel-to-catalog"
+                  >
+                    Ver en Catálogo →
+                  </button>
+                </header>
+                {!selectedNode.isArchetype && (
+                  <label className="fam-subtree-toggle">
+                    <input
+                      type="checkbox"
+                      checked={includeSubtree}
+                      onChange={(e) => setIncludeSubtree(e.target.checked)}
+                      data-testid="fam-panel-subtree"
+                    />
+                    <span>Incluir subniveles</span>
+                  </label>
+                )}
+                {panelProducts.length === 0 ? (
+                  <p className="catalog-empty" data-testid="fam-panel-empty">
+                    Sin productos {includeSubtree ? 'en el subárbol' : 'directos en este nodo'}.
+                  </p>
+                ) : (
+                  <ul className="fam-product-list" data-testid="fam-product-list">
+                    {panelProducts.map((p) => (
+                      <li key={p.id} className="fam-product-item" data-testid="fam-product-item">
+                        <span className="fam-product-name">{p.name}</span>
+                        <span className="fam-product-price">{fmtEur(Number(p.salePrice))}</span>
+                        <Select
+                          className="fam-product-move"
+                          value=""
+                          onChange={(value) => {
+                            if (value && value !== p.familyId)
+                              moveProductMut.mutate({ id: p.id, familyId: value });
+                          }}
+                          triggerLabel="Mover"
+                          options={[{ value: '', label: 'Mover a…' }, ...productMoveOptions]}
+                          ariaLabel={`Mover ${p.name} a otro nodo`}
+                          data-testid="fam-product-move"
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <button
+                  type="button"
+                  className="btn-primary fam-panel-add"
+                  onClick={() =>
+                    setProductForm({ ...EMPTY_PRODUCT_FORM, familyId: selectedNode.id })
+                  }
+                  data-testid="fam-panel-add-product"
+                >
+                  Añadir producto aquí
+                </button>
+              </aside>
+            )}
           </div>
         )}
       </div>
+
+      {productForm && (
+        <ProductFormModal
+          form={productForm}
+          onChange={setProductForm}
+          onSubmit={() => createProductMut.mutate(productForm)}
+          onClose={() => setProductForm(null)}
+          familyOptions={productMoveOptions}
+          pending={createProductMut.isPending}
+          errorMessage={
+            createProductMut.isError
+              ? formErrorMessage(createProductMut.error, 'No se pudo crear el producto.')
+              : null
+          }
+          title={`Nuevo producto en ${selectedNode?.name ?? 'el nodo'}`}
+          primaryLabel={createProductMut.isPending ? 'Creando…' : 'Crear'}
+        />
+      )}
 
       {form && (
         <Modal

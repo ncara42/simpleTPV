@@ -139,6 +139,12 @@ function Home() {
     setNavStoreId(storeId);
     setTab(view);
   };
+  // Atajo del panel de Familias (I-13): el contador navega a Catálogo filtrado.
+  const [navFamilyId, setNavFamilyId] = useState<string | null>(null);
+  const openCatalogFamily = (familyId: string): void => {
+    setNavFamilyId(familyId);
+    setTab('catalog');
+  };
 
   return (
     <div className="app-shell">
@@ -149,6 +155,7 @@ function Home() {
         activeItem={tab}
         onSelect={(id) => {
           setNavStoreId(null);
+          setNavFamilyId(null);
           setTab(id as Tab);
         }}
         account={{ name: 'Administrador', subtitle: 'Central · Admin' }}
@@ -165,8 +172,8 @@ function Home() {
               />
             )}
             {tab === 'notifications' && <NotificationsPage />}
-            {tab === 'catalog' && <CatalogPage />}
-            {tab === 'families' && <FamiliesPage />}
+            {tab === 'catalog' && <CatalogPage initialFamilyId={navFamilyId} />}
+            {tab === 'families' && <FamiliesPage onOpenCatalogFamily={openCatalogFamily} />}
             {tab === 'stock' && <StockPage initialStoreId={navStoreId} />}
             {tab === 'transfers' && <TransfersPage />}
             {tab === 'promotions' && <PromotionsPage />}

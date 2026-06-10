@@ -9,6 +9,14 @@ vi.mock('./lib/families.js', () => ({
   deleteFamily: vi.fn(),
 }));
 
+// El panel de productos del nodo (I-13) y el contador real (E-16) consultan
+// /products; sin red en unit.
+vi.mock('./lib/products.js', () => ({
+  listProducts: vi.fn(() => Promise.resolve([])),
+  createProduct: vi.fn(),
+  updateProduct: vi.fn(),
+}));
+
 import { ConfirmProvider } from './components/ConfirmProvider.js';
 import { FamiliesPage } from './FamiliesPage.js';
 

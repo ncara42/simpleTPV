@@ -386,6 +386,62 @@ test('Familias: marcar un subnivel como arquetipo lo distingue y oculta "+ Subni
   await expect(row.getByTestId('fam-add-child')).toHaveCount(0);
 });
 
+test('Familias: panel de productos del nodo — ver, añadir aquí y mover (I-13, E-16)', async ({
+  page,
+}) => {
+  await navTo(page, 'families');
+  // Seleccionar el arquetipo "Aceite CBD 10%" abre el panel con sus productos.
+  const arq = page.getByTestId('fam-row').filter({ hasText: 'Aceite CBD 10%' }).first();
+  await arq.click();
+  await expect(page.getByTestId('fam-products-panel')).toBeVisible();
+  await expect(page.getByTestId('fam-product-item').first()).toBeVisible();
+  const items = await page.getByTestId('fam-product-item').count();
+  expect(items).toBeGreaterThanOrEqual(3); // el seed da 3 al arquetipo
+  // El contador de la fila dice la VERDAD (E-16): coincide con el panel.
+  await expect(arq.getByTestId('fam-count')).toHaveText(`${items} productos`);
+  // En un arquetipo no hay toggle de subniveles (no tiene descendientes)…
+  await expect(page.getByTestId('fam-panel-subtree')).toHaveCount(0);
+
+  // …y en una familia raíz sí: incluir subniveles amplía la lista.
+  await page.getByTestId('fam-row').first().click(); // "Aceites" (sortOrder 1)
+  await expect(page.getByTestId('fam-products-panel')).toBeVisible();
+  const direct = await page.getByTestId('fam-product-item').count();
+  await page.getByTestId('fam-panel-subtree').check();
+  await expect.poll(() => page.getByTestId('fam-product-item').count()).toBeGreaterThan(direct);
+
+  // "Añadir producto aquí": modal con el nodo precargado; aparece en el panel.
+  await arq.click();
+  await page.getByTestId('fam-panel-add-product').click();
+  await expect(page.getByTestId('product-form')).toContainText('Aceite CBD 10%');
+  const name = `Producto E2E ${Date.now()}`;
+  await page.getByTestId('form-name').fill(name);
+  await page.getByTestId('form-price').fill('12.5');
+  await page.getByTestId('form-save').click();
+  await expect(page.getByTestId('product-form')).toHaveCount(0);
+  await expect(page.getByTestId('fam-product-list')).toContainText(name);
+
+  // Mover el producto a otro arquetipo desde el panel: sale de esta lista…
+  const item = page.getByTestId('fam-product-item').filter({ hasText: name });
+  await item.getByTestId('fam-product-move').click();
+  await page.locator('[role="option"]', { hasText: 'Aceite CBD 20%' }).first().click();
+  await expect(page.getByTestId('fam-product-list')).not.toContainText(name);
+  // …y aparece en la del destino.
+  await page.getByTestId('fam-row').filter({ hasText: 'Aceite CBD 20%' }).first().click();
+  await expect(page.getByTestId('fam-product-list')).toContainText(name);
+
+  // "Ver en Catálogo →" navega al catálogo filtrado por el nodo.
+  await page.getByTestId('fam-panel-to-catalog').click();
+  await expect(page.getByTestId('catalog-table')).toBeVisible();
+  await expect(page.getByTestId('catalog-table')).toContainText(name);
+
+  // Limpieza: borrar el producto creado para no contaminar el seed.
+  await page.getByTestId('catalog-search').fill(name);
+  await expect(page.getByTestId('product-select')).toHaveCount(1);
+  await page.getByTestId('product-select').check();
+  await page.getByTestId('products-delete').click();
+  await expect(page.getByTestId('catalog-table')).not.toContainText(name);
+});
+
 test('Control horario muestra la tabla de fichajes con totales', async ({ page }) => {
   await navTo(page, 'timeclock');
   await expect(page.getByTestId('timeclock-table')).toBeVisible();
