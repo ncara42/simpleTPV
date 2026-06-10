@@ -19,9 +19,9 @@ test('Catálogo muestra los productos del seed', async ({ page }) => {
 test('Catálogo: selector jerárquico único de familia (#97)', async ({ page }) => {
   await page.getByTestId('nav-catalog').click();
   // El modal tiene un único selector jerárquico: se elige un nodo de cualquier
-  // nivel (p. ej. la subfamilia "Índica") sin cascada familia → subfamilia.
+  // nivel (p. ej. la subfamilia "Aceites CBD") sin cascada familia → subfamilia.
   await page.getByTestId('new-product').click();
-  await selectByLabel(page, 'form-family', 'Índica');
+  await selectByLabel(page, 'form-family', 'Aceites CBD');
   await expect(page.getByTestId('form-subfamily')).toHaveCount(0);
 });
 
@@ -187,18 +187,18 @@ test('Compras y VeriFactu están retiradas del menú (#106)', async ({ page }) =
 
 test('Familias muestra las raíz con subfamilias anidadas (#97)', async ({ page }) => {
   await page.getByTestId('nav-families').click();
-  // 4 familias raíz + 6 subfamilias del seed (Flores, Aceites y Cosmética con 2 cada
-  // una). >= por si otros tests crean subniveles.
-  expect(await page.getByTestId('fam-row').count()).toBeGreaterThanOrEqual(10);
-  await expect(page.getByText('Índica')).toBeVisible();
+  // Árbol canónico del seed: 4 raíces + 2 subfamilias + 6 arquetipos = 12 nodos.
+  // >= por si otros tests crean subniveles.
+  expect(await page.getByTestId('fam-row').count()).toBeGreaterThanOrEqual(12);
+  await expect(page.getByText('Aceites CBD')).toBeVisible();
   await expect(page.getByTestId('fam-count').first()).toContainText('productos');
 });
 
 test('Familias: crear un subnivel anidado (profundidad arbitraria, UX)', async ({ page }) => {
   await page.getByTestId('nav-families').click();
-  const indica = page.getByTestId('fam-row').filter({ hasText: 'Índica' }).first();
-  await indica.click();
-  await indica.getByTestId('fam-add-child').click();
+  const aceitesCbd = page.getByTestId('fam-row').filter({ hasText: 'Aceites CBD' }).first();
+  await aceitesCbd.click();
+  await aceitesCbd.getByTestId('fam-add-child').click();
   const subName = `Subnivel E2E ${Date.now()}`;
   await page.getByTestId('family-name').fill(subName);
   await page.getByTestId('family-save').click();
@@ -208,11 +208,11 @@ test('Familias: crear un subnivel anidado (profundidad arbitraria, UX)', async (
 test('Familias: árbol con raíz en orden y todas las filas (#98)', async ({ page }) => {
   await page.getByTestId('nav-families').click();
   const rows = page.getByTestId('fam-row');
-  // Orden por defecto: la primera raíz es "Flores CBD" (sortOrder 1).
-  await expect(rows.first()).toContainText('Flores CBD');
-  // El árbol expone todas las filas (4 raíz + 6 subfamilias). El reordenado por
-  // drag&drop nativo HTML5 no es fiable en Playwright; su lógica se cubre en unit.
-  expect(await rows.count()).toBeGreaterThanOrEqual(10);
+  // Orden por defecto: la primera raíz es "Aceites" (sortOrder 1).
+  await expect(rows.first()).toContainText('Aceites');
+  // El árbol expone todas las filas (4 raíces + 2 subfamilias + 6 arquetipos). El
+  // reordenado por drag&drop nativo HTML5 no es fiable en Playwright; unit lo cubre.
+  expect(await rows.count()).toBeGreaterThanOrEqual(12);
 });
 
 test('Familias: marcar un subnivel como arquetipo lo distingue y oculta "+ Subnivel"', async ({
