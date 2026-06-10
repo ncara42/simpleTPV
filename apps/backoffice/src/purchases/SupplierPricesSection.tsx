@@ -21,10 +21,12 @@ import {
 
 // Tarifas de compra por proveedor (P1-B): alta/edición de precio por producto,
 // import CSV por SKU y comparativa de precios entre proveedores por arquetipo.
-export function SupplierPricesSection() {
+// Con `fixedSupplierId` (vista detalle de proveedor, I-18/D-07) se fija el
+// proveedor y se ocultan el selector y la comparativa (que es cross-proveedor).
+export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: string } = {}) {
   const qc = useQueryClient();
   const [view, setView] = useState<'tarifas' | 'comparativa'>('tarifas');
-  const [supplierId, setSupplierId] = useState('');
+  const [supplierId, setSupplierId] = useState(fixedSupplierId ?? '');
   const [familyId, setFamilyId] = useState('');
   const [importing, setImporting] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -155,35 +157,39 @@ export function SupplierPricesSection() {
   return (
     <div className="table-panel">
       <div className="table-toolbar">
-        <nav className="bo-tabs" data-testid="sp-view-tabs">
-          <button
-            className={`bo-tab ${view === 'tarifas' ? 'active' : ''}`}
-            onClick={() => setView('tarifas')}
-            data-testid="sp-view-tarifas"
-          >
-            Tarifas por proveedor
-          </button>
-          <button
-            className={`bo-tab ${view === 'comparativa' ? 'active' : ''}`}
-            onClick={() => setView('comparativa')}
-            data-testid="sp-view-comparativa"
-          >
-            Comparativa
-          </button>
-        </nav>
+        {!fixedSupplierId && (
+          <nav className="bo-tabs" data-testid="sp-view-tabs">
+            <button
+              className={`bo-tab ${view === 'tarifas' ? 'active' : ''}`}
+              onClick={() => setView('tarifas')}
+              data-testid="sp-view-tarifas"
+            >
+              Tarifas por proveedor
+            </button>
+            <button
+              className={`bo-tab ${view === 'comparativa' ? 'active' : ''}`}
+              onClick={() => setView('comparativa')}
+              data-testid="sp-view-comparativa"
+            >
+              Comparativa
+            </button>
+          </nav>
+        )}
         {view === 'tarifas' ? (
           <div className="sales-filters">
-            <Select
-              className="catalog-search"
-              value={supplierId}
-              onChange={setSupplierId}
-              ariaLabel="Proveedor"
-              data-testid="sp-supplier"
-              options={[
-                { value: '', label: 'Todos los proveedores' },
-                ...suppliers.map((s) => ({ value: s.id, label: s.name })),
-              ]}
-            />
+            {!fixedSupplierId && (
+              <Select
+                className="catalog-search"
+                value={supplierId}
+                onChange={setSupplierId}
+                ariaLabel="Proveedor"
+                data-testid="sp-supplier"
+                options={[
+                  { value: '', label: 'Todos los proveedores' },
+                  ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+                ]}
+              />
+            )}
             <button
               type="button"
               className="users-sel-btn"

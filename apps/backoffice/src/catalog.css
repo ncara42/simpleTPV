@@ -2981,3 +2981,59 @@
     position: static;
   }
 }
+
+/* ── Vista detalle de proveedor (I-18 / D-07) ── */
+.row-clickable {
+  cursor: pointer;
+}
+.supplier-detail-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ui-space-3);
+}
+.supplier-detail-title h2 {
+  margin: 0;
+}
+.supplier-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--ui-space-3);
+  align-items: end;
+  padding: var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md, 0.5rem);
+  background: var(--ui-surface);
+  margin-bottom: var(--ui-space-4);
+}
+.supplier-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
+  min-width: 0;
+}
+.supplier-form input {
+  width: 100%;
+  height: 2.5rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-md, 0.5rem);
+  padding: 0 0.8rem;
+  font-size: 0.9rem;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+.supplier-form input:focus-visible {
+  outline: none;
+  border-color: var(--ui-accent, #0066cc);
+  box-shadow: 0 0 0 3px var(--ui-accent-soft, rgb(0 102 204 / 0.15));
+}
+.supplier-form .btn-primary {
+  justify-self: start;
+}
+.supplier-detail-h {
+  margin: var(--ui-space-4) 0 var(--ui-space-2);
+}

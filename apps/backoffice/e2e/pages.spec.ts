@@ -449,6 +449,47 @@ test('Familias: panel de productos del nodo — ver, añadir aquí y mover (I-13
   await expect(page.getByTestId('catalog-table')).not.toContainText(name);
 });
 
+test('Proveedores: vista detalle — datos editables, tarifa con import CSV y pedidos (I-18, D-07)', async ({
+  page,
+}) => {
+  await navTo(page, 'suppliers');
+  await page
+    .getByTestId('supplier-row')
+    .filter({ hasText: 'Distribuciones Norte' })
+    .first()
+    .click();
+  await expect(page.getByTestId('supplier-detail')).toBeVisible();
+  // Sus tarifas con el proveedor FIJO (sin selector ni comparativa)…
+  await expect(page.getByTestId('sp-row').first()).toBeVisible();
+  await expect(page.getByTestId('sp-supplier')).toHaveCount(0);
+  await expect(page.getByTestId('sp-view-tabs')).toHaveCount(0);
+  // …y sus pedidos de compra (seed: pedido confirmado de Distribuciones Norte).
+  await expect(page.getByTestId('order-row').first()).toBeVisible();
+
+  // Editar los datos PERSISTE (PATCH /suppliers/:id): volver y reabrir.
+  await page.getByTestId('sd-phone').fill('600123123');
+  await page.getByTestId('sd-save').click();
+  await expect(page.getByTestId('sd-save')).toHaveText('Guardado ✓');
+  await page.getByTestId('supplier-back').click();
+  await page
+    .getByTestId('supplier-row')
+    .filter({ hasText: 'Distribuciones Norte' })
+    .first()
+    .click();
+  await expect(page.getByTestId('sd-phone')).toHaveValue('600123123');
+
+  // Import CSV desde el detalle: una fila con un SKU del seed (upsert, idempotente).
+  await page.getByTestId('sp-import').click();
+  await page.locator('[data-testid="sp-import-modal"] input[type="file"]').setInputFiles({
+    name: 'tarifa.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('sku,price\nSKU-001,3.21\n'),
+  });
+  await expect(page.getByTestId('csv-dropzone-result')).toContainText('1 fila');
+  await page.getByRole('button', { name: 'Cerrar' }).click();
+  await expect(page.getByTestId('sp-table')).toContainText('3,21');
+});
+
 test('Control horario muestra la tabla de fichajes con totales', async ({ page }) => {
   await navTo(page, 'timeclock');
   await expect(page.getByTestId('timeclock-table')).toBeVisible();
