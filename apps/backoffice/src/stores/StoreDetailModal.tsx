@@ -12,11 +12,17 @@ export function StoreDetailModal({
   store,
   ops,
   onPatchOps,
+  onEdit,
+  onDelete,
+  deleteError,
   onClose,
 }: {
   store: Store;
   ops: StoreOps | undefined;
   onPatchOps: (patch: Partial<StoreOps>) => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  deleteError: string | null;
   onClose: () => void;
 }) {
   const [logOpen, setLogOpen] = useState(false);
@@ -135,7 +141,16 @@ export function StoreDetailModal({
           </section>
         </div>
 
-        <div className="modal-foot">
+        {deleteError && <p className="form-error">{deleteError}</p>}
+        <div className="modal-foot modal-foot--split">
+          <div className="modal-foot-actions">
+            <button type="button" onClick={onEdit} data-testid="store-edit">
+              Editar
+            </button>
+            <button type="button" className="danger" onClick={onDelete} data-testid="store-delete">
+              Borrar
+            </button>
+          </div>
           <button type="button" onClick={onClose}>
             Cerrar
           </button>

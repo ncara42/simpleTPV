@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
-import { createStore, deleteStore, listStores, type Store } from './lib/admin.js';
+import { useConfirm } from './components/ConfirmProvider.js';
+import { createStore, deleteStore, listStores, type Store, updateStore } from './lib/admin.js';
 import { getSalesToday } from './lib/dashboard.js';
 import { formErrorMessage } from './lib/form-error.js';
 import { usePageHeader } from './lib/pageHeader.js';
@@ -33,7 +34,9 @@ export function StoresPage({
   onOpenStoreView: (view: 'stock' | 'sales', storeId: string) => void;
 }) {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Store | null>(null);
   const period: StoreSalesPeriod = 'today';
   const [ops, setOps] = useState<Record<string, StoreOps>>({});
   const [detail, setDetail] = useState<Store | null>(null);
@@ -66,7 +69,36 @@ export function StoresPage({
       invalidate();
     },
   });
-  void deleteStore;
+  // Edición y borrado REALES (I-10): el backend ya tenía PATCH/DELETE.
+  const updateMut = useMutation({
+    mutationFn: ({ id, form }: { id: string; form: StoreForm }) =>
+      updateStore(id, {
+        name: form.name,
+        code: form.code,
+        ...(form.address ? { address: form.address } : { address: null }),
+      }),
+    onSuccess: () => {
+      setEditing(null);
+      setDetail(null);
+      invalidate();
+    },
+  });
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteStore(id),
+    onSuccess: () => {
+      setDetail(null);
+      invalidate();
+    },
+  });
+  const askDelete = async (s: Store): Promise<void> => {
+    const ok = await confirm({
+      title: 'Borrar tienda',
+      message: `¿Borrar la tienda "${s.name}"? Si tiene ventas o stock asociados no se podrá.`,
+      confirmLabel: 'Borrar',
+      danger: true,
+    });
+    if (ok) deleteMut.mutate(s.id);
+  };
 
   const opsOf = (id: string): StoreOps | undefined => ops[id];
   const patchOps = (id: string, patch: Partial<StoreOps>): void =>
@@ -135,7 +167,24 @@ export function StoresPage({
           store={detail}
           ops={opsOf(detail.id)}
           onPatchOps={(patch) => patchOps(detail.id, patch)}
+          onEdit={() => setEditing(detail)}
+          onDelete={() => void askDelete(detail)}
+          deleteError={
+            deleteMut.isError ? formErrorMessage(deleteMut.error, 'No se pudo borrar.') : null
+          }
           onClose={() => setDetail(null)}
+        />
+      )}
+
+      {editing && (
+        <StoreFormModal
+          initial={{ name: editing.name, code: editing.code, address: editing.address ?? '' }}
+          onClose={() => setEditing(null)}
+          onSubmit={(f) => updateMut.mutate({ id: editing.id, form: f })}
+          pending={updateMut.isPending}
+          error={
+            updateMut.isError ? formErrorMessage(updateMut.error, 'No se pudo guardar.') : null
+          }
         />
       )}
 

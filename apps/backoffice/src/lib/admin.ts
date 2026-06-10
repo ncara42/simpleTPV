@@ -60,6 +60,10 @@ export function createStore(input: StoreInput): Promise<Store> {
   return api.post<Store>('/stores', input);
 }
 
+export function updateStore(id: string, input: Partial<StoreInput>): Promise<Store> {
+  return api.patch<Store>(`/stores/${id}`, input);
+}
+
 export function deleteStore(id: string): Promise<void> {
   return api.del(`/stores/${id}`);
 }

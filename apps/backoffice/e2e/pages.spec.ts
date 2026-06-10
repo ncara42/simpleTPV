@@ -73,6 +73,38 @@ test('Tiendas: detalle, estado operativo y registro de fichajes (#100, #102)', a
   await expect(page.getByTestId('store-token-value')).toContainText('FICHA-');
 });
 
+test('Tiendas: crear, editar y borrar persisten (I-10)', async ({ page }) => {
+  await navTo(page, 'stores');
+  // Crear una tienda temporal (código único por run).
+  const code = `9${Date.now() % 100000}`.slice(0, 6);
+  await page.getByTestId('new-store').click();
+  await page.getByTestId('store-name').fill(`Tienda E2E ${code}`);
+  await page.getByTestId('store-code').fill(code);
+  await page.getByTestId('store-save').click();
+  await expect(page.getByTestId('store-form')).toHaveCount(0);
+  const card = page.getByTestId('store-card').filter({ hasText: `Tienda E2E ${code}` });
+  await expect(card).toBeVisible();
+  // Editar desde el detalle: renombrar.
+  await card.click();
+  await page.getByTestId('store-edit').click();
+  await page.getByTestId('store-name').fill(`Tienda E2E ${code} Editada`);
+  await page.getByTestId('store-save').click();
+  await expect(page.getByTestId('store-form')).toHaveCount(0);
+  // Persiste tras recargar.
+  await page.reload();
+  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
+  await navTo(page, 'stores');
+  const renamed = page.getByTestId('store-card').filter({ hasText: `Tienda E2E ${code} Editada` });
+  await expect(renamed).toBeVisible();
+  // Borrar (tienda vacía) con confirmación; desaparece del grid.
+  await renamed.click();
+  await page.getByTestId('store-delete').click();
+  await page.getByRole('button', { name: 'Borrar' }).last().click();
+  await expect(
+    page.getByTestId('store-card').filter({ hasText: `Tienda E2E ${code}` }),
+  ).toHaveCount(0);
+});
+
 test('Usuarios muestra 4 usuarios con badge de rol', async ({ page }) => {
   await navTo(page, 'users');
   await expect(page.getByTestId('users-count')).toContainText('4');
