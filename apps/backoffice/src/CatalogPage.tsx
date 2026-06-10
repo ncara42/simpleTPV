@@ -9,6 +9,7 @@ import {
   ProductFormModal,
   type ProductFormState,
 } from './components/ProductFormModal.js';
+import { ProductMovements } from './components/ProductMovements.js';
 import { useTableColumns } from './components/useTableColumns.js';
 import { type FamilyNode, listFamilies } from './lib/families.js';
 import { findNodePath, flattenTree, isDescendantOf } from './lib/family-tree.js';
@@ -494,6 +495,7 @@ export function CatalogPage() {
           }
           title={wizard ? 'Editar producto' : 'Nuevo producto'}
           primaryLabel={primaryLabel}
+          extraSection={form.id ? <ProductMovements productId={form.id} /> : undefined}
         />
       )}
 

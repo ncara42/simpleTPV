@@ -8,14 +8,8 @@ import { useTableColumns } from '../components/useTableColumns.js';
 import { listStores } from '../lib/admin.js';
 import { listFamilies } from '../lib/families.js';
 import { formErrorMessage } from '../lib/form-error.js';
-import {
-  adjustStock,
-  getGlobalStock,
-  listAlerts,
-  listMovements,
-  setMinStock,
-} from '../lib/stock.js';
-import { ALERT_LABEL, dt, LEVEL_LABEL, MOVEMENT_LABEL, ROTATION_LABEL } from './labels.js';
+import { adjustStock, getGlobalStock, listAlerts, setMinStock } from '../lib/stock.js';
+import { ALERT_LABEL, LEVEL_LABEL, ROTATION_LABEL } from './labels.js';
 
 interface AdjustState {
   productId: string;
@@ -35,7 +29,6 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
   const [storeId, setStoreId] = useState(initialStoreId ?? '');
   const [rotation, setRotation] = useState('');
   const [adjusting, setAdjusting] = useState<AdjustState | null>(null);
-  const [movementsFor, setMovementsFor] = useState<string | null>(null);
   // Solo productos con alguna tienda en alerta (rotura o bajo mínimo).
   const [alertsOnly, setAlertsOnly] = useState(false);
   const [sort, setSort] = useState<DataTableSort | undefined>(undefined);
@@ -231,23 +224,7 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
     editorTestId: 'stock-columns-editor',
     title: 'Columnas de stock',
   });
-  const actionsColumn: DataTableColumn<StockRow> = {
-    key: 'actions',
-    header: '',
-    width: '8rem',
-    align: 'right',
-    render: (row) => (
-      <button
-        type="button"
-        className="link-btn"
-        onClick={() => setMovementsFor(row.productId)}
-        data-testid="stock-history"
-      >
-        Movimientos
-      </button>
-    ),
-  };
-  const tableColumns = [...effectiveColumns, actionsColumn];
+  const tableColumns = effectiveColumns;
 
   // Orden cliente por producto/total.
   const sortedRows = sort
@@ -474,56 +451,6 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
           </div>
         </Modal>
       )}
-
-      {movementsFor && (
-        <MovementsModal productId={movementsFor} onClose={() => setMovementsFor(null)} />
-      )}
     </>
-  );
-}
-
-function MovementsModal({ productId, onClose }: { productId: string; onClose: () => void }) {
-  const { data, isLoading } = useQuery({
-    queryKey: ['stock-movements', productId],
-    queryFn: () => listMovements(productId),
-  });
-
-  return (
-    <Modal onClose={onClose} testId="movements-modal" ariaLabel="Movimientos de stock">
-      <h3>Movimientos de stock</h3>
-      {isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : !data || data.items.length === 0 ? (
-        <p className="catalog-empty" data-testid="movements-empty">
-          Sin movimientos.
-        </p>
-      ) : (
-        <table className="catalog-table" data-testid="movements-table">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Tipo</th>
-              <th>Cantidad</th>
-              <th>Motivo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.items.map((m) => (
-              <tr key={m.id} data-testid="movement-row">
-                <td className="muted">{dt.format(new Date(m.createdAt))}</td>
-                <td>{MOVEMENT_LABEL[m.type] ?? m.type}</td>
-                <td>{m.quantity}</td>
-                <td className="muted">{m.reason ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <div className="modal-foot">
-        <button type="button" onClick={onClose}>
-          Cerrar
-        </button>
-      </div>
-    </Modal>
   );
 }

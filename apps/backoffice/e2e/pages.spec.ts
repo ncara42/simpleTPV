@@ -238,6 +238,23 @@ test('Stock: filtro por rotación re-renderiza la tabla (#96)', async ({ page })
   expect(await page.getByTestId('stock-row').count()).toBeLessThanOrEqual(total);
 });
 
+test('Movimientos de stock viven en el detalle del producto (I-12, D-05)', async ({ page }) => {
+  // La tabla de Stock ya no tiene el botón repetido por fila.
+  await navTo(page, 'stock');
+  await expect(page.getByTestId('stock-row').first()).toBeVisible();
+  await expect(page.getByTestId('stock-history')).toHaveCount(0);
+  // El histórico se consulta desde la edición del producto (carga lazy).
+  await navTo(page, 'catalog');
+  await page.getByTestId('product-select').first().check();
+  await page.getByTestId('products-edit').click();
+  await expect(page.getByTestId('product-form')).toBeVisible();
+  await page.getByTestId('product-movements-open').click();
+  await expect(
+    page.getByTestId('movements-table').or(page.getByTestId('movements-empty')),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+});
+
 test('Stock: ajustar existencias PERSISTE tras recargar (E-01)', async ({ page }) => {
   await navTo(page, 'stock');
   await expect(page.getByTestId('stock-row').first()).toBeVisible();
