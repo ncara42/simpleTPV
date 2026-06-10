@@ -49,6 +49,12 @@ export interface DataTableProps<Row> {
   /** Contenido cuando no hay filas y no está cargando. */
   emptyState?: React.ReactNode;
   skeletonRows?: number;
+  /** Clic en la fila (p. ej. alternar selección múltiple). */
+  onRowClick?: (row: Row) => void;
+  /** Clase extra por fila (p. ej. 'is-selected'). */
+  rowClassName?: (row: Row) => string | undefined;
+  /** aria-selected por fila (selección múltiple accesible). */
+  rowAriaSelected?: (row: Row) => boolean;
   className?: string;
   'data-testid'?: string;
 }
@@ -107,6 +113,9 @@ export function DataTable<Row>({
   pagination,
   emptyState,
   skeletonRows = 6,
+  onRowClick,
+  rowClassName,
+  rowAriaSelected,
   className,
   'data-testid': testid,
 }: DataTableProps<Row>) {
@@ -171,7 +180,13 @@ export function DataTable<Row>({
           ) : (
             <tbody>
               {rows.map((row, i) => (
-                <tr key={rowKey(row, i)} data-testid="ui-dt-row">
+                <tr
+                  key={rowKey(row, i)}
+                  data-testid="ui-dt-row"
+                  className={rowClassName?.(row)}
+                  aria-selected={rowAriaSelected?.(row)}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                >
                   {columns.map((col) => (
                     <td key={col.key} className={ALIGN_CLASS[col.align ?? 'left']}>
                       {col.render ? col.render(row, i) : cellValue(row, col.key)}

@@ -1,9 +1,10 @@
-import { Select } from '@simpletpv/ui';
+import { DataTable, type DataTableColumn, type DataTableSort, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
 import { CsvDropzone } from './components/CsvDropzone.js';
 import { Modal } from './components/Modal.js';
+import { useTableColumns } from './components/useTableColumns.js';
 import { type FamilyNode, listFamilies } from './lib/families.js';
 import { findNodePath, flattenTree, isDescendantOf } from './lib/family-tree.js';
 import { formErrorMessage } from './lib/form-error.js';
@@ -99,6 +100,9 @@ export function CatalogPage() {
   const [selected, setSelected] = useState<string[]>([]);
   // Modal de importación de catálogo por CSV (POST /products/import).
   const [importing, setImporting] = useState(false);
+  // Orden y paginación cliente del DataTable (D-04).
+  const [sort, setSort] = useState<DataTableSort | undefined>(undefined);
+  const [page, setPage] = useState(1);
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products', search],
@@ -146,6 +150,47 @@ export function CatalogPage() {
   );
 
   usePageHeader('Catálogo', `${filtered.length} productos activos`, 'catalog-count');
+
+  // Orden cliente (numérico para precios/margen/stock; texto para el resto).
+  const sortValue = (p: Product, key: string): number | string => {
+    switch (key) {
+      case 'salePrice':
+        return Number(p.salePrice);
+      case 'costPrice':
+        return Number(p.costPrice);
+      case 'margin':
+        return Number(p.salePrice) - Number(p.costPrice);
+      case 'stock':
+        return stockByProduct.get(p.id) ?? 0;
+      case 'family':
+        return familyPathLabel(families, p.familyId);
+      default:
+        return p.name.toLocaleLowerCase();
+    }
+  };
+  const sorted = useMemo(() => {
+    if (!sort) return filtered;
+    const dir = sort.dir === 'desc' ? -1 : 1;
+    return [...filtered].sort((a, b) => {
+      const va = sortValue(a, sort.key);
+      const vb = sortValue(b, sort.key);
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+      return String(va).localeCompare(String(vb)) * dir;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, sort, families, stockByProduct]);
+
+  const PAGE_SIZE = 25;
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const onSortChange = (key: string): void => {
+    setSort((cur) =>
+      cur?.key === key ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' },
+    );
+    setPage(1);
+  };
 
   // ─── Selección ─────────────────────────────────────────────────────────
   const selectedSet = useMemo(() => new Set(selected), [selected]);
@@ -235,164 +280,219 @@ export function CatalogPage() {
         ? `Guardar (${total} / ${total})`
         : 'Guardar';
 
-  return (
-    <section className="catalog">
-      <div className="table-panel">
-        <div className="users-toolbar">
-          <div className="sales-filters">
-            <span className="search-field">
-              <input
-                className="catalog-search"
-                placeholder="Buscar por nombre, SKU o código…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                data-testid="catalog-search"
-              />
-            </span>
-            <Select
-              className="catalog-search"
-              value={familyFilter}
-              onChange={setFamilyFilter}
-              ariaLabel="Filtrar por familia"
-              data-testid="catalog-family-filter"
-              options={[{ value: '', label: 'Todos los arquetipos' }, ...archetypeOptions]}
-            />
-            {selected.length > 0 && (
-              <>
-                {!allFilteredSelected && (
-                  <button
-                    type="button"
-                    className="users-sel-btn"
-                    onClick={selectAllFiltered}
-                    data-testid="products-select-all"
-                  >
-                    Seleccionar todo
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="users-sel-btn"
-                  onClick={clearSelection}
-                  data-testid="products-clear"
-                >
-                  Quitar selección
-                </button>
-              </>
-            )}
-          </div>
-          {selected.length > 0 ? (
-            <div className="users-toolbar-actions">
-              <button
-                type="button"
-                className="users-bulk-edit"
-                onClick={openBulkEdit}
-                data-testid="products-edit"
-              >
-                Editar{selected.length > 1 ? ` (${selected.length})` : ''}
-              </button>
-              <button
-                type="button"
-                className="users-bulk-del"
-                onClick={removeSelected}
-                data-testid="products-delete"
-              >
-                Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
-              </button>
-            </div>
-          ) : (
-            <div className="users-toolbar-actions">
+  // Columnas de datos (la de selección va aparte, siempre visible). Defaults D-12:
+  // visibles Nombre · Familia · PVP · Margen · Stock; ocultas SKU · Coste · IVA.
+  const dataColumns: DataTableColumn<Product>[] = [
+    { key: 'name', header: 'Nombre', sortable: true },
+    {
+      key: 'family',
+      header: 'Familia',
+      render: (p) => (
+        <span className="muted" data-testid="catalog-family">
+          {familyPathLabel(families, p.familyId)}
+        </span>
+      ),
+    },
+    { key: 'sku', header: 'SKU', render: (p) => <span className="muted">{p.sku ?? '—'}</span> },
+    {
+      key: 'costPrice',
+      header: 'Coste',
+      align: 'right',
+      sortable: true,
+      render: (p) => <span className="muted">{fmtEur(Number(p.costPrice))}</span>,
+    },
+    {
+      key: 'salePrice',
+      header: 'PVP',
+      align: 'right',
+      sortable: true,
+      render: (p) => fmtEur(Number(p.salePrice)),
+    },
+    {
+      key: 'margin',
+      header: 'Margen',
+      align: 'right',
+      sortable: true,
+      render: (p) => (
+        <span data-testid="catalog-margin">
+          {fmtEur(Number(p.salePrice) - Number(p.costPrice))}
+          <span className="muted">
+            {' · '}
+            {marginPct(Number(p.salePrice), Number(p.costPrice))}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: 'taxRate',
+      header: 'IVA',
+      align: 'right',
+      render: (p) => <span className="muted">{Number(p.taxRate).toFixed(0)}%</span>,
+    },
+    {
+      key: 'stock',
+      header: 'Stock',
+      align: 'right',
+      render: (p) => {
+        const qty = stockByProduct.get(p.id) ?? 0;
+        return (
+          <span className={`stock-tag stock-${stockLevel(qty)}`} data-testid="catalog-stock">
+            {qty}
+          </span>
+        );
+      },
+    },
+  ];
+  const {
+    effectiveColumns,
+    editor: columnsEditor,
+    editorOpen: columnsEditorOpen,
+    toggleEditor: toggleColumnsEditor,
+  } = useTableColumns('table.catalog.columns', dataColumns, {
+    defaultHidden: ['sku', 'costPrice', 'taxRate'],
+    editorTestId: 'catalog-columns-editor',
+    title: 'Columnas del catálogo',
+  });
+  // Columna de selección múltiple: fija, fuera de la configuración.
+  const selectColumn: DataTableColumn<Product> = {
+    key: 'select',
+    header: '',
+    width: '2.2rem',
+    render: (p) => (
+      <input
+        type="checkbox"
+        className="user-check"
+        aria-label={`Seleccionar ${p.name}`}
+        data-testid="product-select"
+        checked={selectedSet.has(p.id)}
+        onChange={() => toggleSelect(p.id)}
+        onClick={(e) => e.stopPropagation()}
+      />
+    ),
+  };
+  const tableColumns = [selectColumn, ...effectiveColumns];
+
+  const toolbar = (
+    <div className="users-toolbar">
+      <div className="sales-filters">
+        <span className="search-field">
+          <input
+            className="catalog-search"
+            placeholder="Buscar por nombre, SKU o código…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            data-testid="catalog-search"
+          />
+        </span>
+        <Select
+          className="catalog-search"
+          value={familyFilter}
+          onChange={setFamilyFilter}
+          ariaLabel="Filtrar por familia"
+          data-testid="catalog-family-filter"
+          options={[{ value: '', label: 'Todos los arquetipos' }, ...archetypeOptions]}
+        />
+        {selected.length > 0 && (
+          <>
+            {!allFilteredSelected && (
               <button
                 type="button"
                 className="users-sel-btn"
-                onClick={() => setImporting(true)}
-                data-testid="catalog-import"
+                onClick={selectAllFiltered}
+                data-testid="products-select-all"
               >
-                Importar CSV
+                Seleccionar todo
               </button>
-              <button className="btn-primary" onClick={openCreate} data-testid="new-product">
-                Nuevo producto
-              </button>
-            </div>
-          )}
-        </div>
-
-        {isLoading ? (
-          <p className="catalog-empty">Cargando…</p>
-        ) : filtered.length === 0 ? (
-          <p className="catalog-empty" data-testid="catalog-empty">
-            {allProducts.length === 0
-              ? 'Sin productos. Crea el primero.'
-              : 'Sin productos para los filtros seleccionados.'}
-          </p>
-        ) : (
-          <table
-            className={`catalog-table users-table${selected.length ? ' has-selection' : ''}`}
-            data-testid="catalog-table"
-          >
-            <thead>
-              <tr>
-                <th className="users-select-col" aria-label="Selección" />
-                <th>Nombre</th>
-                <th>Familia</th>
-                <th>SKU</th>
-                <th>Coste</th>
-                <th>Precio</th>
-                <th>Margen</th>
-                <th>IVA</th>
-                <th>Stock</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((p) => {
-                const isSel = selectedSet.has(p.id);
-                const qty = stockByProduct.get(p.id) ?? 0;
-                return (
-                  <tr
-                    key={p.id}
-                    className={isSel ? 'is-selected' : undefined}
-                    aria-selected={isSel}
-                    onClick={() => toggleSelect(p.id)}
-                    data-testid="product-row"
-                  >
-                    <td className="users-select-col" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        className="user-check"
-                        aria-label={`Seleccionar ${p.name}`}
-                        data-testid="product-select"
-                        checked={isSel}
-                        onChange={() => toggleSelect(p.id)}
-                      />
-                    </td>
-                    <td>{p.name}</td>
-                    <td className="muted" data-testid="catalog-family">
-                      {familyPathLabel(families, p.familyId)}
-                    </td>
-                    <td className="muted">{p.sku ?? '—'}</td>
-                    <td className="muted">{fmtEur(Number(p.costPrice))}</td>
-                    <td>{fmtEur(Number(p.salePrice))}</td>
-                    <td data-testid="catalog-margin">
-                      {fmtEur(Number(p.salePrice) - Number(p.costPrice))}
-                      <span className="muted">
-                        {' · '}
-                        {marginPct(Number(p.salePrice), Number(p.costPrice))}
-                      </span>
-                    </td>
-                    <td className="muted">{Number(p.taxRate).toFixed(0)}%</td>
-                    <td>
-                      <span
-                        className={`stock-tag stock-${stockLevel(qty)}`}
-                        data-testid="catalog-stock"
-                      >
-                        {qty}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+            )}
+            <button
+              type="button"
+              className="users-sel-btn"
+              onClick={clearSelection}
+              data-testid="products-clear"
+            >
+              Quitar selección
+            </button>
+          </>
         )}
+      </div>
+      {selected.length > 0 ? (
+        <div className="users-toolbar-actions">
+          <button
+            type="button"
+            className="users-bulk-edit"
+            onClick={openBulkEdit}
+            data-testid="products-edit"
+          >
+            Editar{selected.length > 1 ? ` (${selected.length})` : ''}
+          </button>
+          <button
+            type="button"
+            className="users-bulk-del"
+            onClick={removeSelected}
+            data-testid="products-delete"
+          >
+            Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
+          </button>
+        </div>
+      ) : (
+        <div className="users-toolbar-actions">
+          <button
+            type="button"
+            className="users-sel-btn"
+            onClick={() => setImporting(true)}
+            data-testid="catalog-import"
+          >
+            Importar CSV
+          </button>
+          <button className="btn-primary" onClick={openCreate} data-testid="new-product">
+            Nuevo producto
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <section className="catalog">
+      <div className="table-panel">
+        {toolbar}
+        <div className="config-bar">
+          <button
+            type="button"
+            className="config-trigger"
+            onClick={toggleColumnsEditor}
+            data-testid="catalog-columns-toggle"
+            aria-expanded={columnsEditorOpen}
+          >
+            Columnas
+          </button>
+        </div>
+        {columnsEditor}
+        <DataTable
+          columns={tableColumns}
+          rows={pageRows}
+          rowKey={(p) => p.id}
+          loading={isLoading}
+          {...(sort ? { sort } : {})}
+          onSortChange={onSortChange}
+          onRowClick={(p) => toggleSelect(p.id)}
+          rowClassName={(p) => (selectedSet.has(p.id) ? 'is-selected' : undefined)}
+          rowAriaSelected={(p) => selectedSet.has(p.id)}
+          pagination={{
+            page: safePage,
+            pageSize: PAGE_SIZE,
+            totalItems: sorted.length,
+            onPageChange: setPage,
+          }}
+          emptyState={
+            <span data-testid="catalog-empty">
+              {allProducts.length === 0
+                ? 'Sin productos. Crea el primero.'
+                : 'Sin productos para los filtros seleccionados.'}
+            </span>
+          }
+          data-testid="catalog-table"
+        />
       </div>
 
       {form && (
