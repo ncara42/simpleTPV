@@ -23,6 +23,7 @@ import {
   renumberSiblings,
   reorderSiblings,
 } from './lib/family-tree.js';
+import { formErrorMessage } from './lib/form-error.js';
 import { usePageHeader } from './lib/pageHeader.js';
 
 interface FormState {
@@ -514,7 +515,9 @@ export function FamiliesPage() {
           {form.hasChildren && (
             <p className="muted">Tiene subniveles: vacíalos para poder convertirlo en arquetipo.</p>
           )}
-          {saveMut.isError && <p className="form-error">No se pudo guardar.</p>}
+          {saveMut.isError && (
+            <p className="form-error">{formErrorMessage(saveMut.error, 'No se pudo guardar.')}</p>
+          )}
           <div className="modal-foot">
             <button type="button" onClick={() => setForm(null)}>
               Cancelar

@@ -7,6 +7,7 @@ import { Modal } from './components/Modal.js';
 import { SectionToolbar } from './components/SectionToolbar.js';
 import { useToast } from './components/ToastProvider.js';
 import { createApiKey, listApiKeys, revokeApiKey } from './lib/api-keys.js';
+import { formErrorMessage } from './lib/form-error.js';
 import { usePageHeader } from './lib/pageHeader.js';
 
 function fmtDate(iso: string | null): string {
@@ -96,7 +97,7 @@ export function ApiKeysPage() {
       void qc.invalidateQueries({ queryKey: ['api-keys'] });
       toast('API key revocada', 'success');
     },
-    onError: () => toast('No se pudo revocar la API key', 'error'),
+    onError: (e) => toast(formErrorMessage(e, 'No se pudo revocar la API key'), 'error'),
   });
 
   const active = keys.filter((k) => !k.revokedAt);

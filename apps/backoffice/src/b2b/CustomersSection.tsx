@@ -15,6 +15,7 @@ import {
   listPriceLists,
   updateCustomer,
 } from '../lib/b2b.js';
+import { formErrorMessage } from '../lib/form-error.js';
 
 interface Form {
   id?: string;
@@ -88,7 +89,7 @@ export function CustomersSection() {
       setForm(null);
       toast(f.id ? 'Cliente actualizado' : 'Cliente creado', 'success');
     },
-    onError: () => toast('No se pudo guardar el cliente', 'error'),
+    onError: (e) => toast(formErrorMessage(e, 'No se pudo guardar el cliente'), 'error'),
   });
 
   const removeMut = useMutation({
@@ -97,7 +98,7 @@ export function CustomersSection() {
       invalidate();
       toast('Cliente eliminado', 'success');
     },
-    onError: () => toast('No se pudo eliminar el cliente', 'error'),
+    onError: (e) => toast(formErrorMessage(e, 'No se pudo eliminar el cliente'), 'error'),
   });
 
   const tariffOptions = [
@@ -234,7 +235,9 @@ export function CustomersSection() {
               />
             </section>
           </div>
-          {saveMut.isError && <p className="form-error">No se pudo guardar.</p>}
+          {saveMut.isError && (
+            <p className="form-error">{formErrorMessage(saveMut.error, 'No se pudo guardar.')}</p>
+          )}
           <div className="modal-foot modal-foot--split">
             <label className="switch">
               <input

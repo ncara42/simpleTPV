@@ -7,6 +7,7 @@ import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
 import { listStores } from '../lib/admin.js';
 import { parseCsvRows } from '../lib/csv.js';
+import { formErrorMessage } from '../lib/form-error.js';
 import { listProducts } from '../lib/products.js';
 import { createTransfer, listTransfers, sendTransfer } from '../lib/stock.js';
 import { dt, STATUS_LABEL } from './labels.js';
@@ -309,7 +310,11 @@ function CreateTransferModal({
           )}
         </section>
       </div>
-      {mutation.isError && <p className="form-error">No se pudo crear el traspaso.</p>}
+      {mutation.isError && (
+        <p className="form-error">
+          {formErrorMessage(mutation.error, 'No se pudo crear el traspaso.')}
+        </p>
+      )}
       <div className="modal-foot modal-foot-actions">
         <button type="button" onClick={onClose}>
           Cancelar

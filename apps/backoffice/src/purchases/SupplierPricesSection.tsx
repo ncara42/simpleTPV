@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
 import { listFamilies } from '../lib/families.js';
+import { formErrorMessage } from '../lib/form-error.js';
 import { fmtEur } from '../lib/format.js';
 import { listProducts } from '../lib/products.js';
 import { listSuppliers } from '../lib/purchases.js';
@@ -254,7 +255,11 @@ export function SupplierPricesSection() {
               data-testid="sp-add-price"
             />
           </label>
-          {upsertMut.isError && <p className="form-error">No se pudo guardar la tarifa.</p>}
+          {upsertMut.isError && (
+            <p className="form-error">
+              {formErrorMessage(upsertMut.error, 'No se pudo guardar la tarifa.')}
+            </p>
+          )}
           <div className="modal-foot">
             <button type="button" onClick={() => setAdding(false)}>
               Cancelar

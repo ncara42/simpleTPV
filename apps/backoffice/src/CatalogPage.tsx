@@ -6,6 +6,7 @@ import { CsvDropzone } from './components/CsvDropzone.js';
 import { Modal } from './components/Modal.js';
 import { type FamilyNode, listFamilies } from './lib/families.js';
 import { findNodePath, flattenTree, isDescendantOf } from './lib/family-tree.js';
+import { formErrorMessage } from './lib/form-error.js';
 import { fmtEur } from './lib/format.js';
 import { usePageHeader } from './lib/pageHeader.js';
 import {
@@ -462,7 +463,9 @@ export function CatalogPage() {
               />
             </label>
           </div>
-          {createMut.isError && <p className="form-error">No se pudo guardar.</p>}
+          {createMut.isError && (
+            <p className="form-error">{formErrorMessage(createMut.error, 'No se pudo guardar.')}</p>
+          )}
           <div className="modal-foot">
             <button type="button" onClick={closeModal}>
               Cancelar

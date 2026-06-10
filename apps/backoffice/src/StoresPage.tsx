@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 
 import { createStore, deleteStore, listStores, type Store } from './lib/admin.js';
 import { getSalesToday } from './lib/dashboard.js';
+import { formErrorMessage } from './lib/form-error.js';
 import { usePageHeader } from './lib/pageHeader.js';
 import { StoreCard } from './stores/StoreCard.js';
 import { StoreDetailModal } from './stores/StoreDetailModal.js';
@@ -125,7 +126,7 @@ export function StoresPage({
           onClose={() => setCreating(false)}
           onSubmit={(f) => createMut.mutate(f)}
           pending={createMut.isPending}
-          error={createMut.isError}
+          error={createMut.isError ? formErrorMessage(createMut.error, 'No se pudo crear.') : null}
         />
       )}
 

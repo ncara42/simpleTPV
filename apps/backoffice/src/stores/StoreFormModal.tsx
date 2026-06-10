@@ -19,7 +19,9 @@ export function StoreFormModal({
   onClose: () => void;
   onSubmit: (form: StoreForm) => void;
   pending: boolean;
-  error: boolean;
+  // Mensaje de error a mostrar (null si no hay error). El padre lo deriva con
+  // formErrorMessage para enseñar la causa real de la API (D-14).
+  error: string | null;
 }) {
   const [form, setForm] = useState<StoreForm>({ name: '', code: '', address: '' });
 
@@ -60,7 +62,7 @@ export function StoreFormModal({
           data-testid="store-address"
         />
       </label>
-      {error && <p className="form-error">No se pudo crear.</p>}
+      {error && <p className="form-error">{error}</p>}
       <div className="modal-foot">
         <button type="button" onClick={onClose}>
           Cancelar

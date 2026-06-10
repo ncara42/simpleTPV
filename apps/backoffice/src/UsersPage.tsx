@@ -16,6 +16,7 @@ import {
   updateUser,
   type User,
 } from './lib/admin.js';
+import { formErrorMessage } from './lib/form-error.js';
 import { usePageHeader } from './lib/pageHeader.js';
 
 type Role = NewUser['role'];
@@ -518,7 +519,9 @@ export function UsersPage() {
             </section>
           </div>
 
-          {createMut.isError && <p className="form-error">No se pudo guardar.</p>}
+          {createMut.isError && (
+            <p className="form-error">{formErrorMessage(createMut.error, 'No se pudo guardar.')}</p>
+          )}
           <div className="modal-foot modal-foot--split">
             <label className="switch">
               <input
