@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
 import { listFamilies } from '../lib/families.js';
+import { flattenTree } from '../lib/family-tree.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { fmtEur } from '../lib/format.js';
 import { listProducts } from '../lib/products.js';
@@ -125,7 +126,12 @@ export function SupplierPricesSection() {
               data-testid="sp-family"
               options={[
                 { value: '', label: 'Todos los arquetipos' },
-                ...families.map((f) => ({ value: f.id, label: f.name })),
+                // Solo nodos ARQUETIPO: la comparativa agrupa productos casi
+                // idénticos; filtrar por una familia raíz no casa con el árbol
+                // canónico (los comparables cuelgan de arquetipos hoja).
+                ...flattenTree(families)
+                  .filter((f) => f.node.isArchetype)
+                  .map((f) => ({ value: f.node.id, label: f.node.name })),
               ]}
             />
           </div>
