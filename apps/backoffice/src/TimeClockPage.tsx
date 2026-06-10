@@ -3,22 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
 import { usePageHeader } from './lib/pageHeader.js';
-import { listHistoryAll } from './lib/time-clock.js';
-
-// Minutos → "Xh Ym" (o "Ym" si es menos de una hora).
-function fmtMinutes(min: number): string {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`;
-}
-
-// ISO → "HH:MM" (mismo criterio que el log de tienda: corte directo del ISO). Guion
-// largo si la jornada no tiene entrada/salida registrada.
-function hhmm(iso: string | null): string {
-  return iso ? iso.slice(11, 16) : '—';
-}
-
-const msToMin = (ms: number): number => Math.round(ms / 60000);
+import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
 
 interface Filters {
   storeId: string;

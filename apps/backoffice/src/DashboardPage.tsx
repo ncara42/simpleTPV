@@ -12,6 +12,7 @@ import {
   getMarginKpis,
   getProductRankings,
   getProductRotation,
+  getSalesByEmployee,
   getSalesByFamily,
   getSalesByHour,
   getSalesKpis,
@@ -31,6 +32,7 @@ import {
 import { usePageHeader } from './lib/pageHeader.js';
 import { readPref, usePreferences } from './lib/preferences.js';
 import { listAlerts } from './lib/stock.js';
+import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
 import { ALERT_LABEL } from './stock/labels.js';
 
 // Personalización de las KPI cards (IT-16): orden + visibilidad por usuario.
@@ -54,9 +56,68 @@ const PERIOD_SUBTITLE: Record<DashboardPeriod, string> = {
   month: 'Este mes',
 };
 
-// Tintes de respaldo (escala azul Apple + neutros) cuando una familia no
-// trae color propio. Mantiene el lienzo monocromo y sobrio.
-const PIE_FALLBACK = ['#0066cc', '#2997ff', '#5ac8fa', '#86868b', '#0a5ac4', '#1d1d1f', '#a1a1a6'];
+// ── Presets del dashboard (I-15 / D-08) ──
+// Cada preset define sus tarjetas KPI Y sus paneles (D-08d), con el reparto
+// EXACTO cerrado en informe_decisiones. 'ventas' es el default. El preset
+// activo y los ocultos POR preset persisten en la preferencia
+// `dashboard.layout` (D-03); el orden de tarjetas sigue en `dashboard.cards`.
+type PresetId = 'ventas' | 'beneficio' | 'inventario' | 'equipo';
+
+interface PresetDef {
+  id: PresetId;
+  label: string;
+  cards: string[];
+  panels: string[];
+}
+
+const PRESETS: PresetDef[] = [
+  {
+    id: 'ventas',
+    label: 'Ventas',
+    cards: ['kpi-today', 'kpi-avg-ticket', 'kpi-upt'],
+    panels: ['dash-bars', 'dash-hour', 'dash-family', 'rank-sales'],
+  },
+  {
+    id: 'beneficio',
+    label: 'Beneficio',
+    cards: ['kpi-margin', 'kpi-profit', 'kpi-discount', 'kpi-return'],
+    panels: ['rank-margin', 'dash-discount-emp'],
+  },
+  {
+    id: 'inventario',
+    label: 'Inventario',
+    cards: ['kpi-lost-sales'],
+    panels: ['dash-stockout', 'dash-rotation', 'rank-rotation'],
+  },
+  {
+    id: 'equipo',
+    label: 'Equipo',
+    cards: [],
+    panels: ['dash-sales-emp', 'dash-discount-emp', 'dash-timeclock'],
+  },
+];
+
+// Etiquetas de los paneles para el editor de personalización.
+const PANEL_LABEL: Record<string, string> = {
+  'dash-bars': 'Ventas hoy vs ayer',
+  'dash-hour': 'Ventas por hora',
+  'dash-family': 'Ventas por familia',
+  'rank-sales': 'Ranking top ventas',
+  'rank-margin': 'Ranking top margen',
+  'rank-rotation': 'Peor rotación',
+  'dash-discount-emp': 'Descuento por empleado',
+  'dash-stockout': 'Roturas de stock',
+  'dash-rotation': 'Rotación',
+  'dash-sales-emp': 'Ventas por vendedor',
+  'dash-timeclock': 'Fichajes de hoy',
+};
+
+// Preferencia de layout (I-15): preset activo + ids ocultos POR preset —
+// ocultar un panel o tarjeta solo afecta al preset donde se ocultó.
+interface LayoutPref {
+  preset?: PresetId;
+  hiddenByPreset?: Partial<Record<PresetId, string[]>>;
+}
 
 // La sparkline solo tiene tonos brand/up/down; 'flat' (sin tendencia) usa el
 // neutro 'brand'. Convierte el tono semántico de una métrica al de la sparkline.
@@ -69,43 +130,90 @@ export function DashboardPage() {
 
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
 
+  // Preferencias ANTES de las queries: el preset activo y sus ocultos deciden
+  // qué se pinta Y qué endpoints se consultan (enabled por visibilidad).
+  const { prefs, setPref, loaded: prefsLoaded } = usePreferences();
+  const [cardsEditorOpen, setCardsEditorOpen] = useState(false);
+  const layout = readPref<LayoutPref>(prefs, 'dashboard.layout', {});
+  const preset = PRESETS.find((p) => p.id === layout.preset) ?? PRESETS[0]!;
+  // Migración tolerante de la preferencia previa a presets (IT-16): si el preset
+  // aún no tiene su lista de ocultos, hereda los de `dashboard.cards.hidden`.
+  const cardsPref = readPref<CardsPref>(prefs, 'dashboard.cards', { order: [], hidden: [] });
+  const legacyHidden = Array.isArray(cardsPref.hidden) ? cardsPref.hidden : [];
+  const knownIds = new Set([...preset.cards, ...preset.panels]);
+  const hidden = new Set(
+    (layout.hiddenByPreset?.[preset.id] ?? legacyHidden).filter((id) => knownIds.has(id)),
+  );
+  // Orden de tarjetas: respeta el guardado y añade al final las nuevas del preset.
+  const savedOrder = (Array.isArray(cardsPref.order) ? cardsPref.order : []).filter((id) =>
+    preset.cards.includes(id),
+  );
+  const cardOrder = [...savedOrder, ...preset.cards.filter((id) => !savedOrder.includes(id))];
+  const visibleCardIds = cardOrder.filter((id) => !hidden.has(id));
+  const visiblePanelIds = preset.panels.filter((id) => !hidden.has(id));
+  const vis = new Set([...visibleCardIds, ...visiblePanelIds]);
+
   // placeholderData: al cambiar de tienda/periodo se conservan los datos previos
   // durante el refetch en vez de vaciarse. Así los nodos del DOM (key estable por
   // tienda/familia) persisten y las gráficas no vuelven a montar ni re-animan.
+  // `enabled` por visibilidad: un panel oculto (o de otro preset) no consulta.
   const salesToday = useQuery({
     queryKey: ['dash-today', store],
     queryFn: () => getSalesToday(store),
     placeholderData: keepPreviousData,
+    enabled: vis.has('kpi-today') || vis.has('dash-bars'),
   });
   const salesKpis = useQuery({
     queryKey: ['dash-sales-kpis', period, store],
     queryFn: () => getSalesKpis(period, store),
     placeholderData: keepPreviousData,
+    enabled: ['kpi-avg-ticket', 'kpi-upt', 'kpi-discount', 'kpi-return'].some((id) => vis.has(id)),
   });
   const marginKpis = useQuery({
     queryKey: ['dash-margin', period, store],
     queryFn: () => getMarginKpis(period, store),
     placeholderData: keepPreviousData,
+    enabled: vis.has('kpi-margin') || vis.has('kpi-profit'),
   });
   const byFamily = useQuery({
     queryKey: ['dash-family', period, store],
     queryFn: () => getSalesByFamily(period, store),
     placeholderData: keepPreviousData,
+    enabled: vis.has('dash-family'),
   });
   const byHour = useQuery({
     queryKey: ['dash-hour', period, store],
     queryFn: () => getSalesByHour(period, store),
     placeholderData: keepPreviousData,
+    enabled: vis.has('dash-hour'),
   });
   const discountByEmp = useQuery({
     queryKey: ['dash-discount-emp', period, store],
     queryFn: () => getDiscountByEmployee(period, store),
     placeholderData: keepPreviousData,
+    enabled: vis.has('dash-discount-emp'),
+  });
+  // Ventas por vendedor (preset Equipo, D-08).
+  const salesByEmp = useQuery({
+    queryKey: ['dash-sales-emp', period, store],
+    queryFn: () => getSalesByEmployee(period, store),
+    placeholderData: keepPreviousData,
+    enabled: vis.has('dash-sales-emp'),
+  });
+  // Fichajes de hoy (preset Equipo, D-08): jornadas de hoy, en hora local.
+  const todayIso = new Intl.DateTimeFormat('en-CA').format(new Date());
+  const timeclockToday = useQuery({
+    queryKey: ['dash-timeclock', todayIso, store],
+    queryFn: () =>
+      listHistoryAll({ from: todayIso, to: todayIso, ...(store ? { storeId: store } : {}) }),
+    placeholderData: keepPreviousData,
+    enabled: vis.has('dash-timeclock'),
   });
   const rotation = useQuery({
     queryKey: ['dash-rotation', period, store],
     queryFn: () => getProductRotation(period, store),
     placeholderData: keepPreviousData,
+    enabled: vis.has('dash-rotation'),
   });
   // Rotación: por defecto AGREGADA POR ARQUETIPO (más sólida); 'product' es el
   // drill-down al SKU concreto (IT-13).
@@ -114,29 +222,29 @@ export function DashboardPage() {
     queryKey: ['dash-arch-rotation', period, store],
     queryFn: () => getArchetypeRotation(period, store),
     placeholderData: keepPreviousData,
+    enabled: vis.has('dash-rotation'),
   });
   const rankings = useQuery({
     queryKey: ['dash-rankings', period, store],
     queryFn: () => getProductRankings(period, store),
     placeholderData: keepPreviousData,
+    enabled: ['rank-sales', 'rank-margin', 'rank-rotation'].some((id) => vis.has(id)),
   });
   // Roturas de stock: lista de alertas activas + KPI de venta perdida estimada.
   const stockoutKpis = useQuery({
     queryKey: ['dash-stockout-kpis', period, store],
     queryFn: () => getStockoutKpis(period, store),
     placeholderData: keepPreviousData,
+    enabled: vis.has('dash-stockout') || vis.has('kpi-lost-sales'),
   });
   const alerts = useQuery({
     queryKey: ['dash-alerts', store],
     queryFn: () => listAlerts(store),
     placeholderData: keepPreviousData,
+    enabled: vis.has('dash-stockout'),
   });
 
   usePageHeader('Resumen', 'Actualizado hace 2 min');
-
-  // KPI cards personalizables (IT-16): cada usuario elige cuáles ve y en qué orden.
-  const { prefs, setPref, loaded: prefsLoaded } = usePreferences();
-  const [cardsEditorOpen, setCardsEditorOpen] = useState(false);
 
   // Periodo y tienda por defecto (IT-16): el dashboard recuerda el último elegido. Se
   // aplica UNA vez tras cargar las preferencias; los cambios del usuario lo reescriben.
@@ -262,30 +370,74 @@ export function DashboardPage() {
         />
       ),
     },
+    {
+      id: 'kpi-lost-sales',
+      label: 'Venta perdida est.',
+      node: (
+        <KpiCard
+          key="kpi-lost-sales"
+          label="Venta perdida est."
+          value={fmtEur(stockoutKpis.data?.estimatedLostSales)}
+          testid="kpi-lost-sales"
+        />
+      ),
+    },
   ];
-  const allCardIds = cardDefs.map((c) => c.id);
-  const cardsPref = readPref<CardsPref>(prefs, 'dashboard.cards', {
-    order: allCardIds,
-    hidden: [],
-  });
-  // Saneado: respeta el orden guardado, añade al final las cards nuevas y descarta ids
-  // desconocidos (robusto ante versiones viejas del pref).
-  const savedOrder = (Array.isArray(cardsPref.order) ? cardsPref.order : []).filter((id) =>
-    allCardIds.includes(id),
-  );
-  const cardOrder = [...savedOrder, ...allCardIds.filter((id) => !savedOrder.includes(id))];
-  const cardHidden = (Array.isArray(cardsPref.hidden) ? cardsPref.hidden : []).filter((id) =>
-    allCardIds.includes(id),
-  );
-  const visibleCards = cardOrder
-    .filter((id) => !cardHidden.includes(id))
+  const visibleCards = visibleCardIds
     .map((id) => cardDefs.find((c) => c.id === id))
     .filter((c): c is (typeof cardDefs)[number] => Boolean(c));
+
+  // Ocultar/mostrar SOLO afecta al preset activo (D-03): se escribe entera la
+  // lista efectiva de ocultos del preset en dashboard.layout.
+  const toggleHidden = (id: string): void => {
+    const next = hidden.has(id) ? [...hidden].filter((h) => h !== id) : [...hidden, id];
+    setPref('dashboard.layout', {
+      ...layout,
+      preset: preset.id,
+      hiddenByPreset: { ...layout.hiddenByPreset, [preset.id]: next },
+    });
+  };
+  // El orden global de dashboard.cards conserva las tarjetas de otros presets al
+  // final: cada preset solo lee las suyas, así que su orden relativo no le afecta.
+  const moveCard = (i: number, dir: -1 | 1): void => {
+    const j = i + dir;
+    if (j < 0 || j >= cardOrder.length) return;
+    const order = [...cardOrder];
+    const tmp = order[i]!;
+    order[i] = order[j]!;
+    order[j] = tmp;
+    const others = (Array.isArray(cardsPref.order) ? cardsPref.order : []).filter(
+      (id) => !preset.cards.includes(id),
+    );
+    setPref('dashboard.cards', { order: [...order, ...others], hidden: legacyHidden });
+  };
+  const setPreset = (id: PresetId): void => setPref('dashboard.layout', { ...layout, preset: id });
 
   return (
     <section className="catalog" data-testid="dashboard">
       <header className="catalog-head is-actions-only">
         <div className="catalog-actions">
+          {/* Selector de preset en la cabecera (D-08c): cambiar de foco = 1 clic. */}
+          <div
+            className="dash-preset-switch"
+            role="tablist"
+            aria-label="Preset del dashboard"
+            data-testid="dash-preset"
+          >
+            {PRESETS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                role="tab"
+                aria-selected={preset.id === p.id}
+                className={preset.id === p.id ? 'is-active' : ''}
+                onClick={() => setPreset(p.id)}
+                data-testid={`dash-preset-${p.id}`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
           <Select
             className="dash-period-select"
             value={period}
@@ -314,7 +466,7 @@ export function DashboardPage() {
         </div>
       </header>
 
-      {/* KPI cards personalizables (IT-16): el usuario elige cuáles y en qué orden. */}
+      {/* Personalización del preset activo (IT-16 + I-15): tarjetas y paneles. */}
       <div className="dash-cards-head">
         <button
           type="button"
@@ -323,333 +475,445 @@ export function DashboardPage() {
           data-testid="dash-customize"
           aria-expanded={cardsEditorOpen}
         >
-          Personalizar tarjetas
+          Personalizar
         </button>
       </div>
       {cardsEditorOpen && (
-        <CardsEditor
-          defs={cardDefs}
-          order={cardOrder}
-          hidden={cardHidden}
-          onChange={(next) => setPref('dashboard.cards', next)}
+        <LayoutEditor
+          cards={cardOrder.map((id) => ({
+            id,
+            label: cardDefs.find((c) => c.id === id)?.label ?? id,
+          }))}
+          panels={preset.panels.map((id) => ({ id, label: PANEL_LABEL[id] ?? id }))}
+          hidden={hidden}
+          onToggle={toggleHidden}
+          onMoveCard={moveCard}
         />
       )}
-      <div className="dash-cards" data-testid="dash-cards">
-        {visibleCards.map((c) => c.node)}
-      </div>
+      {visibleCards.length > 0 && (
+        <div className="dash-cards" data-testid="dash-cards">
+          {visibleCards.map((c) => c.node)}
+        </div>
+      )}
 
+      {/* La rejilla solo monta los paneles del preset activo (D-08d); cada uno
+          conserva su data-testid histórico. Los spans están elegidos para que
+          cada preset complete filas de 12 columnas. */}
       <div className="dash-grid">
         {/* Ventas hoy vs ayer por tienda (líneas + área, coherente con las sparklines) */}
-        <div className="dash-panel span-7" data-testid="dash-bars">
-          <h3>Ventas hoy vs ayer</h3>
-          <p className="dash-panel-sub">Facturación neta por tienda</p>
-          {(() => {
-            const stores = salesToday.data?.byStore ?? [];
-            // Escala a la facturación máxima (Hoy o Ayer) de cualquier tienda → la
-            // barra más alta llena el lienzo y las alturas comparan de un vistazo.
-            const top = Math.max(1, ...stores.flatMap((s) => [s.today, s.yesterday]));
-            // Si la tienda del filtro está en el gráfico, se resalta su columna y
-            // se atenúan las demás (mismo gesto que el hover).
-            const focused = !!storeId && stores.some((s) => s.storeId === storeId);
-            return (
-              <>
-                <div className={`dash-bars-chart${focused ? ' has-selection' : ''}`}>
-                  {stores.map((s, i) => {
-                    const tone = deltaTone(s.deltaPct);
-                    return (
-                      <div
-                        className={`dash-bars-group${s.storeId === storeId ? ' is-selected' : ''}`}
-                        key={s.storeId}
-                        style={{ '--i': i } as React.CSSProperties}
-                      >
-                        <div className="dash-bars-cap">
-                          <strong className="dash-bars-cap-val">{fmtEur(s.today)}</strong>
-                          <span className={`dash-bars-cap-delta dash-delta-${tone}`}>
-                            {fmtDelta(s.deltaPct)}
-                          </span>
+        {vis.has('dash-bars') && (
+          <div className="dash-panel span-7" data-testid="dash-bars">
+            <h3>Ventas hoy vs ayer</h3>
+            <p className="dash-panel-sub">Facturación neta por tienda</p>
+            {(() => {
+              const stores = salesToday.data?.byStore ?? [];
+              // Escala a la facturación máxima (Hoy o Ayer) de cualquier tienda → la
+              // barra más alta llena el lienzo y las alturas comparan de un vistazo.
+              const top = Math.max(1, ...stores.flatMap((s) => [s.today, s.yesterday]));
+              // Si la tienda del filtro está en el gráfico, se resalta su columna y
+              // se atenúan las demás (mismo gesto que el hover).
+              const focused = !!storeId && stores.some((s) => s.storeId === storeId);
+              return (
+                <>
+                  <div className={`dash-bars-chart${focused ? ' has-selection' : ''}`}>
+                    {stores.map((s, i) => {
+                      const tone = deltaTone(s.deltaPct);
+                      return (
+                        <div
+                          className={`dash-bars-group${s.storeId === storeId ? ' is-selected' : ''}`}
+                          key={s.storeId}
+                          style={{ '--i': i } as React.CSSProperties}
+                        >
+                          <div className="dash-bars-cap">
+                            <strong className="dash-bars-cap-val">{fmtEur(s.today)}</strong>
+                            <span className={`dash-bars-cap-delta dash-delta-${tone}`}>
+                              {fmtDelta(s.deltaPct)}
+                            </span>
+                          </div>
+                          <div className="dash-bars-pair">
+                            <span
+                              className="dash-bars-bar dash-bars-bar-prev"
+                              style={{ height: `${(s.yesterday / top) * 100}%` }}
+                            >
+                              <span className="dash-bars-bar-val">
+                                {fmtEurCompact(s.yesterday)}
+                              </span>
+                            </span>
+                            <span
+                              className="dash-bars-bar dash-bars-bar-now"
+                              style={{ height: `${(s.today / top) * 100}%` }}
+                            >
+                              <span className="dash-bars-bar-val">{fmtEurCompact(s.today)}</span>
+                            </span>
+                          </div>
+                          <span className="dash-bars-name">{s.storeName}</span>
                         </div>
-                        <div className="dash-bars-pair">
-                          <span
-                            className="dash-bars-bar dash-bars-bar-prev"
-                            style={{ height: `${(s.yesterday / top) * 100}%` }}
-                          >
-                            <span className="dash-bars-bar-val">{fmtEurCompact(s.yesterday)}</span>
-                          </span>
-                          <span
-                            className="dash-bars-bar dash-bars-bar-now"
-                            style={{ height: `${(s.today / top) * 100}%` }}
-                          >
-                            <span className="dash-bars-bar-val">{fmtEurCompact(s.today)}</span>
-                          </span>
-                        </div>
-                        <span className="dash-bars-name">{s.storeName}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="dash-bars-legend">
-                  <span>
-                    <span className="dash-legend-dot dash-swatch-prev" /> Ayer
-                  </span>
-                  <span>
-                    <span className="dash-legend-dot dash-swatch-now" /> Hoy
-                  </span>
-                </div>
-              </>
-            );
-          })()}
-        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="dash-bars-legend">
+                    <span>
+                      <span className="dash-legend-dot dash-swatch-prev" /> Ayer
+                    </span>
+                    <span>
+                      <span className="dash-legend-dot dash-swatch-now" /> Hoy
+                    </span>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
 
         {/* Ventas por familia (barras CSS horizontales) */}
-        <div className="dash-panel span-5" data-testid="dash-family">
-          <h3>Ventas por familia</h3>
-          <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]}</p>
-          {(() => {
-            const fams = byFamily.data ?? [];
-            const max = Math.max(1, ...fams.map((f) => f.total));
-            return (
-              <ul className="dash-family-list">
-                {fams.map((f, i) => {
-                  return (
-                    <li key={f.familyId ?? `none-${i}`} style={{ '--i': i } as React.CSSProperties}>
-                      <span className="dash-family-name">{f.familyName}</span>
+        {vis.has('dash-family') && (
+          <div className="dash-panel span-5" data-testid="dash-family">
+            <h3>Ventas por familia</h3>
+            <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]}</p>
+            {(() => {
+              const fams = byFamily.data ?? [];
+              const max = Math.max(1, ...fams.map((f) => f.total));
+              return (
+                <ul className="dash-family-list">
+                  {fams.map((f, i) => {
+                    return (
+                      <li
+                        key={f.familyId ?? `none-${i}`}
+                        style={{ '--i': i } as React.CSSProperties}
+                      >
+                        <span className="dash-family-name">{f.familyName}</span>
+                        <span className="dash-family-track">
+                          <span
+                            className="dash-family-fill"
+                            style={{ width: `${(f.total / max) * 100}%` }}
+                          >
+                            <span className="dash-family-pct">{fmtEur(f.total)}</span>
+                          </span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Panel de roturas: alertas activas (GET /stock/alerts) + venta perdida est. */}
+        {vis.has('dash-stockout') && (
+          <div className="dash-panel span-5" data-testid="dash-stockout">
+            <h3>Roturas de stock</h3>
+            <p className="dash-panel-sub">Productos en alerta ahora</p>
+            {(() => {
+              const items = alerts.data ?? [];
+              if (items.length === 0) {
+                return <p className="catalog-empty">Sin roturas ahora.</p>;
+              }
+              return (
+                <ul className="dash-stockout-list">
+                  {items.map((a) => (
+                    <li
+                      key={a.id}
+                      className={`dash-stockout-item lvl-${a.alertType === 'OUT_OF_STOCK' ? 'red' : 'yellow'}`}
+                    >
+                      <span className="dash-stockout-info">
+                        <span className="dash-stockout-name">{a.productName}</span>
+                        <span className="dash-stockout-store">{a.storeName}</span>
+                      </span>
+                      <span className="dash-stockout-tag">{ALERT_LABEL[a.alertType]}</span>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+            <div className="dash-stockout-foot">
+              <span>Venta perdida est.</span>
+              <strong className="dash-lost">{fmtEur(stockoutKpis.data?.estimatedLostSales)}</strong>
+            </div>
+          </div>
+        )}
+
+        {/* Rankings: cada preset fija su pestaña inicial (D-08 los reparte como
+            paneles distintos: top ventas / top margen / peor rotación); el
+            selector interno sigue permitiendo explorar. span-5 en Ventas para
+            completar la fila con "Ventas por hora". */}
+        {(['rank-sales', 'rank-margin', 'rank-rotation'] as const).some((id) => vis.has(id)) && (
+          <div
+            className={`dash-panel ${vis.has('rank-sales') ? 'span-5' : 'span-7'}`}
+            data-testid="dash-rankings"
+          >
+            <Rankings
+              key={preset.id}
+              data={rankings.data}
+              loading={rankings.isLoading}
+              initialTab={
+                vis.has('rank-sales') ? 'sales' : vis.has('rank-margin') ? 'margin' : 'rotation'
+              }
+            />
+          </div>
+        )}
+
+        {/* Ventas por hora (STAT-02): barras con el Chart reutilizable (IT-02) */}
+        {vis.has('dash-hour') && (
+          <div className="dash-panel span-7" data-testid="dash-hour">
+            <h3>Ventas por hora</h3>
+            <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]} · importe por franja</p>
+            <Chart
+              data={(byHour.data ?? []).map((h) => ({ label: `${h.hour}h`, value: h.revenue }))}
+              height={200}
+              formatValue={fmtEurCompact}
+              ariaLabel="Ventas por hora"
+            />
+          </div>
+        )}
+
+        {/* Ventas por vendedor (preset Equipo, D-08): facturación por empleado. */}
+        {vis.has('dash-sales-emp') && (
+          <div className="dash-panel span-7" data-testid="dash-sales-emp">
+            <h3>Ventas por vendedor</h3>
+            <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]} · facturación por empleado</p>
+            {(() => {
+              const emps = salesByEmp.data ?? [];
+              if (emps.length === 0) {
+                return <p className="catalog-empty">Sin ventas en el periodo.</p>;
+              }
+              const max = Math.max(1, ...emps.map((e) => e.total));
+              return (
+                <ul className="dash-family-list">
+                  {emps.map((e, i) => (
+                    <li key={e.userId} style={{ '--i': i } as React.CSSProperties}>
+                      <span className="dash-family-name">
+                        {e.userName}
+                        <span className="dash-rotation-arch"> · {e.salesCount} tickets</span>
+                      </span>
                       <span className="dash-family-track">
                         <span
                           className="dash-family-fill"
-                          style={{ width: `${(f.total / max) * 100}%` }}
+                          style={{ width: `${(e.total / max) * 100}%` }}
                         >
-                          <span className="dash-family-pct">{fmtEur(f.total)}</span>
+                          <span className="dash-family-pct">{fmtEur(e.total)}</span>
                         </span>
                       </span>
                     </li>
-                  );
-                })}
-              </ul>
-            );
-          })()}
-        </div>
-
-        {/* Panel de roturas: alertas activas (GET /stock/alerts) + venta perdida est. */}
-        <div className="dash-panel span-5" data-testid="dash-stockout">
-          <h3>Roturas de stock</h3>
-          <p className="dash-panel-sub">Productos en alerta ahora</p>
-          {(() => {
-            const items = alerts.data ?? [];
-            if (items.length === 0) {
-              return <p className="catalog-empty">Sin roturas ahora.</p>;
-            }
-            return (
-              <ul className="dash-stockout-list">
-                {items.map((a) => (
-                  <li
-                    key={a.id}
-                    className={`dash-stockout-item lvl-${a.alertType === 'OUT_OF_STOCK' ? 'red' : 'yellow'}`}
-                  >
-                    <span className="dash-stockout-info">
-                      <span className="dash-stockout-name">{a.productName}</span>
-                      <span className="dash-stockout-store">{a.storeName}</span>
-                    </span>
-                    <span className="dash-stockout-tag">{ALERT_LABEL[a.alertType]}</span>
-                  </li>
-                ))}
-              </ul>
-            );
-          })()}
-          <div className="dash-stockout-foot">
-            <span>Venta perdida est.</span>
-            <strong className="dash-lost">{fmtEur(stockoutKpis.data?.estimatedLostSales)}</strong>
+                  ))}
+                </ul>
+              );
+            })()}
           </div>
-        </div>
-
-        {/* Rankings */}
-        <div className="dash-panel span-7" data-testid="dash-rankings">
-          <Rankings data={rankings.data} loading={rankings.isLoading} />
-        </div>
-
-        {/* Ventas por hora (STAT-02): barras con el Chart reutilizable (IT-02) */}
-        <div className="dash-panel span-7" data-testid="dash-hour">
-          <h3>Ventas por hora</h3>
-          <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]} · importe por franja</p>
-          <Chart
-            data={(byHour.data ?? []).map((h) => ({ label: `${h.hour}h`, value: h.revenue }))}
-            height={200}
-            formatValue={fmtEurCompact}
-            ariaLabel="Ventas por hora"
-          />
-        </div>
+        )}
 
         {/* Descuento medio por empleado (STAT-04) */}
-        <div className="dash-panel span-5" data-testid="dash-discount-emp">
-          <h3>Descuento por empleado</h3>
-          <p className="dash-panel-sub">
-            {PERIOD_SUBTITLE[period]} · descuento voluntario medio (sin promociones)
-          </p>
-          {(() => {
-            const emps = discountByEmp.data ?? [];
-            const max = Math.max(0.0001, ...emps.map((e) => e.avgDiscountPct));
-            return (
-              <ul className="dash-family-list">
-                {emps.map((e, i) => (
-                  <li key={e.userId} style={{ '--i': i } as React.CSSProperties}>
-                    <span className="dash-family-name">{e.userName}</span>
-                    <span className="dash-family-track">
-                      <span
-                        className="dash-family-fill"
-                        style={{ width: `${(e.avgDiscountPct / max) * 100}%` }}
-                      >
-                        <span className="dash-family-pct">{fmtRate(e.avgDiscountPct)}</span>
+        {vis.has('dash-discount-emp') && (
+          <div className="dash-panel span-5" data-testid="dash-discount-emp">
+            <h3>Descuento por empleado</h3>
+            <p className="dash-panel-sub">
+              {PERIOD_SUBTITLE[period]} · descuento voluntario medio (sin promociones)
+            </p>
+            {(() => {
+              const emps = discountByEmp.data ?? [];
+              const max = Math.max(0.0001, ...emps.map((e) => e.avgDiscountPct));
+              return (
+                <ul className="dash-family-list">
+                  {emps.map((e, i) => (
+                    <li key={e.userId} style={{ '--i': i } as React.CSSProperties}>
+                      <span className="dash-family-name">{e.userName}</span>
+                      <span className="dash-family-track">
+                        <span
+                          className="dash-family-fill"
+                          style={{ width: `${(e.avgDiscountPct / max) * 100}%` }}
+                        >
+                          <span className="dash-family-pct">{fmtRate(e.avgDiscountPct)}</span>
+                        </span>
                       </span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            );
-          })()}
-        </div>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+          </div>
+        )}
 
         {/* Rotación (STAT-05/06): por defecto AGREGADA POR ARQUETIPO (familia) — más
             sólida estadísticamente; el conmutador baja al detalle por producto (IT-13). */}
-        <div className="dash-panel" data-testid="dash-rotation">
-          <div className="dash-toggle" role="tablist" aria-label="Nivel de rotación">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={rotationLevel === 'archetype'}
-              className={rotationLevel === 'archetype' ? 'is-active' : ''}
-              onClick={() => setRotationLevel('archetype')}
-              data-testid="rotation-by-archetype"
-            >
-              Arquetipo
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={rotationLevel === 'product'}
-              className={rotationLevel === 'product' ? 'is-active' : ''}
-              onClick={() => setRotationLevel('product')}
-              data-testid="rotation-by-product"
-            >
-              Producto
-            </button>
-          </div>
-          <h3>Rotación</h3>
-          <p className="dash-panel-sub">
-            {PERIOD_SUBTITLE[period]} ·{' '}
-            {rotationLevel === 'archetype'
-              ? 'por arquetipo · media/día sobre días con tienda abierta'
-              : 'por producto · unidades, días sin venta y evolución'}
-          </p>
-          <ul className="dash-rotation-list">
-            {(rotationLevel === 'archetype'
-              ? (archetypeRotation.data ?? []).map((a) => ({
-                  key: a.familyId ?? 'none',
-                  label: a.familyName,
-                  sub: `${a.productCount} productos · ${fmtNum(a.ventaMediaDiaria, 1)} ud/día`,
-                  units: a.units,
-                  days: a.daysSinceLastSale,
-                  trend: a.trend,
-                  isNew: false,
-                  archeAvg: null as number | null,
-                }))
-              : (rotation.data ?? []).map((p) => ({
-                  key: p.productId,
-                  label: p.name,
-                  sub: null as string | null,
-                  units: p.units,
-                  days: p.daysSinceLastSale,
-                  trend: p.trend,
-                  isNew: p.isNew,
-                  archeAvg: p.archetypeAvgDaily,
-                }))
-            ).map((r) => (
-              <li key={r.key} className="dash-rotation-row">
-                <span className="dash-rotation-name">
-                  {r.label}
-                  {r.sub && <span className="dash-rotation-arch"> · {r.sub}</span>}
-                  {r.isNew && <span className="dash-new-tag">nuevo</span>}
-                </span>
-                <span className="dash-rotation-units">{fmtNum(r.units, 0)} ud</span>
-                <span className="dash-rotation-days">
-                  {/* Producto nuevo: su día-a-día propio es poco fiable → mostramos la
+        {vis.has('dash-rotation') && (
+          <div className="dash-panel" data-testid="dash-rotation">
+            <div className="dash-toggle" role="tablist" aria-label="Nivel de rotación">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={rotationLevel === 'archetype'}
+                className={rotationLevel === 'archetype' ? 'is-active' : ''}
+                onClick={() => setRotationLevel('archetype')}
+                data-testid="rotation-by-archetype"
+              >
+                Arquetipo
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={rotationLevel === 'product'}
+                className={rotationLevel === 'product' ? 'is-active' : ''}
+                onClick={() => setRotationLevel('product')}
+                data-testid="rotation-by-product"
+              >
+                Producto
+              </button>
+            </div>
+            <h3>Rotación</h3>
+            <p className="dash-panel-sub">
+              {PERIOD_SUBTITLE[period]} ·{' '}
+              {rotationLevel === 'archetype'
+                ? 'por arquetipo · media/día sobre días con tienda abierta'
+                : 'por producto · unidades, días sin venta y evolución'}
+            </p>
+            <ul className="dash-rotation-list">
+              {(rotationLevel === 'archetype'
+                ? (archetypeRotation.data ?? []).map((a) => ({
+                    key: a.familyId ?? 'none',
+                    label: a.familyName,
+                    sub: `${a.productCount} productos · ${fmtNum(a.ventaMediaDiaria, 1)} ud/día`,
+                    units: a.units,
+                    days: a.daysSinceLastSale,
+                    trend: a.trend,
+                    isNew: false,
+                    archeAvg: null as number | null,
+                  }))
+                : (rotation.data ?? []).map((p) => ({
+                    key: p.productId,
+                    label: p.name,
+                    sub: null as string | null,
+                    units: p.units,
+                    days: p.daysSinceLastSale,
+                    trend: p.trend,
+                    isNew: p.isNew,
+                    archeAvg: p.archetypeAvgDaily,
+                  }))
+              ).map((r) => (
+                <li key={r.key} className="dash-rotation-row">
+                  <span className="dash-rotation-name">
+                    {r.label}
+                    {r.sub && <span className="dash-rotation-arch"> · {r.sub}</span>}
+                    {r.isNew && <span className="dash-new-tag">nuevo</span>}
+                  </span>
+                  <span className="dash-rotation-units">{fmtNum(r.units, 0)} ud</span>
+                  <span className="dash-rotation-days">
+                    {/* Producto nuevo: su día-a-día propio es poco fiable → mostramos la
                       referencia de su arquetipo (IT-15). */}
-                  {r.isNew && r.archeAvg != null
-                    ? `~${fmtNum(r.archeAvg, 1)}/día · arquetipo`
-                    : r.days == null
-                      ? 'sin ventas'
-                      : r.days <= 0
-                        ? 'hoy'
-                        : `hace ${r.days} d`}
-                </span>
-                <span className="dash-rotation-spark">
-                  {r.trend.length > 1 && (
-                    <Sparkline data={r.trend} tone="brand" height={28} ariaLabel="Evolución" />
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+                    {r.isNew && r.archeAvg != null
+                      ? `~${fmtNum(r.archeAvg, 1)}/día · arquetipo`
+                      : r.days == null
+                        ? 'sin ventas'
+                        : r.days <= 0
+                          ? 'hoy'
+                          : `hace ${r.days} d`}
+                  </span>
+                  <span className="dash-rotation-spark">
+                    {r.trend.length > 1 && (
+                      <Sparkline data={r.trend} tone="brand" height={28} ariaLabel="Evolución" />
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Fichajes de hoy (preset Equipo, D-08): jornadas registradas hoy. */}
+        {vis.has('dash-timeclock') && (
+          <div className="dash-panel" data-testid="dash-timeclock">
+            <h3>Fichajes de hoy</h3>
+            <p className="dash-panel-sub">
+              {storeId ? 'Tienda filtrada' : 'Todas las tiendas'} · entrada, salida y tiempo
+              trabajado
+            </p>
+            {(() => {
+              const rows = timeclockToday.data ?? [];
+              if (rows.length === 0) {
+                return <p className="catalog-empty">Nadie ha fichado hoy todavía.</p>;
+              }
+              return (
+                <ul className="dash-timeclock-list">
+                  {rows.map((r) => (
+                    <li key={`${r.userId}-${r.storeId}`} className="dash-timeclock-row">
+                      <span className="dash-timeclock-name">{r.userName}</span>
+                      <span className="dash-timeclock-store">{r.storeName}</span>
+                      <span className="dash-timeclock-times tabular-nums">
+                        {hhmm(r.firstIn)} → {r.lastOut ? hhmm(r.lastOut) : 'en curso'}
+                      </span>
+                      <span className="dash-timeclock-worked tabular-nums">
+                        {fmtMinutes(msToMin(r.workedMs))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+          </div>
+        )}
       </div>
     </section>
   );
 }
 
-// Editor de las KPI cards (IT-16): casilla de visibilidad + flechas de orden por card.
-function CardsEditor(props: {
-  defs: Array<{ id: string; label: string }>;
-  order: string[];
-  hidden: string[];
-  onChange: (next: { order: string[]; hidden: string[] }) => void;
+// Editor del preset activo (IT-16 → I-15): visibilidad de tarjetas Y paneles,
+// más flechas de orden para las tarjetas. Ocultar solo afecta a este preset.
+function LayoutEditor(props: {
+  cards: Array<{ id: string; label: string }>;
+  panels: Array<{ id: string; label: string }>;
+  hidden: ReadonlySet<string>;
+  onToggle: (id: string) => void;
+  onMoveCard: (i: number, dir: -1 | 1) => void;
 }) {
-  const labelOf = (id: string): string => props.defs.find((d) => d.id === id)?.label ?? id;
-  const move = (i: number, dir: -1 | 1): void => {
-    const j = i + dir;
-    if (j < 0 || j >= props.order.length) return;
-    const order = [...props.order];
-    const tmp = order[i]!;
-    order[i] = order[j]!;
-    order[j] = tmp;
-    props.onChange({ order, hidden: props.hidden });
-  };
-  const toggle = (id: string): void => {
-    const hidden = props.hidden.includes(id)
-      ? props.hidden.filter((h) => h !== id)
-      : [...props.hidden, id];
-    props.onChange({ order: props.order, hidden });
-  };
   return (
     <div className="dash-cards-editor" data-testid="dash-cards-editor">
-      <p className="dash-cards-editor-title">Tarjetas del panel</p>
+      <p className="dash-cards-editor-title">Tarjetas del preset</p>
+      {props.cards.length === 0 && <p className="catalog-empty">Este preset no tiene tarjetas.</p>}
       <ul>
-        {props.order.map((id, i) => (
-          <li key={id}>
+        {props.cards.map((c, i) => (
+          <li key={c.id}>
             <label>
               <input
                 type="checkbox"
-                checked={!props.hidden.includes(id)}
-                onChange={() => toggle(id)}
-                data-testid={`card-toggle-${id}`}
+                checked={!props.hidden.has(c.id)}
+                onChange={() => props.onToggle(c.id)}
+                data-testid={`card-toggle-${c.id}`}
               />
-              {labelOf(id)}
+              {c.label}
             </label>
             <span className="dash-cards-editor-move">
               <button
                 type="button"
-                onClick={() => move(i, -1)}
+                onClick={() => props.onMoveCard(i, -1)}
                 disabled={i === 0}
-                aria-label={`Subir ${labelOf(id)}`}
+                aria-label={`Subir ${c.label}`}
               >
                 ↑
               </button>
               <button
                 type="button"
-                onClick={() => move(i, 1)}
-                disabled={i === props.order.length - 1}
-                aria-label={`Bajar ${labelOf(id)}`}
+                onClick={() => props.onMoveCard(i, 1)}
+                disabled={i === props.cards.length - 1}
+                aria-label={`Bajar ${c.label}`}
               >
                 ↓
               </button>
             </span>
+          </li>
+        ))}
+      </ul>
+      <p className="dash-cards-editor-title">Paneles del preset</p>
+      <ul>
+        {props.panels.map((p) => (
+          <li key={p.id}>
+            <label>
+              <input
+                type="checkbox"
+                checked={!props.hidden.has(p.id)}
+                onChange={() => props.onToggle(p.id)}
+                data-testid={`panel-toggle-${p.id}`}
+              />
+              {p.label}
+            </label>
           </li>
         ))}
       </ul>
@@ -702,8 +966,10 @@ const RANK_OPTIONS = [
 function Rankings(props: {
   data: import('./lib/dashboard.js').ProductRankings | undefined;
   loading: boolean;
+  // Pestaña inicial según el preset (D-08): top ventas / top margen / peor rotación.
+  initialTab?: RankTab;
 }) {
-  const [tab, setTab] = useState<RankTab>('sales');
+  const [tab, setTab] = useState<RankTab>(props.initialTab ?? 'sales');
   if (props.loading) {
     return (
       <>

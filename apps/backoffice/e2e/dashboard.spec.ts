@@ -5,30 +5,98 @@ import { gotoApp } from './helpers.js';
 // Dashboard contra backend real (seed-demo). Los KPIs se calculan en vivo, así que
 // las aserciones son estructurales (cards visibles, valores no vacíos) en vez de
 // cifras exactas de fixture. Parte autenticada vía storageState (auth.setup.ts).
+// Desde I-15 el dashboard se organiza en 4 presets (D-08); cada test fija primero
+// el preset que necesita (la preferencia persiste entre tests y ejecuciones).
 test.beforeEach(async ({ page }) => {
   await gotoApp(page);
 });
 
-test('muestra las 7 KPI cards y el selector de periodo', async ({ page }) => {
+test('preset Ventas (default): sus 3 KPI cards y sus paneles (I-15, D-08d)', async ({ page }) => {
+  await page.getByTestId('dash-preset-ventas').click();
   await expect(page.getByTestId('dash-cards')).toBeVisible();
-  for (const id of [
-    'kpi-today',
-    'kpi-avg-ticket',
-    'kpi-upt',
-    'kpi-margin',
-    'kpi-profit',
-    'kpi-discount',
-    'kpi-return',
-  ]) {
+  for (const id of ['kpi-today', 'kpi-avg-ticket', 'kpi-upt']) {
     await expect(page.getByTestId(id)).toBeVisible();
   }
+  // El preset cambia el dashboard COMPLETO: las cards de Beneficio no están.
+  await expect(page.getByTestId('kpi-margin')).toHaveCount(0);
   // Valores en vivo: no vacíos (contienen algún dígito), sin asumir cifras exactas.
   await expect(page.getByTestId('kpi-today')).toContainText(/\d/);
-  await expect(page.getByTestId('kpi-profit')).toContainText(/\d/);
   await expect(page.getByTestId('dash-period')).toBeVisible();
+  // Paneles del preset: ventas hoy vs ayer · por hora · por familia · top ventas.
+  for (const id of ['dash-bars', 'dash-hour', 'dash-family', 'dash-rankings']) {
+    await expect(page.getByTestId(id)).toBeVisible();
+  }
+  await expect(page.getByTestId('rank-tabs')).toContainText('Top ventas');
+  await expect(page.getByTestId('dash-stockout')).toHaveCount(0);
+});
+
+test('cambiar de preset cambia KPIs y paneles en 1 clic y se recuerda (I-15)', async ({ page }) => {
+  // Beneficio: 4 cards de margen y el ranking arranca en Top margen.
+  await page.getByTestId('dash-preset-beneficio').click();
+  for (const id of ['kpi-margin', 'kpi-profit', 'kpi-discount', 'kpi-return']) {
+    await expect(page.getByTestId(id)).toBeVisible();
+  }
+  await expect(page.getByTestId('kpi-today')).toHaveCount(0);
+  await expect(page.getByTestId('rank-tabs')).toContainText('Top margen');
+  await expect(page.getByTestId('dash-discount-emp')).toBeVisible();
+  // Persiste tras recargar (preferencia dashboard.layout en /me/preferences).
+  await page.reload();
+  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByTestId('dash-preset-beneficio')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('kpi-margin')).toBeVisible();
+  // Restaurar el default para no condicionar otros tests.
+  await page.getByTestId('dash-preset-ventas').click();
+  await expect(page.getByTestId('kpi-today')).toBeVisible();
+});
+
+test('preset Inventario: roturas, rotación y peor rotación; Equipo: vendedores y fichajes (I-15)', async ({
+  page,
+}) => {
+  await page.getByTestId('dash-preset-inventario').click();
+  await expect(page.getByTestId('kpi-lost-sales')).toBeVisible();
+  await expect(page.getByTestId('dash-stockout')).toBeVisible();
+  await expect(page.getByTestId('dash-rotation')).toBeVisible();
+  await expect(page.getByTestId('rank-tabs')).toContainText('Peor rotación');
+  // Rotación por arquetipo por defecto (IT-13) con conmutador a producto.
+  await expect(page.getByTestId('rotation-by-archetype')).toHaveAttribute('aria-selected', 'true');
+  await page.getByTestId('rotation-by-product').click();
+  await expect(page.getByTestId('rotation-by-product')).toHaveAttribute('aria-selected', 'true');
+
+  await page.getByTestId('dash-preset-equipo').click();
+  // Equipo no define tarjetas KPI (D-08): solo paneles.
+  await expect(page.getByTestId('dash-cards')).toHaveCount(0);
+  await expect(page.getByTestId('dash-sales-emp')).toBeVisible();
+  await expect(page.getByTestId('dash-discount-emp')).toBeVisible();
+  await expect(page.getByTestId('dash-timeclock')).toBeVisible();
+  // El seed tiene ventas: el panel de vendedores trae al menos una fila con cifra.
+  await expect(page.getByTestId('dash-sales-emp')).toContainText(/\d/);
+  await page.getByTestId('dash-preset-ventas').click();
+});
+
+test('ocultar un panel solo afecta al preset activo y persiste (I-15, D-03)', async ({ page }) => {
+  await page.getByTestId('dash-preset-equipo').click();
+  await expect(page.getByTestId('dash-discount-emp')).toBeVisible();
+  await page.getByTestId('dash-customize').click();
+  await page.getByTestId('panel-toggle-dash-discount-emp').click();
+  await expect(page.getByTestId('dash-discount-emp')).toHaveCount(0);
+  // En Beneficio el mismo panel sigue visible (ocultos por preset).
+  await page.getByTestId('dash-preset-beneficio').click();
+  await expect(page.getByTestId('dash-discount-emp')).toBeVisible();
+  // De vuelta en Equipo sigue oculto, también tras recargar.
+  await page.getByTestId('dash-preset-equipo').click();
+  await expect(page.getByTestId('dash-discount-emp')).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByTestId('dash-discount-emp')).toHaveCount(0);
+  // Restaurar.
+  await page.getByTestId('dash-customize').click();
+  await page.getByTestId('panel-toggle-dash-discount-emp').click();
+  await expect(page.getByTestId('dash-discount-emp')).toBeVisible();
+  await page.getByTestId('dash-preset-ventas').click();
 });
 
 test('personalización: ocultar una KPI card la quita y persiste (IT-16)', async ({ page }) => {
+  await page.getByTestId('dash-preset-ventas').click();
   await expect(page.getByTestId('kpi-upt')).toBeVisible();
   await page.getByTestId('dash-customize').click();
   await expect(page.getByTestId('dash-cards-editor')).toBeVisible();
@@ -49,6 +117,7 @@ test('preferencias por defecto: el dashboard recuerda el periodo elegido (IT-16)
 }) => {
   // Espera a que carguen los KPIs antes de tocar el selector: si llega data a media
   // interacción, un re-render cierra el desplegable y la selección se pierde.
+  await page.getByTestId('dash-preset-ventas').click();
   await expect(page.getByTestId('kpi-today')).toContainText(/\d/);
   // Cambiar a Semana y comprobar que el periodo persiste tras recargar.
   await page.getByTestId('dash-period').click();
@@ -65,20 +134,4 @@ test('preferencias por defecto: el dashboard recuerda el periodo elegido (IT-16)
   await page.reload();
   await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
   await expect(page.getByTestId('dash-period')).toContainText('Hoy');
-});
-
-test('los paneles de gráficas y roturas se renderizan', async ({ page }) => {
-  await expect(page.getByTestId('dash-bars')).toBeVisible();
-  await expect(page.getByTestId('dash-family')).toBeVisible();
-  await expect(page.getByTestId('dash-stockout')).toBeVisible();
-  await expect(page.getByTestId('dash-rankings')).toBeVisible();
-  // Estadística avanzada: ventas por hora (IT-10), descuento por empleado (IT-11)
-  // y rotación de producto (IT-12).
-  await expect(page.getByTestId('dash-hour')).toBeVisible();
-  await expect(page.getByTestId('dash-discount-emp')).toBeVisible();
-  await expect(page.getByTestId('dash-rotation')).toBeVisible();
-  // Rotación por arquetipo por defecto (IT-13) con conmutador a producto.
-  await expect(page.getByTestId('rotation-by-archetype')).toHaveAttribute('aria-selected', 'true');
-  await page.getByTestId('rotation-by-product').click();
-  await expect(page.getByTestId('rotation-by-product')).toHaveAttribute('aria-selected', 'true');
 });
