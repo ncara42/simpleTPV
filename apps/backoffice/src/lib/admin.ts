@@ -6,6 +6,7 @@ import type {
   SaleSummary,
   Store,
   StoreInput,
+  StoreOpsInput,
   UpdateUserInput,
   User,
 } from '@simpletpv/auth';
@@ -62,6 +63,11 @@ export function createStore(input: StoreInput): Promise<Store> {
 
 export function updateStore(id: string, input: Partial<StoreInput>): Promise<Store> {
   return api.patch<Store>(`/stores/${id}`, input);
+}
+
+// Estado operativo manual persistido (I-09): verificada + incidencia.
+export function updateStoreOps(id: string, input: StoreOpsInput): Promise<Store> {
+  return api.patch<Store>(`/stores/${id}/ops`, input);
 }
 
 export function deleteStore(id: string): Promise<void> {

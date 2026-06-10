@@ -78,6 +78,30 @@ test('Tiendas: detalle, estado operativo y registro de fichajes (#100, #102)', a
   await expect(page.getByTestId('store-device-item')).toHaveCount(0);
 });
 
+test('Tiendas: el estado operativo PERSISTE tras recargar (I-09, E-02)', async ({ page }) => {
+  await navTo(page, 'stores');
+  await page.getByTestId('store-card').filter({ hasText: 'Sur' }).click();
+  await expect(page.getByTestId('store-ops')).toBeVisible();
+  // Estado inicial → marcar verificada + incidencia y guardar.
+  const wasVerified = await page.getByTestId('store-ops-verified').isChecked();
+  await page.getByTestId('store-ops-verified').setChecked(!wasVerified, { force: true });
+  await page.getByTestId('store-ops-incident').fill('e2e: incidencia de prueba');
+  await page.getByTestId('store-ops-save').click();
+  await expect(page.getByTestId('store-ops-save')).toContainText('Guardado', { timeout: 5000 });
+  // Recargar: el estado viene del backend, no de un useState (anti-test E-02).
+  await page.reload();
+  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
+  await navTo(page, 'stores');
+  await page.getByTestId('store-card').filter({ hasText: 'Sur' }).click();
+  await expect(page.getByTestId('store-ops-verified')).toBeChecked({ checked: !wasVerified });
+  await expect(page.getByTestId('store-ops-incident')).toHaveValue('e2e: incidencia de prueba');
+  // Restaurar para no contaminar el seed entre runs.
+  await page.getByTestId('store-ops-verified').setChecked(wasVerified, { force: true });
+  await page.getByTestId('store-ops-incident').fill('');
+  await page.getByTestId('store-ops-save').click();
+  await expect(page.getByTestId('store-ops-save')).toContainText('Guardado', { timeout: 5000 });
+});
+
 test('Tiendas: crear, editar y borrar persisten (I-10)', async ({ page }) => {
   await navTo(page, 'stores');
   // Crear una tienda temporal (código único por run).

@@ -93,6 +93,16 @@ export interface Store {
   address: string | null;
   code: string;
   active: boolean;
+  // Estado operativo manual persistido (D-10). El estado del dispositivo NO va
+  // aquí: se deriva de GET /devices (D-10b).
+  opsVerified: boolean;
+  opsIncident: string | null;
+  opsUpdatedAt: string | null;
+}
+
+export interface StoreOpsInput {
+  verified?: boolean;
+  incident?: string | null;
 }
 
 export interface StoreInput {

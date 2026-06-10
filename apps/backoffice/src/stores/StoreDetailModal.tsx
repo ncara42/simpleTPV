@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useConfirm } from '../components/ConfirmProvider.js';
 import { Modal } from '../components/Modal.js';
 import type { Store } from '../lib/admin.js';
+import { updateStoreOps } from '../lib/admin.js';
 import { createDevice, listDevices, revokeDevice } from '../lib/devices.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { fmtDayMonth } from '../lib/format.js';
@@ -54,6 +55,26 @@ export function StoreDetailModal({
     if (ok) revokeMut.mutate(id);
   };
   const anyPaired = devices.some((d) => d.authorized);
+
+  // Estado operativo MANUAL persistido (I-09/D-10): verificada + incidencia. El
+  // formulario edita en local y guarda vía PATCH /stores/:id/ops; la verdad
+  // vuelve por el invalidate de 'stores'.
+  const [opsVerified, setOpsVerified] = useState(store.opsVerified);
+  const [opsIncident, setOpsIncident] = useState(store.opsIncident ?? '');
+  // Baseline local: el prop `store` es un snapshot del listado y no se refresca
+  // dentro del modal; tras guardar, la baseline se sincroniza con lo enviado.
+  const [opsBaseline, setOpsBaseline] = useState({
+    verified: store.opsVerified,
+    incident: store.opsIncident ?? '',
+  });
+  const opsDirty = opsVerified !== opsBaseline.verified || opsIncident !== opsBaseline.incident;
+  const opsMut = useMutation({
+    mutationFn: () => updateStoreOps(store.id, { verified: opsVerified, incident: opsIncident }),
+    onSuccess: () => {
+      setOpsBaseline({ verified: opsVerified, incident: opsIncident });
+      void qc.invalidateQueries({ queryKey: ['stores'] });
+    },
+  });
   // Registro de fichajes real de la tienda (GET /time-clock/entries, lo más reciente
   // primero) → resumen de última apertura/cierre + drawer.
   const { data: log = [] } = useQuery({
@@ -107,6 +128,49 @@ export function StoreDetailModal({
               data-testid="store-log-open"
             >
               Ver registros
+            </button>
+          </section>
+
+          <section className="form-section" data-testid="store-ops">
+            <span className="form-section-title">Estado operativo</span>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={opsVerified}
+                onChange={(e) => setOpsVerified(e.target.checked)}
+                data-testid="store-ops-verified"
+              />
+              <span className="switch-track">
+                <span className="switch-thumb" />
+              </span>
+              <span className="switch-text">Tienda verificada</span>
+            </label>
+            <label>
+              Incidencias / notas
+              <input
+                placeholder="p. ej. persiana rota, obras en la calle…"
+                value={opsIncident}
+                onChange={(e) => setOpsIncident(e.target.value)}
+                data-testid="store-ops-incident"
+              />
+            </label>
+            {opsMut.isError && (
+              <p className="form-error">
+                {formErrorMessage(opsMut.error, 'No se pudo guardar el estado.')}
+              </p>
+            )}
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!opsDirty || opsMut.isPending}
+              onClick={() => opsMut.mutate()}
+              data-testid="store-ops-save"
+            >
+              {opsMut.isPending
+                ? 'Guardando…'
+                : opsMut.isSuccess && !opsDirty
+                  ? 'Guardado ✓'
+                  : 'Guardar estado'}
             </button>
           </section>
 
