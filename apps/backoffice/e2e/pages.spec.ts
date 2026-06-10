@@ -134,6 +134,8 @@ test('Usuarios: el foco no salta al teclear en el alta (regresión bug de foco)'
 test('Stock global muestra la tabla con filas por producto', async ({ page }) => {
   await navTo(page, 'stock');
   await expect(page.getByTestId('stock-table')).toBeVisible();
+  // El DataTable pinta skeleton mientras carga: esperar a la primera fila real.
+  await expect(page.getByTestId('stock-row').first()).toBeVisible();
   expect(await page.getByTestId('stock-row').count()).toBeGreaterThan(0);
 });
 
@@ -249,6 +251,7 @@ test('Familias: marcar un subnivel como arquetipo lo distingue y oculta "+ Subni
 test('Control horario muestra la tabla de fichajes con totales', async ({ page }) => {
   await navTo(page, 'timeclock');
   await expect(page.getByTestId('timeclock-table')).toBeVisible();
+  await expect(page.getByTestId('timeclock-row').first()).toBeVisible();
   expect(await page.getByTestId('timeclock-row').count()).toBeGreaterThan(0);
   await expect(page.getByTestId('timeclock-totals')).toContainText('jornada');
 });

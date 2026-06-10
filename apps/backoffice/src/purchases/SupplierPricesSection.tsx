@@ -1,9 +1,10 @@
-import { Select } from '@simpletpv/ui';
+import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
+import { useTableColumns } from '../components/useTableColumns.js';
 import { listFamilies } from '../lib/families.js';
 import { flattenTree } from '../lib/family-tree.js';
 import { formErrorMessage } from '../lib/form-error.js';
@@ -27,6 +28,7 @@ export function SupplierPricesSection() {
   const [familyId, setFamilyId] = useState('');
   const [importing, setImporting] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | undefined>(undefined);
   const [addProduct, setAddProduct] = useState('');
   const [addPrice, setAddPrice] = useState('');
 
@@ -36,11 +38,11 @@ export function SupplierPricesSection() {
     queryKey: ['products'],
     queryFn: () => listProducts(),
   });
-  const { data: prices = [] } = useQuery({
+  const { data: prices = [], isLoading: pricesLoading } = useQuery({
     queryKey: ['supplier-prices', supplierId || null],
     queryFn: () => listSupplierPrices(supplierId || undefined),
   });
-  const { data: comparison = [] } = useQuery({
+  const { data: comparison = [], isLoading: comparisonLoading } = useQuery({
     queryKey: ['supplier-comparison', familyId || null],
     queryFn: () => compareSupplierPrices(familyId || undefined),
     enabled: view === 'comparativa',
@@ -63,6 +65,92 @@ export function SupplierPricesSection() {
   const deleteMut = useMutation({ mutationFn: deleteSupplierPrice, onSuccess: invalidate });
 
   const supplierName = (id: string): string => suppliers.find((s) => s.id === id)?.name ?? '—';
+
+  // Columnas del DataTable de tarifas (D-12: Producto · SKU · Precio; Proveedor
+  // visible y ocultable). La acción Borrar va fija.
+  type PriceRow = (typeof prices)[number];
+  const dataColumns: DataTableColumn<PriceRow>[] = [
+    { key: 'product', header: 'Producto', sortable: true, render: (r) => r.productName },
+    { key: 'sku', header: 'SKU', render: (r) => <span className="muted">{r.sku ?? '—'}</span> },
+    {
+      key: 'supplier',
+      header: 'Proveedor',
+      render: (r) => <span className="muted">{r.supplierName}</span>,
+    },
+    {
+      key: 'price',
+      header: 'Precio compra',
+      align: 'right',
+      sortable: true,
+      render: (r) => fmtEur(r.price),
+    },
+  ];
+  const {
+    effectiveColumns,
+    editor: columnsEditor,
+    editorOpen: columnsEditorOpen,
+    toggleEditor: toggleColumnsEditor,
+  } = useTableColumns('table.supplier-prices.columns', dataColumns, {
+    editorTestId: 'sp-columns-editor',
+    title: 'Columnas de tarifas',
+  });
+  const deleteColumn: DataTableColumn<PriceRow> = {
+    key: 'actions',
+    header: '',
+    width: '6rem',
+    align: 'right',
+    render: (r) => (
+      <button
+        type="button"
+        className="link-btn danger"
+        onClick={() => deleteMut.mutate(r.id)}
+        data-testid="sp-delete"
+      >
+        Borrar
+      </button>
+    ),
+  };
+  const priceSorted = sort
+    ? [...prices].sort((a, b) => {
+        const dir = sort.dir === 'desc' ? -1 : 1;
+        if (sort.key === 'price') return (a.price - b.price) * dir;
+        return a.productName.localeCompare(b.productName) * dir;
+      })
+    : prices;
+
+  // Comparativa: tabla de presentación (sin configuración de columnas).
+  type CmpRow = (typeof comparison)[number];
+  const comparisonColumns: DataTableColumn<CmpRow>[] = [
+    { key: 'product', header: 'Producto', render: (r) => r.productName },
+    {
+      key: 'prices',
+      header: 'Precios por proveedor',
+      render: (row) => (
+        <span className="sp-price-chips">
+          {row.prices.map((pr) => (
+            <span
+              key={pr.supplierId}
+              className={`sp-price-chip${row.best?.supplierId === pr.supplierId ? ' is-best' : ''}`}
+            >
+              {pr.supplierName}: {fmtEur(pr.price)}
+            </span>
+          ))}
+        </span>
+      ),
+    },
+    {
+      key: 'best',
+      header: 'Mejor',
+      render: (row) =>
+        row.best ? (
+          <strong className="sp-best">
+            {supplierName(row.best.supplierId)} · {fmtEur(row.best.price)}
+          </strong>
+        ) : (
+          '—'
+        ),
+    },
+  ];
 
   return (
     <div className="table-panel">
@@ -139,85 +227,53 @@ export function SupplierPricesSection() {
       </div>
 
       {view === 'tarifas' ? (
-        prices.length === 0 ? (
-          <p className="catalog-empty" data-testid="sp-empty">
-            Sin tarifas. Añade una o impórtalas por CSV.
-          </p>
-        ) : (
-          <table className="catalog-table" data-testid="sp-table">
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>SKU</th>
-                {!supplierId && <th>Proveedor</th>}
-                <th>Precio compra</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {prices.map((p) => (
-                <tr key={p.id} data-testid="sp-row">
-                  <td>{p.productName}</td>
-                  <td className="muted">{p.sku ?? '—'}</td>
-                  {!supplierId && <td className="muted">{p.supplierName}</td>}
-                  <td>{fmtEur(p.price)}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="link-btn danger"
-                      onClick={() => deleteMut.mutate(p.id)}
-                      data-testid="sp-delete"
-                    >
-                      Borrar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )
-      ) : comparison.length === 0 ? (
-        <p className="catalog-empty" data-testid="sp-comparison-empty">
-          Sin tarifas que comparar para este arquetipo.
-        </p>
+        <>
+          <div className="config-bar">
+            <button
+              type="button"
+              className="config-trigger"
+              onClick={toggleColumnsEditor}
+              data-testid="sp-columns-toggle"
+              aria-expanded={columnsEditorOpen}
+            >
+              Columnas
+            </button>
+          </div>
+          {columnsEditor}
+          <DataTable
+            columns={[...effectiveColumns, deleteColumn]}
+            rows={priceSorted}
+            rowKey={(r) => r.id}
+            loading={pricesLoading}
+            {...(sort ? { sort } : {})}
+            onSortChange={(key) =>
+              setSort((cur) =>
+                cur?.key === key
+                  ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' }
+                  : { key, dir: 'asc' },
+              )
+            }
+            rowTestId="sp-row"
+            emptyState={
+              <span data-testid="sp-empty">Sin tarifas. Añade una o impórtalas por CSV.</span>
+            }
+            data-testid="sp-table"
+          />
+        </>
       ) : (
-        <table className="catalog-table" data-testid="sp-comparison-table">
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>Precios por proveedor</th>
-              <th>Mejor</th>
-            </tr>
-          </thead>
-          <tbody>
-            {comparison.map((row) => (
-              <tr key={row.productId} data-testid="sp-comparison-row">
-                <td>{row.productName}</td>
-                <td>
-                  <span className="sp-price-chips">
-                    {row.prices.map((pr) => (
-                      <span
-                        key={pr.supplierId}
-                        className={`sp-price-chip${row.best?.supplierId === pr.supplierId ? ' is-best' : ''}`}
-                      >
-                        {pr.supplierName}: {fmtEur(pr.price)}
-                      </span>
-                    ))}
-                  </span>
-                </td>
-                <td>
-                  {row.best ? (
-                    <strong className="sp-best">
-                      {supplierName(row.best.supplierId)} · {fmtEur(row.best.price)}
-                    </strong>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          columns={comparisonColumns}
+          rows={comparison}
+          rowKey={(r) => r.productId}
+          loading={comparisonLoading}
+          rowTestId="sp-comparison-row"
+          emptyState={
+            <span data-testid="sp-comparison-empty">
+              Sin tarifas que comparar para este arquetipo.
+            </span>
+          }
+          data-testid="sp-comparison-table"
+        />
       )}
 
       {adding && (
