@@ -16,7 +16,7 @@ test('Catálogo muestra los productos del seed', async ({ page }) => {
   await expect(page.getByTestId('catalog-count')).toContainText(/\d/);
 });
 
-test('Catálogo: selector jerárquico único de arquetipo (#97)', async ({ page }) => {
+test('Catálogo: selector jerárquico único de familia (#97)', async ({ page }) => {
   await page.getByTestId('nav-catalog').click();
   // El modal tiene un único selector jerárquico: se elige un nodo de cualquier
   // nivel (p. ej. la subfamilia "Índica") sin cascada familia → subfamilia.
@@ -164,20 +164,20 @@ test('Ventas: DataTable con filtros, paginación y agregados (#95 / IT-06)', asy
 
 test('Ventas: columnas configurables ocultan una columna y persiste (IT-16)', async ({ page }) => {
   await page.getByTestId('nav-sales').click();
-  await expect(page.getByRole('columnheader', { name: 'Arquetipo' })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Vendedor' })).toBeVisible();
   await page.getByTestId('sales-columns-toggle').click();
   await expect(page.getByTestId('sales-columns-editor')).toBeVisible();
-  await page.getByTestId('col-toggle-familyName').click();
-  await expect(page.getByRole('columnheader', { name: 'Arquetipo' })).toBeHidden();
+  await page.getByTestId('col-toggle-sellerName').click();
+  await expect(page.getByRole('columnheader', { name: 'Vendedor' })).toBeHidden();
   // Persiste tras recargar (preferencia en /me/preferences).
   await page.reload();
   await page.getByTestId('nav-sales').click();
   await expect(page.getByTestId('sales-table')).toBeVisible();
-  await expect(page.getByRole('columnheader', { name: 'Arquetipo' })).toBeHidden();
+  await expect(page.getByRole('columnheader', { name: 'Vendedor' })).toBeHidden();
   // Restaura la columna para no dejar la preferencia sucia.
   await page.getByTestId('sales-columns-toggle').click();
-  await page.getByTestId('col-toggle-familyName').click();
-  await expect(page.getByRole('columnheader', { name: 'Arquetipo' })).toBeVisible();
+  await page.getByTestId('col-toggle-sellerName').click();
+  await expect(page.getByRole('columnheader', { name: 'Vendedor' })).toBeVisible();
 });
 
 test('Compras y VeriFactu están retiradas del menú (#106)', async ({ page }) => {
@@ -215,7 +215,7 @@ test('Familias: árbol con raíz en orden y todas las filas (#98)', async ({ pag
   expect(await rows.count()).toBeGreaterThanOrEqual(10);
 });
 
-test('Arquetipos: marcar un subnivel como arquetipo lo distingue y oculta "+ Subnivel"', async ({
+test('Familias: marcar un subnivel como arquetipo lo distingue y oculta "+ Subnivel"', async ({
   page,
 }) => {
   await page.getByTestId('nav-families').click();

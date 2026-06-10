@@ -64,14 +64,13 @@ function toQuery(filters: Filters): SalesQueryInput {
 }
 
 function downloadCsv(items: SalesViewRow[]): void {
-  const header = 'Nº ticket,Hora,Tienda,Vendedor,Arquetipo,Importe (€),Método,Estado';
+  const header = 'Nº ticket,Hora,Tienda,Vendedor,Importe (€),Método,Estado';
   const rows = items.map((s) =>
     [
       s.ticketNumber,
       hour.format(new Date(s.createdAt)),
       s.storeName,
       s.sellerName,
-      s.familyName,
       Number(s.total).toFixed(2),
       PAYMENT_LABEL[s.paymentMethod] ?? s.paymentMethod,
       s.status === 'VOIDED' ? 'Anulada' : 'Completada',
@@ -90,7 +89,6 @@ const columns: DataTableColumn<SalesViewRow>[] = [
   { key: 'ticketNumber', header: 'Ticket' },
   { key: 'storeName', header: 'Tienda' },
   { key: 'sellerName', header: 'Vendedor' },
-  { key: 'familyName', header: 'Arquetipo' },
   {
     key: 'paymentMethod',
     header: 'Pago',
@@ -233,10 +231,10 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
           className="catalog-search"
           value={filters.familyId}
           onChange={(value) => setFilter({ familyId: value })}
-          ariaLabel="Filtrar por arquetipo"
+          ariaLabel="Filtrar por familia"
           data-testid="sales-family"
           options={[
-            { value: '', label: 'Todos los arquetipos' },
+            { value: '', label: 'Todas las familias' },
             ...familyOptions.map((f) => ({ value: f.id, label: f.name })),
           ]}
         />

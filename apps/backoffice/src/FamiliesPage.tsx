@@ -98,10 +98,9 @@ function FamilyRow({
   const selected = actions.selectedId === node.id;
   const hasChildren = node.children.length > 0;
   const collapsed = actions.collapsedIds.has(node.id);
-  // Destinos válidos para "Mover": cualquier arquetipo salvo el propio subárbol y
-  // el padre actual. La sangría del label indica la profundidad del destino.
-  // Destinos válidos: no el propio subárbol, no el padre actual, y NUNCA un
-  // arquetipo (un arquetipo solo contiene productos, no subniveles).
+  // Destinos válidos para "Mover": cualquier familia/subfamilia salvo el propio
+  // subárbol y el padre actual; NUNCA un arquetipo (solo contiene productos).
+  // La sangría del label indica la profundidad del destino.
   const moveOptions = flattenTree(actions.roots)
     .filter(
       (f) =>
@@ -190,7 +189,7 @@ function FamilyRow({
                 }}
                 triggerLabel="Mover"
                 options={[{ value: '', label: 'Mover bajo…' }, ...moveOptions]}
-                ariaLabel="Mover bajo otro arquetipo"
+                ariaLabel="Mover bajo otra familia"
                 data-testid="fam-move-to"
               />
             )}
@@ -383,7 +382,7 @@ export function FamiliesPage() {
     const n = countDescendants(node);
     if (n > 0) {
       const ok = await confirm({
-        title: 'Borrar arquetipo',
+        title: 'Borrar familia',
         message: `"${node.name}" tiene ${n} subnivel(es). ¿Borrar todo el grupo?`,
         confirmLabel: 'Borrar',
         danger: true,
@@ -423,7 +422,7 @@ export function FamiliesPage() {
     onDelete,
   };
 
-  usePageHeader('Arquetipos', 'Agrupa los productos en arquetipos y subniveles');
+  usePageHeader('Familias', 'Organiza el catálogo en familias, subfamilias y arquetipos');
 
   return (
     <section className="catalog">
@@ -433,7 +432,7 @@ export function FamiliesPage() {
             <span className="search-field">
               <input
                 className="catalog-search"
-                placeholder="Buscar arquetipo…"
+                placeholder="Buscar familia…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 data-testid="fam-search"
@@ -446,7 +445,7 @@ export function FamiliesPage() {
               ariaLabel="Filtrar por familia"
               data-testid="fam-filter"
               options={[
-                { value: '', label: 'Todos los arquetipos' },
+                { value: '', label: 'Todas las familias' },
                 ...view.map((r) => ({ value: r.id, label: r.name })),
               ]}
             />
@@ -458,7 +457,7 @@ export function FamiliesPage() {
             }
             data-testid="new-family"
           >
-            Nuevo arquetipo
+            Nueva familia
           </button>
         </div>
 
@@ -466,11 +465,11 @@ export function FamiliesPage() {
           <p className="catalog-empty">Cargando…</p>
         ) : view.length === 0 ? (
           <p className="catalog-empty" data-testid="families-empty">
-            Sin arquetipos. Crea el primero.
+            Sin familias. Crea la primera.
           </p>
         ) : filtered.length === 0 ? (
           <p className="catalog-empty" data-testid="fam-empty">
-            Sin arquetipos para la búsqueda.
+            Sin familias para la búsqueda.
           </p>
         ) : (
           <div className="fam-tree" data-testid="fam-tree" ref={treeRef}>
@@ -491,9 +490,7 @@ export function FamiliesPage() {
             saveMut.mutate(form);
           }}
         >
-          <h3>
-            {form.id ? 'Editar arquetipo' : form.parentId ? 'Nuevo subnivel' : 'Nuevo arquetipo'}
-          </h3>
+          <h3>{form.id ? 'Editar familia' : form.parentId ? 'Nuevo subnivel' : 'Nueva familia'}</h3>
           <label>
             Nombre
             <input

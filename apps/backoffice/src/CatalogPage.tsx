@@ -43,7 +43,7 @@ interface FormState {
   barcode: string | null;
   costPrice: number;
   taxRate: number;
-  // Arquetipo efectivo del producto: el id del nodo elegido en el selector
+  // Familia efectiva del producto: el id del nodo elegido en el selector
   // jerárquico, a cualquier profundidad (raíz, sub o sub-sub…).
   familyId: string | null;
 }
@@ -132,7 +132,7 @@ export function CatalogPage() {
     [families],
   );
 
-  // Filtro por arquetipo: el nodo elegido y todo su subárbol (la búsqueda por
+  // Filtro por familia: el nodo elegido y todo su subárbol (la búsqueda por
   // texto ya la resuelve listProducts).
   const filtered = useMemo<Product[]>(
     () =>
@@ -252,7 +252,7 @@ export function CatalogPage() {
               className="catalog-search"
               value={familyFilter}
               onChange={setFamilyFilter}
-              ariaLabel="Filtrar por arquetipo"
+              ariaLabel="Filtrar por familia"
               data-testid="catalog-family-filter"
               options={[{ value: '', label: 'Todos los arquetipos' }, ...archetypeOptions]}
             />
@@ -332,7 +332,7 @@ export function CatalogPage() {
               <tr>
                 <th className="users-select-col" aria-label="Selección" />
                 <th>Nombre</th>
-                <th>Arquetipo</th>
+                <th>Familia</th>
                 <th>SKU</th>
                 <th>Coste</th>
                 <th>Precio</th>
@@ -415,12 +415,12 @@ export function CatalogPage() {
             />
           </label>
           <label>
-            Arquetipo
+            Familia
             <Select
               value={form.familyId ?? ''}
               onChange={(value) => setForm({ ...form, familyId: value || null })}
               options={[{ value: '', label: '— Sin arquetipo —' }, ...archetypeOptions]}
-              ariaLabel="Arquetipo"
+              ariaLabel="Familia"
               data-testid="form-family"
             />
           </label>
