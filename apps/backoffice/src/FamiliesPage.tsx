@@ -34,7 +34,23 @@ interface FormState {
   isArchetype: boolean;
   // Si el nodo editado ya tiene subniveles, no puede convertirse en arquetipo.
   hasChildren: boolean;
+  color: string | null;
+  icon: string | null;
 }
+
+// Paleta acotada (colores del seed + acentos del design system) e iconos
+// curados (I-14): nada de pickers libres — consistencia visual garantizada.
+const FAMILY_COLORS = [
+  '#4CAF50',
+  '#FFC107',
+  '#E91E63',
+  '#607D8B',
+  '#0066cc',
+  '#9C27B0',
+  '#FF7043',
+  '#14b8a6',
+];
+const FAMILY_ICONS = ['🌿', '💧', '🧴', '🛍️', '🍬', '🔥', '🌸', '📦'];
 
 // Normaliza para buscar sin distinguir mayúsculas ni acentos.
 const norm = (s: string): string =>
@@ -294,8 +310,19 @@ export function FamiliesPage() {
   const saveMut = useMutation({
     mutationFn: (f: FormState) =>
       f.id
-        ? updateFamily(f.id, { name: f.name, isArchetype: f.isArchetype })
-        : createFamily({ name: f.name, parentId: f.parentId, isArchetype: f.isArchetype }),
+        ? updateFamily(f.id, {
+            name: f.name,
+            isArchetype: f.isArchetype,
+            color: f.color,
+            icon: f.icon,
+          })
+        : createFamily({
+            name: f.name,
+            parentId: f.parentId,
+            isArchetype: f.isArchetype,
+            color: f.color,
+            icon: f.icon,
+          }),
     onSuccess: (saved, f) => {
       setTree((prev) => {
         const base = prev ?? view;
@@ -304,7 +331,7 @@ export function FamiliesPage() {
           const rename = (list: FamilyNode[]): FamilyNode[] =>
             list.map((n) =>
               n.id === f.id
-                ? { ...n, name: f.name, isArchetype: f.isArchetype }
+                ? { ...n, name: f.name, isArchetype: f.isArchetype, color: f.color, icon: f.icon }
                 : { ...n, children: rename(n.children) },
             );
           return rename(base);
@@ -417,9 +444,18 @@ export function FamiliesPage() {
         parentId: node.parentId,
         isArchetype: node.isArchetype,
         hasChildren: node.children.length > 0,
+        color: node.color,
+        icon: node.icon,
       }),
     onAddChild: (parentId) =>
-      setForm({ name: '', parentId, isArchetype: false, hasChildren: false }),
+      setForm({
+        name: '',
+        parentId,
+        isArchetype: false,
+        hasChildren: false,
+        color: null,
+        icon: null,
+      }),
     onDelete,
   };
 
@@ -454,7 +490,14 @@ export function FamiliesPage() {
           <button
             className="btn-primary"
             onClick={() =>
-              setForm({ name: '', parentId: null, isArchetype: false, hasChildren: false })
+              setForm({
+                name: '',
+                parentId: null,
+                isArchetype: false,
+                hasChildren: false,
+                color: null,
+                icon: null,
+              })
             }
             data-testid="new-family"
           >
@@ -502,6 +545,38 @@ export function FamiliesPage() {
               data-testid="family-name"
             />
           </label>
+          <div className="fam-style-pickers">
+            <span className="form-section-title">Color</span>
+            <div className="fam-color-palette" role="radiogroup" aria-label="Color de la familia">
+              {FAMILY_COLORS.map((c) => (
+                <button
+                  type="button"
+                  key={c}
+                  className={`fam-color-swatch${form.color === c ? ' is-active' : ''}`}
+                  style={{ background: c }}
+                  aria-pressed={form.color === c}
+                  aria-label={`Color ${c}`}
+                  onClick={() => setForm({ ...form, color: form.color === c ? null : c })}
+                  data-testid={`family-color-${c.slice(1)}`}
+                />
+              ))}
+            </div>
+            <span className="form-section-title">Icono</span>
+            <div className="fam-icon-palette" role="radiogroup" aria-label="Icono de la familia">
+              {FAMILY_ICONS.map((i) => (
+                <button
+                  type="button"
+                  key={i}
+                  className={`fam-icon-swatch${form.icon === i ? ' is-active' : ''}`}
+                  aria-pressed={form.icon === i}
+                  onClick={() => setForm({ ...form, icon: form.icon === i ? null : i })}
+                  data-testid="family-icon-option"
+                >
+                  {i}
+                </button>
+              ))}
+            </div>
+          </div>
           <label className="fam-archetype-toggle">
             <input
               type="checkbox"

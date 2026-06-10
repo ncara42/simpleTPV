@@ -2856,3 +2856,47 @@
   color: var(--tpv-teal-700, #0f766e);
   font-weight: 600;
 }
+
+/* ── Paleta de color e icono del form de familia (I-14) ── */
+.fam-style-pickers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.fam-color-palette,
+.fam-icon-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.fam-color-swatch {
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.1s;
+}
+.fam-color-swatch:hover {
+  transform: scale(1.12);
+}
+.fam-color-swatch.is-active {
+  border-color: var(--ui-text);
+  box-shadow: 0 0 0 2px var(--ui-surface);
+}
+.fam-icon-swatch {
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+.fam-icon-swatch.is-active {
+  border-color: var(--tpv-teal-500, #14b8a6);
+  background: var(--ui-success-soft, #e8f6f2);
+}
