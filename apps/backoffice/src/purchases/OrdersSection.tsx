@@ -11,18 +11,13 @@ import {
 } from '../lib/purchases.js';
 import { STATUS_LABEL } from './labels.js';
 
-export function OrdersSection({
-  supplierId,
-}: {
-  // Vista detalle de proveedor (I-18/D-07): solo sus pedidos.
-  supplierId?: string;
-} = {}) {
+export function OrdersSection() {
   const qc = useQueryClient();
   const [detailId, setDetailId] = useState<string | null>(null);
 
   const { data: orders = [], isLoading } = useQuery({
-    queryKey: ['purchase-orders', supplierId ?? null],
-    queryFn: () => listPurchaseOrders(undefined, supplierId),
+    queryKey: ['purchase-orders'],
+    queryFn: () => listPurchaseOrders(),
     placeholderData: keepPreviousData,
   });
   const confirmMut = useMutation({
@@ -35,11 +30,7 @@ export function OrdersSection({
   }
   return (
     <>
-      {orders.length === 0 && supplierId ? (
-        <p className="catalog-empty" data-testid="orders-empty">
-          Este proveedor no tiene pedidos de compra.
-        </p>
-      ) : orders.length === 0 ? (
+      {orders.length === 0 ? (
         <div className="purchases-empty" data-testid="orders-empty">
           <span className="purchases-empty-icon" aria-hidden="true">
             <svg

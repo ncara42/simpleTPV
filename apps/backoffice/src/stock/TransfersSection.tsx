@@ -1,5 +1,5 @@
 import type { ImportResult } from '@simpletpv/auth';
-import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Select } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -7,7 +7,6 @@ import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
 import { listStores } from '../lib/admin.js';
 import { parseCsvRows } from '../lib/csv.js';
-import { formErrorMessage } from '../lib/form-error.js';
 import { listProducts } from '../lib/products.js';
 import { createTransfer, listTransfers, sendTransfer } from '../lib/stock.js';
 import { dt, STATUS_LABEL } from './labels.js';
@@ -35,42 +34,6 @@ export function TransfersSection() {
     },
   });
 
-  type TransferRow = (typeof transfers)[number];
-  const transferColumns: DataTableColumn<TransferRow>[] = [
-    {
-      key: 'date',
-      header: 'Fecha',
-      render: (t) => <span className="muted">{dt.format(new Date(t.createdAt))}</span>,
-    },
-    { key: 'lines', header: 'Líneas', render: (t) => t.lines.length },
-    {
-      key: 'status',
-      header: 'Estado',
-      render: (t) => (
-        <span className="status-badge" data-testid="transfer-status">
-          {STATUS_LABEL[t.status] ?? t.status}
-        </span>
-      ),
-    },
-    {
-      key: 'actions',
-      header: '',
-      align: 'right',
-      render: (t) =>
-        t.status === 'DRAFT' ? (
-          <button
-            type="button"
-            className="link-btn"
-            disabled={sendMutation.isPending}
-            onClick={() => sendMutation.mutate(t.id)}
-            data-testid="transfer-send"
-          >
-            Enviar
-          </button>
-        ) : null,
-    },
-  ];
-
   return (
     <>
       <div className="table-panel">
@@ -84,15 +47,50 @@ export function TransfersSection() {
             Nuevo traspaso
           </button>
         </div>
-        <DataTable
-          columns={transferColumns}
-          rows={transfers}
-          rowKey={(t) => t.id}
-          loading={isLoading}
-          rowTestId="transfer-row"
-          emptyState={<span data-testid="transfers-empty">Sin traspasos.</span>}
-          data-testid="transfers-table"
-        />
+        {isLoading ? (
+          <p className="catalog-empty">Cargando…</p>
+        ) : transfers.length === 0 ? (
+          <p className="catalog-empty" data-testid="transfers-empty">
+            Sin traspasos.
+          </p>
+        ) : (
+          <table className="catalog-table" data-testid="transfers-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Líneas</th>
+                <th>Estado</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {transfers.map((t) => (
+                <tr key={t.id} data-testid="transfer-row">
+                  <td className="muted">{dt.format(new Date(t.createdAt))}</td>
+                  <td>{t.lines.length}</td>
+                  <td>
+                    <span className="status-badge" data-testid="transfer-status">
+                      {STATUS_LABEL[t.status] ?? t.status}
+                    </span>
+                  </td>
+                  <td>
+                    {t.status === 'DRAFT' && (
+                      <button
+                        type="button"
+                        className="link-btn"
+                        disabled={sendMutation.isPending}
+                        onClick={() => sendMutation.mutate(t.id)}
+                        data-testid="transfer-send"
+                      >
+                        Enviar
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {creating && (
@@ -311,11 +309,7 @@ function CreateTransferModal({
           )}
         </section>
       </div>
-      {mutation.isError && (
-        <p className="form-error">
-          {formErrorMessage(mutation.error, 'No se pudo crear el traspaso.')}
-        </p>
-      )}
+      {mutation.isError && <p className="form-error">No se pudo crear el traspaso.</p>}
       <div className="modal-foot modal-foot-actions">
         <button type="button" onClick={onClose}>
           Cancelar

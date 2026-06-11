@@ -1,8 +1,6 @@
 import type { ImportResult } from '@simpletpv/auth';
 import { type ReactNode, useId, useRef, useState } from 'react';
 
-import { formErrorMessage } from '../lib/form-error.js';
-
 interface Props {
   // Columnas esperadas en la cabecera (para validar y construir la plantilla).
   columns: string[];
@@ -70,13 +68,8 @@ export function CsvDropzone({
       const res = await onImport(csv);
       setResult(res);
       if (res.inserted > 0) onImported?.();
-    } catch (e) {
-      setError(
-        formErrorMessage(
-          e,
-          'No se pudo importar el archivo. Comprueba el formato e inténtalo de nuevo.',
-        ),
-      );
+    } catch {
+      setError('No se pudo importar el archivo. Comprueba el formato e inténtalo de nuevo.');
     } finally {
       setLoading(false);
     }

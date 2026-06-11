@@ -1,10 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
-import { useConfirm } from './components/ConfirmProvider.js';
-import { createStore, deleteStore, listStores, type Store, updateStore } from './lib/admin.js';
+import { createStore, deleteStore, listStores, type Store } from './lib/admin.js';
 import { getSalesToday } from './lib/dashboard.js';
-import { formErrorMessage } from './lib/form-error.js';
 import { usePageHeader } from './lib/pageHeader.js';
 import { StoreCard } from './stores/StoreCard.js';
 import { StoreDetailModal } from './stores/StoreDetailModal.js';
@@ -12,6 +10,15 @@ import { type StoreForm, StoreFormModal } from './stores/StoreFormModal.js';
 import { StorePricesModal } from './stores/StorePricesModal.js';
 
 export type StoreSalesPeriod = 'today' | 'week' | 'month';
+
+export interface StoreOps {
+  open: boolean;
+  openedBy: string | null;
+  openedSince: string | null;
+  deviceType: 'ip' | 'token';
+  deviceValue: string;
+  deviceVerified: boolean;
+}
 
 const SALES_LABEL: Record<StoreSalesPeriod, string> = {
   today: 'Ventas de hoy',
@@ -25,10 +32,9 @@ export function StoresPage({
   onOpenStoreView: (view: 'stock' | 'sales', storeId: string) => void;
 }) {
   const qc = useQueryClient();
-  const confirm = useConfirm();
   const [creating, setCreating] = useState(false);
-  const [editing, setEditing] = useState<Store | null>(null);
   const period: StoreSalesPeriod = 'today';
+  const [ops, setOps] = useState<Record<string, StoreOps>>({});
   const [detail, setDetail] = useState<Store | null>(null);
   const [pricesFor, setPricesFor] = useState<Store | null>(null);
 
@@ -59,36 +65,11 @@ export function StoresPage({
       invalidate();
     },
   });
-  // Edición y borrado REALES (I-10): el backend ya tenía PATCH/DELETE.
-  const updateMut = useMutation({
-    mutationFn: ({ id, form }: { id: string; form: StoreForm }) =>
-      updateStore(id, {
-        name: form.name,
-        code: form.code,
-        ...(form.address ? { address: form.address } : { address: null }),
-      }),
-    onSuccess: () => {
-      setEditing(null);
-      setDetail(null);
-      invalidate();
-    },
-  });
-  const deleteMut = useMutation({
-    mutationFn: (id: string) => deleteStore(id),
-    onSuccess: () => {
-      setDetail(null);
-      invalidate();
-    },
-  });
-  const askDelete = async (s: Store): Promise<void> => {
-    const ok = await confirm({
-      title: 'Borrar tienda',
-      message: `¿Borrar la tienda "${s.name}"? Si tiene ventas o stock asociados no se podrá.`,
-      confirmLabel: 'Borrar',
-      danger: true,
-    });
-    if (ok) deleteMut.mutate(s.id);
-  };
+  void deleteStore;
+
+  const opsOf = (id: string): StoreOps | undefined => ops[id];
+  const patchOps = (id: string, patch: Partial<StoreOps>): void =>
+    setOps((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
 
   // Orden por ventas de hoy (desc); empate o sin ventas → por nombre estable.
   const visibleStores = useMemo(
@@ -144,31 +125,16 @@ export function StoresPage({
           onClose={() => setCreating(false)}
           onSubmit={(f) => createMut.mutate(f)}
           pending={createMut.isPending}
-          error={createMut.isError ? formErrorMessage(createMut.error, 'No se pudo crear.') : null}
+          error={createMut.isError}
         />
       )}
 
       {detail && (
         <StoreDetailModal
           store={detail}
-          onEdit={() => setEditing(detail)}
-          onDelete={() => void askDelete(detail)}
-          deleteError={
-            deleteMut.isError ? formErrorMessage(deleteMut.error, 'No se pudo borrar.') : null
-          }
+          ops={opsOf(detail.id)}
+          onPatchOps={(patch) => patchOps(detail.id, patch)}
           onClose={() => setDetail(null)}
-        />
-      )}
-
-      {editing && (
-        <StoreFormModal
-          initial={{ name: editing.name, code: editing.code, address: editing.address ?? '' }}
-          onClose={() => setEditing(null)}
-          onSubmit={(f) => updateMut.mutate({ id: editing.id, form: f })}
-          pending={updateMut.isPending}
-          error={
-            updateMut.isError ? formErrorMessage(updateMut.error, 'No se pudo guardar.') : null
-          }
         />
       )}
 

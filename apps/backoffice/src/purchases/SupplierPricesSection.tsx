@@ -1,13 +1,10 @@
-import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
-import { useTableColumns } from '../components/useTableColumns.js';
 import { listFamilies } from '../lib/families.js';
-import { flattenTree } from '../lib/family-tree.js';
-import { formErrorMessage } from '../lib/form-error.js';
 import { fmtEur } from '../lib/format.js';
 import { listProducts } from '../lib/products.js';
 import { listSuppliers } from '../lib/purchases.js';
@@ -21,16 +18,13 @@ import {
 
 // Tarifas de compra por proveedor (P1-B): alta/edición de precio por producto,
 // import CSV por SKU y comparativa de precios entre proveedores por arquetipo.
-// Con `fixedSupplierId` (vista detalle de proveedor, I-18/D-07) se fija el
-// proveedor y se ocultan el selector y la comparativa (que es cross-proveedor).
-export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: string } = {}) {
+export function SupplierPricesSection() {
   const qc = useQueryClient();
   const [view, setView] = useState<'tarifas' | 'comparativa'>('tarifas');
-  const [supplierId, setSupplierId] = useState(fixedSupplierId ?? '');
+  const [supplierId, setSupplierId] = useState('');
   const [familyId, setFamilyId] = useState('');
   const [importing, setImporting] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | undefined>(undefined);
   const [addProduct, setAddProduct] = useState('');
   const [addPrice, setAddPrice] = useState('');
 
@@ -40,11 +34,11 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
     queryKey: ['products'],
     queryFn: () => listProducts(),
   });
-  const { data: prices = [], isLoading: pricesLoading } = useQuery({
+  const { data: prices = [] } = useQuery({
     queryKey: ['supplier-prices', supplierId || null],
     queryFn: () => listSupplierPrices(supplierId || undefined),
   });
-  const { data: comparison = [], isLoading: comparisonLoading } = useQuery({
+  const { data: comparison = [] } = useQuery({
     queryKey: ['supplier-comparison', familyId || null],
     queryFn: () => compareSupplierPrices(familyId || undefined),
     enabled: view === 'comparativa',
@@ -68,128 +62,38 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
 
   const supplierName = (id: string): string => suppliers.find((s) => s.id === id)?.name ?? '—';
 
-  // Columnas del DataTable de tarifas (D-12: Producto · SKU · Precio; Proveedor
-  // visible y ocultable). La acción Borrar va fija.
-  type PriceRow = (typeof prices)[number];
-  const dataColumns: DataTableColumn<PriceRow>[] = [
-    { key: 'product', header: 'Producto', sortable: true, render: (r) => r.productName },
-    { key: 'sku', header: 'SKU', render: (r) => <span className="muted">{r.sku ?? '—'}</span> },
-    {
-      key: 'supplier',
-      header: 'Proveedor',
-      render: (r) => <span className="muted">{r.supplierName}</span>,
-    },
-    {
-      key: 'price',
-      header: 'Precio compra',
-      align: 'right',
-      sortable: true,
-      render: (r) => fmtEur(r.price),
-    },
-  ];
-  const {
-    effectiveColumns,
-    editor: columnsEditor,
-    editorOpen: columnsEditorOpen,
-    toggleEditor: toggleColumnsEditor,
-  } = useTableColumns('table.supplier-prices.columns', dataColumns, {
-    editorTestId: 'sp-columns-editor',
-    title: 'Columnas de tarifas',
-  });
-  const deleteColumn: DataTableColumn<PriceRow> = {
-    key: 'actions',
-    header: '',
-    width: '6rem',
-    align: 'right',
-    render: (r) => (
-      <button
-        type="button"
-        className="link-btn danger"
-        onClick={() => deleteMut.mutate(r.id)}
-        data-testid="sp-delete"
-      >
-        Borrar
-      </button>
-    ),
-  };
-  const priceSorted = sort
-    ? [...prices].sort((a, b) => {
-        const dir = sort.dir === 'desc' ? -1 : 1;
-        if (sort.key === 'price') return (a.price - b.price) * dir;
-        return a.productName.localeCompare(b.productName) * dir;
-      })
-    : prices;
-
-  // Comparativa: tabla de presentación (sin configuración de columnas).
-  type CmpRow = (typeof comparison)[number];
-  const comparisonColumns: DataTableColumn<CmpRow>[] = [
-    { key: 'product', header: 'Producto', render: (r) => r.productName },
-    {
-      key: 'prices',
-      header: 'Precios por proveedor',
-      render: (row) => (
-        <span className="sp-price-chips">
-          {row.prices.map((pr) => (
-            <span
-              key={pr.supplierId}
-              className={`sp-price-chip${row.best?.supplierId === pr.supplierId ? ' is-best' : ''}`}
-            >
-              {pr.supplierName}: {fmtEur(pr.price)}
-            </span>
-          ))}
-        </span>
-      ),
-    },
-    {
-      key: 'best',
-      header: 'Mejor',
-      render: (row) =>
-        row.best ? (
-          <strong className="sp-best">
-            {supplierName(row.best.supplierId)} · {fmtEur(row.best.price)}
-          </strong>
-        ) : (
-          '—'
-        ),
-    },
-  ];
-
   return (
     <div className="table-panel">
       <div className="table-toolbar">
-        {!fixedSupplierId && (
-          <nav className="bo-tabs" data-testid="sp-view-tabs">
-            <button
-              className={`bo-tab ${view === 'tarifas' ? 'active' : ''}`}
-              onClick={() => setView('tarifas')}
-              data-testid="sp-view-tarifas"
-            >
-              Tarifas por proveedor
-            </button>
-            <button
-              className={`bo-tab ${view === 'comparativa' ? 'active' : ''}`}
-              onClick={() => setView('comparativa')}
-              data-testid="sp-view-comparativa"
-            >
-              Comparativa
-            </button>
-          </nav>
-        )}
+        <nav className="bo-tabs" data-testid="sp-view-tabs">
+          <button
+            className={`bo-tab ${view === 'tarifas' ? 'active' : ''}`}
+            onClick={() => setView('tarifas')}
+            data-testid="sp-view-tarifas"
+          >
+            Tarifas por proveedor
+          </button>
+          <button
+            className={`bo-tab ${view === 'comparativa' ? 'active' : ''}`}
+            onClick={() => setView('comparativa')}
+            data-testid="sp-view-comparativa"
+          >
+            Comparativa
+          </button>
+        </nav>
         {view === 'tarifas' ? (
           <div className="sales-filters">
-            {!fixedSupplierId && (
-              <Select
-                className="catalog-search"
-                value={supplierId}
-                onChange={setSupplierId}
-                ariaLabel="Proveedor"
-                data-testid="sp-supplier"
-                options={[
-                  { value: '', label: 'Todos los proveedores' },
-                  ...suppliers.map((s) => ({ value: s.id, label: s.name })),
-                ]}
-              />
-            )}
+            <Select
+              className="catalog-search"
+              value={supplierId}
+              onChange={setSupplierId}
+              ariaLabel="Proveedor"
+              data-testid="sp-supplier"
+              options={[
+                { value: '', label: 'Todos los proveedores' },
+                ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+            />
             <button
               type="button"
               className="users-sel-btn"
@@ -220,12 +124,7 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
               data-testid="sp-family"
               options={[
                 { value: '', label: 'Todos los arquetipos' },
-                // Solo nodos ARQUETIPO: la comparativa agrupa productos casi
-                // idénticos; filtrar por una familia raíz no casa con el árbol
-                // canónico (los comparables cuelgan de arquetipos hoja).
-                ...flattenTree(families)
-                  .filter((f) => f.node.isArchetype)
-                  .map((f) => ({ value: f.node.id, label: f.node.name })),
+                ...families.map((f) => ({ value: f.id, label: f.name })),
               ]}
             />
           </div>
@@ -233,53 +132,85 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
       </div>
 
       {view === 'tarifas' ? (
-        <>
-          <div className="config-bar">
-            <button
-              type="button"
-              className="config-trigger"
-              onClick={toggleColumnsEditor}
-              data-testid="sp-columns-toggle"
-              aria-expanded={columnsEditorOpen}
-            >
-              Columnas
-            </button>
-          </div>
-          {columnsEditor}
-          <DataTable
-            columns={[...effectiveColumns, deleteColumn]}
-            rows={priceSorted}
-            rowKey={(r) => r.id}
-            loading={pricesLoading}
-            {...(sort ? { sort } : {})}
-            onSortChange={(key) =>
-              setSort((cur) =>
-                cur?.key === key
-                  ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' }
-                  : { key, dir: 'asc' },
-              )
-            }
-            rowTestId="sp-row"
-            emptyState={
-              <span data-testid="sp-empty">Sin tarifas. Añade una o impórtalas por CSV.</span>
-            }
-            data-testid="sp-table"
-          />
-        </>
+        prices.length === 0 ? (
+          <p className="catalog-empty" data-testid="sp-empty">
+            Sin tarifas. Añade una o impórtalas por CSV.
+          </p>
+        ) : (
+          <table className="catalog-table" data-testid="sp-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>SKU</th>
+                {!supplierId && <th>Proveedor</th>}
+                <th>Precio compra</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {prices.map((p) => (
+                <tr key={p.id} data-testid="sp-row">
+                  <td>{p.productName}</td>
+                  <td className="muted">{p.sku ?? '—'}</td>
+                  {!supplierId && <td className="muted">{p.supplierName}</td>}
+                  <td>{fmtEur(p.price)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="link-btn danger"
+                      onClick={() => deleteMut.mutate(p.id)}
+                      data-testid="sp-delete"
+                    >
+                      Borrar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      ) : comparison.length === 0 ? (
+        <p className="catalog-empty" data-testid="sp-comparison-empty">
+          Sin tarifas que comparar para este arquetipo.
+        </p>
       ) : (
-        <DataTable
-          columns={comparisonColumns}
-          rows={comparison}
-          rowKey={(r) => r.productId}
-          loading={comparisonLoading}
-          rowTestId="sp-comparison-row"
-          emptyState={
-            <span data-testid="sp-comparison-empty">
-              Sin tarifas que comparar para este arquetipo.
-            </span>
-          }
-          data-testid="sp-comparison-table"
-        />
+        <table className="catalog-table" data-testid="sp-comparison-table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Precios por proveedor</th>
+              <th>Mejor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {comparison.map((row) => (
+              <tr key={row.productId} data-testid="sp-comparison-row">
+                <td>{row.productName}</td>
+                <td>
+                  <span className="sp-price-chips">
+                    {row.prices.map((pr) => (
+                      <span
+                        key={pr.supplierId}
+                        className={`sp-price-chip${row.best?.supplierId === pr.supplierId ? ' is-best' : ''}`}
+                      >
+                        {pr.supplierName}: {fmtEur(pr.price)}
+                      </span>
+                    ))}
+                  </span>
+                </td>
+                <td>
+                  {row.best ? (
+                    <strong className="sp-best">
+                      {supplierName(row.best.supplierId)} · {fmtEur(row.best.price)}
+                    </strong>
+                  ) : (
+                    '—'
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
 
       {adding && (
@@ -323,11 +254,7 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
               data-testid="sp-add-price"
             />
           </label>
-          {upsertMut.isError && (
-            <p className="form-error">
-              {formErrorMessage(upsertMut.error, 'No se pudo guardar la tarifa.')}
-            </p>
-          )}
+          {upsertMut.isError && <p className="form-error">No se pudo guardar la tarifa.</p>}
           <div className="modal-foot">
             <button type="button" onClick={() => setAdding(false)}>
               Cancelar

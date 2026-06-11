@@ -34,10 +34,10 @@ describe('PurchasesController', () => {
     expect(service.create).toHaveBeenCalledWith(dto, 'user-1');
   });
 
-  it('GET /purchase-orders pasa los filtros de estado y proveedor (I-18)', async () => {
+  it('GET /purchase-orders pasa el filtro de estado', async () => {
     const { controller, service } = makeController();
-    await controller.list({ status: 'DRAFT', supplierId: 'sup-1' });
-    expect(service.list).toHaveBeenCalledWith('DRAFT', 'sup-1');
+    await controller.list('DRAFT');
+    expect(service.list).toHaveBeenCalledWith('DRAFT');
   });
 
   it('GET /purchase-orders/:id delega en get', async () => {

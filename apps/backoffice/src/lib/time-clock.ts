@@ -4,24 +4,6 @@ import { api } from './auth.js';
 
 export type { TimeClockHistoryRow };
 
-// ── Formato de jornadas (compartido por Control horario y el panel "Fichajes
-// de hoy" del dashboard, I-15) ──
-
-// Minutos → "Xh Ym" (o "Ym" si es menos de una hora).
-export function fmtMinutes(min: number): string {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`;
-}
-
-// ISO → "HH:MM" (corte directo del ISO, mismo criterio que el log de tienda).
-// Guion largo si la jornada no tiene entrada/salida registrada.
-export function hhmm(iso: string | null): string {
-  return iso ? iso.slice(11, 16) : '—';
-}
-
-export const msToMin = (ms: number): number => Math.round(ms / 60000);
-
 // Filtros opcionales del histórico cross-tienda. Sin nada → últimos 30 días, todas
 // las tiendas de la organización (lo resuelve el backend).
 export interface TimeClockHistoryFilters {

@@ -144,23 +144,6 @@ describe('PurchasesService.list', () => {
     };
     expect(arg.where.status).toBeUndefined();
   });
-
-  it('filtra por proveedor, combinable con estado (I-18)', async () => {
-    const prisma = makePrisma();
-    const service = new PurchasesService(prisma as never, {} as never, {} as never);
-    await tenantStorage.run({ organizationId: ORG }, () => service.list('CONFIRMED', 'sup-1'));
-    const arg = prisma.purchaseOrder.findMany.mock.calls[0]![0] as {
-      where: { organizationId: string; status?: string; supplierId?: string };
-    };
-    expect(arg.where.supplierId).toBe('sup-1');
-    expect(arg.where.status).toBe('CONFIRMED');
-    // Sin proveedor no aparece la clave (no filtra de más).
-    await tenantStorage.run({ organizationId: ORG }, () => service.list());
-    const arg2 = prisma.purchaseOrder.findMany.mock.calls[1]![0] as {
-      where: Record<string, unknown>;
-    };
-    expect(arg2.where.supplierId).toBeUndefined();
-  });
 });
 
 describe('PurchasesService.get', () => {

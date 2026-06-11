@@ -311,43 +311,6 @@ export class DashboardService {
     });
   }
 
-  // Ventas por vendedor (D-08, preset Equipo): facturación y nº de tickets por
-  // empleado en el periodo, de mayor a menor. Solo ventas COMPLETED (mismo
-  // criterio que el resto de KPIs).
-  async salesByEmployee(
-    q: DashboardPeriodQueryDto,
-  ): Promise<Array<{ userId: string; userName: string; salesCount: number; total: number }>> {
-    const { organizationId } = requireTenant();
-    const range = this.rangeFor(q);
-    const { storeId } = q;
-
-    return withTenantTx(this.base, organizationId, async (tx) => {
-      const rows = await tx.$queryRaw<
-        Array<{ userId: string; userName: string; count: bigint; total: string }>
-      >`
-        SELECT u.id::text AS "userId",
-               u.name AS "userName",
-               COUNT(sa.id) AS count,
-               COALESCE(SUM(sa.total), 0) AS total
-        FROM "Sale" sa
-        JOIN "User" u ON u.id = sa."userId"
-        WHERE sa."organizationId" = ${organizationId}::uuid
-          AND sa.status = 'COMPLETED'
-          AND sa."createdAt" >= ${range.from}
-          AND sa."createdAt" < ${range.to}
-          ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
-        GROUP BY u.id, u.name
-        ORDER BY SUM(sa.total) DESC
-      `;
-      return rows.map((r) => ({
-        userId: r.userId,
-        userName: r.userName,
-        salesCount: num(r.count),
-        total: num(r.total),
-      }));
-    });
-  }
-
   // KPIs de venta: ticket medio, UPT, tasa de descuento, tasa de devolución.
   // `series` añade la evolución intra-periodo de cada KPI (por hora o por día,
   // según la duración) para las sparklines de las tarjetas.

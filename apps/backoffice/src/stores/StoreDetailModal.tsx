@@ -1,80 +1,26 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { useConfirm } from '../components/ConfirmProvider.js';
 import { Modal } from '../components/Modal.js';
 import type { Store } from '../lib/admin.js';
-import { updateStoreOps } from '../lib/admin.js';
-import { createDevice, listDevices, revokeDevice } from '../lib/devices.js';
-import { formErrorMessage } from '../lib/form-error.js';
 import { fmtDayMonth } from '../lib/format.js';
 import { listStoreLog } from '../lib/time-clock.js';
+import type { StoreOps } from '../StoresPage.js';
 import { StoreLogDrawer } from './StoreLogDrawer.js';
 
 export function StoreDetailModal({
   store,
-  onEdit,
-  onDelete,
-  deleteError,
+  ops,
+  onPatchOps,
   onClose,
 }: {
   store: Store;
-  onEdit: () => void;
-  onDelete: () => void;
-  deleteError: string | null;
+  ops: StoreOps | undefined;
+  onPatchOps: (patch: Partial<StoreOps>) => void;
   onClose: () => void;
 }) {
-  const qc = useQueryClient();
-  const confirm = useConfirm();
   const [logOpen, setLogOpen] = useState(false);
-  // Token recién generado: se muestra UNA sola vez (no vuelve a viajar en el GET).
   const [token, setToken] = useState<string | null>(null);
-
-  // Dispositivos de fichaje REALES de la tienda (I-08): la verdad viene de la API
-  // de devices, no de un check manual (E-02/E-03).
-  const { data: devices = [] } = useQuery({
-    queryKey: ['devices', store.id],
-    queryFn: () => listDevices(store.id),
-  });
-  const invalidateDevices = () => void qc.invalidateQueries({ queryKey: ['devices', store.id] });
-  const createMut = useMutation({
-    mutationFn: () => createDevice({ storeId: store.id, name: `TPV ${store.code}` }),
-    onSuccess: (d) => {
-      setToken(d.pairingToken);
-      invalidateDevices();
-    },
-  });
-  const revokeMut = useMutation({ mutationFn: revokeDevice, onSuccess: invalidateDevices });
-  const askRevoke = async (id: string, name: string): Promise<void> => {
-    const ok = await confirm({
-      title: 'Revocar dispositivo',
-      message: `¿Revocar "${name}"? El TPV emparejado con él quedará bloqueado para fichar.`,
-      confirmLabel: 'Revocar',
-      danger: true,
-    });
-    if (ok) revokeMut.mutate(id);
-  };
-  const anyPaired = devices.some((d) => d.authorized);
-
-  // Estado operativo MANUAL persistido (I-09/D-10): verificada + incidencia. El
-  // formulario edita en local y guarda vía PATCH /stores/:id/ops; la verdad
-  // vuelve por el invalidate de 'stores'.
-  const [opsVerified, setOpsVerified] = useState(store.opsVerified);
-  const [opsIncident, setOpsIncident] = useState(store.opsIncident ?? '');
-  // Baseline local: el prop `store` es un snapshot del listado y no se refresca
-  // dentro del modal; tras guardar, la baseline se sincroniza con lo enviado.
-  const [opsBaseline, setOpsBaseline] = useState({
-    verified: store.opsVerified,
-    incident: store.opsIncident ?? '',
-  });
-  const opsDirty = opsVerified !== opsBaseline.verified || opsIncident !== opsBaseline.incident;
-  const opsMut = useMutation({
-    mutationFn: () => updateStoreOps(store.id, { verified: opsVerified, incident: opsIncident }),
-    onSuccess: () => {
-      setOpsBaseline({ verified: opsVerified, incident: opsIncident });
-      void qc.invalidateQueries({ queryKey: ['stores'] });
-    },
-  });
   // Registro de fichajes real de la tienda (GET /time-clock/entries, lo más reciente
   // primero) → resumen de última apertura/cierre + drawer.
   const { data: log = [] } = useQuery({
@@ -83,6 +29,10 @@ export function StoreDetailModal({
   });
   const lastOpen = log.find((e) => e.type === 'apertura') ?? null;
   const lastClose = log.find((e) => e.type === 'cierre') ?? null;
+
+  const isIp = ops?.deviceType === 'ip';
+  const deviceLabel = isIp ? 'IP del dispositivo' : 'Identificador del dispositivo';
+  const devicePlaceholder = isIp ? 'p. ej. 83.45.12.7' : 'p. ej. TPV-01';
 
   return (
     <>
@@ -131,139 +81,61 @@ export function StoreDetailModal({
             </button>
           </section>
 
-          <section className="form-section" data-testid="store-ops">
-            <span className="form-section-title">Estado operativo</span>
-            <label className="switch">
-              <input
-                type="checkbox"
-                checked={opsVerified}
-                onChange={(e) => setOpsVerified(e.target.checked)}
-                data-testid="store-ops-verified"
-              />
-              <span className="switch-track">
-                <span className="switch-thumb" />
-              </span>
-              <span className="switch-text">Tienda verificada</span>
-            </label>
-            <label>
-              Incidencias / notas
-              <input
-                placeholder="p. ej. persiana rota, obras en la calle…"
-                value={opsIncident}
-                onChange={(e) => setOpsIncident(e.target.value)}
-                data-testid="store-ops-incident"
-              />
-            </label>
-            {opsMut.isError && (
-              <p className="form-error">
-                {formErrorMessage(opsMut.error, 'No se pudo guardar el estado.')}
-              </p>
-            )}
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={!opsDirty || opsMut.isPending}
-              onClick={() => opsMut.mutate()}
-              data-testid="store-ops-save"
-            >
-              {opsMut.isPending
-                ? 'Guardando…'
-                : opsMut.isSuccess && !opsDirty
-                  ? 'Guardado ✓'
-                  : 'Guardar estado'}
-            </button>
-          </section>
-
           <section className="form-section" data-testid="store-device">
-            <span className="form-section-title">Dispositivos de fichaje</span>
-            {devices.length === 0 ? (
+            <span className="form-section-title">Dispositivo autorizado</span>
+            <label>
+              {deviceLabel}
+              <input
+                value={ops?.deviceValue ?? ''}
+                placeholder={devicePlaceholder}
+                onChange={(e) => onPatchOps({ deviceValue: e.target.value, deviceVerified: false })}
+                data-testid="store-device-value"
+              />
+            </label>
+            {ops?.deviceVerified ? (
+              <p className="store-device-note is-ok" data-testid="store-device-ok">
+                <span className="store-device-note-icon" aria-hidden="true">
+                  ✓
+                </span>
+                Dispositivo verificado.
+              </p>
+            ) : (
               <p className="store-device-note is-warn" data-testid="store-device-warn">
                 <span className="store-device-note-icon" aria-hidden="true">
                   ⚠
                 </span>
-                Sin dispositivos: el TPV de esta tienda no puede fichar hasta emparejar uno.
+                Dispositivo no verificado: el TPV de esta tienda no podrá operar hasta autorizarlo.
               </p>
-            ) : (
-              <>
-                {anyPaired ? (
-                  <p className="store-device-note is-ok" data-testid="store-device-ok">
-                    <span className="store-device-note-icon" aria-hidden="true">
-                      ✓
-                    </span>
-                    Hay un dispositivo emparejado: el fichaje está operativo.
-                  </p>
-                ) : (
-                  <p className="store-device-note is-warn" data-testid="store-device-warn">
-                    <span className="store-device-note-icon" aria-hidden="true">
-                      ⚠
-                    </span>
-                    Token generado pero ningún dispositivo emparejado todavía.
-                  </p>
-                )}
-                <ul className="store-device-list" data-testid="store-device-list">
-                  {devices.map((d) => (
-                    <li key={d.id} className="store-device-item" data-testid="store-device-item">
-                      <span className="store-device-name">{d.name}</span>
-                      <span className={`store-device-state ${d.authorized ? 'is-ok' : ''}`}>
-                        {d.authorized
-                          ? `Emparejado${d.pairedAt ? ` · ${fmtDayMonth(d.pairedAt)}` : ''}`
-                          : 'Pendiente de emparejar'}
-                      </span>
-                      <button
-                        type="button"
-                        className="link-btn danger"
-                        onClick={() => void askRevoke(d.id, d.name)}
-                        data-testid="store-device-revoke"
-                      >
-                        Revocar
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </>
+            )}
+            {!ops?.deviceVerified && (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => onPatchOps({ deviceVerified: true })}
+                data-testid="store-device-authorize"
+              >
+                Autorizar dispositivo
+              </button>
             )}
             <div className="store-device-token">
               <button
                 type="button"
                 className="link-btn"
-                onClick={() => createMut.mutate()}
-                disabled={createMut.isPending}
+                onClick={() => setToken(`FICHA-${store.code}-2K7P9X`)}
                 data-testid="store-gen-token"
               >
-                {createMut.isPending ? 'Generando…' : 'Generar token de fichaje'}
+                Generar token de fichaje
               </button>
-              {createMut.isError && (
-                <p className="form-error">
-                  {formErrorMessage(createMut.error, 'No se pudo generar el token.')}
-                </p>
-              )}
               {token && (
                 <p className="muted" data-testid="store-token-value">
-                  Token (se muestra una sola vez — introdúcelo en el TPV): <code>{token}</code>{' '}
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => void navigator.clipboard?.writeText(token)}
-                    data-testid="store-token-copy"
-                  >
-                    Copiar
-                  </button>
+                  Token para habilitar el fichaje en el dispositivo: <code>{token}</code>
                 </p>
               )}
             </div>
           </section>
         </div>
 
-        {deleteError && <p className="form-error">{deleteError}</p>}
-        <div className="modal-foot modal-foot--split">
-          <div className="modal-foot-actions">
-            <button type="button" onClick={onEdit} data-testid="store-edit">
-              Editar
-            </button>
-            <button type="button" className="danger" onClick={onDelete} data-testid="store-delete">
-              Borrar
-            </button>
-          </div>
+        <div className="modal-foot">
           <button type="button" onClick={onClose}>
             Cerrar
           </button>

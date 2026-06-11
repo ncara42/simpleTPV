@@ -16,29 +16,6 @@ export class StoresService {
     });
   }
 
-  // Estado operativo manual (I-09): verificada + incidencia, con marca de tiempo.
-  async updateOps(
-    id: string,
-    input: { verified?: boolean; incident?: string | null },
-  ): Promise<Store> {
-    const tenant = requireTenant();
-    const store = await this.prisma.store.findFirst({
-      where: { id, organizationId: tenant.organizationId },
-      select: { id: true },
-    });
-    if (!store) {
-      throw new NotFoundException(`Tienda ${id} no encontrada`);
-    }
-    return this.prisma.store.update({
-      where: { id },
-      data: {
-        ...(input.verified !== undefined ? { opsVerified: input.verified } : {}),
-        ...(input.incident !== undefined ? { opsIncident: input.incident || null } : {}),
-        opsUpdatedAt: new Date(),
-      },
-    });
-  }
-
   async findAll(): Promise<Store[]> {
     return this.prisma.store.findMany({ orderBy: { name: 'asc' } });
   }

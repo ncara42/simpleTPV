@@ -17,41 +17,6 @@ function makePrisma() {
   };
 }
 
-describe('StoresService.updateOps', () => {
-  it('persiste verificada/incidencia con marca de tiempo y 404 fuera del tenant', async () => {
-    const prisma = makePrisma();
-    prisma.store.findFirst = vi.fn(async () => ({ id: 's1' })) as never;
-    prisma.store.update = vi.fn(async (a: unknown) => a) as never;
-    const service = new StoresService(prisma as never);
-    await tenantStorage.run({ organizationId: ORG }, () =>
-      service.updateOps('s1', { verified: true, incident: 'Persiana rota' }),
-    );
-    const arg = prisma.store.update.mock.calls[0]![0] as {
-      data: { opsVerified: boolean; opsIncident: string; opsUpdatedAt: Date };
-    };
-    expect(arg.data.opsVerified).toBe(true);
-    expect(arg.data.opsIncident).toBe('Persiana rota');
-    expect(arg.data.opsUpdatedAt).toBeInstanceOf(Date);
-
-    prisma.store.findFirst = vi.fn(async () => null) as never;
-    await expect(
-      tenantStorage.run({ organizationId: ORG }, () => service.updateOps('nope', {})),
-    ).rejects.toThrow();
-  });
-
-  it('incidencia vacía se normaliza a null', async () => {
-    const prisma = makePrisma();
-    prisma.store.findFirst = vi.fn(async () => ({ id: 's1' })) as never;
-    prisma.store.update = vi.fn(async (a: unknown) => a) as never;
-    const service = new StoresService(prisma as never);
-    await tenantStorage.run({ organizationId: ORG }, () =>
-      service.updateOps('s1', { incident: '' }),
-    );
-    const arg = prisma.store.update.mock.calls[0]![0] as { data: { opsIncident: null } };
-    expect(arg.data.opsIncident).toBeNull();
-  });
-});
-
 describe('StoresService', () => {
   it('create añade el organizationId del tenant', async () => {
     const prisma = makePrisma();

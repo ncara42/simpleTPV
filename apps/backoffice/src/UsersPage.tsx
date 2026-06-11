@@ -1,11 +1,10 @@
-import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { CsvDropzone } from './components/CsvDropzone.js';
 import { Modal } from './components/Modal.js';
-import { useTableColumns } from './components/useTableColumns.js';
 import {
   assignUserStores,
   createUser,
@@ -17,7 +16,6 @@ import {
   updateUser,
   type User,
 } from './lib/admin.js';
-import { formErrorMessage } from './lib/form-error.js';
 import { usePageHeader } from './lib/pageHeader.js';
 
 type Role = NewUser['role'];
@@ -82,7 +80,6 @@ export function UsersPage() {
   const [wizard, setWizard] = useState<EditWizard | null>(null);
   // Modal de importación de usuarios por CSV (alta en lote).
   const [importing, setImporting] = useState(false);
-  const [sortDesc, setSortDesc] = useState(false);
   // Filtros de la barra superior (espejo de la toolbar de stock).
   const [search, setSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
@@ -249,83 +246,6 @@ export function UsersPage() {
         ? `Guardar (${total} / ${total})`
         : 'Guardar';
 
-  // Columnas del DataTable (D-12: las cinco visibles por defecto); la de
-  // selección va fija fuera de la configuración.
-  const dataColumns: DataTableColumn<UserWithStores>[] = [
-    { key: 'name', header: 'Nombre', sortable: true },
-    { key: 'email', header: 'Email', render: (u) => <span className="muted">{u.email}</span> },
-    {
-      key: 'role',
-      header: 'Rol',
-      render: (u) => (
-        <span className="role-badge" data-testid="user-role-badge">
-          {ROLE_LABEL[u.role]}
-        </span>
-      ),
-    },
-    {
-      key: 'stores',
-      header: 'Tiendas',
-      render: (u) => <span className="muted">{storesLabel(u.role, u.storeIds ?? [])}</span>,
-    },
-    {
-      key: 'active',
-      header: 'Estado',
-      render: (u) => (
-        <button
-          type="button"
-          className={`user-state ${u.active ? 'on' : 'off'}`}
-          title={u.active ? 'Activo — pulsa para desactivar' : 'Inactivo — pulsa para activar'}
-          aria-label={u.active ? 'Activo' : 'Inactivo'}
-          aria-pressed={u.active}
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleActive(u.id);
-          }}
-        >
-          <Check
-            className="user-state__icon user-state__icon--on"
-            size={14}
-            strokeWidth={3}
-            aria-hidden="true"
-          />
-          <X
-            className="user-state__icon user-state__icon--off"
-            size={14}
-            strokeWidth={3}
-            aria-hidden="true"
-          />
-        </button>
-      ),
-    },
-  ];
-  const {
-    effectiveColumns,
-    editor: columnsEditor,
-    editorOpen: columnsEditorOpen,
-    toggleEditor: toggleColumnsEditor,
-  } = useTableColumns('table.users.columns', dataColumns, {
-    editorTestId: 'users-columns-editor',
-    title: 'Columnas de usuarios',
-  });
-  const selectColumn: DataTableColumn<UserWithStores> = {
-    key: 'select',
-    header: '',
-    width: '2.2rem',
-    render: (u) => (
-      <input
-        type="checkbox"
-        className="user-check"
-        aria-label={`Seleccionar ${u.name}`}
-        data-testid="user-select"
-        checked={selectedSet.has(u.id)}
-        onChange={() => toggleSelect(u.id)}
-        onClick={(e) => e.stopPropagation()}
-      />
-    ),
-  };
-  const tableColumns = [selectColumn, ...effectiveColumns];
-
   return (
     <section className="catalog">
       <div className="table-panel">
@@ -410,34 +330,92 @@ export function UsersPage() {
           )}
         </div>
 
-        <div className="config-bar">
-          <button
-            type="button"
-            className="config-trigger"
-            onClick={toggleColumnsEditor}
-            data-testid="users-columns-toggle"
-            aria-expanded={columnsEditorOpen}
+        {isLoading ? (
+          <p className="catalog-empty">Cargando…</p>
+        ) : filtered.length === 0 ? (
+          <p className="catalog-empty" data-testid="users-empty">
+            Sin usuarios para los filtros seleccionados.
+          </p>
+        ) : (
+          <table
+            className={`catalog-table users-table${selected.length ? ' has-selection' : ''}`}
+            data-testid="users-table"
           >
-            Columnas
-          </button>
-        </div>
-        {columnsEditor}
-        <DataTable
-          columns={tableColumns}
-          rows={sortDesc ? [...filtered].reverse() : filtered}
-          rowKey={(u) => u.id}
-          loading={isLoading}
-          sort={{ key: 'name', dir: sortDesc ? 'desc' : 'asc' }}
-          onSortChange={() => setSortDesc((d) => !d)}
-          onRowClick={(u) => toggleSelect(u.id)}
-          rowClassName={(u) => (selectedSet.has(u.id) ? 'is-selected' : undefined)}
-          rowAriaSelected={(u) => selectedSet.has(u.id)}
-          rowTestId="user-row"
-          emptyState={
-            <span data-testid="users-empty">Sin usuarios para los filtros seleccionados.</span>
-          }
-          data-testid="users-table"
-        />
+            <thead>
+              <tr>
+                <th className="users-select-col" aria-label="Selección" />
+                <th>Nombre</th>
+                <th>Email</th>
+                <th>Rol</th>
+                <th>Tiendas</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((u) => {
+                const isSel = selectedSet.has(u.id);
+                return (
+                  <tr
+                    key={u.id}
+                    className={isSel ? 'is-selected' : undefined}
+                    aria-selected={isSel}
+                    onClick={() => toggleSelect(u.id)}
+                    data-testid="user-row"
+                  >
+                    <td className="users-select-col" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="user-check"
+                        aria-label={`Seleccionar ${u.name}`}
+                        data-testid="user-select"
+                        checked={isSel}
+                        onChange={() => toggleSelect(u.id)}
+                      />
+                    </td>
+                    <td>{u.name}</td>
+                    <td className="muted">{u.email}</td>
+                    <td>
+                      <span className="role-badge" data-testid="user-role-badge">
+                        {ROLE_LABEL[u.role]}
+                      </span>
+                    </td>
+                    <td className="muted">{storesLabel(u.role, u.storeIds ?? [])}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className={`user-state ${u.active ? 'on' : 'off'}`}
+                        title={
+                          u.active
+                            ? 'Activo — pulsa para desactivar'
+                            : 'Inactivo — pulsa para activar'
+                        }
+                        aria-label={u.active ? 'Activo' : 'Inactivo'}
+                        aria-pressed={u.active}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleActive(u.id);
+                        }}
+                      >
+                        <Check
+                          className="user-state__icon user-state__icon--on"
+                          size={14}
+                          strokeWidth={3}
+                          aria-hidden="true"
+                        />
+                        <X
+                          className="user-state__icon user-state__icon--off"
+                          size={14}
+                          strokeWidth={3}
+                          aria-hidden="true"
+                        />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {form && (
@@ -540,9 +518,7 @@ export function UsersPage() {
             </section>
           </div>
 
-          {createMut.isError && (
-            <p className="form-error">{formErrorMessage(createMut.error, 'No se pudo guardar.')}</p>
-          )}
+          {createMut.isError && <p className="form-error">No se pudo guardar.</p>}
           <div className="modal-foot modal-foot--split">
             <label className="switch">
               <input

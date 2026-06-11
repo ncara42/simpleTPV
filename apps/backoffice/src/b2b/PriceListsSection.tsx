@@ -15,7 +15,6 @@ import {
   removePriceListItem,
   setPriceListItem,
 } from '../lib/b2b.js';
-import { formErrorMessage } from '../lib/form-error.js';
 import { listProducts } from '../lib/products.js';
 
 function eur(n: number | string): string {
@@ -173,7 +172,7 @@ export function PriceListsSection() {
       setNewName('');
       toast('Tarifa creada', 'success');
     },
-    onError: (e) => toast(formErrorMessage(e, 'No se pudo crear la tarifa'), 'error'),
+    onError: () => toast('No se pudo crear la tarifa', 'error'),
   });
   const removeMut = useMutation({
     mutationFn: (id: string) => deletePriceList(id),
@@ -181,7 +180,7 @@ export function PriceListsSection() {
       invalidate();
       toast('Tarifa eliminada', 'success');
     },
-    onError: (e) => toast(formErrorMessage(e, 'No se pudo eliminar la tarifa'), 'error'),
+    onError: () => toast('No se pudo eliminar la tarifa', 'error'),
   });
 
   return (

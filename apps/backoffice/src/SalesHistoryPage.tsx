@@ -2,7 +2,7 @@ import { Badge, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { useTableColumns } from './components/useTableColumns.js';
+import { ConfigEditor, type OrderHidden, resolveConfig } from './components/ConfigEditor.js';
 import {
   listSales,
   listStores,
@@ -14,6 +14,7 @@ import { type FamilyNode, listFamilies } from './lib/families.js';
 import { useFeatures } from './lib/features.js';
 import { fmtEur, fmtRate } from './lib/format.js';
 import { usePageHeader } from './lib/pageHeader.js';
+import { readPref, usePreferences } from './lib/preferences.js';
 
 const hour = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
 const PAYMENT_LABEL: Record<string, string> = { CASH: 'Efectivo', CARD: 'Tarjeta' };
@@ -63,13 +64,14 @@ function toQuery(filters: Filters): SalesQueryInput {
 }
 
 function downloadCsv(items: SalesViewRow[]): void {
-  const header = 'Nº ticket,Hora,Tienda,Vendedor,Importe (€),Método,Estado';
+  const header = 'Nº ticket,Hora,Tienda,Vendedor,Arquetipo,Importe (€),Método,Estado';
   const rows = items.map((s) =>
     [
       s.ticketNumber,
       hour.format(new Date(s.createdAt)),
       s.storeName,
       s.sellerName,
+      s.familyName,
       Number(s.total).toFixed(2),
       PAYMENT_LABEL[s.paymentMethod] ?? s.paymentMethod,
       s.status === 'VOIDED' ? 'Anulada' : 'Completada',
@@ -88,6 +90,7 @@ const columns: DataTableColumn<SalesViewRow>[] = [
   { key: 'ticketNumber', header: 'Ticket' },
   { key: 'storeName', header: 'Tienda' },
   { key: 'sellerName', header: 'Vendedor' },
+  { key: 'familyName', header: 'Arquetipo' },
   {
     key: 'paymentMethod',
     header: 'Pago',
@@ -138,17 +141,25 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
 
   usePageHeader('Ventas', 'Historial de tickets');
 
-  // Columnas configurables por usuario (IT-16/D-04): hook compartido con el resto
-  // de tablas; persistido en 'table.sales.columns'.
-  const {
-    effectiveColumns,
-    editor: columnsEditor,
-    editorOpen: columnsEditorOpen,
-    toggleEditor: toggleColumnsEditor,
-  } = useTableColumns('table.sales.columns', columns, {
-    editorTestId: 'sales-columns-editor',
-    title: 'Columnas de la tabla',
-  });
+  // Columnas configurables por usuario (IT-16): visibilidad + orden, persistido en
+  // 'table.sales.columns'. Si se ocultan todas, se muestran todas (salvaguarda).
+  const { prefs, setPref } = usePreferences();
+  const [columnsEditorOpen, setColumnsEditorOpen] = useState(false);
+  const colItems = columns.map((c) => ({
+    id: c.key,
+    label: typeof c.header === 'string' ? c.header : c.key,
+  }));
+  const allColIds = colItems.map((c) => c.id);
+  const colCfg = resolveConfig(
+    readPref<Partial<OrderHidden>>(prefs, 'table.sales.columns', {}),
+    allColIds,
+  );
+  const columnsByKey = new Map(columns.map((c) => [c.key, c]));
+  const effectiveColumns = colCfg.visible.length
+    ? colCfg.visible
+        .map((id) => columnsByKey.get(id))
+        .filter((c): c is (typeof columns)[number] => Boolean(c))
+    : columns;
 
   const hasFilters = Boolean(
     filters.storeId || filters.sellerId || filters.familyId || filters.status,
@@ -222,10 +233,10 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
           className="catalog-search"
           value={filters.familyId}
           onChange={(value) => setFilter({ familyId: value })}
-          ariaLabel="Filtrar por familia"
+          ariaLabel="Filtrar por arquetipo"
           data-testid="sales-family"
           options={[
-            { value: '', label: 'Todas las familias' },
+            { value: '', label: 'Todos los arquetipos' },
             ...familyOptions.map((f) => ({ value: f.id, label: f.name })),
           ]}
         />
@@ -317,14 +328,24 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
         <button
           type="button"
           className="config-trigger"
-          onClick={toggleColumnsEditor}
+          onClick={() => setColumnsEditorOpen((o) => !o)}
           data-testid="sales-columns-toggle"
           aria-expanded={columnsEditorOpen}
         >
           Columnas
         </button>
       </div>
-      {columnsEditor}
+      {columnsEditorOpen && (
+        <ConfigEditor
+          title="Columnas de la tabla"
+          items={colItems}
+          order={colCfg.order}
+          hidden={colCfg.hidden}
+          onChange={(next) => setPref('table.sales.columns', next)}
+          testid="sales-columns-editor"
+          toggleIdPrefix="col"
+        />
+      )}
 
       <DataTable
         columns={effectiveColumns}

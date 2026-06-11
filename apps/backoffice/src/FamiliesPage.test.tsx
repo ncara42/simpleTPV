@@ -9,14 +9,6 @@ vi.mock('./lib/families.js', () => ({
   deleteFamily: vi.fn(),
 }));
 
-// El panel de productos del nodo (I-13) y el contador real (E-16) consultan
-// /products; sin red en unit.
-vi.mock('./lib/products.js', () => ({
-  listProducts: vi.fn(() => Promise.resolve([])),
-  createProduct: vi.fn(),
-  updateProduct: vi.fn(),
-}));
-
 import { ConfirmProvider } from './components/ConfirmProvider.js';
 import { FamiliesPage } from './FamiliesPage.js';
 
@@ -32,12 +24,12 @@ function renderPage(): void {
 }
 
 describe('FamiliesPage', () => {
-  it('renderiza la cabecera y el botón de nueva familia', () => {
+  it('renderiza la cabecera y el botón de nuevo arquetipo', () => {
     renderPage();
     expect(screen.getByTestId('new-family')).toBeInTheDocument();
   });
 
-  it('muestra el vacío cuando no hay familias', async () => {
+  it('muestra el vacío cuando no hay arquetipos', async () => {
     renderPage();
     await waitFor(() => expect(screen.getByTestId('families-empty')).toBeInTheDocument());
   });

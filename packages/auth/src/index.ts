@@ -74,7 +74,6 @@ export type {
   StockRow,
   Store,
   StoreInput,
-  StoreOpsInput,
   StoreOrder,
   StoreOrderLine,
   StoreOrderStatus,

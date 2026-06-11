@@ -1011,11 +1011,6 @@
   color: var(--ui-text-muted);
   margin-bottom: 0.9rem;
 }
-.modal input:not([type='checkbox']) {
-  /* Causa raíz de E-04: sin width, el input conserva su ancho intrínseco
-     (~250px) y desborda las columnas estrechas de .modal-row. */
-  width: 100%;
-}
 .modal input {
   height: 2.6rem;
   border: 1px solid var(--ui-border-strong);
@@ -1040,10 +1035,6 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.8rem;
-}
-/* Las celdas del grid pueden encoger por debajo del ancho intrínseco del input. */
-.modal-row label {
-  min-width: 0;
 }
 .form-error {
   color: #c0392b;
@@ -2767,6 +2758,11 @@
   gap: var(--ui-space-2);
 }
 
+/* ── Vista unificada Dashboard + Ventas (IT-19) ─────────────────────────────── */
+.overview-sales {
+  margin-top: var(--ui-space-6);
+}
+
 /* ── Promociones: chips de filtro por grupo (UX) ────────────────────────────── */
 .promo-chips {
   display: inline-flex;
@@ -2809,231 +2805,4 @@
   border-radius: 0.4rem;
   background: var(--surface, #fff);
   font: inherit;
-}
-
-/* ── Dispositivos de fichaje reales en el detalle de tienda (I-08) ── */
-.store-device-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0 0 var(--ui-space-2);
-  padding: 0;
-  list-style: none;
-}
-.store-device-item {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: var(--ui-space-3);
-  padding: var(--ui-space-1) var(--ui-space-2);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-}
-.store-device-name {
-  font-weight: 600;
-}
-.store-device-state {
-  font-size: var(--ui-text-sm);
-  color: var(--ui-warning, #b45309);
-}
-.store-device-state.is-ok {
-  color: var(--tpv-teal-700, #0f766e);
-}
-
-/* Margen calculado en vivo del form de producto (I-11). */
-.product-form-margin {
-  display: block;
-  padding: 0.55rem 0.7rem;
-  border: 1px dashed var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-  background: var(--ui-surface-subtle);
-  font-variant-numeric: tabular-nums;
-  color: var(--tpv-teal-700, #0f766e);
-  font-weight: 600;
-}
-
-/* ── Paleta de color e icono del form de familia (I-14) ── */
-.fam-style-pickers {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-.fam-color-palette,
-.fam-icon-palette {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-}
-.fam-color-swatch {
-  width: 1.6rem;
-  height: 1.6rem;
-  border: 2px solid transparent;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: transform 0.1s, border-color 0.1s;
-}
-.fam-color-swatch:hover {
-  transform: scale(1.12);
-}
-.fam-color-swatch.is-active {
-  border-color: var(--ui-text);
-  box-shadow: 0 0 0 2px var(--ui-surface);
-}
-.fam-icon-swatch {
-  width: 2rem;
-  height: 2rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-  background: var(--ui-surface);
-  font-size: 1.05rem;
-  cursor: pointer;
-}
-.fam-icon-swatch.is-active {
-  border-color: var(--tpv-teal-500, #14b8a6);
-  background: var(--ui-success-soft, #e8f6f2);
-}
-
-/* ── Panel de productos del nodo en Familias (I-13) ── */
-.fam-layout {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-.fam-layout.has-panel {
-  grid-template-columns: minmax(0, 1fr) 22rem;
-  gap: var(--ui-space-3);
-  align-items: start;
-}
-.fam-products-panel {
-  position: sticky;
-  top: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-2);
-  padding: var(--ui-space-3);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md, 0.5rem);
-  background: var(--ui-surface);
-}
-.fam-panel-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--ui-space-2);
-}
-.fam-panel-head h4 {
-  margin: 0;
-  display: inline-flex;
-  align-items: center;
-}
-.fam-subtree-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: var(--ui-text-sm);
-  color: var(--ui-text-muted);
-}
-.fam-subtree-toggle input {
-  width: auto;
-}
-.fam-product-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  max-height: 22rem;
-  overflow-y: auto;
-}
-.fam-product-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: var(--ui-space-2);
-  padding: 0.3rem 0.45rem;
-  border-radius: var(--ui-radius-sm);
-}
-.fam-product-item:hover {
-  background: var(--ui-surface-subtle);
-}
-.fam-product-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.88rem;
-}
-.fam-product-price {
-  font-variant-numeric: tabular-nums;
-  color: var(--ui-text-muted);
-  font-size: 0.85rem;
-}
-.fam-panel-add {
-  margin-top: var(--ui-space-1);
-}
-@media (max-width: 900px) {
-  .fam-layout.has-panel {
-    grid-template-columns: 1fr;
-  }
-  .fam-products-panel {
-    position: static;
-  }
-}
-
-/* ── Vista detalle de proveedor (I-18 / D-07) ── */
-.row-clickable {
-  cursor: pointer;
-}
-.supplier-detail-title {
-  display: flex;
-  align-items: baseline;
-  gap: var(--ui-space-3);
-}
-.supplier-detail-title h2 {
-  margin: 0;
-}
-.supplier-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  gap: var(--ui-space-3);
-  align-items: end;
-  padding: var(--ui-space-3);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md, 0.5rem);
-  background: var(--ui-surface);
-  margin-bottom: var(--ui-space-4);
-}
-.supplier-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  font-size: var(--ui-text-sm);
-  color: var(--ui-text-muted);
-  min-width: 0;
-}
-.supplier-form input {
-  width: 100%;
-  height: 2.5rem;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-md, 0.5rem);
-  padding: 0 0.8rem;
-  font-size: 0.9rem;
-  background: var(--ui-surface);
-  color: var(--ui-text);
-  transition:
-    border-color 0.12s,
-    box-shadow 0.12s;
-}
-.supplier-form input:focus-visible {
-  outline: none;
-  border-color: var(--ui-accent, #0066cc);
-  box-shadow: 0 0 0 3px var(--ui-accent-soft, rgb(0 102 204 / 0.15));
-}
-.supplier-form .btn-primary {
-  justify-self: start;
-}
-.supplier-detail-h {
-  margin: var(--ui-space-4) 0 var(--ui-space-2);
 }

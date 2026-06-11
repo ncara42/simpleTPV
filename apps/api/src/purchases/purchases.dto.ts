@@ -3,7 +3,6 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
-  IsIn,
   IsNumber,
   IsOptional,
   IsPositive,
@@ -100,15 +99,4 @@ export class SuggestPurchaseOrderDto {
   @IsOptional()
   @IsPositive()
   daysCoverage?: number;
-}
-
-// Listado de pedidos (I-18): por estado y/o proveedor (vista detalle, D-07).
-export class ListPurchaseOrdersQueryDto {
-  @IsOptional()
-  @IsIn(['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED', 'RECEIVED'])
-  status?: 'DRAFT' | 'CONFIRMED' | 'PARTIALLY_RECEIVED' | 'RECEIVED';
-
-  @IsOptional()
-  @IsUUID()
-  supplierId?: string;
 }

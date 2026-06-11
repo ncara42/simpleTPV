@@ -49,18 +49,6 @@ export interface DataTableProps<Row> {
   /** Contenido cuando no hay filas y no está cargando. */
   emptyState?: React.ReactNode;
   skeletonRows?: number;
-  /** Clic en la fila (p. ej. alternar selección múltiple). */
-  onRowClick?: (row: Row) => void;
-  /** Clase extra por fila (p. ej. 'is-selected'). */
-  rowClassName?: (row: Row) => string | undefined;
-  /** aria-selected por fila (selección múltiple accesible). */
-  rowAriaSelected?: (row: Row) => boolean;
-  /** data-testid de cada fila (por defecto 'ui-dt-row'; las pages migradas
-   *  conservan el suyo: 'stock-row', 'user-row'…). */
-  rowTestId?: string;
-  /** Fila de detalle bajo la fila (p. ej. desglose por tienda del Stock):
-   *  si devuelve contenido, se pinta un <tr> extra a ancho completo. */
-  renderDetail?: (row: Row) => React.ReactNode;
   className?: string;
   'data-testid'?: string;
 }
@@ -119,11 +107,6 @@ export function DataTable<Row>({
   pagination,
   emptyState,
   skeletonRows = 6,
-  onRowClick,
-  rowClassName,
-  rowAriaSelected,
-  rowTestId = 'ui-dt-row',
-  renderDetail,
   className,
   'data-testid': testid,
 }: DataTableProps<Row>) {
@@ -187,30 +170,15 @@ export function DataTable<Row>({
             </tbody>
           ) : (
             <tbody>
-              {rows.map((row, i) => {
-                const detail = renderDetail?.(row);
-                return (
-                  <React.Fragment key={rowKey(row, i)}>
-                    <tr
-                      data-testid={rowTestId}
-                      className={rowClassName?.(row)}
-                      aria-selected={rowAriaSelected?.(row)}
-                      onClick={onRowClick ? () => onRowClick(row) : undefined}
-                    >
-                      {columns.map((col) => (
-                        <td key={col.key} className={ALIGN_CLASS[col.align ?? 'left']}>
-                          {col.render ? col.render(row, i) : cellValue(row, col.key)}
-                        </td>
-                      ))}
-                    </tr>
-                    {detail != null && detail !== false && (
-                      <tr className="ui-dt-detail">
-                        <td colSpan={colCount}>{detail}</td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
+              {rows.map((row, i) => (
+                <tr key={rowKey(row, i)} data-testid="ui-dt-row">
+                  {columns.map((col) => (
+                    <td key={col.key} className={ALIGN_CLASS[col.align ?? 'left']}>
+                      {col.render ? col.render(row, i) : cellValue(row, col.key)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
             </tbody>
           )}
         </table>

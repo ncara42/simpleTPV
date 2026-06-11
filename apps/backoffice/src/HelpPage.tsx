@@ -1,7 +1,6 @@
 import { LifeBuoy, Mail, MessageCircle, Phone } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { ApiKeysSection } from './ApiKeysPage.js';
 import { usePageHeader } from './lib/pageHeader.js';
 
 // Canales de soporte. Configurables por despliegue (VITE_SUPPORT_*) con defaults
@@ -28,8 +27,8 @@ const FAQ: Faq[] = [
     a: 'En Catálogo › «Nuevo producto». Para cargar muchos a la vez, usa «Importar CSV» con las columnas name, salePrice, sku, barcode.',
   },
   {
-    q: '¿Cómo organizo el catálogo en familias?',
-    a: 'En Familias puedes crear familias y subfamilias (con la profundidad que necesites), marcar como arquetipo los grupos de productos casi idénticos, reordenar arrastrando y mover productos entre nodos.',
+    q: '¿Cómo organizo el catálogo en arquetipos?',
+    a: 'En Arquetipos puedes crear arquetipos y subniveles (con la profundidad que necesites), reordenarlos arrastrando y mover productos entre ellos.',
   },
   {
     q: '¿Cómo cargo el stock inicial de cada tienda?',
@@ -103,16 +102,6 @@ export function HelpPage() {
               <p>{f.a}</p>
             </details>
           ))}
-        </div>
-
-        {/* Integraciones (D-09b): la gestión de claves API vive aquí — una page
-            propia en el menú era overkill para una función que se toca poco. */}
-        <div className="help-integrations" id="integraciones" data-testid="help-integrations">
-          <h3>Integraciones · Claves API</h3>
-          <p className="muted">
-            Acceso externo de solo lectura al stock para integraciones (webs, ERPs…).
-          </p>
-          <ApiKeysSection />
         </div>
       </div>
     </section>

@@ -5,41 +5,14 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Store } from './lib/admin.js';
 
 const STORES: Store[] = [
-  {
-    id: 's1',
-    name: 'Centro',
-    code: '01',
-    address: 'C/ Mayor 1',
-    active: true,
-    opsVerified: false,
-    opsIncident: null,
-    opsUpdatedAt: null,
-  },
-  {
-    id: 's2',
-    name: 'Norte',
-    code: '02',
-    address: null,
-    active: false,
-    opsVerified: false,
-    opsIncident: null,
-    opsUpdatedAt: null,
-  },
+  { id: 's1', name: 'Centro', code: '01', address: 'C/ Mayor 1', active: true },
+  { id: 's2', name: 'Norte', code: '02', address: null, active: false },
 ];
 
 vi.mock('./lib/admin.js', () => ({
   listStores: vi.fn(() => Promise.resolve(STORES)),
   createStore: vi.fn(),
-  updateStore: vi.fn(),
-  updateStoreOps: vi.fn(),
   deleteStore: vi.fn(),
-}));
-
-// Dispositivos reales del detalle (I-08): sin red en unit.
-vi.mock('./lib/devices.js', () => ({
-  listDevices: vi.fn(() => Promise.resolve([])),
-  createDevice: vi.fn(),
-  revokeDevice: vi.fn(),
 }));
 
 // El modal de precios por tienda (#127 A) consulta overrides y productos; los
@@ -53,16 +26,13 @@ vi.mock('./lib/products.js', () => ({
   listProducts: vi.fn(() => Promise.resolve([])),
 }));
 
-import { ConfirmProvider } from './components/ConfirmProvider.js';
 import { StoresPage } from './StoresPage.js';
 
 function renderPage(): void {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <ConfirmProvider>
-        <StoresPage onOpenStoreView={vi.fn()} />
-      </ConfirmProvider>
+      <StoresPage onOpenStoreView={vi.fn()} />
     </QueryClientProvider>,
   );
 }

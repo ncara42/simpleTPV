@@ -35,11 +35,6 @@ export class DashboardController {
     return this.dashboard.discountByEmployee(query);
   }
 
-  @Get('sales-by-employee')
-  salesByEmployee(@Query() query: DashboardPeriodQueryDto) {
-    return this.dashboard.salesByEmployee(query);
-  }
-
   @Get('sales-kpis')
   salesKpis(@Query() query: DashboardPeriodQueryDto) {
     return this.dashboard.salesKpis(query);

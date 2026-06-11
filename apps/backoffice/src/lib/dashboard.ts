@@ -76,14 +76,6 @@ export interface DiscountByEmployee {
   avgDiscountPct: number;
 }
 
-// Ventas por vendedor (D-08, preset Equipo): facturación y tickets por empleado.
-export interface SalesByEmployee {
-  userId: string;
-  userName: string;
-  salesCount: number;
-  total: number;
-}
-
 export interface ProductRotation {
   productId: string;
   name: string;
@@ -134,13 +126,6 @@ export function getDiscountByEmployee(
     '/dashboard/discount-by-employee',
     periodQuery(period, storeId),
   );
-}
-
-export function getSalesByEmployee(
-  period: DashboardPeriod,
-  storeId?: string,
-): Promise<SalesByEmployee[]> {
-  return api.get<SalesByEmployee[]>('/dashboard/sales-by-employee', periodQuery(period, storeId));
 }
 
 export function getProductRotation(

@@ -26,8 +26,6 @@ export interface NavItem {
 export interface NavGroup {
   id: string;
   label: string;
-  /** Icono del grupo (solo se pinta en el modo dropdown). */
-  icon?: React.ReactNode;
 }
 
 interface SidebarAccount {
@@ -45,13 +43,6 @@ export interface SidebarProps {
   brand?: { title: string; subtitle?: string };
   /** Cuenta en el pie (estilo ChatGPT): avatar + nombre + rol. */
   account?: SidebarAccount;
-  /**
-   * Modo dropdown (D-02): los grupos se pliegan a una sola entrada y su contenido
-   * se despliega inline al mantener el hover >200ms (preview) o al hacer CLIC,
-   * que lo deja ANCLADO hasta clic-fuera/Escape. Solo un grupo abierto a la vez.
-   * Los items sin grupo se renderizan como entradas directas en su posición.
-   */
-  groupsAsDropdowns?: boolean;
 }
 
 function LogoutGlyph() {
@@ -82,7 +73,6 @@ export function Sidebar({
   logo,
   brand,
   account,
-  groupsAsDropdowns = false,
 }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
@@ -137,92 +127,17 @@ export function Sidebar({
     itemsEls[next]?.focus();
   }, []);
 
-  // ─── Modo dropdown (D-02): un grupo abierto, preview por hover, anclaje por clic ──
-  const [openGroup, setOpenGroup] = useState<string | null>(null);
-  const [anchored, setAnchored] = useState(false);
-  const hoverTimer = useRef<number | null>(null);
-  const leaveTimer = useRef<number | null>(null);
-  const navRef = useRef<HTMLElement>(null);
-
-  const clearTimers = useCallback(() => {
-    if (hoverTimer.current != null) window.clearTimeout(hoverTimer.current);
-    if (leaveTimer.current != null) window.clearTimeout(leaveTimer.current);
-    hoverTimer.current = null;
-    leaveTimer.current = null;
-  }, []);
-
-  const closeDropdown = useCallback(() => {
-    clearTimers();
-    setOpenGroup(null);
-    setAnchored(false);
-  }, [clearTimers]);
-
-  // Hover sostenido >200ms abre el preview (sin anclar). El anclado no se pisa.
-  const onGroupEnter = useCallback(
-    (groupId: string) => {
-      if (!groupsAsDropdowns) return;
-      clearTimers();
-      if (anchored) return;
-      hoverTimer.current = window.setTimeout(() => {
-        setOpenGroup(groupId);
-        setAnchored(false);
-      }, 200);
-    },
-    [groupsAsDropdowns, anchored, clearTimers],
-  );
-
-  // Al salir del grupo (cabecera + contenido), el preview se cierra con un
-  // pequeño margen de gracia; el anclado permanece.
-  const onGroupLeave = useCallback(() => {
-    if (!groupsAsDropdowns) return;
-    if (hoverTimer.current != null) window.clearTimeout(hoverTimer.current);
-    if (anchored) return;
-    leaveTimer.current = window.setTimeout(() => setOpenGroup(null), 150);
-  }, [groupsAsDropdowns, anchored]);
-
-  // Clic: ancla el dropdown; si ya estaba anclado en ese grupo, lo cierra.
-  const onGroupClick = useCallback(
-    (groupId: string) => {
-      clearTimers();
-      if (openGroup === groupId && anchored) {
-        closeDropdown();
-        return;
-      }
-      setOpenGroup(groupId);
-      setAnchored(true);
-    },
-    [openGroup, anchored, clearTimers, closeDropdown],
-  );
-
-  // Clic fuera del nav o Escape cierran el dropdown (anclado incluido).
-  useEffect(() => {
-    if (!groupsAsDropdowns || openGroup === null) return;
-    const onPointerDown = (e: PointerEvent) => {
-      if (!navRef.current?.contains(e.target as Node)) closeDropdown();
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeDropdown();
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [groupsAsDropdowns, openGroup, closeDropdown]);
-
   const handleSelect = useCallback(
     (id: string) => {
       onSelect(id);
       setMobileOpen(false);
-      if (groupsAsDropdowns) closeDropdown();
     },
-    [onSelect, groupsAsDropdowns, closeDropdown],
+    [onSelect],
   );
 
-  const renderItems = (filterGroup?: string, onlyId?: string) =>
+  const renderItems = (filterGroup?: string) =>
     items
-      .filter((item) => item.group === filterGroup && (onlyId === undefined || item.id === onlyId))
+      .filter((item) => item.group === filterGroup)
       .map((item, index) => {
         const isActive = activeItem === item.id;
         return (
@@ -278,112 +193,41 @@ export function Sidebar({
         </div>
 
         {/* Nav */}
-        <nav className="sidebar-nav" aria-label="Navegación principal" ref={navRef}>
-          {groupsAsDropdowns && groups ? (
-            // Modo dropdown: se respeta el ORDEN de `items` — los sin grupo son
-            // entradas directas; al encontrar el primer item de un grupo se pinta
-            // la entrada del grupo completa (cabecera + contenido desplegable).
-            (() => {
-              const rendered = new Set<string>();
-              const out: React.ReactNode[] = [];
-              for (const item of items) {
-                if (!item.group) {
-                  out.push(
-                    <ul className="sidebar-group-items" key={item.id}>
-                      {renderItems(undefined, item.id)}
-                    </ul>,
-                  );
-                  continue;
-                }
-                if (rendered.has(item.group)) continue;
-                rendered.add(item.group);
-                const group = groups.find((g) => g.id === item.group);
-                if (!group) continue;
-                const isOpen = openGroup === group.id;
-                const groupActive = items.some((i) => i.group === group.id && i.id === activeItem);
-                out.push(
-                  <div
-                    key={group.id}
-                    className={`sidebar-group sidebar-group--dd${isOpen ? ' open' : ''}`}
-                    onMouseEnter={() => onGroupEnter(group.id)}
-                    onMouseLeave={onGroupLeave}
+        <nav className="sidebar-nav" aria-label="Navegación principal">
+          <ul className="sidebar-group-items">{renderItems(undefined)}</ul>
+          {groups?.map((group) => {
+            const isCollapsed = !!collapsedGroups[group.id];
+            return (
+              <div key={group.id} className="sidebar-group">
+                <button
+                  type="button"
+                  className={`sidebar-group-header${isCollapsed ? '' : ' expanded'}`}
+                  onClick={() => toggleGroup(group.id)}
+                  title={group.label}
+                  aria-expanded={!isCollapsed}
+                >
+                  <span className="sidebar-group-label">{group.label}</span>
+                  <svg
+                    className="sidebar-group-chevron"
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
                   >
-                    <button
-                      type="button"
-                      className={`sidebar-item sidebar-group-entry${groupActive ? ' active' : ''}${
-                        isOpen && anchored ? ' anchored' : ''
-                      }`}
-                      onClick={() => onGroupClick(group.id)}
-                      title={group.label}
-                      aria-expanded={isOpen}
-                      aria-haspopup="true"
-                      data-testid={`nav-group-${group.id}`}
-                    >
-                      {group.icon && <span className="sidebar-item-icon">{group.icon}</span>}
-                      <span className="sidebar-item-label">{group.label}</span>
-                      <svg
-                        className={`sidebar-group-chevron${isOpen ? ' open' : ''}`}
-                        width="11"
-                        height="11"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <polyline points="6 9 12 15 18 9" />
-                      </svg>
-                    </button>
-                    {isOpen && (
-                      <ul className="sidebar-group-items sidebar-dd-items">
-                        {renderItems(group.id)}
-                      </ul>
-                    )}
-                  </div>,
-                );
-              }
-              return out;
-            })()
-          ) : (
-            <>
-              <ul className="sidebar-group-items">{renderItems(undefined)}</ul>
-              {groups?.map((group) => {
-                const isCollapsed = !!collapsedGroups[group.id];
-                return (
-                  <div key={group.id} className="sidebar-group">
-                    <button
-                      type="button"
-                      className={`sidebar-group-header${isCollapsed ? '' : ' expanded'}`}
-                      onClick={() => toggleGroup(group.id)}
-                      title={group.label}
-                      aria-expanded={!isCollapsed}
-                    >
-                      <span className="sidebar-group-label">{group.label}</span>
-                      <svg
-                        className="sidebar-group-chevron"
-                        width="11"
-                        height="11"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <polyline points="6 9 12 15 18 9" />
-                      </svg>
-                    </button>
-                    <ul className={`sidebar-group-items${isCollapsed ? ' collapsed' : ''}`}>
-                      {renderItems(group.id)}
-                    </ul>
-                  </div>
-                );
-              })}
-            </>
-          )}
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                <ul className={`sidebar-group-items${isCollapsed ? ' collapsed' : ''}`}>
+                  {renderItems(group.id)}
+                </ul>
+              </div>
+            );
+          })}
         </nav>
 
         {/* Footer: cuenta (estilo ChatGPT) o cierre de sesión simple */}

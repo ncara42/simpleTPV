@@ -15,9 +15,7 @@ function makePrisma() {
     officialDevice: {
       create: vi.fn(async (_a?: unknown) => ({ id: 'dev-1' }) as unknown),
       findFirst: vi.fn(async (_a?: unknown) => null as unknown),
-      findMany: vi.fn(async (_a?: unknown): Promise<unknown[]> => []),
       update: vi.fn(async (_a?: unknown) => ({ id: 'dev-1' }) as unknown),
-      delete: vi.fn(async (_a?: unknown) => ({ id: 'dev-1' }) as unknown),
     },
   };
 }
@@ -112,45 +110,6 @@ describe('DevicesService', () => {
     expect(prisma.officialDevice.update).toHaveBeenCalled();
     expect(result.authorized).toBe(true);
     expect(result.device?.id).toBe('dev-1');
-  });
-
-  it('findAll lista los dispositivos del tenant (con filtro por tienda) y su estado', async () => {
-    const prisma = makePrisma();
-    prisma.officialDevice.findMany = vi.fn(async (args?: unknown) => {
-      const where = (args as { where: Record<string, unknown> }).where;
-      expect(where.organizationId).toBe(ORG);
-      expect(where.storeId).toBe(STORE);
-      return [
-        {
-          id: 'dev-1',
-          storeId: STORE,
-          name: 'TPV mostrador',
-          authorized: true,
-          pairedAt: new Date('2026-06-01'),
-          lastSeenAt: null,
-          pairingToken: 'SECRETO',
-        },
-      ];
-    });
-    const service = makeService(prisma);
-    const res = await tenantStorage.run({ organizationId: ORG }, () => service.findAll(STORE));
-    expect(res).toHaveLength(1);
-    expect(res[0]).toMatchObject({ id: 'dev-1', name: 'TPV mostrador', authorized: true });
-    // El token NUNCA se expone en el listado (solo al crearlo).
-    expect((res[0] as { pairingToken?: string }).pairingToken).toBeUndefined();
-  });
-
-  it('revoke elimina el dispositivo del tenant y 404 si no existe', async () => {
-    const prisma = makePrisma();
-    prisma.officialDevice.findFirst = vi.fn(async () => ({ id: 'dev-1' }));
-    const service = makeService(prisma);
-    await tenantStorage.run({ organizationId: ORG }, () => service.revoke('dev-1'));
-    expect(prisma.officialDevice.delete).toHaveBeenCalledWith({ where: { id: 'dev-1' } });
-
-    prisma.officialDevice.findFirst = vi.fn(async () => null);
-    await expect(
-      tenantStorage.run({ organizationId: ORG }, () => service.revoke('nope')),
-    ).rejects.toThrow(NotFoundException);
   });
 
   it('pair lanza 404 si el token no existe', async () => {
