@@ -89,6 +89,12 @@ const SEARCH_INDEX: SearchEntry[] = [
     synonyms: ['fichajes', 'horas', 'jornada', 'fichar'],
   },
   {
+    label: 'Ajustes',
+    tab: 'settings',
+    hint: 'Organización',
+    synonyms: ['marca', 'color corporativo', 'logo', 'tema', 'personalizacion'],
+  },
+  {
     label: 'Ayuda',
     tab: 'help',
     hint: 'Soporte y FAQ',

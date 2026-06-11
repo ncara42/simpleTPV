@@ -17,6 +17,7 @@ import {
   LayoutDashboard,
   LifeBuoy,
   Package,
+  Palette,
   Percent,
   Receipt,
   ShoppingCart,
@@ -33,6 +34,7 @@ import { DashboardPage } from './DashboardPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { HelpPage } from './HelpPage.js';
 import { api, useAuthStore } from './lib/auth.js';
+import { useBranding } from './lib/branding.js';
 import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { switchApp, type Tab } from './lib/nav.js';
@@ -40,6 +42,7 @@ import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
 import { NotificationsPage } from './NotificationsPage.js';
 import { PromotionsPage } from './PromotionsPage.js';
 import { SalesHistoryPage } from './SalesHistoryPage.js';
+import { SettingsPage } from './SettingsPage.js';
 import { StockPage } from './StockPage.js';
 import { StoresPage } from './StoresPage.js';
 import { SuppliersPage } from './SuppliersPage.js';
@@ -70,10 +73,11 @@ const ALL_NAV: NavItem[] = [
   { id: 'sales', label: 'Ventas', icon: <Receipt size={18} />, group: 'commercial' },
   { id: 'b2b', label: 'Clientes B2B', icon: <Handshake size={18} />, group: 'commercial' },
   { id: 'promotions', label: 'Promociones', icon: <Percent size={18} />, group: 'commercial' },
-  // Organización (D-09): Tiendas · Usuarios · Control horario
+  // Organización (D-09 + U-08): Tiendas · Usuarios · Control horario · Ajustes
   { id: 'stores', label: 'Tiendas', icon: <Store size={18} />, group: 'org' },
   { id: 'users', label: 'Usuarios', icon: <Users size={18} />, group: 'org' },
   { id: 'timeclock', label: 'Control horario', icon: <Clock size={18} />, group: 'org' },
+  { id: 'settings', label: 'Ajustes', icon: <Palette size={18} />, group: 'org' },
   { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'org' },
   { id: 'help', label: 'Ayuda', icon: <LifeBuoy size={18} /> },
 ];
@@ -121,6 +125,8 @@ function PageHeading() {
 function Home() {
   const logout = useAuthStore((s) => s.clear);
   const [tab, setTab] = useState<Tab>('dashboard');
+  // U-08: tema corporativo (color aplicado como tokens; el logo va al sidebar).
+  const branding = useBranding();
   // Feature flags (#127 B): oculta del menú los módulos apagados a nivel org (el
   // backoffice es central → resolución de org). El backend sigue bloqueando con 403.
   const features = useFeatures();
@@ -151,6 +157,11 @@ function Home() {
         groups={NAV_GROUPS}
         groupsAsDropdowns
         collapsible
+        logo={
+          branding?.logoUrl ? (
+            <img className="sidebar-logo-img" src={branding.logoUrl} alt="Logo" />
+          ) : undefined
+        }
         activeItem={tab}
         onSelect={(id) => {
           setNavStoreId(null);
@@ -187,6 +198,7 @@ function Home() {
             {tab === 'suppliers' && <SuppliersPage />}
             {tab === 'verifactu' && <VerifactuPage />}
             {tab === 'b2b' && <B2bPage />}
+            {tab === 'settings' && <SettingsPage />}
             {tab === 'help' && <HelpPage />}
           </main>
         </PageHeaderProvider>

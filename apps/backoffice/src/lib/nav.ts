@@ -17,6 +17,7 @@ export type Tab =
   | 'suppliers'
   | 'verifactu'
   | 'b2b'
+  | 'settings'
   | 'help';
 
 // Toggle Backoffice/TPV. La derivación de URL vive en @simpletpv/ui (siblingAppUrl);

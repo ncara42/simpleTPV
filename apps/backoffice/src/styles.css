@@ -278,3 +278,73 @@
   font-size: 0.88rem;
   color: var(--ui-text-muted);
 }
+
+/* ─── U-08: Ajustes — sección Marca ─────────────────────────────────────── */
+.settings-panel {
+  padding: 1.2rem 1.4rem;
+  max-width: 44rem;
+}
+.settings-brand-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin: 1rem 0;
+}
+.settings-field label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+  margin-bottom: 0.4rem;
+}
+.settings-color-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.settings-color-row input[type='color'] {
+  width: 2.6rem;
+  height: 2.2rem;
+  padding: 0.15rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm, 8px);
+  background: var(--ui-surface);
+  cursor: pointer;
+}
+.settings-hex {
+  width: 7.5rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm, 8px);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+.settings-logo-preview {
+  margin-top: 0.6rem;
+  width: 3.2rem;
+  height: 3.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: 12px;
+  background: var(--ui-surface-subtle);
+  font-weight: 700;
+  color: var(--ui-text-muted);
+  overflow: hidden;
+}
+.settings-logo-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.settings-error {
+  color: var(--ui-danger, #b3261e);
+  font-size: 0.84rem;
+  margin: 0.4rem 0 0;
+}
+.settings-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}

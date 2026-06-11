@@ -671,3 +671,28 @@ test('U-06: la búsqueda de funciones del header navega por nombre y sinónimo',
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('page-heading')).toContainText('Usuarios');
 });
+
+test('U-08: la marca corporativa se aplica como tema en vivo y persiste', async ({ page }) => {
+  const brandVar = () =>
+    page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--ui-brand').trim(),
+    );
+  await navTo(page, 'settings');
+  // El valor por defecto depende de la skin activa (theme-apple): capturarlo.
+  const defaultBrand = await brandVar();
+  await page.getByTestId('brand-color-hex').fill('#aa00ff');
+  await page.getByTestId('settings-save').click();
+  await expect(page.getByTestId('settings-save')).toContainText('Guardado');
+  // El token de acento cambia en vivo (useBranding re-aplica al invalidarse).
+  await expect.poll(brandVar).toBe('#aa00ff');
+  // Persiste tras recargar (viene de la organización, no de localStorage).
+  await page.reload();
+  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
+  await expect.poll(brandVar).toBe('#aa00ff');
+  // Restaurar por defecto para no contaminar el seed entre runs.
+  await navTo(page, 'settings');
+  await page.getByTestId('settings-reset').click();
+  await page.getByTestId('settings-save').click();
+  await expect(page.getByTestId('settings-save')).toContainText('Guardado');
+  await expect.poll(brandVar).toBe(defaultBrand);
+});
