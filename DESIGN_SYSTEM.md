@@ -359,6 +359,32 @@ Wrapper pill con **lupa lucide a la izquierda** pintada como máscara CSS (se ti
 - **Total de cobro** (`.pay-total-amount`): `--ui-text-4xl` (32px), 700, `-0.03em`, tabular.
 - Steppers +/- conservan radio propio (fuera de la regla pill).
 
+### 10.18 Popovers y menús desplegables (U-07)
+
+TODO desplegable flotante (Select, flyouts del sidebar en rail, menú de cuenta,
+resultados de la búsqueda de funciones, futuros menús) comparte UNA piel:
+
+- **Contenedor:** fondo `--ui-surface` · borde 1px `--ui-border-strong` ·
+  radio **12px** · sombra `--ui-shadow-md` · padding interior `0.3rem` ·
+  animación de entrada 0.12s (`opacity` + 3-4px de desplazamiento) con
+  `--ui-ease`; sin animación bajo `prefers-reduced-motion`.
+- **Items:** radio 8px · hover/activo con `--ui-surface-subtle` (o tinte
+  `--ui-brand-soft` si hay semántica de selección) · NUNCA se atenúan las
+  opciones no seleccionadas (regla anti-gris, igual que los gráficos §10.16).
+- **Cierre:** clic fuera + Escape, siempre.
+- Base reutilizable: clases `ui-menu` / `ui-menu-item` / `ui-menu-item-hint`
+  (theme.css); las variantes solo añaden posicionamiento.
+
+### 10.19 Gráficos de barras y línea (revisión U-01/U-02)
+
+- Barras gruesas (38px, máx. 56% de la columna), color constante: **nunca** se
+  atenúa el resto al hover ni hay selección por color.
+- **Sin cifras dentro de las barras**: el valor vive en el tooltip lateral
+  (`ui-chart-tip`) que se materializa al hover/focus junto a la cima de la
+  barra (en los extremos se alinea hacia dentro), y en el `aria-label`.
+- Variante línea (`kind="line"`): misma escala, mismos labels y mismo tooltip;
+  polyline `--ui-brand` (comparación en `--ui-border-strong`) con puntos.
+
 ---
 
 ## 11. Iconografía

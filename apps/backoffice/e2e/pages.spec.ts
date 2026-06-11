@@ -637,3 +637,37 @@ test('API Keys (en Ayuda → Integraciones): lista, alta y banner de un solo uso
   await expect(page.getByTestId('apikey-banner')).toContainText('no se mostrará');
   await expect(page.getByTestId('apikeys-table')).toContainText(keyName);
 });
+
+test('U-04: sidebar contraído a rail — flyout lateral con anclaje y navegación', async ({
+  page,
+}) => {
+  await page.getByTestId('sidebar-collapse').click();
+  await expect(page.locator('aside.sidebar.collapsed')).toBeVisible();
+  // Contraído no se ven las labels del rail (solo iconos).
+  await expect(page.getByTestId('nav-group-inventory').locator('.sidebar-item-label')).toBeHidden();
+  // Clic en el grupo ancla el flyout lateral con sus opciones (labels visibles).
+  await page.getByTestId('nav-group-inventory').click();
+  await expect(page.getByTestId('nav-stock')).toBeVisible();
+  await page.getByTestId('nav-stock').click();
+  // Navega a Stock y el flyout se cierra.
+  await expect(page.getByTestId('stock-alerts-only')).toBeVisible();
+  await expect(page.getByTestId('nav-stock')).toBeHidden();
+  // Vuelta a expandido.
+  await page.getByTestId('sidebar-collapse').click();
+  await expect(page.locator('aside.sidebar.collapsed')).toHaveCount(0);
+});
+
+test('U-06: la búsqueda de funciones del header navega por nombre y sinónimo', async ({ page }) => {
+  // El título de la page vive bajo el header (PageHeading), no en la TopBar.
+  await expect(page.getByTestId('page-heading')).toBeVisible();
+  // Por sinónimo: "tarifas" → Proveedores.
+  await page.getByTestId('function-search-input').fill('tarifas');
+  await expect(page.getByTestId('function-search-result-suppliers')).toBeVisible();
+  await page.getByTestId('function-search-result-suppliers').click();
+  await expect(page.getByTestId('page-heading')).toContainText('Proveedores');
+  // Por nombre con teclado: Ctrl+K, "usuarios", Enter.
+  await page.keyboard.press('Control+k');
+  await page.getByTestId('function-search-input').fill('usuarios');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('page-heading')).toContainText('Usuarios');
+});

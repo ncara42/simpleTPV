@@ -18,6 +18,11 @@ export interface TopBarProps {
   subtitle?: string | undefined;
   /** data-testid opcional para el subtítulo (preserva hooks de e2e como `catalog-count`). */
   subtitleTestId?: string | undefined;
+  /**
+   * U-06: slot de búsqueda. Si se aporta, ocupa la zona izquierda de la barra
+   * (el título/descriptor de la page pasan a vivir bajo el header, en la page).
+   */
+  search?: React.ReactNode;
   activeApp?: 'backoffice' | 'tpv';
   onSwitchApp?: (app: 'backoffice' | 'tpv') => void;
   /** Si se define, pinta la campana de notificaciones a la izquierda del conmutador. */
@@ -52,6 +57,7 @@ export function TopBar({
   title,
   subtitle,
   subtitleTestId,
+  search,
   activeApp = 'tpv',
   onSwitchApp,
   onNotifications,
@@ -61,16 +67,20 @@ export function TopBar({
   return (
     <header className="topbar" data-testid="topbar">
       <div className="topbar-left">
-        {eyebrow && <span className="topbar-eyebrow">{eyebrow}</span>}
-        {title && (
-          <h1 className="topbar-title" title={title}>
-            {title}
-          </h1>
-        )}
-        {title && subtitle && (
-          <p className="topbar-subtitle" data-testid={subtitleTestId} title={subtitle}>
-            {subtitle}
-          </p>
+        {search ?? (
+          <>
+            {eyebrow && <span className="topbar-eyebrow">{eyebrow}</span>}
+            {title && (
+              <h1 className="topbar-title" title={title}>
+                {title}
+              </h1>
+            )}
+            {title && subtitle && (
+              <p className="topbar-subtitle" data-testid={subtitleTestId} title={subtitle}>
+                {subtitle}
+              </p>
+            )}
+          </>
         )}
       </div>
       <div className="topbar-right">

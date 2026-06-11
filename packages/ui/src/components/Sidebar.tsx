@@ -52,6 +52,22 @@ export interface SidebarProps {
    * Los items sin grupo se renderizan como entradas directas en su posición.
    */
   groupsAsDropdowns?: boolean;
+  /**
+   * U-04: permite contraer el sidebar a un rail de iconos. Contraído, el hover
+   * (o clic, que ancla) sobre un grupo abre un flyout lateral con sus opciones;
+   * los items directos enseñan su nombre vía `title`. Persistido en localStorage.
+   */
+  collapsible?: boolean;
+}
+
+const RAIL_STORAGE_KEY = 'ui.sidebar.collapsed';
+
+function readRailCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(RAIL_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
 function LogoutGlyph() {
@@ -83,8 +99,23 @@ export function Sidebar({
   brand,
   account,
   groupsAsDropdowns = false,
+  collapsible = false,
 }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  // U-04: rail de iconos persistido. En móvil el panel siempre abre completo.
+  const [railCollapsed, setRailCollapsed] = useState(() => collapsible && readRailCollapsed());
+  const toggleRail = useCallback(() => {
+    setRailCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(RAIL_STORAGE_KEY, next ? '1' : '0');
+      } catch {
+        /* almacenamiento no disponible: el colapso no se recuerda esta sesión */
+      }
+      return next;
+    });
+  }, []);
+  const collapsed = collapsible && railCollapsed && !mobileOpen;
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [menuOpen, setMenuOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
@@ -265,7 +296,9 @@ export function Sidebar({
         aria-hidden="true"
       />
 
-      <aside className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
+      <aside
+        className={`sidebar${mobileOpen ? ' mobile-open' : ''}${collapsed ? ' collapsed' : ''}`}
+      >
         {/* Header: logotipo (+ marca opcional) */}
         <div className="sidebar-header">
           <span className="sidebar-logo">{logo ?? 'S'}</span>
@@ -385,6 +418,35 @@ export function Sidebar({
             </>
           )}
         </nav>
+
+        {/* U-04: control de contracción a rail (solo si collapsible). */}
+        {collapsible && (
+          <button
+            type="button"
+            className="sidebar-collapse"
+            onClick={toggleRail}
+            data-testid="sidebar-collapse"
+            aria-pressed={collapsed}
+            title={collapsed ? 'Expandir menú' : 'Contraer menú'}
+          >
+            <svg
+              className={`sidebar-collapse-icon${collapsed ? ' is-rail' : ''}`}
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="11 17 6 12 11 7" />
+              <polyline points="18 17 13 12 18 7" />
+            </svg>
+            <span className="sidebar-item-label">Contraer</span>
+          </button>
+        )}
 
         {/* Footer: cuenta (estilo ChatGPT) o cierre de sesión simple */}
         {account ? (

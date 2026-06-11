@@ -81,6 +81,8 @@
 }
 
 /* ─── Menú flotante ─── */
+/* U-07: piel común de popover (radio 12, borde fuerte, sombra md, animación
+   0.12s) — misma que .ui-menu, los flyouts del sidebar y la búsqueda. */
 .ui-select-menu {
   position: absolute;
   z-index: 60;
@@ -90,21 +92,19 @@
   max-height: 18rem;
   overflow-y: auto;
   margin: 0;
-  padding: 0.35rem;
+  padding: 0.3rem;
   list-style: none;
   background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: 14px;
-  box-shadow:
-    0 0 0 0.5px rgba(0, 0, 0, 0.04),
-    0 10px 30px rgba(0, 0, 0, 0.14);
-  animation: ui-select-pop 0.12s ease;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 12px;
+  box-shadow: var(--ui-shadow-md);
+  animation: ui-select-pop 0.12s var(--ui-ease, ease);
 }
 
 @keyframes ui-select-pop {
   from {
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(-3px);
   }
   to {
     opacity: 1;
@@ -140,16 +140,8 @@
   cursor: not-allowed;
 }
 
-/* Cuando hay selección activa, opacar las opciones no seleccionadas */
-.ui-select-menu[data-has-selection] .ui-select-option:not(.is-selected) {
-  opacity: 0.45;
-  transition: opacity 0.12s;
-}
-
-/* Restaurar al hacer hover sobre una opción no seleccionada */
-.ui-select-menu[data-has-selection] .ui-select-option.is-active:not(.is-selected) {
-  opacity: 1;
-}
+/* U-07: la selección se marca con peso + tinte (is-selected/is-active); las
+   demás opciones NO se atenúan (misma regla anti-gris que los gráficos U-01). */
 
 .ui-select-option-label {
   flex: 1;

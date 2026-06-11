@@ -261,3 +261,20 @@
     max-width: none;
   }
 }
+
+/* ─── U-06: título y descriptor de la page bajo el header ──────────────── */
+.bo-page-heading {
+  padding: 1.1rem 1.5rem 0;
+}
+.bo-page-title {
+  margin: 0;
+  font-size: 1.32rem;
+  font-weight: 650;
+  letter-spacing: -0.022em;
+  color: var(--ui-text);
+}
+.bo-page-desc {
+  margin: 0.15rem 0 0;
+  font-size: 0.88rem;
+  color: var(--ui-text-muted);
+}

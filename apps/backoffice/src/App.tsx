@@ -28,13 +28,14 @@ import { useState } from 'react';
 
 import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
+import { FunctionSearch } from './components/FunctionSearch.js';
 import { DashboardPage } from './DashboardPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { HelpPage } from './HelpPage.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
-import { switchApp } from './lib/nav.js';
+import { switchApp, type Tab } from './lib/nav.js';
 import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
 import { NotificationsPage } from './NotificationsPage.js';
 import { PromotionsPage } from './PromotionsPage.js';
@@ -46,23 +47,6 @@ import { TimeClockPage } from './TimeClockPage.js';
 import { TransfersPage } from './TransfersPage.js';
 import { UsersPage } from './UsersPage.js';
 import { VerifactuPage } from './VerifactuPage.js';
-
-type Tab =
-  | 'dashboard'
-  | 'notifications'
-  | 'catalog'
-  | 'families'
-  | 'stock'
-  | 'transfers'
-  | 'promotions'
-  | 'users'
-  | 'timeclock'
-  | 'stores'
-  | 'sales'
-  | 'suppliers'
-  | 'verifactu'
-  | 'b2b'
-  | 'help';
 
 // Menú de 5 entradas (D-02/D-09): Dashboard y Ayuda son pages directas; los tres
 // grupos se despliegan como dropdown (hover sostenido >200ms = preview; clic =
@@ -102,22 +86,35 @@ const ALL_NAV: NavItem[] = [
 const HIDDEN_TABS = new Set<Tab>(['notifications', 'verifactu']);
 const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab));
 
-// La TopBar refleja el título y la descripción de la vista activa (publicados por
-// cada página vía usePageHeader). Sustituye al antiguo eyebrow fijo «Administración»:
-// el contexto de área ya lo da el conmutador Backoffice/TPV de la derecha.
-// La campana de notificaciones se retiró (informe §10): la rotura de stock ya se
-// refuerza en varias zonas, así que el badge global era ruido. Sin onNotifications,
-// la TopBar no renderiza la campana.
-function ShellTopBar() {
-  const { title, description, descriptionTestId } = usePageHeaderValue();
+// U-06: la TopBar aloja la búsqueda de funciones (Ctrl+K); el título/descriptor
+// de la vista activa viven en PageHeading, bajo el header. La campana de
+// notificaciones se retiró (D-16) y vuelve con U-11/D-17.
+function ShellTopBar({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   return (
     <TopBar
-      title={title}
-      subtitle={description}
-      subtitleTestId={descriptionTestId}
+      search={<FunctionSearch onNavigate={onNavigate} />}
       activeApp="backoffice"
       onSwitchApp={switchApp}
     />
+  );
+}
+
+// U-06: el título y el descriptor de la page salen del header a un bloque propio
+// bajo la TopBar. Conserva el data-testid del descriptor (hooks de e2e).
+function PageHeading() {
+  const { title, description, descriptionTestId } = usePageHeaderValue();
+  if (!title) return null;
+  return (
+    <div className="bo-page-heading" data-testid="page-heading">
+      <h1 className="bo-page-title" title={title}>
+        {title}
+      </h1>
+      {description && (
+        <p className="bo-page-desc" data-testid={descriptionTestId} title={description}>
+          {description}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -153,6 +150,7 @@ function Home() {
         items={navItems}
         groups={NAV_GROUPS}
         groupsAsDropdowns
+        collapsible
         activeItem={tab}
         onSelect={(id) => {
           setNavStoreId(null);
@@ -164,8 +162,15 @@ function Home() {
       />
       <div className="app-content">
         <PageHeaderProvider>
-          <ShellTopBar />
+          <ShellTopBar
+            onNavigate={(t) => {
+              setNavStoreId(null);
+              setNavFamilyId(null);
+              setTab(t);
+            }}
+          />
           <main className="bo-main">
+            <PageHeading />
             {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
                 embebe la tabla — enlaza con "Ver todas las ventas →". */}
             {tab === 'dashboard' && <DashboardPage onNavigate={(t) => setTab(t)} />}
