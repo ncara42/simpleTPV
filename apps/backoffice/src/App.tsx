@@ -7,6 +7,7 @@ import './catalog.css';
 import './styles.css';
 
 import { LoginForm, type NavGroup, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeftRight,
   BarChart2,
@@ -39,6 +40,7 @@ import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { switchApp, type Tab } from './lib/nav.js';
 import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
+import { listAlerts } from './lib/stock.js';
 import { NotificationsPage } from './NotificationsPage.js';
 import { PromotionsPage } from './PromotionsPage.js';
 import { SalesHistoryPage } from './SalesHistoryPage.js';
@@ -91,14 +93,28 @@ const HIDDEN_TABS = new Set<Tab>(['notifications', 'verifactu']);
 const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab));
 
 // U-06: la TopBar aloja la búsqueda de funciones (Ctrl+K); el título/descriptor
-// de la vista activa viven en PageHeading, bajo el header. La campana de
-// notificaciones se retiró (D-16) y vuelve con U-11/D-17.
-function ShellTopBar({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
+// de la vista activa viven en PageHeading, bajo el header. U-11/D-17: la campana
+// vuelve a la TopBar con el badge de roturas y abre Notificaciones (esa page sigue
+// fuera del menú lateral; la campana es su acceso, como dictaba D-09).
+function ShellTopBar({
+  onNavigate,
+  onNotifications,
+  notificationCount,
+  notificationsActive,
+}: {
+  onNavigate: (tab: Tab) => void;
+  onNotifications: () => void;
+  notificationCount: number;
+  notificationsActive: boolean;
+}) {
   return (
     <TopBar
       search={<FunctionSearch onNavigate={onNavigate} />}
       activeApp="backoffice"
       onSwitchApp={switchApp}
+      onNotifications={onNotifications}
+      notificationCount={notificationCount}
+      notificationsActive={notificationsActive}
     />
   );
 }
@@ -149,6 +165,19 @@ function Home() {
     setNavFamilyId(familyId);
     setTab('catalog');
   };
+  // U-12: "Resolver" una notificación → Stock filtrado por tienda y producto.
+  const [navSearch, setNavSearch] = useState<string | null>(null);
+  const resolveStock = (storeId: string, productName: string): void => {
+    setNavStoreId(storeId);
+    setNavSearch(productName);
+    setTab('stock');
+  };
+  // U-11/D-17: badge de la campana = nº de roturas activas (misma queryKey que
+  // Notificaciones; refresca con el SSE de esa vista).
+  const { data: alerts = [] } = useQuery({
+    queryKey: ['stock-alerts'],
+    queryFn: () => listAlerts(),
+  });
 
   return (
     <div className="app-shell">
@@ -166,6 +195,7 @@ function Home() {
         onSelect={(id) => {
           setNavStoreId(null);
           setNavFamilyId(null);
+          setNavSearch(null);
           setTab(id as Tab);
         }}
         account={{ name: 'Administrador', subtitle: 'Central · Admin' }}
@@ -177,8 +207,12 @@ function Home() {
             onNavigate={(t) => {
               setNavStoreId(null);
               setNavFamilyId(null);
+              setNavSearch(null);
               setTab(t);
             }}
+            onNotifications={() => setTab('notifications')}
+            notificationCount={alerts.length}
+            notificationsActive={tab === 'notifications'}
           />
           <main className="bo-main">
             <PageHeading />
@@ -186,10 +220,10 @@ function Home() {
                 embebe la tabla — enlaza con "Ver todas las ventas →". */}
             {tab === 'dashboard' && <DashboardPage onNavigate={(t) => setTab(t)} />}
             {tab === 'sales' && <SalesHistoryPage initialStoreId={navStoreId} />}
-            {tab === 'notifications' && <NotificationsPage />}
+            {tab === 'notifications' && <NotificationsPage onResolve={{ resolveStock }} />}
             {tab === 'catalog' && <CatalogPage initialFamilyId={navFamilyId} />}
             {tab === 'families' && <FamiliesPage onOpenCatalogFamily={openCatalogFamily} />}
-            {tab === 'stock' && <StockPage initialStoreId={navStoreId} />}
+            {tab === 'stock' && <StockPage initialStoreId={navStoreId} initialSearch={navSearch} />}
             {tab === 'transfers' && <TransfersPage />}
             {tab === 'promotions' && <PromotionsPage />}
             {tab === 'users' && <UsersPage />}

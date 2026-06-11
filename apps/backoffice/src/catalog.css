@@ -2454,6 +2454,15 @@
   padding-left: var(--ui-space-5);
   border-left: 1px solid var(--ui-border);
 }
+/* U-09: grupo anclado a la derecha (botón Columnas) — sin separador. */
+.stock-filter-group--end {
+  margin-left: auto;
+}
+.stock-filter-group--end + .stock-filter-group,
+.stock-filter-group.stock-filter-group--end {
+  padding-left: 0;
+  border-left: none;
+}
 .stock-filter-label {
   font-size: var(--ui-text-2xs);
   font-weight: 600;
@@ -2686,13 +2695,13 @@
   background: var(--ui-surface-subtle);
 }
 
-/* ── Panel centralizado de roturas ── */
+/* ── Panel centralizado de roturas (U-10: card propia, encima de la tabla) ──
+   Hereda el chrome de .table-panel; aquí solo el espaciado inferior y el límite
+   de alto para que no empuje la tabla demasiado abajo. */
 .stock-alerts-panel {
-  margin: var(--ui-space-3) 0;
-  padding: var(--ui-space-3);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md, 0.5rem);
-  background: var(--ui-surface);
+  margin-bottom: var(--ui-space-4);
+  max-height: 18rem;
+  overflow-y: auto;
 }
 .stock-alerts-head {
   display: flex;
@@ -3036,4 +3045,10 @@
 }
 .supplier-detail-h {
   margin: var(--ui-space-4) 0 var(--ui-space-2);
+}
+
+/* U-12: celda de acción de las notificaciones — botón "Resolver" a la derecha. */
+.notif-action-cell {
+  text-align: right;
+  white-space: nowrap;
 }

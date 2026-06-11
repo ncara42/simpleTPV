@@ -696,3 +696,32 @@ test('U-08: la marca corporativa se aplica como tema en vivo y persiste', async 
   await expect(page.getByTestId('settings-save')).toContainText('Guardado');
   await expect.poll(brandVar).toBe(defaultBrand);
 });
+
+test('U-10/U-09: avisos de stock en panel propio encima y botón Columnas en la toolbar', async ({
+  page,
+}) => {
+  await navTo(page, 'stock');
+  await expect(page.getByTestId('stock-page')).toBeVisible();
+  // El panel de avisos es una card propia, hermana de la tabla (no anidada dentro).
+  const alertsPanel = page.getByTestId('stock-alerts-panel');
+  await expect(alertsPanel).toBeVisible();
+  const nestedTables = await alertsPanel.locator('table').count();
+  expect(nestedTables).toBe(0);
+  // El botón de columnas vive en la toolbar de filtros, no flotando sobre la tabla.
+  await expect(page.getByTestId('stock-columns-toggle')).toBeVisible();
+});
+
+test('U-11/U-12: la campana abre Notificaciones y "Resolver" lleva a Stock del producto', async ({
+  page,
+}) => {
+  // La campana de la TopBar vuelve (D-17) con badge de roturas.
+  await expect(page.getByTestId('topbar-notifications')).toBeVisible();
+  await page.getByTestId('topbar-notifications').click();
+  await expect(page.getByTestId('notifications-page')).toBeVisible();
+  // Cada alerta tiene su botón Resolver → Stock filtrado por el producto.
+  const firstAlert = page.getByTestId('alert-row').first();
+  const productName = (await firstAlert.locator('td').first().textContent())?.trim() ?? '';
+  await firstAlert.getByTestId('alert-resolve').click();
+  await expect(page.getByTestId('stock-page')).toBeVisible();
+  await expect(page.getByTestId('stock-search')).toHaveValue(productName);
+});
