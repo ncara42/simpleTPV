@@ -6,11 +6,19 @@ import { usePageHeader } from './lib/pageHeader.js';
 import { listAlerts, listExpiringBatches } from './lib/stock.js';
 import { ALERT_LABEL, df, EXPIRY_LABEL, expiryDaysText } from './stock/labels.js';
 
+// U-12: cada notificación lleva A LA ACCIÓN que la resuelve. El destino reutiliza
+// la navegación del shell (Stock filtrado por tienda + búsqueda por producto), así
+// se aterriza directamente sobre el producto afectado para reponer/ajustar o
+// revisar sus lotes.
+export interface NotifResolve {
+  resolveStock: (storeId: string, productName: string) => void;
+}
+
 // Portal de notificaciones: centraliza las alertas de stock y la caducidad de
 // lotes (#126 slice 4). El badge de la campana (TopBar) y el del sidebar comparten
 // la queryKey ['stock-alerts'] con esta vista. La caducidad se computa on-read
 // (sin cron): GET /stock/expiring devuelve lotes caducados o por caducar.
-export function NotificationsPage() {
+export function NotificationsPage({ onResolve }: { onResolve?: NotifResolve }) {
   const qc = useQueryClient();
   const { data: alerts = [], isLoading: loadingAlerts } = useQuery({
     queryKey: ['stock-alerts'],
@@ -58,6 +66,7 @@ export function NotificationsPage() {
                   <th>Producto</th>
                   <th>Tienda</th>
                   <th>Alerta</th>
+                  <th aria-label="Acción" />
                 </tr>
               </thead>
               <tbody>
@@ -78,6 +87,16 @@ export function NotificationsPage() {
                           · hay sustituto
                         </span>
                       )}
+                    </td>
+                    <td className="notif-action-cell">
+                      <button
+                        type="button"
+                        className="config-trigger"
+                        onClick={() => onResolve?.resolveStock(a.storeId, a.productName)}
+                        data-testid="alert-resolve"
+                      >
+                        Resolver
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -109,6 +128,7 @@ export function NotificationsPage() {
                   <th>Caducidad</th>
                   <th>Cantidad</th>
                   <th>Estado</th>
+                  <th aria-label="Acción" />
                 </tr>
               </thead>
               <tbody>
@@ -124,6 +144,16 @@ export function NotificationsPage() {
                         {EXPIRY_LABEL[b.status] ?? b.status}
                       </span>
                       <span className="expiry-when">· {expiryDaysText(b.daysToExpiry)}</span>
+                    </td>
+                    <td className="notif-action-cell">
+                      <button
+                        type="button"
+                        className="config-trigger"
+                        onClick={() => onResolve?.resolveStock(b.storeId, b.productName)}
+                        data-testid="expiring-resolve"
+                      >
+                        Ver en stock
+                      </button>
                     </td>
                   </tr>
                 ))}

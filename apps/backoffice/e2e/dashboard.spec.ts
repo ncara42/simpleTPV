@@ -89,25 +89,17 @@ test('preset Inventario: roturas, rotación y peor rotación; Equipo: vendedores
   await expect(page.getByTestId('kpi-today')).toBeVisible();
 });
 
-test('ocultar un panel solo afecta al preset activo y persiste (I-15, D-03)', async ({ page }) => {
+test('D-18 (U-03): no hay personalización manual — el preset dicta la composición', async ({
+  page,
+}) => {
+  await expect(page.getByTestId('dashboard')).toBeVisible();
+  // El botón Personalizar y su editor ya no existen.
+  await expect(page.getByTestId('dash-customize')).toHaveCount(0);
+  await expect(page.getByTestId('dash-cards-editor')).toHaveCount(0);
+  // Cada preset pinta SIEMPRE sus paneles completos.
   await page.getByTestId('dash-preset-equipo').click();
   await expect(page.getByTestId('dash-discount-emp')).toBeVisible();
-  await page.getByTestId('dash-customize').click();
-  await page.getByTestId('panel-toggle-dash-discount-emp').click();
-  await expect(page.getByTestId('dash-discount-emp')).toHaveCount(0);
-  // En Beneficio el mismo panel sigue visible (ocultos por preset).
-  await page.getByTestId('dash-preset-beneficio').click();
-  await expect(page.getByTestId('dash-discount-emp')).toBeVisible();
-  // De vuelta en Equipo sigue oculto, también tras recargar.
-  await page.getByTestId('dash-preset-equipo').click();
-  await expect(page.getByTestId('dash-discount-emp')).toHaveCount(0);
-  await page.reload();
-  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
-  await expect(page.getByTestId('dash-discount-emp')).toHaveCount(0);
-  // Restaurar.
-  await page.getByTestId('dash-customize').click();
-  await page.getByTestId('panel-toggle-dash-discount-emp').click();
-  await expect(page.getByTestId('dash-discount-emp')).toBeVisible();
+  await expect(page.getByTestId('dash-sales-emp')).toBeVisible();
   await page.getByTestId('dash-preset-ventas').click();
 });
 
@@ -123,21 +115,22 @@ test('Ventas es page propia: el dashboard no embebe la tabla y enlaza al final (
   await expect(page.getByTestId('sales-totals')).toBeVisible();
 });
 
-test('personalización: ocultar una KPI card la quita y persiste (IT-16)', async ({ page }) => {
+test('U-02: el toggle barras ↔ línea cambia los gráficos y persiste', async ({ page }) => {
   await page.getByTestId('dash-preset-ventas').click();
-  await expect(page.getByTestId('kpi-upt')).toBeVisible();
-  await page.getByTestId('dash-customize').click();
-  await expect(page.getByTestId('dash-cards-editor')).toBeVisible();
-  await page.getByTestId('card-toggle-kpi-upt').click();
-  await expect(page.getByTestId('kpi-upt')).toBeHidden();
-  // Persiste tras recargar (preferencia guardada en /me/preferences).
+  await expect(page.getByTestId('dash-hour')).toBeVisible();
+  // Por defecto, barras.
+  await expect(page.getByTestId('dash-hour').locator('.ui-chart-bar').first()).toBeVisible();
+  // Cambiar a línea: aparece la polyline y desaparecen las barras.
+  await page.getByTestId('dash-chart-kind-line').click();
+  await expect(page.getByTestId('dash-hour').locator('.ui-chart-line-path')).toBeVisible();
+  await expect(page.getByTestId('dash-hour').locator('.ui-chart-bar')).toHaveCount(0);
+  // Persiste tras recargar (preferencia en /me/preferences).
   await page.reload();
   await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
-  await expect(page.getByTestId('kpi-upt')).toBeHidden();
-  // Restaura para no dejar la preferencia sucia entre tests.
-  await page.getByTestId('dash-customize').click();
-  await page.getByTestId('card-toggle-kpi-upt').click();
-  await expect(page.getByTestId('kpi-upt')).toBeVisible();
+  await expect(page.getByTestId('dash-hour').locator('.ui-chart-line-path')).toBeVisible();
+  // Restaura a barras para no dejar la preferencia sucia entre tests.
+  await page.getByTestId('dash-chart-kind-bars').click();
+  await expect(page.getByTestId('dash-hour').locator('.ui-chart-bar').first()).toBeVisible();
 });
 
 test('preferencias por defecto: el dashboard recuerda el periodo elegido (IT-16)', async ({

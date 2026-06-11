@@ -21,4 +21,11 @@ describe('Button', () => {
     );
     expect(screen.getByRole('button', { name: 'Eliminar' })).toHaveClass('bg-[var(--ui-danger)]');
   });
+
+  it('U-14: pinta el icono (aria-hidden) junto al texto sin romper el nombre accesible', () => {
+    render(<Button icon={<svg data-testid="cta-icon" />}>Nuevo producto</Button>);
+    // El nombre accesible sigue siendo el texto (el icono es decorativo).
+    const btn = screen.getByRole('button', { name: 'Nuevo producto' });
+    expect(btn.querySelector('[data-testid="cta-icon"]')).not.toBeNull();
+  });
 });

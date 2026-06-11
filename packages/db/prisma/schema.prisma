@@ -15,6 +15,9 @@ model Organization {
   locale    String   @default("es-ES")
   currency  String   @default("EUR")
   createdAt DateTime @default(now())
+  // U-08: marca corporativa — color primario (#rrggbb) y logo (data-URL acotada).
+  brandColor String?
+  logoUrl    String?
 
   stores              Store[]
   users               User[]

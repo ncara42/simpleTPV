@@ -58,6 +58,7 @@ const NAV_GROUP_OF: Record<string, string> = {
   stores: 'org',
   users: 'org',
   timeclock: 'org',
+  settings: 'org',
 };
 
 // Navega por el menú de grupos: ancla el dropdown del grupo (clic) y elige la

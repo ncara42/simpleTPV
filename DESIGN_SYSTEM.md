@@ -78,11 +78,16 @@ Capa 3 — TAILWIND @theme inline (apps/tpv/src/styles.css)
 
 ### 3.2 Texto
 
-| Token             | BASE      | VIVO (Apple)       | Uso                                      |
-| ----------------- | --------- | ------------------ | ---------------------------------------- |
-| `--ui-text`       | `#18181a` | `#1d1d1f` (ink)    | Titulares y cuerpo                       |
-| `--ui-text-muted` | `#6b6b66` | `#6e6e73` (gray-1) | Texto secundario                         |
-| `--ui-text-soft`  | `#8d897f` | `#86868b` (gray-2) | Texto terciario, placeholders, etiquetas |
+| Token             | BASE      | VIVO (Apple)       | Uso                                      | Contraste sobre canvas |
+| ----------------- | --------- | ------------------ | ---------------------------------------- | ---------------------- |
+| `--ui-text`       | `#18181a` | `#1d1d1f` (ink)    | Titulares y cuerpo                       | ~16:1                  |
+| `--ui-text-muted` | `#6b6b66` | `#6e6e73` (gray-1) | Texto secundario                         | 4.7:1 (AA)             |
+| `--ui-text-soft`  | `#71706c` | `#6f6f78` (gray-2) | Texto terciario, placeholders, etiquetas | 4.5:1 (AA)             |
+
+> **WCAG (revisión 2026-06-11):** el terciario era `#86868b` (3.6:1) y NO cumplía
+> AA para texto normal; oscurecido a `#6f6f78` (gray-2) / `#71706c` (base) para
+> alcanzar ≥4.5:1. Todos los tokens de texto cumplen ahora AA sobre `--ui-bg` y
+> `--ui-surface`.
 
 ### 3.3 Acción primaria y marca
 
@@ -359,13 +364,57 @@ Wrapper pill con **lupa lucide a la izquierda** pintada como máscara CSS (se ti
 - **Total de cobro** (`.pay-total-amount`): `--ui-text-4xl` (32px), 700, `-0.03em`, tabular.
 - Steppers +/- conservan radio propio (fuera de la regla pill).
 
+### 10.18 Popovers y menús desplegables (U-07)
+
+TODO desplegable flotante (Select, flyouts del sidebar en rail, menú de cuenta,
+resultados de la búsqueda de funciones, futuros menús) comparte UNA piel:
+
+- **Contenedor:** fondo `--ui-surface` · borde 1px `--ui-border-strong` ·
+  radio **12px** · sombra `--ui-shadow-md` · padding interior `0.3rem` ·
+  animación de entrada 0.12s (`opacity` + 3-4px de desplazamiento) con
+  `--ui-ease`; sin animación bajo `prefers-reduced-motion`.
+- **Items:** radio 8px · hover/activo con `--ui-surface-subtle` (o tinte
+  `--ui-brand-soft` si hay semántica de selección) · NUNCA se atenúan las
+  opciones no seleccionadas (regla anti-gris, igual que los gráficos §10.16).
+- **Cierre:** clic fuera + Escape, siempre.
+- Base reutilizable: clases `ui-menu` / `ui-menu-item` / `ui-menu-item-hint`
+  (theme.css); las variantes solo añaden posicionamiento.
+
+### 10.19 Gráficos de barras y línea (revisión U-01/U-02)
+
+- Barras gruesas (38px, máx. 56% de la columna), color constante: **nunca** se
+  atenúa el resto al hover ni hay selección por color.
+- **Sin cifras dentro de las barras**: el valor vive en el tooltip lateral
+  (`ui-chart-tip`) que se materializa al hover/focus junto a la cima de la
+  barra (en los extremos se alinea hacia dentro), y en el `aria-label`.
+- Variante línea (`kind="line"`): misma escala, mismos labels y mismo tooltip;
+  polyline `--ui-brand` (comparación en `--ui-border-strong`) con puntos.
+
 ---
 
 ## 11. Iconografía
 
 - **Set:** Lucide (líneas, `stroke-width: 2`, `stroke-linecap/linejoin: round`). Algunos iconos se inyectan como **máscara CSS** para tintarse con tokens (p. ej. la lupa de búsqueda).
-- **Tamaños:** icono de ítem de sidebar 19px; lupa de búsqueda 1.05rem.
+- **Tamaños:** icono de ítem de sidebar 19px; lupa de búsqueda 1.05rem; icono de botón/CTA 16px.
 - **Color:** heredan `currentColor`/tokens; nunca color propio fijo.
+
+### 11.1 Mapa acción → icono (U-14, vinculante)
+
+Todo CTA/botón de acción lleva su icono; **un icono = una acción** en toda la app.
+El `Button` acepta `icon` y pone hueco/alineación (no se compone a mano).
+
+| Acción            | Icono (lucide) | Acción               | Icono         |
+| ----------------- | -------------- | -------------------- | ------------- |
+| Crear / nuevo     | `Plus`         | Importar             | `Upload`      |
+| Guardar           | `Check`        | Exportar / descargar | `Download`    |
+| Editar            | `Pencil`       | Imprimir             | `Printer`     |
+| Borrar            | `Trash2`       | Reponer              | `PackagePlus` |
+| Cancelar / cerrar | `X`            | Mover                | `Move`        |
+| Buscar            | `Search`       | Ver                  | `Eye`         |
+| Filtrar           | `Filter`       | Refrescar            | `RefreshCw`   |
+
+Excepción admitida: botones de texto dentro de tablas densas si el icono añade
+ruido (anotar en el PR). Los icon-only (sin texto) llevan `aria-label` y `title`.
 
 ---
 
@@ -379,7 +428,7 @@ Wrapper pill con **lupa lucide a la izquierda** pintada como máscara CSS (se ti
 6. **Filas de tabla a 3.5rem** y controles a `--bo-control-height` para densidad homogénea.
 7. **Movimiento:** una sola curva (`--ui-ease`) y tres tiempos; respetar `prefers-reduced-motion`.
 8. **Accesibilidad:** foco con `:focus-visible` + `--ui-focus`; contraste AA; ARIA correcto en overlays.
-9. **Nunca hardcodear** un hex/medida en un componente: usar `--ui-*` o utilidades `rounded-*`. Si falta un token, se añade al sistema, no al componente.
+9. **Nunca hardcodear** un hex/medida en un componente: usar `--ui-*` o utilidades `rounded-*`. Si falta un token, se añade al sistema, no al componente. (U-15) Esto incluye los **fallbacks** de `var()`: nada de `var(--x, #a9a9a9)` con un gris/semántico literal, ni tokens huérfanos legacy (`--tpv-*`, `--border`, `--ui-accent`); referenciar siempre el token canónico `--ui-*` sin fallback hardcodeado. La escala de grises vive en §3.1 (`--ui-bg/surface/surface-subtle/border/border-strong/text-*`).
 
 ---
 

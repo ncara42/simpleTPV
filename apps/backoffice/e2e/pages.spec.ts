@@ -344,7 +344,7 @@ test('Compras y VeriFactu están retiradas del menú (#106)', async ({ page }) =
 test('Familias muestra las raíz con subfamilias anidadas (#97)', async ({ page }) => {
   await navTo(page, 'families');
   // Árbol canónico del seed: 4 raíces + 2 subfamilias + 6 arquetipos = 12 nodos.
-  // >= por si otros tests crean subniveles. count() no auto-espera: anclar antes
+  // >= por si otros tests crean subfamilias. count() no auto-espera: anclar antes
   // la primera fila para no contar durante la carga.
   await expect(page.getByTestId('fam-row').first()).toBeVisible();
   expect(await page.getByTestId('fam-row').count()).toBeGreaterThanOrEqual(12);
@@ -352,12 +352,12 @@ test('Familias muestra las raíz con subfamilias anidadas (#97)', async ({ page 
   await expect(page.getByTestId('fam-count').first()).toContainText('productos');
 });
 
-test('Familias: crear un subnivel anidado (profundidad arbitraria, UX)', async ({ page }) => {
+test('Familias: crear una subfamilia anidada (profundidad arbitraria, UX)', async ({ page }) => {
   await navTo(page, 'families');
   const aceitesCbd = page.getByTestId('fam-row').filter({ hasText: 'Aceites CBD' }).first();
   await aceitesCbd.click();
   await aceitesCbd.getByTestId('fam-add-child').click();
-  const subName = `Subnivel E2E ${Date.now()}`;
+  const subName = `Subfamilia E2E ${Date.now()}`;
   await page.getByTestId('family-name').fill(subName);
   await page.getByTestId('family-save').click();
   await expect(page.getByTestId('fam-tree')).toContainText(subName);
@@ -373,11 +373,11 @@ test('Familias: árbol con raíz en orden y todas las filas (#98)', async ({ pag
   expect(await rows.count()).toBeGreaterThanOrEqual(12);
 });
 
-test('Familias: marcar un subnivel como arquetipo lo distingue y oculta "+ Subnivel"', async ({
+test('Familias: marcar una subfamilia como arquetipo la distingue y oculta "Añadir subfamilia"', async ({
   page,
 }) => {
   await navTo(page, 'families');
-  // Crear un subnivel bajo "Flores CBD" (no una raíz, para no alterar el orden de
+  // Crear una subfamilia bajo "Flores CBD" (no una raíz, para no alterar el orden de
   // raíces en reruns) y marcarlo como arquetipo.
   const flores = page.getByTestId('fam-row').filter({ hasText: 'Flores CBD' }).first();
   await flores.click();
@@ -390,7 +390,7 @@ test('Familias: marcar un subnivel como arquetipo lo distingue y oculta "+ Subni
   // El nodo aparece con el distintivo "Arquetipo".
   const row = page.getByTestId('fam-row').filter({ hasText: name });
   await expect(row.getByTestId('fam-archetype-badge')).toBeVisible();
-  // Al seleccionarlo NO ofrece crear subniveles (un arquetipo solo contiene productos).
+  // Al seleccionarlo NO ofrece crear subfamilias (un arquetipo solo contiene productos).
   await row.click();
   await expect(row.getByTestId('fam-add-child')).toHaveCount(0);
 });
@@ -408,12 +408,15 @@ test('Familias: panel de productos del nodo — ver, añadir aquí y mover (I-13
   expect(items).toBeGreaterThanOrEqual(3); // el seed da 3 al arquetipo
   // El contador de la fila dice la VERDAD (E-16): coincide con el panel.
   await expect(arq.getByTestId('fam-count')).toHaveText(`${items} productos`);
-  // En un arquetipo no hay toggle de subniveles (no tiene descendientes)…
+  // En un arquetipo no hay toggle de subfamilias (no tiene descendientes)…
   await expect(page.getByTestId('fam-panel-subtree')).toHaveCount(0);
 
-  // …y en una familia raíz sí: incluir subniveles amplía la lista.
-  await page.getByTestId('fam-row').first().click(); // "Aceites" (sortOrder 1)
+  // …y en una familia raíz sí: incluir subfamilias amplía la lista. Se clica el
+  // NOMBRE (no el centro de la fila, que ahora puede caer sobre las acciones
+  // siempre visibles de U-13) para seleccionar "Aceites" de forma estable.
+  await page.getByTestId('fam-row').first().locator('.fam-name').click();
   await expect(page.getByTestId('fam-products-panel')).toBeVisible();
+  await expect(page.getByTestId('fam-panel-subtree')).toBeVisible();
   const direct = await page.getByTestId('fam-product-item').count();
   await page.getByTestId('fam-panel-subtree').check();
   await expect.poll(() => page.getByTestId('fam-product-item').count()).toBeGreaterThan(direct);
@@ -636,4 +639,92 @@ test('API Keys (en Ayuda → Integraciones): lista, alta y banner de un solo uso
   await page.getByRole('button', { name: 'Crear' }).click();
   await expect(page.getByTestId('apikey-banner')).toContainText('no se mostrará');
   await expect(page.getByTestId('apikeys-table')).toContainText(keyName);
+});
+
+test('U-04: sidebar contraído a rail — flyout lateral con anclaje y navegación', async ({
+  page,
+}) => {
+  await page.getByTestId('sidebar-collapse').click();
+  await expect(page.locator('aside.sidebar.collapsed')).toBeVisible();
+  // Contraído no se ven las labels del rail (solo iconos).
+  await expect(page.getByTestId('nav-group-inventory').locator('.sidebar-item-label')).toBeHidden();
+  // Clic en el grupo ancla el flyout lateral con sus opciones (labels visibles).
+  await page.getByTestId('nav-group-inventory').click();
+  await expect(page.getByTestId('nav-stock')).toBeVisible();
+  await page.getByTestId('nav-stock').click();
+  // Navega a Stock y el flyout se cierra.
+  await expect(page.getByTestId('stock-alerts-only')).toBeVisible();
+  await expect(page.getByTestId('nav-stock')).toBeHidden();
+  // Vuelta a expandido.
+  await page.getByTestId('sidebar-collapse').click();
+  await expect(page.locator('aside.sidebar.collapsed')).toHaveCount(0);
+});
+
+test('U-06: la búsqueda de funciones del header navega por nombre y sinónimo', async ({ page }) => {
+  // El título de la page vive bajo el header (PageHeading), no en la TopBar.
+  await expect(page.getByTestId('page-heading')).toBeVisible();
+  // Por sinónimo: "tarifas" → Proveedores.
+  await page.getByTestId('function-search-input').fill('tarifas');
+  await expect(page.getByTestId('function-search-result-suppliers')).toBeVisible();
+  await page.getByTestId('function-search-result-suppliers').click();
+  await expect(page.getByTestId('page-heading')).toContainText('Proveedores');
+  // Por nombre con teclado: Ctrl+K, "usuarios", Enter.
+  await page.keyboard.press('Control+k');
+  await page.getByTestId('function-search-input').fill('usuarios');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('page-heading')).toContainText('Usuarios');
+});
+
+test('U-08: la marca corporativa se aplica como tema en vivo y persiste', async ({ page }) => {
+  const brandVar = () =>
+    page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--ui-brand').trim(),
+    );
+  await navTo(page, 'settings');
+  // El valor por defecto depende de la skin activa (theme-apple): capturarlo.
+  const defaultBrand = await brandVar();
+  await page.getByTestId('brand-color-hex').fill('#aa00ff');
+  await page.getByTestId('settings-save').click();
+  await expect(page.getByTestId('settings-save')).toContainText('Guardado');
+  // El token de acento cambia en vivo (useBranding re-aplica al invalidarse).
+  await expect.poll(brandVar).toBe('#aa00ff');
+  // Persiste tras recargar (viene de la organización, no de localStorage).
+  await page.reload();
+  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
+  await expect.poll(brandVar).toBe('#aa00ff');
+  // Restaurar por defecto para no contaminar el seed entre runs.
+  await navTo(page, 'settings');
+  await page.getByTestId('settings-reset').click();
+  await page.getByTestId('settings-save').click();
+  await expect(page.getByTestId('settings-save')).toContainText('Guardado');
+  await expect.poll(brandVar).toBe(defaultBrand);
+});
+
+test('U-10/U-09: avisos de stock en panel propio encima y botón Columnas en la toolbar', async ({
+  page,
+}) => {
+  await navTo(page, 'stock');
+  await expect(page.getByTestId('stock-page')).toBeVisible();
+  // El panel de avisos es una card propia, hermana de la tabla (no anidada dentro).
+  const alertsPanel = page.getByTestId('stock-alerts-panel');
+  await expect(alertsPanel).toBeVisible();
+  const nestedTables = await alertsPanel.locator('table').count();
+  expect(nestedTables).toBe(0);
+  // El botón de columnas vive en la toolbar de filtros, no flotando sobre la tabla.
+  await expect(page.getByTestId('stock-columns-toggle')).toBeVisible();
+});
+
+test('U-11/U-12: la campana abre Notificaciones y "Resolver" lleva a Stock del producto', async ({
+  page,
+}) => {
+  // La campana de la TopBar vuelve (D-17) con badge de roturas.
+  await expect(page.getByTestId('topbar-notifications')).toBeVisible();
+  await page.getByTestId('topbar-notifications').click();
+  await expect(page.getByTestId('notifications-page')).toBeVisible();
+  // Cada alerta tiene su botón Resolver → Stock filtrado por el producto.
+  const firstAlert = page.getByTestId('alert-row').first();
+  const productName = (await firstAlert.locator('td').first().textContent())?.trim() ?? '';
+  await firstAlert.getByTestId('alert-resolve').click();
+  await expect(page.getByTestId('stock-page')).toBeVisible();
+  await expect(page.getByTestId('stock-search')).toHaveValue(productName);
 });
