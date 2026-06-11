@@ -1,9 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Store } from '@simpletpv/db';
 
+import { assertStoreAccess } from '../auth/store-access.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import type { CreateStoreDto, UpdateStoreDto } from './stores.dto.js';
+
+// El actor que gestiona el estado operativo: lo necesita assertStoreAccess para
+// acotar a un MANAGER a sus tiendas (SEC-01).
+type StoreOpsActor = { userId: string; role: string };
 
 @Injectable()
 export class StoresService {
@@ -20,7 +25,9 @@ export class StoresService {
   async updateOps(
     id: string,
     input: { verified?: boolean; incident?: string | null },
+    actor: StoreOpsActor,
   ): Promise<Store> {
+    await assertStoreAccess(this.prisma, { userId: actor.userId, role: actor.role, storeId: id });
     const tenant = requireTenant();
     const store = await this.prisma.store.findFirst({
       where: { id, organizationId: tenant.organizationId },

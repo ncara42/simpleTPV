@@ -5,6 +5,8 @@ import { StoresService } from './stores.service.js';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 
+const ADMIN_ACTOR = { userId: 'u1', role: 'ADMIN' };
+
 function makePrisma() {
   return {
     store: {
@@ -13,6 +15,9 @@ function makePrisma() {
       findFirst: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 's1', name: 'Tienda' })),
       update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 's1', ...data })),
       delete: vi.fn(async () => ({ id: 's1' })),
+    },
+    userStore: {
+      findFirst: vi.fn(async () => null),
     },
   };
 }
@@ -24,7 +29,7 @@ describe('StoresService.updateOps', () => {
     prisma.store.update = vi.fn(async (a: unknown) => a) as never;
     const service = new StoresService(prisma as never);
     await tenantStorage.run({ organizationId: ORG }, () =>
-      service.updateOps('s1', { verified: true, incident: 'Persiana rota' }),
+      service.updateOps('s1', { verified: true, incident: 'Persiana rota' }, ADMIN_ACTOR),
     );
     const arg = prisma.store.update.mock.calls[0]![0] as {
       data: { opsVerified: boolean; opsIncident: string; opsUpdatedAt: Date };
@@ -35,7 +40,7 @@ describe('StoresService.updateOps', () => {
 
     prisma.store.findFirst = vi.fn(async () => null) as never;
     await expect(
-      tenantStorage.run({ organizationId: ORG }, () => service.updateOps('nope', {})),
+      tenantStorage.run({ organizationId: ORG }, () => service.updateOps('nope', {}, ADMIN_ACTOR)),
     ).rejects.toThrow();
   });
 
@@ -45,7 +50,7 @@ describe('StoresService.updateOps', () => {
     prisma.store.update = vi.fn(async (a: unknown) => a) as never;
     const service = new StoresService(prisma as never);
     await tenantStorage.run({ organizationId: ORG }, () =>
-      service.updateOps('s1', { incident: '' }),
+      service.updateOps('s1', { incident: '' }, ADMIN_ACTOR),
     );
     const arg = prisma.store.update.mock.calls[0]![0] as { data: { opsIncident: null } };
     expect(arg.data.opsIncident).toBeNull();
