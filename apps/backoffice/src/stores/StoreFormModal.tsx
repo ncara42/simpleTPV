@@ -1,3 +1,4 @@
+import { Check, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
@@ -69,6 +70,7 @@ export function StoreFormModal({
       {error && <p className="form-error">{error}</p>}
       <div className="modal-foot">
         <button type="button" onClick={onClose}>
+          <X size={16} aria-hidden="true" />
           Cancelar
         </button>
         <button
@@ -77,6 +79,7 @@ export function StoreFormModal({
           disabled={pending || !form.name.trim() || !form.code.trim()}
           data-testid="store-save"
         >
+          <Check size={16} aria-hidden="true" />
           {pending ? 'Guardando…' : editing ? 'Guardar' : 'Crear'}
         </button>
       </div>

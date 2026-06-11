@@ -1,6 +1,7 @@
 import { type StockGlobalRow, stockLevel } from '@simpletpv/auth';
 import { DataTable, type DataTableColumn, type DataTableSort, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
@@ -443,6 +444,7 @@ export function GlobalStockSection({
           )}
           <div className="modal-foot">
             <button type="button" onClick={() => setAdjusting(null)}>
+              <X size={16} aria-hidden="true" />
               Cancelar
             </button>
             <button
@@ -452,6 +454,7 @@ export function GlobalStockSection({
               disabled={adjustMutation.isPending}
               data-testid="stock-adjust-save"
             >
+              <Check size={16} aria-hidden="true" />
               {adjustMutation.isPending ? 'Guardando…' : 'Guardar'}
             </button>
           </div>

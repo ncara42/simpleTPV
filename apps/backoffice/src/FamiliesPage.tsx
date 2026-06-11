@@ -1,6 +1,6 @@
 import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { useConfirm } from './components/ConfirmProvider.js';
@@ -794,6 +794,7 @@ export function FamiliesPage({
           )}
           <div className="modal-foot">
             <button type="button" onClick={() => setForm(null)}>
+              <X size={16} aria-hidden="true" />
               Cancelar
             </button>
             <button
@@ -802,6 +803,7 @@ export function FamiliesPage({
               disabled={saveMut.isPending}
               data-testid="family-save"
             >
+              <Check size={16} aria-hidden="true" />
               {saveMut.isPending ? 'Guardando…' : 'Guardar'}
             </button>
           </div>

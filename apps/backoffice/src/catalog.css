@@ -1386,7 +1386,9 @@
   gap: 0.3rem;
   white-space: nowrap;
   margin-left: 0.4rem;
-  opacity: 0.4;
+  /* U-13: claramente visibles en reposo (no ocultas); a plena opacidad con
+     hover/selección de la fila. */
+  opacity: 0.7;
   transition: opacity 0.12s var(--ui-ease, ease);
 }
 .fam-row:hover .fam-actions,

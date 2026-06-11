@@ -1,5 +1,6 @@
 import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { CsvDropzone } from '../components/CsvDropzone.js';
@@ -127,6 +128,7 @@ export function StorePricesModal({ store, onClose }: { store: Store; onClose: ()
               onClick={() => setMut.mutate({ productId, price: Number(price) })}
               data-testid="store-price-add"
             >
+              <Plus size={16} aria-hidden="true" />
               Añadir
             </button>
           </div>
@@ -162,6 +164,7 @@ export function StorePricesModal({ store, onClose }: { store: Store; onClose: ()
       </div>
       <div className="modal-foot modal-foot-actions">
         <button type="button" onClick={onClose}>
+          <X size={16} aria-hidden="true" />
           Cerrar
         </button>
       </div>
