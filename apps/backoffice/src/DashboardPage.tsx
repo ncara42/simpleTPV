@@ -546,50 +546,22 @@ export function DashboardPage({
             <p className="dash-panel-sub">Facturación neta por tienda</p>
             {(() => {
               const stores = salesToday.data?.byStore ?? [];
-              // Escala a la facturación máxima (Hoy o Ayer) de cualquier tienda → la
-              // barra más alta llena el lienzo y las alturas comparan de un vistazo.
-              const top = Math.max(1, ...stores.flatMap((s) => [s.today, s.yesterday]));
-              // Si la tienda del filtro está en el gráfico, se resalta su columna y
-              // se atenúan las demás (mismo gesto que el hover).
-              const focused = !!storeId && stores.some((s) => s.storeId === storeId);
+              // U-01: Chart común (color constante, tooltip lateral con Hoy/Ayer/delta).
               return (
                 <>
-                  <div className={`dash-bars-chart${focused ? ' has-selection' : ''}`}>
-                    {stores.map((s, i) => {
-                      const tone = deltaTone(s.deltaPct);
-                      return (
-                        <div
-                          className={`dash-bars-group${s.storeId === storeId ? ' is-selected' : ''}`}
-                          key={s.storeId}
-                          style={{ '--i': i } as React.CSSProperties}
-                        >
-                          <div className="dash-bars-cap">
-                            <strong className="dash-bars-cap-val">{fmtEur(s.today)}</strong>
-                            <span className={`dash-bars-cap-delta dash-delta-${tone}`}>
-                              {fmtDelta(s.deltaPct)}
-                            </span>
-                          </div>
-                          <div className="dash-bars-pair">
-                            <span
-                              className="dash-bars-bar dash-bars-bar-prev"
-                              style={{ height: `${(s.yesterday / top) * 100}%` }}
-                            >
-                              <span className="dash-bars-bar-val">
-                                {fmtEurCompact(s.yesterday)}
-                              </span>
-                            </span>
-                            <span
-                              className="dash-bars-bar dash-bars-bar-now"
-                              style={{ height: `${(s.today / top) * 100}%` }}
-                            >
-                              <span className="dash-bars-bar-val">{fmtEurCompact(s.today)}</span>
-                            </span>
-                          </div>
-                          <span className="dash-bars-name">{s.storeName}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <Chart
+                    data={stores.map((s) => ({
+                      label: s.storeName,
+                      value: s.today,
+                      compareValue: s.yesterday,
+                      valueText: `Hoy ${fmtEur(s.today)}`,
+                      compareText: `Ayer ${fmtEur(s.yesterday)}`,
+                      tipExtra: fmtDelta(s.deltaPct),
+                    }))}
+                    height={200}
+                    formatValue={fmtEurCompact}
+                    ariaLabel="Ventas hoy vs ayer por tienda"
+                  />
                   <div className="dash-bars-legend">
                     <span>
                       <span className="dash-legend-dot dash-swatch-prev" /> Ayer
@@ -625,9 +597,8 @@ export function DashboardPage({
                           <span
                             className="dash-family-fill"
                             style={{ width: `${(f.total / max) * 100}%` }}
-                          >
-                            <span className="dash-family-pct">{fmtEur(f.total)}</span>
-                          </span>
+                          />
+                          <span className="dash-family-pct">{fmtEur(f.total)}</span>
                         </span>
                       </li>
                     );
@@ -827,9 +798,8 @@ export function DashboardPage({
                         <span
                           className="dash-family-fill"
                           style={{ width: `${(e.total / max) * 100}%` }}
-                        >
-                          <span className="dash-family-pct">{fmtEur(e.total)}</span>
-                        </span>
+                        />
+                        <span className="dash-family-pct">{fmtEur(e.total)}</span>
                       </span>
                     </li>
                   ))}

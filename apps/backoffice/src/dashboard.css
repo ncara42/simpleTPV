@@ -222,132 +222,9 @@
   color: var(--ui-text-muted);
 }
 
-/* ─── Barras verticales: ventas hoy vs ayer por tienda ─── */
-/* Cada tienda = un par de barras (Ayer neutra, Hoy de marca) con su facturación
-   y un badge de variación coloreado encima → el estado se lee de un vistazo. */
-.dash-bars-chart {
-  display: flex;
-  align-items: stretch;
-  justify-content: space-around;
-  gap: 0.75rem;
-  height: 248px;
-}
-.dash-bars-group {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 1;
-  min-width: 0;
-  transition: opacity 0.18s ease;
-}
-/* Al enfocar una tienda, las demás se atenúan */
-.dash-bars-chart:hover .dash-bars-group:not(:hover) {
-  opacity: 0.4;
-}
-/* Tienda elegida en el filtro: se resalta su columna y se atenúan las demás
-   (mismo gesto visual que el hover). */
-.dash-bars-chart.has-selection .dash-bars-group:not(.is-selected) {
-  opacity: 0.4;
-}
-/* El hover siempre manda: resalta la columna apuntada aunque haya otra elegida. */
-.dash-bars-chart:hover .dash-bars-group:hover {
-  opacity: 1;
-}
-/* Cabecera del grupo: facturación de hoy + badge de variación coloreado */
-.dash-bars-cap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  margin-bottom: 0.55rem; /* aire entre la pill y las barras */
-}
-.dash-bars-cap-val {
-  font-size: 0.92rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--ui-text);
-  font-variant-numeric: tabular-nums;
-}
-.dash-bars-cap-delta {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.12rem;
-  padding: 0.1rem 0.45rem;
-  border-radius: 9999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-}
-/* (color/fondo del badge los aporta dash-delta-up/-down/-flat) */
-.dash-bars-pair {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 0.4rem;
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-  border-bottom: 1px solid var(--ui-border-strong); /* línea base */
-}
-.dash-bars-bar {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  width: 26px;
-  max-width: 40%;
-  min-height: 4px;
-  padding-bottom: 0.4rem;
-  border-radius: 7px 7px 0 0;
-  overflow: hidden; /* recorta la cifra a la barra */
-  transform-origin: bottom;
-  animation: dash-bar-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
-  animation-delay: calc(var(--i, 0) * 70ms);
-}
-.dash-bars-bar-prev {
-  background: var(--ui-border-strong);
-}
-.dash-bars-bar-now {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ui-brand) 82%, #fff),
-    var(--ui-brand)
-  );
-}
-@keyframes dash-bar-rise {
-  from {
-    transform: scaleY(0);
-  }
-}
-/* Cifra de la venta dentro de la barra, en vertical (lee de abajo arriba) */
-.dash-bars-bar-val {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  line-height: 1;
-}
-.dash-bars-bar-prev .dash-bars-bar-val {
-  color: var(--ui-text);
-}
-.dash-bars-bar-now .dash-bars-bar-val {
-  color: #fff;
-}
-.dash-bars-name {
-  font-size: 0.8rem;
-  font-weight: 500;
-  letter-spacing: -0.012em;
-  color: var(--ui-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
+/* ─── Ventas hoy vs ayer por tienda ─── */
+/* El gráfico es el <Chart> común de packages/ui (U-01); aquí solo viven la
+   leyenda y sus muestras de color. */
 /* Leyenda anclada arriba a la derecha, a la altura del título (ahorra espacio) */
 .dash-bars-legend {
   position: absolute;
@@ -393,11 +270,8 @@
   align-items: center;
   gap: 0.8rem;
   padding-right: 0.4rem;
-  transition: opacity 0.2s ease;
 }
-.dash-family-list:hover li:not(:hover) {
-  opacity: 0.5;
-}
+/* U-01: sin atenuación del resto al hover — el feedback es el badge de importe. */
 .dash-family-name {
   font-size: 0.85rem;
   letter-spacing: -0.012em;
@@ -407,26 +281,21 @@
   text-overflow: ellipsis;
 }
 .dash-family-track {
+  position: relative; /* ancla del badge de importe */
   height: 22px;
   border-radius: 9999px;
   background: var(--ui-surface-subtle);
-  overflow: hidden;
 }
 .dash-family-fill {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  display: block;
   height: 100%;
-  /* sitio para el precio con aire a ambos lados aun en las barras más cortas */
-  min-width: 5.5rem;
-  padding: 0 0.6rem;
+  min-width: 8px;
   border-radius: 9999px;
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--ui-brand) 82%, #fff),
     var(--ui-brand)
   );
-  overflow: hidden;
   transform-origin: left;
   animation: dash-family-grow 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   animation-delay: calc(var(--i, 0) * 70ms);
@@ -436,17 +305,32 @@
     transform: scaleX(0);
   }
 }
-/* Importe de la familia, dentro de la barra (alineado a la derecha) */
+/* U-01: el importe ya no vive dentro de la barra — es un badge al final de la
+   pista que se materializa al hover/focus de la fila. */
 .dash-family-pct {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0.05rem 0.5rem;
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
   font-size: 0.7rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--ui-text);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s var(--ui-ease, ease);
+}
+.dash-family-list li:hover .dash-family-pct,
+.dash-family-list li:focus-within .dash-family-pct {
+  opacity: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dash-bars-bar,
   .dash-family-fill,
   .dash-rank-meter::after {
     animation: none;

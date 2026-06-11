@@ -68,17 +68,10 @@ button.ui-chart-group:focus-visible {
   outline-offset: 2px;
   border-radius: var(--ui-radius-sm, 6px);
 }
-/* Al enfocar/seleccionar una columna, las demás se atenúan; el hover siempre manda. */
-.ui-chart:hover .ui-chart-group:not(:hover) {
-  opacity: 0.4;
-}
-.ui-chart.has-selection .ui-chart-group:not(.is-selected) {
-  opacity: 0.4;
-}
-.ui-chart:hover .ui-chart-group:hover {
-  opacity: 1;
-}
+/* U-01: ninguna columna se atenúa nunca — color constante en reposo, hover y
+   selección. El feedback de hover/focus es el tooltip lateral (.ui-chart-tip). */
 .ui-chart-pair {
+  position: relative; /* ancla del tooltip */
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -89,15 +82,10 @@ button.ui-chart-group:focus-visible {
   border-bottom: 1px solid var(--ui-border-strong); /* línea base */
 }
 .ui-chart-bar {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  width: 26px;
-  max-width: 40%;
+  width: 38px;
+  max-width: 56%;
   min-height: 4px;
-  padding-bottom: 0.4rem;
   border-radius: 7px 7px 0 0;
-  overflow: hidden; /* recorta la cifra a la barra */
   transform-origin: bottom;
   animation: ui-bar-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   animation-delay: calc(var(--i, 0) * 70ms);
@@ -113,22 +101,57 @@ button.ui-chart-group:focus-visible {
     transform: scaleY(0);
   }
 }
-/* Cifra dentro de la barra, en vertical (lee de abajo arriba). */
-.ui-chart-bar-text {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  font-size: 0.7rem;
-  font-weight: 600;
+/* Tooltip lateral (U-01): badge que se materializa junto a la cima de la barra al
+   hover/focus, con el valor (y comparación/delta si existen). Sin interceptar ratón. */
+.ui-chart-tip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 0.3rem 0.55rem;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm, 6px);
+  box-shadow: var(--ui-shadow-md, 0 4px 12px rgb(0 0 0 / 0.08));
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 5;
+  animation: ui-tip-in 0.12s var(--ui-ease, ease) backwards;
+}
+/* En los extremos el badge se alinea hacia dentro para no salirse del panel. */
+.ui-chart-tip-start {
+  left: 0;
+  transform: none;
+}
+.ui-chart-tip-end {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+.ui-chart-tip-value {
+  font-size: 0.78rem;
+  font-weight: 650;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  line-height: 1;
-}
-.ui-chart-bar-compare .ui-chart-bar-text {
   color: var(--ui-text);
+  line-height: 1.2;
 }
-.ui-chart-bar-value .ui-chart-bar-text {
-  color: #fff;
+.ui-chart-tip-compare,
+.ui-chart-tip-extra {
+  font-size: 0.72rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-muted);
+  line-height: 1.2;
+}
+@keyframes ui-tip-in {
+  from {
+    opacity: 0;
+    translate: 0 3px;
+  }
 }
 .ui-chart-name {
   font-size: 0.8rem;
