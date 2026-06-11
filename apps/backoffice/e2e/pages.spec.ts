@@ -344,7 +344,9 @@ test('Compras y VeriFactu están retiradas del menú (#106)', async ({ page }) =
 test('Familias muestra las raíz con subfamilias anidadas (#97)', async ({ page }) => {
   await navTo(page, 'families');
   // Árbol canónico del seed: 4 raíces + 2 subfamilias + 6 arquetipos = 12 nodos.
-  // >= por si otros tests crean subniveles.
+  // >= por si otros tests crean subniveles. count() no auto-espera: anclar antes
+  // la primera fila para no contar durante la carga.
+  await expect(page.getByTestId('fam-row').first()).toBeVisible();
   expect(await page.getByTestId('fam-row').count()).toBeGreaterThanOrEqual(12);
   await expect(page.getByText('Aceites CBD')).toBeVisible();
   await expect(page.getByTestId('fam-count').first()).toContainText('productos');

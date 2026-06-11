@@ -106,6 +106,8 @@ interface RowActions {
   onEdit: (n: FamilyNode) => void;
   onAddChild: (parentId: string) => void;
   onDelete: (n: FamilyNode) => void | Promise<void>;
+  // Atajo D-11: el contador navega a Catálogo filtrado por el nodo.
+  onOpenInCatalog?: (familyId: string) => void;
 }
 
 function FamilyRow({
@@ -201,9 +203,18 @@ function FamilyRow({
             </span>
           )}
         </span>
-        <span className="fam-count" data-testid="fam-count">
+        <button
+          type="button"
+          className="fam-count"
+          data-testid="fam-count"
+          title="Ver estos productos en Catálogo"
+          onClick={(e) => {
+            e.stopPropagation();
+            actions.onOpenInCatalog?.(node.id);
+          }}
+        >
           {actions.productCountOf(node)} productos
-        </span>
+        </button>
         {selected && (
           <span className="fam-actions" onClick={(e) => e.stopPropagation()}>
             {moveOptions.length > 0 && (
