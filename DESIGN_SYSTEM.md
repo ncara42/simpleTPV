@@ -78,11 +78,16 @@ Capa 3 — TAILWIND @theme inline (apps/tpv/src/styles.css)
 
 ### 3.2 Texto
 
-| Token             | BASE      | VIVO (Apple)       | Uso                                      |
-| ----------------- | --------- | ------------------ | ---------------------------------------- |
-| `--ui-text`       | `#18181a` | `#1d1d1f` (ink)    | Titulares y cuerpo                       |
-| `--ui-text-muted` | `#6b6b66` | `#6e6e73` (gray-1) | Texto secundario                         |
-| `--ui-text-soft`  | `#8d897f` | `#86868b` (gray-2) | Texto terciario, placeholders, etiquetas |
+| Token             | BASE      | VIVO (Apple)       | Uso                                      | Contraste sobre canvas |
+| ----------------- | --------- | ------------------ | ---------------------------------------- | ---------------------- |
+| `--ui-text`       | `#18181a` | `#1d1d1f` (ink)    | Titulares y cuerpo                       | ~16:1                  |
+| `--ui-text-muted` | `#6b6b66` | `#6e6e73` (gray-1) | Texto secundario                         | 4.7:1 (AA)             |
+| `--ui-text-soft`  | `#71706c` | `#6f6f78` (gray-2) | Texto terciario, placeholders, etiquetas | 4.5:1 (AA)             |
+
+> **WCAG (revisión 2026-06-11):** el terciario era `#86868b` (3.6:1) y NO cumplía
+> AA para texto normal; oscurecido a `#6f6f78` (gray-2) / `#71706c` (base) para
+> alcanzar ≥4.5:1. Todos los tokens de texto cumplen ahora AA sobre `--ui-bg` y
+> `--ui-surface`.
 
 ### 3.3 Acción primaria y marca
 

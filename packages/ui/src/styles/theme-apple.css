@@ -20,8 +20,10 @@
   --ap-surface: #ffffff; /* cards, paneles */
   --ap-pearl: #fafafc; /* superficie sutil */
   --ap-ink: #1d1d1f; /* tinta — titulares y cuerpo */
-  --ap-gray-1: #6e6e73; /* texto secundario */
-  --ap-gray-2: #86868b; /* texto terciario */
+  --ap-gray-1: #6e6e73; /* texto secundario (4.7:1 sobre canvas — AA) */
+  /* U-15/WCAG: terciario oscurecido de #86868b (3.6:1, fallaba AA) a #6f6f78
+     (4.57:1 sobre el lienzo parchment, 4.98:1 sobre blanco). */
+  --ap-gray-2: #6f6f78; /* texto terciario */
   --ap-hairline: #e3e3e6; /* hairline suave */
   --ap-hairline-strong: #d2d2d7; /* hairline marcado */
 

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Copy, Eye, EyeOff, KeyRound, X } from 'lucide-react';
+import { Copy, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useState } from 'react';
 
 import { useConfirm } from './components/ConfirmProvider.js';
@@ -257,7 +257,6 @@ export function ApiKeysSection() {
           </div>
           <div className="modal-foot modal-foot-actions">
             <button type="button" onClick={() => setShowCreate(false)}>
-              <X size={16} aria-hidden="true" />
               Cancelar
             </button>
             <button
@@ -265,7 +264,6 @@ export function ApiKeysSection() {
               className="btn-primary"
               disabled={!form.name.trim() || createMut.isPending}
             >
-              <Check size={16} aria-hidden="true" />
               {createMut.isPending ? 'Creando…' : 'Crear'}
             </button>
           </div>

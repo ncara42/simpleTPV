@@ -1,4 +1,3 @@
-import { Check, Trash2, X } from 'lucide-react';
 import { createContext, type ReactNode, useCallback, useContext, useState } from 'react';
 
 import { Modal } from './Modal.js';
@@ -54,7 +53,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           </div>
           <div className="modal-foot modal-foot-actions">
             <button type="button" onClick={() => close(false)} data-testid="confirm-cancel">
-              <X size={16} aria-hidden="true" />
               {pending.opts.cancelLabel ?? 'Cancelar'}
             </button>
             <button
@@ -63,11 +61,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               onClick={() => close(true)}
               data-testid="confirm-accept"
             >
-              {pending.opts.danger ? (
-                <Trash2 size={16} aria-hidden="true" />
-              ) : (
-                <Check size={16} aria-hidden="true" />
-              )}
               {pending.opts.confirmLabel ?? 'Aceptar'}
             </button>
           </div>

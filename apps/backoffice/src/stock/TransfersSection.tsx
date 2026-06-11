@@ -1,7 +1,7 @@
 import type { ImportResult } from '@simpletpv/auth';
 import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Plus, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { CsvDropzone } from '../components/CsvDropzone.js';
@@ -320,7 +320,6 @@ function CreateTransferModal({
       )}
       <div className="modal-foot modal-foot-actions">
         <button type="button" onClick={onClose}>
-          <X size={16} aria-hidden="true" />
           Cancelar
         </button>
         <button
@@ -329,7 +328,6 @@ function CreateTransferModal({
           disabled={!canSubmit || mutation.isPending}
           data-testid="transfer-save"
         >
-          <Check size={16} aria-hidden="true" />
           {mutation.isPending ? 'Creando…' : 'Crear'}
         </button>
       </div>

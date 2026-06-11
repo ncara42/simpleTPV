@@ -1,6 +1,6 @@
 import { DataTable, type DataTableColumn, type DataTableSort, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Upload, X } from 'lucide-react';
+import { Plus, Upload } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { CsvDropzone } from './components/CsvDropzone.js';
@@ -526,7 +526,6 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
           />
           <div className="modal-foot">
             <button type="button" onClick={() => setImporting(false)}>
-              <X size={16} aria-hidden="true" />
               Cerrar
             </button>
           </div>
