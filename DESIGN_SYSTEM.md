@@ -423,7 +423,7 @@ ruido (anotar en el PR). Los icon-only (sin texto) llevan `aria-label` y `title`
 6. **Filas de tabla a 3.5rem** y controles a `--bo-control-height` para densidad homogénea.
 7. **Movimiento:** una sola curva (`--ui-ease`) y tres tiempos; respetar `prefers-reduced-motion`.
 8. **Accesibilidad:** foco con `:focus-visible` + `--ui-focus`; contraste AA; ARIA correcto en overlays.
-9. **Nunca hardcodear** un hex/medida en un componente: usar `--ui-*` o utilidades `rounded-*`. Si falta un token, se añade al sistema, no al componente.
+9. **Nunca hardcodear** un hex/medida en un componente: usar `--ui-*` o utilidades `rounded-*`. Si falta un token, se añade al sistema, no al componente. (U-15) Esto incluye los **fallbacks** de `var()`: nada de `var(--x, #a9a9a9)` con un gris/semántico literal, ni tokens huérfanos legacy (`--tpv-*`, `--border`, `--ui-accent`); referenciar siempre el token canónico `--ui-*` sin fallback hardcodeado. La escala de grises vive en §3.1 (`--ui-bg/surface/surface-subtle/border/border-strong/text-*`).
 
 ---
 

@@ -1982,12 +1982,12 @@
 }
 
 .time-clock-badge--break {
-  background: var(--ui-warning-soft, #fff4e5);
-  color: var(--ui-warning, #b25e00);
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
 }
 
 .time-clock-badge--out {
-  background: var(--ui-surface-subtle, #f0f0f2);
+  background: var(--ui-surface-subtle);
   color: var(--ui-text-muted);
 }
 

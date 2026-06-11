@@ -339,7 +339,7 @@
   object-fit: contain;
 }
 .settings-error {
-  color: var(--ui-danger, #b3261e);
+  color: var(--ui-danger);
   font-size: 0.84rem;
   margin: 0.4rem 0 0;
 }
