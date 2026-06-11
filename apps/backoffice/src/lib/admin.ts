@@ -1,16 +1,19 @@
 import type {
+  ImportResult,
   NewUser,
   SalesPage,
   SalesQueryInput,
   SaleSummary,
   Store,
   StoreInput,
+  StoreOpsInput,
+  UpdateUserInput,
   User,
 } from '@simpletpv/auth';
 
 import { api } from './auth.js';
 
-export type { NewUser, SalesQueryInput, Store, StoreInput, User };
+export type { ImportResult, NewUser, SalesQueryInput, Store, StoreInput, UpdateUserInput, User };
 
 export interface SalesViewRow extends SaleSummary {
   storeName: string;
@@ -33,6 +36,19 @@ export function createUser(input: NewUser): Promise<User> {
   return api.post<User>('/users', input);
 }
 
+export function importUsersCsv(csv: string): Promise<ImportResult> {
+  return api.post<ImportResult>('/users/import', { csv });
+}
+
+export function updateUser(id: string, input: UpdateUserInput): Promise<User> {
+  return api.patch<User>(`/users/${id}`, input);
+}
+
+// Reemplaza las tiendas asignadas del usuario (PUT /users/:id/stores).
+export function assignUserStores(id: string, storeIds: string[]): Promise<void> {
+  return api.put<void>(`/users/${id}/stores`, { storeIds });
+}
+
 export function deleteUser(id: string): Promise<void> {
   return api.del(`/users/${id}`);
 }
@@ -43,6 +59,15 @@ export function listStores(): Promise<Store[]> {
 
 export function createStore(input: StoreInput): Promise<Store> {
   return api.post<Store>('/stores', input);
+}
+
+export function updateStore(id: string, input: Partial<StoreInput>): Promise<Store> {
+  return api.patch<Store>(`/stores/${id}`, input);
+}
+
+// Estado operativo manual persistido (I-09): verificada + incidencia.
+export function updateStoreOps(id: string, input: StoreOpsInput): Promise<Store> {
+  return api.patch<Store>(`/stores/${id}/ops`, input);
 }
 
 export function deleteStore(id: string): Promise<void> {

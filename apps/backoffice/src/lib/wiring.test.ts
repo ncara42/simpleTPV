@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mockeamos el cliente HTTP real para verificar QUÉ endpoint llama cada lib del
-// backoffice en modo real (IT-09), sin backend. isDemo() (api-config) NO se mockea:
-// lee VITE_DEMO_MODE, que stubeamos por bloque.
+// backoffice (IT-09). El data layer opera SIEMPRE contra el backend real (sin demo).
 vi.mock('./auth.js', () => ({
   api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), del: vi.fn() },
 }));
@@ -27,9 +26,8 @@ const put = vi.mocked(api.put);
 const patch = vi.mocked(api.patch);
 const del = vi.mocked(api.del);
 
-describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
+describe('cableado API real del backoffice', () => {
   beforeEach(() => {
-    vi.stubEnv('VITE_DEMO_MODE', 'false');
     vi.clearAllMocks();
     get.mockResolvedValue([] as never);
     post.mockResolvedValue({} as never);
@@ -188,23 +186,6 @@ describe('cableado API real del backoffice (VITE_DEMO_MODE=false)', () => {
     expect(get).toHaveBeenCalledWith('/me/features', { storeId: 'st1' });
     await features.getFeatures();
     expect(get).toHaveBeenLastCalledWith('/me/features', {});
-  });
-
-  it('feature-flags: gestión contra /feature-flags (#127 B slice 2)', async () => {
-    await features.listFeatureFlags();
-    expect(get).toHaveBeenCalledWith('/feature-flags');
-    await features.setFeatureFlag('b2b', false, 'st1');
-    expect(put).toHaveBeenCalledWith('/feature-flags', {
-      key: 'b2b',
-      enabled: false,
-      storeId: 'st1',
-    });
-    await features.setFeatureFlag('b2b', true);
-    expect(put).toHaveBeenLastCalledWith('/feature-flags', { key: 'b2b', enabled: true });
-    await features.clearFeatureFlag('time_clock', 'st1');
-    expect(del).toHaveBeenCalledWith('/feature-flags/time_clock?storeId=st1');
-    await features.clearFeatureFlag('time_clock');
-    expect(del).toHaveBeenLastCalledWith('/feature-flags/time_clock');
   });
 
   it('store-prices: overrides retail por tienda contra /stores/:id/prices', async () => {

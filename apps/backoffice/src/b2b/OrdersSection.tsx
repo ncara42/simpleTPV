@@ -14,6 +14,7 @@ import {
   updateWholesaleOrderStatus,
   type WholesaleOrderStatus,
 } from '../lib/b2b.js';
+import { formErrorMessage } from '../lib/form-error.js';
 import { listProducts } from '../lib/products.js';
 
 const STATUS_LABEL: Record<WholesaleOrderStatus, string> = {
@@ -70,7 +71,7 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
       toast('Pedido creado', 'success');
       onCreated();
     },
-    onError: () => toast('No se pudo crear el pedido', 'error'),
+    onError: (e) => toast(formErrorMessage(e, 'No se pudo crear el pedido'), 'error'),
   });
 
   const customerOptions = [
@@ -161,7 +162,11 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
           </label>
         </section>
       </div>
-      {createMut.isError && <p className="form-error">No se pudo crear el pedido.</p>}
+      {createMut.isError && (
+        <p className="form-error">
+          {formErrorMessage(createMut.error, 'No se pudo crear el pedido.')}
+        </p>
+      )}
       <div className="modal-foot modal-foot-actions">
         <button type="button" onClick={onClose}>
           Cancelar
@@ -195,7 +200,7 @@ function OrderDetailModal({ orderId, onClose }: { orderId: string; onClose: () =
       void qc.invalidateQueries({ queryKey: ['b2b-orders'] });
       toast('Estado del pedido actualizado', 'success');
     },
-    onError: () => toast('No se pudo cambiar el estado', 'error'),
+    onError: (e) => toast(formErrorMessage(e, 'No se pudo cambiar el estado'), 'error'),
   });
 
   return (

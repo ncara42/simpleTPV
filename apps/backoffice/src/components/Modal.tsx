@@ -41,6 +41,15 @@ export function Modal({
   style,
 }: ModalProps) {
   const panelRef = useRef<HTMLElement>(null);
+  // Ref "siempre fresca" de onClose: así el efecto de foco/teclado corre UNA sola vez
+  // (al montar) y no se re-ejecuta cuando el padre pasa un onClose inline en cada
+  // render. Antes, con `[onClose]` en deps, cada tecla re-ejecutaba el efecto y su
+  // cleanup hacía `previouslyFocused.focus()`, robando el foco del campo (bug de foco
+  // que saltaba entre campos al teclear, p.ej. en el alta de usuario).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     // Guarda el elemento que tenía el foco para restaurarlo al cerrar.
@@ -56,7 +65,7 @@ export function Modal({
 
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       // Focus-trap: Tab/Shift+Tab ciclan dentro del panel.
@@ -79,7 +88,8 @@ export function Modal({
       document.removeEventListener('keydown', onKey);
       previouslyFocused?.focus?.();
     };
-  }, [onClose]);
+    // Solo al montar/desmontar: onClose se lee desde onCloseRef (siempre fresca).
+  }, []);
 
   const panelClass = className ? `modal ${className}` : 'modal';
   const stop = (e: MouseEvent): void => e.stopPropagation();

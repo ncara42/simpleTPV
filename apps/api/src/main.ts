@@ -13,6 +13,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 
 import { AppModule } from './app.module.js';
+import { PrismaExceptionFilter } from './common/prisma-exception.filter.js';
 import { resolveCorsOrigins, trustProxyHops } from './config/security.js';
 import { initSentry } from './observability/sentry.js';
 
@@ -74,6 +75,10 @@ async function bootstrap(): Promise<void> {
       transform: true, // instancia el DTO y convierte tipos primitivos
     }),
   );
+
+  // Errores conocidos de Prisma → HTTP con causa legible (D-14): unique → 409,
+  // FK → 409, registro inexistente → 404. Evita 500 opacos en los formularios.
+  app.useGlobalFilters(new PrismaExceptionFilter());
 
   // Swagger/OpenAPI (#48). Solo FUERA de producción: publicar el contrato completo
   // (rutas, DTOs, validaciones) en prod facilita el reconocimiento a un atacante

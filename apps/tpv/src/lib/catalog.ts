@@ -4,25 +4,6 @@ import { api } from './auth.js';
 
 export type { FamilyNode, Product };
 
-export function familySubtreeIds(roots: FamilyNode[], familyId: string): Set<string> {
-  const ids = new Set<string>();
-  const collect = (node: FamilyNode): void => {
-    ids.add(node.id);
-    node.children.forEach(collect);
-  };
-  const find = (nodes: FamilyNode[]): FamilyNode | null => {
-    for (const n of nodes) {
-      if (n.id === familyId) return n;
-      const hit = find(n.children);
-      if (hit) return hit;
-    }
-    return null;
-  };
-  const node = find(roots);
-  if (node) collect(node);
-  return ids;
-}
-
 export function searchProducts(search: string, familyId: string | null): Promise<Product[]> {
   const term = search.trim();
   return api.get<Product[]>('/products', {

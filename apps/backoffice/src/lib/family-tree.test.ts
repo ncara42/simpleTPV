@@ -12,11 +12,21 @@ import {
   moveRoot,
   moveToParent,
   removeNode,
+  renumberSiblings,
   reorderSiblings,
 } from './family-tree.js';
 
 function node(id: string, children: FamilyNode[] = [], parentId: string | null = null): FamilyNode {
-  return { id, parentId, name: id, color: null, icon: null, sortOrder: 0, children };
+  return {
+    id,
+    parentId,
+    name: id,
+    color: null,
+    icon: null,
+    sortOrder: 0,
+    isArchetype: false,
+    children,
+  };
 }
 
 // Árbol base: A[A1, A2], B[]
@@ -123,6 +133,30 @@ describe('reorderSiblings (N niveles)', () => {
   it('reordena raíces con parentId null', () => {
     const out = reorderSiblings(deepTree(), null, 'B', 'A', 'before');
     expect(out.map((n) => n.id)).toEqual(['B', 'A']);
+  });
+});
+
+describe('renumberSiblings', () => {
+  it('reasigna sortOrder consecutivo a las raíces', () => {
+    const out = renumberSiblings(tree(), null);
+    expect(out.map((n) => [n.id, n.sortOrder])).toEqual([
+      ['A', 0],
+      ['B', 1],
+    ]);
+  });
+  it('reasigna sortOrder a las hijas de un nodo concreto', () => {
+    const out = renumberSiblings(deepTree(), 'A1');
+    const a1 = findNode(out, 'A1')!;
+    expect(a1.children.map((c) => [c.id, c.sortOrder])).toEqual([
+      ['A1a', 0],
+      ['A1b', 1],
+    ]);
+  });
+  it('conserva la identidad de nodos cuyo sortOrder ya es correcto', () => {
+    const base = tree();
+    const out = renumberSiblings(base, null);
+    // A ya está en posición 0 → mismo objeto (sin copia innecesaria).
+    expect(out[0]).toBe(base[0]);
   });
 });
 

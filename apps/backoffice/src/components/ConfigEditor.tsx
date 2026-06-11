@@ -11,15 +11,18 @@ export interface OrderHidden {
 
 // Saneado del pref de visibilidad/orden (IT-16): respeta el orden guardado, añade al
 // final los ids nuevos y descarta los desconocidos (robusto ante versiones viejas).
+// `defaultHidden` (D-12) aplica SOLO mientras el usuario no haya guardado nada:
+// columnas ocultas por defecto pero activables.
 export function resolveConfig(
   pref: Partial<OrderHidden> | undefined,
   allIds: string[],
+  defaultHidden: string[] = [],
 ): OrderHidden & { visible: string[] } {
   const savedOrder = (Array.isArray(pref?.order) ? pref.order : []).filter((id) =>
     allIds.includes(id),
   );
   const order = [...savedOrder, ...allIds.filter((id) => !savedOrder.includes(id))];
-  const hidden = (Array.isArray(pref?.hidden) ? pref.hidden : []).filter((id) =>
+  const hidden = (Array.isArray(pref?.hidden) ? pref.hidden : defaultHidden).filter((id) =>
     allIds.includes(id),
   );
   return { order, hidden, visible: order.filter((id) => !hidden.includes(id)) };

@@ -6,13 +6,15 @@ import {
   HttpCode,
   Param,
   ParseUUIDPipe,
+  Post,
   Put,
   Req,
 } from '@nestjs/common';
 
 import type { JwtPayload } from '../auth/jwt-payload.js';
 import { Roles } from '../auth/roles.decorator.js';
-import { SetStorePriceDto } from './store-prices.dto.js';
+import type { ImportResult } from '../common/csv.js';
+import { ImportStorePricesDto, SetStorePriceDto } from './store-prices.dto.js';
 import { StorePricesService } from './store-prices.service.js';
 
 // Precios retail por tienda (#127 A): override del PVP por (producto, tienda). Función
@@ -39,6 +41,19 @@ export class StorePricesController {
     @Req() req: { user: JwtPayload },
   ) {
     return this.prices.setPrice(storeId, body, { userId: req.user.sub, role: req.user.role });
+  }
+
+  @Post(':storeId/prices/import')
+  @Roles('ADMIN', 'MANAGER')
+  importCsv(
+    @Param('storeId', ParseUUIDPipe) storeId: string,
+    @Body() body: ImportStorePricesDto,
+    @Req() req: { user: JwtPayload },
+  ): Promise<ImportResult> {
+    return this.prices.importCsv(storeId, body.csv, {
+      userId: req.user.sub,
+      role: req.user.role,
+    });
   }
 
   @Delete(':storeId/prices/:productId')

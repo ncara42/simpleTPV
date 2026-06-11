@@ -1,8 +1,8 @@
-import type { Product, ProductInput } from '@simpletpv/auth';
+import type { ImportResult, Product, ProductInput } from '@simpletpv/auth';
 
 import { api } from './auth.js';
 
-export type { Product, ProductInput };
+export type { ImportResult, Product, ProductInput };
 
 export function listProducts(search?: string): Promise<Product[]> {
   const term = (search ?? '').trim();
@@ -19,11 +19,6 @@ export function updateProduct(id: string, input: Partial<ProductInput>): Promise
 
 export function deleteProduct(id: string): Promise<void> {
   return api.del(`/products/${id}`);
-}
-
-export interface ImportResult {
-  inserted: number;
-  errors: Array<{ row: number; message: string }>;
 }
 
 export function importProductsCsv(csv: string): Promise<ImportResult> {

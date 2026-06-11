@@ -255,8 +255,11 @@ jobs:
           psql -h localhost -p 5432 -U postgres -d simpletpv \
             -f packages/db/scripts/dev-bootstrap.sql
 
-      - name: Seed multi-tenant fixtures
-        run: pnpm --filter @simpletpv/db exec prisma db seed
+      # E2E corre contra el seed demo (rico: 6 tiendas, catálogo, promos, B2B,
+      # fichajes, histórico). seed.ts (contractual) lo siguen usando las pruebas
+      # de integración del API en el job `quality`.
+      - name: Seed datos demo (e2e)
+        run: pnpm --filter @simpletpv/db db:seed:demo
 
       - name: Build apps
         run: pnpm build

@@ -7,7 +7,7 @@ import { Modal } from './components/Modal.js';
 import { SectionToolbar } from './components/SectionToolbar.js';
 import { useToast } from './components/ToastProvider.js';
 import { createApiKey, listApiKeys, revokeApiKey } from './lib/api-keys.js';
-import { usePageHeader } from './lib/pageHeader.js';
+import { formErrorMessage } from './lib/form-error.js';
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
@@ -62,8 +62,9 @@ interface CreateForm {
 
 const EMPTY_FORM: CreateForm = { name: '', priceListId: '' };
 
-export function ApiKeysPage() {
-  usePageHeader('API Keys', 'Acceso externo de solo lectura al stock');
+// Sección embebible en Ayuda → "Integraciones" (D-09b): API Keys dejó de ser una
+// page del menú; esta sección conserva sus testids (apikeys-*) y su flujo.
+export function ApiKeysSection() {
   const qc = useQueryClient();
   const confirm = useConfirm();
   const toast = useToast();
@@ -96,14 +97,14 @@ export function ApiKeysPage() {
       void qc.invalidateQueries({ queryKey: ['api-keys'] });
       toast('API key revocada', 'success');
     },
-    onError: () => toast('No se pudo revocar la API key', 'error'),
+    onError: (e) => toast(formErrorMessage(e, 'No se pudo revocar la API key'), 'error'),
   });
 
   const active = keys.filter((k) => !k.revokedAt);
   const revoked = keys.filter((k) => k.revokedAt);
 
   return (
-    <section className="catalog" data-testid="apikeys-page">
+    <div className="help-integrations-body" data-testid="apikeys-page">
       <div className="table-panel">
         <SectionToolbar
           actionLabel="Nueva API key"
@@ -268,6 +269,6 @@ export function ApiKeysPage() {
           </div>
         </Modal>
       )}
-    </section>
+    </div>
   );
 }

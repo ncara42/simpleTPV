@@ -15,7 +15,8 @@ export class ProductFamiliesService {
   async create(input: CreateFamilyDto): Promise<ProductFamily> {
     const tenant = requireTenant();
     if (input.parentId) {
-      await this.requireExists(input.parentId);
+      const parent = await this.requireExists(input.parentId);
+      this.assertAcceptsChildren(parent);
     }
     return this.prisma.productFamily.create({
       data: { ...input, organizationId: tenant.organizationId },
@@ -48,8 +49,18 @@ export class ProductFamiliesService {
       if (input.parentId === id) {
         throw new BadRequestException('Una familia no puede ser su propio padre');
       }
-      await this.requireExists(input.parentId);
+      const parent = await this.requireExists(input.parentId);
+      this.assertAcceptsChildren(parent);
       await this.assertNoCycle(id, input.parentId);
+    }
+    // Marcar un nodo como arquetipo exige que no tenga subfamilias (solo productos).
+    if (input.isArchetype === true) {
+      const children = await this.prisma.productFamily.count({ where: { parentId: id } });
+      if (children > 0) {
+        throw new BadRequestException(
+          'No se puede marcar como arquetipo un nodo con subfamilias: un arquetipo solo contiene productos',
+        );
+      }
     }
     return this.prisma.productFamily.update({ where: { id }, data: input });
   }
@@ -74,6 +85,16 @@ export class ProductFamiliesService {
       visited.add(cursor);
       const node = await this.requireExists(cursor);
       cursor = node.parentId;
+    }
+  }
+
+  // Un arquetipo es hoja de clasificación: solo admite productos, no subnodos. Se
+  // rechaza crear/mover una familia bajo un nodo marcado como arquetipo.
+  private assertAcceptsChildren(parent: ProductFamily): void {
+    if (parent.isArchetype) {
+      throw new BadRequestException(
+        'Un arquetipo solo puede contener productos, no subfamilias ni arquetipos',
+      );
     }
   }
 

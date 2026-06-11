@@ -4,7 +4,7 @@ import { Prisma } from '@simpletpv/db';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
-import { withTenantTx } from '../prisma/with-tenant-tx.js';
+import { type TxClient, withTenantTx } from '../prisma/with-tenant-tx.js';
 import type { DashboardPeriodQueryDto, ProductRankingsQueryDto } from './dashboard.dto.js';
 import { type DateRange, deltaPct, previousRange, resolvePeriod } from './period.js';
 
@@ -311,7 +311,46 @@ export class DashboardService {
     });
   }
 
+  // Ventas por vendedor (D-08, preset Equipo): facturación y nº de tickets por
+  // empleado en el periodo, de mayor a menor. Solo ventas COMPLETED (mismo
+  // criterio que el resto de KPIs).
+  async salesByEmployee(
+    q: DashboardPeriodQueryDto,
+  ): Promise<Array<{ userId: string; userName: string; salesCount: number; total: number }>> {
+    const { organizationId } = requireTenant();
+    const range = this.rangeFor(q);
+    const { storeId } = q;
+
+    return withTenantTx(this.base, organizationId, async (tx) => {
+      const rows = await tx.$queryRaw<
+        Array<{ userId: string; userName: string; count: bigint; total: string }>
+      >`
+        SELECT u.id::text AS "userId",
+               u.name AS "userName",
+               COUNT(sa.id) AS count,
+               COALESCE(SUM(sa.total), 0) AS total
+        FROM "Sale" sa
+        JOIN "User" u ON u.id = sa."userId"
+        WHERE sa."organizationId" = ${organizationId}::uuid
+          AND sa.status = 'COMPLETED'
+          AND sa."createdAt" >= ${range.from}
+          AND sa."createdAt" < ${range.to}
+          ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+        GROUP BY u.id, u.name
+        ORDER BY SUM(sa.total) DESC
+      `;
+      return rows.map((r) => ({
+        userId: r.userId,
+        userName: r.userName,
+        salesCount: num(r.count),
+        total: num(r.total),
+      }));
+    });
+  }
+
   // KPIs de venta: ticket medio, UPT, tasa de descuento, tasa de devolución.
+  // `series` añade la evolución intra-periodo de cada KPI (por hora o por día,
+  // según la duración) para las sparklines de las tarjetas.
   async salesKpis(q: DashboardPeriodQueryDto): Promise<{
     salesCount: number;
     revenue: number;
@@ -319,6 +358,7 @@ export class DashboardService {
     upt: number;
     discountRate: number;
     returnRate: number;
+    series: { avgTicket: number[]; upt: number[]; discountRate: number[]; returnRate: number[] };
   }> {
     const { organizationId } = requireTenant();
     const range = this.rangeFor(q);
@@ -372,6 +412,8 @@ export class DashboardService {
       const units = num(agg?.units);
       const returnsTotal = num(ret?.returns_total);
 
+      const series = await this.salesSeries(tx, organizationId, range, storeId);
+
       return {
         salesCount,
         revenue,
@@ -382,16 +424,100 @@ export class DashboardService {
         // (subtotal + discount ≈ importe a precio de tarifa).
         discountRate: subtotal + discount > 0 ? discount / (subtotal + discount) : 0,
         returnRate: revenue > 0 ? returnsTotal / revenue : 0,
+        series,
       };
     });
   }
 
+  // Granularidad de las series intra-periodo: por hora si el rango cubre ~1 día
+  // (hoy/ayer), por día en rangos más largos (semana/mes/personalizado).
+  private bucketUnit(range: DateRange): 'hour' | 'day' {
+    const spanMs = range.to.getTime() - range.from.getTime();
+    return spanMs <= 36 * 60 * 60 * 1000 ? 'hour' : 'day';
+  }
+
+  // Evolución intra-periodo de los KPIs de venta, un punto por bucket temporal
+  // (hora o día). Cada serie va en orden cronológico para alimentar la sparkline.
+  private async salesSeries(
+    tx: TxClient,
+    organizationId: string,
+    range: DateRange,
+    storeId?: string,
+  ): Promise<{ avgTicket: number[]; upt: number[]; discountRate: number[]; returnRate: number[] }> {
+    const unit = this.bucketUnit(range);
+    const sales = await tx.$queryRaw<
+      Array<{ bucket: Date; count: bigint; revenue: string; subtotal: string; discount: string }>
+    >`
+      SELECT date_trunc(${unit}, sa."createdAt") AS bucket,
+             COUNT(*) AS count,
+             COALESCE(SUM(sa.total), 0) AS revenue,
+             COALESCE(SUM(sa.subtotal), 0) AS subtotal,
+             COALESCE(SUM(sa."discountTotal"), 0) AS discount
+      FROM "Sale" sa
+      WHERE sa."organizationId" = ${organizationId}::uuid
+        AND sa.status = 'COMPLETED'
+        AND sa."createdAt" >= ${range.from}
+        AND sa."createdAt" < ${range.to}
+        ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+      GROUP BY bucket
+      ORDER BY bucket
+    `;
+    const unitsRows = await tx.$queryRaw<Array<{ bucket: Date; units: string }>>`
+      SELECT date_trunc(${unit}, sa."createdAt") AS bucket, COALESCE(SUM(sl.qty), 0) AS units
+      FROM "SaleLine" sl
+      JOIN "Sale" sa ON sa.id = sl."saleId"
+      WHERE sa."organizationId" = ${organizationId}::uuid
+        AND sa.status = 'COMPLETED'
+        AND sa."createdAt" >= ${range.from}
+        AND sa."createdAt" < ${range.to}
+        ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+      GROUP BY bucket
+    `;
+    const returnsRows = await tx.$queryRaw<Array<{ bucket: Date; returns: string }>>`
+      SELECT date_trunc(${unit}, "createdAt") AS bucket, COALESCE(SUM(total), 0) AS returns
+      FROM "Return"
+      WHERE "organizationId" = ${organizationId}::uuid
+        AND "createdAt" >= ${range.from}
+        AND "createdAt" < ${range.to}
+        ${storeId ? this.eqStore('"storeId"', storeId) : EMPTY}
+      GROUP BY bucket
+    `;
+    const unitsBy = new Map(unitsRows.map((r) => [new Date(r.bucket).getTime(), num(r.units)]));
+    const returnsBy = new Map(
+      returnsRows.map((r) => [new Date(r.bucket).getTime(), num(r.returns)]),
+    );
+
+    const avgTicket: number[] = [];
+    const upt: number[] = [];
+    const discountRate: number[] = [];
+    const returnRate: number[] = [];
+    for (const r of sales) {
+      const key = new Date(r.bucket).getTime();
+      const count = num(r.count);
+      const revenue = num(r.revenue);
+      const subtotal = num(r.subtotal);
+      const discount = num(r.discount);
+      const u = unitsBy.get(key) ?? 0;
+      const ret = returnsBy.get(key) ?? 0;
+      avgTicket.push(count > 0 ? Math.round((revenue / count) * 100) / 100 : 0);
+      upt.push(count > 0 ? Math.round((u / count) * 100) / 100 : 0);
+      discountRate.push(
+        subtotal + discount > 0 ? Math.round((discount / (subtotal + discount)) * 1000) / 1000 : 0,
+      );
+      returnRate.push(revenue > 0 ? Math.round((ret / revenue) * 1000) / 1000 : 0);
+    }
+    return { avgTicket, upt, discountRate, returnRate };
+  }
+
   // KPIs de margen: bruto (sin descuentos), real (tras descuentos) y % margen.
+  // `series` (% margen) y `realMarginSeries` (€) añaden la evolución intra-periodo.
   async marginKpis(q: DashboardPeriodQueryDto): Promise<{
     grossMargin: number;
     realMargin: number;
     marginPct: number;
     revenue: number;
+    series: number[];
+    realMarginSeries: number[];
   }> {
     const { organizationId } = requireTenant();
     const range = this.rangeFor(q);
@@ -414,13 +540,55 @@ export class DashboardService {
       const grossMargin = num(r?.gross);
       const realMargin = num(r?.real);
       const revenue = num(r?.revenue);
+      const { series, realMarginSeries } = await this.marginSeries(
+        tx,
+        organizationId,
+        range,
+        storeId,
+      );
       return {
         grossMargin,
         realMargin,
         marginPct: revenue > 0 ? realMargin / revenue : 0,
         revenue,
+        series,
+        realMarginSeries,
       };
     });
+  }
+
+  // Evolución intra-periodo del margen real (€) y del % de margen, por bucket
+  // temporal (hora o día), en orden cronológico para las sparklines.
+  private async marginSeries(
+    tx: TxClient,
+    organizationId: string,
+    range: DateRange,
+    storeId?: string,
+  ): Promise<{ series: number[]; realMarginSeries: number[] }> {
+    const unit = this.bucketUnit(range);
+    const rows = await tx.$queryRaw<Array<{ bucket: Date; real: string; revenue: string }>>`
+      SELECT date_trunc(${unit}, sa."createdAt") AS bucket,
+             COALESCE(SUM(sl."lineTotal" - sl."costPrice" * sl.qty), 0) AS real,
+             COALESCE(SUM(sl."lineTotal"), 0) AS revenue
+      FROM "SaleLine" sl
+      JOIN "Sale" sa ON sa.id = sl."saleId"
+      WHERE sa."organizationId" = ${organizationId}::uuid
+        AND sa.status = 'COMPLETED'
+        AND sa."createdAt" >= ${range.from}
+        AND sa."createdAt" < ${range.to}
+        ${storeId ? this.eqStore('sa."storeId"', storeId) : EMPTY}
+      GROUP BY bucket
+      ORDER BY bucket
+    `;
+    const series: number[] = [];
+    const realMarginSeries: number[] = [];
+    for (const row of rows) {
+      const real = num(row.real);
+      const revenue = num(row.revenue);
+      realMarginSeries.push(Math.round(real * 100) / 100);
+      series.push(revenue > 0 ? Math.round((real / revenue) * 1000) / 1000 : 0);
+    }
+    return { series, realMarginSeries };
   }
 
   // KPIs de rotura de stock sobre StockAlert OUT_OF_STOCK en el periodo.

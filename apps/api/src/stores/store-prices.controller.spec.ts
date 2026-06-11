@@ -10,6 +10,7 @@ function makeService() {
   return {
     list: vi.fn(async () => [{ id: 'sp-1', productId: 'p-1', price: '7.5' }]),
     setPrice: vi.fn(async (storeId: string, dto: unknown) => ({ storeId, ...(dto as object) })),
+    importCsv: vi.fn(async () => ({ inserted: 1, errors: [] })),
     removePrice: vi.fn(async (_storeId: string, _productId: string) => undefined),
   };
 }
@@ -38,6 +39,19 @@ describe('StorePricesController', () => {
       userId: 'user-1',
       role: 'MANAGER',
     });
+  });
+
+  it('importCsv delega con storeId, csv y actor', async () => {
+    const svc = makeService();
+    const ctrl = new StorePricesController(svc as never);
+
+    const res = await ctrl.importCsv('store-1', { csv: 'sku,price\nA,1' } as never, req as never);
+
+    expect(svc.importCsv).toHaveBeenCalledWith('store-1', 'sku,price\nA,1', {
+      userId: 'user-1',
+      role: 'MANAGER',
+    });
+    expect(res).toEqual({ inserted: 1, errors: [] });
   });
 
   it('removePrice delega con storeId, productId y actor', async () => {

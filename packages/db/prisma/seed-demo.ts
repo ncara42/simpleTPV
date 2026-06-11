@@ -15,6 +15,8 @@ import {
   MovementType,
   PaymentMethod,
   PrismaClient,
+  PromoConditionType,
+  PromoDiscountType,
   SaleStatus,
   TimeClockType,
   UserRole,
@@ -42,78 +44,118 @@ if (!databaseUrl) {
 const adapter = new PrismaPg({ connectionString: databaseUrl });
 const prisma = new PrismaClient({ adapter });
 
-interface FamilySeed {
+// Árbol de clasificación canónico (informe_arquetipo.md §5): familias raíz,
+// subfamilias y ARQUETIPOS hoja (isArchetype: solo contienen productos). Cubre
+// los 4 casos de colgado de producto: bajo raíz, bajo subfamilia, bajo arquetipo
+// y familia de productos sueltos (Accesorios).
+interface NodeSeed {
   key: string;
+  parentKey: string | null;
   name: string;
   color: string;
   icon: string;
   sortOrder: number;
+  isArchetype?: boolean;
 }
 
-const FAMILIES: FamilySeed[] = [
-  { key: 'flores', name: 'Flores CBD', color: '#4CAF50', icon: '🌿', sortOrder: 1 },
-  { key: 'aceites', name: 'Aceites', color: '#FFC107', icon: '💧', sortOrder: 2 },
-  { key: 'cosmetica', name: 'Cosmética', color: '#E91E63', icon: '🧴', sortOrder: 3 },
-  { key: 'accesorios', name: 'Accesorios', color: '#607D8B', icon: '🛍️', sortOrder: 4 },
-];
-
-interface SubfamilySeed {
-  key: string;
-  parentKey: string;
-  name: string;
-  color: string;
-  icon: string;
-  sortOrder: number;
-}
-
-const SUBFAMILIES: SubfamilySeed[] = [
+const NODES: NodeSeed[] = [
+  // Familias raíz
+  { key: 'aceites', parentKey: null, name: 'Aceites', color: '#FFC107', icon: '💧', sortOrder: 1 },
   {
-    key: 'flores-indica',
-    parentKey: 'flores',
-    name: 'Índica',
-    color: '#4CAF50',
-    icon: '🌿',
-    sortOrder: 1,
-  },
-  {
-    key: 'flores-sativa',
-    parentKey: 'flores',
-    name: 'Sativa',
+    key: 'flores',
+    parentKey: null,
+    name: 'Flores CBD',
     color: '#4CAF50',
     icon: '🌿',
     sortOrder: 2,
   },
   {
-    key: 'aceites-suave',
+    key: 'cosmetica',
+    parentKey: null,
+    name: 'Cosmética',
+    color: '#E91E63',
+    icon: '🧴',
+    sortOrder: 3,
+  },
+  {
+    key: 'accesorios',
+    parentKey: null,
+    name: 'Accesorios',
+    color: '#607D8B',
+    icon: '🛍️',
+    sortOrder: 4,
+  },
+  // Subfamilias
+  {
+    key: 'aceites-cbd',
     parentKey: 'aceites',
-    name: 'Suaves (≤5%)',
+    name: 'Aceites CBD',
     color: '#FFC107',
     icon: '💧',
     sortOrder: 1,
   },
   {
-    key: 'aceites-fuerte',
-    parentKey: 'aceites',
-    name: 'Fuertes (≥10%)',
-    color: '#FFC107',
-    icon: '💧',
-    sortOrder: 2,
-  },
-  {
-    key: 'cosmetica-facial',
+    key: 'cremas',
     parentKey: 'cosmetica',
-    name: 'Facial',
+    name: 'Cremas',
     color: '#E91E63',
     icon: '🧴',
     sortOrder: 1,
   },
+  // Arquetipos (producto genérico sin marca; debajo solo hay productos)
   {
-    key: 'cosmetica-corporal',
-    parentKey: 'cosmetica',
-    name: 'Corporal',
+    key: 'arq-aceite-10',
+    parentKey: 'aceites-cbd',
+    name: 'Aceite CBD 10%',
+    color: '#FFC107',
+    icon: '💧',
+    sortOrder: 1,
+    isArchetype: true,
+  },
+  {
+    key: 'arq-aceite-20',
+    parentKey: 'aceites-cbd',
+    name: 'Aceite CBD 20%',
+    color: '#FFC107',
+    icon: '💧',
+    sortOrder: 2,
+    isArchetype: true,
+  },
+  {
+    key: 'arq-aceite-canamo',
+    parentKey: 'aceites',
+    name: 'Aceite de cáñamo alimentario',
+    color: '#FFC107',
+    icon: '💧',
+    sortOrder: 2,
+    isArchetype: true,
+  },
+  {
+    key: 'arq-flor-lemon',
+    parentKey: 'flores',
+    name: 'Flor Lemon Haze',
+    color: '#4CAF50',
+    icon: '🌿',
+    sortOrder: 1,
+    isArchetype: true,
+  },
+  {
+    key: 'arq-flor-ogkush',
+    parentKey: 'flores',
+    name: 'Flor OG Kush',
+    color: '#4CAF50',
+    icon: '🌿',
+    sortOrder: 2,
+    isArchetype: true,
+  },
+  {
+    key: 'arq-crema-3',
+    parentKey: 'cremas',
+    name: 'Crema CBD 3%',
     color: '#E91E63',
     icon: '🧴',
-    sortOrder: 2,
+    sortOrder: 1,
+    isArchetype: true,
   },
 ];
 
@@ -128,8 +170,104 @@ interface ProductSeed {
 }
 
 const PRODUCTS: ProductSeed[] = [
+  // ── Arquetipo: Aceite CBD 10% (3 marcas → comparativa de proveedores) ──
   {
-    family: 'flores',
+    family: 'arq-aceite-10',
+    name: 'Aceite CBD 10% — Beemine',
+    barcode: '8400000000127',
+    salePrice: 39.9,
+    costPrice: 16.0,
+    minStock: 6,
+    initialStock: 15,
+  },
+  {
+    family: 'arq-aceite-10',
+    name: 'Aceite CBD 10% Premium — Profesor CBD',
+    barcode: '8400000000400',
+    salePrice: 44.9,
+    costPrice: 18.0,
+    minStock: 4,
+    initialStock: 9,
+  },
+  {
+    family: 'arq-aceite-10',
+    name: 'Aceite CBD 10% — Cannactiva',
+    barcode: '8400000000417',
+    salePrice: 37.5,
+    costPrice: 15.0,
+    minStock: 4,
+    initialStock: 12,
+  },
+  // ── Arquetipo: Aceite CBD 20% (2 marcas) ──
+  {
+    family: 'arq-aceite-20',
+    name: 'Aceite CBD 20% — Beemine',
+    barcode: '8400000000134',
+    salePrice: 59.9,
+    costPrice: 24.0,
+    minStock: 4,
+    initialStock: 3,
+  },
+  {
+    family: 'arq-aceite-20',
+    name: 'Aceite CBD 20% — Profesor CBD',
+    barcode: '8400000000424',
+    salePrice: 64.9,
+    costPrice: 26.0,
+    minStock: 3,
+    initialStock: 5,
+  },
+  // ── Arquetipo: Aceite de cáñamo alimentario (2 marcas, cuelga de la raíz Aceites) ──
+  {
+    family: 'arq-aceite-canamo',
+    name: 'Aceite de cáñamo alimentario — Beemine',
+    barcode: '8400000000431',
+    salePrice: 12.9,
+    costPrice: 5.0,
+    minStock: 6,
+    initialStock: 14,
+  },
+  {
+    family: 'arq-aceite-canamo',
+    name: 'Aceite de cáñamo alimentario — Cannactiva',
+    barcode: '8400000000448',
+    salePrice: 11.5,
+    costPrice: 4.4,
+    minStock: 6,
+    initialStock: 10,
+  },
+  // ── Productos directos bajo la subfamilia Aceites CBD (sin arquetipo) ──
+  {
+    family: 'aceites-cbd',
+    name: 'Aceite CBD 5%',
+    barcode: '8400000000110',
+    salePrice: 24.9,
+    costPrice: 10.0,
+    minStock: 6,
+    initialStock: 20,
+  },
+  {
+    family: 'aceites-cbd',
+    name: 'Aceite CBD + Melatonina',
+    barcode: '8400000000141',
+    salePrice: 29.9,
+    costPrice: 12.0,
+    minStock: 6,
+    initialStock: 18,
+  },
+  // ── Producto directo bajo la familia raíz Aceites ──
+  {
+    family: 'aceites',
+    name: 'Cápsulas CBD 30u',
+    barcode: '8400000000158',
+    salePrice: 27.5,
+    costPrice: 11.0,
+    minStock: 6,
+    initialStock: 22,
+  },
+  // ── Arquetipo: Flor Lemon Haze (2 formatos/proveedores) ──
+  {
+    family: 'arq-flor-lemon',
     name: 'Flor CBD Lemon Haze 20%',
     barcode: '8400000000011',
     salePrice: 12.5,
@@ -138,6 +276,35 @@ const PRODUCTS: ProductSeed[] = [
     initialStock: 40,
   },
   {
+    family: 'arq-flor-lemon',
+    name: 'Flor Lemon Haze 5g — CBD Valley',
+    barcode: '8400000000455',
+    salePrice: 26.0,
+    costPrice: 11.0,
+    minStock: 6,
+    initialStock: 18,
+  },
+  // ── Arquetipo: Flor OG Kush (2 marcas) ──
+  {
+    family: 'arq-flor-ogkush',
+    name: 'Flor CBD OG Kush 22%',
+    barcode: '8400000000035',
+    salePrice: 13.5,
+    costPrice: 5.5,
+    minStock: 10,
+    initialStock: 30,
+  },
+  {
+    family: 'arq-flor-ogkush',
+    name: 'Flor OG Kush — Mountain Grow',
+    barcode: '8400000000462',
+    salePrice: 12.9,
+    costPrice: 5.2,
+    minStock: 8,
+    initialStock: 22,
+  },
+  // ── Productos directos bajo Flores CBD ──
+  {
     family: 'flores',
     name: 'Flor CBD Amnesia 18%',
     barcode: '8400000000028',
@@ -145,15 +312,6 @@ const PRODUCTS: ProductSeed[] = [
     costPrice: 4.5,
     minStock: 10,
     initialStock: 8,
-  },
-  {
-    family: 'flores',
-    name: 'Flor CBD OG Kush 22%',
-    barcode: '8400000000035',
-    salePrice: 13.5,
-    costPrice: 5.5,
-    minStock: 10,
-    initialStock: 30,
   },
   {
     family: 'flores',
@@ -182,53 +340,28 @@ const PRODUCTS: ProductSeed[] = [
     minStock: 12,
     initialStock: 50,
   },
+  // ── Arquetipo: Crema CBD 3% (2 marcas, bajo la subfamilia Cremas) ──
   {
-    family: 'aceites',
-    name: 'Aceite CBD 5%',
-    barcode: '8400000000110',
-    salePrice: 24.9,
-    costPrice: 10.0,
-    minStock: 6,
-    initialStock: 20,
+    family: 'arq-crema-3',
+    name: 'Crema CBD 3% — Beemine',
+    barcode: '8400000000479',
+    salePrice: 18.5,
+    costPrice: 7.4,
+    minStock: 5,
+    initialStock: 12,
   },
   {
-    family: 'aceites',
-    name: 'Aceite CBD 10%',
-    barcode: '8400000000127',
-    salePrice: 39.9,
-    costPrice: 16.0,
-    minStock: 6,
-    initialStock: 15,
+    family: 'arq-crema-3',
+    name: 'Crema CBD 3% — Cannactiva',
+    barcode: '8400000000486',
+    salePrice: 17.0,
+    costPrice: 6.8,
+    minStock: 5,
+    initialStock: 9,
   },
+  // ── Productos directos bajo la subfamilia Cremas ──
   {
-    family: 'aceites',
-    name: 'Aceite CBD 20%',
-    barcode: '8400000000134',
-    salePrice: 59.9,
-    costPrice: 24.0,
-    minStock: 4,
-    initialStock: 3,
-  },
-  {
-    family: 'aceites',
-    name: 'Aceite CBD + Melatonina',
-    barcode: '8400000000141',
-    salePrice: 29.9,
-    costPrice: 12.0,
-    minStock: 6,
-    initialStock: 18,
-  },
-  {
-    family: 'aceites',
-    name: 'Cápsulas CBD 30u',
-    barcode: '8400000000158',
-    salePrice: 27.5,
-    costPrice: 11.0,
-    minStock: 6,
-    initialStock: 22,
-  },
-  {
-    family: 'cosmetica',
+    family: 'cremas',
     name: 'Crema CBD facial',
     barcode: '8400000000219',
     salePrice: 19.95,
@@ -237,13 +370,23 @@ const PRODUCTS: ProductSeed[] = [
     initialStock: 16,
   },
   {
-    family: 'cosmetica',
+    family: 'cremas',
     name: 'Crema CBD muscular',
     barcode: '8400000000226',
     salePrice: 22.0,
     costPrice: 9.0,
     minStock: 5,
     initialStock: 4,
+  },
+  // ── Productos directos bajo la familia raíz Cosmética ──
+  {
+    family: 'cosmetica',
+    name: 'Champú CBD',
+    barcode: '8400000000240',
+    salePrice: 14.0,
+    costPrice: 5.5,
+    minStock: 6,
+    initialStock: 12,
   },
   {
     family: 'cosmetica',
@@ -256,15 +399,6 @@ const PRODUCTS: ProductSeed[] = [
   },
   {
     family: 'cosmetica',
-    name: 'Champú CBD',
-    barcode: '8400000000240',
-    salePrice: 14.0,
-    costPrice: 5.5,
-    minStock: 6,
-    initialStock: 12,
-  },
-  {
-    family: 'cosmetica',
     name: 'Sérum CBD',
     barcode: '8400000000257',
     salePrice: 34.0,
@@ -272,6 +406,7 @@ const PRODUCTS: ProductSeed[] = [
     minStock: 4,
     initialStock: 10,
   },
+  // ── Accesorios: familia de productos sueltos (sin subniveles) ──
   {
     family: 'accesorios',
     name: 'Grinder metálico',
@@ -377,30 +512,33 @@ async function seedCatalog(orgId: string): Promise<void> {
     });
   }
 
+  // Árbol de clasificación: los padres se crean antes que sus hijos (NODES está
+  // ordenado raíces → subfamilias → arquetipos). Idempotente: actualiza posición,
+  // estilo y flag de arquetipo si el nodo ya existe (nombres únicos en el árbol).
   const familyIdByKey = new Map<string, string>();
-  for (const f of FAMILIES) {
+  for (const n of NODES) {
+    const parentId = n.parentKey ? (familyIdByKey.get(n.parentKey) ?? null) : null;
+    const data = {
+      parentId,
+      color: n.color,
+      icon: n.icon,
+      sortOrder: n.sortOrder,
+      isArchetype: n.isArchetype ?? false,
+    };
     const existing = await prisma.productFamily.findFirst({
-      where: { organizationId: orgId, name: f.name },
+      where: { organizationId: orgId, name: n.name },
     });
-    const fam = existing
-      ? await prisma.productFamily.update({
-          where: { id: existing.id },
-          data: { color: f.color, icon: f.icon, sortOrder: f.sortOrder },
-        })
+    const node = existing
+      ? await prisma.productFamily.update({ where: { id: existing.id }, data })
       : await prisma.productFamily.create({
-          data: {
-            organizationId: orgId,
-            name: f.name,
-            color: f.color,
-            icon: f.icon,
-            sortOrder: f.sortOrder,
-          },
+          data: { organizationId: orgId, name: n.name, ...data },
         });
-    familyIdByKey.set(f.key, fam.id);
+    familyIdByKey.set(n.key, node.id);
   }
 
   const stores = await prisma.store.findMany({ where: { organizationId: orgId } });
   for (const p of PRODUCTS) {
+    const familyId = familyIdByKey.get(p.family) ?? null;
     let product = await prisma.product.findFirst({
       where: { organizationId: orgId, name: p.name },
     });
@@ -408,13 +546,16 @@ async function seedCatalog(orgId: string): Promise<void> {
       product = await prisma.product.create({
         data: {
           organizationId: orgId,
-          familyId: familyIdByKey.get(p.family) ?? null,
+          familyId,
           name: p.name,
           barcode: p.barcode,
           salePrice: p.salePrice,
           costPrice: p.costPrice,
         },
       });
+    } else if (product.familyId !== familyId) {
+      // Recolgado idempotente al nodo canónico del árbol.
+      product = await prisma.product.update({ where: { id: product.id }, data: { familyId } });
     }
     for (const store of stores) {
       await prisma.stock.upsert({
@@ -426,39 +567,6 @@ async function seedCatalog(orgId: string): Promise<void> {
           storeId: store.id,
           quantity: p.initialStock,
           minStock: p.minStock,
-        },
-      });
-    }
-  }
-}
-
-/** Crea subfamilias (jerarquía de 2 niveles) para familias existentes. Idempotente. */
-async function seedSubfamilies(orgId: string): Promise<void> {
-  const familyIdByKey = new Map<string, string>();
-  const families = await prisma.productFamily.findMany({
-    where: { organizationId: orgId, parentId: null },
-  });
-  for (const f of families) {
-    const key = FAMILIES.find((fam) => fam.name === f.name)?.key;
-    if (key) familyIdByKey.set(key, f.id);
-  }
-
-  for (const sf of SUBFAMILIES) {
-    const parentId = familyIdByKey.get(sf.parentKey);
-    if (!parentId) continue;
-
-    const existing = await prisma.productFamily.findFirst({
-      where: { organizationId: orgId, name: sf.name, parentId },
-    });
-    if (!existing) {
-      await prisma.productFamily.create({
-        data: {
-          organizationId: orgId,
-          parentId,
-          name: sf.name,
-          color: sf.color,
-          icon: sf.icon,
-          sortOrder: sf.sortOrder,
         },
       });
     }
@@ -1061,6 +1169,179 @@ async function seedStorePrices(orgId: string): Promise<void> {
   }
 }
 
+// Promociones demo (#143): 4 reglas que cubren los 3 grupos del backoffice
+// (Activas / Programadas / Inactivas). Fechas relativas a hoy para que la
+// clasificación promoStatus() sea estable se ejecute cuando se ejecute el seed.
+// Idempotente por [organizationId, name].
+async function seedPromotions(orgId: string): Promise<void> {
+  const day = (offset: number): Date => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + offset);
+    return d;
+  };
+  const promos = [
+    // Activa: en rango y active
+    {
+      name: '2 o más Flores: -15%',
+      conditionType: PromoConditionType.min_qty,
+      threshold: 2,
+      discountType: PromoDiscountType.percent,
+      discountValue: 15,
+      startDate: day(-10),
+      endDate: day(20),
+      active: true,
+    },
+    // Activa: por importe de ticket
+    {
+      name: 'Ahorra 10€ en compras de 50€+',
+      conditionType: PromoConditionType.min_ticket,
+      threshold: 50,
+      discountType: PromoDiscountType.amount,
+      discountValue: 10,
+      startDate: day(-5),
+      endDate: day(25),
+      active: true,
+    },
+    // Programada: empieza en el futuro
+    {
+      name: 'Campaña verano CBD',
+      conditionType: PromoConditionType.min_ticket,
+      threshold: 40,
+      discountType: PromoDiscountType.percent,
+      discountValue: 10,
+      startDate: day(5),
+      endDate: day(35),
+      active: true,
+    },
+    // Inactiva: en rango pero pausada (active=false)
+    {
+      name: 'Black Friday (pausada)',
+      conditionType: PromoConditionType.min_qty,
+      threshold: 3,
+      discountType: PromoDiscountType.percent,
+      discountValue: 20,
+      startDate: day(-10),
+      endDate: day(20),
+      active: false,
+    },
+  ];
+  for (const p of promos) {
+    await prisma.promotion.upsert({
+      where: { organizationId_name: { organizationId: orgId, name: p.name } },
+      update: {},
+      create: { organizationId: orgId, ...p },
+    });
+  }
+}
+
+/**
+ * Crea proveedores demo + tarifas de compra por proveedor (P1-B). Asigna un SKU a
+ * los productos con tarifa (habilita el import CSV por SKU). Idempotente.
+ */
+async function seedSuppliers(orgId: string): Promise<void> {
+  const suppliers = [
+    { name: 'Distribuciones Norte', nif: 'B12121212', leadTimeDays: 5 },
+    { name: 'Mayorista Sur', nif: 'B34343434', leadTimeDays: 9 },
+    { name: 'Importaciones García', nif: 'B56565656', leadTimeDays: 14 },
+  ];
+  const created = [];
+  for (const s of suppliers) {
+    let sup = await prisma.supplier.findFirst({ where: { organizationId: orgId, nif: s.nif } });
+    if (!sup) {
+      sup = await prisma.supplier.create({ data: { organizationId: orgId, ...s } });
+    }
+    created.push(sup);
+  }
+
+  // Tarifas de compra para los primeros 8 productos: cada proveedor ofrece un
+  // precio distinto en torno al coste, para que la comparativa entre proveedores
+  // tenga sentido. Se dejan huecos (no todos sirven todos los productos).
+  const products = await prisma.product.findMany({
+    where: { organizationId: orgId },
+    take: 8,
+    orderBy: { name: 'asc' },
+  });
+  const factors = [0.95, 1.0, 1.08]; // por proveedor: más barato … más caro
+  for (let pi = 0; pi < products.length; pi++) {
+    const p = products[pi]!;
+    if (!p.sku) {
+      await prisma.product.update({
+        where: { id: p.id },
+        data: { sku: `SKU-${String(pi + 1).padStart(3, '0')}` },
+      });
+    }
+    const base = Number(p.costPrice) > 0 ? Number(p.costPrice) : Number(p.salePrice) * 0.5;
+    for (let si = 0; si < created.length; si++) {
+      if ((pi + si) % 4 === 3) continue; // hueco realista
+      const sup = created[si]!;
+      const price = Math.round(base * factors[si]! * 100) / 100;
+      await prisma.supplierPrice.upsert({
+        where: { supplierId_productId: { supplierId: sup.id, productId: p.id } },
+        update: { price },
+        create: { organizationId: orgId, supplierId: sup.id, productId: p.id, price },
+      });
+    }
+  }
+}
+
+/**
+ * Pedidos de compra de ejemplo (I-16): uno en borrador y otro confirmado,
+ * pendientes de recibir, para que el panel "Pedidos de compra pendientes" del
+ * dashboard y la page de Proveedores tengan datos en demo. Idempotente: si la
+ * organización ya tiene pedidos, no crea más.
+ */
+async function seedPurchaseOrders(orgId: string): Promise<void> {
+  const existing = await prisma.purchaseOrder.count({ where: { organizationId: orgId } });
+  if (existing > 0) return;
+
+  const suppliers = await prisma.supplier.findMany({
+    where: { organizationId: orgId },
+    orderBy: { name: 'asc' },
+    take: 2,
+  });
+  const store = await prisma.store.findFirst({
+    where: { organizationId: orgId },
+    orderBy: { code: 'asc' },
+  });
+  const admin = await prisma.user.findFirst({
+    where: { organizationId: orgId, role: UserRole.ADMIN },
+  });
+  // Productos con tarifa de proveedor (seedSuppliers cubre los primeros 8).
+  const products = await prisma.product.findMany({
+    where: { organizationId: orgId },
+    orderBy: { name: 'asc' },
+    take: 4,
+  });
+  if (suppliers.length < 2 || !store || !admin || products.length < 4) return;
+
+  const orders = [
+    { supplier: suppliers[0]!, status: 'CONFIRMED' as const, lines: products.slice(0, 2) },
+    { supplier: suppliers[1]!, status: 'DRAFT' as const, lines: products.slice(2, 4) },
+  ];
+  for (const o of orders) {
+    await prisma.purchaseOrder.create({
+      data: {
+        organizationId: orgId,
+        supplierId: o.supplier.id,
+        storeId: store.id,
+        status: o.status,
+        createdBy: admin.id,
+        ...(o.status === 'CONFIRMED' ? { confirmedAt: new Date() } : {}),
+        notes: 'Pedido demo',
+        lines: {
+          create: o.lines.map((p, i) => ({
+            organizationId: orgId,
+            productId: p.id,
+            quantityOrdered: 10 + i * 5,
+            unitCost: Number(p.costPrice) > 0 ? Number(p.costPrice) : 5,
+          })),
+        },
+      },
+    });
+  }
+}
+
 async function main(): Promise<void> {
   assertNotProduction();
 
@@ -1071,7 +1352,6 @@ async function main(): Promise<void> {
   });
 
   await seedCatalog(org.id);
-  await seedSubfamilies(org.id);
   await seedMoreStores(org.id);
 
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
@@ -1109,8 +1389,11 @@ async function main(): Promise<void> {
   await seedBatches(org.id);
   await seedAlerts(org.id);
   await seedB2B(org.id);
+  await seedSuppliers(org.id);
+  await seedPurchaseOrders(org.id);
   await seedFeatureFlags(org.id);
   await seedStorePrices(org.id);
+  await seedPromotions(org.id);
 
   console.log(`Seed demo completado: organización ${org.nif} con catálogo, usuarios e histórico.`);
 }

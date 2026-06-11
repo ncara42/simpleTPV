@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { deltaTone, fmtDelta, fmtEur, fmtHours, fmtNum, fmtRate } from './format.js';
+import {
+  deltaTone,
+  fmtDelta,
+  fmtEur,
+  fmtHours,
+  fmtNum,
+  fmtRate,
+  invertTone,
+  seriesTrend,
+} from './format.js';
 
 // Todos los formatters comparten la misma convención: null/undefined/NaN → "—".
 // Se cubre ese contrato en cada uno además de su formato propio.
@@ -86,5 +95,27 @@ describe('fmtHours', () => {
   it('formatea horas con coma decimal y sufijo h', () => {
     expect(fmtHours(1.5)).toBe('1,5 h');
     expect(fmtHours(0)).toBe('0,0 h');
+  });
+});
+
+describe('seriesTrend', () => {
+  it('compara el último punto con el primero', () => {
+    expect(seriesTrend([1, 2, 3])).toBe('up');
+    expect(seriesTrend([3, 2, 1])).toBe('down');
+    expect(seriesTrend([2, 5, 2])).toBe('flat');
+  });
+
+  it('es plano sin serie o con menos de dos puntos', () => {
+    expect(seriesTrend(undefined)).toBe('flat');
+    expect(seriesTrend([])).toBe('flat');
+    expect(seriesTrend([7])).toBe('flat');
+  });
+});
+
+describe('invertTone', () => {
+  it('intercambia subir y bajar, deja plano igual', () => {
+    expect(invertTone('up')).toBe('down');
+    expect(invertTone('down')).toBe('up');
+    expect(invertTone('flat')).toBe('flat');
   });
 });

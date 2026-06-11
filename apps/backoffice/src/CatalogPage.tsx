@@ -1,14 +1,25 @@
-import { Select } from '@simpletpv/ui';
+import { DataTable, type DataTableColumn, type DataTableSort, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
+import { CsvDropzone } from './components/CsvDropzone.js';
 import { Modal } from './components/Modal.js';
+import {
+  EMPTY_PRODUCT_FORM,
+  ProductFormModal,
+  type ProductFormState,
+} from './components/ProductFormModal.js';
+import { ProductMovements } from './components/ProductMovements.js';
+import { useTableColumns } from './components/useTableColumns.js';
 import { type FamilyNode, listFamilies } from './lib/families.js';
 import { findNodePath, flattenTree, isDescendantOf } from './lib/family-tree.js';
+import { formErrorMessage } from './lib/form-error.js';
+import { fmtEur } from './lib/format.js';
 import { usePageHeader } from './lib/pageHeader.js';
 import {
   createProduct,
   deleteProduct,
+  importProductsCsv,
   listProducts,
   type Product,
   type ProductInput,
@@ -28,18 +39,11 @@ function stockLevel(qty: number): 'red' | 'yellow' | 'green' {
   return 'green';
 }
 
-interface FormState {
-  id?: string;
-  name: string;
-  salePrice: number;
-  sku: string | null;
-  barcode: string | null;
-  costPrice: number;
-  taxRate: number;
-  // Arquetipo efectivo del producto: el id del nodo elegido en el selector
-  // jerárquico, a cualquier profundidad (raíz, sub o sub-sub…).
-  familyId: string | null;
-}
+// Margen sobre PVP: (PVP − coste) / PVP en %. '—' si no hay PVP.
+const marginPct = (sale: number, cost: number): string =>
+  sale > 0 ? `${Math.round(((sale - cost) / sale) * 100)}%` : '—';
+
+type FormState = ProductFormState;
 
 // Asistente de edición en lote: cola de productos seleccionados + paso actual.
 interface EditWizard {
@@ -47,15 +51,7 @@ interface EditWizard {
   step: number;
 }
 
-const EMPTY: FormState = {
-  name: '',
-  salePrice: 0,
-  sku: '',
-  barcode: '',
-  costPrice: 0,
-  taxRate: 21,
-  familyId: null,
-};
+const EMPTY: FormState = EMPTY_PRODUCT_FORM;
 
 function toForm(p: Product): FormState {
   return {
@@ -82,29 +78,18 @@ function toPayload(f: FormState): ProductInput {
   };
 }
 
-// Parche local (demo: el backend stub no persiste) con los campos editables.
-function toPatch(f: FormState): Partial<Product> {
-  return {
-    name: f.name,
-    salePrice: String(f.salePrice),
-    sku: f.sku || null,
-    barcode: f.barcode || null,
-    costPrice: String(f.costPrice ?? 0),
-    taxRate: String(f.taxRate ?? 21),
-    familyId: f.familyId,
-  };
-}
-
-export function CatalogPage() {
+export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | null } = {}) {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
-  const [familyFilter, setFamilyFilter] = useState('');
+  const [familyFilter, setFamilyFilter] = useState(initialFamilyId ?? '');
   const [form, setForm] = useState<FormState | null>(null);
   const [wizard, setWizard] = useState<EditWizard | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
-  const [overrides, setOverrides] = useState<Record<string, Partial<Product>>>({});
-  const [extras, setExtras] = useState<Product[]>([]);
-  const [deleted, setDeleted] = useState<string[]>([]);
+  // Modal de importación de catálogo por CSV (POST /products/import).
+  const [importing, setImporting] = useState(false);
+  // Orden y paginación cliente del DataTable (D-04).
+  const [sort, setSort] = useState<DataTableSort | undefined>(undefined);
+  const [page, setPage] = useState(1);
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products', search],
@@ -128,10 +113,7 @@ export function CatalogPage() {
 
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['products'] });
 
-  const allProducts = useMemo<Product[]>(() => {
-    const base = products.map((p) => ({ ...p, ...overrides[p.id] }));
-    return [...base, ...extras].filter((p) => !deleted.includes(p.id));
-  }, [products, overrides, extras, deleted]);
+  const allProducts = products;
 
   const archetypeOptions = useMemo(
     () =>
@@ -142,7 +124,7 @@ export function CatalogPage() {
     [families],
   );
 
-  // Filtro por arquetipo: el nodo elegido y todo su subárbol (la búsqueda por
+  // Filtro por familia: el nodo elegido y todo su subárbol (la búsqueda por
   // texto ya la resuelve listProducts).
   const filtered = useMemo<Product[]>(
     () =>
@@ -155,6 +137,47 @@ export function CatalogPage() {
   );
 
   usePageHeader('Catálogo', `${filtered.length} productos activos`, 'catalog-count');
+
+  // Orden cliente (numérico para precios/margen/stock; texto para el resto).
+  const sortValue = (p: Product, key: string): number | string => {
+    switch (key) {
+      case 'salePrice':
+        return Number(p.salePrice);
+      case 'costPrice':
+        return Number(p.costPrice);
+      case 'margin':
+        return Number(p.salePrice) - Number(p.costPrice);
+      case 'stock':
+        return stockByProduct.get(p.id) ?? 0;
+      case 'family':
+        return familyPathLabel(families, p.familyId);
+      default:
+        return p.name.toLocaleLowerCase();
+    }
+  };
+  const sorted = useMemo(() => {
+    if (!sort) return filtered;
+    const dir = sort.dir === 'desc' ? -1 : 1;
+    return [...filtered].sort((a, b) => {
+      const va = sortValue(a, sort.key);
+      const vb = sortValue(b, sort.key);
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+      return String(va).localeCompare(String(vb)) * dir;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, sort, families, stockByProduct]);
+
+  const PAGE_SIZE = 25;
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const onSortChange = (key: string): void => {
+    setSort((cur) =>
+      cur?.key === key ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' },
+    );
+    setPage(1);
+  };
 
   // ─── Selección ─────────────────────────────────────────────────────────
   const selectedSet = useMemo(() => new Set(selected), [selected]);
@@ -172,37 +195,25 @@ export function CatalogPage() {
     [filtered, selectedSet],
   );
 
-  // ─── Mutaciones / overlays ─────────────────────────────────────────────
+  // ─── Mutaciones (persistencia real; la tabla se refresca por invalidate) ──
   const createMut = useMutation({
     mutationFn: (f: FormState) => createProduct(toPayload(f)),
-    onSuccess: (created) => {
-      setExtras((prev) => [...prev, created]);
+    onSuccess: () => {
       closeModal();
       invalidate();
     },
   });
 
-  // Aplica la edición de un producto existente sobre los overlays locales.
+  // Edita un producto existente; el refetch tras invalidate refleja el cambio.
   const applyEdit = (f: FormState): void => {
     if (!f.id) return;
-    const patch = toPatch(f);
-    if (extras.some((p) => p.id === f.id)) {
-      setExtras((prev) => prev.map((p) => (p.id === f.id ? { ...p, ...patch } : p)));
-    } else {
-      setOverrides((prev) => ({ ...prev, [f.id as string]: patch }));
-    }
-    void updateProduct(f.id, toPayload(f)); // parity con futuro backend
+    void updateProduct(f.id, toPayload(f)).then(invalidate);
   };
 
-  // Borrado en lote en local (demo: deleteProduct es un stub sin backend).
+  // Borrado en lote: se refresca cuando terminan todos los DELETE.
   const removeSelected = (): void => {
-    const ids = new Set(selected);
-    const extraIds = new Set(extras.map((e) => e.id));
-    setExtras((prev) => prev.filter((p) => !ids.has(p.id)));
-    setDeleted((prev) => [...prev, ...selected.filter((id) => !extraIds.has(id))]);
-    selected.forEach((id) => void deleteProduct(id));
+    void Promise.all(selected.map((id) => deleteProduct(id))).then(invalidate);
     clearSelection();
-    invalidate();
   };
 
   // ─── Modal ─────────────────────────────────────────────────────────────
@@ -256,226 +267,263 @@ export function CatalogPage() {
         ? `Guardar (${total} / ${total})`
         : 'Guardar';
 
+  // Columnas de datos (la de selección va aparte, siempre visible). Defaults D-12:
+  // visibles Nombre · Familia · PVP · Margen · Stock; ocultas SKU · Coste · IVA.
+  const dataColumns: DataTableColumn<Product>[] = [
+    { key: 'name', header: 'Nombre', sortable: true },
+    {
+      key: 'family',
+      header: 'Familia',
+      render: (p) => (
+        <span className="muted" data-testid="catalog-family">
+          {familyPathLabel(families, p.familyId)}
+        </span>
+      ),
+    },
+    { key: 'sku', header: 'SKU', render: (p) => <span className="muted">{p.sku ?? '—'}</span> },
+    {
+      key: 'costPrice',
+      header: 'Coste',
+      align: 'right',
+      sortable: true,
+      render: (p) => <span className="muted">{fmtEur(Number(p.costPrice))}</span>,
+    },
+    {
+      key: 'salePrice',
+      header: 'PVP',
+      align: 'right',
+      sortable: true,
+      render: (p) => fmtEur(Number(p.salePrice)),
+    },
+    {
+      key: 'margin',
+      header: 'Margen',
+      align: 'right',
+      sortable: true,
+      render: (p) => (
+        <span data-testid="catalog-margin">
+          {fmtEur(Number(p.salePrice) - Number(p.costPrice))}
+          <span className="muted">
+            {' · '}
+            {marginPct(Number(p.salePrice), Number(p.costPrice))}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: 'taxRate',
+      header: 'IVA',
+      align: 'right',
+      render: (p) => <span className="muted">{Number(p.taxRate).toFixed(0)}%</span>,
+    },
+    {
+      key: 'stock',
+      header: 'Stock',
+      align: 'right',
+      render: (p) => {
+        const qty = stockByProduct.get(p.id) ?? 0;
+        return (
+          <span className={`stock-tag stock-${stockLevel(qty)}`} data-testid="catalog-stock">
+            {qty}
+          </span>
+        );
+      },
+    },
+  ];
+  const {
+    effectiveColumns,
+    editor: columnsEditor,
+    editorOpen: columnsEditorOpen,
+    toggleEditor: toggleColumnsEditor,
+  } = useTableColumns('table.catalog.columns', dataColumns, {
+    defaultHidden: ['sku', 'costPrice', 'taxRate'],
+    editorTestId: 'catalog-columns-editor',
+    title: 'Columnas del catálogo',
+  });
+  // Columna de selección múltiple: fija, fuera de la configuración.
+  const selectColumn: DataTableColumn<Product> = {
+    key: 'select',
+    header: '',
+    width: '2.2rem',
+    render: (p) => (
+      <input
+        type="checkbox"
+        className="user-check"
+        aria-label={`Seleccionar ${p.name}`}
+        data-testid="product-select"
+        checked={selectedSet.has(p.id)}
+        onChange={() => toggleSelect(p.id)}
+        onClick={(e) => e.stopPropagation()}
+      />
+    ),
+  };
+  const tableColumns = [selectColumn, ...effectiveColumns];
+
+  const toolbar = (
+    <div className="users-toolbar">
+      <div className="sales-filters">
+        <span className="search-field">
+          <input
+            className="catalog-search"
+            placeholder="Buscar por nombre, SKU o código…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            data-testid="catalog-search"
+          />
+        </span>
+        <Select
+          className="catalog-search"
+          value={familyFilter}
+          onChange={setFamilyFilter}
+          ariaLabel="Filtrar por familia"
+          data-testid="catalog-family-filter"
+          options={[{ value: '', label: 'Todos los arquetipos' }, ...archetypeOptions]}
+        />
+        {selected.length > 0 && (
+          <>
+            {!allFilteredSelected && (
+              <button
+                type="button"
+                className="users-sel-btn"
+                onClick={selectAllFiltered}
+                data-testid="products-select-all"
+              >
+                Seleccionar todo
+              </button>
+            )}
+            <button
+              type="button"
+              className="users-sel-btn"
+              onClick={clearSelection}
+              data-testid="products-clear"
+            >
+              Quitar selección
+            </button>
+          </>
+        )}
+      </div>
+      {selected.length > 0 ? (
+        <div className="users-toolbar-actions">
+          <button
+            type="button"
+            className="users-bulk-edit"
+            onClick={openBulkEdit}
+            data-testid="products-edit"
+          >
+            Editar{selected.length > 1 ? ` (${selected.length})` : ''}
+          </button>
+          <button
+            type="button"
+            className="users-bulk-del"
+            onClick={removeSelected}
+            data-testid="products-delete"
+          >
+            Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
+          </button>
+        </div>
+      ) : (
+        <div className="users-toolbar-actions">
+          <button
+            type="button"
+            className="users-sel-btn"
+            onClick={() => setImporting(true)}
+            data-testid="catalog-import"
+          >
+            Importar CSV
+          </button>
+          <button className="btn-primary" onClick={openCreate} data-testid="new-product">
+            Nuevo producto
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <section className="catalog">
       <div className="table-panel">
-        <div className="users-toolbar">
-          <div className="sales-filters">
-            <span className="search-field">
-              <input
-                className="catalog-search"
-                placeholder="Buscar por nombre, SKU o código…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                data-testid="catalog-search"
-              />
-            </span>
-            <Select
-              className="catalog-search"
-              value={familyFilter}
-              onChange={setFamilyFilter}
-              ariaLabel="Filtrar por arquetipo"
-              data-testid="catalog-family-filter"
-              options={[{ value: '', label: 'Todos los arquetipos' }, ...archetypeOptions]}
-            />
-            {selected.length > 0 && (
-              <>
-                {!allFilteredSelected && (
-                  <button
-                    type="button"
-                    className="users-sel-btn"
-                    onClick={selectAllFiltered}
-                    data-testid="products-select-all"
-                  >
-                    Seleccionar todo
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="users-sel-btn"
-                  onClick={clearSelection}
-                  data-testid="products-clear"
-                >
-                  Quitar selección
-                </button>
-              </>
-            )}
-          </div>
-          {selected.length > 0 ? (
-            <div className="users-toolbar-actions">
-              <button
-                type="button"
-                className="users-bulk-edit"
-                onClick={openBulkEdit}
-                data-testid="products-edit"
-              >
-                Editar{selected.length > 1 ? ` (${selected.length})` : ''}
-              </button>
-              <button
-                type="button"
-                className="users-bulk-del"
-                onClick={removeSelected}
-                data-testid="products-delete"
-              >
-                Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
-              </button>
-            </div>
-          ) : (
-            <button className="btn-primary" onClick={openCreate} data-testid="new-product">
-              Nuevo producto
-            </button>
-          )}
-        </div>
-
-        {isLoading ? (
-          <p className="catalog-empty">Cargando…</p>
-        ) : filtered.length === 0 ? (
-          <p className="catalog-empty" data-testid="catalog-empty">
-            {allProducts.length === 0
-              ? 'Sin productos. Crea el primero.'
-              : 'Sin productos para los filtros seleccionados.'}
-          </p>
-        ) : (
-          <table
-            className={`catalog-table users-table${selected.length ? ' has-selection' : ''}`}
-            data-testid="catalog-table"
+        {toolbar}
+        <div className="config-bar">
+          <button
+            type="button"
+            className="config-trigger"
+            onClick={toggleColumnsEditor}
+            data-testid="catalog-columns-toggle"
+            aria-expanded={columnsEditorOpen}
           >
-            <thead>
-              <tr>
-                <th className="users-select-col" aria-label="Selección" />
-                <th>Nombre</th>
-                <th>Arquetipo</th>
-                <th>SKU</th>
-                <th>Precio</th>
-                <th>IVA</th>
-                <th>Stock</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((p) => {
-                const isSel = selectedSet.has(p.id);
-                const qty = stockByProduct.get(p.id) ?? 0;
-                return (
-                  <tr
-                    key={p.id}
-                    className={isSel ? 'is-selected' : undefined}
-                    aria-selected={isSel}
-                    onClick={() => toggleSelect(p.id)}
-                    data-testid="product-row"
-                  >
-                    <td className="users-select-col" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        className="user-check"
-                        aria-label={`Seleccionar ${p.name}`}
-                        data-testid="product-select"
-                        checked={isSel}
-                        onChange={() => toggleSelect(p.id)}
-                      />
-                    </td>
-                    <td>{p.name}</td>
-                    <td className="muted" data-testid="catalog-family">
-                      {familyPathLabel(families, p.familyId)}
-                    </td>
-                    <td className="muted">{p.sku ?? '—'}</td>
-                    <td>{Number(p.salePrice).toFixed(2).replace('.', ',')} €</td>
-                    <td className="muted">{Number(p.taxRate).toFixed(0)}%</td>
-                    <td>
-                      <span
-                        className={`stock-tag stock-${stockLevel(qty)}`}
-                        data-testid="catalog-stock"
-                      >
-                        {qty}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+            Columnas
+          </button>
+        </div>
+        {columnsEditor}
+        <DataTable
+          columns={tableColumns}
+          rows={pageRows}
+          rowKey={(p) => p.id}
+          loading={isLoading}
+          {...(sort ? { sort } : {})}
+          onSortChange={onSortChange}
+          onRowClick={(p) => toggleSelect(p.id)}
+          rowClassName={(p) => (selectedSet.has(p.id) ? 'is-selected' : undefined)}
+          rowAriaSelected={(p) => selectedSet.has(p.id)}
+          pagination={{
+            page: safePage,
+            pageSize: PAGE_SIZE,
+            totalItems: sorted.length,
+            onPageChange: setPage,
+          }}
+          emptyState={
+            <span data-testid="catalog-empty">
+              {allProducts.length === 0
+                ? 'Sin productos. Crea el primero.'
+                : 'Sin productos para los filtros seleccionados.'}
+            </span>
+          }
+          data-testid="catalog-table"
+        />
       </div>
 
       {form && (
-        <Modal
+        <ProductFormModal
+          form={form}
+          onChange={setForm}
+          onSubmit={submitForm}
           onClose={closeModal}
+          familyOptions={archetypeOptions}
+          pending={createMut.isPending}
+          errorMessage={
+            createMut.isError ? formErrorMessage(createMut.error, 'No se pudo guardar.') : null
+          }
+          title={wizard ? 'Editar producto' : 'Nuevo producto'}
+          primaryLabel={primaryLabel}
+          extraSection={form.id ? <ProductMovements productId={form.id} /> : undefined}
+        />
+      )}
+
+      {importing && (
+        <Modal
+          onClose={() => setImporting(false)}
           className="modal--form"
-          testId="product-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            submitForm();
-          }}
+          testId="catalog-import-modal"
+          ariaLabel="Importar catálogo desde CSV"
         >
-          <h3>{wizard ? 'Editar producto' : 'Nuevo producto'}</h3>
-          <label>
-            Nombre
-            <input
-              required
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              data-testid="form-name"
-            />
-          </label>
-          <label>
-            Arquetipo
-            <Select
-              value={form.familyId ?? ''}
-              onChange={(value) => setForm({ ...form, familyId: value || null })}
-              options={[{ value: '', label: '— Sin arquetipo —' }, ...archetypeOptions]}
-              ariaLabel="Arquetipo"
-              data-testid="form-family"
-            />
-          </label>
-          <div className="modal-row">
-            <label>
-              Precio venta (€)
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={form.salePrice}
-                onChange={(e) => setForm({ ...form, salePrice: Number(e.target.value) })}
-                data-testid="form-price"
-              />
-            </label>
-            <label>
-              IVA (%)
-              <input
-                type="number"
-                step="1"
-                value={form.taxRate}
-                onChange={(e) => setForm({ ...form, taxRate: Number(e.target.value) })}
-              />
-            </label>
-          </div>
-          <div className="modal-row">
-            <label>
-              SKU
-              <input
-                value={form.sku ?? ''}
-                onChange={(e) => setForm({ ...form, sku: e.target.value })}
-              />
-            </label>
-            <label>
-              Código de barras
-              <input
-                value={form.barcode ?? ''}
-                onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-              />
-            </label>
-          </div>
-          {createMut.isError && <p className="form-error">No se pudo guardar.</p>}
+          <h3>Importar catálogo desde CSV</h3>
+          <CsvDropzone
+            columns={['name', 'salePrice', 'sku', 'barcode']}
+            example={['Producto ejemplo', '9.99', 'SKU-001', '8412345678901']}
+            templateName="plantilla_catalogo.csv"
+            testId="catalog-csv"
+            help={
+              <>
+                Columnas: <code>name,salePrice,sku,barcode</code>. Solo <code>name</code> y{' '}
+                <code>salePrice</code> son obligatorios.
+              </>
+            }
+            onImport={importProductsCsv}
+            onImported={invalidate}
+          />
           <div className="modal-foot">
-            <button type="button" onClick={closeModal}>
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={createMut.isPending}
-              data-testid="form-save"
-            >
-              {primaryLabel}
+            <button type="button" onClick={() => setImporting(false)}>
+              Cerrar
             </button>
           </div>
         </Modal>

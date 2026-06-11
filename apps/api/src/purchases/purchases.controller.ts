@@ -14,6 +14,7 @@ import type { JwtPayload } from '../auth/jwt-payload.js';
 import { Roles } from '../auth/roles.decorator.js';
 import {
   CreatePurchaseOrderDto,
+  ListPurchaseOrdersQueryDto,
   ReceivePurchaseOrderDto,
   SuggestPurchaseOrderDto,
 } from './purchases.dto.js';
@@ -38,10 +39,11 @@ export class PurchasesController {
     return this.purchases.suggest(body);
   }
 
+  // Filtros opcionales: estado y/o proveedor (vista detalle de proveedor, I-18).
   @Get()
   @Roles('ADMIN', 'MANAGER', 'CLERK')
-  list(@Query('status') status?: string) {
-    return this.purchases.list(status);
+  list(@Query() query: ListPurchaseOrdersQueryDto) {
+    return this.purchases.list(query.status, query.supplierId);
   }
 
   @Get(':id')

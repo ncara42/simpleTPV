@@ -12,44 +12,40 @@ import {
   BarChart2,
   Bell,
   CheckSquare,
-  ClipboardCheck,
   Clock,
   Handshake,
-  KeyRound,
   LayoutDashboard,
   LifeBuoy,
   Package,
   Percent,
   Receipt,
   ShoppingCart,
-  SlidersHorizontal,
   Store,
   Tag,
   Users,
 } from 'lucide-react';
 import { useState } from 'react';
 
-import { ApiKeysPage } from './ApiKeysPage.js';
 import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
+import { DashboardPage } from './DashboardPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { HelpPage } from './HelpPage.js';
 import { api, useAuthStore } from './lib/auth.js';
+import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { switchApp } from './lib/nav.js';
 import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
-import { ModulesPage } from './ModulesPage.js';
 import { NotificationsPage } from './NotificationsPage.js';
-import { OverviewPage } from './OverviewPage.js';
 import { PromotionsPage } from './PromotionsPage.js';
-import { PurchasesPage } from './PurchasesPage.js';
+import { SalesHistoryPage } from './SalesHistoryPage.js';
 import { StockPage } from './StockPage.js';
 import { StoresPage } from './StoresPage.js';
+import { SuppliersPage } from './SuppliersPage.js';
 import { TimeClockPage } from './TimeClockPage.js';
 import { TransfersPage } from './TransfersPage.js';
 import { UsersPage } from './UsersPage.js';
 import { VerifactuPage } from './VerifactuPage.js';
-import { ZReportPage } from './ZReportPage.js';
 
 type Tab =
   | 'dashboard'
@@ -63,51 +59,47 @@ type Tab =
   | 'timeclock'
   | 'stores'
   | 'sales'
-  | 'zreport'
-  | 'purchases'
+  | 'suppliers'
   | 'verifactu'
   | 'b2b'
-  | 'apikeys'
-  | 'modules'
   | 'help';
 
-// Navegación agrupada por tipo de tarea para no saturar el lateral. Dashboard va
-// suelto arriba; Ayuda (Soporte) queda separada al final. "Ventas y clientes"
-// reúne lo comercial (ventas, mayorista, API) frente a la gestión de la operación.
+// Menú de 5 entradas (D-02/D-09): Dashboard y Ayuda son pages directas; los tres
+// grupos se despliegan como dropdown (hover sostenido >200ms = preview; clic =
+// anclado). El mapa de contenido por grupo es el cerrado en informe_decisiones D-09.
 const NAV_GROUPS: NavGroup[] = [
-  { id: 'inventory', label: 'Catálogo e inventario' },
-  { id: 'commercial', label: 'Ventas y clientes' },
-  { id: 'org', label: 'Organización' },
-  { id: 'support', label: 'Soporte' },
+  { id: 'inventory', label: 'Catálogo e inventario', icon: <Package size={18} /> },
+  { id: 'commercial', label: 'Ventas y clientes', icon: <Receipt size={18} /> },
+  { id: 'org', label: 'Organización', icon: <Store size={18} /> },
 ];
 
 const ALL_NAV: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
   { id: 'notifications', label: 'Notificaciones', icon: <Bell size={18} />, group: 'inventory' },
+  // Catálogo e inventario (D-09): Catálogo · Familias · Stock · Traspasos · Proveedores
   { id: 'catalog', label: 'Catálogo', icon: <Package size={18} />, group: 'inventory' },
-  { id: 'families', label: 'Arquetipos', icon: <Tag size={18} />, group: 'inventory' },
+  { id: 'families', label: 'Familias', icon: <Tag size={18} />, group: 'inventory' },
   { id: 'stock', label: 'Stock', icon: <BarChart2 size={18} />, group: 'inventory' },
   { id: 'transfers', label: 'Traspasos', icon: <ArrowLeftRight size={18} />, group: 'inventory' },
-  { id: 'promotions', label: 'Promociones', icon: <Percent size={18} />, group: 'inventory' },
+  { id: 'suppliers', label: 'Proveedores', icon: <ShoppingCart size={18} />, group: 'inventory' },
+  // Ventas y clientes (D-09): Ventas · Clientes B2B · Promociones
   { id: 'sales', label: 'Ventas', icon: <Receipt size={18} />, group: 'commercial' },
-  { id: 'zreport', label: 'Cierre Z', icon: <ClipboardCheck size={18} />, group: 'commercial' },
-  { id: 'b2b', label: 'Mayorista', icon: <Handshake size={18} />, group: 'commercial' },
-  { id: 'apikeys', label: 'API Keys', icon: <KeyRound size={18} />, group: 'commercial' },
+  { id: 'b2b', label: 'Clientes B2B', icon: <Handshake size={18} />, group: 'commercial' },
+  { id: 'promotions', label: 'Promociones', icon: <Percent size={18} />, group: 'commercial' },
+  // Organización (D-09): Tiendas · Usuarios · Control horario
   { id: 'stores', label: 'Tiendas', icon: <Store size={18} />, group: 'org' },
   { id: 'users', label: 'Usuarios', icon: <Users size={18} />, group: 'org' },
   { id: 'timeclock', label: 'Control horario', icon: <Clock size={18} />, group: 'org' },
-  { id: 'modules', label: 'Módulos', icon: <SlidersHorizontal size={18} />, group: 'org' },
-  { id: 'purchases', label: 'Compras', icon: <ShoppingCart size={18} />, group: 'commercial' },
   { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'org' },
-  { id: 'help', label: 'Ayuda', icon: <LifeBuoy size={18} />, group: 'support' },
+  { id: 'help', label: 'Ayuda', icon: <LifeBuoy size={18} /> },
 ];
 
-// #106: Compras y VeriFactu se retiran del menú (decisión informe UX 2026-06-02).
-// Notificaciones también sale del sidebar: su acceso es la campana de la TopBar
-// (mismo destino y badge), así que la entrada del menú era redundante.
-// El código (páginas, lib y datos demo) se conserva para una posible reactivación
-// futura: basta con quitar el id de este set para que vuelvan a aparecer.
-const HIDDEN_TABS = new Set<Tab>(['notifications', 'purchases', 'verifactu']);
+// VeriFactu se mantiene fuera del menú (backend sin UI). Notificaciones también:
+// su acceso es la campana de la TopBar (mismo destino y badge), así que la entrada
+// del menú era redundante. Compras dejó de ser una página propia: sus secciones
+// viven ahora dentro de Proveedores (P1-B). El código se conserva para reactivar
+// VeriFactu/Notificaciones quitando su id de este set.
+const HIDDEN_TABS = new Set<Tab>(['notifications', 'verifactu']);
 const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab));
 
 // La TopBar refleja el título y la descripción de la vista activa (publicados por
@@ -148,15 +140,23 @@ function Home() {
     setNavStoreId(storeId);
     setTab(view);
   };
+  // Atajo del panel de Familias (I-13): el contador navega a Catálogo filtrado.
+  const [navFamilyId, setNavFamilyId] = useState<string | null>(null);
+  const openCatalogFamily = (familyId: string): void => {
+    setNavFamilyId(familyId);
+    setTab('catalog');
+  };
 
   return (
     <div className="app-shell">
       <Sidebar
         items={navItems}
         groups={NAV_GROUPS}
+        groupsAsDropdowns
         activeItem={tab}
         onSelect={(id) => {
           setNavStoreId(null);
+          setNavFamilyId(null);
           setTab(id as Tab);
         }}
         account={{ name: 'Administrador', subtitle: 'Central · Admin' }}
@@ -166,27 +166,22 @@ function Home() {
         <PageHeaderProvider>
           <ShellTopBar />
           <main className="bo-main">
-            {(tab === 'dashboard' || tab === 'sales') && (
-              <OverviewPage
-                scrollTo={tab === 'sales' ? 'sales' : null}
-                initialStoreId={navStoreId}
-              />
-            )}
+            {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
+                embebe la tabla — enlaza con "Ver todas las ventas →". */}
+            {tab === 'dashboard' && <DashboardPage onNavigate={(t) => setTab(t)} />}
+            {tab === 'sales' && <SalesHistoryPage initialStoreId={navStoreId} />}
             {tab === 'notifications' && <NotificationsPage />}
-            {tab === 'catalog' && <CatalogPage />}
-            {tab === 'families' && <FamiliesPage />}
+            {tab === 'catalog' && <CatalogPage initialFamilyId={navFamilyId} />}
+            {tab === 'families' && <FamiliesPage onOpenCatalogFamily={openCatalogFamily} />}
             {tab === 'stock' && <StockPage initialStoreId={navStoreId} />}
             {tab === 'transfers' && <TransfersPage />}
             {tab === 'promotions' && <PromotionsPage />}
             {tab === 'users' && <UsersPage />}
             {tab === 'timeclock' && <TimeClockPage />}
             {tab === 'stores' && <StoresPage onOpenStoreView={openStoreView} />}
-            {tab === 'zreport' && <ZReportPage />}
-            {tab === 'purchases' && <PurchasesPage />}
+            {tab === 'suppliers' && <SuppliersPage />}
             {tab === 'verifactu' && <VerifactuPage />}
             {tab === 'b2b' && <B2bPage />}
-            {tab === 'apikeys' && <ApiKeysPage />}
-            {tab === 'modules' && <ModulesPage />}
             {tab === 'help' && <HelpPage />}
           </main>
         </PageHeaderProvider>
@@ -215,6 +210,7 @@ function AccessDenied() {
 export default function App() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const getRole = useAuthStore((s) => s.getRole);
+  useDevAutoLogin(accessToken === null);
   if (accessToken === null) {
     return <LoginForm onSubmit={api.login} />;
   }

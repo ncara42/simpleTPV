@@ -1,15 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, type Product } from '@simpletpv/db';
 
+import { type ImportResult, parseCsv, rowNumber } from '../common/csv.js';
 import { MAX_PRICE } from '../common/limits.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 import type { CreateProductDto, UpdateProductDto } from './products.dto.js';
 
-export interface ImportResult {
-  inserted: number;
-  errors: Array<{ row: number; message: string }>;
-}
+export type { ImportResult };
 
 @Injectable()
 export class ProductsService {
@@ -79,23 +77,23 @@ export class ProductsService {
     const errors: ImportResult['errors'] = [];
 
     rows.forEach((cells, idx) => {
-      const rowNumber = idx + 2; // +1 por cabecera, +1 porque humano cuenta desde 1
+      const row = rowNumber(idx);
       const name = (cells.name ?? '').trim();
       const priceRaw = (cells.salePrice ?? '').trim();
       const price = Number(priceRaw);
       if (!name) {
-        errors.push({ row: rowNumber, message: 'Falta el nombre' });
+        errors.push({ row, message: 'Falta el nombre' });
         return;
       }
       if (!priceRaw || Number.isNaN(price)) {
-        errors.push({ row: rowNumber, message: 'Precio inválido' });
+        errors.push({ row, message: 'Precio inválido' });
         return;
       }
       // Mismas cotas que CreateProductDto (SEC-16): el import a mano no debe ser una
       // puerta trasera a precios negativos (que generan ventas/cuadres negativos) ni
       // a valores que excedan Decimal(10,4).
       if (price < 0 || price > MAX_PRICE) {
-        errors.push({ row: rowNumber, message: 'Precio fuera de rango (0–999999.9999)' });
+        errors.push({ row, message: 'Precio fuera de rango (0–999999.9999)' });
         return;
       }
       valid.push({
@@ -114,25 +112,4 @@ export class ProductsService {
     }
     return { inserted, errors };
   }
-}
-
-// Parser CSV mínimo: primera línea = cabecera, resto = filas. Separador coma,
-// sin soporte de comillas/escapes (el catálogo importado es de formato simple).
-function parseCsv(csv: string): Array<Record<string, string>> {
-  const lines = csv
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
-  if (lines.length < 2) {
-    return [];
-  }
-  const header = lines[0]!.split(',').map((h) => h.trim());
-  return lines.slice(1).map((line) => {
-    const cells = line.split(',');
-    const obj: Record<string, string> = {};
-    header.forEach((h, i) => {
-      obj[h] = (cells[i] ?? '').trim();
-    });
-    return obj;
-  });
 }
