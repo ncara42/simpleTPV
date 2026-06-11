@@ -63,6 +63,20 @@ describe('Chart', () => {
     expect(onSelect).toHaveBeenCalledWith('Norte');
   });
 
+  it('kind="line" dibuja polyline + puntos y conserva el tooltip al hover (U-02)', () => {
+    const { container } = render(<Chart data={data} kind="line" formatValue={(n) => `${n} €`} />);
+    expect(container.querySelector('.ui-chart-line-path')).not.toBeNull();
+    expect(container.querySelector('.ui-chart-line-path-compare')).not.toBeNull();
+    // 2 datos → 2 puntos de valor + 1 de comparación (solo Centro la tiene).
+    expect(container.querySelectorAll('.ui-chart-dot')).toHaveLength(3);
+    expect(screen.queryByText('200 €')).not.toBeInTheDocument();
+    const [centro] = screen.getAllByTestId('ui-chart-group');
+    fireEvent.mouseEnter(centro!);
+    expect(screen.getByText('200 €')).toBeInTheDocument();
+    expect(screen.getByText('+33 %')).toBeInTheDocument();
+    expect(screen.getByText('Centro')).toBeInTheDocument(); // label bajo el lienzo
+  });
+
   it('expone el conjunto con ariaLabel y cada columna lleva el valor en su aria', () => {
     render(<Chart data={data} ariaLabel="Ventas por tienda" formatValue={(n) => `${n} €`} />);
     expect(screen.getByRole('group', { name: 'Ventas por tienda' })).toBeInTheDocument();

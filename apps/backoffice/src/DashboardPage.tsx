@@ -2,6 +2,7 @@ import './dashboard.css';
 
 import { Badge, Chart, Select, Sparkline } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { BarChart2, LineChart } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { listStores } from './lib/admin.js';
@@ -37,12 +38,6 @@ import { compareSupplierPrices } from './lib/supplier-prices.js';
 import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
 import { STATUS_LABEL } from './purchases/labels.js';
 import { ALERT_LABEL, df, EXPIRY_LABEL, expiryDaysText } from './stock/labels.js';
-
-// Personalización de las KPI cards (IT-16): orden + visibilidad por usuario.
-interface CardsPref {
-  order: string[];
-  hidden: string[];
-}
 
 const PERIODS: Array<{ id: DashboardPeriod; label: string }> = [
   { id: 'today', label: 'Hoy' },
@@ -106,29 +101,12 @@ const PRESETS: PresetDef[] = [
   },
 ];
 
-// Etiquetas de los paneles para el editor de personalización.
-const PANEL_LABEL: Record<string, string> = {
-  'dash-bars': 'Ventas hoy vs ayer',
-  'dash-hour': 'Ventas por hora',
-  'dash-family': 'Ventas por familia',
-  'rank-sales': 'Ranking top ventas',
-  'rank-margin': 'Ranking top margen',
-  'rank-rotation': 'Peor rotación',
-  'dash-discount-emp': 'Descuento por empleado',
-  'dash-stockout': 'Roturas de stock',
-  'dash-rotation': 'Rotación',
-  'dash-sales-emp': 'Ventas por vendedor',
-  'dash-timeclock': 'Fichajes de hoy',
-  'dash-suppliers': 'Comparativa de proveedores',
-  'dash-expiring': 'Lotes por caducar',
-  'dash-purchase-orders': 'Pedidos de compra pendientes',
-};
-
-// Preferencia de layout (I-15): preset activo + ids ocultos POR preset —
-// ocultar un panel o tarjeta solo afecta al preset donde se ocultó.
+// Preferencia de layout (I-15, simplificada en U-03/D-18): preset activo y tipo
+// de gráfico. Las claves antiguas (hiddenByPreset, dashboard.cards) se ignoran.
 interface LayoutPref {
   preset?: PresetId;
-  hiddenByPreset?: Partial<Record<PresetId, string[]>>;
+  /** U-02: representación de los gráficos del dashboard (barras o línea). */
+  chartKind?: 'bars' | 'line';
 }
 
 // La sparkline solo tiene tonos brand/up/down; 'flat' (sin tendencia) usa el
@@ -147,28 +125,15 @@ export function DashboardPage({
 
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
 
-  // Preferencias ANTES de las queries: el preset activo y sus ocultos deciden
-  // qué se pinta Y qué endpoints se consultan (enabled por visibilidad).
+  // Preferencias ANTES de las queries: el preset activo decide qué se pinta Y
+  // qué endpoints se consultan (enabled por visibilidad). D-18: la composición
+  // (tarjetas y paneles) la dictan exclusivamente los presets — no hay
+  // personalización manual; las preferencias antiguas de ocultos se ignoran.
   const { prefs, setPref, loaded: prefsLoaded } = usePreferences();
-  const [cardsEditorOpen, setCardsEditorOpen] = useState(false);
   const layout = readPref<LayoutPref>(prefs, 'dashboard.layout', {});
   const preset = PRESETS.find((p) => p.id === layout.preset) ?? PRESETS[0]!;
-  // Migración tolerante de la preferencia previa a presets (IT-16): si el preset
-  // aún no tiene su lista de ocultos, hereda los de `dashboard.cards.hidden`.
-  const cardsPref = readPref<CardsPref>(prefs, 'dashboard.cards', { order: [], hidden: [] });
-  const legacyHidden = Array.isArray(cardsPref.hidden) ? cardsPref.hidden : [];
-  const knownIds = new Set([...preset.cards, ...preset.panels]);
-  const hidden = new Set(
-    (layout.hiddenByPreset?.[preset.id] ?? legacyHidden).filter((id) => knownIds.has(id)),
-  );
-  // Orden de tarjetas: respeta el guardado y añade al final las nuevas del preset.
-  const savedOrder = (Array.isArray(cardsPref.order) ? cardsPref.order : []).filter((id) =>
-    preset.cards.includes(id),
-  );
-  const cardOrder = [...savedOrder, ...preset.cards.filter((id) => !savedOrder.includes(id))];
-  const visibleCardIds = cardOrder.filter((id) => !hidden.has(id));
-  const visiblePanelIds = preset.panels.filter((id) => !hidden.has(id));
-  const vis = new Set([...visibleCardIds, ...visiblePanelIds]);
+  const visibleCardIds = preset.cards;
+  const vis = new Set([...preset.cards, ...preset.panels]);
 
   // placeholderData: al cambiar de tienda/periodo se conservan los datos previos
   // durante el refetch en vez de vaciarse. Así los nodos del DOM (key estable por
@@ -428,29 +393,11 @@ export function DashboardPage({
 
   // Ocultar/mostrar SOLO afecta al preset activo (D-03): se escribe entera la
   // lista efectiva de ocultos del preset en dashboard.layout.
-  const toggleHidden = (id: string): void => {
-    const next = hidden.has(id) ? [...hidden].filter((h) => h !== id) : [...hidden, id];
-    setPref('dashboard.layout', {
-      ...layout,
-      preset: preset.id,
-      hiddenByPreset: { ...layout.hiddenByPreset, [preset.id]: next },
-    });
-  };
-  // El orden global de dashboard.cards conserva las tarjetas de otros presets al
-  // final: cada preset solo lee las suyas, así que su orden relativo no le afecta.
-  const moveCard = (i: number, dir: -1 | 1): void => {
-    const j = i + dir;
-    if (j < 0 || j >= cardOrder.length) return;
-    const order = [...cardOrder];
-    const tmp = order[i]!;
-    order[i] = order[j]!;
-    order[j] = tmp;
-    const others = (Array.isArray(cardsPref.order) ? cardsPref.order : []).filter(
-      (id) => !preset.cards.includes(id),
-    );
-    setPref('dashboard.cards', { order: [...order, ...others], hidden: legacyHidden });
-  };
   const setPreset = (id: PresetId): void => setPref('dashboard.layout', { ...layout, preset: id });
+  // U-02: toggle global barras ↔ línea, persistido con el resto del layout.
+  const chartKind: 'bars' | 'line' = layout.chartKind === 'line' ? 'line' : 'bars';
+  const setChartKind = (kind: 'bars' | 'line'): void =>
+    setPref('dashboard.layout', { ...layout, chartKind: kind });
 
   return (
     <section className="catalog" data-testid="dashboard">
@@ -476,6 +423,36 @@ export function DashboardPage({
                 {p.label}
               </button>
             ))}
+          </div>
+          {/* U-02: toggle barras ↔ línea para los gráficos del dashboard. */}
+          <div
+            className="dash-preset-switch dash-chart-kind"
+            role="tablist"
+            aria-label="Tipo de gráfico"
+            data-testid="dash-chart-kind"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={chartKind === 'bars'}
+              className={chartKind === 'bars' ? 'is-active' : ''}
+              onClick={() => setChartKind('bars')}
+              data-testid="dash-chart-kind-bars"
+              title="Barras"
+            >
+              <BarChart2 size={15} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={chartKind === 'line'}
+              className={chartKind === 'line' ? 'is-active' : ''}
+              onClick={() => setChartKind('line')}
+              data-testid="dash-chart-kind-line"
+              title="Línea"
+            >
+              <LineChart size={15} aria-hidden="true" />
+            </button>
           </div>
           <Select
             className="dash-period-select"
@@ -505,30 +482,7 @@ export function DashboardPage({
         </div>
       </header>
 
-      {/* Personalización del preset activo (IT-16 + I-15): tarjetas y paneles. */}
-      <div className="dash-cards-head">
-        <button
-          type="button"
-          className="dash-customize"
-          onClick={() => setCardsEditorOpen((o) => !o)}
-          data-testid="dash-customize"
-          aria-expanded={cardsEditorOpen}
-        >
-          Personalizar
-        </button>
-      </div>
-      {cardsEditorOpen && (
-        <LayoutEditor
-          cards={cardOrder.map((id) => ({
-            id,
-            label: cardDefs.find((c) => c.id === id)?.label ?? id,
-          }))}
-          panels={preset.panels.map((id) => ({ id, label: PANEL_LABEL[id] ?? id }))}
-          hidden={hidden}
-          onToggle={toggleHidden}
-          onMoveCard={moveCard}
-        />
-      )}
+      {/* D-18 (U-03): sin personalización manual de tarjetas — el preset manda. */}
       {visibleCards.length > 0 && (
         <div className="dash-cards" data-testid="dash-cards">
           {visibleCards.map((c) => c.node)}
@@ -560,6 +514,7 @@ export function DashboardPage({
                     }))}
                     height={200}
                     formatValue={fmtEurCompact}
+                    kind={chartKind}
                     ariaLabel="Ventas hoy vs ayer por tienda"
                   />
                   <div className="dash-bars-legend">
@@ -770,6 +725,7 @@ export function DashboardPage({
               data={(byHour.data ?? []).map((h) => ({ label: `${h.hour}h`, value: h.revenue }))}
               height={200}
               formatValue={fmtEurCompact}
+              kind={chartKind}
               ariaLabel="Ventas por hora"
             />
           </div>
@@ -1026,72 +982,6 @@ export function DashboardPage({
         </button>
       </footer>
     </section>
-  );
-}
-
-// Editor del preset activo (IT-16 → I-15): visibilidad de tarjetas Y paneles,
-// más flechas de orden para las tarjetas. Ocultar solo afecta a este preset.
-function LayoutEditor(props: {
-  cards: Array<{ id: string; label: string }>;
-  panels: Array<{ id: string; label: string }>;
-  hidden: ReadonlySet<string>;
-  onToggle: (id: string) => void;
-  onMoveCard: (i: number, dir: -1 | 1) => void;
-}) {
-  return (
-    <div className="dash-cards-editor" data-testid="dash-cards-editor">
-      <p className="dash-cards-editor-title">Tarjetas del preset</p>
-      {props.cards.length === 0 && <p className="catalog-empty">Este preset no tiene tarjetas.</p>}
-      <ul>
-        {props.cards.map((c, i) => (
-          <li key={c.id}>
-            <label>
-              <input
-                type="checkbox"
-                checked={!props.hidden.has(c.id)}
-                onChange={() => props.onToggle(c.id)}
-                data-testid={`card-toggle-${c.id}`}
-              />
-              {c.label}
-            </label>
-            <span className="dash-cards-editor-move">
-              <button
-                type="button"
-                onClick={() => props.onMoveCard(i, -1)}
-                disabled={i === 0}
-                aria-label={`Subir ${c.label}`}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                onClick={() => props.onMoveCard(i, 1)}
-                disabled={i === props.cards.length - 1}
-                aria-label={`Bajar ${c.label}`}
-              >
-                ↓
-              </button>
-            </span>
-          </li>
-        ))}
-      </ul>
-      <p className="dash-cards-editor-title">Paneles del preset</p>
-      <ul>
-        {props.panels.map((p) => (
-          <li key={p.id}>
-            <label>
-              <input
-                type="checkbox"
-                checked={!props.hidden.has(p.id)}
-                onChange={() => props.onToggle(p.id)}
-                data-testid={`panel-toggle-${p.id}`}
-              />
-              {p.label}
-            </label>
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }
 
