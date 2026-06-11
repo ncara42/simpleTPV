@@ -1,4 +1,4 @@
-import { Select } from '@simpletpv/ui';
+import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -15,6 +15,7 @@ import {
   listPriceLists,
   updateCustomer,
 } from '../lib/b2b.js';
+import { formErrorMessage } from '../lib/form-error.js';
 
 interface Form {
   id?: string;
@@ -88,7 +89,7 @@ export function CustomersSection() {
       setForm(null);
       toast(f.id ? 'Cliente actualizado' : 'Cliente creado', 'success');
     },
-    onError: () => toast('No se pudo guardar el cliente', 'error'),
+    onError: (e) => toast(formErrorMessage(e, 'No se pudo guardar el cliente'), 'error'),
   });
 
   const removeMut = useMutation({
@@ -97,12 +98,60 @@ export function CustomersSection() {
       invalidate();
       toast('Cliente eliminado', 'success');
     },
-    onError: () => toast('No se pudo eliminar el cliente', 'error'),
+    onError: (e) => toast(formErrorMessage(e, 'No se pudo eliminar el cliente'), 'error'),
   });
 
   const tariffOptions = [
     { value: '', label: 'Sin tarifa (PVP)' },
     ...priceLists.map((p) => ({ value: p.id, label: p.name })),
+  ];
+
+  type CustomerRow = (typeof customers)[number];
+  const customerColumns: DataTableColumn<CustomerRow>[] = [
+    { key: 'name', header: 'Nombre', render: (c) => c.name },
+    { key: 'nif', header: 'NIF', render: (c) => <span className="muted">{c.nif ?? '—'}</span> },
+    {
+      key: 'contact',
+      header: 'Contacto',
+      render: (c) => <span className="muted">{c.email ?? c.phone ?? '—'}</span>,
+    },
+    {
+      key: 'tariff',
+      header: 'Tarifa',
+      render: (c) => c.priceList?.name ?? <span className="muted">PVP</span>,
+    },
+    {
+      key: 'active',
+      header: 'Estado',
+      render: (c) => <span className="role-badge">{c.active ? 'Activo' : 'Inactivo'}</span>,
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      render: (c) => (
+        <>
+          <button type="button" className="link-btn" onClick={() => setForm(toForm(c))}>
+            Editar
+          </button>
+          <button
+            type="button"
+            className="link-btn"
+            onClick={async () => {
+              const ok = await confirm({
+                title: 'Eliminar cliente',
+                message: `¿Eliminar el cliente "${c.name}"? Esta acción no se puede deshacer.`,
+                confirmLabel: 'Eliminar',
+                danger: true,
+              });
+              if (ok) removeMut.mutate(c.id);
+            }}
+          >
+            Borrar
+          </button>
+        </>
+      ),
+    },
   ];
 
   return (
@@ -117,57 +166,15 @@ export function CustomersSection() {
         </span>
       </SectionToolbar>
 
-      {isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : customers.length === 0 ? (
-        <p className="catalog-empty">Aún no hay clientes mayoristas. Crea el primero.</p>
-      ) : (
-        <table className="catalog-table" data-testid="b2b-customers-table">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>NIF</th>
-              <th>Contacto</th>
-              <th>Tarifa</th>
-              <th>Estado</th>
-              <th aria-label="Acciones" />
-            </tr>
-          </thead>
-          <tbody>
-            {customers.map((c) => (
-              <tr key={c.id} data-testid="b2b-customer-row">
-                <td>{c.name}</td>
-                <td className="muted">{c.nif ?? '—'}</td>
-                <td className="muted">{c.email ?? c.phone ?? '—'}</td>
-                <td>{c.priceList?.name ?? <span className="muted">PVP</span>}</td>
-                <td>
-                  <span className="role-badge">{c.active ? 'Activo' : 'Inactivo'}</span>
-                </td>
-                <td>
-                  <button type="button" className="link-btn" onClick={() => setForm(toForm(c))}>
-                    Editar
-                  </button>
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        title: 'Eliminar cliente',
-                        message: `¿Eliminar el cliente "${c.name}"? Esta acción no se puede deshacer.`,
-                        confirmLabel: 'Eliminar',
-                        danger: true,
-                      });
-                      if (ok) removeMut.mutate(c.id);
-                    }}
-                  >
-                    Borrar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <DataTable
+        columns={customerColumns}
+        rows={customers}
+        rowKey={(c) => c.id}
+        loading={isLoading}
+        rowTestId="b2b-customer-row"
+        emptyState="Aún no hay clientes mayoristas. Crea el primero."
+        data-testid="b2b-customers-table"
+      />
 
       {form && (
         <Modal
@@ -234,7 +241,9 @@ export function CustomersSection() {
               />
             </section>
           </div>
-          {saveMut.isError && <p className="form-error">No se pudo guardar.</p>}
+          {saveMut.isError && (
+            <p className="form-error">{formErrorMessage(saveMut.error, 'No se pudo guardar.')}</p>
+          )}
           <div className="modal-foot modal-foot--split">
             <label className="switch">
               <input

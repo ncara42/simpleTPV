@@ -895,3 +895,135 @@
   opacity: 0.35;
   cursor: default;
 }
+
+/* ── Selector de preset del dashboard (I-15 / D-08c): control segmentado en la
+   cabecera, junto a periodo y tienda. Mismo lenguaje que .dash-toggle pero en
+   flujo (no flota sobre un panel). ── */
+.dash-preset-switch {
+  display: inline-flex;
+  gap: 0.15rem;
+  padding: 0.18rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface-subtle);
+}
+.dash-preset-switch button {
+  border: none;
+  background: none;
+  padding: 0.28rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.dash-preset-switch button.is-active {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+/* ── Fichajes de hoy (preset Equipo, I-15) ── */
+.dash-timeclock-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dash-timeclock-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--ui-border-subtle, var(--ui-border));
+}
+.dash-timeclock-row:last-child {
+  border-bottom: none;
+}
+.dash-timeclock-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.dash-timeclock-store,
+.dash-timeclock-times {
+  color: var(--ui-text-muted);
+  font-size: 0.85rem;
+}
+.dash-timeclock-worked {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+/* ── Comparativa de proveedores (I-16) ── */
+.dash-suppliers-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dash-suppliers-row {
+  display: grid;
+  grid-template-columns: minmax(0, 16rem) 1fr;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--ui-border-subtle, var(--ui-border));
+}
+.dash-suppliers-row:last-child {
+  border-bottom: none;
+}
+.dash-suppliers-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Pedidos de compra pendientes (I-16) ── */
+.dash-po-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dash-po-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--ui-border-subtle, var(--ui-border));
+}
+.dash-po-row:last-child {
+  border-bottom: none;
+}
+.dash-po-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.dash-po-supplier {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.dash-po-meta {
+  color: var(--ui-text-muted);
+  font-size: 0.8rem;
+}
+
+/* ── Pie del dashboard (I-17/D-06): acceso a la page de Ventas ── */
+.dash-foot {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+  padding: 0.5rem 0;
+}

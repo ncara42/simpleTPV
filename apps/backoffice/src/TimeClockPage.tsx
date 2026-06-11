@@ -1,24 +1,9 @@
-import { Select } from '@simpletpv/ui';
+import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
 import { usePageHeader } from './lib/pageHeader.js';
-import { listHistoryAll } from './lib/time-clock.js';
-
-// Minutos → "Xh Ym" (o "Ym" si es menos de una hora).
-function fmtMinutes(min: number): string {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`;
-}
-
-// ISO → "HH:MM" (mismo criterio que el log de tienda: corte directo del ISO). Guion
-// largo si la jornada no tiene entrada/salida registrada.
-function hhmm(iso: string | null): string {
-  return iso ? iso.slice(11, 16) : '—';
-}
-
-const msToMin = (ms: number): number => Math.round(ms / 60000);
+import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
 
 interface Filters {
   storeId: string;
@@ -76,6 +61,35 @@ export function TimeClockPage() {
 
   const hasFilters = Boolean(filters.storeId || filters.userId || filters.date);
 
+  type TimeRow = (typeof filtered)[number];
+  const timeclockColumns: DataTableColumn<TimeRow>[] = [
+    { key: 'user', header: 'Empleado', render: (r) => r.userName },
+    { key: 'store', header: 'Tienda', render: (r) => <span className="muted">{r.storeName}</span> },
+    { key: 'date', header: 'Fecha', render: (r) => <span className="muted">{r.date}</span> },
+    {
+      key: 'in',
+      header: 'Entrada',
+      render: (r) => <span className="muted tabular-nums">{hhmm(r.firstIn)}</span>,
+    },
+    {
+      key: 'out',
+      header: 'Salida',
+      render: (r) => <span className="muted tabular-nums">{hhmm(r.lastOut)}</span>,
+    },
+    {
+      key: 'breaks',
+      header: 'Pausas',
+      align: 'right',
+      render: (r) => <span className="muted tabular-nums">{fmtMinutes(msToMin(r.breakMs))}</span>,
+    },
+    {
+      key: 'worked',
+      header: 'Horas',
+      align: 'right',
+      render: (r) => <span className="tabular-nums">{fmtMinutes(msToMin(r.workedMs))}</span>,
+    },
+  ];
+
   return (
     <section className="catalog">
       <div className="table-panel">
@@ -127,45 +141,22 @@ export function TimeClockPage() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
-          <p className="catalog-empty" data-testid="timeclock-empty">
-            Sin fichajes para los filtros seleccionados.
-          </p>
-        ) : (
-          <table className="catalog-table" data-testid="timeclock-table">
-            <thead>
-              <tr>
-                <th>Empleado</th>
-                <th>Tienda</th>
-                <th>Fecha</th>
-                <th>Entrada</th>
-                <th>Salida</th>
-                <th>Pausas</th>
-                <th>Horas</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((row) => (
-                <tr key={`${row.userId}-${row.storeId}-${row.date}`} data-testid="timeclock-row">
-                  <td>{row.userName}</td>
-                  <td className="muted">{row.storeName}</td>
-                  <td className="muted">{row.date}</td>
-                  <td className="muted tabular-nums">{hhmm(row.firstIn)}</td>
-                  <td className="muted tabular-nums">{hhmm(row.lastOut)}</td>
-                  <td className="muted tabular-nums">{fmtMinutes(msToMin(row.breakMs))}</td>
-                  <td className="tabular-nums">{fmtMinutes(msToMin(row.workedMs))}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr data-testid="timeclock-totals">
-                <td colSpan={5}>{totals.count} jornadas</td>
-                <td className="tabular-nums">{fmtMinutes(totals.breaks)}</td>
-                <td className="tabular-nums">{fmtMinutes(totals.worked)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        )}
+        <DataTable
+          columns={timeclockColumns}
+          rows={filtered}
+          rowKey={(r) => `${r.userId}-${r.storeId}-${r.date}`}
+          rowTestId="timeclock-row"
+          footer={
+            <span data-testid="timeclock-totals">
+              {totals.count} jornadas · pausas {fmtMinutes(totals.breaks)} · trabajadas{' '}
+              {fmtMinutes(totals.worked)}
+            </span>
+          }
+          emptyState={
+            <span data-testid="timeclock-empty">Sin fichajes para los filtros seleccionados.</span>
+          }
+          data-testid="timeclock-table"
+        />
       </div>
     </section>
   );

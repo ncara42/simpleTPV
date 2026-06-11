@@ -44,3 +44,33 @@ export async function selectByLabel(
   await page.getByTestId(triggerTestId).click();
   await page.locator('[role="option"]', { hasText: label }).first().click();
 }
+
+// Mapa page→grupo del menú dropdown (D-02/D-09). Dashboard y Ayuda son directas.
+const NAV_GROUP_OF: Record<string, string> = {
+  catalog: 'inventory',
+  families: 'inventory',
+  stock: 'inventory',
+  transfers: 'inventory',
+  suppliers: 'inventory',
+  sales: 'commercial',
+  b2b: 'commercial',
+  promotions: 'commercial',
+  stores: 'org',
+  users: 'org',
+  timeclock: 'org',
+};
+
+// Navega por el menú de grupos: ancla el dropdown del grupo (clic) y elige la
+// page. Las directas (dashboard, help) se clican sin desplegar.
+export async function navTo(page: Page, id: string): Promise<void> {
+  const group = NAV_GROUP_OF[id];
+  if (group) {
+    const item = page.getByTestId(`nav-${id}`);
+    if (!(await item.isVisible().catch(() => false))) {
+      await page.getByTestId(`nav-group-${group}`).click();
+    }
+    await item.click();
+  } else {
+    await page.getByTestId(`nav-${id}`).click();
+  }
+}

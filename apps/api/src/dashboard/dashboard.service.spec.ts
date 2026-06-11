@@ -320,6 +320,36 @@ describe('DashboardService — mapeos y cálculos (unit)', () => {
     }
   });
 
+  // ─── salesByEmployee ─────────────────────────────────────────────────────────
+
+  it('salesByEmployee: mapea bigint/string→number conservando el orden del SQL', async () => {
+    // El ORDER BY total DESC lo hace el SQL; el service solo mapea.
+    const fake = withFakeRows([
+      [
+        { userId: 'u2', userName: 'Bruno', count: 5n, total: '350.50' },
+        { userId: 'u1', userName: 'Ana', count: 2n, total: '120' },
+      ],
+    ]);
+    try {
+      const rows = await run(() => makeService().salesByEmployee({}));
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toEqual({ userId: 'u2', userName: 'Bruno', salesCount: 5, total: 350.5 });
+      expect(rows[1]).toEqual({ userId: 'u1', userName: 'Ana', salesCount: 2, total: 120 });
+    } finally {
+      fake.restore();
+    }
+  });
+
+  it('salesByEmployee: lista vacía cuando no hay ventas en el periodo', async () => {
+    const fake = withFakeRows([[]]);
+    try {
+      const rows = await run(() => makeService().salesByEmployee({}));
+      expect(rows).toHaveLength(0);
+    } finally {
+      fake.restore();
+    }
+  });
+
   // ─── marginKpis: rama sin ventas ─────────────────────────────────────────────
 
   it('marginKpis: revenue cero → marginPct=0 (evita /0)', async () => {
