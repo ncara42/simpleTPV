@@ -10,7 +10,6 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcryptjs';
 
 import {
-  AlertType,
   CashSessionStatus,
   MovementType,
   PaymentMethod,
@@ -23,6 +22,7 @@ import {
   VerifactuStatus,
   VerifactuType,
 } from '../generated/client/index.js';
+import { DEMO_API_KEY, seedExtras } from './seed-demo-extras.js';
 
 const DEMO_NIF = 'B99999999';
 const DEMO_PASSWORD = 'demo1234';
@@ -855,7 +855,11 @@ async function seedHistory(
   }
 }
 
-/** Crea fichajes (CLOCK_IN/CLOCK_OUT) de los últimos 5 días. Idempotente. */
+/**
+ * Crea fichajes (CLOCK_IN/CLOCK_OUT) de los últimos 5 días. HOY solo se ficha la
+ * entrada (el turno queda abierto → estados vivos en la UI; las pausas las añade
+ * seed-demo-extras). Idempotente.
+ */
 async function seedTimeClock(orgId: string): Promise<void> {
   const users = await prisma.user.findMany({
     where: { organizationId: orgId, role: { in: [UserRole.MANAGER, UserRole.CLERK] } },
@@ -890,6 +894,9 @@ async function seedTimeClock(orgId: string): Promise<void> {
           },
         });
       }
+
+      // Hoy NO se ficha la salida: el turno queda abierto (en curso) en la UI.
+      if (daysAgo === 0) continue;
 
       const existingOut = await prisma.timeClockEntry.findFirst({
         where: {
@@ -1010,39 +1017,9 @@ async function seedBatches(orgId: string): Promise<void> {
   }
 }
 
-/** Crea alertas de stock (OUT_OF_STOCK). Idempotente. */
-async function seedAlerts(orgId: string): Promise<void> {
-  const products = await prisma.product.findMany({
-    where: { organizationId: orgId },
-    take: 2,
-  });
-  const centroStore = await prisma.store.findFirst({
-    where: { organizationId: orgId, code: '01' },
-  });
-
-  if (!centroStore) return;
-
-  for (const product of products) {
-    const existing = await prisma.stockAlert.findFirst({
-      where: {
-        organizationId: orgId,
-        productId: product.id,
-        storeId: centroStore.id,
-        resolved: false,
-      },
-    });
-    if (existing) continue;
-
-    await prisma.stockAlert.create({
-      data: {
-        organizationId: orgId,
-        productId: product.id,
-        storeId: centroStore.id,
-        alertType: AlertType.OUT_OF_STOCK,
-      },
-    });
-  }
-}
+// Las alertas de stock se derivan del stock REAL en seed-demo-extras
+// (seedRestock + seedStockAlertsFromStock); el antiguo seedAlerts creaba dos
+// OUT_OF_STOCK arbitrarias que contradecían el inventario y se eliminó.
 
 /** Crea clientes B2B, lista de precios y pedidos mayoristas. Idempotente. */
 async function seedB2B(orgId: string): Promise<void> {
@@ -1387,7 +1364,6 @@ async function main(): Promise<void> {
   await seedTimeClock(org.id);
   await seedVerifactu(org.id);
   await seedBatches(org.id);
-  await seedAlerts(org.id);
   await seedB2B(org.id);
   await seedSuppliers(org.id);
   await seedPurchaseOrders(org.id);
@@ -1395,7 +1371,14 @@ async function main(): Promise<void> {
   await seedStorePrices(org.id);
   await seedPromotions(org.id);
 
+  // Extras: traspasos, devoluciones, caja, pausas, dispositivos, ventas
+  // anuladas/con descuento, pedidos recibidos, B2B, VeriFactu, exports, keys…
+  await seedExtras(prisma, org.id);
+
   console.log(`Seed demo completado: organización ${org.nif} con catálogo, usuarios e histórico.`);
+  console.log(`  Login: admin@demo.simpletpv / ${DEMO_PASSWORD} (manager@…, clerk@…, jon@… igual)`);
+  console.log('  PINs: admin 1111 · manager 2222 · clerk 3333 · jon 4444');
+  console.log(`  API key pública (demo): ${DEMO_API_KEY}`);
 }
 
 main()
