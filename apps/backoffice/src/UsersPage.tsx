@@ -1,6 +1,6 @@
 import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, X } from 'lucide-react';
+import { Check, Plus, Upload, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { CsvDropzone } from './components/CsvDropzone.js';
@@ -401,9 +401,11 @@ export function UsersPage() {
                 onClick={() => setImporting(true)}
                 data-testid="users-import"
               >
+                <Upload size={16} aria-hidden="true" />
                 Importar CSV
               </button>
               <button className="btn-primary" onClick={openCreate} data-testid="new-user">
+                <Plus size={16} aria-hidden="true" />
                 Nuevo usuario
               </button>
             </div>

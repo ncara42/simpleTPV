@@ -390,8 +390,26 @@ resultados de la búsqueda de funciones, futuros menús) comparte UNA piel:
 ## 11. Iconografía
 
 - **Set:** Lucide (líneas, `stroke-width: 2`, `stroke-linecap/linejoin: round`). Algunos iconos se inyectan como **máscara CSS** para tintarse con tokens (p. ej. la lupa de búsqueda).
-- **Tamaños:** icono de ítem de sidebar 19px; lupa de búsqueda 1.05rem.
+- **Tamaños:** icono de ítem de sidebar 19px; lupa de búsqueda 1.05rem; icono de botón/CTA 16px.
 - **Color:** heredan `currentColor`/tokens; nunca color propio fijo.
+
+### 11.1 Mapa acción → icono (U-14, vinculante)
+
+Todo CTA/botón de acción lleva su icono; **un icono = una acción** en toda la app.
+El `Button` acepta `icon` y pone hueco/alineación (no se compone a mano).
+
+| Acción            | Icono (lucide) | Acción               | Icono         |
+| ----------------- | -------------- | -------------------- | ------------- |
+| Crear / nuevo     | `Plus`         | Importar             | `Upload`      |
+| Guardar           | `Check`        | Exportar / descargar | `Download`    |
+| Editar            | `Pencil`       | Imprimir             | `Printer`     |
+| Borrar            | `Trash2`       | Reponer              | `PackagePlus` |
+| Cancelar / cerrar | `X`            | Mover                | `Move`        |
+| Buscar            | `Search`       | Ver                  | `Eye`         |
+| Filtrar           | `Filter`       | Refrescar            | `RefreshCw`   |
+
+Excepción admitida: botones de texto dentro de tablas densas si el icono añade
+ruido (anotar en el PR). Los icon-only (sin texto) llevan `aria-label` y `title`.
 
 ---
 

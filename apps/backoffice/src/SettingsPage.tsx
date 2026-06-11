@@ -1,5 +1,6 @@
 import { Button } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { getBranding, updateBranding } from './lib/branding.js';
@@ -131,6 +132,7 @@ export function SettingsPage() {
         )}
         <div className="settings-actions">
           <Button
+            icon={<Check size={16} />}
             onClick={() => save.mutate()}
             disabled={!colorValid || save.isPending}
             data-testid="settings-save"

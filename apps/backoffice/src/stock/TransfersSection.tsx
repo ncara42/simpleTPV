@@ -1,6 +1,7 @@
 import type { ImportResult } from '@simpletpv/auth';
 import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { CsvDropzone } from '../components/CsvDropzone.js';
@@ -81,6 +82,7 @@ export function TransfersSection() {
             onClick={() => setCreating(true)}
             data-testid="new-transfer"
           >
+            <Plus size={16} aria-hidden="true" />
             Nuevo traspaso
           </button>
         </div>

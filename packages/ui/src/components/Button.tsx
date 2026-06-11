@@ -8,10 +8,16 @@ type ButtonSize = 'sm' | 'md' | 'lg';
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  /**
+   * U-14: icono a la izquierda del texto. Pasar el componente de lucide ya
+   * dimensionado (size 16). El hueco/alineación los pone el propio Button — los
+   * CTAs no componen el icono a mano. Ver DESIGN_SYSTEM §11 (mapa acción→icono).
+   */
+  icon?: React.ReactNode;
 };
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', ...props }, ref) => (
+  ({ className, variant = 'primary', size = 'md', icon, children, ...props }, ref) => (
     <button
       ref={ref}
       className={cn(
@@ -30,7 +36,14 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         className,
       )}
       {...props}
-    />
+    >
+      {icon != null && (
+        <span className="inline-flex shrink-0 items-center" aria-hidden="true">
+          {icon}
+        </span>
+      )}
+      {children}
+    </button>
   ),
 );
 Button.displayName = 'Button';

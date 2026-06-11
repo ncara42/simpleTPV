@@ -344,7 +344,7 @@ test('Compras y VeriFactu están retiradas del menú (#106)', async ({ page }) =
 test('Familias muestra las raíz con subfamilias anidadas (#97)', async ({ page }) => {
   await navTo(page, 'families');
   // Árbol canónico del seed: 4 raíces + 2 subfamilias + 6 arquetipos = 12 nodos.
-  // >= por si otros tests crean subniveles. count() no auto-espera: anclar antes
+  // >= por si otros tests crean subfamilias. count() no auto-espera: anclar antes
   // la primera fila para no contar durante la carga.
   await expect(page.getByTestId('fam-row').first()).toBeVisible();
   expect(await page.getByTestId('fam-row').count()).toBeGreaterThanOrEqual(12);
@@ -352,12 +352,12 @@ test('Familias muestra las raíz con subfamilias anidadas (#97)', async ({ page 
   await expect(page.getByTestId('fam-count').first()).toContainText('productos');
 });
 
-test('Familias: crear un subnivel anidado (profundidad arbitraria, UX)', async ({ page }) => {
+test('Familias: crear una subfamilia anidada (profundidad arbitraria, UX)', async ({ page }) => {
   await navTo(page, 'families');
   const aceitesCbd = page.getByTestId('fam-row').filter({ hasText: 'Aceites CBD' }).first();
   await aceitesCbd.click();
   await aceitesCbd.getByTestId('fam-add-child').click();
-  const subName = `Subnivel E2E ${Date.now()}`;
+  const subName = `Subfamilia E2E ${Date.now()}`;
   await page.getByTestId('family-name').fill(subName);
   await page.getByTestId('family-save').click();
   await expect(page.getByTestId('fam-tree')).toContainText(subName);
@@ -373,11 +373,11 @@ test('Familias: árbol con raíz en orden y todas las filas (#98)', async ({ pag
   expect(await rows.count()).toBeGreaterThanOrEqual(12);
 });
 
-test('Familias: marcar un subnivel como arquetipo lo distingue y oculta "+ Subnivel"', async ({
+test('Familias: marcar una subfamilia como arquetipo la distingue y oculta "Añadir subfamilia"', async ({
   page,
 }) => {
   await navTo(page, 'families');
-  // Crear un subnivel bajo "Flores CBD" (no una raíz, para no alterar el orden de
+  // Crear una subfamilia bajo "Flores CBD" (no una raíz, para no alterar el orden de
   // raíces en reruns) y marcarlo como arquetipo.
   const flores = page.getByTestId('fam-row').filter({ hasText: 'Flores CBD' }).first();
   await flores.click();
@@ -390,7 +390,7 @@ test('Familias: marcar un subnivel como arquetipo lo distingue y oculta "+ Subni
   // El nodo aparece con el distintivo "Arquetipo".
   const row = page.getByTestId('fam-row').filter({ hasText: name });
   await expect(row.getByTestId('fam-archetype-badge')).toBeVisible();
-  // Al seleccionarlo NO ofrece crear subniveles (un arquetipo solo contiene productos).
+  // Al seleccionarlo NO ofrece crear subfamilias (un arquetipo solo contiene productos).
   await row.click();
   await expect(row.getByTestId('fam-add-child')).toHaveCount(0);
 });
@@ -408,12 +408,15 @@ test('Familias: panel de productos del nodo — ver, añadir aquí y mover (I-13
   expect(items).toBeGreaterThanOrEqual(3); // el seed da 3 al arquetipo
   // El contador de la fila dice la VERDAD (E-16): coincide con el panel.
   await expect(arq.getByTestId('fam-count')).toHaveText(`${items} productos`);
-  // En un arquetipo no hay toggle de subniveles (no tiene descendientes)…
+  // En un arquetipo no hay toggle de subfamilias (no tiene descendientes)…
   await expect(page.getByTestId('fam-panel-subtree')).toHaveCount(0);
 
-  // …y en una familia raíz sí: incluir subniveles amplía la lista.
-  await page.getByTestId('fam-row').first().click(); // "Aceites" (sortOrder 1)
+  // …y en una familia raíz sí: incluir subfamilias amplía la lista. Se clica el
+  // NOMBRE (no el centro de la fila, que ahora puede caer sobre las acciones
+  // siempre visibles de U-13) para seleccionar "Aceites" de forma estable.
+  await page.getByTestId('fam-row').first().locator('.fam-name').click();
   await expect(page.getByTestId('fam-products-panel')).toBeVisible();
+  await expect(page.getByTestId('fam-panel-subtree')).toBeVisible();
   const direct = await page.getByTestId('fam-product-item').count();
   await page.getByTestId('fam-panel-subtree').check();
   await expect.poll(() => page.getByTestId('fam-product-item').count()).toBeGreaterThan(direct);

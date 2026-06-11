@@ -1378,21 +1378,21 @@
 .fam-row:last-child {
   border-bottom: none;
 }
+/* U-13: las acciones de la fila están SIEMPRE en el DOM; atenuadas en reposo y
+   a plena opacidad cuando se pasa el ratón por la fila o la fila está seleccionada
+   (visibles en todo momento sin saturar el árbol). */
 .fam-actions {
   display: flex;
   gap: 0.3rem;
   white-space: nowrap;
-  animation: fam-actions-in 0.13s var(--ui-ease);
+  margin-left: 0.4rem;
+  opacity: 0.4;
+  transition: opacity 0.12s var(--ui-ease, ease);
 }
-@keyframes fam-actions-in {
-  from {
-    opacity: 0;
-    transform: translateX(0.4rem);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+.fam-row:hover .fam-actions,
+.fam-row:focus-within .fam-actions,
+.fam-actions.is-selected {
+  opacity: 1;
 }
 .fam-actions button {
   display: inline-flex;
@@ -1408,11 +1408,19 @@
     background 0.12s,
     border-color 0.12s;
 }
+/* Acciones por icono (U-13/U-14): cuadradas y compactas. */
+.fam-action-btn {
+  justify-content: center;
+  padding: 0.3rem;
+  color: var(--ui-text-muted);
+}
 .fam-actions button:hover {
   background: var(--ui-surface-subtle);
+  color: var(--ui-text);
 }
-.fam-actions button.danger {
-  color: #c0392b;
+.fam-actions button.danger,
+.fam-actions button.danger:hover {
+  color: var(--ui-danger, #c0392b);
 }
 
 /* Plegar/desplegar el subárbol. El espaciador de hoja mantiene la alineación
@@ -2572,6 +2580,9 @@
   font-size: 0.85em;
 }
 .csv-dropzone-template {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   font-size: var(--ui-text-sm);
   color: var(--tpv-teal-700, #0f766e);
 }

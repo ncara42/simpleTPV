@@ -1,4 +1,5 @@
 import type { ImportResult } from '@simpletpv/auth';
+import { Download } from 'lucide-react';
 import { type ReactNode, useId, useRef, useState } from 'react';
 
 import { formErrorMessage } from '../lib/form-error.js';
@@ -86,7 +87,8 @@ export function CsvDropzone({
     <div className="csv-dropzone" data-testid={testId}>
       {help && <p className="csv-dropzone-help">{help}</p>}
       <a className="csv-dropzone-template" href={templateHref} download={templateName}>
-        ↓ Descargar plantilla CSV
+        <Download size={15} aria-hidden="true" />
+        Descargar plantilla CSV
       </a>
 
       <input

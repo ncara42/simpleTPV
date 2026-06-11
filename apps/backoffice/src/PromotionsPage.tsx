@@ -1,5 +1,6 @@
 import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Modal } from './components/Modal.js';
@@ -280,6 +281,7 @@ export function PromotionsPage() {
               onClick={() => setForm({ ...EMPTY })}
               data-testid="new-promo"
             >
+              <Plus size={16} aria-hidden="true" />
               Nueva promoción
             </button>
           )}
