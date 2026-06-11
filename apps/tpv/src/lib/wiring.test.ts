@@ -74,6 +74,10 @@ describe('cableado API real', () => {
     expect(get).toHaveBeenCalledWith('/cash-sessions/current', { storeId: 'store-1' });
     get.mockRejectedValueOnce(new ApiError(404, 'sin caja'));
     expect(await cash.currentCashSession('store-1')).toBeNull();
+    // 200 con body vacío (sin caja abierta): el cliente devuelve undefined y la
+    // lib lo normaliza a null (TanStack Query rechaza undefined).
+    get.mockResolvedValueOnce(undefined);
+    expect(await cash.currentCashSession('store-1')).toBeNull();
     await cash.listCashMovements('cs-1');
     expect(get).toHaveBeenCalledWith('/cash-sessions/cs-1/movements');
     await cash.createCashMovement('cs-1', { type: 'OUT', amount: 25, reason: 'Retirada' });
