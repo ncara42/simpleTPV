@@ -2711,45 +2711,72 @@
    Hereda el chrome de .table-panel; aquí solo el espaciado inferior y el límite
    de alto para que no empuje la tabla demasiado abajo. */
 .stock-alerts-panel {
-  margin-bottom: var(--ui-space-4);
-  max-height: 18rem;
+  margin-bottom: var(--ui-space-5);
+  max-height: 22rem;
   overflow-y: auto;
 }
 .stock-alerts-head {
   display: flex;
   align-items: baseline;
   gap: var(--ui-space-2);
-  margin-bottom: var(--ui-space-2);
+  margin-bottom: var(--ui-space-4);
+  padding-bottom: var(--ui-space-3);
+  border-bottom: 1px solid var(--ui-border);
+}
+.stock-alerts-head strong {
+  font-size: var(--ui-text-md);
+  letter-spacing: -0.012em;
 }
 .stock-alerts-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--ui-space-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
+/* Cada aviso es una tarjeta con aire: acento a la izquierda, fondo semántico
+   suave, padding cómodo y columnas alineadas (producto · tienda · tipo). */
 .stock-alert-item {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: var(--ui-space-3);
-  padding: var(--ui-space-1) var(--ui-space-2);
+  gap: var(--ui-space-4);
+  padding: var(--ui-space-3) var(--ui-space-4);
   border-left: 3px solid var(--ui-warning);
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-warning-soft);
 }
 .stock-alert-item.sev-critical {
   border-left-color: var(--ui-danger);
   background: var(--ui-danger-soft);
 }
-.stock-alert-tag {
+.stock-alert-name {
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stock-alert-store {
   font-size: var(--ui-text-sm);
+  white-space: nowrap;
+}
+.stock-alert-tag {
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
   color: var(--ui-text-muted);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  padding: 0.15rem 0.6rem;
   white-space: nowrap;
 }
 .stock-alerts-more {
-  margin: var(--ui-space-2) 0 0;
+  margin: var(--ui-space-3) 0 0;
   font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
 }
 /* Chip de filtro "solo en alerta". */
 .stock-alert-toggle {

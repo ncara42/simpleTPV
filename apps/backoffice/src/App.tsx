@@ -119,21 +119,17 @@ function ShellTopBar({
   );
 }
 
-// U-06: el título y el descriptor de la page salen del header a un bloque propio
-// bajo la TopBar. Conserva el data-testid del descriptor (hooks de e2e).
+// U-06 (repaso): solo el TÍTULO de la page bajo la TopBar, alineado con el
+// contenido (mismo max-width centrado que .catalog). La descripción se retiró:
+// ensuciaba y no aportaba.
 function PageHeading() {
-  const { title, description, descriptionTestId } = usePageHeaderValue();
+  const { title } = usePageHeaderValue();
   if (!title) return null;
   return (
     <div className="bo-page-heading" data-testid="page-heading">
       <h1 className="bo-page-title" title={title}>
         {title}
       </h1>
-      {description && (
-        <p className="bo-page-desc" data-testid={descriptionTestId} title={description}>
-          {description}
-        </p>
-      )}
     </div>
   );
 }

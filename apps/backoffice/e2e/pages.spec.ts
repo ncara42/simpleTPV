@@ -13,7 +13,9 @@ test.beforeEach(async ({ page }) => {
 test('Catálogo muestra los productos del seed', async ({ page }) => {
   await navTo(page, 'catalog');
   await expect(page.getByTestId('catalog-table')).toBeVisible();
-  await expect(page.getByTestId('catalog-count')).toContainText(/\d/);
+  // El contador vivía en la descripción del header, retirada en el repaso:
+  // verificamos directamente que hay filas de producto.
+  expect(await page.getByTestId('product-select').count()).toBeGreaterThan(0);
 });
 
 test('Catálogo: selector jerárquico único de familia (#97)', async ({ page }) => {
@@ -172,8 +174,10 @@ test('Tiendas: crear, editar y borrar persisten (I-10)', async ({ page }) => {
 
 test('Usuarios muestra 4 usuarios con badge de rol', async ({ page }) => {
   await navTo(page, 'users');
-  await expect(page.getByTestId('users-count')).toContainText('4');
+  // El contador vivía en la descripción del header (retirada): contamos filas
+  // por su badge de rol (uno por usuario).
   await expect(page.getByTestId('user-role-badge').first()).toBeVisible();
+  expect(await page.getByTestId('user-role-badge').count()).toBe(4);
 });
 
 test('Usuarios: editar precarga datos y permite renombrar (#104)', async ({ page }) => {

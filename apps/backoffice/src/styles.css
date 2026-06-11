@@ -262,9 +262,14 @@
   }
 }
 
-/* ─── U-06: título y descriptor de la page bajo el header ──────────────── */
+/* ─── U-06 (repaso): título de la page bajo el header, ALINEADO con el
+   contenido. El contenido (.catalog) va max-width:75rem centrado dentro del
+   padding de .bo-main; el título replica ese contenedor (sin padding propio)
+   para que su borde izquierdo coincida exactamente. ── */
 .bo-page-heading {
-  padding: 1.1rem 1.5rem 0;
+  max-width: 75rem;
+  margin: 0 auto;
+  padding: 0 0 1rem;
 }
 .bo-page-title {
   margin: 0;
@@ -272,11 +277,6 @@
   font-weight: 650;
   letter-spacing: -0.022em;
   color: var(--ui-text);
-}
-.bo-page-desc {
-  margin: 0.15rem 0 0;
-  font-size: 0.88rem;
-  color: var(--ui-text-muted);
 }
 
 /* ─── U-08: Ajustes — sección Marca ─────────────────────────────────────── */
