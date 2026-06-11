@@ -1533,19 +1533,6 @@ export async function seedAuditLogs(prisma: PrismaClient, orgId: string): Promis
   }
 }
 
-// ─── Marca corporativa (U-08): color primario de la organización ─────────────
-
-// Verde CBD oscuro: luminancia baja → la UI deriva texto blanco (contraste AA).
-// Solo se siembra si la org aún no eligió color (no pisa la elección del usuario).
-export async function seedBranding(prisma: PrismaClient, orgId: string): Promise<void> {
-  const org = await prisma.organization.findFirst({ where: { id: orgId } });
-  if (!org || org.brandColor) return;
-  await prisma.organization.update({
-    where: { id: orgId },
-    data: { brandColor: '#15803d' },
-  });
-}
-
 // ─── Backfill: coste congelado en líneas históricas (margen real en stats) ───
 
 export async function backfillSaleLineCosts(prisma: PrismaClient, orgId: string): Promise<void> {
@@ -1564,7 +1551,6 @@ export async function backfillSaleLineCosts(prisma: PrismaClient, orgId: string)
 /** Punto de entrada: ejecuta todos los extras en orden de dependencia. */
 export async function seedExtras(prisma: PrismaClient, orgId: string): Promise<void> {
   await seedProductDetails(prisma, orgId);
-  await seedBranding(prisma, orgId);
   await seedUserPins(prisma, orgId);
   await seedStoreOps(prisma, orgId);
   await seedDevices(prisma, orgId);
