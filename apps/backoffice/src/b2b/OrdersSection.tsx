@@ -1,6 +1,6 @@
 import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
@@ -169,6 +169,7 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
       )}
       <div className="modal-foot modal-foot-actions">
         <button type="button" onClick={onClose}>
+          <X size={16} aria-hidden="true" />
           Cancelar
         </button>
         <button
@@ -177,6 +178,7 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
           disabled={!canSubmit}
           data-testid="b2b-order-save"
         >
+          <Plus size={16} aria-hidden="true" />
           {createMut.isPending ? 'Creando…' : 'Crear pedido'}
         </button>
       </div>
@@ -269,6 +271,7 @@ function OrderDetailModal({ orderId, onClose }: { orderId: string; onClose: () =
         </div>
         <div className="modal-foot-actions">
           <button type="button" onClick={onClose}>
+            <X size={16} aria-hidden="true" />
             Cerrar
           </button>
         </div>

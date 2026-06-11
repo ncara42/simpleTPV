@@ -1,6 +1,7 @@
 import { type StockGlobalRow, stockLevel } from '@simpletpv/auth';
 import { DataTable, type DataTableColumn, type DataTableSort, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
@@ -22,9 +23,15 @@ interface AdjustState {
   reason: string;
 }
 
-export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string | null }) {
+export function GlobalStockSection({
+  initialStoreId,
+  initialSearch,
+}: {
+  initialStoreId?: string | null;
+  initialSearch?: string | null;
+}) {
   const qc = useQueryClient();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch ?? '');
   const [familyId, setFamilyId] = useState('');
   const [storeId, setStoreId] = useState(initialStoreId ?? '');
   const [rotation, setRotation] = useState('');
@@ -237,6 +244,37 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
 
   return (
     <>
+      {/* U-10: los avisos de roturas viven en su PROPIO panel, encima de la tabla
+          (antes anidados dentro del table-panel de la tabla). Reusa GET /stock/alerts. */}
+      {alerts.length > 0 && (
+        <div className="table-panel stock-alerts-panel" data-testid="stock-alerts-panel">
+          <div className="stock-alerts-head">
+            <strong>
+              {alerts.length} {alerts.length === 1 ? 'rotura' : 'roturas'} de stock
+            </strong>
+            <span className="muted">
+              {criticalAlerts} crítica{criticalAlerts === 1 ? '' : 's'} · {softAlerts} con sustituto
+            </span>
+          </div>
+          <ul className="stock-alerts-list">
+            {alerts.slice(0, 8).map((a) => (
+              <li
+                key={a.id}
+                className={`stock-alert-item sev-${a.severity}`}
+                data-testid="stock-alert-item"
+              >
+                <span className="stock-alert-name">{a.productName}</span>
+                <span className="stock-alert-store muted">{a.storeName}</span>
+                <span className="stock-alert-tag">{ALERT_LABEL[a.alertType]}</span>
+              </li>
+            ))}
+          </ul>
+          {alerts.length > 8 && (
+            <p className="muted stock-alerts-more">y {alerts.length - 8} más…</p>
+          )}
+        </div>
+      )}
+
       <div className="table-panel">
         <div className="stock-filters">
           <div className="stock-filter-group">
@@ -301,50 +339,19 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
               Solo en alerta
             </button>
           </div>
-        </div>
-
-        {/* Panel centralizado de roturas: única vista de consulta de roturas de
-            stock (reusa GET /stock/alerts), filtrado por la tienda activa. */}
-        {alerts.length > 0 && (
-          <div className="stock-alerts-panel" data-testid="stock-alerts-panel">
-            <div className="stock-alerts-head">
-              <strong>
-                {alerts.length} {alerts.length === 1 ? 'rotura' : 'roturas'} de stock
-              </strong>
-              <span className="muted">
-                {criticalAlerts} crítica{criticalAlerts === 1 ? '' : 's'} · {softAlerts} con
-                sustituto
-              </span>
-            </div>
-            <ul className="stock-alerts-list">
-              {alerts.slice(0, 8).map((a) => (
-                <li
-                  key={a.id}
-                  className={`stock-alert-item sev-${a.severity}`}
-                  data-testid="stock-alert-item"
-                >
-                  <span className="stock-alert-name">{a.productName}</span>
-                  <span className="stock-alert-store muted">{a.storeName}</span>
-                  <span className="stock-alert-tag">{ALERT_LABEL[a.alertType]}</span>
-                </li>
-              ))}
-            </ul>
-            {alerts.length > 8 && (
-              <p className="muted stock-alerts-more">y {alerts.length - 8} más…</p>
-            )}
+          {/* U-09: el botón de columnas vive en la toolbar (no flotando sobre las
+              cabeceras de la tabla). margin-left:auto lo ancla a la derecha. */}
+          <div className="stock-filter-group stock-filter-group--end">
+            <button
+              type="button"
+              className="config-trigger"
+              onClick={toggleColumnsEditor}
+              data-testid="stock-columns-toggle"
+              aria-expanded={columnsEditorOpen}
+            >
+              Columnas
+            </button>
           </div>
-        )}
-
-        <div className="config-bar">
-          <button
-            type="button"
-            className="config-trigger"
-            onClick={toggleColumnsEditor}
-            data-testid="stock-columns-toggle"
-            aria-expanded={columnsEditorOpen}
-          >
-            Columnas
-          </button>
         </div>
         {columnsEditor}
         <DataTable
@@ -437,6 +444,7 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
           )}
           <div className="modal-foot">
             <button type="button" onClick={() => setAdjusting(null)}>
+              <X size={16} aria-hidden="true" />
               Cancelar
             </button>
             <button
@@ -446,6 +454,7 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
               disabled={adjustMutation.isPending}
               data-testid="stock-adjust-save"
             >
+              <Check size={16} aria-hidden="true" />
               {adjustMutation.isPending ? 'Guardando…' : 'Guardar'}
             </button>
           </div>

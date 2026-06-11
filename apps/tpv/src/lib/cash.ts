@@ -20,7 +20,9 @@ export function closeCashSession(id: string, countedAmount: number): Promise<Cas
 
 export async function currentCashSession(storeId: string): Promise<CashSession | null> {
   try {
-    return await api.get<CashSession | null>('/cash-sessions/current', { storeId });
+    // Sin caja abierta la API responde 200 con body vacío → el cliente devuelve
+    // undefined, que TanStack Query rechaza ("Query data cannot be undefined").
+    return (await api.get<CashSession | null>('/cash-sessions/current', { storeId })) ?? null;
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) return null;
     throw e;

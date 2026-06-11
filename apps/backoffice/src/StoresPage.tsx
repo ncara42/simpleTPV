@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { useConfirm } from './components/ConfirmProvider.js';
@@ -111,6 +112,7 @@ export function StoresPage({
           onClick={() => setCreating(true)}
           data-testid="new-store"
         >
+          <Plus size={16} aria-hidden="true" />
           Nueva tienda
         </button>
       </div>

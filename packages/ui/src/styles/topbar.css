@@ -199,3 +199,46 @@
     transition: none;
   }
 }
+
+/* ─── U-06: búsqueda de funciones en el header ──────────────────────────── */
+.topbar-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: min(26rem, 100%);
+}
+.topbar-search-icon {
+  position: absolute;
+  left: 0.7rem;
+  color: var(--ui-text-soft);
+  pointer-events: none;
+}
+.topbar-search-input {
+  width: 100%;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+  border-radius: 9999px;
+  padding: 0.4rem 0.9rem 0.4rem 2.1rem;
+  font-size: 0.86rem;
+  color: var(--ui-text);
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+.topbar-search-input::placeholder {
+  color: var(--ui-text-soft);
+}
+.topbar-search-input:focus {
+  outline: none;
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface);
+}
+.topbar-search-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 21rem;
+  overflow-y: auto;
+}

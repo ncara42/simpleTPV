@@ -369,20 +369,19 @@
 }
 
 /* Menú de cuenta (popover sobre el footer, abre hacia arriba) */
+/* U-07: piel común de popover (radio 12, borde fuerte, sombra md). */
 .sidebar-account-menu {
   position: absolute;
   z-index: 60;
   left: 0.6rem;
   right: 0.6rem;
   bottom: calc(100% + 0.5rem);
-  padding: 0.35rem;
+  padding: 0.3rem;
   background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: 14px;
-  box-shadow:
-    0 0 0 0.5px rgba(0, 0, 0, 0.04),
-    0 10px 30px rgba(0, 0, 0, 0.14);
-  animation: sidebar-account-pop 0.12s ease;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 12px;
+  box-shadow: var(--ui-shadow-md);
+  animation: sidebar-account-pop 0.12s var(--ui-ease, ease);
 }
 
 @keyframes sidebar-account-pop {
@@ -510,15 +509,26 @@
    su contenido se despliega INLINE (acordeón) en el preview por hover
    sostenido o anclado por clic. Solo un grupo abierto a la vez. */
 .sidebar-group--dd {
-  margin-top: 2px;
+  /* U-05: aire entre grupos para que cada uno se lea como unidad desplegable. */
+  margin-top: 6px;
 }
 .sidebar-group-entry {
   width: 100%;
   justify-content: flex-start;
 }
+/* U-05: el chevron de los grupos se ve SIEMPRE (no solo al hover) — affordance
+   de que la entrada es un dropdown. El hover/abierto solo lo enfatiza. */
 .sidebar-group-entry .sidebar-group-chevron {
   margin-left: auto;
-  transition: transform 0.18s var(--ui-ease, ease);
+  opacity: 0.55;
+  transition:
+    transform 0.18s var(--ui-ease, ease),
+    opacity 0.12s ease;
+}
+.sidebar-group-entry:hover .sidebar-group-chevron,
+.sidebar-group-entry:focus-visible .sidebar-group-chevron,
+.sidebar-group-entry .sidebar-group-chevron.open {
+  opacity: 0.9;
 }
 .sidebar-group-entry .sidebar-group-chevron.open {
   transform: rotate(180deg);
@@ -546,4 +556,131 @@
   .sidebar-dd-items {
     animation: none;
   }
+}
+
+/* ─── U-04: rail de iconos + flyout lateral ─────────────────────────────────
+   El sidebar se contrae a --sidebar-width-rail: solo iconos. El dropdown de
+   un grupo pasa de acordeón inline a FLYOUT flotante pegado al rail (mismos
+   gestos: hover 200ms = preview, clic = anclar, Escape/clic-fuera = cerrar). */
+.sidebar {
+  transition: width 0.15s var(--ui-ease, ease);
+}
+.sidebar.collapsed {
+  width: var(--sidebar-width-rail);
+}
+.sidebar.collapsed .sidebar-brand,
+.sidebar.collapsed .sidebar-item-label,
+.sidebar.collapsed .sidebar-item-counter,
+.sidebar.collapsed .sidebar-group-entry .sidebar-group-chevron,
+.sidebar.collapsed .sidebar-account-meta {
+  display: none;
+}
+.sidebar.collapsed .sidebar-header {
+  justify-content: center;
+}
+.sidebar.collapsed .sidebar-item,
+.sidebar.collapsed .sidebar-collapse {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+/* El badge sobrevive en el rail como punto compacto sobre el icono. */
+.sidebar.collapsed .sidebar-item {
+  position: relative;
+}
+.sidebar.collapsed .sidebar-item-badge {
+  position: absolute;
+  top: 3px;
+  right: 6px;
+  font-size: 0.6rem;
+  min-width: 0.95rem;
+  height: 0.95rem;
+  line-height: 0.95rem;
+  padding: 0;
+}
+.sidebar.collapsed .sidebar-account {
+  justify-content: center;
+}
+/* Flyout lateral: el acordeón se vuelve popover pegado al rail. */
+.sidebar.collapsed .sidebar-group--dd {
+  position: relative;
+}
+.sidebar.collapsed .sidebar-dd-items {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 0;
+  min-width: 200px;
+  padding: 0.35rem;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 12px;
+  box-shadow: var(--ui-shadow-md, 0 6px 20px rgb(0 0 0 / 0.1));
+  z-index: 40;
+  animation: sidebar-flyout-in 0.14s var(--ui-ease, ease);
+}
+/* Dentro del flyout los labels vuelven a verse. */
+.sidebar.collapsed .sidebar-dd-items .sidebar-item-label {
+  display: inline;
+}
+.sidebar.collapsed .sidebar-dd-items .sidebar-item {
+  justify-content: flex-start;
+  padding-left: 0.7rem;
+  padding-right: 0.7rem;
+}
+.sidebar.collapsed .sidebar-dd-items .sidebar-item-counter {
+  display: inline-flex;
+}
+@keyframes sidebar-flyout-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Botón de contracción: mismo lenguaje que un item, anclado sobre el footer. */
+.sidebar-collapse {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 0.45rem 0.7rem;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.84rem;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+}
+.sidebar-collapse:hover {
+  color: var(--ui-text);
+  background: var(--sidebar-item-active-bg, rgba(0, 0, 0, 0.05));
+}
+.sidebar-collapse-icon {
+  flex-shrink: 0;
+  transition: transform 0.18s var(--ui-ease, ease);
+}
+.sidebar-collapse-icon.is-rail {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar.collapsed .sidebar-dd-items {
+    animation: none;
+  }
+  .sidebar,
+  .sidebar-collapse-icon {
+    transition: none;
+  }
+}
+
+/* U-08: logo corporativo en el hueco de la "S". */
+.sidebar-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: inherit;
 }

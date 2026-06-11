@@ -1,6 +1,6 @@
 import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, X } from 'lucide-react';
+import { Check, Plus, Upload, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { CsvDropzone } from './components/CsvDropzone.js';
@@ -401,9 +401,11 @@ export function UsersPage() {
                 onClick={() => setImporting(true)}
                 data-testid="users-import"
               >
+                <Upload size={16} aria-hidden="true" />
                 Importar CSV
               </button>
               <button className="btn-primary" onClick={openCreate} data-testid="new-user">
+                <Plus size={16} aria-hidden="true" />
                 Nuevo usuario
               </button>
             </div>
@@ -558,6 +560,7 @@ export function UsersPage() {
             </label>
             <div className="modal-foot-actions">
               <button type="button" onClick={closeModal}>
+                <X size={16} aria-hidden="true" />
                 Cancelar
               </button>
               <button
@@ -566,6 +569,7 @@ export function UsersPage() {
                 disabled={createMut.isPending}
                 data-testid="user-save"
               >
+                <Check size={16} aria-hidden="true" />
                 {primaryLabel}
               </button>
             </div>
@@ -597,6 +601,7 @@ export function UsersPage() {
           />
           <div className="modal-foot">
             <button type="button" onClick={() => setImporting(false)}>
+              <X size={16} aria-hidden="true" />
               Cerrar
             </button>
           </div>

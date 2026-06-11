@@ -20,6 +20,7 @@ import { EventsModule } from './events/events.module.js';
 import { FeatureFlagsModule } from './feature-flags/feature-flags.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MeModule } from './me/me.module.js';
+import { OrganizationModule } from './organization/organization.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProductFamiliesModule } from './product-families/product-families.module.js';
 import { ProductsModule } from './products/products.module.js';
@@ -73,6 +74,7 @@ const throttle = throttleConfig(process.env);
     DashboardModule,
     ZReportModule,
     MeModule,
+    OrganizationModule,
     DevicesModule,
     TimeClockModule,
     ApiKeysModule,

@@ -1,5 +1,6 @@
 import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { useConfirm } from '../components/ConfirmProvider.js';
@@ -258,6 +259,7 @@ export function CustomersSection() {
             </label>
             <div className="modal-foot-actions">
               <button type="button" onClick={() => setForm(null)}>
+                <X size={16} aria-hidden="true" />
                 Cancelar
               </button>
               <button
@@ -266,6 +268,7 @@ export function CustomersSection() {
                 disabled={!form.name.trim() || saveMut.isPending}
                 data-testid="b2b-customer-save"
               >
+                <Check size={16} aria-hidden="true" />
                 {saveMut.isPending ? 'Guardando…' : 'Guardar'}
               </button>
             </div>

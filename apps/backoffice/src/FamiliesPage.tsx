@@ -1,5 +1,6 @@
 import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { useConfirm } from './components/ConfirmProvider.js';
@@ -106,6 +107,8 @@ interface RowActions {
   onEdit: (n: FamilyNode) => void;
   onAddChild: (parentId: string) => void;
   onDelete: (n: FamilyNode) => void | Promise<void>;
+  // Atajo D-11: el contador navega a Catálogo filtrado por el nodo.
+  onOpenInCatalog?: (familyId: string) => void;
 }
 
 function FamilyRow({
@@ -201,35 +204,65 @@ function FamilyRow({
             </span>
           )}
         </span>
-        <span className="fam-count" data-testid="fam-count">
+        <button
+          type="button"
+          className="fam-count"
+          data-testid="fam-count"
+          title="Ver estos productos en Catálogo"
+          onClick={(e) => {
+            e.stopPropagation();
+            actions.onOpenInCatalog?.(node.id);
+          }}
+        >
           {actions.productCountOf(node)} productos
-        </span>
-        {selected && (
-          <span className="fam-actions" onClick={(e) => e.stopPropagation()}>
-            {moveOptions.length > 0 && (
-              <Select
-                className="fam-move-select"
-                value=""
-                onChange={(value) => {
-                  if (value) actions.onMoveTo(node.id, value);
-                }}
-                triggerLabel="Mover"
-                options={[{ value: '', label: 'Mover bajo…' }, ...moveOptions]}
-                ariaLabel="Mover bajo otra familia"
-                data-testid="fam-move-to"
-              />
-            )}
-            {!node.isArchetype && (
-              <button onClick={() => actions.onAddChild(node.id)} data-testid="fam-add-child">
-                + Subnivel
-              </button>
-            )}
-            <button onClick={() => actions.onEdit(node)}>Editar</button>
-            <button className="danger" onClick={() => void actions.onDelete(node)}>
-              Borrar
+        </button>
+        {/* U-13: las acciones de la fila están SIEMPRE visibles (atenuadas en
+            reposo, plenas al pasar el ratón o al seleccionar la fila). */}
+        <span
+          className={`fam-actions${selected ? ' is-selected' : ''}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {moveOptions.length > 0 && (
+            <Select
+              className="fam-move-select"
+              value=""
+              onChange={(value) => {
+                if (value) actions.onMoveTo(node.id, value);
+              }}
+              triggerLabel="Mover"
+              options={[{ value: '', label: 'Mover bajo…' }, ...moveOptions]}
+              ariaLabel="Mover bajo otra familia"
+              data-testid="fam-move-to"
+            />
+          )}
+          {!node.isArchetype && (
+            <button
+              className="fam-action-btn"
+              onClick={() => actions.onAddChild(node.id)}
+              data-testid="fam-add-child"
+              title="Añadir subfamilia"
+              aria-label={`Añadir subfamilia a ${node.name}`}
+            >
+              <Plus size={15} aria-hidden="true" />
             </button>
-          </span>
-        )}
+          )}
+          <button
+            className="fam-action-btn"
+            onClick={() => actions.onEdit(node)}
+            title="Editar"
+            aria-label={`Editar ${node.name}`}
+          >
+            <Pencil size={15} aria-hidden="true" />
+          </button>
+          <button
+            className="fam-action-btn danger"
+            onClick={() => void actions.onDelete(node)}
+            title="Borrar"
+            aria-label={`Borrar ${node.name}`}
+          >
+            <Trash2 size={15} aria-hidden="true" />
+          </button>
+        </span>
       </div>
       {!collapsed &&
         node.children.map((c) => (
@@ -438,7 +471,7 @@ export function FamiliesPage({
     if (n > 0) {
       const ok = await confirm({
         title: 'Borrar familia',
-        message: `"${node.name}" tiene ${n} subnivel(es). ¿Borrar todo el grupo?`,
+        message: `"${node.name}" tiene ${n} subfamilia(s). ¿Borrar todo el grupo?`,
         confirmLabel: 'Borrar',
         danger: true,
       });
@@ -575,6 +608,7 @@ export function FamiliesPage({
             }
             data-testid="new-family"
           >
+            <Plus size={16} aria-hidden="true" />
             Nueva familia
           </button>
         </div>
@@ -622,7 +656,7 @@ export function FamiliesPage({
                       onChange={(e) => setIncludeSubtree(e.target.checked)}
                       data-testid="fam-panel-subtree"
                     />
-                    <span>Incluir subniveles</span>
+                    <span>Incluir subfamilias</span>
                   </label>
                 )}
                 {panelProducts.length === 0 ? (
@@ -695,7 +729,9 @@ export function FamiliesPage({
             saveMut.mutate(form);
           }}
         >
-          <h3>{form.id ? 'Editar familia' : form.parentId ? 'Nuevo subnivel' : 'Nueva familia'}</h3>
+          <h3>
+            {form.id ? 'Editar familia' : form.parentId ? 'Nueva subfamilia' : 'Nueva familia'}
+          </h3>
           <label>
             Nombre
             <input
@@ -746,16 +782,19 @@ export function FamiliesPage({
               onChange={(e) => setForm({ ...form, isArchetype: e.target.checked })}
               data-testid="family-archetype"
             />
-            <span>Es un arquetipo (agrupa productos casi idénticos; no admite subniveles)</span>
+            <span>Es un arquetipo (agrupa productos casi idénticos; no admite subfamilias)</span>
           </label>
           {form.hasChildren && (
-            <p className="muted">Tiene subniveles: vacíalos para poder convertirlo en arquetipo.</p>
+            <p className="muted">
+              Tiene subfamilias: vacíalas para poder convertirlo en arquetipo.
+            </p>
           )}
           {saveMut.isError && (
             <p className="form-error">{formErrorMessage(saveMut.error, 'No se pudo guardar.')}</p>
           )}
           <div className="modal-foot">
             <button type="button" onClick={() => setForm(null)}>
+              <X size={16} aria-hidden="true" />
               Cancelar
             </button>
             <button
@@ -764,6 +803,7 @@ export function FamiliesPage({
               disabled={saveMut.isPending}
               data-testid="family-save"
             >
+              <Check size={16} aria-hidden="true" />
               {saveMut.isPending ? 'Guardando…' : 'Guardar'}
             </button>
           </div>

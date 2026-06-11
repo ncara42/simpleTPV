@@ -1,5 +1,6 @@
 import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { useConfirm } from '../components/ConfirmProvider.js';
@@ -144,6 +145,7 @@ function PriceListDetail({
       </div>
       <div className="modal-foot modal-foot-actions">
         <button type="button" onClick={onClose}>
+          <X size={16} aria-hidden="true" />
           Cerrar
         </button>
       </div>
@@ -276,6 +278,7 @@ export function PriceListsSection() {
           </div>
           <div className="modal-foot modal-foot-actions">
             <button type="button" onClick={() => setCreating(false)}>
+              <X size={16} aria-hidden="true" />
               Cancelar
             </button>
             <button
@@ -283,6 +286,7 @@ export function PriceListsSection() {
               className="btn-primary"
               disabled={!newName.trim() || createMut.isPending}
             >
+              <Plus size={16} aria-hidden="true" />
               Crear
             </button>
           </div>

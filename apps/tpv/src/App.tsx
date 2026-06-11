@@ -14,6 +14,7 @@ import { CashPanel } from './CashPanel.js';
 import { ConnectivityBanner } from './ConnectivityBanner.js';
 import { InventoryPanel } from './InventoryPanel.js';
 import { api, useAuthStore } from './lib/auth.js';
+import { useBranding } from './lib/branding.js';
 import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { formatDuration } from './lib/format.js';
@@ -54,6 +55,8 @@ function ShellTopBar() {
 function Home() {
   const logout = useAuthStore((s) => s.clear);
   const [view, setView] = useState<View>('sale');
+  // U-08: tema corporativo compartido con el backoffice (color + logo).
+  const branding = useBranding();
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
   const activeStore = stores[0]?.id ?? null;
 
@@ -75,6 +78,11 @@ function Home() {
         items={navItems}
         activeItem={view}
         onSelect={(id) => setView(id as View)}
+        logo={
+          branding?.logoUrl ? (
+            <img className="sidebar-logo-img" src={branding.logoUrl} alt="Logo" />
+          ) : undefined
+        }
         brand={{ title: 'SimpleTPV', subtitle: 'Punto de venta' }}
         account={{ name: 'Usuario', subtitle: 'Dependiente' }}
         onLogout={logout}

@@ -18,6 +18,7 @@ export { Select, type SelectOption, type SelectProps } from './components/Select
 export { type NavGroup, type NavItem, Sidebar, type SidebarProps } from './components/Sidebar.js';
 export { Sparkline, type SparklineProps, type SparklineTone } from './components/Sparkline.js';
 export { TopBar, type TopBarProps } from './components/TopBar.js';
+export { applyBrandColor, type Branding, relativeLuminance } from './lib/brand.js';
 export { cn } from './lib/cn.js';
 export { initials } from './lib/initials.js';
 export { siblingAppUrl } from './lib/nav.js';

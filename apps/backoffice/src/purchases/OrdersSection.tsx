@@ -1,5 +1,6 @@
 import type { PurchaseOrder } from '@simpletpv/auth';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
@@ -185,6 +186,7 @@ function OrderDetailModal({ id, onClose }: { id: string; onClose: () => void }) 
                 onClick={() => receiveMut.mutate(order)}
                 data-testid="receive-confirm"
               >
+                <Check size={16} aria-hidden="true" />
                 Confirmar recepción
               </button>
             </div>
@@ -193,6 +195,7 @@ function OrderDetailModal({ id, onClose }: { id: string; onClose: () => void }) 
       )}
       <div className="modal-foot">
         <button type="button" onClick={onClose}>
+          <X size={16} aria-hidden="true" />
           Cerrar
         </button>
       </div>
