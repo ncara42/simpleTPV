@@ -1,13 +1,15 @@
-import { stockLevel } from '@simpletpv/auth';
-import { Select } from '@simpletpv/ui';
+import { type StockGlobalRow, stockLevel } from '@simpletpv/auth';
+import { DataTable, type DataTableColumn, type DataTableSort, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
+import { useTableColumns } from '../components/useTableColumns.js';
 import { listStores } from '../lib/admin.js';
 import { listFamilies } from '../lib/families.js';
-import { getGlobalStock, listAlerts, listMovements, setMinStock } from '../lib/stock.js';
-import { ALERT_LABEL, dt, LEVEL_LABEL, MOVEMENT_LABEL, ROTATION_LABEL } from './labels.js';
+import { formErrorMessage } from '../lib/form-error.js';
+import { adjustStock, getGlobalStock, listAlerts, setMinStock } from '../lib/stock.js';
+import { ALERT_LABEL, LEVEL_LABEL, ROTATION_LABEL } from './labels.js';
 
 interface AdjustState {
   productId: string;
@@ -16,6 +18,8 @@ interface AdjustState {
   storeName: string;
   quantity: string;
   min: string;
+  // Motivo del ajuste (obligatorio en POST /stock/adjust; auditoría).
+  reason: string;
 }
 
 export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string | null }) {
@@ -25,10 +29,9 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
   const [storeId, setStoreId] = useState(initialStoreId ?? '');
   const [rotation, setRotation] = useState('');
   const [adjusting, setAdjusting] = useState<AdjustState | null>(null);
-  const [movementsFor, setMovementsFor] = useState<string | null>(null);
-  const [qtyOverlay, setQtyOverlay] = useState<Record<string, number>>({});
   // Solo productos con alguna tienda en alerta (rotura o bajo mínimo).
   const [alertsOnly, setAlertsOnly] = useState(false);
+  const [sort, setSort] = useState<DataTableSort | undefined>(undefined);
   // Desglose por tienda plegado por defecto: la fila no crece con N tiendas. Se
   // expande bajo demanda mostrando la mini-tabla por tienda.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -65,18 +68,30 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
     queryFn: listStores,
   });
 
-  const minMutation = useMutation({
-    mutationFn: setMinStock,
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['stock-alerts'] }),
+  // Ajuste REAL (E-01): la cantidad va a POST /stock/adjust (movimiento
+  // ADJUSTMENT auditable) y el mínimo a PUT /stock/min; al terminar, refetch.
+  const adjustMutation = useMutation({
+    mutationFn: async (a: AdjustState) => {
+      await adjustStock({
+        productId: a.productId,
+        storeId: a.storeId,
+        newQuantity: Number(a.quantity),
+        reason: a.reason.trim() || 'Ajuste manual desde backoffice',
+      });
+      await setMinStock({ productId: a.productId, storeId: a.storeId, minStock: Number(a.min) });
+    },
+    onSuccess: () => {
+      setAdjusting(null);
+      void qc.invalidateQueries({ queryKey: ['stock-global'] });
+      void qc.invalidateQueries({ queryKey: ['stock-alerts'] });
+      void qc.invalidateQueries({ queryKey: ['stock-movements'] });
+    },
   });
 
-  const rows = rawRows.map((row) => {
-    const stores = row.stores.map((st) => {
-      const q = qtyOverlay[`${row.productId}:${st.storeId}`] ?? st.quantity;
-      return { ...st, quantity: q, level: stockLevel(q, st.minStock) };
-    });
-    return { ...row, stores, total: stores.reduce((acc, s) => acc + s.quantity, 0) };
-  });
+  const rows = rawRows.map((row) => ({
+    ...row,
+    stores: row.stores.map((st) => ({ ...st, level: stockLevel(st.quantity, st.minStock) })),
+  }));
 
   const storeOptions = stores.map((s) => ({ id: s.id, name: s.name }));
 
@@ -95,19 +110,130 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
   const criticalAlerts = alerts.filter((a) => a.severity === 'critical').length;
   const softAlerts = alerts.length - criticalAlerts;
 
-  const saveAdjust = (): void => {
-    if (!adjusting) return;
-    setQtyOverlay((prev) => ({
-      ...prev,
-      [`${adjusting.productId}:${adjusting.storeId}`]: Number(adjusting.quantity),
-    }));
-    minMutation.mutate({
-      productId: adjusting.productId,
-      storeId: adjusting.storeId,
-      minStock: Number(adjusting.min),
+  // Fila enriquecida para el DataTable: tiendas visibles según el filtro.
+  type StockRow = (typeof rows)[number];
+  const singleStore = Boolean(storeId);
+  const visibleStoresOf = (row: StockRow) =>
+    storeId ? row.stores.filter((s) => s.storeId === storeId) : row.stores;
+  const openAdjust = (row: StockRow, st: StockGlobalRow['stores'][number]): void =>
+    setAdjusting({
+      productId: row.productId,
+      productName: row.productName,
+      storeId: st.storeId,
+      storeName: st.storeName,
+      quantity: String(st.quantity),
+      min: String(st.minStock),
+      reason: '',
     });
-    setAdjusting(null);
+
+  const saveAdjust = (): void => {
+    if (!adjusting || adjustMutation.isPending) return;
+    adjustMutation.mutate(adjusting);
   };
+
+  // Columnas del DataTable. D-12: Producto · Por tienda · Total · Rotación (la
+  // columna Familia anterior siempre pintaba "—": eliminada). La acción
+  // Movimientos va fija fuera de la configuración (I-12 la reubicará).
+  const dataColumns: DataTableColumn<StockRow>[] = [
+    { key: 'product', header: 'Producto', sortable: true, render: (r) => r.productName },
+    {
+      key: 'rotation',
+      header: 'Rotación',
+      render: (r) => (
+        <span
+          className={`rotation-meter rotation-${r.rotation}`}
+          title={`Rotación ${ROTATION_LABEL[r.rotation].toLowerCase()}`}
+        >
+          <span className="rotation-bars" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          <span className="rotation-label">{ROTATION_LABEL[r.rotation]}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'stores',
+      header: singleStore
+        ? (storeOptions.find((s) => s.id === storeId)?.name ?? 'Tienda')
+        : 'Por tienda',
+      render: (row) => {
+        const visibleStores = visibleStoresOf(row);
+        if (singleStore) {
+          return visibleStores.map((st) => (
+            <button
+              type="button"
+              key={st.storeId}
+              className="stock-store-inline"
+              onClick={() => openAdjust(row, st)}
+              data-testid="stock-store-cell"
+              title={`${LEVEL_LABEL[st.level]} · mín ${st.minStock} · clic para ajustar`}
+            >
+              <span className={`stock-store-dot sb-${st.level}`} aria-hidden="true" />
+              <span className="stock-store-item-qty">{st.quantity}</span>
+            </button>
+          ));
+        }
+        const isExpanded = expanded.has(row.productId);
+        const alertN = visibleStores.filter((s) => s.level !== 'green').length;
+        return (
+          <button
+            type="button"
+            className="stock-heatmap"
+            onClick={() => toggleExpanded(row.productId)}
+            aria-expanded={isExpanded}
+            data-testid="stock-heatmap"
+          >
+            <span className="stock-heat-dots" aria-hidden="true">
+              {visibleStores.map((st) => (
+                <span
+                  key={st.storeId}
+                  className={`stock-heat-dot sb-${st.level}`}
+                  title={`${st.storeName}: ${st.quantity}`}
+                />
+              ))}
+            </span>
+            <span className="stock-heat-meta">
+              {visibleStores.length} {visibleStores.length === 1 ? 'tienda' : 'tiendas'}
+              {alertN > 0 && <span className="stock-heat-alert"> · {alertN} en alerta</span>}
+            </span>
+            <span className="stock-heat-caret" aria-hidden="true">
+              {isExpanded ? '▾' : '▸'}
+            </span>
+          </button>
+        );
+      },
+    },
+    {
+      key: 'total',
+      header: 'Total',
+      align: 'right',
+      sortable: true,
+      render: (row) => (
+        <strong>{singleStore ? (visibleStoresOf(row)[0]?.quantity ?? 0) : row.total}</strong>
+      ),
+    },
+  ];
+  const {
+    effectiveColumns,
+    editor: columnsEditor,
+    editorOpen: columnsEditorOpen,
+    toggleEditor: toggleColumnsEditor,
+  } = useTableColumns('table.stock.columns', dataColumns, {
+    editorTestId: 'stock-columns-editor',
+    title: 'Columnas de stock',
+  });
+  const tableColumns = effectiveColumns;
+
+  // Orden cliente por producto/total.
+  const sortedRows = sort
+    ? [...filtered].sort((a, b) => {
+        const dir = sort.dir === 'desc' ? -1 : 1;
+        if (sort.key === 'total') return (a.total - b.total) * dir;
+        return a.productName.localeCompare(b.productName) * dir;
+      })
+    : filtered;
 
   return (
     <>
@@ -128,10 +254,10 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
               className="catalog-search"
               value={familyId}
               onChange={(value) => setFamilyId(value)}
-              ariaLabel="Filtrar por arquetipo"
+              ariaLabel="Filtrar por familia"
               data-testid="stock-family"
               options={[
-                { value: '', label: 'Todos los arquetipos' },
+                { value: '', label: 'Todas las familias' },
                 ...families.map((f) => ({ value: f.id, label: f.name })),
               ]}
             />
@@ -209,159 +335,58 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
           </div>
         )}
 
-        {isLoading ? (
-          <p className="catalog-empty">Cargando…</p>
-        ) : filtered.length === 0 ? (
-          <p className="catalog-empty" data-testid="stock-empty">
-            Sin productos para los filtros seleccionados.
-          </p>
-        ) : (
-          <table className="catalog-table" data-testid="stock-table">
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Arquetipo</th>
-                <th>Rotación</th>
-                <th>{storeId ? storeOptions.find((s) => s.id === storeId)?.name : 'Por tienda'}</th>
-                <th>Total</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((row) => {
-                const visibleStores = storeId
-                  ? row.stores.filter((s) => s.storeId === storeId)
-                  : row.stores;
-                const rot = row.rotation;
-                const singleStore = Boolean(storeId);
-                const isExpanded = expanded.has(row.productId);
-                const alertN = visibleStores.filter((s) => s.level !== 'green').length;
-                // Abre el ajuste de existencias para una tienda concreta del producto.
-                const openAdjust = (st: (typeof visibleStores)[number]): void =>
-                  setAdjusting({
-                    productId: row.productId,
-                    productName: row.productName,
-                    storeId: st.storeId,
-                    storeName: st.storeName,
-                    quantity: String(st.quantity),
-                    min: String(st.minStock),
-                  });
-                return (
-                  <Fragment key={row.productId}>
-                    <tr data-testid="stock-row">
-                      <td>{row.productName}</td>
-                      <td className="muted">—</td>
-                      <td>
-                        <span
-                          className={`rotation-meter rotation-${rot}`}
-                          title={`Rotación ${ROTATION_LABEL[rot].toLowerCase()}`}
-                        >
-                          <span className="rotation-bars" aria-hidden="true">
-                            <i />
-                            <i />
-                            <i />
-                          </span>
-                          <span className="rotation-label">{ROTATION_LABEL[rot]}</span>
-                        </span>
-                      </td>
-                      <td>
-                        {singleStore ? (
-                          // Filtrado a una tienda: punto de nivel + clic para ajustar.
-                          visibleStores.map((st) => (
-                            <button
-                              type="button"
-                              key={st.storeId}
-                              className="stock-store-inline"
-                              onClick={() => openAdjust(st)}
-                              data-testid="stock-store-cell"
-                              title={`${LEVEL_LABEL[st.level]} · mín ${st.minStock} · clic para ajustar`}
-                            >
-                              <span
-                                className={`stock-store-dot sb-${st.level}`}
-                                aria-hidden="true"
-                              />
-                              <span className="stock-store-item-qty">{st.quantity}</span>
-                            </button>
-                          ))
-                        ) : (
-                          // Vista global: heatmap compacto plegable. La fila no crece
-                          // con N tiendas; el desglose se abre bajo demanda.
-                          <button
-                            type="button"
-                            className="stock-heatmap"
-                            onClick={() => toggleExpanded(row.productId)}
-                            aria-expanded={isExpanded}
-                            data-testid="stock-heatmap"
-                          >
-                            <span className="stock-heat-dots" aria-hidden="true">
-                              {visibleStores.map((st) => (
-                                <span
-                                  key={st.storeId}
-                                  className={`stock-heat-dot sb-${st.level}`}
-                                  title={`${st.storeName}: ${st.quantity}`}
-                                />
-                              ))}
-                            </span>
-                            <span className="stock-heat-meta">
-                              {visibleStores.length}{' '}
-                              {visibleStores.length === 1 ? 'tienda' : 'tiendas'}
-                              {alertN > 0 && (
-                                <span className="stock-heat-alert"> · {alertN} en alerta</span>
-                              )}
-                            </span>
-                            <span className="stock-heat-caret" aria-hidden="true">
-                              {isExpanded ? '▾' : '▸'}
-                            </span>
-                          </button>
-                        )}
-                      </td>
-                      <td>
-                        <strong>
-                          {singleStore ? (visibleStores[0]?.quantity ?? 0) : row.total}
-                        </strong>
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="link-btn"
-                          onClick={() => setMovementsFor(row.productId)}
-                          data-testid="stock-history"
-                        >
-                          Movimientos
-                        </button>
-                      </td>
-                    </tr>
-                    {!singleStore && isExpanded && (
-                      <tr className="stock-detail-row" data-testid="stock-detail-row">
-                        <td colSpan={6}>
-                          <div className="stock-store-list">
-                            {visibleStores.map((st) => (
-                              <button
-                                type="button"
-                                key={st.storeId}
-                                className="stock-store-item"
-                                onClick={() => openAdjust(st)}
-                                data-testid="stock-store-cell"
-                                title={`${LEVEL_LABEL[st.level]} · mín ${st.minStock} · clic para ajustar`}
-                              >
-                                <span
-                                  className={`stock-store-dot sb-${st.level}`}
-                                  aria-hidden="true"
-                                />
-                                <span className="stock-store-item-name">{st.storeName}</span>
-                                <span className="stock-store-item-qty">{st.quantity}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+        <div className="config-bar">
+          <button
+            type="button"
+            className="config-trigger"
+            onClick={toggleColumnsEditor}
+            data-testid="stock-columns-toggle"
+            aria-expanded={columnsEditorOpen}
+          >
+            Columnas
+          </button>
+        </div>
+        {columnsEditor}
+        <DataTable
+          columns={tableColumns}
+          rows={sortedRows}
+          rowKey={(r) => r.productId}
+          loading={isLoading}
+          {...(sort ? { sort } : {})}
+          onSortChange={(key) =>
+            setSort((cur) =>
+              cur?.key === key
+                ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' }
+                : { key, dir: 'asc' },
+            )
+          }
+          rowTestId="stock-row"
+          renderDetail={(row) => {
+            if (singleStore || !expanded.has(row.productId)) return null;
+            return (
+              <div className="stock-store-list" data-testid="stock-detail-row">
+                {visibleStoresOf(row).map((st) => (
+                  <button
+                    type="button"
+                    key={st.storeId}
+                    className="stock-store-item"
+                    onClick={() => openAdjust(row, st)}
+                    data-testid="stock-store-cell"
+                    title={`${LEVEL_LABEL[st.level]} · mín ${st.minStock} · clic para ajustar`}
+                  >
+                    <span className={`stock-store-dot sb-${st.level}`} aria-hidden="true" />
+                    <span className="stock-store-item-name">{st.storeName}</span>
+                    <span className="stock-store-item-qty">{st.quantity}</span>
+                  </button>
+                ))}
+              </div>
+            );
+          }}
+          emptyState={
+            <span data-testid="stock-empty">Sin productos para los filtros seleccionados.</span>
+          }
+          data-testid="stock-table"
+        />
       </div>
 
       {adjusting && (
@@ -396,6 +421,20 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
               />
             </label>
           </div>
+          <label>
+            Motivo
+            <input
+              placeholder="Recuento, merma, rotura…"
+              value={adjusting.reason}
+              onChange={(e) => setAdjusting({ ...adjusting, reason: e.target.value })}
+              data-testid="stock-adjust-reason"
+            />
+          </label>
+          {adjustMutation.isError && (
+            <p className="form-error">
+              {formErrorMessage(adjustMutation.error, 'No se pudo guardar el ajuste.')}
+            </p>
+          )}
           <div className="modal-foot">
             <button type="button" onClick={() => setAdjusting(null)}>
               Cancelar
@@ -404,63 +443,14 @@ export function GlobalStockSection({ initialStoreId }: { initialStoreId?: string
               type="button"
               className="btn-primary"
               onClick={saveAdjust}
+              disabled={adjustMutation.isPending}
               data-testid="stock-adjust-save"
             >
-              Guardar
+              {adjustMutation.isPending ? 'Guardando…' : 'Guardar'}
             </button>
           </div>
         </Modal>
       )}
-
-      {movementsFor && (
-        <MovementsModal productId={movementsFor} onClose={() => setMovementsFor(null)} />
-      )}
     </>
-  );
-}
-
-function MovementsModal({ productId, onClose }: { productId: string; onClose: () => void }) {
-  const { data, isLoading } = useQuery({
-    queryKey: ['stock-movements', productId],
-    queryFn: () => listMovements(productId),
-  });
-
-  return (
-    <Modal onClose={onClose} testId="movements-modal" ariaLabel="Movimientos de stock">
-      <h3>Movimientos de stock</h3>
-      {isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : !data || data.items.length === 0 ? (
-        <p className="catalog-empty" data-testid="movements-empty">
-          Sin movimientos.
-        </p>
-      ) : (
-        <table className="catalog-table" data-testid="movements-table">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Tipo</th>
-              <th>Cantidad</th>
-              <th>Motivo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.items.map((m) => (
-              <tr key={m.id} data-testid="movement-row">
-                <td className="muted">{dt.format(new Date(m.createdAt))}</td>
-                <td>{MOVEMENT_LABEL[m.type] ?? m.type}</td>
-                <td>{m.quantity}</td>
-                <td className="muted">{m.reason ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <div className="modal-foot">
-        <button type="button" onClick={onClose}>
-          Cerrar
-        </button>
-      </div>
-    </Modal>
   );
 }

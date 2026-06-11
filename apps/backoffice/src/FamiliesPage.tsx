@@ -5,6 +5,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useConfirm } from './components/ConfirmProvider.js';
 import { Modal } from './components/Modal.js';
 import {
+  EMPTY_PRODUCT_FORM,
+  ProductFormModal,
+  type ProductFormState,
+} from './components/ProductFormModal.js';
+import {
   createFamily,
   deleteFamily,
   type FamilyNode,
@@ -23,7 +28,10 @@ import {
   renumberSiblings,
   reorderSiblings,
 } from './lib/family-tree.js';
+import { formErrorMessage } from './lib/form-error.js';
+import { fmtEur } from './lib/format.js';
 import { usePageHeader } from './lib/pageHeader.js';
+import { createProduct, listProducts, updateProduct } from './lib/products.js';
 
 interface FormState {
   id?: string;
@@ -33,7 +41,23 @@ interface FormState {
   isArchetype: boolean;
   // Si el nodo editado ya tiene subniveles, no puede convertirse en arquetipo.
   hasChildren: boolean;
+  color: string | null;
+  icon: string | null;
 }
+
+// Paleta acotada (colores del seed + acentos del design system) e iconos
+// curados (I-14): nada de pickers libres — consistencia visual garantizada.
+const FAMILY_COLORS = [
+  '#4CAF50',
+  '#FFC107',
+  '#E91E63',
+  '#607D8B',
+  '#0066cc',
+  '#9C27B0',
+  '#FF7043',
+  '#14b8a6',
+];
+const FAMILY_ICONS = ['🌿', '💧', '🧴', '🛍️', '🍬', '🔥', '🌸', '📦'];
 
 // Normaliza para buscar sin distinguir mayúsculas ni acentos.
 const norm = (s: string): string =>
@@ -64,6 +88,8 @@ function saveCollapsed(ids: Set<string>): void {
 
 interface RowActions {
   roots: FamilyNode[];
+  // Contador real de productos del subárbol del nodo (E-16).
+  productCountOf: (node: FamilyNode) => number;
   selectedId: string | null;
   onSelect: (id: string) => void;
   // Nodos plegados (sus hijas no se muestran). Vacío mientras se busca.
@@ -98,10 +124,9 @@ function FamilyRow({
   const selected = actions.selectedId === node.id;
   const hasChildren = node.children.length > 0;
   const collapsed = actions.collapsedIds.has(node.id);
-  // Destinos válidos para "Mover": cualquier arquetipo salvo el propio subárbol y
-  // el padre actual. La sangría del label indica la profundidad del destino.
-  // Destinos válidos: no el propio subárbol, no el padre actual, y NUNCA un
-  // arquetipo (un arquetipo solo contiene productos, no subniveles).
+  // Destinos válidos para "Mover": cualquier familia/subfamilia salvo el propio
+  // subárbol y el padre actual; NUNCA un arquetipo (solo contiene productos).
+  // La sangría del label indica la profundidad del destino.
   const moveOptions = flattenTree(actions.roots)
     .filter(
       (f) =>
@@ -177,7 +202,7 @@ function FamilyRow({
           )}
         </span>
         <span className="fam-count" data-testid="fam-count">
-          {(node as { productCount?: number }).productCount ?? 0} productos
+          {actions.productCountOf(node)} productos
         </span>
         {selected && (
           <span className="fam-actions" onClick={(e) => e.stopPropagation()}>
@@ -190,7 +215,7 @@ function FamilyRow({
                 }}
                 triggerLabel="Mover"
                 options={[{ value: '', label: 'Mover bajo…' }, ...moveOptions]}
-                ariaLabel="Mover bajo otro arquetipo"
+                ariaLabel="Mover bajo otra familia"
                 data-testid="fam-move-to"
               />
             )}
@@ -214,7 +239,12 @@ function FamilyRow({
   );
 }
 
-export function FamiliesPage() {
+export function FamiliesPage({
+  onOpenCatalogFamily,
+}: {
+  // Atajo del contador "X productos": navega a Catálogo filtrado por el nodo.
+  onOpenCatalogFamily?: (familyId: string) => void;
+} = {}) {
   const qc = useQueryClient();
   const confirm = useConfirm();
   const [form, setForm] = useState<FormState | null>(null);
@@ -247,6 +277,19 @@ export function FamiliesPage() {
     }
   }, [serverTree, tree]);
   const view = tree ?? serverTree;
+
+  // Productos completos: alimentan el panel del nodo (I-13) y el contador REAL
+  // por subárbol de cada fila (E-16), coherente con el filtro de Catálogo.
+  const { data: allProducts = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => listProducts(),
+  });
+  const directCount = new Map<string, number>();
+  for (const p of allProducts) {
+    if (p.familyId) directCount.set(p.familyId, (directCount.get(p.familyId) ?? 0) + 1);
+  }
+  const subtreeCount = (n: FamilyNode): number =>
+    (directCount.get(n.id) ?? 0) + n.children.reduce((acc, c) => acc + subtreeCount(c), 0);
 
   // Vista filtrada por la toolbar (no muta el árbol: el reordenado y "Mover a"
   // siguen operando sobre `view`). Una raíz que coincide se muestra entera; si solo
@@ -294,8 +337,19 @@ export function FamiliesPage() {
   const saveMut = useMutation({
     mutationFn: (f: FormState) =>
       f.id
-        ? updateFamily(f.id, { name: f.name, isArchetype: f.isArchetype })
-        : createFamily({ name: f.name, parentId: f.parentId, isArchetype: f.isArchetype }),
+        ? updateFamily(f.id, {
+            name: f.name,
+            isArchetype: f.isArchetype,
+            color: f.color,
+            icon: f.icon,
+          })
+        : createFamily({
+            name: f.name,
+            parentId: f.parentId,
+            isArchetype: f.isArchetype,
+            color: f.color,
+            icon: f.icon,
+          }),
     onSuccess: (saved, f) => {
       setTree((prev) => {
         const base = prev ?? view;
@@ -304,7 +358,7 @@ export function FamiliesPage() {
           const rename = (list: FamilyNode[]): FamilyNode[] =>
             list.map((n) =>
               n.id === f.id
-                ? { ...n, name: f.name, isArchetype: f.isArchetype }
+                ? { ...n, name: f.name, isArchetype: f.isArchetype, color: f.color, icon: f.icon }
                 : { ...n, children: rename(n.children) },
             );
           return rename(base);
@@ -383,7 +437,7 @@ export function FamiliesPage() {
     const n = countDescendants(node);
     if (n > 0) {
       const ok = await confirm({
-        title: 'Borrar arquetipo',
+        title: 'Borrar familia',
         message: `"${node.name}" tiene ${n} subnivel(es). ¿Borrar todo el grupo?`,
         confirmLabel: 'Borrar',
         danger: true,
@@ -397,6 +451,7 @@ export function FamiliesPage() {
 
   const actions: RowActions = {
     roots: view,
+    productCountOf: subtreeCount,
     selectedId,
     onSelect: toggleSelected,
     // Al buscar se ignora el plegado para que las coincidencias siempre se vean.
@@ -417,13 +472,68 @@ export function FamiliesPage() {
         parentId: node.parentId,
         isArchetype: node.isArchetype,
         hasChildren: node.children.length > 0,
+        color: node.color,
+        icon: node.icon,
       }),
     onAddChild: (parentId) =>
-      setForm({ name: '', parentId, isArchetype: false, hasChildren: false }),
+      setForm({
+        name: '',
+        parentId,
+        isArchetype: false,
+        hasChildren: false,
+        color: null,
+        icon: null,
+      }),
     onDelete,
   };
 
-  usePageHeader('Arquetipos', 'Agrupa los productos en arquetipos y subniveles');
+  usePageHeader('Familias', 'Organiza el catálogo en familias, subfamilias y arquetipos');
+
+  // ── Panel de productos del nodo seleccionado (I-13 / D-11) ──
+  const selectedNode = selectedId ? findNode(view, selectedId) : null;
+  // En familias/subfamilias, alternar entre productos directos y todo el subárbol.
+  const [includeSubtree, setIncludeSubtree] = useState(false);
+  const panelProducts = selectedNode
+    ? allProducts.filter((p) =>
+        p.familyId == null
+          ? false
+          : includeSubtree && !selectedNode.isArchetype
+            ? isDescendantOf(view, selectedNode.id, p.familyId)
+            : p.familyId === selectedNode.id,
+      )
+    : [];
+  // Destinos de "mover producto": cualquier nodo del árbol (sangría por profundidad).
+  const productMoveOptions = flattenTree(view).map((f) => ({
+    value: f.node.id,
+    label: `${'– '.repeat(f.depth)}${f.node.name}`,
+  }));
+  const invalidateProducts = () => {
+    void qc.invalidateQueries({ queryKey: ['products'] });
+    void qc.invalidateQueries({ queryKey: ['families'] }); // contadores
+  };
+  const moveProductMut = useMutation({
+    mutationFn: ({ id, familyId }: { id: string; familyId: string }) =>
+      updateProduct(id, { familyId }),
+    onSuccess: invalidateProducts,
+  });
+  // Alta de producto con el nodo precargado (reusa el ProductFormModal de I-11).
+  const [productForm, setProductForm] = useState<ProductFormState | null>(null);
+  const createProductMut = useMutation({
+    mutationFn: (f: ProductFormState) =>
+      createProduct({
+        name: f.name,
+        salePrice: Number(f.salePrice),
+        sku: f.sku || null,
+        barcode: f.barcode || null,
+        costPrice: Number(f.costPrice ?? 0),
+        taxRate: Number(f.taxRate ?? 21),
+        familyId: f.familyId,
+      }),
+    onSuccess: () => {
+      setProductForm(null);
+      invalidateProducts();
+    },
+  });
 
   return (
     <section className="catalog">
@@ -433,7 +543,7 @@ export function FamiliesPage() {
             <span className="search-field">
               <input
                 className="catalog-search"
-                placeholder="Buscar arquetipo…"
+                placeholder="Buscar familia…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 data-testid="fam-search"
@@ -446,7 +556,7 @@ export function FamiliesPage() {
               ariaLabel="Filtrar por familia"
               data-testid="fam-filter"
               options={[
-                { value: '', label: 'Todos los arquetipos' },
+                { value: '', label: 'Todas las familias' },
                 ...view.map((r) => ({ value: r.id, label: r.name })),
               ]}
             />
@@ -454,11 +564,18 @@ export function FamiliesPage() {
           <button
             className="btn-primary"
             onClick={() =>
-              setForm({ name: '', parentId: null, isArchetype: false, hasChildren: false })
+              setForm({
+                name: '',
+                parentId: null,
+                isArchetype: false,
+                hasChildren: false,
+                color: null,
+                icon: null,
+              })
             }
             data-testid="new-family"
           >
-            Nuevo arquetipo
+            Nueva familia
           </button>
         </div>
 
@@ -466,20 +583,107 @@ export function FamiliesPage() {
           <p className="catalog-empty">Cargando…</p>
         ) : view.length === 0 ? (
           <p className="catalog-empty" data-testid="families-empty">
-            Sin arquetipos. Crea el primero.
+            Sin familias. Crea la primera.
           </p>
         ) : filtered.length === 0 ? (
           <p className="catalog-empty" data-testid="fam-empty">
-            Sin arquetipos para la búsqueda.
+            Sin familias para la búsqueda.
           </p>
         ) : (
-          <div className="fam-tree" data-testid="fam-tree" ref={treeRef}>
-            {filtered.map((n) => (
-              <FamilyRow key={n.id} node={n} depth={0} parentId={null} actions={actions} />
-            ))}
+          <div className={`fam-layout${selectedNode ? ' has-panel' : ''}`}>
+            <div className="fam-tree" data-testid="fam-tree" ref={treeRef}>
+              {filtered.map((n) => (
+                <FamilyRow key={n.id} node={n} depth={0} parentId={null} actions={actions} />
+              ))}
+            </div>
+
+            {/* Panel de productos del nodo (I-13/D-11): ver, añadir aquí y mover. */}
+            {selectedNode && (
+              <aside className="fam-products-panel" data-testid="fam-products-panel">
+                <header className="fam-panel-head">
+                  <h4>
+                    {selectedNode.name}
+                    {selectedNode.isArchetype && <span className="fam-badge">Arquetipo</span>}
+                  </h4>
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() => onOpenCatalogFamily?.(selectedNode.id)}
+                    data-testid="fam-panel-to-catalog"
+                  >
+                    Ver en Catálogo →
+                  </button>
+                </header>
+                {!selectedNode.isArchetype && (
+                  <label className="fam-subtree-toggle">
+                    <input
+                      type="checkbox"
+                      checked={includeSubtree}
+                      onChange={(e) => setIncludeSubtree(e.target.checked)}
+                      data-testid="fam-panel-subtree"
+                    />
+                    <span>Incluir subniveles</span>
+                  </label>
+                )}
+                {panelProducts.length === 0 ? (
+                  <p className="catalog-empty" data-testid="fam-panel-empty">
+                    Sin productos {includeSubtree ? 'en el subárbol' : 'directos en este nodo'}.
+                  </p>
+                ) : (
+                  <ul className="fam-product-list" data-testid="fam-product-list">
+                    {panelProducts.map((p) => (
+                      <li key={p.id} className="fam-product-item" data-testid="fam-product-item">
+                        <span className="fam-product-name">{p.name}</span>
+                        <span className="fam-product-price">{fmtEur(Number(p.salePrice))}</span>
+                        <Select
+                          className="fam-product-move"
+                          value=""
+                          onChange={(value) => {
+                            if (value && value !== p.familyId)
+                              moveProductMut.mutate({ id: p.id, familyId: value });
+                          }}
+                          triggerLabel="Mover"
+                          options={[{ value: '', label: 'Mover a…' }, ...productMoveOptions]}
+                          ariaLabel={`Mover ${p.name} a otro nodo`}
+                          data-testid="fam-product-move"
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <button
+                  type="button"
+                  className="btn-primary fam-panel-add"
+                  onClick={() =>
+                    setProductForm({ ...EMPTY_PRODUCT_FORM, familyId: selectedNode.id })
+                  }
+                  data-testid="fam-panel-add-product"
+                >
+                  Añadir producto aquí
+                </button>
+              </aside>
+            )}
           </div>
         )}
       </div>
+
+      {productForm && (
+        <ProductFormModal
+          form={productForm}
+          onChange={setProductForm}
+          onSubmit={() => createProductMut.mutate(productForm)}
+          onClose={() => setProductForm(null)}
+          familyOptions={productMoveOptions}
+          pending={createProductMut.isPending}
+          errorMessage={
+            createProductMut.isError
+              ? formErrorMessage(createProductMut.error, 'No se pudo crear el producto.')
+              : null
+          }
+          title={`Nuevo producto en ${selectedNode?.name ?? 'el nodo'}`}
+          primaryLabel={createProductMut.isPending ? 'Creando…' : 'Crear'}
+        />
+      )}
 
       {form && (
         <Modal
@@ -491,9 +695,7 @@ export function FamiliesPage() {
             saveMut.mutate(form);
           }}
         >
-          <h3>
-            {form.id ? 'Editar arquetipo' : form.parentId ? 'Nuevo subnivel' : 'Nuevo arquetipo'}
-          </h3>
+          <h3>{form.id ? 'Editar familia' : form.parentId ? 'Nuevo subnivel' : 'Nueva familia'}</h3>
           <label>
             Nombre
             <input
@@ -504,6 +706,38 @@ export function FamiliesPage() {
               data-testid="family-name"
             />
           </label>
+          <div className="fam-style-pickers">
+            <span className="form-section-title">Color</span>
+            <div className="fam-color-palette" role="radiogroup" aria-label="Color de la familia">
+              {FAMILY_COLORS.map((c) => (
+                <button
+                  type="button"
+                  key={c}
+                  className={`fam-color-swatch${form.color === c ? ' is-active' : ''}`}
+                  style={{ background: c }}
+                  aria-pressed={form.color === c}
+                  aria-label={`Color ${c}`}
+                  onClick={() => setForm({ ...form, color: form.color === c ? null : c })}
+                  data-testid={`family-color-${c.slice(1)}`}
+                />
+              ))}
+            </div>
+            <span className="form-section-title">Icono</span>
+            <div className="fam-icon-palette" role="radiogroup" aria-label="Icono de la familia">
+              {FAMILY_ICONS.map((i) => (
+                <button
+                  type="button"
+                  key={i}
+                  className={`fam-icon-swatch${form.icon === i ? ' is-active' : ''}`}
+                  aria-pressed={form.icon === i}
+                  onClick={() => setForm({ ...form, icon: form.icon === i ? null : i })}
+                  data-testid="family-icon-option"
+                >
+                  {i}
+                </button>
+              ))}
+            </div>
+          </div>
           <label className="fam-archetype-toggle">
             <input
               type="checkbox"
@@ -517,7 +751,9 @@ export function FamiliesPage() {
           {form.hasChildren && (
             <p className="muted">Tiene subniveles: vacíalos para poder convertirlo en arquetipo.</p>
           )}
-          {saveMut.isError && <p className="form-error">No se pudo guardar.</p>}
+          {saveMut.isError && (
+            <p className="form-error">{formErrorMessage(saveMut.error, 'No se pudo guardar.')}</p>
+          )}
           <div className="modal-foot">
             <button type="button" onClick={() => setForm(null)}>
               Cancelar

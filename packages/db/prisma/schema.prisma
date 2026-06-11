@@ -80,6 +80,11 @@ model Store {
   active         Boolean  @default(true)
   code           String
   ticketCounter  Int      @default(0)
+  // Estado operativo MANUAL persistido (D-10): verificada + nota de incidencia.
+  // El estado del dispositivo NO se guarda aquí: lo deriva la API de devices (D-10b).
+  opsVerified    Boolean   @default(false)
+  opsIncident    String?
+  opsUpdatedAt   DateTime?
   createdAt      DateTime @default(now())
 
   organization     Organization     @relation(fields: [organizationId], references: [id])

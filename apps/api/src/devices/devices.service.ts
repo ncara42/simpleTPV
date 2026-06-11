@@ -33,6 +33,31 @@ export class DevicesService {
     };
   }
 
+  // Lista los dispositivos de la organización (opcionalmente de una tienda),
+  // con su estado de emparejamiento. Para la gestión desde Tiendas (I-08).
+  async findAll(storeId?: string) {
+    const tenant = requireTenant();
+    const devices = await this.prisma.officialDevice.findMany({
+      where: { organizationId: tenant.organizationId, ...(storeId ? { storeId } : {}) },
+      orderBy: { createdAt: 'desc' },
+    });
+    return devices.map((d) => ({ ...this.publicDevice(d), authorized: d.authorized }));
+  }
+
+  // Revoca (elimina) un dispositivo: su token deja de autorizar el fichaje en el
+  // TPV inmediatamente (status volverá authorized=false).
+  async revoke(id: string): Promise<void> {
+    const tenant = requireTenant();
+    const device = await this.prisma.officialDevice.findFirst({
+      where: { id, organizationId: tenant.organizationId },
+      select: { id: true },
+    });
+    if (!device) {
+      throw new NotFoundException(`Dispositivo ${id} no encontrado`);
+    }
+    await this.prisma.officialDevice.delete({ where: { id } });
+  }
+
   async status(pairingToken?: string) {
     const tenant = requireTenant();
     if (!pairingToken) {

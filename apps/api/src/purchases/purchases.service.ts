@@ -75,8 +75,8 @@ export class PurchasesService {
     });
   }
 
-  /** Listado de pedidos del tenant, filtrable por estado. */
-  async list(status?: string) {
+  /** Listado de pedidos del tenant, filtrable por estado y/o proveedor (I-18). */
+  async list(status?: string, supplierId?: string) {
     const tenant = requireTenant();
     return this.prisma.purchaseOrder.findMany({
       where: {
@@ -84,6 +84,8 @@ export class PurchasesService {
         ...(status
           ? { status: status as 'DRAFT' | 'CONFIRMED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' }
           : {}),
+        // Vista detalle de proveedor (D-07): solo sus pedidos.
+        ...(supplierId ? { supplierId } : {}),
       },
       orderBy: { createdAt: 'desc' },
       include: { lines: true, supplier: { select: { name: true, leadTimeDays: true } } },

@@ -1,4 +1,4 @@
-import { IsString, IsUUID, MinLength } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class CreateDeviceDto {
   @IsUUID()
@@ -13,4 +13,10 @@ export class PairDeviceDto {
   @IsString()
   @MinLength(6)
   pairingToken!: string;
+}
+
+export class ListDevicesQueryDto {
+  @IsOptional()
+  @IsUUID()
+  storeId?: string;
 }

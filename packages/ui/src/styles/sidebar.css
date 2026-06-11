@@ -503,3 +503,47 @@
     animation: none;
   }
 }
+
+
+/* ─── Modo dropdown (D-02): grupos plegados a una entrada ─────────────
+   La cabecera del grupo se viste como un item (icono + label + chevron);
+   su contenido se despliega INLINE (acordeón) en el preview por hover
+   sostenido o anclado por clic. Solo un grupo abierto a la vez. */
+.sidebar-group--dd {
+  margin-top: 2px;
+}
+.sidebar-group-entry {
+  width: 100%;
+  justify-content: flex-start;
+}
+.sidebar-group-entry .sidebar-group-chevron {
+  margin-left: auto;
+  transition: transform 0.18s var(--ui-ease, ease);
+}
+.sidebar-group-entry .sidebar-group-chevron.open {
+  transform: rotate(180deg);
+}
+/* Anclado: tinte de seleccionado persistente para distinguirlo del preview. */
+.sidebar-group-entry.anchored {
+  background: var(--sidebar-item-active-bg, rgba(0, 0, 0, 0.06));
+}
+/* Contenido desplegado: sangrado suave + animación de entrada. */
+.sidebar-dd-items {
+  padding-left: 0.85rem;
+  animation: sidebar-dd-in 0.16s var(--ui-ease, ease);
+}
+@keyframes sidebar-dd-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-dd-items {
+    animation: none;
+  }
+}
