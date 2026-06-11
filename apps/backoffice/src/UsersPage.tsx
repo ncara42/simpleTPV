@@ -560,7 +560,6 @@ export function UsersPage() {
             </label>
             <div className="modal-foot-actions">
               <button type="button" onClick={closeModal}>
-                <X size={16} aria-hidden="true" />
                 Cancelar
               </button>
               <button
@@ -569,7 +568,6 @@ export function UsersPage() {
                 disabled={createMut.isPending}
                 data-testid="user-save"
               >
-                <Check size={16} aria-hidden="true" />
                 {primaryLabel}
               </button>
             </div>
@@ -601,7 +599,6 @@ export function UsersPage() {
           />
           <div className="modal-foot">
             <button type="button" onClick={() => setImporting(false)}>
-              <X size={16} aria-hidden="true" />
               Cerrar
             </button>
           </div>

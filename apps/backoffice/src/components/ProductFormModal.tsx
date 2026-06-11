@@ -1,5 +1,4 @@
 import { Select } from '@simpletpv/ui';
-import { Check, X } from 'lucide-react';
 
 import { fmtEur } from '../lib/format.js';
 import { Modal } from './Modal.js';
@@ -181,11 +180,9 @@ export function ProductFormModal({
       {errorMessage && <p className="form-error">{errorMessage}</p>}
       <div className="modal-foot">
         <button type="button" onClick={onClose}>
-          <X size={16} aria-hidden="true" />
           Cancelar
         </button>
         <button type="submit" className="btn-primary" disabled={pending} data-testid="form-save">
-          <Check size={16} aria-hidden="true" />
           {primaryLabel}
         </button>
       </div>

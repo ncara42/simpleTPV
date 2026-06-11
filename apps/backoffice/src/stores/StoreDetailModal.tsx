@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Eye, KeyRound, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { useConfirm } from '../components/ConfirmProvider.js';
@@ -128,7 +127,6 @@ export function StoreDetailModal({
               onClick={() => setLogOpen(true)}
               data-testid="store-log-open"
             >
-              <Eye size={15} aria-hidden="true" />
               Ver registros
             </button>
           </section>
@@ -217,7 +215,6 @@ export function StoreDetailModal({
                         onClick={() => void askRevoke(d.id, d.name)}
                         data-testid="store-device-revoke"
                       >
-                        <Ban size={15} aria-hidden="true" />
                         Revocar
                       </button>
                     </li>
@@ -233,7 +230,6 @@ export function StoreDetailModal({
                 disabled={createMut.isPending}
                 data-testid="store-gen-token"
               >
-                <KeyRound size={15} aria-hidden="true" />
                 {createMut.isPending ? 'Generando…' : 'Generar token de fichaje'}
               </button>
               {createMut.isError && (
@@ -262,11 +258,9 @@ export function StoreDetailModal({
         <div className="modal-foot modal-foot--split">
           <div className="modal-foot-actions">
             <button type="button" onClick={onEdit} data-testid="store-edit">
-              <Pencil size={16} aria-hidden="true" />
               Editar
             </button>
             <button type="button" className="danger" onClick={onDelete} data-testid="store-delete">
-              <Trash2 size={16} aria-hidden="true" />
               Borrar
             </button>
           </div>

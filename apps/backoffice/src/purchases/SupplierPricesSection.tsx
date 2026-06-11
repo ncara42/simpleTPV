@@ -1,6 +1,5 @@
 import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { CsvDropzone } from '../components/CsvDropzone.js';
@@ -331,7 +330,6 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
           )}
           <div className="modal-foot">
             <button type="button" onClick={() => setAdding(false)}>
-              <X size={16} aria-hidden="true" />
               Cancelar
             </button>
             <button
@@ -340,7 +338,6 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
               disabled={!addProduct || !addPrice || upsertMut.isPending}
               data-testid="sp-add-save"
             >
-              <Check size={16} aria-hidden="true" />
               Guardar
             </button>
           </div>
@@ -371,7 +368,6 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
           />
           <div className="modal-foot">
             <button type="button" onClick={() => setImporting(false)}>
-              <X size={16} aria-hidden="true" />
               Cerrar
             </button>
           </div>

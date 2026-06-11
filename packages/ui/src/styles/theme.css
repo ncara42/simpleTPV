@@ -9,7 +9,8 @@
   /* ─── Texto ───────────────────────────────────────────── */
   --ui-text: #18181a;
   --ui-text-muted: #6b6b66;
-  --ui-text-soft: #8d897f;
+  /* WCAG AA: terciario oscurecido de #8d897f (~3.4:1) a #71706c (~4.5:1). */
+  --ui-text-soft: #71706c;
 
   /* ─── Acción primaria (tinta) ─────────────────────────── */
   --ui-primary: #171717;

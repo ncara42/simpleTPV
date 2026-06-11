@@ -1,6 +1,6 @@
 import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Plus, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Modal } from './components/Modal.js';
@@ -483,11 +483,9 @@ function PromoModal({
 
       <div className="modal-foot">
         <button type="button" onClick={onClose}>
-          <X size={16} aria-hidden="true" />
           Cancelar
         </button>
         <button type="submit" className="btn-primary" disabled={!valid} data-testid="promo-save">
-          <Check size={16} aria-hidden="true" />
           {form.id ? 'Guardar' : 'Crear'}
         </button>
       </div>

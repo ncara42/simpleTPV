@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { listStores } from '../lib/admin.js';
@@ -139,7 +138,6 @@ export function SuggestSection() {
               }
               data-testid="suggest-create-order"
             >
-              <Plus size={16} aria-hidden="true" />
               Crear pedido (selecciona proveedor)
             </button>
           </div>
