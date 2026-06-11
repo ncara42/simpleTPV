@@ -827,6 +827,38 @@ async function seedHistory(
           },
         });
       }
+
+      // Reapertura de HOY: el e2e (z-cash) y el uso normal cierran la caja del
+      // día; sin esto, re-sembrar el mismo día dejaría la tienda sin caja abierta
+      // (el TPV bloquea el cobro). Cierra primero cualquier OPEN de días previos
+      // (re-ejecuciones en fechas distintas) para respetar el índice único de una
+      // sola sesión OPEN por tienda, y abre una nueva si no queda ninguna.
+      if (isToday) {
+        await prisma.cashSession.updateMany({
+          where: {
+            organizationId: orgId,
+            storeId: store.id,
+            status: CashSessionStatus.OPEN,
+            openedAt: { lt: dateDaysAgo(0, 0, 0) },
+          },
+          data: { status: CashSessionStatus.CLOSED, closedAt: new Date() },
+        });
+        const openToday = await prisma.cashSession.findFirst({
+          where: { organizationId: orgId, storeId: store.id, status: CashSessionStatus.OPEN },
+        });
+        if (!openToday) {
+          await prisma.cashSession.create({
+            data: {
+              organizationId: orgId,
+              storeId: store.id,
+              userId,
+              openingAmount: 100,
+              status: CashSessionStatus.OPEN,
+              openedAt: new Date(),
+            },
+          });
+        }
+      }
     }
   }
 
