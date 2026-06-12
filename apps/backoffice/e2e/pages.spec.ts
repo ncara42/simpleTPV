@@ -748,14 +748,20 @@ test('Proveedores · Comparativa: gráficos de media/mediana y de producto busca
   // Gráfico de media/mediana por proveedor (Chart común del sistema).
   await expect(page.getByTestId('sp-cmp-avg')).toBeVisible();
   await expect(page.getByTestId('sp-cmp-avg').locator('.ui-chart')).toBeVisible();
+  // La tabla de apoyo se retiró: solo quedan los dos paneles de gráficos.
+  await expect(page.getByTestId('sp-comparison-table')).toHaveCount(0);
   // Sin selección, el panel de producto invita a buscar.
   await expect(page.getByTestId('sp-cmp-product')).toContainText('Busca un producto');
-  // Buscar filtra la tabla y puebla el gráfico del producto.
+  // Buscar puebla el gráfico del producto.
   await page.getByTestId('sp-cmp-search').fill('Aceite CBD 10% — Beemine');
   await expect(page.getByTestId('sp-cmp-product')).toContainText('Aceite CBD 10% — Beemine');
   await expect(page.getByTestId('sp-cmp-product').locator('.ui-chart')).toBeVisible();
-  // Clic en una fila también selecciona.
-  await page.getByTestId('sp-cmp-search').fill('');
-  await page.getByTestId('sp-comparison-row').first().click();
+  // Una búsqueda amplia ofrece píldoras de coincidencias; clicar una selecciona.
+  await page.getByTestId('sp-cmp-search').fill('Aceite');
+  const suggestions = page.getByTestId('sp-cmp-suggestion');
+  await expect(suggestions.first()).toBeVisible();
+  const picked = (await suggestions.nth(1).textContent()) ?? '';
+  await suggestions.nth(1).click();
+  await expect(page.getByTestId('sp-cmp-product')).toContainText(picked.trim());
   await expect(page.getByTestId('sp-cmp-product').locator('.ui-chart')).toBeVisible();
 });

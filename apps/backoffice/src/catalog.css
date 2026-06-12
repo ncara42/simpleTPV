@@ -2562,7 +2562,7 @@
   color: var(--ui-text);
 }
 
-/* ── Comparativa de tarifas de compra entre proveedores (P1-B) ── */
+/* ── Chips de precios por proveedor (los usa el widget del dashboard) ── */
 .sp-price-chips {
   display: inline-flex;
   flex-wrap: wrap;
@@ -2582,11 +2582,6 @@
   color: var(--ui-brand);
   font-weight: 600;
 }
-.sp-best {
-  color: var(--ui-brand);
-  font-variant-numeric: tabular-nums;
-}
-
 /* ── Zona de importación CSV reutilizable (CsvDropzone, P1-E) ── */
 .csv-dropzone {
   display: flex;
@@ -3117,14 +3112,20 @@
 }
 
 /* ─── Proveedores · Comparativa gráfica ─────────────────────────────────── */
+/* Apilados (una columna) para que cada gráfico use todo el ancho; el panel
+   contenedor (.table-panel) no aporta padding, así que el grid pone el suyo. */
 .sp-cmp-charts {
   display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ui-space-5);
+  margin: var(--ui-space-5);
+}
+/* Con ≤3 proveedores las barras caben de sobra: los dos paneles en línea. */
+.sp-cmp-charts.is-inline {
   grid-template-columns: 1fr 1fr;
-  gap: var(--ui-space-4);
-  margin-bottom: var(--ui-space-4);
 }
 @media (max-width: 900px) {
-  .sp-cmp-charts {
+  .sp-cmp-charts.is-inline {
     grid-template-columns: 1fr;
   }
 }
@@ -3132,7 +3133,7 @@
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-md, 12px);
   background: var(--ui-surface);
-  padding: var(--ui-space-4) var(--ui-space-5);
+  padding: var(--ui-space-5) var(--ui-space-6);
 }
 .sp-cmp-panel h3 {
   margin: 0 0 var(--ui-space-4);
@@ -3143,9 +3144,43 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Búsqueda dentro del panel de producto (la tabla de apoyo se retiró). */
+.sp-cmp-search-row {
+  display: flex;
+  margin-bottom: var(--ui-space-4);
+}
+.sp-cmp-search-row .catalog-search {
+  width: 100%;
+  max-width: 26rem;
+}
+/* Píldoras de coincidencias para elegir el producto exacto a comparar. */
+.sp-cmp-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+  margin: 0 0 var(--ui-space-4);
+}
+.sp-cmp-suggestion {
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-surface);
+  padding: var(--ui-space-1) var(--ui-space-3);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.sp-cmp-suggestion:hover {
+  border-color: var(--ui-border-strong);
+}
+.sp-cmp-suggestion.is-active {
+  background: var(--ui-primary);
+  border-color: var(--ui-primary);
+  color: var(--ui-primary-fg);
+}
 .sp-cmp-legend {
   display: flex;
-  gap: 1rem;
+  gap: var(--ui-space-4);
   margin-top: var(--ui-space-3);
   font-size: var(--ui-text-sm);
   color: var(--ui-text-muted);
@@ -3153,7 +3188,7 @@
 .sp-cmp-legend span {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--ui-space-2);
 }
 .sp-cmp-dot {
   width: 10px;

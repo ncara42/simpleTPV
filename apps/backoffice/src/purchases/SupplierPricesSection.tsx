@@ -167,40 +167,6 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
     mediana: median(e.prices),
   }));
 
-  // Comparativa: tabla de presentación (sin configuración de columnas).
-  type CmpRow = (typeof comparison)[number];
-  const comparisonColumns: DataTableColumn<CmpRow>[] = [
-    { key: 'product', header: 'Producto', render: (r) => r.productName },
-    {
-      key: 'prices',
-      header: 'Precios por proveedor',
-      render: (row) => (
-        <span className="sp-price-chips">
-          {row.prices.map((pr) => (
-            <span
-              key={pr.supplierId}
-              className={`sp-price-chip${row.best?.supplierId === pr.supplierId ? ' is-best' : ''}`}
-            >
-              {pr.supplierName}: {fmtEur(pr.price)}
-            </span>
-          ))}
-        </span>
-      ),
-    },
-    {
-      key: 'best',
-      header: 'Mejor',
-      render: (row) =>
-        row.best ? (
-          <strong className="sp-best">
-            {supplierName(row.best.supplierId)} · {fmtEur(row.best.price)}
-          </strong>
-        ) : (
-          '—'
-        ),
-    },
-  ];
-
   return (
     <div className="table-panel">
       <div className="table-toolbar">
@@ -317,11 +283,17 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
       ) : (
         <>
           {/* Comparativa gráfica: media/mediana por proveedor + producto concreto.
-              Los gráficos responden al toggle barras↔línea del dashboard. */}
-          <div className="sp-cmp-charts">
+              Apilados para que cada gráfico respire; con ≤3 proveedores las barras
+              caben de sobra y los dos paneles van en línea. Responden al toggle
+              barras↔línea del dashboard. */}
+          <div
+            className={`sp-cmp-charts${cmpStats.length > 0 && cmpStats.length <= 3 ? ' is-inline' : ''}`}
+          >
             <div className="sp-cmp-panel" data-testid="sp-cmp-avg">
               <h3>Media y mediana por proveedor</h3>
-              {cmpStats.length === 0 ? (
+              {comparisonLoading ? (
+                <p className="catalog-empty">Cargando…</p>
+              ) : cmpStats.length === 0 ? (
                 <p className="catalog-empty">Sin tarifas que comparar.</p>
               ) : (
                 <>
@@ -353,6 +325,35 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
               <h3>
                 {activeRow ? `Comparativa · ${activeRow.productName}` : 'Comparar un producto'}
               </h3>
+              <span className="search-field sp-cmp-search-row">
+                <input
+                  className="catalog-search"
+                  placeholder="Buscar producto o arquetipo…"
+                  value={cmpSearch}
+                  onChange={(e) => {
+                    setCmpSearch(e.target.value);
+                    setCmpProductId(null);
+                  }}
+                  data-testid="sp-cmp-search"
+                />
+              </span>
+              {/* Con varias coincidencias, píldoras para elegir el producto exacto
+                  (sustituyen al clic en fila de la tabla retirada). */}
+              {cmpQuery && filteredComparison.length > 1 && (
+                <div className="sp-cmp-suggestions" data-testid="sp-cmp-suggestions">
+                  {filteredComparison.slice(0, 6).map((r) => (
+                    <button
+                      key={r.productId}
+                      type="button"
+                      className={`sp-cmp-suggestion${r.productId === activeRow?.productId ? ' is-active' : ''}`}
+                      onClick={() => setCmpProductId(r.productId)}
+                      data-testid="sp-cmp-suggestion"
+                    >
+                      {r.productName}
+                    </button>
+                  ))}
+                </div>
+              )}
               {activeRow ? (
                 <Chart
                   data={activeRow.prices.map((pr) => ({
@@ -366,44 +367,11 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
                 />
               ) : (
                 <p className="catalog-empty">
-                  Busca un producto o arquetipo (o pulsa una fila de la tabla) para comparar sus
-                  precios entre proveedores.
+                  Busca un producto o arquetipo para comparar sus precios entre proveedores.
                 </p>
               )}
             </div>
           </div>
-          <DataTable
-            columns={comparisonColumns}
-            rows={filteredComparison}
-            rowKey={(r) => r.productId}
-            loading={comparisonLoading}
-            toolbar={
-              <div className="sales-filters">
-                <span className="search-field">
-                  <input
-                    className="catalog-search"
-                    placeholder="Buscar producto o arquetipo…"
-                    value={cmpSearch}
-                    onChange={(e) => {
-                      setCmpSearch(e.target.value);
-                      setCmpProductId(null);
-                    }}
-                    data-testid="sp-cmp-search"
-                  />
-                </span>
-              </div>
-            }
-            onRowClick={(r) => setCmpProductId(r.productId)}
-            rowClassName={(r) => (r.productId === activeRow?.productId ? 'is-selected' : undefined)}
-            rowAriaSelected={(r) => r.productId === activeRow?.productId}
-            rowTestId="sp-comparison-row"
-            emptyState={
-              <span data-testid="sp-comparison-empty">
-                Sin tarifas que comparar para este arquetipo.
-              </span>
-            }
-            data-testid="sp-comparison-table"
-          />
         </>
       )}
 
