@@ -305,20 +305,19 @@
     transform: scaleX(0);
   }
 }
-/* U-01: el importe ya no vive dentro de la barra — es un badge al final de la
-   pista que se materializa al hover/focus de la fila. */
+/* U-01 (repaso): el importe es un badge PEGADO al final de la pista, del mismo
+   color que la barra (primary) — se materializa al hover/focus de la fila. */
 .dash-family-pct {
   position: absolute;
-  right: 4px;
+  right: 0;
   top: 50%;
   transform: translateY(-50%);
-  padding: 0.05rem 0.5rem;
+  padding: 0.12rem 0.55rem;
   border-radius: 9999px;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-primary);
   font-size: 0.7rem;
   font-weight: 600;
-  color: var(--ui-text);
+  color: var(--ui-primary-fg);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   opacity: 0;
