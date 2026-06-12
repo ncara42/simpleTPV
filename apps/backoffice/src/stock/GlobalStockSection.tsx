@@ -338,19 +338,6 @@ export function GlobalStockSection({
               Solo en alerta
             </button>
           </div>
-          {/* U-09: el botón de columnas vive en la toolbar (no flotando sobre las
-              cabeceras de la tabla). margin-left:auto lo ancla a la derecha. */}
-          <div className="stock-filter-group stock-filter-group--end">
-            <button
-              type="button"
-              className="config-trigger"
-              onClick={toggleColumnsEditor}
-              data-testid="stock-columns-toggle"
-              aria-expanded={columnsEditorOpen}
-            >
-              Columnas
-            </button>
-          </div>
         </div>
         {columnsEditor}
         <DataTable
@@ -358,6 +345,19 @@ export function GlobalStockSection({
           rows={sortedRows}
           rowKey={(r) => r.productId}
           loading={isLoading}
+          toolbar={
+            <div className="ui-dt-cols">
+              <button
+                type="button"
+                className="ui-dt-cols-trigger"
+                onClick={toggleColumnsEditor}
+                data-testid="stock-columns-toggle"
+                aria-expanded={columnsEditorOpen}
+              >
+                Columnas
+              </button>
+            </div>
+          }
           {...(sort ? { sort } : {})}
           onSortChange={(key) =>
             setSort((cur) =>

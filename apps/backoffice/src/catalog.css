@@ -2495,15 +2495,6 @@
   padding-left: var(--ui-space-5);
   border-left: 1px solid var(--ui-border);
 }
-/* U-09: grupo anclado a la derecha (botón Columnas) — sin separador. */
-.stock-filter-group--end {
-  margin-left: auto;
-}
-.stock-filter-group--end + .stock-filter-group,
-.stock-filter-group.stock-filter-group--end {
-  padding-left: 0;
-  border-left: none;
-}
 .stock-filter-label {
   font-size: var(--ui-text-2xs);
   font-weight: 600;
