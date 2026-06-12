@@ -234,23 +234,25 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
 
       {view === 'tarifas' ? (
         <>
-          <div className="config-bar">
-            <button
-              type="button"
-              className="config-trigger"
-              onClick={toggleColumnsEditor}
-              data-testid="sp-columns-toggle"
-              aria-expanded={columnsEditorOpen}
-            >
-              Columnas
-            </button>
-          </div>
           {columnsEditor}
           <DataTable
             columns={[...effectiveColumns, deleteColumn]}
             rows={priceSorted}
             rowKey={(r) => r.id}
             loading={pricesLoading}
+            toolbar={
+              <div className="ui-dt-cols">
+                <button
+                  type="button"
+                  className="ui-dt-cols-trigger"
+                  onClick={toggleColumnsEditor}
+                  data-testid="sp-columns-toggle"
+                  aria-expanded={columnsEditorOpen}
+                >
+                  Columnas
+                </button>
+              </div>
+            }
             {...(sort ? { sort } : {})}
             onSortChange={(key) =>
               setSort((cur) =>

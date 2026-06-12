@@ -412,23 +412,25 @@ export function UsersPage() {
           )}
         </div>
 
-        <div className="config-bar">
-          <button
-            type="button"
-            className="config-trigger"
-            onClick={toggleColumnsEditor}
-            data-testid="users-columns-toggle"
-            aria-expanded={columnsEditorOpen}
-          >
-            Columnas
-          </button>
-        </div>
         {columnsEditor}
         <DataTable
           columns={tableColumns}
           rows={sortDesc ? [...filtered].reverse() : filtered}
           rowKey={(u) => u.id}
           loading={isLoading}
+          toolbar={
+            <div className="ui-dt-cols">
+              <button
+                type="button"
+                className="ui-dt-cols-trigger"
+                onClick={toggleColumnsEditor}
+                data-testid="users-columns-toggle"
+                aria-expanded={columnsEditorOpen}
+              >
+                Columnas
+              </button>
+            </div>
+          }
           sort={{ key: 'name', dir: sortDesc ? 'desc' : 'asc' }}
           onSortChange={() => setSortDesc((d) => !d)}
           onRowClick={(u) => toggleSelect(u.id)}

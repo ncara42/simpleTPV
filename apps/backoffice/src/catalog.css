@@ -867,6 +867,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
+  white-space: nowrap; /* icono + texto nunca parten de línea */
   height: var(--bo-control-height);
   padding: 0 1.25rem;
   border: none;
@@ -880,6 +881,9 @@
   transition:
     background 0.12s,
     transform 0.06s;
+}
+.btn-primary > svg {
+  flex-shrink: 0;
 }
 .btn-primary:hover {
   background: var(--ui-primary-hover);
@@ -1725,6 +1729,11 @@
 /* Botones de selección (Seleccionar todo / Quitar selección): secundarios, al
    lado del filtro de tienda dentro de .sales-filters. Igualan su altura (2.5rem). */
 .users-sel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  white-space: nowrap; /* el icono no se sube encima del texto */
   height: 2.5rem;
   padding: 0 1.05rem;
   border: 1px solid var(--ui-border-strong);
@@ -1739,6 +1748,9 @@
     background 0.12s,
     border-color 0.12s,
     transform 0.06s;
+}
+.users-sel-btn > svg {
+  flex-shrink: 0;
 }
 .users-sel-btn:hover {
   background: var(--ap-blue-soft);
@@ -1891,6 +1903,25 @@
   display: inline-block;
   font-size: 0.85rem;
   font-weight: 600;
+  white-space: nowrap;
+}
+/* Estado de una notificación: badge arriba y descriptor JUSTO DEBAJO, ambos
+   sin partir de línea (en móvil el descriptor caía partido). */
+.notif-status {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+}
+.notif-status > * {
+  white-space: nowrap;
+}
+/* Columnas no esenciales (Lote, Caducidad): se ocultan en pantallas estrechas
+   para dar aire; el descriptor del estado ya indica la urgencia. */
+@media (max-width: 640px) {
+  .notif-hide-narrow {
+    display: none;
+  }
 }
 .stock-tag.stock-red,
 .stock-tag.stock-yellow,
@@ -1901,9 +1932,9 @@
 /* Anti-rotura por arquetipo (IT-13): nota de que hay sustituto en la familia →
    la rotura está degradada (no crítica). */
 .alert-substitute {
-  margin-left: 0.5rem;
   font-size: 0.8rem;
   color: var(--ui-text-muted);
+  white-space: nowrap;
 }
 
 /* ─── Notificaciones: secciones (alertas de stock + caducidad de lotes, #126) ─── */
@@ -1941,6 +1972,7 @@
   font-size: 0.8rem;
   font-weight: 600;
   line-height: 1.4;
+  white-space: nowrap;
 }
 .expiry-tag.expiry-expired {
   background: color-mix(in oklab, var(--ui-danger) 14%, transparent);
@@ -1951,9 +1983,9 @@
   color: var(--ui-warning);
 }
 .expiry-when {
-  margin-left: 0.5rem;
   font-size: 0.8rem;
   color: var(--ui-text-muted);
+  white-space: nowrap;
 }
 
 /* ─── Stock: banda de métricas, panel envolvente y etiqueta de rotación (#96) ─── */
