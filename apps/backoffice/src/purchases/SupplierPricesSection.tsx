@@ -1,4 +1,4 @@
-import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Chart, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -9,6 +9,7 @@ import { listFamilies } from '../lib/families.js';
 import { flattenTree } from '../lib/family-tree.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { fmtEur } from '../lib/format.js';
+import { readPref, usePreferences } from '../lib/preferences.js';
 import { listProducts } from '../lib/products.js';
 import { listSuppliers } from '../lib/purchases.js';
 import {
@@ -120,39 +121,51 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
       })
     : prices;
 
-  // Comparativa: tabla de presentación (sin configuración de columnas).
-  type CmpRow = (typeof comparison)[number];
-  const comparisonColumns: DataTableColumn<CmpRow>[] = [
-    { key: 'product', header: 'Producto', render: (r) => r.productName },
-    {
-      key: 'prices',
-      header: 'Precios por proveedor',
-      render: (row) => (
-        <span className="sp-price-chips">
-          {row.prices.map((pr) => (
-            <span
-              key={pr.supplierId}
-              className={`sp-price-chip${row.best?.supplierId === pr.supplierId ? ' is-best' : ''}`}
-            >
-              {pr.supplierName}: {fmtEur(pr.price)}
-            </span>
-          ))}
-        </span>
-      ),
-    },
-    {
-      key: 'best',
-      header: 'Mejor',
-      render: (row) =>
-        row.best ? (
-          <strong className="sp-best">
-            {supplierName(row.best.supplierId)} · {fmtEur(row.best.price)}
-          </strong>
-        ) : (
-          '—'
-        ),
-    },
-  ];
+  // ── Comparativa gráfica ──
+  // El tipo de gráfico (barras/línea) sigue la MISMA preferencia que el
+  // dashboard (dashboard.layout.chartKind): un solo toggle para toda la app.
+  const { prefs } = usePreferences();
+  const chartKind: 'bars' | 'line' =
+    readPref<{ chartKind?: 'bars' | 'line' }>(prefs, 'dashboard.layout', {}).chartKind === 'line'
+      ? 'line'
+      : 'bars';
+  // Búsqueda de producto/arquetipo (encima de la tabla) + selección por clic.
+  const [cmpSearch, setCmpSearch] = useState('');
+  const [cmpProductId, setCmpProductId] = useState<string | null>(null);
+  const cmpQuery = cmpSearch.trim().toLowerCase();
+  const filteredComparison = cmpQuery
+    ? comparison.filter(
+        (r) =>
+          r.productName.toLowerCase().includes(cmpQuery) ||
+          (r.sku ?? '').toLowerCase().includes(cmpQuery),
+      )
+    : comparison;
+  // Fila activa del gráfico de producto: la clicada o, si se está buscando,
+  // la primera coincidencia.
+  const activeRow =
+    (cmpProductId ? comparison.find((r) => r.productId === cmpProductId) : undefined) ??
+    (cmpQuery ? filteredComparison[0] : undefined) ??
+    null;
+  // Media y mediana del precio de compra POR PROVEEDOR sobre las filas visibles
+  // (respeta el filtro de arquetipo del toolbar).
+  const median = (xs: number[]): number => {
+    const s = [...xs].sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
+  };
+  const bySupplier = new Map<string, { name: string; prices: number[] }>();
+  for (const row of comparison) {
+    for (const pr of row.prices) {
+      const entry = bySupplier.get(pr.supplierId) ?? { name: pr.supplierName, prices: [] };
+      entry.prices.push(pr.price);
+      bySupplier.set(pr.supplierId, entry);
+    }
+  }
+  const cmpStats = [...bySupplier.values()].map((e) => ({
+    label: e.name,
+    media: e.prices.reduce((a, b) => a + b, 0) / e.prices.length,
+    mediana: median(e.prices),
+  }));
 
   return (
     <div className="table-panel">
@@ -209,6 +222,18 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
             >
               Añadir tarifa
             </button>
+            {/* Botón Columnas en el MISMO contenedor que el resto de controles. */}
+            <div className="ui-dt-cols">
+              <button
+                type="button"
+                className="ui-dt-cols-trigger"
+                onClick={toggleColumnsEditor}
+                data-testid="sp-columns-toggle"
+                aria-expanded={columnsEditorOpen}
+              >
+                Columnas
+              </button>
+            </div>
           </div>
         ) : (
           <div className="sales-filters">
@@ -234,17 +259,6 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
 
       {view === 'tarifas' ? (
         <>
-          <div className="config-bar">
-            <button
-              type="button"
-              className="config-trigger"
-              onClick={toggleColumnsEditor}
-              data-testid="sp-columns-toggle"
-              aria-expanded={columnsEditorOpen}
-            >
-              Columnas
-            </button>
-          </div>
           {columnsEditor}
           <DataTable
             columns={[...effectiveColumns, deleteColumn]}
@@ -267,19 +281,98 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
           />
         </>
       ) : (
-        <DataTable
-          columns={comparisonColumns}
-          rows={comparison}
-          rowKey={(r) => r.productId}
-          loading={comparisonLoading}
-          rowTestId="sp-comparison-row"
-          emptyState={
-            <span data-testid="sp-comparison-empty">
-              Sin tarifas que comparar para este arquetipo.
-            </span>
-          }
-          data-testid="sp-comparison-table"
-        />
+        <>
+          {/* Comparativa gráfica: media/mediana por proveedor + producto concreto.
+              Apilados para que cada gráfico respire; con ≤3 proveedores las barras
+              caben de sobra y los dos paneles van en línea. Responden al toggle
+              barras↔línea del dashboard. */}
+          <div
+            className={`sp-cmp-charts${cmpStats.length > 0 && cmpStats.length <= 3 ? ' is-inline' : ''}`}
+          >
+            <div className="sp-cmp-panel" data-testid="sp-cmp-avg">
+              <h3>Media y mediana por proveedor</h3>
+              {comparisonLoading ? (
+                <p className="catalog-empty">Cargando…</p>
+              ) : cmpStats.length === 0 ? (
+                <p className="catalog-empty">Sin tarifas que comparar.</p>
+              ) : (
+                <>
+                  <Chart
+                    data={cmpStats.map((s) => ({
+                      label: s.label,
+                      value: s.media,
+                      compareValue: s.mediana,
+                      valueText: `Media ${fmtEur(s.media)}`,
+                      compareText: `Mediana ${fmtEur(s.mediana)}`,
+                    }))}
+                    height={190}
+                    formatValue={fmtEur}
+                    kind={chartKind}
+                    ariaLabel="Precio medio y mediana por proveedor"
+                  />
+                  <div className="sp-cmp-legend">
+                    <span>
+                      <i className="sp-cmp-dot is-media" aria-hidden="true" /> Media
+                    </span>
+                    <span>
+                      <i className="sp-cmp-dot is-mediana" aria-hidden="true" /> Mediana
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="sp-cmp-panel" data-testid="sp-cmp-product">
+              <h3>
+                {activeRow ? `Comparativa · ${activeRow.productName}` : 'Comparar un producto'}
+              </h3>
+              <span className="search-field sp-cmp-search-row">
+                <input
+                  className="catalog-search"
+                  placeholder="Buscar producto o arquetipo…"
+                  value={cmpSearch}
+                  onChange={(e) => {
+                    setCmpSearch(e.target.value);
+                    setCmpProductId(null);
+                  }}
+                  data-testid="sp-cmp-search"
+                />
+              </span>
+              {/* Con varias coincidencias, píldoras para elegir el producto exacto
+                  (sustituyen al clic en fila de la tabla retirada). */}
+              {cmpQuery && filteredComparison.length > 1 && (
+                <div className="sp-cmp-suggestions" data-testid="sp-cmp-suggestions">
+                  {filteredComparison.slice(0, 6).map((r) => (
+                    <button
+                      key={r.productId}
+                      type="button"
+                      className={`sp-cmp-suggestion${r.productId === activeRow?.productId ? ' is-active' : ''}`}
+                      onClick={() => setCmpProductId(r.productId)}
+                      data-testid="sp-cmp-suggestion"
+                    >
+                      {r.productName}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {activeRow ? (
+                <Chart
+                  data={activeRow.prices.map((pr) => ({
+                    label: pr.supplierName,
+                    value: pr.price,
+                  }))}
+                  height={190}
+                  formatValue={fmtEur}
+                  kind={chartKind}
+                  ariaLabel={`Precios de ${activeRow.productName} por proveedor`}
+                />
+              ) : (
+                <p className="catalog-empty">
+                  Busca un producto o arquetipo para comparar sus precios entre proveedores.
+                </p>
+              )}
+            </div>
+          </div>
+        </>
       )}
 
       {adding && (

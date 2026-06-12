@@ -305,20 +305,19 @@
     transform: scaleX(0);
   }
 }
-/* U-01: el importe ya no vive dentro de la barra — es un badge al final de la
-   pista que se materializa al hover/focus de la fila. */
+/* U-01 (repaso): el importe es un badge PEGADO al final de la pista, del mismo
+   color que la barra (primary) — se materializa al hover/focus de la fila. */
 .dash-family-pct {
   position: absolute;
-  right: 4px;
+  right: 0;
   top: 50%;
   transform: translateY(-50%);
-  padding: 0.05rem 0.5rem;
+  padding: 0.12rem 0.55rem;
   border-radius: 9999px;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-primary);
   font-size: 0.7rem;
   font-weight: 600;
-  color: var(--ui-text);
+  color: var(--ui-primary-fg);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   opacity: 0;
@@ -449,12 +448,11 @@
   gap: 0.1rem;
 }
 .dash-rank-row {
-  position: relative;
   display: grid;
   grid-template-columns: 1.6rem minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 0.75rem;
-  padding: 0.5rem 0.55rem 0.62rem;
+  padding: 0.5rem 0.55rem;
   margin: 0 -0.55rem; /* sangra el hover a todo el ancho útil del panel */
   border-radius: var(--ui-radius-md);
   transition: background 0.15s ease;
@@ -494,31 +492,8 @@
   color: var(--ui-text);
   font-variant-numeric: tabular-nums;
 }
-/* Medidor: el contenedor abarca el ancho de contenido (inset que compensa el
-   bleed del hover); el relleno crece según la magnitud relativa al máximo. */
-.dash-rank-meter {
-  position: absolute;
-  left: 0.55rem;
-  right: 0.55rem;
-  bottom: 0.3rem;
-  height: 3px;
-  border-radius: 999px;
-}
-.dash-rank-meter::after {
-  content: '';
-  display: block;
-  height: 100%;
-  width: var(--w, 0%);
-  border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--ui-brand) 65%, #fff),
-    var(--ui-brand)
-  );
-  transform-origin: left;
-  animation: dash-family-grow 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
-  animation-delay: calc(var(--i, 0) * 60ms);
-}
+/* (Repaso) Se eliminó el medidor azul bajo cada fila de ranking: no aportaba
+   información y ensuciaba. El valor numérico a la derecha ya da la magnitud. */
 
 /* ════════════════════════════════════════════════════════════
    VeriFactu (página conservada, fuera de menú) — alineada a Apple

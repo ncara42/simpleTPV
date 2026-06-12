@@ -867,6 +867,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
+  white-space: nowrap; /* icono + texto nunca parten de línea */
   height: var(--bo-control-height);
   padding: 0 1.25rem;
   border: none;
@@ -880,6 +881,9 @@
   transition:
     background 0.12s,
     transform 0.06s;
+}
+.btn-primary > svg {
+  flex-shrink: 0;
 }
 .btn-primary:hover {
   background: var(--ui-primary-hover);
@@ -1725,6 +1729,11 @@
 /* Botones de selección (Seleccionar todo / Quitar selección): secundarios, al
    lado del filtro de tienda dentro de .sales-filters. Igualan su altura (2.5rem). */
 .users-sel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  white-space: nowrap; /* el icono no se sube encima del texto */
   height: 2.5rem;
   padding: 0 1.05rem;
   border: 1px solid var(--ui-border-strong);
@@ -1739,6 +1748,9 @@
     background 0.12s,
     border-color 0.12s,
     transform 0.06s;
+}
+.users-sel-btn > svg {
+  flex-shrink: 0;
 }
 .users-sel-btn:hover {
   background: var(--ap-blue-soft);
@@ -1891,6 +1903,26 @@
   display: inline-block;
   font-size: 0.85rem;
   font-weight: 600;
+  white-space: nowrap;
+}
+/* Estado de una notificación: badge arriba y descriptor JUSTO DEBAJO, ambos
+   sin partir de línea (en móvil el descriptor caía partido). */
+.notif-status {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+}
+.notif-status > * {
+  white-space: nowrap;
+}
+/* Columnas no esenciales (Lote, Caducidad): se ocultan ya en anchos medios
+   (tablets/ventanas a medias) para dar aire; el descriptor del estado ya
+   indica la urgencia. */
+@media (max-width: 900px) {
+  .notif-hide-narrow {
+    display: none;
+  }
 }
 .stock-tag.stock-red,
 .stock-tag.stock-yellow,
@@ -1901,9 +1933,9 @@
 /* Anti-rotura por arquetipo (IT-13): nota de que hay sustituto en la familia →
    la rotura está degradada (no crítica). */
 .alert-substitute {
-  margin-left: 0.5rem;
   font-size: 0.8rem;
   color: var(--ui-text-muted);
+  white-space: nowrap;
 }
 
 /* ─── Notificaciones: secciones (alertas de stock + caducidad de lotes, #126) ─── */
@@ -1941,6 +1973,7 @@
   font-size: 0.8rem;
   font-weight: 600;
   line-height: 1.4;
+  white-space: nowrap;
 }
 .expiry-tag.expiry-expired {
   background: color-mix(in oklab, var(--ui-danger) 14%, transparent);
@@ -1951,9 +1984,9 @@
   color: var(--ui-warning);
 }
 .expiry-when {
-  margin-left: 0.5rem;
   font-size: 0.8rem;
   color: var(--ui-text-muted);
+  white-space: nowrap;
 }
 
 /* ─── Stock: banda de métricas, panel envolvente y etiqueta de rotación (#96) ─── */
@@ -2463,15 +2496,6 @@
   padding-left: var(--ui-space-5);
   border-left: 1px solid var(--ui-border);
 }
-/* U-09: grupo anclado a la derecha (botón Columnas) — sin separador. */
-.stock-filter-group--end {
-  margin-left: auto;
-}
-.stock-filter-group--end + .stock-filter-group,
-.stock-filter-group.stock-filter-group--end {
-  padding-left: 0;
-  border-left: none;
-}
 .stock-filter-label {
   font-size: var(--ui-text-2xs);
   font-weight: 600;
@@ -2538,7 +2562,7 @@
   color: var(--ui-text);
 }
 
-/* ── Comparativa de tarifas de compra entre proveedores (P1-B) ── */
+/* ── Chips de precios por proveedor (los usa el widget del dashboard) ── */
 .sp-price-chips {
   display: inline-flex;
   flex-wrap: wrap;
@@ -2558,11 +2582,6 @@
   color: var(--ui-brand);
   font-weight: 600;
 }
-.sp-best {
-  color: var(--ui-brand);
-  font-variant-numeric: tabular-nums;
-}
-
 /* ── Zona de importación CSV reutilizable (CsvDropzone, P1-E) ── */
 .csv-dropzone {
   display: flex;
@@ -2711,45 +2730,72 @@
    Hereda el chrome de .table-panel; aquí solo el espaciado inferior y el límite
    de alto para que no empuje la tabla demasiado abajo. */
 .stock-alerts-panel {
-  margin-bottom: var(--ui-space-4);
-  max-height: 18rem;
+  margin-bottom: var(--ui-space-5);
+  max-height: 22rem;
   overflow-y: auto;
 }
 .stock-alerts-head {
   display: flex;
   align-items: baseline;
   gap: var(--ui-space-2);
-  margin-bottom: var(--ui-space-2);
+  margin-bottom: var(--ui-space-4);
+  padding-bottom: var(--ui-space-3);
+  border-bottom: 1px solid var(--ui-border);
+}
+.stock-alerts-head strong {
+  font-size: var(--ui-text-md);
+  letter-spacing: -0.012em;
 }
 .stock-alerts-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--ui-space-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
+/* Cada aviso es una tarjeta con aire: acento a la izquierda, fondo semántico
+   suave, padding cómodo y columnas alineadas (producto · tienda · tipo). */
 .stock-alert-item {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: var(--ui-space-3);
-  padding: var(--ui-space-1) var(--ui-space-2);
+  gap: var(--ui-space-4);
+  padding: var(--ui-space-3) var(--ui-space-4);
   border-left: 3px solid var(--ui-warning);
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-warning-soft);
 }
 .stock-alert-item.sev-critical {
   border-left-color: var(--ui-danger);
   background: var(--ui-danger-soft);
 }
-.stock-alert-tag {
+.stock-alert-name {
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stock-alert-store {
   font-size: var(--ui-text-sm);
+  white-space: nowrap;
+}
+.stock-alert-tag {
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
   color: var(--ui-text-muted);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  padding: 0.15rem 0.6rem;
   white-space: nowrap;
 }
 .stock-alerts-more {
-  margin: var(--ui-space-2) 0 0;
+  margin: var(--ui-space-3) 0 0;
   font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
 }
 /* Chip de filtro "solo en alerta". */
 .stock-alert-toggle {
@@ -3063,4 +3109,96 @@
 .notif-action-cell {
   text-align: right;
   white-space: nowrap;
+}
+
+/* ─── Proveedores · Comparativa gráfica ─────────────────────────────────── */
+/* Apilados (una columna) para que cada gráfico use todo el ancho; el panel
+   contenedor (.table-panel) no aporta padding, así que el grid pone el suyo. */
+.sp-cmp-charts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ui-space-5);
+  margin: var(--ui-space-5);
+}
+/* Con ≤3 proveedores las barras caben de sobra: los dos paneles en línea. */
+.sp-cmp-charts.is-inline {
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 900px) {
+  .sp-cmp-charts.is-inline {
+    grid-template-columns: 1fr;
+  }
+}
+.sp-cmp-panel {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md, 12px);
+  background: var(--ui-surface);
+  padding: var(--ui-space-5) var(--ui-space-6);
+}
+.sp-cmp-panel h3 {
+  margin: 0 0 var(--ui-space-4);
+  font-size: var(--ui-text-md);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Búsqueda dentro del panel de producto (la tabla de apoyo se retiró). */
+.sp-cmp-search-row {
+  display: flex;
+  margin-bottom: var(--ui-space-4);
+}
+.sp-cmp-search-row .catalog-search {
+  width: 100%;
+  max-width: 26rem;
+}
+/* Píldoras de coincidencias para elegir el producto exacto a comparar. */
+.sp-cmp-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+  margin: 0 0 var(--ui-space-4);
+}
+.sp-cmp-suggestion {
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-surface);
+  padding: var(--ui-space-1) var(--ui-space-3);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.sp-cmp-suggestion:hover {
+  border-color: var(--ui-border-strong);
+}
+.sp-cmp-suggestion.is-active {
+  background: var(--ui-primary);
+  border-color: var(--ui-primary);
+  color: var(--ui-primary-fg);
+}
+.sp-cmp-legend {
+  display: flex;
+  gap: var(--ui-space-4);
+  margin-top: var(--ui-space-3);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
+}
+.sp-cmp-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+.sp-cmp-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+.sp-cmp-dot.is-media {
+  background: var(--ui-brand);
+}
+.sp-cmp-dot.is-mediana {
+  background: var(--ui-border-strong);
 }

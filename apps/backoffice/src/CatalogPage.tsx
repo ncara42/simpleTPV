@@ -275,6 +275,9 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
     {
       key: 'family',
       header: 'Familia',
+      // Se oculta en pantallas estrechas (la ruta de familia es ancha y no es
+      // crítica al primer vistazo): así la tabla cabe en ≤4 columnas en móvil.
+      hideOnNarrow: true,
       render: (p) => (
         <span className="muted" data-testid="catalog-family">
           {familyPathLabel(families, p.familyId)}
@@ -301,6 +304,7 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
       header: 'Margen',
       align: 'right',
       sortable: true,
+      noWrap: true,
       render: (p) => (
         <span data-testid="catalog-margin">
           {fmtEur(Number(p.salePrice) - Number(p.costPrice))}
@@ -445,24 +449,30 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
   return (
     <section className="catalog">
       <div className="table-panel">
-        {toolbar}
-        <div className="config-bar">
-          <button
-            type="button"
-            className="config-trigger"
-            onClick={toggleColumnsEditor}
-            data-testid="catalog-columns-toggle"
-            aria-expanded={columnsEditorOpen}
-          >
-            Columnas
-          </button>
-        </div>
         {columnsEditor}
         <DataTable
           columns={tableColumns}
           rows={pageRows}
           rowKey={(p) => p.id}
           loading={isLoading}
+          toolbar={
+            /* Patrón de Ventas: búsqueda/filtros/CTAs y el botón Columnas en
+               LA MISMA banda (toolbar del DataTable). */
+            <>
+              {toolbar}
+              <div className="ui-dt-cols">
+                <button
+                  type="button"
+                  className="ui-dt-cols-trigger"
+                  onClick={toggleColumnsEditor}
+                  data-testid="catalog-columns-toggle"
+                  aria-expanded={columnsEditorOpen}
+                >
+                  Columnas
+                </button>
+              </div>
+            </>
+          }
           {...(sort ? { sort } : {})}
           onSortChange={onSortChange}
           onRowClick={(p) => toggleSelect(p.id)}

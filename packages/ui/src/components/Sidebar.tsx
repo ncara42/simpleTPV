@@ -262,7 +262,8 @@ export function Sidebar({
               type="button"
               className={`sidebar-item${isActive ? ' active' : ''}`}
               onClick={() => handleSelect(item.id)}
-              title={item.label}
+              // En rail la burbuja CSS ya enseña el nombre; el title nativo duplicaría.
+              title={collapsed ? undefined : item.label}
               aria-current={isActive ? 'page' : undefined}
               data-testid={`nav-${item.id}`}
             >
@@ -290,6 +291,28 @@ export function Sidebar({
 
   return (
     <>
+      {/* Hamburguesa móvil: en <768px el sidebar va off-canvas; este botón fijo
+          es su único acceso (antes no existía: el menú era inalcanzable). */}
+      <button
+        type="button"
+        className="sidebar-mobile-trigger"
+        onClick={() => setMobileOpen(true)}
+        aria-label="Abrir menú"
+        data-testid="sidebar-open"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          aria-hidden="true"
+        >
+          <path d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
       <div
         className={`sidebar-overlay${mobileOpen ? ' visible' : ''}`}
         onClick={() => setMobileOpen(false)}
@@ -299,7 +322,8 @@ export function Sidebar({
       <aside
         className={`sidebar${mobileOpen ? ' mobile-open' : ''}${collapsed ? ' collapsed' : ''}`}
       >
-        {/* Header: logotipo (+ marca opcional) */}
+        {/* Header: logotipo (+ marca opcional) + control de contracción a rail,
+            ARRIBA y como icono visible (antes era un texto gris al fondo). */}
         <div className="sidebar-header">
           <span className="sidebar-logo">{logo ?? 'S'}</span>
           {brand && (
@@ -307,6 +331,32 @@ export function Sidebar({
               <span className="sidebar-brand-title">{brand.title}</span>
               {brand.subtitle && <span className="sidebar-brand-sub">{brand.subtitle}</span>}
             </span>
+          )}
+          {collapsible && (
+            <button
+              type="button"
+              className="sidebar-collapse"
+              onClick={toggleRail}
+              data-testid="sidebar-collapse"
+              aria-pressed={collapsed}
+              title={collapsed ? 'Expandir menú' : 'Contraer menú'}
+            >
+              <svg
+                className={`sidebar-collapse-icon${collapsed ? ' is-rail' : ''}`}
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="11 17 6 12 11 7" />
+                <polyline points="18 17 13 12 18 7" />
+              </svg>
+            </button>
           )}
         </div>
 
@@ -418,35 +468,6 @@ export function Sidebar({
             </>
           )}
         </nav>
-
-        {/* U-04: control de contracción a rail (solo si collapsible). */}
-        {collapsible && (
-          <button
-            type="button"
-            className="sidebar-collapse"
-            onClick={toggleRail}
-            data-testid="sidebar-collapse"
-            aria-pressed={collapsed}
-            title={collapsed ? 'Expandir menú' : 'Contraer menú'}
-          >
-            <svg
-              className={`sidebar-collapse-icon${collapsed ? ' is-rail' : ''}`}
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <polyline points="11 17 6 12 11 7" />
-              <polyline points="18 17 13 12 18 7" />
-            </svg>
-            <span className="sidebar-item-label">Contraer</span>
-          </button>
-        )}
 
         {/* Footer: cuenta (estilo ChatGPT) o cierre de sesión simple */}
         {account ? (

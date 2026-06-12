@@ -19,6 +19,42 @@
   border-bottom: 1px solid var(--ui-border);
 }
 
+/* Control de columnas dentro de la toolbar de la tabla (ya no flota suelto
+   entre la toolbar de página y las cabeceras). Anclado a la derecha. */
+.ui-dt-cols {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+}
+.ui-dt-cols-trigger {
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  border-radius: 9999px;
+  padding: 0.25rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ui-dt-cols-trigger:hover {
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
+
+/* Columna sin salto de línea (valores compuestos: "17,90 € · 60%"). */
+.ui-dt-col-nowrap {
+  white-space: nowrap;
+}
+
+/* Responsividad: columnas marcadas hideOnNarrow se ocultan en pantallas
+   estrechas para no saturar (p. ej. Familia en Catálogo). */
+@media (max-width: 640px) {
+  .ui-dt-col-narrow-hide {
+    display: none;
+  }
+}
+
 .ui-dt-scroll {
   overflow-x: auto;
 }

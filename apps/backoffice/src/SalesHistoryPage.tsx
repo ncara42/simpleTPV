@@ -313,17 +313,6 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
         </div>
       )}
 
-      <div className="config-bar">
-        <button
-          type="button"
-          className="config-trigger"
-          onClick={toggleColumnsEditor}
-          data-testid="sales-columns-toggle"
-          aria-expanded={columnsEditorOpen}
-        >
-          Columnas
-        </button>
-      </div>
       {columnsEditor}
 
       <DataTable
@@ -331,7 +320,22 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
         rows={data?.items ?? []}
         rowKey={(r) => r.id}
         loading={query.isLoading}
-        toolbar={toolbar}
+        toolbar={
+          <>
+            {toolbar}
+            <div className="ui-dt-cols">
+              <button
+                type="button"
+                className="ui-dt-cols-trigger"
+                onClick={toggleColumnsEditor}
+                data-testid="sales-columns-toggle"
+                aria-expanded={columnsEditorOpen}
+              >
+                Columnas
+              </button>
+            </div>
+          </>
+        }
         footer={footer}
         pagination={{
           page,

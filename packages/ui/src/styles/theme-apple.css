@@ -109,10 +109,20 @@ body {
   flex-direction: column;
   background: var(--content-bg);
   min-width: 0;
+  transition: margin-left 0.15s var(--ui-ease, ease);
+}
+
+/* U-04 (repaso): al colapsar el sidebar a rail, el contenido SE REAJUSTA al
+   ancho del rail (antes mantenía el margen de la barra expandida → hueco). El
+   sidebar es position:fixed, así que es el margin-left del contenido el que
+   crea el espacio; lo sincronizamos con el estado colapsado de la barra. */
+.sidebar.collapsed ~ .app-content {
+  margin-left: var(--sidebar-width-rail);
 }
 
 @media (max-width: 767px) {
-  .app-content {
+  .app-content,
+  .sidebar.collapsed ~ .app-content {
     margin-left: 0;
   }
 }
