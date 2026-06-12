@@ -14,7 +14,9 @@ test('Catálogo muestra los productos del seed', async ({ page }) => {
   await navTo(page, 'catalog');
   await expect(page.getByTestId('catalog-table')).toBeVisible();
   // El contador vivía en la descripción del header, retirada en el repaso:
-  // verificamos directamente que hay filas de producto.
+  // verificamos directamente que hay filas de producto. count() no auto-espera:
+  // anclar antes la primera fila (mismo patrón que Familias #97).
+  await expect(page.getByTestId('product-select').first()).toBeVisible();
   expect(await page.getByTestId('product-select').count()).toBeGreaterThan(0);
 });
 
