@@ -567,6 +567,12 @@
 }
 .sidebar.collapsed {
   width: var(--sidebar-width-rail);
+  /* FIX: el overflow:hidden del aside RECORTABA el flyout y cualquier burbuja
+     flotante hacia la derecha — en rail el overflow debe ser visible. */
+  overflow: visible;
+}
+.sidebar.collapsed .sidebar-nav {
+  overflow: visible;
 }
 .sidebar.collapsed .sidebar-brand,
 .sidebar.collapsed .sidebar-item-label,
@@ -587,6 +593,46 @@
 /* El badge sobrevive en el rail como punto compacto sobre el icono. */
 .sidebar.collapsed .sidebar-item {
   position: relative;
+}
+/* Burbuja con el NOMBRE al hover/focus de un item directo del rail (los grupos
+   despliegan su flyout de opciones; los items sin opciones enseñan su nombre).
+   Reutiliza el label oculto como burbuja flotante hacia la derecha. */
+.sidebar.collapsed .sidebar-nav .sidebar-group-items .sidebar-item:hover .sidebar-item-label,
+.sidebar.collapsed
+  .sidebar-nav
+  .sidebar-group-items
+  .sidebar-item:focus-visible
+  .sidebar-item-label {
+  display: block;
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0.35rem 0.7rem;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 10px;
+  box-shadow: var(--ui-shadow-md);
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: visible;
+  z-index: 60;
+  pointer-events: none;
+  animation: sidebar-flyout-in 0.12s var(--ui-ease, ease);
+}
+/* Dentro del flyout de un grupo los labels son texto normal, no burbuja. */
+.sidebar.collapsed .sidebar-dd-items .sidebar-item:hover .sidebar-item-label,
+.sidebar.collapsed .sidebar-dd-items .sidebar-item:focus-visible .sidebar-item-label {
+  position: static;
+  transform: none;
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  animation: none;
+  pointer-events: auto;
 }
 .sidebar.collapsed .sidebar-item-badge {
   position: absolute;

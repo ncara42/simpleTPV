@@ -262,7 +262,8 @@ export function Sidebar({
               type="button"
               className={`sidebar-item${isActive ? ' active' : ''}`}
               onClick={() => handleSelect(item.id)}
-              title={item.label}
+              // En rail la burbuja CSS ya enseña el nombre; el title nativo duplicaría.
+              title={collapsed ? undefined : item.label}
               aria-current={isActive ? 'page' : undefined}
               data-testid={`nav-${item.id}`}
             >
