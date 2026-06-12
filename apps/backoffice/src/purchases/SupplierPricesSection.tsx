@@ -209,6 +209,18 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
             >
               Añadir tarifa
             </button>
+            {/* Botón Columnas en el MISMO contenedor que el resto de controles. */}
+            <div className="ui-dt-cols">
+              <button
+                type="button"
+                className="ui-dt-cols-trigger"
+                onClick={toggleColumnsEditor}
+                data-testid="sp-columns-toggle"
+                aria-expanded={columnsEditorOpen}
+              >
+                Columnas
+              </button>
+            </div>
           </div>
         ) : (
           <div className="sales-filters">
@@ -240,19 +252,6 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
             rows={priceSorted}
             rowKey={(r) => r.id}
             loading={pricesLoading}
-            toolbar={
-              <div className="ui-dt-cols">
-                <button
-                  type="button"
-                  className="ui-dt-cols-trigger"
-                  onClick={toggleColumnsEditor}
-                  data-testid="sp-columns-toggle"
-                  aria-expanded={columnsEditorOpen}
-                >
-                  Columnas
-                </button>
-              </div>
-            }
             {...(sort ? { sort } : {})}
             onSortChange={(key) =>
               setSort((cur) =>

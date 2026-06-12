@@ -449,7 +449,6 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
   return (
     <section className="catalog">
       <div className="table-panel">
-        {toolbar}
         {columnsEditor}
         <DataTable
           columns={tableColumns}
@@ -457,17 +456,22 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
           rowKey={(p) => p.id}
           loading={isLoading}
           toolbar={
-            <div className="ui-dt-cols">
-              <button
-                type="button"
-                className="ui-dt-cols-trigger"
-                onClick={toggleColumnsEditor}
-                data-testid="catalog-columns-toggle"
-                aria-expanded={columnsEditorOpen}
-              >
-                Columnas
-              </button>
-            </div>
+            /* Patrón de Ventas: búsqueda/filtros/CTAs y el botón Columnas en
+               LA MISMA banda (toolbar del DataTable). */
+            <>
+              {toolbar}
+              <div className="ui-dt-cols">
+                <button
+                  type="button"
+                  className="ui-dt-cols-trigger"
+                  onClick={toggleColumnsEditor}
+                  data-testid="catalog-columns-toggle"
+                  aria-expanded={columnsEditorOpen}
+                >
+                  Columnas
+                </button>
+              </div>
+            </>
           }
           {...(sort ? { sort } : {})}
           onSortChange={onSortChange}
