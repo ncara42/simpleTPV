@@ -641,24 +641,26 @@
   }
 }
 
-/* Botón de contracción: mismo lenguaje que un item, anclado sobre el footer. */
+/* Botón de contracción a rail: icono en la CABECERA (junto al logo), visible a
+   primer golpe de vista. En móvil no aplica (el sidebar va off-canvas). */
 .sidebar-collapse {
-  display: flex;
+  margin-left: auto;
+  display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-  width: 100%;
-  border: 0;
-  background: none;
-  padding: 0.45rem 0.7rem;
-  border-radius: 10px;
-  font: inherit;
-  font-size: 0.84rem;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  border-radius: 8px;
   color: var(--ui-text-muted);
   cursor: pointer;
 }
 .sidebar-collapse:hover {
   color: var(--ui-text);
-  background: var(--sidebar-item-active-bg, rgba(0, 0, 0, 0.05));
+  border-color: var(--ui-border-strong);
+  background: var(--sidebar-item-hover-bg, rgba(0, 0, 0, 0.04));
 }
 .sidebar-collapse-icon {
   flex-shrink: 0;
@@ -666,6 +668,45 @@
 }
 .sidebar-collapse-icon.is-rail {
   transform: rotate(180deg);
+}
+/* En rail, la cabecera se apila: logo arriba, toggle debajo (caben en 56px). */
+.sidebar.collapsed .sidebar-header {
+  flex-direction: column;
+  height: auto;
+  padding: 0.65rem 0 0.35rem;
+  gap: 0.5rem;
+}
+.sidebar.collapsed .sidebar-collapse {
+  margin-left: 0;
+}
+@media (max-width: 767px) {
+  .sidebar-collapse {
+    display: none;
+  }
+}
+
+/* Hamburguesa móvil: única vía de abrir el sidebar off-canvas en <768px. */
+.sidebar-mobile-trigger {
+  display: none;
+}
+@media (max-width: 767px) {
+  .sidebar-mobile-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 0.7rem;
+    left: 0.75rem;
+    z-index: 60;
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--ui-border);
+    background: var(--ui-surface);
+    border-radius: 9999px;
+    color: var(--ui-text);
+    cursor: pointer;
+    box-shadow: var(--ui-shadow-sm);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .sidebar.collapsed .sidebar-dd-items {

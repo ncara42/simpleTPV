@@ -1916,9 +1916,10 @@
 .notif-status > * {
   white-space: nowrap;
 }
-/* Columnas no esenciales (Lote, Caducidad): se ocultan en pantallas estrechas
-   para dar aire; el descriptor del estado ya indica la urgencia. */
-@media (max-width: 640px) {
+/* Columnas no esenciales (Lote, Caducidad): se ocultan ya en anchos medios
+   (tablets/ventanas a medias) para dar aire; el descriptor del estado ya
+   indica la urgencia. */
+@media (max-width: 900px) {
   .notif-hide-narrow {
     display: none;
   }
