@@ -1,4 +1,4 @@
-import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Chart, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -9,6 +9,7 @@ import { listFamilies } from '../lib/families.js';
 import { flattenTree } from '../lib/family-tree.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { fmtEur } from '../lib/format.js';
+import { readPref, usePreferences } from '../lib/preferences.js';
 import { listProducts } from '../lib/products.js';
 import { listSuppliers } from '../lib/purchases.js';
 import {
@@ -119,6 +120,52 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
         return a.productName.localeCompare(b.productName) * dir;
       })
     : prices;
+
+  // ── Comparativa gráfica ──
+  // El tipo de gráfico (barras/línea) sigue la MISMA preferencia que el
+  // dashboard (dashboard.layout.chartKind): un solo toggle para toda la app.
+  const { prefs } = usePreferences();
+  const chartKind: 'bars' | 'line' =
+    readPref<{ chartKind?: 'bars' | 'line' }>(prefs, 'dashboard.layout', {}).chartKind === 'line'
+      ? 'line'
+      : 'bars';
+  // Búsqueda de producto/arquetipo (encima de la tabla) + selección por clic.
+  const [cmpSearch, setCmpSearch] = useState('');
+  const [cmpProductId, setCmpProductId] = useState<string | null>(null);
+  const cmpQuery = cmpSearch.trim().toLowerCase();
+  const filteredComparison = cmpQuery
+    ? comparison.filter(
+        (r) =>
+          r.productName.toLowerCase().includes(cmpQuery) ||
+          (r.sku ?? '').toLowerCase().includes(cmpQuery),
+      )
+    : comparison;
+  // Fila activa del gráfico de producto: la clicada o, si se está buscando,
+  // la primera coincidencia.
+  const activeRow =
+    (cmpProductId ? comparison.find((r) => r.productId === cmpProductId) : undefined) ??
+    (cmpQuery ? filteredComparison[0] : undefined) ??
+    null;
+  // Media y mediana del precio de compra POR PROVEEDOR sobre las filas visibles
+  // (respeta el filtro de arquetipo del toolbar).
+  const median = (xs: number[]): number => {
+    const s = [...xs].sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
+  };
+  const bySupplier = new Map<string, { name: string; prices: number[] }>();
+  for (const row of comparison) {
+    for (const pr of row.prices) {
+      const entry = bySupplier.get(pr.supplierId) ?? { name: pr.supplierName, prices: [] };
+      entry.prices.push(pr.price);
+      bySupplier.set(pr.supplierId, entry);
+    }
+  }
+  const cmpStats = [...bySupplier.values()].map((e) => ({
+    label: e.name,
+    media: e.prices.reduce((a, b) => a + b, 0) / e.prices.length,
+    mediana: median(e.prices),
+  }));
 
   // Comparativa: tabla de presentación (sin configuración de columnas).
   type CmpRow = (typeof comparison)[number];
@@ -268,19 +315,96 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
           />
         </>
       ) : (
-        <DataTable
-          columns={comparisonColumns}
-          rows={comparison}
-          rowKey={(r) => r.productId}
-          loading={comparisonLoading}
-          rowTestId="sp-comparison-row"
-          emptyState={
-            <span data-testid="sp-comparison-empty">
-              Sin tarifas que comparar para este arquetipo.
-            </span>
-          }
-          data-testid="sp-comparison-table"
-        />
+        <>
+          {/* Comparativa gráfica: media/mediana por proveedor + producto concreto.
+              Los gráficos responden al toggle barras↔línea del dashboard. */}
+          <div className="sp-cmp-charts">
+            <div className="sp-cmp-panel" data-testid="sp-cmp-avg">
+              <h3>Media y mediana por proveedor</h3>
+              {cmpStats.length === 0 ? (
+                <p className="catalog-empty">Sin tarifas que comparar.</p>
+              ) : (
+                <>
+                  <Chart
+                    data={cmpStats.map((s) => ({
+                      label: s.label,
+                      value: s.media,
+                      compareValue: s.mediana,
+                      valueText: `Media ${fmtEur(s.media)}`,
+                      compareText: `Mediana ${fmtEur(s.mediana)}`,
+                    }))}
+                    height={190}
+                    formatValue={fmtEur}
+                    kind={chartKind}
+                    ariaLabel="Precio medio y mediana por proveedor"
+                  />
+                  <div className="sp-cmp-legend">
+                    <span>
+                      <i className="sp-cmp-dot is-media" aria-hidden="true" /> Media
+                    </span>
+                    <span>
+                      <i className="sp-cmp-dot is-mediana" aria-hidden="true" /> Mediana
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="sp-cmp-panel" data-testid="sp-cmp-product">
+              <h3>
+                {activeRow ? `Comparativa · ${activeRow.productName}` : 'Comparar un producto'}
+              </h3>
+              {activeRow ? (
+                <Chart
+                  data={activeRow.prices.map((pr) => ({
+                    label: pr.supplierName,
+                    value: pr.price,
+                  }))}
+                  height={190}
+                  formatValue={fmtEur}
+                  kind={chartKind}
+                  ariaLabel={`Precios de ${activeRow.productName} por proveedor`}
+                />
+              ) : (
+                <p className="catalog-empty">
+                  Busca un producto o arquetipo (o pulsa una fila de la tabla) para comparar sus
+                  precios entre proveedores.
+                </p>
+              )}
+            </div>
+          </div>
+          <DataTable
+            columns={comparisonColumns}
+            rows={filteredComparison}
+            rowKey={(r) => r.productId}
+            loading={comparisonLoading}
+            toolbar={
+              <div className="sales-filters">
+                <span className="search-field">
+                  <input
+                    className="catalog-search"
+                    placeholder="Buscar producto o arquetipo…"
+                    value={cmpSearch}
+                    onChange={(e) => {
+                      setCmpSearch(e.target.value);
+                      setCmpProductId(null);
+                    }}
+                    data-testid="sp-cmp-search"
+                  />
+                </span>
+              </div>
+            }
+            onRowClick={(r) => setCmpProductId(r.productId)}
+            rowClassName={(r) => (r.productId === activeRow?.productId ? 'is-selected' : undefined)}
+            rowAriaSelected={(r) => r.productId === activeRow?.productId}
+            rowTestId="sp-comparison-row"
+            emptyState={
+              <span data-testid="sp-comparison-empty">
+                Sin tarifas que comparar para este arquetipo.
+              </span>
+            }
+            data-testid="sp-comparison-table"
+          />
+        </>
       )}
 
       {adding && (

@@ -3115,3 +3115,55 @@
   text-align: right;
   white-space: nowrap;
 }
+
+/* ─── Proveedores · Comparativa gráfica ─────────────────────────────────── */
+.sp-cmp-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--ui-space-4);
+  margin-bottom: var(--ui-space-4);
+}
+@media (max-width: 900px) {
+  .sp-cmp-charts {
+    grid-template-columns: 1fr;
+  }
+}
+.sp-cmp-panel {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md, 12px);
+  background: var(--ui-surface);
+  padding: var(--ui-space-4) var(--ui-space-5);
+}
+.sp-cmp-panel h3 {
+  margin: 0 0 var(--ui-space-4);
+  font-size: var(--ui-text-md);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sp-cmp-legend {
+  display: flex;
+  gap: 1rem;
+  margin-top: var(--ui-space-3);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
+}
+.sp-cmp-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.sp-cmp-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+.sp-cmp-dot.is-media {
+  background: var(--ui-brand);
+}
+.sp-cmp-dot.is-mediana {
+  background: var(--ui-border-strong);
+}
