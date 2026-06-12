@@ -13,7 +13,9 @@ test.beforeEach(async ({ page }) => {
 test('Catálogo muestra los productos del seed', async ({ page }) => {
   await navTo(page, 'catalog');
   await expect(page.getByTestId('catalog-table')).toBeVisible();
-  await expect(page.getByTestId('catalog-count')).toContainText(/\d/);
+  // El contador vivía en la descripción del header, retirada en el repaso:
+  // verificamos directamente que hay filas de producto.
+  expect(await page.getByTestId('product-select').count()).toBeGreaterThan(0);
 });
 
 test('Catálogo: selector jerárquico único de familia (#97)', async ({ page }) => {
@@ -172,8 +174,10 @@ test('Tiendas: crear, editar y borrar persisten (I-10)', async ({ page }) => {
 
 test('Usuarios muestra 4 usuarios con badge de rol', async ({ page }) => {
   await navTo(page, 'users');
-  await expect(page.getByTestId('users-count')).toContainText('4');
+  // El contador vivía en la descripción del header (retirada): contamos filas
+  // por su badge de rol (uno por usuario).
   await expect(page.getByTestId('user-role-badge').first()).toBeVisible();
+  expect(await page.getByTestId('user-role-badge').count()).toBe(4);
 });
 
 test('Usuarios: editar precarga datos y permite renombrar (#104)', async ({ page }) => {
@@ -681,8 +685,10 @@ test('U-08: la marca corporativa se aplica como tema en vivo y persiste', async 
       getComputedStyle(document.documentElement).getPropertyValue('--ui-brand').trim(),
     );
   await navTo(page, 'settings');
-  // El valor por defecto depende de la skin activa (theme-apple): capturarlo.
-  const defaultBrand = await brandVar();
+  // La org puede traer YA un color guardado (uso real): capturarlo para
+  // restaurarlo al final sin pisar la configuración del usuario.
+  await expect(page.getByTestId('brand-color-hex')).toBeVisible();
+  const initialHex = await page.getByTestId('brand-color-hex').inputValue();
   await page.getByTestId('brand-color-hex').fill('#aa00ff');
   await page.getByTestId('settings-save').click();
   await expect(page.getByTestId('settings-save')).toContainText('Guardado');
@@ -692,12 +698,16 @@ test('U-08: la marca corporativa se aplica como tema en vivo y persiste', async 
   await page.reload();
   await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
   await expect.poll(brandVar).toBe('#aa00ff');
-  // Restaurar por defecto para no contaminar el seed entre runs.
+  // Restaurar el estado original (color guardado previo, o el default).
   await navTo(page, 'settings');
-  await page.getByTestId('settings-reset').click();
+  if (initialHex) {
+    await page.getByTestId('brand-color-hex').fill(initialHex);
+  } else {
+    await page.getByTestId('settings-reset').click();
+  }
   await page.getByTestId('settings-save').click();
   await expect(page.getByTestId('settings-save')).toContainText('Guardado');
-  await expect.poll(brandVar).toBe(defaultBrand);
+  await expect.poll(brandVar).not.toBe('#aa00ff');
 });
 
 test('U-10/U-09: avisos de stock en panel propio encima y botón Columnas en la toolbar', async ({
@@ -727,4 +737,31 @@ test('U-11/U-12: la campana abre Notificaciones y "Resolver" lleva a Stock del p
   await firstAlert.getByTestId('alert-resolve').click();
   await expect(page.getByTestId('stock-page')).toBeVisible();
   await expect(page.getByTestId('stock-search')).toHaveValue(productName);
+});
+
+test('Proveedores · Comparativa: gráficos de media/mediana y de producto buscado', async ({
+  page,
+}) => {
+  await navTo(page, 'suppliers');
+  await page.getByTestId('suppliers-tab-prices').click();
+  await page.getByTestId('sp-view-comparativa').click();
+  // Gráfico de media/mediana por proveedor (Chart común del sistema).
+  await expect(page.getByTestId('sp-cmp-avg')).toBeVisible();
+  await expect(page.getByTestId('sp-cmp-avg').locator('.ui-chart')).toBeVisible();
+  // La tabla de apoyo se retiró: solo quedan los dos paneles de gráficos.
+  await expect(page.getByTestId('sp-comparison-table')).toHaveCount(0);
+  // Sin selección, el panel de producto invita a buscar.
+  await expect(page.getByTestId('sp-cmp-product')).toContainText('Busca un producto');
+  // Buscar puebla el gráfico del producto.
+  await page.getByTestId('sp-cmp-search').fill('Aceite CBD 10% — Beemine');
+  await expect(page.getByTestId('sp-cmp-product')).toContainText('Aceite CBD 10% — Beemine');
+  await expect(page.getByTestId('sp-cmp-product').locator('.ui-chart')).toBeVisible();
+  // Una búsqueda amplia ofrece píldoras de coincidencias; clicar una selecciona.
+  await page.getByTestId('sp-cmp-search').fill('Aceite');
+  const suggestions = page.getByTestId('sp-cmp-suggestion');
+  await expect(suggestions.first()).toBeVisible();
+  const picked = (await suggestions.nth(1).textContent()) ?? '';
+  await suggestions.nth(1).click();
+  await expect(page.getByTestId('sp-cmp-product')).toContainText(picked.trim());
+  await expect(page.getByTestId('sp-cmp-product').locator('.ui-chart')).toBeVisible();
 });

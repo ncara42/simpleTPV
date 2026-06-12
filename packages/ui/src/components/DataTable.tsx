@@ -15,6 +15,10 @@ export interface DataTableColumn<Row> {
   sortable?: boolean;
   /** Ancho CSS opcional de la columna (p. ej. "8rem"). */
   width?: string;
+  /** La celda no parte de línea (valores compuestos como "17,90 € · 60%"). */
+  noWrap?: boolean;
+  /** Se oculta en pantallas estrechas (≤640px) para no saturar. */
+  hideOnNarrow?: boolean;
 }
 
 export interface DataTableSort {
@@ -70,6 +74,15 @@ const ALIGN_CLASS: Record<DataTableAlign, string> = {
   right: 'ui-dt-col-right',
   center: 'ui-dt-col-center',
 };
+
+/** Clases de columna comunes a th y td (alineación + nowrap + ocultar en móvil). */
+function colClass<Row>(col: DataTableColumn<Row>): string {
+  return cn(
+    ALIGN_CLASS[col.align ?? 'left'],
+    col.noWrap && 'ui-dt-col-nowrap',
+    col.hideOnNarrow && 'ui-dt-col-narrow-hide',
+  );
+}
 
 function ariaSort(active: boolean, dir: SortDir | undefined): React.AriaAttributes['aria-sort'] {
   if (!active) return 'none';
@@ -145,7 +158,7 @@ export function DataTable<Row>({
                   <th
                     key={col.key}
                     scope="col"
-                    className={ALIGN_CLASS[col.align ?? 'left']}
+                    className={colClass(col)}
                     aria-sort={sortable ? ariaSort(active, sort?.dir) : undefined}
                     style={col.width ? { width: col.width } : undefined}
                   >
@@ -172,7 +185,7 @@ export function DataTable<Row>({
               {Array.from({ length: skeletonRows }, (_, r) => (
                 <tr key={`skel-${r}`} className="ui-dt-skeleton">
                   {columns.map((col) => (
-                    <td key={col.key} className={ALIGN_CLASS[col.align ?? 'left']}>
+                    <td key={col.key} className={colClass(col)}>
                       <div className="ui-dt-skel-bar" />
                     </td>
                   ))}
@@ -198,7 +211,7 @@ export function DataTable<Row>({
                       onClick={onRowClick ? () => onRowClick(row) : undefined}
                     >
                       {columns.map((col) => (
-                        <td key={col.key} className={ALIGN_CLASS[col.align ?? 'left']}>
+                        <td key={col.key} className={colClass(col)}>
                           {col.render ? col.render(row, i) : cellValue(row, col.key)}
                         </td>
                       ))}

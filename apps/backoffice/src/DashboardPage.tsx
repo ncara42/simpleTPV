@@ -1055,23 +1055,13 @@ function Rankings(props: {
   }
   const rows =
     tab === 'sales'
-      ? (props.data?.topSales ?? []).map((r) => ({
-          name: r.name,
-          value: fmtEur(r.total),
-          num: r.total,
-        }))
+      ? (props.data?.topSales ?? []).map((r) => ({ name: r.name, value: fmtEur(r.total) }))
       : tab === 'margin'
-        ? (props.data?.topMargin ?? []).map((r) => ({
-            name: r.name,
-            value: fmtEur(r.margin),
-            num: r.margin,
-          }))
+        ? (props.data?.topMargin ?? []).map((r) => ({ name: r.name, value: fmtEur(r.margin) }))
         : (props.data?.worstRotation ?? []).map((r) => ({
             name: r.name,
             value: `${fmtNum(r.units, 0)} ud`,
-            num: r.units,
           }));
-  const max = Math.max(1, ...rows.map((r) => r.num));
 
   return (
     <>
@@ -1091,18 +1081,10 @@ function Rankings(props: {
       ) : (
         <ol className="dash-rank-list" data-testid="rank-table">
           {rows.map((r, i) => (
-            <li
-              key={`${r.name}-${i}`}
-              className="dash-rank-row"
-              style={{ '--i': i } as React.CSSProperties}
-            >
+            <li key={`${r.name}-${i}`} className="dash-rank-row">
               <span className="dash-rank-pos">{i + 1}</span>
               <span className="dash-rank-name">{r.name}</span>
               <span className="dash-rank-value">{r.value}</span>
-              <span
-                className="dash-rank-meter"
-                style={{ '--w': `${(r.num / max) * 100}%` } as React.CSSProperties}
-              />
             </li>
           ))}
         </ol>

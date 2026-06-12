@@ -275,89 +275,91 @@ export function GlobalStockSection({
       )}
 
       <div className="table-panel">
-        <div className="stock-filters">
-          <div className="stock-filter-group">
-            <span className="stock-filter-label">Producto</span>
-            <span className="search-field">
-              <input
-                className="catalog-search"
-                placeholder="Buscar producto…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                data-testid="stock-search"
-              />
-            </span>
-            <Select
-              className="catalog-search"
-              value={familyId}
-              onChange={(value) => setFamilyId(value)}
-              ariaLabel="Filtrar por familia"
-              data-testid="stock-family"
-              options={[
-                { value: '', label: 'Todas las familias' },
-                ...families.map((f) => ({ value: f.id, label: f.name })),
-              ]}
-            />
-            <Select
-              className="catalog-search"
-              value={rotation}
-              onChange={(value) => setRotation(value)}
-              ariaLabel="Filtrar por rotación"
-              data-testid="stock-rotation"
-              options={[
-                { value: '', label: 'Toda rotación' },
-                { value: 'alta', label: 'Rotación alta' },
-                { value: 'media', label: 'Rotación media' },
-                { value: 'baja', label: 'Rotación baja' },
-              ]}
-            />
-          </div>
-          <div className="stock-filter-group">
-            <span className="stock-filter-label">Tienda</span>
-            <Select
-              className="catalog-search"
-              value={storeId}
-              onChange={(value) => setStoreId(value)}
-              ariaLabel="Filtrar por tienda"
-              data-testid="stock-store"
-              options={[
-                { value: '', label: 'Todas las tiendas' },
-                ...storeOptions.map((s) => ({ value: s.id, label: s.name })),
-              ]}
-            />
-          </div>
-          <div className="stock-filter-group">
-            <span className="stock-filter-label">Roturas</span>
-            <button
-              type="button"
-              className={`stock-alert-toggle${alertsOnly ? ' is-on' : ''}`}
-              onClick={() => setAlertsOnly((v) => !v)}
-              aria-pressed={alertsOnly}
-              data-testid="stock-alerts-only"
-            >
-              Solo en alerta
-            </button>
-          </div>
-          {/* U-09: el botón de columnas vive en la toolbar (no flotando sobre las
-              cabeceras de la tabla). margin-left:auto lo ancla a la derecha. */}
-          <div className="stock-filter-group stock-filter-group--end">
-            <button
-              type="button"
-              className="config-trigger"
-              onClick={toggleColumnsEditor}
-              data-testid="stock-columns-toggle"
-              aria-expanded={columnsEditorOpen}
-            >
-              Columnas
-            </button>
-          </div>
-        </div>
         {columnsEditor}
         <DataTable
           columns={tableColumns}
           rows={sortedRows}
           rowKey={(r) => r.productId}
           loading={isLoading}
+          toolbar={
+            /* Patrón de Ventas: filtros y botón Columnas en LA MISMA banda
+               (el toolbar del DataTable), no en contenedores separados. */
+            <>
+              <div className="stock-filter-group">
+                <span className="stock-filter-label">Producto</span>
+                <span className="search-field">
+                  <input
+                    className="catalog-search"
+                    placeholder="Buscar producto…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    data-testid="stock-search"
+                  />
+                </span>
+                <Select
+                  className="catalog-search"
+                  value={familyId}
+                  onChange={(value) => setFamilyId(value)}
+                  ariaLabel="Filtrar por familia"
+                  data-testid="stock-family"
+                  options={[
+                    { value: '', label: 'Todas las familias' },
+                    ...families.map((f) => ({ value: f.id, label: f.name })),
+                  ]}
+                />
+                <Select
+                  className="catalog-search"
+                  value={rotation}
+                  onChange={(value) => setRotation(value)}
+                  ariaLabel="Filtrar por rotación"
+                  data-testid="stock-rotation"
+                  options={[
+                    { value: '', label: 'Toda rotación' },
+                    { value: 'alta', label: 'Rotación alta' },
+                    { value: 'media', label: 'Rotación media' },
+                    { value: 'baja', label: 'Rotación baja' },
+                  ]}
+                />
+              </div>
+              <div className="stock-filter-group">
+                <span className="stock-filter-label">Tienda</span>
+                <Select
+                  className="catalog-search"
+                  value={storeId}
+                  onChange={(value) => setStoreId(value)}
+                  ariaLabel="Filtrar por tienda"
+                  data-testid="stock-store"
+                  options={[
+                    { value: '', label: 'Todas las tiendas' },
+                    ...storeOptions.map((s) => ({ value: s.id, label: s.name })),
+                  ]}
+                />
+              </div>
+              <div className="stock-filter-group">
+                <span className="stock-filter-label">Roturas</span>
+                <button
+                  type="button"
+                  className={`stock-alert-toggle${alertsOnly ? ' is-on' : ''}`}
+                  onClick={() => setAlertsOnly((v) => !v)}
+                  aria-pressed={alertsOnly}
+                  data-testid="stock-alerts-only"
+                >
+                  Solo en alerta
+                </button>
+              </div>
+              <div className="ui-dt-cols">
+                <button
+                  type="button"
+                  className="ui-dt-cols-trigger"
+                  onClick={toggleColumnsEditor}
+                  data-testid="stock-columns-toggle"
+                  aria-expanded={columnsEditorOpen}
+                >
+                  Columnas
+                </button>
+              </div>
+            </>
+          }
           {...(sort ? { sort } : {})}
           onSortChange={(key) =>
             setSort((cur) =>

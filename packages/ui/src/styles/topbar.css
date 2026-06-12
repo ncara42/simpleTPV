@@ -242,3 +242,10 @@
   max-height: 21rem;
   overflow-y: auto;
 }
+
+/* Móvil: hueco a la izquierda para la hamburguesa fija del sidebar. */
+@media (max-width: 767px) {
+  .topbar {
+    padding-left: 3.6rem;
+  }
+}

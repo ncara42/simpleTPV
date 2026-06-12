@@ -77,16 +77,18 @@ export function NotificationsPage({ onResolve }: { onResolve?: NotifResolve }) {
                     <td>
                       {/* Degradación por arquetipo: una rotura con sustituto en la
                           familia se pinta como aviso (amarillo), no como crítica (rojo). */}
-                      <span
-                        className={`stock-tag stock-${a.severity === 'critical' ? 'red' : 'yellow'}`}
-                      >
-                        {ALERT_LABEL[a.alertType] ?? a.alertType}
-                      </span>
-                      {a.hasSubstituteStock && (
-                        <span className="alert-substitute" data-testid="alert-substitute">
-                          · hay sustituto
+                      <span className="notif-status">
+                        <span
+                          className={`stock-tag stock-${a.severity === 'critical' ? 'red' : 'yellow'}`}
+                        >
+                          {ALERT_LABEL[a.alertType] ?? a.alertType}
                         </span>
-                      )}
+                        {a.hasSubstituteStock && (
+                          <span className="alert-substitute" data-testid="alert-substitute">
+                            hay sustituto
+                          </span>
+                        )}
+                      </span>
                     </td>
                     <td className="notif-action-cell">
                       <button
@@ -124,8 +126,8 @@ export function NotificationsPage({ onResolve }: { onResolve?: NotifResolve }) {
                 <tr>
                   <th>Producto</th>
                   <th>Tienda</th>
-                  <th>Lote</th>
-                  <th>Caducidad</th>
+                  <th className="notif-hide-narrow">Lote</th>
+                  <th className="notif-hide-narrow">Caducidad</th>
                   <th>Cantidad</th>
                   <th>Estado</th>
                   <th aria-label="Acción" />
@@ -136,14 +138,16 @@ export function NotificationsPage({ onResolve }: { onResolve?: NotifResolve }) {
                   <tr key={b.id} data-testid="expiring-row">
                     <td>{b.productName}</td>
                     <td>{b.storeName}</td>
-                    <td>{b.lotCode}</td>
-                    <td>{df.format(new Date(b.expiryDate))}</td>
+                    <td className="notif-hide-narrow">{b.lotCode}</td>
+                    <td className="notif-hide-narrow">{df.format(new Date(b.expiryDate))}</td>
                     <td>{b.quantity}</td>
                     <td>
-                      <span className={`expiry-tag expiry-${b.status}`}>
-                        {EXPIRY_LABEL[b.status] ?? b.status}
+                      <span className="notif-status">
+                        <span className={`expiry-tag expiry-${b.status}`}>
+                          {EXPIRY_LABEL[b.status] ?? b.status}
+                        </span>
+                        <span className="expiry-when">{expiryDaysText(b.daysToExpiry)}</span>
                       </span>
-                      <span className="expiry-when">· {expiryDaysText(b.daysToExpiry)}</span>
                     </td>
                     <td className="notif-action-cell">
                       <button
