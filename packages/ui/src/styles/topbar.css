@@ -200,13 +200,15 @@
   }
 }
 
-/* ─── U-06: búsqueda de funciones en el header ──────────────────────────── */
+/* ─── U-06 (revisado): búsqueda de funciones en el clúster derecho del header,
+   entre la campana y el conmutador de app. Ancho contenido: la zona izquierda
+   es del título de la vista. ── */
 .topbar-search {
   position: relative;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  width: min(26rem, 100%);
+  width: min(19rem, 34vw);
 }
 .topbar-search-icon {
   position: absolute;

@@ -25,11 +25,12 @@ export function fmtEurCompact(value: number | null | undefined): string {
 }
 
 // Proporción 0–1 → porcentaje "12,3 %". Útil para tasas (descuento, margen…).
+// Coma decimal como fmtEur: todo el dashboard comparte separador es-ES.
 export function fmtRate(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return '—';
   }
-  return `${(value * 100).toFixed(1)} %`;
+  return `${(value * 100).toFixed(1).replace('.', ',')} %`;
 }
 
 // Delta ya en puntos porcentuales (p.ej. 145 = +145%). null → "—". Añade signo.
@@ -38,7 +39,7 @@ export function fmtDelta(value: number | null | undefined): string {
     return '—';
   }
   const sign = value > 0 ? '+' : '';
-  return `${sign}${value.toFixed(1)} %`;
+  return `${sign}${value.toFixed(1).replace('.', ',')} %`;
 }
 
 // Color semántico del delta: sube → verde, baja → rojo, igual/null → neutro.
@@ -68,12 +69,12 @@ export function invertTone(tone: 'up' | 'down' | 'flat'): 'up' | 'down' | 'flat'
   return tone === 'up' ? 'down' : tone === 'down' ? 'up' : 'flat';
 }
 
-// Número con decimales fijos (UPT, unidades). null → "—".
+// Número con decimales fijos (UPT, unidades). null → "—". Coma decimal es-ES.
 export function fmtNum(value: number | null | undefined, decimals = 2): string {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return '—';
   }
-  return value.toFixed(decimals);
+  return value.toFixed(decimals).replace('.', ',');
 }
 
 // Horas → texto humano: 1.5 → "1,5 h"; null → "—".

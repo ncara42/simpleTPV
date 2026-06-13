@@ -667,7 +667,8 @@ test('U-04: sidebar contraído a rail — flyout lateral con anclaje y navegaci�
 });
 
 test('U-06: la búsqueda de funciones del header navega por nombre y sinónimo', async ({ page }) => {
-  // El título de la page vive bajo el header (PageHeading), no en la TopBar.
+  // El título de la page vive a la izquierda de la TopBar; la búsqueda, en el
+  // clúster derecho (campana · buscador · conmutador de app).
   await expect(page.getByTestId('page-heading')).toBeVisible();
   // Por sinónimo: "tarifas" → Proveedores.
   await page.getByTestId('function-search-input').fill('tarifas');

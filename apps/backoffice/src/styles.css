@@ -3,6 +3,11 @@
 @import '@simpletpv/ui/theme-apple.css';
 @import '@simpletpv/ui/sidebar.css';
 
+/* Tailwind 4 no escanea node_modules y el `content` de tailwind.config.ts (formato
+   v3) se ignora: sin esta directiva, las utilidades que usan los componentes de
+   @simpletpv/ui (Badge, etc.) no se generan y llegan sin estilo al navegador. */
+@source '../../../packages/ui/src';
+
 /* La Fundación Apple compartida (tokens, body, shell, topbar) vive en
    @simpletpv/ui/theme-apple.css. Aquí solo lo específico del backoffice. */
 
@@ -260,23 +265,6 @@
     box-shadow: none;
     max-width: none;
   }
-}
-
-/* ─── U-06 (repaso): título de la page bajo el header, ALINEADO con el
-   contenido. El contenido (.catalog) va max-width:75rem centrado dentro del
-   padding de .bo-main; el título replica ese contenedor (sin padding propio)
-   para que su borde izquierdo coincida exactamente. ── */
-.bo-page-heading {
-  max-width: 75rem;
-  margin: 0 auto;
-  padding: 0 0 1rem;
-}
-.bo-page-title {
-  margin: 0;
-  font-size: 1.32rem;
-  font-weight: 650;
-  letter-spacing: -0.022em;
-  color: var(--ui-text);
 }
 
 /* ─── U-08: Ajustes — sección Marca ─────────────────────────────────────── */

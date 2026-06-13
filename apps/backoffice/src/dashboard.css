@@ -187,11 +187,21 @@
 .dash-panel {
   position: relative; /* ancla leyendas/controles en la esquina del panel */
   grid-column: span 12;
+  display: flex; /* columna: permite que el gráfico crezca y llene el alto */
+  flex-direction: column;
   padding: 1.4rem 1.5rem;
   border: 1px solid var(--ui-border);
   border-radius: 18px;
   background: var(--ui-surface);
   min-width: 0;
+}
+/* La rejilla iguala alturas por fila: el gráfico crece para llenar el panel en
+   vez de dejar media tarjeta vacía bajo el eje. El height inline del <Chart>
+   (prop) pasa a ser solo el mínimo. */
+.dash-panel > .ui-chart {
+  flex: 1;
+  height: auto !important;
+  min-height: 200px;
 }
 .dash-panel.span-7 {
   grid-column: span 7;
@@ -259,16 +269,26 @@
 .dash-family-list {
   list-style: none;
   margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
+  /* Altura fija con scroll interno: la lista (12+ familias) ya no estira la fila
+     y, con ella, el gráfico vecino. Muestra ~6 filas; el resto se desplaza. */
+  max-height: 13rem;
+  overflow-y: auto;
+  overflow-x: clip;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  padding: 0 0.35rem 0 0;
+  display: grid;
+  /* La columna de etiqueta se ciñe al nombre más largo (tope 12rem): evita
+     truncar "Jon Aguirre · 62 tickets" cuando la pista tiene espacio de sobra.
+     Las filas la comparten vía subgrid → todas las barras arrancan en la misma x. */
+  grid-template-columns: fit-content(12rem) 1fr;
+  gap: 0.85rem 0.8rem;
 }
 .dash-family-list li {
   display: grid;
-  grid-template-columns: 7.5rem 1fr;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: 0.8rem;
   padding-right: 0.4rem;
 }
 /* U-01: sin atenuación del resto al hover — el feedback es el badge de importe. */
@@ -305,32 +325,52 @@
     transform: scaleX(0);
   }
 }
-/* U-01 (repaso): el importe es un badge PEGADO al final de la pista, del mismo
-   color que la barra (primary) — se materializa al hover/focus de la fila. */
-.dash-family-pct {
+/* Valor 0: sin píldora mínima — el min-width de 8px pintaba una barra azul que
+   sugería un valor inexistente. El badge de importe al hover sigue funcionando
+   (se ancla a la pista, no al relleno). */
+.dash-family-fill.is-zero {
+  min-width: 0;
+}
+/* Importe SIEMPRE visible (sin hover) y CENTRADO en el carril: dos capas idénticas
+   superpuestas en el mismo punto (centro del carril). La base es oscura (legible
+   sobre el carril claro); encima, una copia blanca recortada con clip-path a la
+   zona exacta del relleno azul → el número se parte por color justo donde acaba la
+   barra y contrasta con el fondo que tenga debajo en cada mitad. */
+.dash-family-val {
   position: absolute;
-  right: 0;
+  left: 50%;
   top: 50%;
-  transform: translateY(-50%);
-  padding: 0.12rem 0.55rem;
-  border-radius: 9999px;
-  background: var(--ui-primary);
-  font-size: 0.7rem;
+  transform: translate(-50%, -50%);
+  font-size: 0.72rem;
   font-weight: 600;
-  color: var(--ui-primary-fg);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 0.12s var(--ui-ease, ease);
+  animation: dash-val-in 0.35s ease backwards;
+  animation-delay: calc(var(--i, 0) * 70ms + 0.18s);
 }
-.dash-family-list li:hover .dash-family-pct,
-.dash-family-list li:focus-within .dash-family-pct {
-  opacity: 1;
+.dash-family-val-base {
+  color: var(--ui-text);
+}
+/* Capa recortada al ancho del relleno (clip-path inline al pct%): solo se ve la
+   parte del número que cae sobre la barra azul, en blanco. */
+.dash-family-clip {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.dash-family-val-fill {
+  color: #fff;
+}
+@keyframes dash-val-in {
+  from {
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .dash-family-fill,
+  .dash-family-val,
   .dash-rank-meter::after {
     animation: none;
   }
@@ -407,7 +447,9 @@
   justify-content: space-between;
   align-items: baseline;
   border-top: 1px solid var(--ui-border);
-  margin-top: 1rem;
+  /* El panel es flex column: el pie se ancla abajo cuando la fila estira el
+     panel más allá de su contenido (antes quedaba un vacío bajo el pie). */
+  margin-top: auto;
   padding-top: 0.85rem;
   font-size: 0.85rem;
   color: var(--ui-text-muted);
@@ -442,7 +484,14 @@
 .dash-rank-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  /* Misma estrategia que familia: altura fija con scroll para no estirar la fila
+     de "Ventas por hora". Muestra ~6 posiciones; el resto se desplaza. */
+  max-height: 14rem;
+  overflow-y: auto;
+  overflow-x: clip;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  padding: 0 0.35rem 0 0;
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
@@ -720,7 +769,10 @@
 }
 .dash-timeclock-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto;
+  /* Columnas de ancho FIJO para horario y trabajado: cada <li> es su propio
+     grid, así que con `auto` el ancho dependía del contenido y las columnas
+     bailaban entre filas ("5h 00m" vs "11h 46m"). */
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 9.5rem 4.5rem;
   align-items: center;
   gap: 1rem;
   padding: 0.45rem 0;
@@ -738,6 +790,11 @@
   color: var(--ui-text-muted);
   font-size: 0.85rem;
 }
+.dash-timeclock-times,
+.dash-timeclock-worked {
+  text-align: right;
+  white-space: nowrap;
+}
 .dash-timeclock-worked {
   font-weight: 600;
   font-size: 0.88rem;
@@ -753,7 +810,9 @@
 }
 .dash-suppliers-row {
   display: grid;
-  grid-template-columns: minmax(0, 16rem) 1fr;
+  /* Se ciñe al nombre más largo (tope 24rem): el panel es a todo lo ancho y
+     truncar a 16rem dejaba elipsis con espacio libre de sobra a la derecha. */
+  grid-template-columns: fit-content(24rem) 1fr;
   align-items: center;
   gap: 1rem;
   padding: 0.45rem 0;

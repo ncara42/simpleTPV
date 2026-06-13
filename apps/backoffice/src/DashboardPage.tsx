@@ -500,6 +500,11 @@ export function DashboardPage({
             <p className="dash-panel-sub">Facturación neta por tienda</p>
             {(() => {
               const stores = salesToday.data?.byStore ?? [];
+              // Sin tiendas con ventas (p. ej. almacén filtrado): estado vacío en vez
+              // de un panel en blanco.
+              if (stores.length === 0) {
+                return <p className="catalog-empty">Sin ventas hoy ni ayer.</p>;
+              }
               // U-01: Chart común (color constante, tooltip lateral con Hoy/Ayer/delta).
               return (
                 <>
@@ -515,6 +520,7 @@ export function DashboardPage({
                     height={200}
                     formatValue={fmtEurCompact}
                     kind={chartKind}
+                    showValues
                     ariaLabel="Ventas hoy vs ayer por tienda"
                   />
                   <div className="dash-bars-legend">
@@ -548,13 +554,7 @@ export function DashboardPage({
                         style={{ '--i': i } as React.CSSProperties}
                       >
                         <span className="dash-family-name">{f.familyName}</span>
-                        <span className="dash-family-track">
-                          <span
-                            className="dash-family-fill"
-                            style={{ width: `${(f.total / max) * 100}%` }}
-                          />
-                          <span className="dash-family-pct">{fmtEur(f.total)}</span>
-                        </span>
+                        <BarTrack pct={(f.total / max) * 100} value={fmtEur(f.total)} />
                       </li>
                     );
                   })}
@@ -721,13 +721,18 @@ export function DashboardPage({
           <div className="dash-panel span-7" data-testid="dash-hour">
             <h3>Ventas por hora</h3>
             <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]} · importe por franja</p>
-            <Chart
-              data={(byHour.data ?? []).map((h) => ({ label: `${h.hour}h`, value: h.revenue }))}
-              height={200}
-              formatValue={fmtEurCompact}
-              kind={chartKind}
-              ariaLabel="Ventas por hora"
-            />
+            {(byHour.data ?? []).length === 0 ? (
+              <p className="catalog-empty">Sin ventas en el periodo.</p>
+            ) : (
+              <Chart
+                data={(byHour.data ?? []).map((h) => ({ label: `${h.hour}h`, value: h.revenue }))}
+                height={200}
+                formatValue={fmtEurCompact}
+                kind={chartKind}
+                showValues
+                ariaLabel="Ventas por hora"
+              />
+            )}
           </div>
         )}
 
@@ -750,13 +755,7 @@ export function DashboardPage({
                         {e.userName}
                         <span className="dash-rotation-arch"> · {e.salesCount} tickets</span>
                       </span>
-                      <span className="dash-family-track">
-                        <span
-                          className="dash-family-fill"
-                          style={{ width: `${(e.total / max) * 100}%` }}
-                        />
-                        <span className="dash-family-pct">{fmtEur(e.total)}</span>
-                      </span>
+                      <BarTrack pct={(e.total / max) * 100} value={fmtEur(e.total)} />
                     </li>
                   ))}
                 </ul>
@@ -780,14 +779,10 @@ export function DashboardPage({
                   {emps.map((e, i) => (
                     <li key={e.userId} style={{ '--i': i } as React.CSSProperties}>
                       <span className="dash-family-name">{e.userName}</span>
-                      <span className="dash-family-track">
-                        <span
-                          className="dash-family-fill"
-                          style={{ width: `${(e.avgDiscountPct / max) * 100}%` }}
-                        >
-                          <span className="dash-family-pct">{fmtRate(e.avgDiscountPct)}</span>
-                        </span>
-                      </span>
+                      <BarTrack
+                        pct={(e.avgDiscountPct / max) * 100}
+                        value={fmtRate(e.avgDiscountPct)}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -985,6 +980,27 @@ export function DashboardPage({
   );
 }
 
+// Pista de barra horizontal con el valor SIEMPRE visible (sin hover) y CENTRADO en
+// el carril (mismo eje para todas las filas → coherencia visual). El color se parte
+// según el fondo para contrastar aunque la punta de la barra caiga en mitad del
+// número: dos capas superpuestas y centradas — una oscura (sobre el carril claro) y
+// otra blanca recortada exactamente a la zona del relleno azul (clip-path al pct%).
+// Compartida por familia, ventas por vendedor y descuento por empleado.
+function BarTrack({ pct, value }: { pct: number; value: string }) {
+  return (
+    <span className="dash-family-track">
+      <span
+        className={`dash-family-fill${pct === 0 ? ' is-zero' : ''}`}
+        style={{ width: `${pct}%` }}
+      />
+      <span className="dash-family-val dash-family-val-base">{value}</span>
+      <span className="dash-family-clip" style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}>
+        <span className="dash-family-val dash-family-val-fill">{value}</span>
+      </span>
+    </span>
+  );
+}
+
 type SparkTone = 'brand' | 'up' | 'down';
 
 function KpiCard(props: {
@@ -998,7 +1014,8 @@ function KpiCard(props: {
   const tone = deltaTone(props.delta);
   return (
     <div className="dash-card-wrap">
-      {props.delta !== undefined && (
+      {/* Sin delta calculable (null) el chip se oculta: un "—" flotante parece roto. */}
+      {props.delta != null && (
         <span className={`dash-card-trend dash-trend-${tone}`}>{fmtDelta(props.delta)}</span>
       )}
       <div className="dash-card" data-testid={props.testid}>

@@ -38,6 +38,8 @@
 
 /* ── Chart (barras verticales con comparación) ──────────────────────────────── */
 .ui-chart {
+  /* Alto de la etiqueta bajo cada barra: ancla de la base hairline continua. */
+  --ui-chart-name-h: 1rem;
   display: flex;
   align-items: stretch;
   justify-content: space-around;
@@ -79,13 +81,19 @@ button.ui-chart-group:focus-visible {
   flex: 1;
   width: 100%;
   min-height: 0;
-  border-bottom: 1px solid var(--ui-border-strong); /* línea base */
+  /* La línea base ya NO vive aquí (se segmentaba por columna). Es una hairline
+     continua a todo el ancho, dibujada por .ui-chart::after a la altura de las
+     bases de las barras (justo encima de las etiquetas). */
 }
+/* Barras refinadas: ancho FIJO para que todas midan igual en cualquier gráfico
+   (antes el max-width en % las hacía variar según el nº de columnas: más anchas en
+   "hoy vs ayer" (5 grupos) que en "por hora" (12 franjas)). El max-width al 70% es
+   solo un tope de seguridad para anchos extremos; en escritorio nunca llega a atar. */
 .ui-chart-bar {
-  width: 38px;
-  max-width: 56%;
+  width: 22px;
+  max-width: 70%;
   min-height: 4px;
-  border-radius: 7px 7px 0 0;
+  border-radius: 5px 5px 0 0;
   transform-origin: bottom;
   animation: ui-bar-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   animation-delay: calc(var(--i, 0) * 70ms);
@@ -94,7 +102,51 @@ button.ui-chart-group:focus-visible {
   background: var(--ui-border-strong);
 }
 .ui-chart-bar-value {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--ui-brand) 82%, #fff), var(--ui-brand));
+  position: relative; /* ancla de la etiqueta de valor siempre visible */
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ui-brand) 90%, #fff), var(--ui-brand));
+}
+/* Valor siempre visible (showValues): girado 90° (lee de arriba abajo), centrado
+   en el ancho de la barra. Dentro = blanco anclado a la cima; si no cabe, encima
+   de la barra en gris. Números tabulares y muy compactos. */
+.ui-chart-val {
+  position: absolute;
+  left: 50%;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  line-height: 1;
+}
+.ui-chart-val-inside {
+  top: 5px;
+  /* rotate(180°): el número lee de abajo arriba (el € queda arriba), no al revés. */
+  transform: translateX(-50%) rotate(180deg);
+  color: #fff;
+}
+.ui-chart-val-above {
+  bottom: calc(100% + 4px);
+  transform: translateX(-50%) rotate(180deg);
+  color: var(--ui-text-muted);
+}
+/* Base hairline continua (solo en modo barras; el modo línea usa el borde de
+   .ui-chart-line-canvas). Se ancla a la altura de la base de las barras: alto de
+   la etiqueta (--ui-chart-name-h) + el gap entre barras y etiqueta del grupo. */
+.ui-chart:not(.ui-chart-line) {
+  position: relative;
+}
+.ui-chart:not(.ui-chart-line)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--ui-chart-name-h, 1rem) + 0.5rem);
+  height: 1px;
+  background: var(--ui-border-strong);
+  pointer-events: none;
 }
 @keyframes ui-bar-rise {
   from {
@@ -216,6 +268,8 @@ button.ui-chart-group:focus-visible {
 .ui-chart-line-names {
   display: flex;
   align-items: center;
+  /* Aire mínimo entre etiquetas: con los slots llenos quedaban pegadas. */
+  gap: 0.5rem;
 }
 .ui-chart-line-names .ui-chart-name {
   flex: 1;
@@ -225,12 +279,19 @@ button.ui-chart-group:focus-visible {
 .ui-chart-name {
   font-size: 0.8rem;
   font-weight: 500;
+  line-height: 1.25; /* 0.8rem × 1.25 = 1rem → coincide con --ui-chart-name-h */
   letter-spacing: -0.012em;
   color: var(--ui-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+/* Etiquetas cortas ("10h"): elipsarlas a "1…" las hace ilegibles; mejor dejar
+   que sobresalgan 1-2px del slot en anchos estrechos. */
+.ui-chart-name-short {
+  overflow: visible;
+  text-overflow: clip;
 }
 
 @media (prefers-reduced-motion: reduce) {

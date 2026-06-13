@@ -92,10 +92,11 @@ const ALL_NAV: NavItem[] = [
 const HIDDEN_TABS = new Set<Tab>(['notifications', 'verifactu']);
 const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab));
 
-// U-06: la TopBar aloja la búsqueda de funciones (Ctrl+K); el título/descriptor
-// de la vista activa viven en PageHeading, bajo el header. U-11/D-17: la campana
-// vuelve a la TopBar con el badge de roturas y abre Notificaciones (esa page sigue
-// fuera del menú lateral; la campana es su acceso, como dictaba D-09).
+// U-06 (revisado): el título de la vista activa vive a la IZQUIERDA de la TopBar
+// (vía usePageHeader, como en el TPV) y la búsqueda de funciones (Ctrl+K) pasa al
+// clúster derecho, entre la campana y el conmutador de app. La descripción sigue
+// retirada (ensuciaba y no aportaba). U-11/D-17: la campana abre Notificaciones
+// con el badge de roturas (esa page sigue fuera del menú lateral, D-09).
 function ShellTopBar({
   onNavigate,
   onNotifications,
@@ -107,8 +108,11 @@ function ShellTopBar({
   notificationCount: number;
   notificationsActive: boolean;
 }) {
+  const { title } = usePageHeaderValue();
   return (
     <TopBar
+      title={title}
+      titleTestId="page-heading"
       search={<FunctionSearch onNavigate={onNavigate} />}
       activeApp="backoffice"
       onSwitchApp={switchApp}
@@ -116,21 +120,6 @@ function ShellTopBar({
       notificationCount={notificationCount}
       notificationsActive={notificationsActive}
     />
-  );
-}
-
-// U-06 (repaso): solo el TÍTULO de la page bajo la TopBar, alineado con el
-// contenido (mismo max-width centrado que .catalog). La descripción se retiró:
-// ensuciaba y no aportaba.
-function PageHeading() {
-  const { title } = usePageHeaderValue();
-  if (!title) return null;
-  return (
-    <div className="bo-page-heading" data-testid="page-heading">
-      <h1 className="bo-page-title" title={title}>
-        {title}
-      </h1>
-    </div>
   );
 }
 
@@ -211,7 +200,6 @@ function Home() {
             notificationsActive={tab === 'notifications'}
           />
           <main className="bo-main">
-            <PageHeading />
             {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
                 embebe la tabla — enlaza con "Ver todas las ventas →". */}
             {tab === 'dashboard' && <DashboardPage onNavigate={(t) => setTab(t)} />}

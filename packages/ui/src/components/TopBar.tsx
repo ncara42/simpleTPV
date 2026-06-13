@@ -18,9 +18,12 @@ export interface TopBarProps {
   subtitle?: string | undefined;
   /** data-testid opcional para el subtítulo (preserva hooks de e2e como `catalog-count`). */
   subtitleTestId?: string | undefined;
+  /** data-testid opcional para el título (preserva hooks de e2e como `page-heading`). */
+  titleTestId?: string | undefined;
   /**
-   * U-06: slot de búsqueda. Si se aporta, ocupa la zona izquierda de la barra
-   * (el título/descriptor de la page pasan a vivir bajo el header, en la page).
+   * U-06 (revisado): slot de búsqueda. Se pinta en la zona DERECHA de la barra,
+   * entre la campana y el conmutador de app; la zona izquierda queda para el
+   * título de la vista activa.
    */
   search?: React.ReactNode;
   activeApp?: 'backoffice' | 'tpv';
@@ -57,6 +60,7 @@ export function TopBar({
   title,
   subtitle,
   subtitleTestId,
+  titleTestId,
   search,
   activeApp = 'tpv',
   onSwitchApp,
@@ -67,20 +71,16 @@ export function TopBar({
   return (
     <header className="topbar" data-testid="topbar">
       <div className="topbar-left">
-        {search ?? (
-          <>
-            {eyebrow && <span className="topbar-eyebrow">{eyebrow}</span>}
-            {title && (
-              <h1 className="topbar-title" title={title}>
-                {title}
-              </h1>
-            )}
-            {title && subtitle && (
-              <p className="topbar-subtitle" data-testid={subtitleTestId} title={subtitle}>
-                {subtitle}
-              </p>
-            )}
-          </>
+        {eyebrow && <span className="topbar-eyebrow">{eyebrow}</span>}
+        {title && (
+          <h1 className="topbar-title" title={title} data-testid={titleTestId}>
+            {title}
+          </h1>
+        )}
+        {title && subtitle && (
+          <p className="topbar-subtitle" data-testid={subtitleTestId} title={subtitle}>
+            {subtitle}
+          </p>
         )}
       </div>
       <div className="topbar-right">
@@ -106,6 +106,7 @@ export function TopBar({
             )}
           </button>
         )}
+        {search}
         <div className="topbar-switch" role="group" aria-label="Cambiar de app">
           <button
             type="button"

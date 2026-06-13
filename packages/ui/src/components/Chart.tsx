@@ -32,9 +32,22 @@ export interface ChartProps {
   onSelect?: (label: string) => void;
   /** Etiqueta accesible del conjunto. */
   ariaLabel?: string;
+  /**
+   * Muestra el valor SIEMPRE sobre cada barra (no solo en el tooltip), girado 90°
+   * dentro de la barra; si la barra es demasiado baja para que quepa, el número
+   * salta encima de ella. Solo aplica al modo barras. Usa el texto compacto de
+   * `formatValue`, no `valueText` (que es la línea larga del tooltip).
+   */
+  showValues?: boolean;
   className?: string;
   'data-testid'?: string;
 }
+
+// Etiquetas de eje: las cortas (p. ej. "10h") nunca se elipsan — "1…" es ilegible
+// y un desbordamiento de 1-2px es preferible. Las largas truncan con ellipsis y
+// exponen el texto completo vía title al pasar el ratón.
+const nameClass = (label: string): string =>
+  cn('ui-chart-name', label.length <= 4 && 'ui-chart-name-short');
 
 // Barras verticales de §10.16 (revisión U-01): color constante (nunca se atenúa el
 // resto), sin cifras dentro de las barras y tooltip lateral al hover/focus con el
@@ -47,6 +60,7 @@ export function Chart({
   selected,
   onSelect,
   ariaLabel,
+  showValues = false,
   className,
   'data-testid': testid,
 }: ChartProps): React.ReactElement {
@@ -90,6 +104,13 @@ export function Chart({
         const valueLabel = bar.valueText ?? fmt(bar.value);
         const compareLabel =
           bar.compareValue != null ? (bar.compareText ?? fmt(bar.compareValue)) : null;
+        // Valor siempre visible (showValues): texto compacto girado 90° dentro de la
+        // barra. Si la barra es más baja que el largo del número, se rotula ENCIMA.
+        // Estimación en px (el alto real ronda `height`): nº de caracteres × ~6,5px.
+        const shortValue = fmt(bar.value);
+        const barAreaPx = Math.max(120, height - 24);
+        const barPx = (bar.value / max) * barAreaPx;
+        const valueFitsInside = barPx >= shortValue.length * 6.5 + 14;
         // Tooltip anclado a la cima de la barra de valor; en los bordes se alinea
         // al lado interior para no salirse del panel.
         const tipEdge =
@@ -100,7 +121,19 @@ export function Chart({
               {comparePct != null && (
                 <div className="ui-chart-bar ui-chart-bar-compare" style={{ height: comparePct }} />
               )}
-              <div className="ui-chart-bar ui-chart-bar-value" style={{ height: valuePct }} />
+              <div className="ui-chart-bar ui-chart-bar-value" style={{ height: valuePct }}>
+                {showValues && (
+                  <span
+                    className={cn(
+                      'ui-chart-val',
+                      valueFitsInside ? 'ui-chart-val-inside' : 'ui-chart-val-above',
+                    )}
+                    aria-hidden="true"
+                  >
+                    {shortValue}
+                  </span>
+                )}
+              </div>
               {tipFor === i && (
                 <div
                   className={cn('ui-chart-tip', tipEdge)}
@@ -117,7 +150,9 @@ export function Chart({
                 </div>
               )}
             </div>
-            <span className="ui-chart-name">{bar.label}</span>
+            <span className={nameClass(bar.label)} title={bar.label}>
+              {bar.label}
+            </span>
           </>
         );
         const aria = [valueLabel, compareLabel, bar.tipExtra].filter(Boolean).join(' · ');
@@ -273,7 +308,7 @@ function ChartLine({
       </div>
       <div className="ui-chart-line-names">
         {data.map((bar) => (
-          <span key={bar.label} className="ui-chart-name">
+          <span key={bar.label} className={nameClass(bar.label)} title={bar.label}>
             {bar.label}
           </span>
         ))}

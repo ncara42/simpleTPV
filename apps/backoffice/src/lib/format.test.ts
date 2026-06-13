@@ -39,10 +39,10 @@ describe('fmtRate', () => {
     }
   });
 
-  it('convierte proporción 0–1 a porcentaje con 1 decimal', () => {
-    expect(fmtRate(0.123)).toBe('12.3 %');
-    expect(fmtRate(1)).toBe('100.0 %');
-    expect(fmtRate(0)).toBe('0.0 %');
+  it('convierte proporción 0–1 a porcentaje con 1 decimal y coma', () => {
+    expect(fmtRate(0.123)).toBe('12,3 %');
+    expect(fmtRate(1)).toBe('100,0 %');
+    expect(fmtRate(0)).toBe('0,0 %');
   });
 });
 
@@ -54,9 +54,9 @@ describe('fmtDelta', () => {
   });
 
   it('añade signo + solo a los positivos', () => {
-    expect(fmtDelta(145)).toBe('+145.0 %');
-    expect(fmtDelta(-10)).toBe('-10.0 %');
-    expect(fmtDelta(0)).toBe('0.0 %');
+    expect(fmtDelta(145)).toBe('+145,0 %');
+    expect(fmtDelta(-10)).toBe('-10,0 %');
+    expect(fmtDelta(0)).toBe('0,0 %');
   });
 });
 
@@ -78,10 +78,10 @@ describe('fmtNum', () => {
     }
   });
 
-  it('respeta los decimales indicados (2 por defecto)', () => {
-    expect(fmtNum(1.5)).toBe('1.50');
+  it('respeta los decimales indicados (2 por defecto) con coma', () => {
+    expect(fmtNum(1.5)).toBe('1,50');
     expect(fmtNum(1.5, 0)).toBe('2');
-    expect(fmtNum(3, 1)).toBe('3.0');
+    expect(fmtNum(3, 1)).toBe('3,0');
   });
 });
 
