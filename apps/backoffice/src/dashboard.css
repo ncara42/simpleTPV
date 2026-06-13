@@ -691,6 +691,14 @@
   background: var(--ui-surface-subtle);
 }
 .dash-preset-switch button {
+  /* inline-flex + min-height: los botones solo-icono (toggle de gráfico) igualan
+     la altura de los botones con texto (preset), que viene dada por la caja de
+     línea de la tipografía. Con box-sizing border-box, min-height incluye el
+     padding, así que ambos miden lo mismo. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.8rem;
   border: none;
   background: none;
   padding: 0.28rem 0.85rem;
