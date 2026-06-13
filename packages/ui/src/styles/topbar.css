@@ -191,6 +191,17 @@
   .topbar-title {
     font-size: 1.2rem;
   }
+
+  /* En móvil el lanzador se reduce a su icono para no desbordar la barra junto
+     al título + campana + conmutador. El palette sigue siendo accesible. */
+  .topbar-search-launcher {
+    width: auto;
+    padding: 0 0.5rem;
+  }
+  .topbar-search-launcher-text,
+  .topbar-search-launcher-kbd {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -200,47 +211,63 @@
   }
 }
 
-/* ─── U-06: búsqueda de funciones en el header ──────────────────────────── */
-.topbar-search {
-  position: relative;
-  display: flex;
+/* ─── U-06: lanzador de búsqueda en el header (zona derecha, entre la campana y
+   el conmutador). Es un botón compacto con la pista de atajo dentro; abre el
+   palette central donde se escribe y se ven sugerencias. ─────────────────── */
+.topbar-search-launcher {
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  width: min(26rem, 100%);
-}
-.topbar-search-icon {
-  position: absolute;
-  left: 0.7rem;
-  color: var(--ui-text-soft);
-  pointer-events: none;
-}
-.topbar-search-input {
-  width: 100%;
+  height: 36px;
+  width: clamp(8.5rem, 14vw, 13rem);
+  min-width: 0;
+  padding: 0 0.5rem 0 0.75rem;
   border: 1px solid var(--ui-border);
-  background: var(--ui-surface-subtle);
   border-radius: 9999px;
-  padding: 0.4rem 0.9rem 0.4rem 2.1rem;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-soft);
   font-size: 0.86rem;
-  color: var(--ui-text);
+  cursor: pointer;
   transition:
     border-color 0.12s ease,
-    background 0.12s ease;
+    background 0.12s ease,
+    color 0.12s ease;
 }
-.topbar-search-input::placeholder {
-  color: var(--ui-text-soft);
-}
-.topbar-search-input:focus {
-  outline: none;
+.topbar-search-launcher:hover {
   border-color: var(--ui-border-strong);
   background: var(--ui-surface);
+  color: var(--ui-text);
 }
-.topbar-search-results {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  max-height: 21rem;
-  overflow-y: auto;
+.topbar-search-launcher:focus-visible {
+  outline: none;
+  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-focus);
+}
+.topbar-search-launcher-icon {
+  flex-shrink: 0;
+  color: var(--ui-text-soft);
+}
+.topbar-search-launcher-text {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Pista de atajo: pastilla discreta a la derecha del lanzador. */
+.topbar-search-launcher-kbd {
+  flex-shrink: 0;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  font-family: inherit;
 }
 
 /* Móvil: hueco a la izquierda para la hamburguesa fija del sidebar. */

@@ -667,14 +667,18 @@ test('U-04: sidebar contraído a rail — flyout lateral con anclaje y navegaci�
 });
 
 test('U-06: la búsqueda de funciones del header navega por nombre y sinónimo', async ({ page }) => {
-  // El título de la page vive bajo el header (PageHeading), no en la TopBar.
+  // El título de la vista vive en la zona izquierda de la TopBar; la búsqueda es
+  // un lanzador a la derecha (entre la campana y el conmutador) que abre el
+  // palette central donde se escribe y se ven las sugerencias.
   await expect(page.getByTestId('page-heading')).toBeVisible();
-  // Por sinónimo: "tarifas" → Proveedores.
+  // Por sinónimo: abrir el palette con el lanzador, "tarifas" → Proveedores.
+  await page.getByTestId('function-search-launcher').click();
   await page.getByTestId('function-search-input').fill('tarifas');
-  await expect(page.getByTestId('function-search-result-suppliers')).toBeVisible();
-  await page.getByTestId('function-search-result-suppliers').click();
+  // El índice es granular: varias acciones comparten destino, basta la primera.
+  await expect(page.getByTestId('function-search-result-suppliers').first()).toBeVisible();
+  await page.getByTestId('function-search-result-suppliers').first().click();
   await expect(page.getByTestId('page-heading')).toContainText('Proveedores');
-  // Por nombre con teclado: Ctrl+K, "usuarios", Enter.
+  // Por nombre con teclado: Ctrl+K abre el palette y enfoca el campo.
   await page.keyboard.press('Control+k');
   await page.getByTestId('function-search-input').fill('usuarios');
   await page.keyboard.press('Enter');
