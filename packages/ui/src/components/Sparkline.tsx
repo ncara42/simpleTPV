@@ -35,6 +35,7 @@ export function Sparkline({
   className,
   'data-testid': testid,
 }: SparklineProps): React.ReactElement | null {
+  const gradientId = React.useId();
   if (data.length < 2) return null;
 
   const min = Math.min(...data);
@@ -62,7 +63,13 @@ export function Sparkline({
       data-testid={testid}
       {...a11y}
     >
-      <path className="ui-spark-area" d={area} />
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="currentColor" stopOpacity="0.28" />
+          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path className="ui-spark-area" d={area} fill={`url(#${gradientId})`} />
       <polyline className="ui-spark-line" points={line} vectorEffect="non-scaling-stroke" />
     </svg>
   );

@@ -1,6 +1,6 @@
 import './dashboard.css';
 
-import { Badge, Chart, Select, Sparkline } from '@simpletpv/ui';
+import { Badge, Chart, DonutChart, type DonutSlice, Select, Sparkline } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { BarChart2, LineChart } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -537,28 +537,32 @@ export function DashboardPage({
             <h3>Ventas por familia</h3>
             <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]}</p>
             {(() => {
-              const fams = byFamily.data ?? [];
-              const max = Math.max(1, ...fams.map((f) => f.total));
+              // Composición por familia como anillo: top 6 + resto agregado en
+              // "Otras", para que el donut quede legible aunque haya muchas familias.
+              const fams = [...(byFamily.data ?? [])]
+                .filter((f) => f.total > 0)
+                .sort((a, b) => b.total - a.total);
+              const TOP = 6;
+              const head = fams.slice(0, TOP);
+              const tail = fams.slice(TOP);
+              const slices: DonutSlice[] = head.map((f) => ({
+                label: f.familyName,
+                value: f.total,
+              }));
+              if (tail.length > 0) {
+                slices.push({
+                  label: 'Otras',
+                  value: tail.reduce((sum, f) => sum + f.total, 0),
+                  color: 'var(--ui-cat-8)',
+                });
+              }
               return (
-                <ul className="dash-family-list">
-                  {fams.map((f, i) => {
-                    return (
-                      <li
-                        key={f.familyId ?? `none-${i}`}
-                        style={{ '--i': i } as React.CSSProperties}
-                      >
-                        <span className="dash-family-name">{f.familyName}</span>
-                        <span className="dash-family-track">
-                          <span
-                            className="dash-family-fill"
-                            style={{ width: `${(f.total / max) * 100}%` }}
-                          />
-                          <span className="dash-family-pct">{fmtEur(f.total)}</span>
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <DonutChart
+                  data={slices}
+                  formatValue={fmtEur}
+                  centerLabel="Total"
+                  ariaLabel="Ventas por familia"
+                />
               );
             })()}
           </div>

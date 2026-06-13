@@ -31,6 +31,29 @@
   --ui-success: #16734f;
   --ui-success-soft: #e8f3ec;
 
+  /* ─── Data-viz (estilo "Stripe": acento índigo dedicado) ────────────────────
+     Los gráficos usan un acento PROPIO (--ui-chart-accent), independiente del
+     --ui-brand de la app, para un lenguaje de datos premium y consistente sin
+     tocar la identidad del resto del backoffice. El tooltip es oscuro invertido. */
+  --ui-chart-accent: #635bff; /* índigo */
+  --ui-chart-accent-strong: #4f46e5;
+  --ui-chart-accent-soft: #635bff14;
+  --ui-chart-tip-bg: #0a2540;
+  --ui-chart-tip-fg: #ffffff;
+  --ui-chart-tip-fg-muted: #b9c2d0;
+  --ui-chart-tip-border: #0a2540;
+
+  /* Paleta categórica (donut, apiladas) — set Stripe. Usar SIEMPRE estos tokens
+     en charts de varias categorías; no inventar colores sueltos. */
+  --ui-cat-1: #635bff; /* índigo (acento) */
+  --ui-cat-2: #0ea5e9; /* sky */
+  --ui-cat-3: #f59e0b; /* ámbar */
+  --ui-cat-4: #8b5cf6; /* violeta */
+  --ui-cat-5: #ec4899; /* rosa */
+  --ui-cat-6: #10b981; /* esmeralda */
+  --ui-cat-7: #f43f5e; /* coral */
+  --ui-cat-8: #64748b; /* pizarra (resto/otros) */
+
   /* ─── Radio (escala única, por rol) ───────────────────────
      xs  6px  → insignias, kbd, micro-controles
      sm  8px  → botones, chips, inputs, steppers, tabs

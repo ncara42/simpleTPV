@@ -11,7 +11,7 @@ const data: ChartBar[] = [
 describe('Chart', () => {
   it('pinta una columna por dato SIN cifra dentro de la barra (U-01)', () => {
     const { container } = render(
-      <Chart data={data} formatValue={(n) => `${n} €`} data-testid="bars" />,
+      <Chart data={data} formatValue={(n) => `${n} €`} showGrid={false} data-testid="bars" />,
     );
     expect(screen.getAllByTestId('ui-chart-group')).toHaveLength(2);
     expect(screen.getByText('Centro')).toBeInTheDocument();
@@ -28,7 +28,7 @@ describe('Chart', () => {
   });
 
   it('hover sobre una columna materializa el tooltip con valor, comparación y extra', () => {
-    render(<Chart data={data} formatValue={(n) => `${n} €`} />);
+    render(<Chart data={data} formatValue={(n) => `${n} €`} showGrid={false} />);
     const [centro] = screen.getAllByTestId('ui-chart-group');
     fireEvent.mouseEnter(centro!);
     expect(screen.getByText('200 €')).toBeInTheDocument();
@@ -64,7 +64,9 @@ describe('Chart', () => {
   });
 
   it('kind="line" dibuja polyline + puntos y conserva el tooltip al hover (U-02)', () => {
-    const { container } = render(<Chart data={data} kind="line" formatValue={(n) => `${n} €`} />);
+    const { container } = render(
+      <Chart data={data} kind="line" formatValue={(n) => `${n} €`} showGrid={false} />,
+    );
     expect(container.querySelector('.ui-chart-line-path')).not.toBeNull();
     expect(container.querySelector('.ui-chart-line-path-compare')).not.toBeNull();
     // 2 datos → 2 puntos de valor + 1 de comparación (solo Centro la tiene).
@@ -75,6 +77,15 @@ describe('Chart', () => {
     expect(screen.getByText('200 €')).toBeInTheDocument();
     expect(screen.getByText('+33 %')).toBeInTheDocument();
     expect(screen.getByText('Centro')).toBeInTheDocument(); // label bajo el lienzo
+  });
+
+  it('con showGrid dibuja líneas de referencia y etiquetas de eje con pasos redondos', () => {
+    const { container } = render(<Chart data={data} formatValue={(n) => `${n} €`} />);
+    // niceTicks(200) → 0,50,100,150,200; cada marca es una línea con su etiqueta.
+    expect(container.querySelectorAll('.ui-chart-grid-line').length).toBeGreaterThanOrEqual(4);
+    const axes = Array.from(container.querySelectorAll('.ui-chart-axis')).map((n) => n.textContent);
+    expect(axes).toContain('200 €');
+    expect(axes).toContain('100 €');
   });
 
   it('expone el conjunto con ariaLabel y cada columna lleva el valor en su aria', () => {

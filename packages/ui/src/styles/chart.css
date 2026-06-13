@@ -1,8 +1,9 @@
-/* Sparkline + Chart — data-viz reutilizable. Sigue DESIGN_SYSTEM.md §10.15/§10.16:
-   un único acento (marca) + tintes `-soft` para severidad, línea base con hairline
-   marcado y "enfocar atenuando el resto". Hereda el tema vía --ui-*. */
+/* Sparkline + Chart + Donut — data-viz reutilizable. Sigue DESIGN_SYSTEM.md
+   §10.15/§10.16 con acabado "finance moderno": área con gradiente que se
+   desvanece, curva monótona, rejilla de referencia tenue, guía vertical
+   (crosshair) y tooltip flotante. Hereda el tema vía --ui-*. */
 
-/* ── Sparkline (SVG full-bleed) ─────────────────────────────────────────────── */
+/* ── Sparkline (SVG full-bleed, área con gradiente) ─────────────────────────── */
 .ui-spark {
   display: block;
   width: 100%;
@@ -16,42 +17,80 @@
 }
 .ui-spark-area {
   stroke: none;
+  /* El relleno lo aporta el gradiente inline (currentColor → transparente);
+     el tono solo fija `color`, así el degradado hereda la severidad. */
 }
 .ui-spark-brand {
-  color: var(--ui-brand);
-}
-.ui-spark-brand .ui-spark-area {
-  fill: var(--ui-brand-soft);
+  color: var(--ui-chart-accent);
 }
 .ui-spark-up {
   color: var(--ui-success);
 }
-.ui-spark-up .ui-spark-area {
-  fill: var(--ui-success-soft);
-}
 .ui-spark-down {
   color: var(--ui-danger);
 }
-.ui-spark-down .ui-spark-area {
-  fill: var(--ui-danger-soft);
-}
 
-/* ── Chart (barras verticales con comparación) ──────────────────────────────── */
+/* ── Chart (base común a barras y línea) ────────────────────────────────────── */
 .ui-chart {
   display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  /* Canal izquierdo reservado para el eje Y (los números no se montan sobre
+     las barras y la rejilla arranca limpia). */
+  --ui-chart-gutter: 2.75rem;
+}
+/* Banda de dibujo: ancla de la rejilla, el lienzo y el tooltip. */
+.ui-chart-plot {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding-left: var(--ui-chart-gutter, 2.75rem);
+}
+
+/* Rejilla de referencia + eje Y (pasos redondos vía niceTicks). */
+.ui-chart-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.ui-chart-grid-line {
+  position: absolute;
+  left: var(--ui-chart-gutter, 2.75rem);
+  right: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--ui-border) 75%, transparent);
+}
+.ui-chart-axis {
+  position: absolute;
+  right: 100%; /* a la izquierda de la rejilla, dentro del canal */
+  top: 0;
+  transform: translateY(-50%);
+  padding-right: 0.45rem;
+  text-align: right;
+  white-space: nowrap;
+  font-size: var(--ui-text-2xs, 0.6875rem);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--ui-text-soft);
+}
+
+/* ── Barras verticales ──────────────────────────────────────────────────────── */
+.ui-chart-cols {
+  position: relative;
+  z-index: 1;
+  display: flex;
   align-items: stretch;
-  justify-content: space-around;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  height: 100%;
 }
 .ui-chart-group {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
   flex: 1;
   min-width: 0;
-  transition: opacity 0.18s var(--ui-ease, ease);
   /* reset de <button> cuando la columna es interactiva (onSelect) */
   border: 0;
   background: none;
@@ -64,7 +103,7 @@ button.ui-chart-group {
   cursor: pointer;
 }
 button.ui-chart-group:focus-visible {
-  outline: 2px solid var(--ui-brand);
+  outline: 2px solid var(--ui-chart-accent);
   outline-offset: 2px;
   border-radius: var(--ui-radius-sm, 6px);
 }
@@ -75,34 +114,126 @@ button.ui-chart-group:focus-visible {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 0.4rem;
+  gap: 0.25rem;
   flex: 1;
   width: 100%;
   min-height: 0;
   border-bottom: 1px solid var(--ui-border-strong); /* línea base */
 }
 .ui-chart-bar {
-  width: 38px;
-  max-width: 56%;
+  width: 24px;
+  max-width: 38%;
   min-height: 4px;
-  border-radius: 7px 7px 0 0;
+  border-radius: 6px 6px 0 0;
   transform-origin: bottom;
   animation: ui-bar-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   animation-delay: calc(var(--i, 0) * 70ms);
 }
 .ui-chart-bar-compare {
-  background: var(--ui-border-strong);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ui-border-strong) 60%, #fff),
+    var(--ui-border-strong)
+  );
 }
 .ui-chart-bar-value {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--ui-brand) 82%, #fff), var(--ui-brand));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ui-chart-accent) 68%, #fff), var(--ui-chart-accent));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35);
+  transition: filter var(--ui-motion-fast, 0.12s) var(--ui-ease, ease);
+}
+.ui-chart-group:hover .ui-chart-bar-value,
+.ui-chart-group:focus-visible .ui-chart-bar-value {
+  filter: brightness(1.05) saturate(1.05);
 }
 @keyframes ui-bar-rise {
   from {
     transform: scaleY(0);
   }
 }
-/* Tooltip lateral (U-01): badge que se materializa junto a la cima de la barra al
-   hover/focus, con el valor (y comparación/delta si existen). Sin interceptar ratón. */
+
+/* ── Barras apiladas (StackedBarChart) ──────────────────────────────────────── */
+.ui-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3, 0.75rem);
+  min-width: 0;
+}
+.ui-chart-stack {
+  width: 24px;
+  max-width: 38%;
+  min-height: 4px;
+  display: flex;
+  flex-direction: column-reverse; /* primer segmento abajo */
+  border-radius: 6px 6px 0 0;
+  overflow: hidden;
+  transform-origin: bottom;
+  animation: ui-bar-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+.ui-chart-seg {
+  width: 100%;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18);
+  transition: filter var(--ui-motion-fast, 0.12s) var(--ui-ease, ease);
+}
+.ui-chart-group:hover .ui-chart-stack .ui-chart-seg,
+.ui-chart-group:focus-visible .ui-chart-stack .ui-chart-seg {
+  filter: brightness(1.05) saturate(1.05);
+}
+.ui-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ui-chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted);
+}
+.ui-chart-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+/* Filas del tooltip apilado (desglose por serie + total). */
+.ui-chart-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-chart-tip-fg-muted, #b9c2d0);
+  line-height: 1.25;
+}
+.ui-chart-tip-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+.ui-chart-tip-row-label {
+  flex: 1;
+}
+.ui-chart-tip-row-value {
+  font-weight: 600;
+  color: var(--ui-chart-tip-fg, #fff);
+}
+.ui-chart-tip-total {
+  margin-top: 1px;
+  padding-top: 3px;
+  border-top: 1px solid rgb(255 255 255 / 0.16);
+  font-size: 0.74rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-chart-tip-fg, #fff);
+}
+
+/* ── Tooltip flotante (compartido barras/línea) ─────────────────────────────── */
 .ui-chart-tip {
   position: absolute;
   left: 50%;
@@ -111,17 +242,16 @@ button.ui-chart-group:focus-visible {
   flex-direction: column;
   align-items: flex-start;
   gap: 1px;
-  padding: 0.3rem 0.55rem;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-sm, 6px);
-  box-shadow: var(--ui-shadow-md, 0 4px 12px rgb(0 0 0 / 0.08));
+  padding: 0.4rem 0.65rem;
+  background: var(--ui-chart-tip-bg, #0a2540);
+  border: 1px solid var(--ui-chart-tip-border, #0a2540);
+  border-radius: var(--ui-radius-sm, 8px);
+  box-shadow: 0 10px 28px -8px rgb(10 37 64 / 0.4);
   pointer-events: none;
   white-space: nowrap;
-  z-index: 5;
+  z-index: 6;
   animation: ui-tip-in 0.12s var(--ui-ease, ease) backwards;
 }
-/* En los extremos el badge se alinea hacia dentro para no salirse del panel. */
 .ui-chart-tip-start {
   left: 0;
   transform: none;
@@ -136,7 +266,7 @@ button.ui-chart-group:focus-visible {
   font-weight: 650;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
-  color: var(--ui-text);
+  color: var(--ui-chart-tip-fg, #fff);
   line-height: 1.2;
 }
 .ui-chart-tip-compare,
@@ -144,7 +274,7 @@ button.ui-chart-group:focus-visible {
   font-size: 0.72rem;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
-  color: var(--ui-text-muted);
+  color: var(--ui-chart-tip-fg-muted, #b9c2d0);
   line-height: 1.2;
 }
 @keyframes ui-tip-in {
@@ -154,15 +284,11 @@ button.ui-chart-group:focus-visible {
   }
 }
 
-/* ── Variante línea (U-02): mismo lienzo, misma escala, mismo tooltip ───────── */
-.ui-chart-line {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.5rem;
-}
+/* ── Variante línea (área con gradiente + curva monótona) ────────────────────── */
 .ui-chart-line-canvas {
   position: relative;
-  flex: 1;
+  z-index: 1;
+  height: 100%;
   min-height: 0;
   border-bottom: 1px solid var(--ui-border-strong); /* misma línea base */
 }
@@ -172,12 +298,15 @@ button.ui-chart-group:focus-visible {
   width: 100%;
   height: 100%;
   overflow: visible;
+  color: var(--ui-chart-accent); /* fuente del gradiente (currentColor) */
+}
+.ui-chart-line-area {
+  stroke: none;
 }
 .ui-chart-line-path {
   fill: none;
-  stroke: var(--ui-brand);
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
+  stroke: var(--ui-chart-accent);
+  stroke-width: 2.5;
   stroke-linejoin: round;
   stroke-linecap: round;
 }
@@ -185,56 +314,222 @@ button.ui-chart-group:focus-visible {
   fill: none;
   stroke: var(--ui-border-strong);
   stroke-width: 2;
-  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 4 4;
   stroke-linejoin: round;
   stroke-linecap: round;
 }
+.ui-chart-crosshair {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dashed color-mix(in srgb, var(--ui-chart-accent) 45%, transparent);
+  transform: translateX(-0.5px);
+  pointer-events: none;
+  z-index: 2;
+}
 .ui-chart-dot {
   position: absolute;
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  background: var(--ui-brand);
+  background: var(--ui-chart-accent);
   border: 2px solid var(--ui-surface);
   transform: translate(-50%, 50%);
   pointer-events: none;
+  z-index: 3;
+  transition: transform var(--ui-motion-fast, 0.12s) var(--ui-ease, ease);
+}
+.ui-chart-dot.is-active {
+  transform: translate(-50%, 50%) scale(1.3);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ui-chart-accent) 18%, transparent);
 }
 .ui-chart-dot-compare {
   background: var(--ui-border-strong);
+  box-shadow: none;
+  width: 7px;
+  height: 7px;
 }
 /* Franja invisible por dato: recibe hover/focus y dispara el tooltip. */
 .ui-chart-hotzone {
   position: absolute;
   top: 0;
   bottom: 0;
+  z-index: 4;
 }
 .ui-chart-hotzone:focus-visible {
-  outline: 2px solid var(--ui-brand);
+  outline: 2px solid var(--ui-chart-accent);
   outline-offset: -2px;
   border-radius: var(--ui-radius-sm, 6px);
 }
-.ui-chart-line-names {
+
+/* ── Fila de etiquetas (compartida; centros alineados con las columnas) ─────── */
+.ui-chart-names {
   display: flex;
+  gap: 0.5rem; /* mismo gap que .ui-chart-cols → centros alineados */
   align-items: center;
+  padding-left: var(--ui-chart-gutter, 2.75rem); /* alinea con las columnas */
 }
-.ui-chart-line-names .ui-chart-name {
+.ui-chart-name {
   flex: 1;
   text-align: center;
   min-width: 0;
-}
-.ui-chart-name {
-  font-size: 0.8rem;
+  padding: 0 0.1rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
   font-weight: 500;
   letter-spacing: -0.012em;
   color: var(--ui-text-muted);
+  /* Una sola línea: si no cabe, elipsis (nombre completo en `title`). */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Donut / anillo (composición; total al centro + leyenda) ─────────────────── */
+.ui-donut {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-5, 1.25rem);
+  flex-wrap: wrap;
+}
+.ui-donut-ring {
+  position: relative;
+  flex: 0 0 auto;
+  line-height: 0;
+}
+.ui-donut-svg {
+  transform: rotate(-90deg); /* arranca arriba */
+  overflow: visible;
+}
+.ui-donut-seg {
+  fill: none;
+  transition:
+    opacity var(--ui-motion-fast, 0.12s) var(--ui-ease, ease),
+    stroke-width var(--ui-motion-fast, 0.12s) var(--ui-ease, ease);
+  cursor: default;
+}
+.ui-donut.has-hover .ui-donut-seg {
+  opacity: 0.4;
+}
+.ui-donut .ui-donut-seg.is-active {
+  opacity: 1;
+}
+.ui-donut-track {
+  fill: none;
+  stroke: var(--ui-surface-subtle);
+}
+.ui-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+  padding: 0 12%;
+}
+.ui-donut-center-label {
+  font-size: var(--ui-text-2xs, 0.6875rem);
+  font-weight: 550;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
 }
+.ui-donut-center-value {
+  font-size: var(--ui-text-xl, 1.25rem);
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text);
+  line-height: 1.1;
+}
+.ui-donut-legend {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ui-donut-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 0.25rem 0.35rem;
+  border-radius: var(--ui-radius-sm, 8px);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: default;
+  transition: background var(--ui-motion-fast, 0.12s) var(--ui-ease, ease);
+}
+button.ui-donut-legend-item {
+  cursor: pointer;
+}
+.ui-donut-legend-item.is-active,
+button.ui-donut-legend-item:hover {
+  background: var(--ui-surface-subtle);
+}
+.ui-donut-legend-item:focus-visible {
+  outline: 2px solid var(--ui-chart-accent);
+  outline-offset: 1px;
+}
+.ui-donut-swatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.ui-donut-legend-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--ui-text-sm, 0.8125rem);
+  font-weight: 500;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ui-donut-legend-value {
+  flex: 0 0 auto;
+  font-size: var(--ui-text-sm, 0.8125rem);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text);
+}
+.ui-donut-legend-pct {
+  flex: 0 0 auto;
+  min-width: 2.6rem;
+  text-align: right;
+  font-size: var(--ui-text-xs, 0.75rem);
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+.ui-donut-empty {
+  font-size: var(--ui-text-sm, 0.8125rem);
+  color: var(--ui-text-muted);
+}
 
 @media (prefers-reduced-motion: reduce) {
   .ui-chart-bar {
     animation: none;
+  }
+  .ui-chart-tip {
+    animation: none;
+  }
+  .ui-chart-dot,
+  .ui-donut-seg {
+    transition: none;
   }
 }
