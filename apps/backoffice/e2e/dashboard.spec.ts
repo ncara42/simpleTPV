@@ -174,23 +174,22 @@ test('el toggle de gráfico y el desplegable de comparación viven dentro de la 
   await expect(compare).toContainText('Hoy vs ayer');
 });
 
-test('Ventas por familia: paginado de 5 en 5 con flechas y buscador', async ({ page }) => {
+test('Ventas por familia: lista con scroll vertical y buscador', async ({ page }) => {
   await page.getByTestId('dash-preset-ventas').click();
   const fam = page.getByTestId('dash-family');
   await expect(fam).toBeVisible();
-  // Como mucho 5 familias por página (el seed-demo tiene bastantes más).
-  await expect(fam.locator('.dash-family-list li')).toHaveCount(5);
-  // Indicador de página y avance/retroceso con las flechas.
-  await expect(fam.getByTestId('dash-family-page')).toContainText('1/');
-  await fam.getByTestId('dash-family-next').click();
-  await expect(fam.getByTestId('dash-family-page')).toContainText('2/');
-  await fam.getByTestId('dash-family-prev').click();
-  await expect(fam.getByTestId('dash-family-page')).toContainText('1/');
-  // Buscador: sin coincidencias → estado vacío; al limpiar, vuelve a 5 filas.
+  // Se renderizan TODAS las familias (el seed-demo tiene más de 5); la lista
+  // hace scroll en vez de paginar.
+  const list = fam.getByTestId('dash-family-list');
+  const total = await list.locator('li').count();
+  expect(total).toBeGreaterThan(5);
+  // El contenedor de scroll desborda → indicador "hay más" presente.
+  await expect(fam.locator('.dash-family-scroll')).toHaveClass(/has-more/);
+  // Buscador: sin coincidencias → estado vacío; al limpiar, vuelve a la lista.
   await fam.getByTestId('dash-family-search').fill('zzz-no-existe');
   await expect(fam.locator('.catalog-empty')).toBeVisible();
   await fam.getByTestId('dash-family-search').fill('');
-  await expect(fam.locator('.dash-family-list li')).toHaveCount(5);
+  await expect(list.locator('li')).toHaveCount(total);
 });
 
 test('preferencias por defecto: el dashboard recuerda el periodo elegido (IT-16)', async ({
