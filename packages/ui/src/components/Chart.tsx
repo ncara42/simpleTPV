@@ -75,6 +75,10 @@ const GRID_TICKS = 4;
 // Holgura sobre la barra más alta cuando se rotulan los valores: deja sitio para
 // la etiqueta vertical encima de la columna sin que se corte.
 const BAR_VALUE_HEADROOM = 1.3;
+// Holgura superior del modo línea sin rejilla: sin un eje que redondee el máximo
+// hacia arriba, el pico se mapearía a y=0 (filo superior) y el punto se cortaría
+// contra el borde de la card. Un 12% deja respirar la cresta y su punto.
+const LINE_HEADROOM = 1.12;
 
 /** Capa de líneas de referencia + etiquetas del eje Y, alineada con la base del plot. */
 function ChartGrid({
@@ -178,8 +182,11 @@ export function Chart({
     ...data.map((b) => Math.max(b.value, b.compareValue ?? Number.NEGATIVE_INFINITY)),
   );
   const base = showGrid ? niceTicks(rawMax, GRID_TICKS) : { top: rawMax, ticks: [] as number[] };
-  // Con valores rotulados garantizamos holgura sobre la barra más alta.
-  const max = barValues ? Math.max(base.top, rawMax * BAR_VALUE_HEADROOM) : base.top;
+  // Holgura superior: con barras rotuladas (etiqueta encima) o en línea sin rejilla
+  // (el pico no debe tocar el filo superior). La rejilla ya redondea hacia arriba.
+  let max = base.top;
+  if (barValues) max = Math.max(max, rawMax * BAR_VALUE_HEADROOM);
+  if (kind === 'line' && !showGrid) max = Math.max(max, rawMax * LINE_HEADROOM);
   const axisTicks = base.ticks;
   // Sin eje (showGrid=false) colapsamos el canal izquierdo reservado a los números.
   const noAxisClass = showGrid ? '' : 'ui-chart-no-axis';

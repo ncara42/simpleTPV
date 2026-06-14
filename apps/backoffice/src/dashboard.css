@@ -261,6 +261,87 @@
   font-weight: 650;
 }
 
+/* ─── Ventas por hora ─── */
+/* Las 24 franjas no caben a la vez, así que la pista (.dash-hour-track, ancho fijado en
+   runtime) vive dentro de un contenedor con scroll horizontal SIN barra nativa visible.
+   Se arranca mostrando ~11 franjas (7→17) y se recorre el día arrastrando el propio
+   gráfico (grab-to-pan) o el pulgar de la barra fina inferior; también rueda y teclado. */
+.dash-hour-wrap {
+  position: relative;
+  /* A sangre: cancela el padding horizontal de la card (1.5rem) para que las franjas
+     entren y salgan justo por los filos del panel en vez de respetar el margen. */
+  margin-inline: -1.5rem;
+}
+.dash-hour-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Edge antiguo */
+  /* Grab-to-pan: el cursor de mano invita a arrastrar el gráfico para mover las horas. */
+  cursor: grab;
+  touch-action: pan-x;
+}
+.dash-hour-scroll::-webkit-scrollbar {
+  display: none; /* WebKit (Chrome/Safari) */
+}
+.dash-hour-scroll:focus-visible {
+  outline: 2px solid var(--ui-success);
+  outline-offset: -2px;
+  border-radius: var(--ui-radius-md);
+}
+/* Mientras se arrastra (gráfico o pulgar): cursor "agarrando" y sin selección de texto. */
+.dash-hour-wrap.is-dragging,
+.dash-hour-wrap.is-dragging .dash-hour-scroll {
+  cursor: grabbing;
+  user-select: none;
+}
+.dash-hour-track {
+  min-width: 100%;
+}
+/* Cada franja queda más estrecha que las columnas de "Ventas", así que el tope por
+   defecto del 38% dejaba las barras muy finas. Subimos ese tope SOLO aquí; el
+   `width:24px` del componente sigue siendo el límite duro, de modo que el cuerpo de
+   la barra queda igual que en Ventas. */
+.dash-hour-chart .ui-chart-bar {
+  max-width: 70%;
+}
+
+/* Barra fina arrastrable: indicador de posición + control directo (estilo "scrollbar
+   custom"). Va a sangre bajo el gráfico; el pulgar refleja la porción visible. */
+.dash-hour-bar {
+  position: relative;
+  height: 6px;
+  margin: 0.55rem 1.5rem 0; /* compensa el sangrado del wrap → alinea con el cuerpo */
+  border-radius: 9999px;
+  background: var(--ui-surface-subtle);
+  cursor: pointer;
+  touch-action: none;
+}
+.dash-hour-thumb {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  min-width: 24px;
+  border-radius: 9999px;
+  background: var(--ui-border-strong, var(--ui-text-soft));
+  cursor: grab;
+  transition: background 0.15s ease;
+}
+.dash-hour-bar:hover .dash-hour-thumb {
+  background: var(--ui-text-muted);
+}
+.dash-hour-wrap.is-dragging .dash-hour-thumb {
+  cursor: grabbing;
+  background: var(--ui-text-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-hour-scroll {
+    scroll-behavior: auto;
+  }
+}
+
 /* ─── Barras horizontales: ventas por familia ─── */
 .dash-family-list {
   list-style: none;
@@ -414,8 +495,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dash-family-fill,
-  .dash-rank-meter::after {
+  .dash-family-fill {
     animation: none;
   }
 }
@@ -663,64 +743,10 @@
   border-radius: 9999px;
 }
 
-/* Leaderboard: posición + nombre + valor, con un medidor proporcional fino
-   bajo cada fila (mismo lenguaje data-viz y feedback de hover que el resto del
-   dashboard). El primero destaca en podio con el acento de marca. */
-.dash-rank-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-}
-.dash-rank-row {
-  display: grid;
-  grid-template-columns: 1.6rem minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: 0.75rem;
-  padding: 0.5rem 0.55rem;
-  margin: 0 -0.55rem; /* sangra el hover a todo el ancho útil del panel */
-  border-radius: var(--ui-radius-md);
-  transition: background 0.15s ease;
-}
-.dash-rank-row:hover {
-  background: var(--ui-surface-subtle);
-}
-.dash-rank-pos {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--ui-text-muted);
-  background: var(--ui-surface-subtle);
-}
-.dash-rank-row:first-child .dash-rank-pos {
-  color: var(--ui-brand-ink);
-  background: var(--ui-brand-soft-2);
-}
-.dash-rank-name {
-  font-size: 0.9rem;
-  font-weight: 500;
-  letter-spacing: -0.012em;
-  color: var(--ui-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.dash-rank-value {
-  text-align: right;
-  font-weight: 600;
-  color: var(--ui-text);
-  font-variant-numeric: tabular-nums;
-}
-/* (Repaso) Se eliminó el medidor azul bajo cada fila de ranking: no aportaba
-   información y ensuciaba. El valor numérico a la derecha ya da la magnitud. */
+/* El leaderboard de Rankings de producto reutiliza el markup y los estilos de
+   "Ventas por familia" (.dash-family-list--fam): píldora de posición, nombre,
+   importe, % de cuota y barra proporcional. No hay estilos propios de ranking
+   más allá del desplegable (.dash-rank-select). */
 
 /* ════════════════════════════════════════════════════════════
    VeriFactu (página conservada, fuera de menú) — alineada a Apple

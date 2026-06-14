@@ -20,6 +20,7 @@ import {
   getSalesKpis,
   getSalesToday,
   getStockoutKpis,
+  type SalesByHour,
   type SalesCompareMode,
 } from './lib/dashboard.js';
 import {
@@ -144,12 +145,17 @@ const PRESETS: PresetDef[] = [
   },
 ];
 
-// Preferencia de layout (I-15, simplificada en U-03/D-18): preset activo y tipo
-// de gráfico. Las claves antiguas (hiddenByPreset, dashboard.cards) se ignoran.
+// Cards con toggle barras↔línea independiente. El tipo de gráfico es LOCAL a cada
+// card: cambiarlo en "Ventas" no afecta a "Ventas por hora" ni viceversa.
+type ChartCard = 'sales' | 'hour';
+
+// Preferencia de layout (I-15, simplificada en U-03/D-18): preset activo y tipo de
+// gráfico POR card. Las claves antiguas (hiddenByPreset, dashboard.cards y el
+// `chartKind` global previo a la separación por card) se ignoran.
 interface LayoutPref {
   preset?: PresetId;
-  /** U-02: representación de los gráficos del dashboard (barras o línea). */
-  chartKind?: 'bars' | 'line';
+  /** U-02: representación (barras o línea) de cada card con toggle, independiente. */
+  chartKinds?: Partial<Record<ChartCard, 'bars' | 'line'>>;
 }
 
 // La sparkline solo tiene tonos brand/up/down; 'flat' (sin tendencia) usa el
@@ -449,10 +455,17 @@ export function DashboardPage({
   // Ocultar/mostrar SOLO afecta al preset activo (D-03): se escribe entera la
   // lista efectiva de ocultos del preset en dashboard.layout.
   const setPreset = (id: PresetId): void => setPref('dashboard.layout', { ...layout, preset: id });
-  // U-02: toggle global barras ↔ línea, persistido con el resto del layout.
-  const chartKind: 'bars' | 'line' = layout.chartKind === 'line' ? 'line' : 'bars';
-  const setChartKind = (kind: 'bars' | 'line'): void =>
-    setPref('dashboard.layout', { ...layout, chartKind: kind });
+  // U-02: toggle barras ↔ línea LOCAL a cada card (persistido por card en el layout).
+  // Cambiar el de una card no toca el de la otra.
+  const chartKindFor = (card: ChartCard): 'bars' | 'line' =>
+    layout.chartKinds?.[card] === 'line' ? 'line' : 'bars';
+  const setChartKind = (card: ChartCard, kind: 'bars' | 'line'): void =>
+    setPref('dashboard.layout', {
+      ...layout,
+      chartKinds: { ...layout.chartKinds, [card]: kind },
+    });
+  const salesKind = chartKindFor('sales');
+  const hourKind = chartKindFor('hour');
 
   return (
     <section className="catalog" data-testid="dashboard">
@@ -538,36 +551,11 @@ export function DashboardPage({
                   {/* Fila de pills a la derecha del título (toggle + desplegable),
                       centrada verticalmente con el título+subtítulo. */}
                   <div className="dash-bars-controls">
-                    {/* U-02: toggle barras ↔ línea para los gráficos del dashboard. */}
-                    <div
-                      className="dash-preset-switch dash-chart-kind"
-                      role="tablist"
-                      aria-label="Tipo de gráfico"
-                      data-testid="dash-chart-kind"
-                    >
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={chartKind === 'bars'}
-                        className={chartKind === 'bars' ? 'is-active' : ''}
-                        onClick={() => setChartKind('bars')}
-                        data-testid="dash-chart-kind-bars"
-                        title="Barras"
-                      >
-                        <BarChart2 size={15} aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={chartKind === 'line'}
-                        className={chartKind === 'line' ? 'is-active' : ''}
-                        onClick={() => setChartKind('line')}
-                        data-testid="dash-chart-kind-line"
-                        title="Línea"
-                      >
-                        <LineChart size={15} aria-hidden="true" />
-                      </button>
-                    </div>
+                    {/* U-02: toggle barras ↔ línea LOCAL a esta card (no afecta a otras). */}
+                    <ChartKindToggle
+                      chartKind={salesKind}
+                      setChartKind={(k) => setChartKind('sales', k)}
+                    />
                     {/* Desplegable de comparación. El triggerNode colorea cada
                         parte como leyenda implícita: gris = anterior, verde = actual. */}
                     <Select
@@ -618,9 +606,9 @@ export function DashboardPage({
                   })}
                   height={200}
                   formatValue={fmtEurCompact}
-                  kind={chartKind}
+                  kind={salesKind}
                   showGrid={false}
-                  barValues={chartKind === 'bars'}
+                  barValues={salesKind === 'bars'}
                   // Modo línea a sangre: el trazo toca el filo de la card cancelando
                   // el padding del panel (1.5rem = 24px); puntos y nombres se reinsertan.
                   edgeBleed={24}
@@ -713,7 +701,7 @@ export function DashboardPage({
             completar la fila con "Ventas por hora". */}
         {(['rank-sales', 'rank-margin', 'rank-rotation'] as const).some((id) => vis.has(id)) && (
           <div
-            className={`dash-panel ${vis.has('rank-sales') ? 'span-5' : 'span-7'}`}
+            className={`dash-panel dash-panel--paged ${vis.has('rank-sales') ? 'span-5' : 'span-7'}`}
             data-testid="dash-rankings"
           >
             <Rankings
@@ -825,18 +813,28 @@ export function DashboardPage({
           </div>
         )}
 
-        {/* Ventas por hora (STAT-02): barras con el Chart reutilizable (IT-02) */}
+        {/* Ventas por hora (STAT-02): mismo lenguaje que la card de Ventas — cabecera
+            con título+subtítulo a la izquierda y el toggle barras↔línea a la derecha.
+            Las 24 franjas no caben a la vez, así que viven en una pista con scroll
+            horizontal (sin barra visible): arranca en las 7h y se arrastra. */}
         {vis.has('dash-hour') && (
           <div className="dash-panel span-7" data-testid="dash-hour">
-            <h3>Ventas por hora</h3>
-            <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]} · importe por franja</p>
-            <Chart
-              data={(byHour.data ?? []).map((h) => ({ label: `${h.hour}h`, value: h.revenue }))}
-              height={200}
-              formatValue={fmtEurCompact}
-              kind={chartKind}
-              ariaLabel="Ventas por hora"
-            />
+            <header className="dash-panel-head">
+              <div className="dash-panel-titles">
+                <h3>Ventas por hora</h3>
+                <p className="dash-panel-sub">
+                  {PERIOD_SUBTITLE[period]} · arrastra para recorrer las 24 h
+                </p>
+              </div>
+              <div className="dash-bars-controls">
+                {/* U-02: toggle LOCAL a esta card (no afecta a "Ventas"). */}
+                <ChartKindToggle
+                  chartKind={hourKind}
+                  setChartKind={(k) => setChartKind('hour', k)}
+                />
+              </div>
+            </header>
+            <HourChart data={byHour.data ?? []} chartKind={hourKind} />
           </div>
         )}
 
@@ -1094,20 +1092,23 @@ export function DashboardPage({
   );
 }
 
-// Lista de "Ventas por familia" con scroll vertical (todas las familias) e
-// indicadores de desbordamiento: degradado + chevron animado abajo cuando queda
-// contenido por ver, y un degradado tenue arriba al haber bajado. El estado se
-// recalcula al hacer scroll y cuando cambian los items (búsqueda/periodo).
-function FamilyScrollList({
-  items,
-  max,
-  totalSum,
+// Contenedor con scroll vertical (lista completa) e indicadores de desbordamiento:
+// degradado + chevron animado abajo cuando queda contenido por ver, y un degradado
+// tenue arriba al haber bajado. El estado de los filos se recalcula al hacer scroll
+// y cuando cambia `resetKey` (búsqueda/periodo/pestaña). Lo comparten "Ventas por
+// familia" y "Rankings de producto", que muestran ~5 filas y el resto por scroll.
+function ScrollFadeList({
+  className,
+  testId,
+  resetKey,
+  children,
 }: {
-  items: FamilySales[];
-  max: number;
-  totalSum: number;
+  className: string;
+  testId: string;
+  resetKey: unknown;
+  children: React.ReactNode;
 }) {
-  const ref = useRef<HTMLUListElement>(null);
+  const ref = useRef<HTMLOListElement>(null);
   const [edges, setEdges] = useState({ top: false, bottom: false });
   const update = (): void => {
     const el = ref.current;
@@ -1117,37 +1118,53 @@ function FamilyScrollList({
       bottom: el.scrollTop + el.clientHeight < el.scrollHeight - 1,
     });
   };
-  useEffect(update, [items]);
+  useEffect(update, [resetKey]);
   const cls = ['dash-family-scroll', edges.top && 'is-scrolled', edges.bottom && 'has-more']
     .filter(Boolean)
     .join(' ');
   return (
     <div className={cls}>
-      <ul
-        ref={ref}
-        onScroll={update}
-        className="dash-family-list dash-family-list--scroll dash-family-list--fam"
-        data-testid="dash-family-list"
-      >
-        {items.map((f, i) => (
-          <li key={f.familyId ?? `none-${i}`} style={{ '--i': i } as React.CSSProperties}>
-            <span className="dash-family-pos">{i + 1}</span>
-            <span className="dash-family-name">{f.familyName}</span>
-            <span className="dash-family-amount">{fmtEur(f.total)}</span>
-            <span className="dash-family-share">
-              {fmtRate(totalSum > 0 ? f.total / totalSum : 0)}
-            </span>
-            <span className="dash-family-track">
-              <span className="dash-family-fill" style={{ width: `${(f.total / max) * 100}%` }} />
-            </span>
-          </li>
-        ))}
-      </ul>
+      <ol ref={ref} onScroll={update} className={className} data-testid={testId}>
+        {children}
+      </ol>
       {/* Pista de scroll: chevron que rebota sobre el degradado inferior. */}
       <span className="dash-family-more" aria-hidden="true">
         <ChevronDown size={18} />
       </span>
     </div>
+  );
+}
+
+// Lista de "Ventas por familia" (todas las familias, con scroll).
+function FamilyScrollList({
+  items,
+  max,
+  totalSum,
+}: {
+  items: FamilySales[];
+  max: number;
+  totalSum: number;
+}) {
+  return (
+    <ScrollFadeList
+      className="dash-family-list dash-family-list--scroll dash-family-list--fam"
+      testId="dash-family-list"
+      resetKey={items}
+    >
+      {items.map((f, i) => (
+        <li key={f.familyId ?? `none-${i}`} style={{ '--i': i } as React.CSSProperties}>
+          <span className="dash-family-pos">{i + 1}</span>
+          <span className="dash-family-name">{f.familyName}</span>
+          <span className="dash-family-amount">{fmtEur(f.total)}</span>
+          <span className="dash-family-share">
+            {fmtRate(totalSum > 0 ? f.total / totalSum : 0)}
+          </span>
+          <span className="dash-family-track">
+            <span className="dash-family-fill" style={{ width: `${(f.total / max) * 100}%` }} />
+          </span>
+        </li>
+      ))}
+    </ScrollFadeList>
   );
 }
 
@@ -1181,6 +1198,249 @@ function KpiCard(props: {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// U-02: toggle barras ↔ línea reutilizable. Es un control "tonto": cada card le pasa
+// SU propio `chartKind` y `setChartKind`, de modo que el cambio es LOCAL a la card que
+// lo monta (Ventas y Ventas por hora son independientes).
+function ChartKindToggle({
+  chartKind,
+  setChartKind,
+}: {
+  chartKind: 'bars' | 'line';
+  setChartKind: (kind: 'bars' | 'line') => void;
+}) {
+  return (
+    <div
+      className="dash-preset-switch dash-chart-kind"
+      role="tablist"
+      aria-label="Tipo de gráfico"
+      data-testid="dash-chart-kind"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={chartKind === 'bars'}
+        className={chartKind === 'bars' ? 'is-active' : ''}
+        onClick={() => setChartKind('bars')}
+        data-testid="dash-chart-kind-bars"
+        title="Barras"
+      >
+        <BarChart2 size={15} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={chartKind === 'line'}
+        className={chartKind === 'line' ? 'is-active' : ''}
+        onClick={() => setChartKind('line')}
+        data-testid="dash-chart-kind-line"
+        title="Línea"
+      >
+        <LineChart size={15} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+// "Ventas por hora": 24 franjas (0..23) en una pista con scroll horizontal SIN barra
+// nativa visible. Al montar dimensiona cada franja para que entren ~11 (de 7 a 17) en el
+// ancho disponible y arranca desplazado a las 7h (comercio diurno). Para recorrer el día
+// de forma granular y sin clics repetidos: se ARRASTRA el propio gráfico (grab-to-pan con
+// ratón) y/o se arrastra una BARRA FINA debajo (pulgar arrastrable + clic en la pista
+// para saltar). Rueda del ratón y flechas del teclado siguen disponibles. Las horas sin
+// ventas quedan a 0 para que el eje temporal esté completo.
+const HOUR_FIRST = 7;
+const HOUR_VISIBLE = 11; // 7..17 visibles por defecto
+const HOUR_COL_MIN = 42; // ancho mínimo por franja → barra cómoda (~24px)
+const HOUR_KEY_FRACTION = 0.45; // cuánto del ancho visible avanza cada flecha del teclado
+
+function HourChart({ data, chartKind }: { data: SalesByHour[]; chartKind: 'bars' | 'line' }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const didScroll = useRef(false);
+  // Pulgar de la barra fina (en % del ancho de la pista) y estado de arrastre (cursor).
+  const [thumb, setThumb] = useState({ left: 0, width: 100 });
+  const [dragging, setDragging] = useState(false);
+  // Origen del arrastre activo: el lienzo (grab-to-pan) o el pulgar de la barra.
+  const panFrom = useRef<number | null>(null);
+  const thumbFrom = useRef<number | null>(null);
+
+  const revByHour = new Map(data.map((h) => [h.hour, h.revenue]));
+  const hours = Array.from({ length: 24 }, (_, h) => ({
+    label: `${h}h`,
+    value: revByHour.get(h) ?? 0,
+  }));
+
+  // Recalcula tamaño y posición del pulgar a partir del scroll actual.
+  const updateThumb = (): void => {
+    const el = scrollRef.current;
+    if (!el || el.scrollWidth <= 0) return;
+    setThumb({
+      left: (el.scrollLeft / el.scrollWidth) * 100,
+      width: Math.min(100, (el.clientWidth / el.scrollWidth) * 100),
+    });
+  };
+
+  // Dimensiona la pista (re-mide en cada resize) y, solo la primera vez, arranca en las 7h.
+  useEffect(() => {
+    const el = scrollRef.current;
+    const track = trackRef.current;
+    if (!el || !track) return;
+    const size = (): void => {
+      const col = Math.max(HOUR_COL_MIN, el.clientWidth / HOUR_VISIBLE);
+      track.style.width = `${24 * col}px`;
+      if (!didScroll.current) {
+        el.scrollLeft = HOUR_FIRST * col;
+        didScroll.current = true;
+      }
+      updateThumb();
+    };
+    size();
+    const ro = new ResizeObserver(size);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [chartKind, data.length]);
+
+  // Rueda del ratón → desplazamiento horizontal. Listener nativo no pasivo para poder
+  // cancelar el scroll vertical de la página; en los extremos deja que la página siga.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent): void => {
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (!delta) return;
+      const atStart = el.scrollLeft <= 0;
+      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+      if ((delta < 0 && !atStart) || (delta > 0 && !atEnd)) {
+        el.scrollLeft += delta;
+        e.preventDefault();
+      }
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // ── Grab-to-pan: arrastrar el propio gráfico con el ratón (el táctil/trackpad usan el
+  // scroll nativo, así que solo interceptamos puntero de ratón). ──
+  const onCanvasPointerDown = (e: React.PointerEvent): void => {
+    if (e.pointerType !== 'mouse') return;
+    panFrom.current = e.clientX;
+    setDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onCanvasPointerMove = (e: React.PointerEvent): void => {
+    const el = scrollRef.current;
+    if (panFrom.current == null || !el) return;
+    el.scrollLeft -= e.clientX - panFrom.current;
+    panFrom.current = e.clientX;
+  };
+  const endCanvasPan = (): void => {
+    panFrom.current = null;
+    setDragging(false);
+  };
+
+  // ── Barra fina: arrastrar el pulgar (mapeo px-barra → px-scroll) o clic en la pista
+  // para saltar centrando esa posición. ──
+  const onThumbPointerDown = (e: React.PointerEvent): void => {
+    e.stopPropagation(); // no dispares el "saltar al clic" de la pista
+    thumbFrom.current = e.clientX;
+    setDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onThumbPointerMove = (e: React.PointerEvent): void => {
+    const el = scrollRef.current;
+    const bar = barRef.current;
+    if (thumbFrom.current == null || !el || !bar) return;
+    el.scrollLeft += (e.clientX - thumbFrom.current) * (el.scrollWidth / bar.clientWidth);
+    thumbFrom.current = e.clientX;
+  };
+  const endThumbDrag = (): void => {
+    thumbFrom.current = null;
+    setDragging(false);
+  };
+  const onBarPointerDown = (e: React.PointerEvent): void => {
+    const el = scrollRef.current;
+    const bar = barRef.current;
+    if (!el || !bar) return;
+    const x = e.clientX - bar.getBoundingClientRect().left;
+    el.scrollTo({
+      left: (x / bar.clientWidth) * el.scrollWidth - el.clientWidth / 2,
+      behavior: 'smooth',
+    });
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent): void => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (e.key === 'ArrowRight') {
+      el.scrollBy({ left: el.clientWidth * HOUR_KEY_FRACTION, behavior: 'smooth' });
+      e.preventDefault();
+    } else if (e.key === 'ArrowLeft') {
+      el.scrollBy({ left: -el.clientWidth * HOUR_KEY_FRACTION, behavior: 'smooth' });
+      e.preventDefault();
+    }
+  };
+
+  const wrapCls = ['dash-hour-wrap', dragging && 'is-dragging'].filter(Boolean).join(' ');
+  // El pulgar solo tiene sentido si hay desbordamiento (si cabe todo, ocupa el 100%).
+  const hasOverflow = thumb.width < 99.5;
+
+  return (
+    <div className={wrapCls}>
+      {/* Lienzo desplazable: grab-to-pan con ratón + enfocable para teclado (accesible). */}
+      <div
+        className="dash-hour-scroll"
+        ref={scrollRef}
+        onScroll={updateThumb}
+        onKeyDown={onKeyDown}
+        onPointerDown={onCanvasPointerDown}
+        onPointerMove={onCanvasPointerMove}
+        onPointerUp={endCanvasPan}
+        onPointerCancel={endCanvasPan}
+        tabIndex={0}
+        role="group"
+        aria-label="Ventas por hora · arrastra para recorrer las 24 horas"
+      >
+        <div className="dash-hour-track" ref={trackRef} style={{ width: `${24 * HOUR_COL_MIN}px` }}>
+          <Chart
+            className="dash-hour-chart"
+            data={hours}
+            height={200}
+            formatValue={fmtEurCompact}
+            kind={chartKind}
+            showGrid={false}
+            // Mismo lenguaje que Ventas: en barras, el importe va rotulado dentro/encima
+            // de la barra (y se desactiva el tooltip lateral, igual que en Ventas).
+            barValues={chartKind === 'bars'}
+            animated={false}
+            ariaLabel="Ventas por hora"
+          />
+        </div>
+      </div>
+      {/* Barra fina arrastrable: indicador de posición + control directo. Clic en la
+          pista salta; arrastrar el pulgar desplaza. Solo visible si hay más de lo que cabe. */}
+      {hasOverflow && (
+        <div
+          className="dash-hour-bar"
+          ref={barRef}
+          onPointerDown={onBarPointerDown}
+          data-testid="dash-hour-bar"
+        >
+          <div
+            className="dash-hour-thumb"
+            style={{ left: `${thumb.left}%`, width: `${thumb.width}%` }}
+            onPointerDown={onThumbPointerDown}
+            onPointerMove={onThumbPointerMove}
+            onPointerUp={endThumbDrag}
+            onPointerCancel={endThumbDrag}
+            role="presentation"
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -1219,15 +1479,29 @@ function Rankings(props: {
       </>
     );
   }
+  // Cada fila lleva su importe formateado (value) y el valor numérico crudo (raw)
+  // para dibujar la barra proporcional y el % de cuota, igual que "Ventas por familia".
   const rows =
     tab === 'sales'
-      ? (props.data?.topSales ?? []).map((r) => ({ name: r.name, value: fmtEur(r.total) }))
+      ? (props.data?.topSales ?? []).map((r) => ({
+          name: r.name,
+          raw: r.total,
+          value: fmtEur(r.total),
+        }))
       : tab === 'margin'
-        ? (props.data?.topMargin ?? []).map((r) => ({ name: r.name, value: fmtEur(r.margin) }))
+        ? (props.data?.topMargin ?? []).map((r) => ({
+            name: r.name,
+            raw: r.margin,
+            value: fmtEur(r.margin),
+          }))
         : (props.data?.worstRotation ?? []).map((r) => ({
             name: r.name,
+            raw: r.units,
             value: `${fmtNum(r.units, 0)} ud`,
           }));
+  // Máximo (escala de las barras) y suma (cuota %) sobre las filas mostradas.
+  const max = Math.max(1, ...rows.map((r) => r.raw));
+  const sum = rows.reduce((acc, r) => acc + r.raw, 0);
 
   return (
     <>
@@ -1245,15 +1519,23 @@ function Rankings(props: {
       {rows.length === 0 ? (
         <p className="catalog-empty">Sin datos.</p>
       ) : (
-        <ol className="dash-rank-list" data-testid="rank-table">
+        <ScrollFadeList
+          className="dash-family-list dash-family-list--scroll dash-family-list--fam"
+          testId="rank-table"
+          resetKey={`${tab}-${rows.length}`}
+        >
           {rows.map((r, i) => (
-            <li key={`${r.name}-${i}`} className="dash-rank-row">
-              <span className="dash-rank-pos">{i + 1}</span>
-              <span className="dash-rank-name">{r.name}</span>
-              <span className="dash-rank-value">{r.value}</span>
+            <li key={`${r.name}-${i}`} style={{ '--i': i } as React.CSSProperties}>
+              <span className="dash-family-pos">{i + 1}</span>
+              <span className="dash-family-name">{r.name}</span>
+              <span className="dash-family-amount">{r.value}</span>
+              <span className="dash-family-share">{fmtRate(sum > 0 ? r.raw / sum : 0)}</span>
+              <span className="dash-family-track">
+                <span className="dash-family-fill" style={{ width: `${(r.raw / max) * 100}%` }} />
+              </span>
             </li>
           ))}
-        </ol>
+        </ScrollFadeList>
       )}
     </>
   );

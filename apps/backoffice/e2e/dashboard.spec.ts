@@ -120,8 +120,9 @@ test('U-02: el toggle barras ↔ línea cambia los gráficos y persiste', async 
   await expect(page.getByTestId('dash-hour')).toBeVisible();
   // Por defecto, barras.
   await expect(page.getByTestId('dash-hour').locator('.ui-chart-bar').first()).toBeVisible();
-  // Cambiar a línea: aparece la polyline y desaparecen las barras.
-  await page.getByTestId('dash-chart-kind-line').click();
+  // Cambiar a línea desde el toggle propio de "Ventas por hora" (Ventas tiene el suyo,
+  // ambos comparten la misma preferencia global): aparece la polyline y desaparecen las barras.
+  await page.getByTestId('dash-hour').getByTestId('dash-chart-kind-line').click();
   await expect(page.getByTestId('dash-hour').locator('.ui-chart-line-path')).toBeVisible();
   await expect(page.getByTestId('dash-hour').locator('.ui-chart-bar')).toHaveCount(0);
   // Persiste tras recargar (preferencia en /me/preferences).
@@ -129,7 +130,7 @@ test('U-02: el toggle barras ↔ línea cambia los gráficos y persiste', async 
   await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
   await expect(page.getByTestId('dash-hour').locator('.ui-chart-line-path')).toBeVisible();
   // Restaura a barras para no dejar la preferencia sucia entre tests.
-  await page.getByTestId('dash-chart-kind-bars').click();
+  await page.getByTestId('dash-hour').getByTestId('dash-chart-kind-bars').click();
   await expect(page.getByTestId('dash-hour').locator('.ui-chart-bar').first()).toBeVisible();
 });
 
