@@ -312,7 +312,8 @@
   }
 }
 /* U-01 (repaso): el importe es un badge PEGADO al final de la pista, del mismo
-   color que la barra (primary) — se materializa al hover/focus de la fila. */
+   color que la barra (primary) — se materializa al hover/focus de la fila.
+   Solo aplica a las listas que NO usan --fam (Ventas/Descuento por empleado). */
 .dash-family-pct {
   position: absolute;
   right: 0;
@@ -335,6 +336,83 @@
   opacity: 1;
 }
 
+/* ─── Variante "Ventas por familia": 2 filas por entrada ─── */
+/* Fila 1: [pos] [nombre]   [importe]  [%]
+   Fila 2:       [barra de proporción — cols 2 a fin]      */
+.dash-family-list--fam li {
+  grid-template-columns: 1.6rem minmax(0, 1fr) auto auto;
+  grid-template-rows: auto 5px;
+  column-gap: 0.75rem;
+  row-gap: 4px;
+  padding-right: 0;
+}
+
+/* Número de posición: píldora circular (mismo lenguaje que el ranking) */
+.dash-family-pos {
+  grid-row: 1 / -1;
+  grid-column: 1;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-muted);
+  background: var(--ui-surface-subtle);
+  flex-shrink: 0;
+}
+.dash-family-list--fam li:first-child .dash-family-pos {
+  color: var(--ui-brand-ink);
+  background: var(--ui-brand-soft-2);
+}
+
+/* Importe: texto limpio, fuera de la barra */
+.dash-family-amount {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.014em;
+  white-space: nowrap;
+}
+
+/* Porcentaje: columna muted a la derecha */
+.dash-family-share {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ui-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+  min-width: 3rem;
+}
+
+/* Barra fina en fila 2, alineada bajo el nombre */
+.dash-family-list--fam .dash-family-track {
+  grid-row: 2;
+  grid-column: 2 / -1;
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--ui-surface-subtle);
+  position: relative;
+  display: block;
+}
+
+/* Fill: mismo verde que las barras del Chart de Ventas */
+.dash-family-list--fam .dash-family-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--ui-success);
+  min-width: 4px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dash-family-fill,
   .dash-rank-meter::after {
@@ -342,103 +420,145 @@
   }
 }
 
-/* Card paginada (Ventas por familia): altura estable, la lista rellena el alto
-   disponible repartiendo sus filas (no deja un hueco grande al pie). */
+/* Card de "Ventas por familia": columna flex que se estira al alto de Ventas (misma
+   fila del grid). La zona de scroll rellena el alto disponible; el gap entre filas
+   está calibrado para que se vean ~5 familias y la siguiente asome (pista de scroll). */
 .dash-panel--paged {
   display: flex;
   flex-direction: column;
 }
-.dash-family-list--paged {
-  flex: 1;
-  justify-content: space-between;
+/* Zona de scroll: ancla de los degradados/indicadores de desbordamiento. */
+.dash-family-scroll {
+  position: relative;
+}
+/* La lista NO debe estirar la card: se topa a la altura del lienzo de Ventas
+   (Chart height=200) para que ambas cards midan lo mismo y aquí entren ~5 filas
+   (la 6ª asoma) con el resto por scroll. Si cambia el alto del Chart, ajustar. */
+.dash-family-list--scroll {
+  max-height: 200px;
+  overflow-y: auto;
+  padding-bottom: 0.6rem;
+  gap: 1.1rem;
+  scrollbar-width: none;
+}
+.dash-family-list--scroll::-webkit-scrollbar {
+  display: none;
+}
+/* Degradado inferior + chevron: aparecen solo cuando queda contenido por debajo. */
+.dash-family-scroll::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2.6rem;
+  /* Degradado suave: transparente en su mayor parte para no apagar las filas. */
+  background: linear-gradient(to bottom, transparent, transparent 45%, var(--ui-surface));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.dash-family-scroll.has-more::after {
+  opacity: 1;
+}
+/* Degradado superior tenue al haber bajado (indica que hay más arriba). */
+.dash-family-scroll::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1.6rem;
+  z-index: 1;
+  background: linear-gradient(to top, transparent, var(--ui-surface) 85%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.dash-family-scroll.is-scrolled::before {
+  opacity: 1;
+}
+.dash-family-more {
+  position: absolute;
+  left: 50%;
+  bottom: 0.4rem;
+  display: inline-flex;
+  color: var(--ui-text-muted);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  animation: dash-family-bounce 1.5s ease-in-out infinite;
+}
+.dash-family-scroll.has-more .dash-family-more {
+  opacity: 1;
+}
+@keyframes dash-family-bounce {
+  0%,
+  100% {
+    transform: translate(-50%, 0);
+  }
+  50% {
+    transform: translate(-50%, 3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-family-more {
+    animation: none;
+  }
 }
 
-/* Controles de la cabecera de "Ventas por familia": buscador + paginador,
-   arriba a la derecha (el buscador a la izquierda de las flechas). */
-.dash-family-controls {
+/* Buscador de "Ventas por familia": mismo diseño y tamaño que el lanzador del
+   header (.topbar-search-launcher) — pill de 36px, fondo sutil, icono + input. */
+.dash-family-search {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-}
-.dash-mini-search {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  width: 9.5rem;
-  padding: 0.3rem 0.7rem;
+  height: 36px;
+  width: clamp(9rem, 42%, 13rem);
+  padding: 0 0.75rem;
   border: 1px solid var(--ui-border);
   border-radius: 9999px;
   background: var(--ui-surface-subtle);
-  color: var(--ui-text-muted);
+  color: var(--ui-text-soft);
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
+    border-color 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease;
 }
-.dash-mini-search:focus-within {
+.dash-family-search:hover {
   border-color: var(--ui-border-strong);
   background: var(--ui-surface);
+  color: var(--ui-text);
 }
-.dash-mini-search svg {
+.dash-family-search:focus-within {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-focus);
+}
+.dash-family-search svg {
   flex: none;
+  color: var(--ui-text-soft);
 }
-.dash-mini-search input {
+.dash-family-search input {
   width: 100%;
   min-width: 0;
   border: none;
   background: none;
   padding: 0;
-  font-size: 0.8rem;
+  font-size: 0.86rem;
   color: var(--ui-text);
   /* Texto/placeholder que no cabe se desvanece (coherente con .search-field). */
   mask-image: linear-gradient(90deg, #000 calc(100% - 1.1rem), transparent);
 }
-.dash-mini-search input:focus {
+.dash-family-search input:focus {
   outline: none;
 }
-.dash-mini-search input::placeholder {
+.dash-family-search input::placeholder {
   color: var(--ui-text-muted);
 }
 /* Oculta la X nativa del type=search (se mantiene el aspecto de píldora). */
-.dash-mini-search input::-webkit-search-cancel-button {
+.dash-family-search input::-webkit-search-cancel-button {
   appearance: none;
-}
-
-.dash-pager {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.15rem;
-}
-.dash-pager-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.7rem;
-  height: 1.7rem;
-  border: 1px solid var(--ui-border);
-  border-radius: 9999px;
-  background: var(--ui-surface);
-  color: var(--ui-text-muted);
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    border-color 0.15s ease;
-}
-.dash-pager-btn:hover:not(:disabled) {
-  background: var(--ui-surface-subtle);
-  color: var(--ui-text);
-  border-color: var(--ui-border-strong);
-}
-.dash-pager-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-.dash-pager-count {
-  min-width: 2.2rem;
-  text-align: center;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--ui-text-muted);
 }
 
 /* ─── Lista de roturas de stock ─── */
@@ -529,7 +649,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1rem;
+  /* Más aire entre la cabecera (título/controles) y el contenido del panel. */
+  margin-bottom: 1.5rem;
 }
 .dash-panel-head h3 {
   margin: 0;

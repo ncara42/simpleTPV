@@ -2,12 +2,13 @@ import './dashboard.css';
 
 import { Badge, Chart, Select, Sparkline } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { BarChart2, ChevronLeft, ChevronRight, LineChart, Search } from 'lucide-react';
+import { BarChart2, ChevronDown, LineChart, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { listStores } from './lib/admin.js';
 import {
   type DashboardPeriod,
+  type FamilySales,
   getArchetypeRotation,
   getDiscountByEmployee,
   getMarginKpis,
@@ -96,9 +97,6 @@ const compareLabelsFor = (mode: SalesCompareMode, now: Date): CompareLabels => {
 
 const COMPARE_MODES: SalesCompareMode[] = ['day', 'month', 'year'];
 
-// Familias por página en el panel "Ventas por familia" (paginado con flechas).
-const FAMILY_PAGE_SIZE = 5;
-
 // ── Presets del dashboard (I-15 / D-08) ──
 // Cada preset define sus tarjetas KPI Y sus paneles (D-08d), con el reparto
 // EXACTO cerrado en informe_decisiones. 'ventas' es el default. El preset
@@ -168,8 +166,7 @@ export function DashboardPage({
   const [storeId, setStoreId] = useState('');
   // Modo de comparación del panel "Ventas" (desplegable dentro de la card).
   const [compare, setCompare] = useState<SalesCompareMode>('day');
-  // Paginación + búsqueda del panel "Ventas por familia" (no crece en altura).
-  const [familyPage, setFamilyPage] = useState(0);
+  // Búsqueda del panel "Ventas por familia" (la lista hace scroll vertical).
   const [familyQuery, setFamilyQuery] = useState('');
   const store = storeId || undefined;
 
@@ -640,83 +637,37 @@ export function DashboardPage({
         {vis.has('dash-family') &&
           (() => {
             const fams = byFamily.data ?? [];
-            // Máximo sobre TODAS las familias: las barras son comparables entre páginas.
+            // Máximo sobre TODAS las familias: las barras son comparables al hacer scroll.
             const max = Math.max(1, ...fams.map((f) => f.total));
+            const totalSum = fams.reduce((sum, f) => sum + f.total, 0);
             const q = familyQuery.trim().toLowerCase();
             const filtered = q ? fams.filter((f) => f.familyName.toLowerCase().includes(q)) : fams;
-            const pageCount = Math.max(1, Math.ceil(filtered.length / FAMILY_PAGE_SIZE));
-            const page = Math.min(familyPage, pageCount - 1);
-            const visible = filtered.slice(
-              page * FAMILY_PAGE_SIZE,
-              page * FAMILY_PAGE_SIZE + FAMILY_PAGE_SIZE,
-            );
             return (
               <div className="dash-panel span-5 dash-panel--paged" data-testid="dash-family">
                 <header className="dash-panel-head">
-                  <h3>Ventas por familia</h3>
-                  <div className="dash-family-controls">
-                    <label className="dash-mini-search">
-                      <Search size={14} aria-hidden="true" />
-                      <input
-                        type="search"
-                        value={familyQuery}
-                        onChange={(e) => {
-                          setFamilyQuery(e.target.value);
-                          setFamilyPage(0);
-                        }}
-                        placeholder="Buscar familia…"
-                        aria-label="Buscar familia"
-                        data-testid="dash-family-search"
-                      />
-                    </label>
-                    <div className="dash-pager">
-                      <button
-                        type="button"
-                        className="dash-pager-btn"
-                        onClick={() => setFamilyPage((p) => Math.max(0, p - 1))}
-                        disabled={page <= 0}
-                        aria-label="Página anterior"
-                        data-testid="dash-family-prev"
-                      >
-                        <ChevronLeft size={16} aria-hidden="true" />
-                      </button>
-                      <span className="dash-pager-count" data-testid="dash-family-page">
-                        {page + 1}/{pageCount}
-                      </span>
-                      <button
-                        type="button"
-                        className="dash-pager-btn"
-                        onClick={() => setFamilyPage((p) => Math.min(pageCount - 1, p + 1))}
-                        disabled={page >= pageCount - 1}
-                        aria-label="Página siguiente"
-                        data-testid="dash-family-next"
-                      >
-                        <ChevronRight size={16} aria-hidden="true" />
-                      </button>
-                    </div>
+                  {/* Título + subtítulo apilados a la izquierda (como en Ventas),
+                      buscador a la derecha y centrado verticalmente con ambos. */}
+                  <div className="dash-panel-titles">
+                    <h3>Ventas por familia</h3>
+                    <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]}</p>
                   </div>
+                  {/* Buscador con el mismo diseño/tamaño que el lanzador del header. */}
+                  <label className="dash-family-search">
+                    <Search size={15} aria-hidden="true" />
+                    <input
+                      type="search"
+                      value={familyQuery}
+                      onChange={(e) => setFamilyQuery(e.target.value)}
+                      placeholder="Buscar familia…"
+                      aria-label="Buscar familia"
+                      data-testid="dash-family-search"
+                    />
+                  </label>
                 </header>
-                <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]}</p>
-                {visible.length === 0 ? (
+                {filtered.length === 0 ? (
                   <p className="catalog-empty">Sin familias que coincidan.</p>
                 ) : (
-                  <ul className="dash-family-list dash-family-list--paged">
-                    {visible.map((f, i) => (
-                      <li
-                        key={f.familyId ?? `none-${i}`}
-                        style={{ '--i': i } as React.CSSProperties}
-                      >
-                        <span className="dash-family-name">{f.familyName}</span>
-                        <span className="dash-family-track">
-                          <span
-                            className="dash-family-fill"
-                            style={{ width: `${(f.total / max) * 100}%` }}
-                          />
-                          <span className="dash-family-pct">{fmtEur(f.total)}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  <FamilyScrollList items={filtered} max={max} totalSum={totalSum} />
                 )}
               </div>
             );
@@ -1140,6 +1091,63 @@ export function DashboardPage({
         </button>
       </footer>
     </section>
+  );
+}
+
+// Lista de "Ventas por familia" con scroll vertical (todas las familias) e
+// indicadores de desbordamiento: degradado + chevron animado abajo cuando queda
+// contenido por ver, y un degradado tenue arriba al haber bajado. El estado se
+// recalcula al hacer scroll y cuando cambian los items (búsqueda/periodo).
+function FamilyScrollList({
+  items,
+  max,
+  totalSum,
+}: {
+  items: FamilySales[];
+  max: number;
+  totalSum: number;
+}) {
+  const ref = useRef<HTMLUListElement>(null);
+  const [edges, setEdges] = useState({ top: false, bottom: false });
+  const update = (): void => {
+    const el = ref.current;
+    if (!el) return;
+    setEdges({
+      top: el.scrollTop > 1,
+      bottom: el.scrollTop + el.clientHeight < el.scrollHeight - 1,
+    });
+  };
+  useEffect(update, [items]);
+  const cls = ['dash-family-scroll', edges.top && 'is-scrolled', edges.bottom && 'has-more']
+    .filter(Boolean)
+    .join(' ');
+  return (
+    <div className={cls}>
+      <ul
+        ref={ref}
+        onScroll={update}
+        className="dash-family-list dash-family-list--scroll dash-family-list--fam"
+        data-testid="dash-family-list"
+      >
+        {items.map((f, i) => (
+          <li key={f.familyId ?? `none-${i}`} style={{ '--i': i } as React.CSSProperties}>
+            <span className="dash-family-pos">{i + 1}</span>
+            <span className="dash-family-name">{f.familyName}</span>
+            <span className="dash-family-amount">{fmtEur(f.total)}</span>
+            <span className="dash-family-share">
+              {fmtRate(totalSum > 0 ? f.total / totalSum : 0)}
+            </span>
+            <span className="dash-family-track">
+              <span className="dash-family-fill" style={{ width: `${(f.total / max) * 100}%` }} />
+            </span>
+          </li>
+        ))}
+      </ul>
+      {/* Pista de scroll: chevron que rebota sobre el degradado inferior. */}
+      <span className="dash-family-more" aria-hidden="true">
+        <ChevronDown size={18} />
+      </span>
+    </div>
   );
 }
 
