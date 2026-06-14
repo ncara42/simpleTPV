@@ -37,6 +37,24 @@ function startOfMonth(d: Date): Date {
   return r;
 }
 
+function startOfYear(d: Date): Date {
+  const r = startOfMonth(d);
+  r.setMonth(0);
+  return r;
+}
+
+function addMonths(d: Date, months: number): Date {
+  const r = new Date(d);
+  r.setMonth(r.getMonth() + months);
+  return r;
+}
+
+function addYears(d: Date, years: number): Date {
+  const r = new Date(d);
+  r.setFullYear(r.getFullYear() + years);
+  return r;
+}
+
 // Resuelve un periodo (+ from/to opcionales para `custom`) a un rango [from, to).
 // `to` es exclusivo y siempre el inicio del día siguiente al último día incluido,
 // salvo en custom donde lo fija el usuario (también semiabierto).
@@ -86,6 +104,39 @@ export function previousRange(range: DateRange): DateRange {
     from: new Date(range.from.getTime() - durationMs),
     to: new Date(range.from.getTime()),
   };
+}
+
+// Modo de comparación del panel de ventas: día (hoy vs ayer), mes (este mes vs
+// el anterior) o año (este año vs el anterior). Siempre "a la misma altura".
+export type CompareMode = 'day' | 'month' | 'year';
+
+export interface ComparisonStarts {
+  currentStart: Date;
+  previousStart: Date;
+  // Corte "mismo tiempo transcurrido" dentro del periodo anterior: evita comparar
+  // un periodo en curso contra uno ya cerrado (el actual saldría siempre peor).
+  previousSameElapsed: Date;
+}
+
+// Devuelve los anclajes para la comparativa "periodo en curso vs anterior
+// equivalente". El periodo actual va desde su inicio hasta AHORA; el anterior
+// desde su inicio hasta el mismo tiempo transcurrido. Función pura (recibe `now`).
+export function comparisonStarts(compare: CompareMode, now: Date): ComparisonStarts {
+  const currentStart =
+    compare === 'day'
+      ? startOfDay(now)
+      : compare === 'month'
+        ? startOfMonth(now)
+        : startOfYear(now);
+  const previousStart =
+    compare === 'day'
+      ? addDays(currentStart, -1)
+      : compare === 'month'
+        ? addMonths(currentStart, -1)
+        : addYears(currentStart, -1);
+  const elapsedMs = now.getTime() - currentStart.getTime();
+  const previousSameElapsed = new Date(previousStart.getTime() + elapsedMs);
+  return { currentStart, previousStart, previousSameElapsed };
 }
 
 // Delta porcentual (current vs previous). null si previous es 0 (evita /0 y el

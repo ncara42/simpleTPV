@@ -17,7 +17,7 @@ export class DashboardController {
 
   @Get('sales-today')
   salesToday(@Query() query: SalesTodayQueryDto) {
-    return this.dashboard.salesToday(query.storeId);
+    return this.dashboard.salesToday(query.storeId, query.compare ?? 'day');
   }
 
   @Get('sales-by-family')

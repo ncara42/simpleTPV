@@ -16,6 +16,20 @@ export interface ChartBar {
   compareText?: string;
   /** Línea extra del tooltip (p. ej. el delta "+12 %"). */
   tipExtra?: string;
+  /** Tono del delta (tipExtra) en el tooltip: verde/rojo/neutro por signo. */
+  tipExtraTone?: 'up' | 'down' | 'neutral';
+  /** Tooltip estructurado (columnas etiqueta↔importe): etiqueta del periodo actual. */
+  tipValueLabel?: string;
+  /** Tooltip estructurado: importe del periodo actual, alineado a la derecha. */
+  tipValueAmount?: string;
+  /** Tooltip estructurado: etiqueta del periodo de comparación. */
+  tipCompareLabel?: string;
+  /** Tooltip estructurado: importe del periodo de comparación. */
+  tipCompareAmount?: string;
+  /** Texto secundario bajo la etiqueta (p. ej. el delta "+12 %"). */
+  subValue?: string;
+  /** Tono del texto secundario: verde (sube), rojo (baja) o neutro. */
+  subTone?: 'up' | 'down' | 'neutral';
 }
 
 export interface ChartProps {
@@ -28,9 +42,25 @@ export interface ChartProps {
   formatAxis?: (value: number) => string;
   /** Líneas de referencia + eje Y con pasos redondos (estilo cuadro de mando). Por defecto, true. */
   showGrid?: boolean;
+  /**
+   * Rotula cada barra con su valor en vertical (-90°) sobre la columna, para leer
+   * las cifras sin pasar el ratón. Reserva holgura arriba para que la etiqueta de
+   * la barra más alta no se corte. Solo aplica a `kind="bars"`. Por defecto, false.
+   */
+  barValues?: boolean;
   /** Representación: barras (default) o línea con área (U-02). Misma escala,
    *  mismos labels y mismo tooltip lateral en ambas. */
   kind?: 'bars' | 'line';
+  /**
+   * Solo modo línea: px que el trazo sangra a cada lado (para cancelar el padding
+   * del panel y que la línea toque el filo de la card). Los puntos y las etiquetas
+   * se reinsertan ese mismo margen, así que quedan alineados y respetan el borde.
+   * Por defecto 0 (sin sangrado).
+   */
+  edgeBleed?: number;
+  /** Si es false, desactiva todas las animaciones/transiciones del gráfico
+   *  (entrada de barras, fade del tooltip, hover de puntos/barras). Por defecto true. */
+  animated?: boolean;
   /** Etiqueta seleccionada: solo semántica (aria-pressed); no altera el color. */
   selected?: string;
   /** Si se aporta, cada columna es un `<button>` que emite su `label` al pulsarla. */
@@ -42,6 +72,9 @@ export interface ChartProps {
 }
 
 const GRID_TICKS = 4;
+// Holgura sobre la barra más alta cuando se rotulan los valores: deja sitio para
+// la etiqueta vertical encima de la columna sin que se corte.
+const BAR_VALUE_HEADROOM = 1.3;
 
 /** Capa de líneas de referencia + etiquetas del eje Y, alineada con la base del plot. */
 function ChartGrid({
@@ -64,6 +97,56 @@ function ChartGrid({
   );
 }
 
+/** Tooltip flotante compartido (barras y línea). Encabezado con la etiqueta del
+ *  dato (p. ej. la tienda) + mini-tabla de filas: punto del color de su serie a la
+ *  izquierda, etiqueta del periodo, e importe alineado a la derecha. Cierra con el
+ *  delta coloreado por signo. Cuando no hay etiqueta de periodo (p. ej. ventas por
+ *  hora), la fila muestra solo el importe. */
+function ChartTip({
+  title,
+  valueName,
+  valueAmount,
+  compareName,
+  compareAmount,
+  extra,
+  extraTone,
+  edgeClass,
+  style,
+}: {
+  title?: string;
+  valueName?: string | undefined;
+  valueAmount: string;
+  compareName?: string | undefined;
+  compareAmount?: string | null;
+  extra?: string | undefined;
+  extraTone?: 'up' | 'down' | 'neutral' | undefined;
+  edgeClass?: string;
+  style?: React.CSSProperties;
+}): React.ReactElement {
+  return (
+    <div className={cn('ui-chart-tip', edgeClass)} style={style} aria-hidden="true">
+      {title != null && title !== '' && <span className="ui-chart-tip-title">{title}</span>}
+      <span className="ui-chart-tip-row2">
+        <span className="ui-chart-tip-dot ui-chart-tip-dot-value" />
+        {valueName != null && <span className="ui-chart-tip-row2-name">{valueName}</span>}
+        <span className="ui-chart-tip-row2-amount">{valueAmount}</span>
+      </span>
+      {compareAmount != null && (
+        <span className="ui-chart-tip-row2 is-compare">
+          <span className="ui-chart-tip-dot ui-chart-tip-dot-compare" />
+          {compareName != null && <span className="ui-chart-tip-row2-name">{compareName}</span>}
+          <span className="ui-chart-tip-row2-amount">{compareAmount}</span>
+        </span>
+      )}
+      {extra != null && (
+        <span className={cn('ui-chart-tip-delta', extraTone && `ui-chart-tip-delta-${extraTone}`)}>
+          {extra}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // Barras verticales de §10.16 (revisión U-01): color constante (nunca se atenúa el
 // resto), sin cifras dentro de las barras y tooltip lateral al hover/focus con el
 // valor (y comparación/delta si existen). CSS-bars (divs); el alto en % por barra.
@@ -74,7 +157,10 @@ export function Chart({
   formatValue,
   formatAxis,
   showGrid = true,
+  barValues = false,
   kind = 'bars',
+  edgeBleed = 0,
+  animated = true,
   selected,
   onSelect,
   ariaLabel,
@@ -91,14 +177,36 @@ export function Chart({
     1,
     ...data.map((b) => Math.max(b.value, b.compareValue ?? Number.NEGATIVE_INFINITY)),
   );
-  const axis = showGrid ? niceTicks(rawMax, GRID_TICKS) : { top: rawMax, ticks: [] };
-  const max = axis.top;
+  const base = showGrid ? niceTicks(rawMax, GRID_TICKS) : { top: rawMax, ticks: [] as number[] };
+  // Con valores rotulados garantizamos holgura sobre la barra más alta.
+  const max = barValues ? Math.max(base.top, rawMax * BAR_VALUE_HEADROOM) : base.top;
+  const axisTicks = base.ticks;
+  // Sin eje (showGrid=false) colapsamos el canal izquierdo reservado a los números.
+  const noAxisClass = showGrid ? '' : 'ui-chart-no-axis';
+
+  // ¿Cabe la etiqueta vertical DENTRO de la barra? Estimamos el alto de la barra
+  // en px (valor/escala · alto útil del plot) y el largo del texto rotado (nº de
+  // caracteres · avance medio). Si cabe con holgura → dentro centrada; si no →
+  // fuera (encima). Aproximación suficiente para decidir posición y contraste.
+  const TAG_FONT_PX = 0.66 * 16; // .ui-chart-bar-tag-text
+  const TAG_CHAR_PX = TAG_FONT_PX * 0.62; // avance medio por carácter (tabular)
+  const TAG_PAD_PX = 12; // margen mínimo dentro de la barra
+  const plotPx = Math.max(40, height - 26); // alto del plot ≈ total − (labels + gap)
+  const tagFitsInside = (value: number, text: string): boolean =>
+    (value / max) * plotPx >= text.length * TAG_CHAR_PX + TAG_PAD_PX;
 
   const names = (
     <div className="ui-chart-names" aria-hidden="true">
       {data.map((bar) => (
-        <span key={bar.label} className="ui-chart-name" title={bar.label}>
-          {bar.label}
+        <span key={bar.label} className="ui-chart-name-cell">
+          <span className="ui-chart-name" title={bar.label}>
+            {bar.label}
+          </span>
+          {bar.subValue != null && (
+            <span className={cn('ui-chart-sub', `ui-chart-sub-${bar.subTone ?? 'neutral'}`)}>
+              {bar.subValue}
+            </span>
+          )}
         </span>
       ))}
     </div>
@@ -112,11 +220,14 @@ export function Chart({
         fmt={fmt}
         fmtAxis={fmtAxis}
         max={max}
-        ticks={axis.ticks}
+        ticks={axisTicks}
         gradientId={gradientId}
         tipFor={tipFor}
         setTipFor={setTipFor}
         names={names}
+        noAxisClass={noAxisClass}
+        edgeBleed={edgeBleed}
+        animated={animated}
         ariaLabel={ariaLabel}
         className={className}
         testid={testid}
@@ -126,14 +237,26 @@ export function Chart({
 
   return (
     <div
-      className={cn('ui-chart ui-chart-bars', className)}
+      className={cn(
+        'ui-chart ui-chart-bars',
+        noAxisClass,
+        !animated && 'ui-chart-no-anim',
+        className,
+      )}
       style={{ height }}
       role={ariaLabel ? 'group' : undefined}
       aria-label={ariaLabel}
       data-testid={testid}
     >
       <div className="ui-chart-plot">
-        {showGrid && <ChartGrid ticks={axis.ticks} top={max} formatAxis={fmtAxis} />}
+        {showGrid && <ChartGrid ticks={axisTicks} top={max} formatAxis={fmtAxis} />}
+        {/* Línea base única y continua (no por columna, así no se ve segmentada por
+            los huecos). Con edgeBleed sangra hasta los filos de la card. */}
+        <div
+          className="ui-chart-baseline"
+          style={edgeBleed > 0 ? { left: -edgeBleed, right: -edgeBleed } : undefined}
+          aria-hidden="true"
+        />
         <div className="ui-chart-cols">
           {data.map((bar, i) => {
             const isSelected = bar.label === selected;
@@ -147,39 +270,67 @@ export function Chart({
             // al lado interior para no salirse del panel.
             const tipEdge =
               i === 0 ? 'ui-chart-tip-start' : i === data.length - 1 ? 'ui-chart-tip-end' : '';
+            const valTagText = fmt(bar.value);
+            const cmpTagText = bar.compareValue != null ? fmt(bar.compareValue) : null;
             const inner = (
               <div className="ui-chart-pair">
                 {comparePct != null && (
-                  <div
-                    className="ui-chart-bar ui-chart-bar-compare"
-                    style={{ height: comparePct }}
-                  />
-                )}
-                <div className="ui-chart-bar ui-chart-bar-value" style={{ height: valuePct }} />
-                {tipFor === i && (
-                  <div
-                    className={cn('ui-chart-tip', tipEdge)}
-                    style={{ bottom: `calc(${valuePct} + 10px)` }}
-                    aria-hidden="true"
-                  >
-                    <span className="ui-chart-tip-value">{valueLabel}</span>
-                    {compareLabel != null && (
-                      <span className="ui-chart-tip-compare">{compareLabel}</span>
-                    )}
-                    {bar.tipExtra != null && (
-                      <span className="ui-chart-tip-extra">{bar.tipExtra}</span>
+                  <div className="ui-chart-bar ui-chart-bar-compare" style={{ height: comparePct }}>
+                    {/* Sin rótulo cuando el valor es 0: el "0 €" flotaría sobre el
+                        muñón mínimo como un artefacto. La ausencia de barra ya lo dice. */}
+                    {barValues && cmpTagText != null && bar.compareValue! > 0 && (
+                      <span
+                        className={cn(
+                          'ui-chart-bar-tag',
+                          tagFitsInside(bar.compareValue!, cmpTagText) ? 'is-inside' : 'is-outside',
+                        )}
+                      >
+                        <span className="ui-chart-bar-tag-text">{cmpTagText}</span>
+                      </span>
                     )}
                   </div>
+                )}
+                <div className="ui-chart-bar ui-chart-bar-value" style={{ height: valuePct }}>
+                  {barValues && bar.value > 0 && (
+                    <span
+                      className={cn(
+                        'ui-chart-bar-tag',
+                        tagFitsInside(bar.value, valTagText) ? 'is-inside' : 'is-outside',
+                      )}
+                    >
+                      <span className="ui-chart-bar-tag-text">{valTagText}</span>
+                    </span>
+                  )}
+                </div>
+                {tipFor === i && !barValues && (
+                  <ChartTip
+                    title={bar.label}
+                    valueName={bar.tipValueLabel}
+                    valueAmount={bar.tipValueAmount ?? valueLabel}
+                    compareName={bar.tipCompareLabel}
+                    compareAmount={
+                      bar.compareValue != null ? (bar.tipCompareAmount ?? compareLabel) : null
+                    }
+                    extra={bar.tipExtra}
+                    extraTone={bar.tipExtraTone}
+                    edgeClass={tipEdge}
+                    style={{ bottom: `calc(${valuePct} + 10px)` }}
+                  />
                 )}
               </div>
             );
             const aria = [valueLabel, compareLabel, bar.tipExtra].filter(Boolean).join(' · ');
+            const hoverHandlers = barValues
+              ? {}
+              : {
+                  onMouseEnter: () => setTipFor(i),
+                  onMouseLeave: () => setTipFor((v) => (v === i ? null : v)),
+                  onFocus: () => setTipFor(i),
+                  onBlur: () => setTipFor((v) => (v === i ? null : v)),
+                };
             const shared = {
               style: { '--i': i } as React.CSSProperties,
-              onMouseEnter: () => setTipFor(i),
-              onMouseLeave: () => setTipFor((v) => (v === i ? null : v)),
-              onFocus: () => setTipFor(i),
-              onBlur: () => setTipFor((v) => (v === i ? null : v)),
+              ...hoverHandlers,
               'data-testid': 'ui-chart-group',
             };
             return onSelect ? (
@@ -227,6 +378,9 @@ function ChartLine({
   tipFor,
   setTipFor,
   names,
+  noAxisClass,
+  edgeBleed = 0,
+  animated = true,
   ariaLabel,
   className,
   testid,
@@ -241,13 +395,39 @@ function ChartLine({
   tipFor: number | null;
   setTipFor: React.Dispatch<React.SetStateAction<number | null>>;
   names: React.ReactNode;
+  noAxisClass?: string | undefined;
+  edgeBleed?: number;
+  animated?: boolean;
   ariaLabel?: string | undefined;
   className?: string | undefined;
   testid?: string | undefined;
 }): React.ReactElement {
   const n = Math.max(1, data.length);
-  const xPct = (i: number): number => ((i + 0.5) / n) * 100;
   const yPct = (v: number): number => (v / max) * 100;
+
+  // Sangrado a los bordes de la card: el lienzo se ensancha edgeBleed px por lado
+  // (cancela el padding del panel) para que la LÍNEA toque el filo, pero los PUNTOS,
+  // ETIQUETAS y tooltip se reinsertan ese margen (alineados entre sí). Mapear el % de
+  // los puntos dentro del lienzo ensanchado requiere medir su ancho real.
+  const canvasRef = React.useRef<HTMLDivElement>(null);
+  const [canvasW, setCanvasW] = React.useState(0);
+  React.useLayoutEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const measure = (): void => setCanvasW(el.getBoundingClientRect().width);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // Fracción del lienzo que ocupa el margen a cada lado (0 si no hay sangrado o aún
+  // no se ha medido → degrada a sin inset). La región interior es [inset, 1-inset].
+  const insetFrac = edgeBleed > 0 && canvasW > 0 ? edgeBleed / canvasW : 0;
+  const insetPct = insetFrac * 100;
+  const innerPct = 100 - 2 * insetPct;
+  // x del dato i en % del lienzo, dentro de la región interior (respeta el margen).
+  const xPct = (i: number): number => insetPct + ((i + 0.5) / n) * innerPct;
 
   const valuePts: Point[] = data.map((b, i) => [xPct(i), 100 - yPct(b.value)]);
   const comparePts: Point[] = data
@@ -255,27 +435,39 @@ function ChartLine({
       b.compareValue != null ? [xPct(i), 100 - yPct(b.compareValue)] : null,
     )
     .filter((p): p is Point => p != null);
-  const valuePath = monotonePath(valuePts);
-  const comparePath = monotonePath(comparePts);
+  // Prolonga la curva hasta los bordes del lienzo (x=0 y x=100 = filos de la card)
+  // repitiendo la altura del primer/último punto: la línea va a sangre, pero los
+  // puntos se quedan dentro del margen (alineados con sus etiquetas).
+  const toEdges = (pts: Point[]): Point[] =>
+    pts.length > 0 ? [[0, pts[0]![1]], ...pts, [100, pts[pts.length - 1]![1]]] : pts;
+  const valuePath = monotonePath(toEdges(valuePts));
+  const comparePath = monotonePath(toEdges(comparePts));
   const hasCompare = comparePts.length > 0;
-  // El área cierra la curva contra la línea base (y = 100) y vuelve al inicio.
-  const firstX = valuePts[0]?.[0] ?? 0;
-  const lastX = valuePts[valuePts.length - 1]?.[0] ?? 100;
-  const areaPath = valuePath
-    ? `${valuePath} L ${lastX.toFixed(2)},100 L ${firstX.toFixed(2)},100 Z`
-    : '';
+  // El área cierra la curva contra la línea base (y = 100) y vuelve al inicio, ya
+  // a sangre en ambos laterales.
+  const areaPath = valuePath ? `${valuePath} L 100,100 L 0,100 Z` : '';
+
+  // El lienzo (trazo) sangra cancelando el padding del panel; los nombres se
+  // reinsertan ese margen para no tocar el filo y seguir cuadrados con los puntos.
+  const bleedStyle: React.CSSProperties =
+    edgeBleed > 0 ? { marginInline: -edgeBleed, width: `calc(100% + ${2 * edgeBleed}px)` } : {};
 
   return (
     <div
-      className={cn('ui-chart ui-chart-line', className)}
-      style={{ height }}
+      className={cn(
+        'ui-chart ui-chart-line',
+        noAxisClass,
+        !animated && 'ui-chart-no-anim',
+        className,
+      )}
+      style={{ height, ...bleedStyle }}
       role={ariaLabel ? 'group' : undefined}
       aria-label={ariaLabel}
       data-testid={testid}
     >
       <div className="ui-chart-plot">
         {ticks.length > 0 && <ChartGrid ticks={ticks} top={max} formatAxis={fmtAxis} />}
-        <div className="ui-chart-line-canvas">
+        <div className="ui-chart-line-canvas" ref={canvasRef}>
           <svg
             className="ui-chart-line-svg"
             viewBox="0 0 100 100"
@@ -308,6 +500,18 @@ function ChartLine({
             const tipEdge =
               i === 0 ? 'ui-chart-tip-start' : i === data.length - 1 ? 'ui-chart-tip-end' : '';
             const active = tipFor === i;
+            // Hotzone por dato cubriendo toda la franja (incluida la parte sangrada
+            // de los extremos) para que el hover sea cómodo hasta el filo.
+            const zoneLeft = i === 0 ? 0 : insetPct + (i / n) * innerPct;
+            const zoneRight = i === n - 1 ? 100 : insetPct + ((i + 1) / n) * innerPct;
+            // Tooltip de borde reinsertado el margen (no se pega al filo); el resto
+            // centrado sobre su punto. Siempre fijo abajo, sobre la línea base.
+            const tipStyle: React.CSSProperties =
+              tipEdge === 'ui-chart-tip-start'
+                ? { left: `${insetPct}%`, bottom: '8px' }
+                : tipEdge === 'ui-chart-tip-end'
+                  ? { right: `${insetPct}%`, bottom: '8px' }
+                  : { left: `${xPct(i)}%`, bottom: '8px' };
             return (
               <React.Fragment key={bar.label}>
                 {active && (
@@ -329,7 +533,7 @@ function ChartLine({
                 />
                 <div
                   className="ui-chart-hotzone"
-                  style={{ left: `${(i / n) * 100}%`, width: `${100 / n}%` }}
+                  style={{ left: `${zoneLeft}%`, width: `${zoneRight - zoneLeft}%` }}
                   tabIndex={0}
                   aria-label={`${bar.label}: ${aria}`}
                   onMouseEnter={() => setTipFor(i)}
@@ -339,30 +543,28 @@ function ChartLine({
                   data-testid="ui-chart-group"
                 />
                 {active && (
-                  <div
-                    className={cn('ui-chart-tip', tipEdge)}
-                    style={
-                      tipEdge
-                        ? { bottom: `calc(${yPct(bar.value)}% + 12px)` }
-                        : { left: `${xPct(i)}%`, bottom: `calc(${yPct(bar.value)}% + 12px)` }
+                  <ChartTip
+                    title={bar.label}
+                    valueName={bar.tipValueLabel}
+                    valueAmount={bar.tipValueAmount ?? valueLabel}
+                    compareName={bar.tipCompareLabel}
+                    compareAmount={
+                      bar.compareValue != null ? (bar.tipCompareAmount ?? compareLabel) : null
                     }
-                    aria-hidden="true"
-                  >
-                    <span className="ui-chart-tip-value">{valueLabel}</span>
-                    {compareLabel != null && (
-                      <span className="ui-chart-tip-compare">{compareLabel}</span>
-                    )}
-                    {bar.tipExtra != null && (
-                      <span className="ui-chart-tip-extra">{bar.tipExtra}</span>
-                    )}
-                  </div>
+                    extra={bar.tipExtra}
+                    extraTone={bar.tipExtraTone}
+                    edgeClass={tipEdge}
+                    style={tipStyle}
+                  />
                 )}
               </React.Fragment>
             );
           })}
         </div>
       </div>
-      {names}
+      {/* Los nombres se reinsertan el margen sangrado para no tocar el filo de la
+          card y quedar centrados bajo cada punto. */}
+      {edgeBleed > 0 ? <div style={{ paddingInline: edgeBleed }}>{names}</div> : names}
     </div>
   );
 }

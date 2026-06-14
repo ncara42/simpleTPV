@@ -1,4 +1,4 @@
-/* Sparkline + Chart + Donut — data-viz reutilizable. Sigue DESIGN_SYSTEM.md
+/* Sparkline + Chart (barras/línea/apiladas) — data-viz reutilizable. Sigue DESIGN_SYSTEM.md
    §10.15/§10.16 con acabado "finance moderno": área con gradiente que se
    desvanece, curva monótona, rejilla de referencia tenue, guía vertical
    (crosshair) y tooltip flotante. Hereda el tema vía --ui-*. */
@@ -39,6 +39,11 @@
   /* Canal izquierdo reservado para el eje Y (los números no se montan sobre
      las barras y la rejilla arranca limpia). */
   --ui-chart-gutter: 2.75rem;
+}
+/* Sin eje Y (showGrid=false): no hay números a la izquierda, así que el canal se
+   colapsa y las barras ocupan todo el ancho. */
+.ui-chart-no-axis {
+  --ui-chart-gutter: 0px;
 }
 /* Banda de dibujo: ancla de la rejilla, el lienzo y el tooltip. */
 .ui-chart-plot {
@@ -103,7 +108,7 @@ button.ui-chart-group {
   cursor: pointer;
 }
 button.ui-chart-group:focus-visible {
-  outline: 2px solid var(--ui-chart-accent);
+  outline: 2px solid var(--ui-success);
   outline-offset: 2px;
   border-radius: var(--ui-radius-sm, 6px);
 }
@@ -118,9 +123,21 @@ button.ui-chart-group:focus-visible {
   flex: 1;
   width: 100%;
   min-height: 0;
-  border-bottom: 1px solid var(--ui-border-strong); /* línea base */
+}
+/* Línea base única y continua bajo todas las columnas (antes iba por columna en
+   .ui-chart-pair, lo que la cortaba en los huecos). Arranca tras el canal del eje
+   Y; con edgeBleed (inline left/right negativos) llega a los filos de la card. */
+.ui-chart-baseline {
+  position: absolute;
+  left: var(--ui-chart-gutter, 2.75rem);
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  border-bottom: 1px solid var(--ui-border-strong);
+  pointer-events: none;
 }
 .ui-chart-bar {
+  position: relative; /* ancla de la etiqueta vertical de valor (.ui-chart-bar-tag) */
   width: 24px;
   max-width: 38%;
   min-height: 4px;
@@ -129,16 +146,72 @@ button.ui-chart-group:focus-visible {
   animation: ui-bar-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   animation-delay: calc(var(--i, 0) * 70ms);
 }
+
+/* Etiqueta de valor rotulada en vertical (-90°) sobre la barra (barValues), se
+   lee de abajo hacia arriba y SIEMPRE centrada horizontalmente sobre la columna.
+   Si cabe va centrada DENTRO de la barra (.is-inside); si no, encima (.is-outside). */
+.ui-chart-bar-tag {
+  position: absolute;
+  pointer-events: none;
+  line-height: 1;
+}
+/* Dentro: ocupa toda la barra y centra el texto con flex (centrado exacto en
+   ambos ejes, sin depender de la caja del texto vertical). */
+.ui-chart-bar-tag.is-inside {
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Fuera: ocupa el ancho completo de la barra y centra el texto con flex,
+   igual que is-inside pero posicionado encima de la cima. */
+.ui-chart-bar-tag.is-outside {
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  margin-bottom: 3px;
+  display: flex;
+  justify-content: center;
+}
+.ui-chart-bar-tag-text {
+  display: inline-block;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 0.66rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+/* Fuera (sobre el fondo claro del panel): número nítido en color de texto, mismo
+   tratamiento de máximo contraste que los de dentro (no puede ser blanco aquí, sería
+   invisible sobre el panel claro). Igual para ambas series. */
+.ui-chart-bar-value .ui-chart-bar-tag.is-outside .ui-chart-bar-tag-text,
+.ui-chart-bar-compare .ui-chart-bar-tag.is-outside .ui-chart-bar-tag-text {
+  color: var(--ui-text);
+}
+/* Dentro (sobre la barra): blanco sobre verde, oscuro sobre gris. */
+.ui-chart-bar-value .ui-chart-bar-tag.is-inside .ui-chart-bar-tag-text {
+  color: #fff;
+}
+.ui-chart-bar-compare .ui-chart-bar-tag.is-inside .ui-chart-bar-tag-text {
+  color: var(--ui-text);
+}
+/* Acabado plano y saturado (tipo Holded/Stripe): degradado casi imperceptible y
+   sin reflejo superior — color confiado, no glossy. */
 .ui-chart-bar-compare {
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--ui-border-strong) 60%, #fff),
+    color-mix(in srgb, var(--ui-border-strong) 92%, #fff),
     var(--ui-border-strong)
   );
 }
 .ui-chart-bar-value {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--ui-chart-accent) 68%, #fff), var(--ui-chart-accent));
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ui-success) 90%, #fff),
+    var(--ui-success)
+  );
   transition: filter var(--ui-motion-fast, 0.12s) var(--ui-ease, ease);
 }
 .ui-chart-group:hover .ui-chart-bar-value,
@@ -261,21 +334,75 @@ button.ui-chart-group:focus-visible {
   right: 0;
   transform: none;
 }
-.ui-chart-tip-value {
-  font-size: 0.78rem;
-  font-weight: 650;
+/* Encabezado del tooltip: la etiqueta del dato (p. ej. la tienda), para que al
+   pasar el ratón se sepa exactamente de qué columna es sin mirar el eje X. */
+.ui-chart-tip-title {
+  font-size: 0.7rem;
+  font-weight: 600;
   letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
   color: var(--ui-chart-tip-fg, #fff);
   line-height: 1.2;
+  margin-bottom: 6px;
 }
-.ui-chart-tip-compare,
-.ui-chart-tip-extra {
-  font-size: 0.72rem;
+/* Fila etiqueta↔importe: punto de color + nombre del periodo a la izquierda e
+   importe empujado a la derecha (margin-left:auto). min-width fija el ancho del
+   tooltip para que los importes de ambas filas queden alineados. */
+.ui-chart-tip-row2 {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 8.5rem;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--ui-chart-tip-fg, #fff);
+  line-height: 1.3;
+}
+.ui-chart-tip-row2.is-compare {
+  color: var(--ui-chart-tip-fg-muted, #b9c2d0);
+}
+.ui-chart-tip-row2-name {
   font-weight: 500;
+}
+.ui-chart-tip-row2-amount {
+  margin-left: auto;
+  font-weight: 650;
+}
+/* Delta de cierre: separador fino arriba, alineado a la derecha (sobre la misma
+   columna que los importes) y color por signo (verde/rojo aclarados para
+   contrastar sobre el fondo oscuro del tooltip). */
+.ui-chart-tip-delta {
+  align-self: stretch;
+  text-align: right;
+  margin-top: 3px;
+  padding-top: 4px;
+  border-top: 1px solid rgb(255 255 255 / 0.16);
+  font-size: 0.74rem;
+  font-weight: 650;
   font-variant-numeric: tabular-nums;
   color: var(--ui-chart-tip-fg-muted, #b9c2d0);
-  line-height: 1.2;
+}
+.ui-chart-tip-delta-up {
+  color: color-mix(in srgb, var(--ui-success) 65%, #fff);
+}
+.ui-chart-tip-delta-down {
+  color: color-mix(in srgb, var(--ui-danger) 60%, #fff);
+}
+.ui-chart-tip-delta-neutral {
+  color: var(--ui-chart-tip-fg-muted, #b9c2d0);
+}
+/* Punto de color por serie (mapea cada fila del tooltip con su barra). */
+.ui-chart-tip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.ui-chart-tip-dot-value {
+  background: var(--ui-success);
+}
+.ui-chart-tip-dot-compare {
+  background: var(--ui-chart-tip-fg-muted, #b9c2d0);
 }
 @keyframes ui-tip-in {
   from {
@@ -298,14 +425,14 @@ button.ui-chart-group:focus-visible {
   width: 100%;
   height: 100%;
   overflow: visible;
-  color: var(--ui-chart-accent); /* fuente del gradiente (currentColor) */
+  color: var(--ui-success); /* fuente del gradiente (currentColor) */
 }
 .ui-chart-line-area {
   stroke: none;
 }
 .ui-chart-line-path {
   fill: none;
-  stroke: var(--ui-chart-accent);
+  stroke: var(--ui-success);
   stroke-width: 2.5;
   stroke-linejoin: round;
   stroke-linecap: round;
@@ -323,7 +450,7 @@ button.ui-chart-group:focus-visible {
   top: 0;
   bottom: 0;
   width: 0;
-  border-left: 1px dashed color-mix(in srgb, var(--ui-chart-accent) 45%, transparent);
+  border-left: 1px dashed color-mix(in srgb, var(--ui-success) 45%, transparent);
   transform: translateX(-0.5px);
   pointer-events: none;
   z-index: 2;
@@ -333,7 +460,7 @@ button.ui-chart-group:focus-visible {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--ui-chart-accent);
+  background: var(--ui-success);
   border: 2px solid var(--ui-surface);
   transform: translate(-50%, 50%);
   pointer-events: none;
@@ -342,7 +469,7 @@ button.ui-chart-group:focus-visible {
 }
 .ui-chart-dot.is-active {
   transform: translate(-50%, 50%) scale(1.3);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ui-chart-accent) 18%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ui-success) 18%, transparent);
 }
 .ui-chart-dot-compare {
   background: var(--ui-border-strong);
@@ -367,14 +494,22 @@ button.ui-chart-group:focus-visible {
 .ui-chart-names {
   display: flex;
   gap: 0.5rem; /* mismo gap que .ui-chart-cols → centros alineados */
-  align-items: center;
+  align-items: flex-start;
   padding-left: var(--ui-chart-gutter, 2.75rem); /* alinea con las columnas */
 }
-.ui-chart-name {
+/* Celda por columna: nombre + delta apilados y centrados. */
+.ui-chart-name-cell {
   flex: 1;
-  text-align: center;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
   padding: 0 0.1rem;
+}
+.ui-chart-name {
+  max-width: 100%;
+  text-align: center;
   font-size: 0.72rem;
   line-height: 1.2;
   font-weight: 500;
@@ -385,140 +520,23 @@ button.ui-chart-group:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-/* ── Donut / anillo (composición; total al centro + leyenda) ─────────────────── */
-.ui-donut {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-5, 1.25rem);
-  flex-wrap: wrap;
-}
-.ui-donut-ring {
-  position: relative;
-  flex: 0 0 auto;
-  line-height: 0;
-}
-.ui-donut-svg {
-  transform: rotate(-90deg); /* arranca arriba */
-  overflow: visible;
-}
-.ui-donut-seg {
-  fill: none;
-  transition:
-    opacity var(--ui-motion-fast, 0.12s) var(--ui-ease, ease),
-    stroke-width var(--ui-motion-fast, 0.12s) var(--ui-ease, ease);
-  cursor: default;
-}
-.ui-donut.has-hover .ui-donut-seg {
-  opacity: 0.4;
-}
-.ui-donut .ui-donut-seg.is-active {
-  opacity: 1;
-}
-.ui-donut-track {
-  fill: none;
-  stroke: var(--ui-surface-subtle);
-}
-.ui-donut-center {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  pointer-events: none;
-  padding: 0 12%;
-}
-.ui-donut-center-label {
-  font-size: var(--ui-text-2xs, 0.6875rem);
-  font-weight: 550;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--ui-text-soft);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-.ui-donut-center-value {
-  font-size: var(--ui-text-xl, 1.25rem);
-  font-weight: 680;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-  color: var(--ui-text);
+/* Delta bajo el nombre: verde si sube, rojo si baja, neutro si igual/sin dato. */
+.ui-chart-sub {
+  font-size: 0.7rem;
+  font-weight: 650;
   line-height: 1.1;
-}
-.ui-donut-legend {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.ui-donut-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  width: 100%;
-  border: 0;
-  background: none;
-  padding: 0.25rem 0.35rem;
-  border-radius: var(--ui-radius-sm, 8px);
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: default;
-  transition: background var(--ui-motion-fast, 0.12s) var(--ui-ease, ease);
-}
-button.ui-donut-legend-item {
-  cursor: pointer;
-}
-.ui-donut-legend-item.is-active,
-button.ui-donut-legend-item:hover {
-  background: var(--ui-surface-subtle);
-}
-.ui-donut-legend-item:focus-visible {
-  outline: 2px solid var(--ui-chart-accent);
-  outline-offset: 1px;
-}
-.ui-donut-swatch {
-  flex: 0 0 auto;
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-}
-.ui-donut-legend-name {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--ui-text-sm, 0.8125rem);
-  font-weight: 500;
-  color: var(--ui-text);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.ui-donut-legend-value {
-  flex: 0 0 auto;
-  font-size: var(--ui-text-sm, 0.8125rem);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--ui-text);
+.ui-chart-sub-up {
+  color: var(--ui-success);
 }
-.ui-donut-legend-pct {
-  flex: 0 0 auto;
-  min-width: 2.6rem;
-  text-align: right;
-  font-size: var(--ui-text-xs, 0.75rem);
-  font-variant-numeric: tabular-nums;
+.ui-chart-sub-down {
+  color: var(--ui-danger);
+}
+.ui-chart-sub-neutral {
   color: var(--ui-text-soft);
-}
-.ui-donut-empty {
-  font-size: var(--ui-text-sm, 0.8125rem);
-  color: var(--ui-text-muted);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -528,8 +546,20 @@ button.ui-donut-legend-item:hover {
   .ui-chart-tip {
     animation: none;
   }
-  .ui-chart-dot,
-  .ui-donut-seg {
+  .ui-chart-dot {
     transition: none;
   }
+}
+
+/* Gráfico sin animaciones (prop animated=false): sin entrada de barras, sin fade
+   del tooltip y sin transiciones de hover de puntos/barras. */
+.ui-chart-no-anim .ui-chart-bar,
+.ui-chart-no-anim .ui-chart-stack,
+.ui-chart-no-anim .ui-chart-tip {
+  animation: none;
+}
+.ui-chart-no-anim .ui-chart-dot,
+.ui-chart-no-anim .ui-chart-bar-value,
+.ui-chart-no-anim .ui-chart-seg {
+  transition: none;
 }

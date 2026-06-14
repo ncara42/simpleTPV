@@ -20,6 +20,20 @@ describe('Chart', () => {
     expect(container.querySelector('.ui-chart-bar-text')).toBeNull();
   });
 
+  it('barValues rotula cada barra con su valor (visible sin hover) y colapsa el eje', () => {
+    const { container } = render(
+      <Chart data={data} formatValue={(n) => `${n} €`} showGrid={false} barValues />,
+    );
+    // Cifras visibles en reposo (no hace falta pasar el ratón).
+    expect(screen.getByText('200 €')).toBeInTheDocument();
+    expect(screen.getByText('150 €')).toBeInTheDocument();
+    expect(screen.getByText('80 €')).toBeInTheDocument();
+    // Una etiqueta por barra: Centro (valor+compare) + Norte (valor) = 3.
+    expect(container.querySelectorAll('.ui-chart-bar-tag-text')).toHaveLength(3);
+    // Sin eje Y → canal izquierdo colapsado.
+    expect(container.querySelector('.ui-chart-no-axis')).not.toBeNull();
+  });
+
   it('añade la barra de comparación cuando hay compareValue', () => {
     const { container } = render(<Chart data={data} formatValue={(n) => `${n} €`} />);
     // Centro: valor + comparación = 2 barras; Norte: solo valor = 1 barra → 3.
@@ -76,7 +90,9 @@ describe('Chart', () => {
     fireEvent.mouseEnter(centro!);
     expect(screen.getByText('200 €')).toBeInTheDocument();
     expect(screen.getByText('+33 %')).toBeInTheDocument();
-    expect(screen.getByText('Centro')).toBeInTheDocument(); // label bajo el lienzo
+    // "Centro" aparece bajo el lienzo y, al hacer hover, también como título del
+    // tooltip → dos coincidencias.
+    expect(screen.getAllByText('Centro').length).toBeGreaterThanOrEqual(1);
   });
 
   it('con showGrid dibuja líneas de referencia y etiquetas de eje con pasos redondos', () => {

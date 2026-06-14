@@ -1,8 +1,8 @@
 import './dashboard.css';
 
-import { Badge, Chart, DonutChart, type DonutSlice, Select, Sparkline } from '@simpletpv/ui';
+import { Badge, Chart, Select, Sparkline } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { BarChart2, LineChart } from 'lucide-react';
+import { BarChart2, ChevronLeft, ChevronRight, LineChart, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { listStores } from './lib/admin.js';
@@ -19,6 +19,7 @@ import {
   getSalesKpis,
   getSalesToday,
   getStockoutKpis,
+  type SalesCompareMode,
 } from './lib/dashboard.js';
 import {
   deltaTone,
@@ -53,6 +54,50 @@ const PERIOD_SUBTITLE: Record<DashboardPeriod, string> = {
   week: 'Esta semana',
   month: 'Este mes',
 };
+
+// ── Comparativa del panel de ventas (hoy vs ayer / mes vs mes / año vs año) ──
+const MONTHS_ES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+// Nombre capitalizado del mes (índice 0..11, envuelto para meses anteriores).
+const monthLabel = (m: number): string => {
+  const name = MONTHS_ES[((m % 12) + 12) % 12]!;
+  return name.charAt(0).toUpperCase() + name.slice(1);
+};
+
+interface CompareLabels {
+  current: string;
+  previous: string;
+}
+
+// Etiquetas "actual vs anterior" de cada modo, derivadas de la fecha de hoy.
+// Alimentan el desplegable, la leyenda de color y el tooltip del panel.
+const compareLabelsFor = (mode: SalesCompareMode, now: Date): CompareLabels => {
+  if (mode === 'month') {
+    return { current: monthLabel(now.getMonth()), previous: monthLabel(now.getMonth() - 1) };
+  }
+  if (mode === 'year') {
+    return { current: String(now.getFullYear()), previous: String(now.getFullYear() - 1) };
+  }
+  return { current: 'Hoy', previous: 'Ayer' };
+};
+
+const COMPARE_MODES: SalesCompareMode[] = ['day', 'month', 'year'];
+
+// Familias por página en el panel "Ventas por familia" (paginado con flechas).
+const FAMILY_PAGE_SIZE = 5;
 
 // ── Presets del dashboard (I-15 / D-08) ──
 // Cada preset define sus tarjetas KPI Y sus paneles (D-08d), con el reparto
@@ -121,6 +166,11 @@ export function DashboardPage({
 } = {}) {
   const [period, setPeriod] = useState<DashboardPeriod>('today');
   const [storeId, setStoreId] = useState('');
+  // Modo de comparación del panel "Ventas" (desplegable dentro de la card).
+  const [compare, setCompare] = useState<SalesCompareMode>('day');
+  // Paginación + búsqueda del panel "Ventas por familia" (no crece en altura).
+  const [familyPage, setFamilyPage] = useState(0);
+  const [familyQuery, setFamilyQuery] = useState('');
   const store = storeId || undefined;
 
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
@@ -144,6 +194,14 @@ export function DashboardPage({
     queryFn: () => getSalesToday(store),
     placeholderData: keepPreviousData,
     enabled: vis.has('kpi-today') || vis.has('dash-bars'),
+  });
+  // Comparativa del panel de ventas en mes/año. En `day` reusamos `salesToday`
+  // (la misma query que la KPI card) para no duplicar el fetch del caso común.
+  const salesComparison = useQuery({
+    queryKey: ['dash-comparison', compare, store],
+    queryFn: () => getSalesToday(store, compare),
+    placeholderData: keepPreviousData,
+    enabled: vis.has('dash-bars') && compare !== 'day',
   });
   const salesKpis = useQuery({
     queryKey: ['dash-sales-kpis', period, store],
@@ -424,36 +482,6 @@ export function DashboardPage({
               </button>
             ))}
           </div>
-          {/* U-02: toggle barras ↔ línea para los gráficos del dashboard. */}
-          <div
-            className="dash-preset-switch dash-chart-kind"
-            role="tablist"
-            aria-label="Tipo de gráfico"
-            data-testid="dash-chart-kind"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={chartKind === 'bars'}
-              className={chartKind === 'bars' ? 'is-active' : ''}
-              onClick={() => setChartKind('bars')}
-              data-testid="dash-chart-kind-bars"
-              title="Barras"
-            >
-              <BarChart2 size={15} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={chartKind === 'line'}
-              className={chartKind === 'line' ? 'is-active' : ''}
-              onClick={() => setChartKind('line')}
-              data-testid="dash-chart-kind-line"
-              title="Línea"
-            >
-              <LineChart size={15} aria-hidden="true" />
-            </button>
-          </div>
           <Select
             className="dash-period-select"
             value={period}
@@ -493,80 +521,206 @@ export function DashboardPage({
           conserva su data-testid histórico. Los spans están elegidos para que
           cada preset complete filas de 12 columnas. */}
       <div className="dash-grid">
-        {/* Ventas hoy vs ayer por tienda (líneas + área, coherente con las sparklines) */}
-        {vis.has('dash-bars') && (
-          <div className="dash-panel span-7" data-testid="dash-bars">
-            <h3>Ventas hoy vs ayer</h3>
-            <p className="dash-panel-sub">Facturación neta por tienda</p>
-            {(() => {
-              const stores = salesToday.data?.byStore ?? [];
-              // U-01: Chart común (color constante, tooltip lateral con Hoy/Ayer/delta).
-              return (
-                <>
-                  <Chart
-                    data={stores.map((s) => ({
+        {/* Ventas: comparativa por tienda (hoy vs ayer / mes vs mes / año vs año).
+            El toggle barras↔línea y el desplegable de comparación viven DENTRO de
+            la card, en su cabecera. */}
+        {vis.has('dash-bars') &&
+          (() => {
+            const labels = compareLabelsFor(compare, new Date());
+            const comparisonData = compare === 'day' ? salesToday.data : salesComparison.data;
+            const stores = comparisonData?.byStore ?? [];
+            return (
+              <div className="dash-panel span-7" data-testid="dash-bars">
+                <header className="dash-panel-head">
+                  {/* Título + subtítulo en columna: el subtítulo queda pegado al
+                      título y no lo arrastra hacia abajo la altura de los controles. */}
+                  <div className="dash-panel-titles">
+                    <h3>Ventas</h3>
+                    <p className="dash-panel-sub">Facturación neta por tienda</p>
+                  </div>
+                  {/* Fila de pills a la derecha del título (toggle + desplegable),
+                      centrada verticalmente con el título+subtítulo. */}
+                  <div className="dash-bars-controls">
+                    {/* U-02: toggle barras ↔ línea para los gráficos del dashboard. */}
+                    <div
+                      className="dash-preset-switch dash-chart-kind"
+                      role="tablist"
+                      aria-label="Tipo de gráfico"
+                      data-testid="dash-chart-kind"
+                    >
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={chartKind === 'bars'}
+                        className={chartKind === 'bars' ? 'is-active' : ''}
+                        onClick={() => setChartKind('bars')}
+                        data-testid="dash-chart-kind-bars"
+                        title="Barras"
+                      >
+                        <BarChart2 size={15} aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={chartKind === 'line'}
+                        className={chartKind === 'line' ? 'is-active' : ''}
+                        onClick={() => setChartKind('line')}
+                        data-testid="dash-chart-kind-line"
+                        title="Línea"
+                      >
+                        <LineChart size={15} aria-hidden="true" />
+                      </button>
+                    </div>
+                    {/* Desplegable de comparación. El triggerNode colorea cada
+                        parte como leyenda implícita: gris = anterior, verde = actual. */}
+                    <Select
+                      className="dash-compare-select"
+                      value={compare}
+                      onChange={(value) => setCompare(value as SalesCompareMode)}
+                      ariaLabel="Comparar"
+                      data-testid="dash-compare"
+                      triggerNode={
+                        <>
+                          <span className="dash-compare-prev">{labels.previous}</span>
+                          {' vs '}
+                          <span className="dash-compare-curr">{labels.current.toLowerCase()}</span>
+                        </>
+                      }
+                      options={COMPARE_MODES.map((mode) => {
+                        const l = compareLabelsFor(mode, new Date());
+                        return {
+                          value: mode,
+                          label: `${l.previous} vs ${l.current.toLowerCase()}`,
+                        };
+                      })}
+                    />
+                  </div>
+                </header>
+                {/* U-01: Chart común (color constante, tooltip lateral actual/anterior/delta). */}
+                <Chart
+                  data={stores.map((s) => {
+                    const tone = deltaTone(s.deltaPct);
+                    const subTone = tone === 'flat' ? ('neutral' as const) : tone;
+                    return {
                       label: s.storeName,
                       value: s.today,
                       compareValue: s.yesterday,
-                      valueText: `Hoy ${fmtEur(s.today)}`,
-                      compareText: `Ayer ${fmtEur(s.yesterday)}`,
+                      valueText: `${labels.current} ${fmtEur(s.today)}`,
+                      compareText: `${labels.previous} ${fmtEur(s.yesterday)}`,
+                      // Tooltip estructurado: periodo (etiqueta) ↔ importe (derecha).
+                      tipValueLabel: labels.current,
+                      tipValueAmount: fmtEur(s.today),
+                      tipCompareLabel: labels.previous,
+                      tipCompareAmount: fmtEur(s.yesterday),
                       tipExtra: fmtDelta(s.deltaPct),
-                    }))}
-                    height={200}
-                    formatValue={fmtEurCompact}
-                    kind={chartKind}
-                    ariaLabel="Ventas hoy vs ayer por tienda"
-                  />
-                  <div className="dash-bars-legend">
-                    <span>
-                      <span className="dash-legend-dot dash-swatch-prev" /> Ayer
-                    </span>
-                    <span>
-                      <span className="dash-legend-dot dash-swatch-now" /> Hoy
-                    </span>
-                  </div>
-                </>
-              );
-            })()}
-          </div>
-        )}
-
-        {/* Ventas por familia (barras CSS horizontales) */}
-        {vis.has('dash-family') && (
-          <div className="dash-panel span-5" data-testid="dash-family">
-            <h3>Ventas por familia</h3>
-            <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]}</p>
-            {(() => {
-              // Composición por familia como anillo: top 6 + resto agregado en
-              // "Otras", para que el donut quede legible aunque haya muchas familias.
-              const fams = [...(byFamily.data ?? [])]
-                .filter((f) => f.total > 0)
-                .sort((a, b) => b.total - a.total);
-              const TOP = 6;
-              const head = fams.slice(0, TOP);
-              const tail = fams.slice(TOP);
-              const slices: DonutSlice[] = head.map((f) => ({
-                label: f.familyName,
-                value: f.total,
-              }));
-              if (tail.length > 0) {
-                slices.push({
-                  label: 'Otras',
-                  value: tail.reduce((sum, f) => sum + f.total, 0),
-                  color: 'var(--ui-cat-8)',
-                });
-              }
-              return (
-                <DonutChart
-                  data={slices}
-                  formatValue={fmtEur}
-                  centerLabel="Total"
-                  ariaLabel="Ventas por familia"
+                      tipExtraTone: subTone,
+                      // Delta bajo el nombre de la tienda, coloreado por signo.
+                      subValue: fmtDelta(s.deltaPct),
+                      subTone,
+                    };
+                  })}
+                  height={200}
+                  formatValue={fmtEurCompact}
+                  kind={chartKind}
+                  showGrid={false}
+                  barValues={chartKind === 'bars'}
+                  // Modo línea a sangre: el trazo toca el filo de la card cancelando
+                  // el padding del panel (1.5rem = 24px); puntos y nombres se reinsertan.
+                  edgeBleed={24}
+                  animated={false}
+                  ariaLabel={`Ventas por tienda · ${labels.current} vs ${labels.previous}`}
                 />
-              );
-            })()}
-          </div>
-        )}
+              </div>
+            );
+          })()}
+
+        {/* Ventas por familia (barras CSS horizontales). Paginado de 5 en 5 con
+            buscador + flechas arriba a la derecha: la card no crece en altura
+            indefinidamente (antes arrastraba la card de Ventas a la izquierda). */}
+        {vis.has('dash-family') &&
+          (() => {
+            const fams = byFamily.data ?? [];
+            // Máximo sobre TODAS las familias: las barras son comparables entre páginas.
+            const max = Math.max(1, ...fams.map((f) => f.total));
+            const q = familyQuery.trim().toLowerCase();
+            const filtered = q ? fams.filter((f) => f.familyName.toLowerCase().includes(q)) : fams;
+            const pageCount = Math.max(1, Math.ceil(filtered.length / FAMILY_PAGE_SIZE));
+            const page = Math.min(familyPage, pageCount - 1);
+            const visible = filtered.slice(
+              page * FAMILY_PAGE_SIZE,
+              page * FAMILY_PAGE_SIZE + FAMILY_PAGE_SIZE,
+            );
+            return (
+              <div className="dash-panel span-5 dash-panel--paged" data-testid="dash-family">
+                <header className="dash-panel-head">
+                  <h3>Ventas por familia</h3>
+                  <div className="dash-family-controls">
+                    <label className="dash-mini-search">
+                      <Search size={14} aria-hidden="true" />
+                      <input
+                        type="search"
+                        value={familyQuery}
+                        onChange={(e) => {
+                          setFamilyQuery(e.target.value);
+                          setFamilyPage(0);
+                        }}
+                        placeholder="Buscar familia…"
+                        aria-label="Buscar familia"
+                        data-testid="dash-family-search"
+                      />
+                    </label>
+                    <div className="dash-pager">
+                      <button
+                        type="button"
+                        className="dash-pager-btn"
+                        onClick={() => setFamilyPage((p) => Math.max(0, p - 1))}
+                        disabled={page <= 0}
+                        aria-label="Página anterior"
+                        data-testid="dash-family-prev"
+                      >
+                        <ChevronLeft size={16} aria-hidden="true" />
+                      </button>
+                      <span className="dash-pager-count" data-testid="dash-family-page">
+                        {page + 1}/{pageCount}
+                      </span>
+                      <button
+                        type="button"
+                        className="dash-pager-btn"
+                        onClick={() => setFamilyPage((p) => Math.min(pageCount - 1, p + 1))}
+                        disabled={page >= pageCount - 1}
+                        aria-label="Página siguiente"
+                        data-testid="dash-family-next"
+                      >
+                        <ChevronRight size={16} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                </header>
+                <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]}</p>
+                {visible.length === 0 ? (
+                  <p className="catalog-empty">Sin familias que coincidan.</p>
+                ) : (
+                  <ul className="dash-family-list dash-family-list--paged">
+                    {visible.map((f, i) => (
+                      <li
+                        key={f.familyId ?? `none-${i}`}
+                        style={{ '--i': i } as React.CSSProperties}
+                      >
+                        <span className="dash-family-name">{f.familyName}</span>
+                        <span className="dash-family-track">
+                          <span
+                            className="dash-family-fill"
+                            style={{ width: `${(f.total / max) * 100}%` }}
+                          />
+                          <span className="dash-family-pct">{fmtEur(f.total)}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })()}
 
         {/* Panel de roturas: alertas activas (GET /stock/alerts) + venta perdida est. */}
         {vis.has('dash-stockout') && (

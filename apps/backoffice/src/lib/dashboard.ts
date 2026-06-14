@@ -2,6 +2,11 @@ import { api } from './auth.js';
 
 export type DashboardPeriod = 'today' | 'yesterday' | 'week' | 'month';
 
+// Modo de comparación del panel de ventas por tienda: día (hoy vs ayer), mes
+// (este mes vs el anterior) o año (este año vs el anterior). Siempre "a la misma
+// altura". En `today`/`yesterday` del response, hoy=actual y ayer=anterior.
+export type SalesCompareMode = 'day' | 'month' | 'year';
+
 export interface SalesTodayResponse {
   today: { total: number; count: number };
   yesterday: { total: number; count: number };
@@ -109,9 +114,15 @@ const periodQuery = (period: DashboardPeriod, storeId?: string): Record<string, 
   ...(storeId ? { storeId } : {}),
 });
 
-export function getSalesToday(storeId?: string): Promise<SalesTodayResponse> {
+export function getSalesToday(
+  storeId?: string,
+  compare: SalesCompareMode = 'day',
+): Promise<SalesTodayResponse> {
   return api.get<SalesTodayResponse>('/dashboard/sales-today', {
     ...(storeId ? { storeId } : {}),
+    // `day` es el valor por defecto del backend: no lo enviamos para mantener la
+    // URL de la KPI card "Facturación hoy" idéntica a antes (cache-friendly).
+    ...(compare !== 'day' ? { compare } : {}),
   });
 }
 

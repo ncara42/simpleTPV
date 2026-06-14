@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 
-import { deltaPct, previousRange, resolvePeriod } from './period.js';
+import { comparisonStarts, deltaPct, previousRange, resolvePeriod } from './period.js';
 
 // `now` fijo: jueves 2026-05-28 15:30 hora local. Las funciones son puras y
 // reciben este `now`, así que los tests no dependen del reloj real.
@@ -70,6 +70,33 @@ describe('previousRange', () => {
     const durationMs = week.to.getTime() - week.from.getTime();
     expect(prev.to.getTime()).toBe(week.from.getTime());
     expect(prev.from.getTime()).toBe(week.from.getTime() - durationMs);
+  });
+});
+
+describe('comparisonStarts', () => {
+  it('day: hoy 00:00 vs ayer 00:00, corte a la misma hora transcurrida', () => {
+    const { currentStart, previousStart, previousSameElapsed } = comparisonStarts('day', NOW);
+    expect(currentStart).toEqual(new Date(2026, 4, 28, 0, 0, 0, 0));
+    expect(previousStart).toEqual(new Date(2026, 4, 27, 0, 0, 0, 0));
+    // 15:30 transcurridas desde medianoche → ayer 27 a las 15:30.
+    expect(previousSameElapsed).toEqual(new Date(2026, 4, 27, 15, 30, 0, 0));
+  });
+
+  it('month: día 1 del mes vs día 1 del mes anterior, mismo tiempo transcurrido', () => {
+    const { currentStart, previousStart, previousSameElapsed } = comparisonStarts('month', NOW);
+    expect(currentStart).toEqual(new Date(2026, 4, 1, 0, 0, 0, 0)); // 1 may
+    expect(previousStart).toEqual(new Date(2026, 3, 1, 0, 0, 0, 0)); // 1 abr
+    // Transcurrido = 28 may 15:30 − 1 may 00:00 = 27d 15h30m → desde 1 abr.
+    const elapsedMs = NOW.getTime() - currentStart.getTime();
+    expect(previousSameElapsed.getTime()).toBe(previousStart.getTime() + elapsedMs);
+  });
+
+  it('year: 1 ene de este año vs 1 ene del anterior, mismo tiempo transcurrido', () => {
+    const { currentStart, previousStart, previousSameElapsed } = comparisonStarts('year', NOW);
+    expect(currentStart).toEqual(new Date(2026, 0, 1, 0, 0, 0, 0));
+    expect(previousStart).toEqual(new Date(2025, 0, 1, 0, 0, 0, 0));
+    const elapsedMs = NOW.getTime() - currentStart.getTime();
+    expect(previousSameElapsed.getTime()).toBe(previousStart.getTime() + elapsedMs);
   });
 });
 

@@ -43,7 +43,7 @@
   --ui-chart-tip-fg-muted: #b9c2d0;
   --ui-chart-tip-border: #0a2540;
 
-  /* Paleta categórica (donut, apiladas) — set Stripe. Usar SIEMPRE estos tokens
+  /* Paleta categórica (barras apiladas) — set Stripe. Usar SIEMPRE estos tokens
      en charts de varias categorías; no inventar colores sueltos. */
   --ui-cat-1: #635bff; /* índigo (acento) */
   --ui-cat-2: #0ea5e9; /* sky */

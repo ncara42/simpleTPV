@@ -28,10 +28,16 @@ function makeController(): {
 }
 
 describe('DashboardController', () => {
-  it('sales-today delega pasando solo el storeId', async () => {
+  it('sales-today delega pasando storeId y compare (por defecto day)', async () => {
     const { controller, service } = makeController();
     await expect(controller.salesToday({ storeId: 's1' })).resolves.toBe('salesToday');
-    expect(service.salesToday).toHaveBeenCalledWith('s1');
+    expect(service.salesToday).toHaveBeenCalledWith('s1', 'day');
+  });
+
+  it('sales-today reenvía el compare elegido', async () => {
+    const { controller, service } = makeController();
+    await controller.salesToday({ storeId: 's1', compare: 'month' });
+    expect(service.salesToday).toHaveBeenCalledWith('s1', 'month');
   });
 
   it('sales-by-family reenvía la query de periodo', async () => {

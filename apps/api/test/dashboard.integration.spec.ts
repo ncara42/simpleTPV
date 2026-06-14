@@ -231,7 +231,7 @@ describe('Dashboard — integración', () => {
     // now inyectado a las 12:00 → ayer se capa a las 12:00 (la venta de ayer a las
     // 23h NO cuenta). Determinista: no depende de la hora real del run.
     const res = await tenantStorage.run({ organizationId: org1Id }, async () =>
-      service.salesToday(storeOwnId, todayAt(12)),
+      service.salesToday(storeOwnId, 'day', todayAt(12)),
     );
     // Hoy: 200 + 45 (50 − 5 ticket) = 245. Ayer hasta las 12: solo la de las 10 = 100
     // (la de las 23 queda fuera por el cap de misma hora).

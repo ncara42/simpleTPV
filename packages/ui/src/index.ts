@@ -11,7 +11,6 @@ export {
   type DataTableSort,
   type SortDir,
 } from './components/DataTable.js';
-export { DonutChart, type DonutChartProps, type DonutSlice } from './components/DonutChart.js';
 export { ErrorScreen } from './components/ErrorScreen.js';
 export { Input } from './components/Input.js';
 export { LoginForm, type LoginFormProps } from './components/LoginForm.js';

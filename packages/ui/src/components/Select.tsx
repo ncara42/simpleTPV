@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 
 export interface SelectOption {
@@ -16,6 +25,8 @@ export interface SelectProps {
   placeholder?: string;
   /** Si se indica, el disparador muestra este texto fijo en vez de la opción seleccionada. */
   triggerLabel?: string;
+  /** Nodo React para el disparador; permite texto coloreado o iconos. Tiene prioridad sobre triggerLabel. */
+  triggerNode?: ReactNode;
   /** Contador opcional alineado junto al chevron del disparador. */
   triggerCount?: number;
   className?: string;
@@ -35,6 +46,7 @@ export function Select({
   options,
   placeholder = 'Seleccionar…',
   triggerLabel,
+  triggerNode,
   triggerCount,
   className,
   disabled,
@@ -226,7 +238,7 @@ export function Select({
         data-testid={testid}
       >
         <span className={`ui-select-value${selected || triggerLabel ? '' : ' is-placeholder'}`}>
-          {triggerLabel ?? (selected ? selected.label : placeholder)}
+          {triggerNode ?? triggerLabel ?? (selected ? selected.label : placeholder)}
         </span>
         {triggerCount != null && <span className="ui-select-trigger-count">{triggerCount}</span>}
         <svg

@@ -133,6 +133,66 @@ test('U-02: el toggle barras ↔ línea cambia los gráficos y persiste', async 
   await expect(page.getByTestId('dash-hour').locator('.ui-chart-bar').first()).toBeVisible();
 });
 
+test('el toggle de gráfico y el desplegable de comparación viven dentro de la card de Ventas', async ({
+  page,
+}) => {
+  await page.getByTestId('dash-preset-ventas').click();
+  const bars = page.getByTestId('dash-bars');
+  await expect(bars).toBeVisible();
+  // El toggle barras/línea ya no está en la cabecera global: vive en la card.
+  await expect(bars.getByTestId('dash-chart-kind')).toBeVisible();
+  // Desplegable de comparación: por defecto "Hoy vs ayer".
+  const compare = bars.getByTestId('dash-compare');
+  await expect(compare).toBeVisible();
+  await expect(compare).toContainText('Hoy vs ayer');
+
+  // Cambiar a comparación por mes: el desplegable refleja la nueva selección
+  // (mes actual vs anterior) y deja de decir Hoy.
+  const MONTHS = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
+  ];
+  const currentMonth = MONTHS[new Date().getMonth()]!;
+  await compare.click();
+  await page.locator('[role="option"][data-value="month"]').click();
+  await expect(compare).toContainText(currentMonth);
+  await expect(compare).not.toContainText('Hoy');
+
+  // Restaura a día para no afectar a otros tests/ejecuciones.
+  await compare.click();
+  await page.locator('[role="option"][data-value="day"]').click();
+  await expect(compare).toContainText('Hoy vs ayer');
+});
+
+test('Ventas por familia: paginado de 5 en 5 con flechas y buscador', async ({ page }) => {
+  await page.getByTestId('dash-preset-ventas').click();
+  const fam = page.getByTestId('dash-family');
+  await expect(fam).toBeVisible();
+  // Como mucho 5 familias por página (el seed-demo tiene bastantes más).
+  await expect(fam.locator('.dash-family-list li')).toHaveCount(5);
+  // Indicador de página y avance/retroceso con las flechas.
+  await expect(fam.getByTestId('dash-family-page')).toContainText('1/');
+  await fam.getByTestId('dash-family-next').click();
+  await expect(fam.getByTestId('dash-family-page')).toContainText('2/');
+  await fam.getByTestId('dash-family-prev').click();
+  await expect(fam.getByTestId('dash-family-page')).toContainText('1/');
+  // Buscador: sin coincidencias → estado vacío; al limpiar, vuelve a 5 filas.
+  await fam.getByTestId('dash-family-search').fill('zzz-no-existe');
+  await expect(fam.locator('.catalog-empty')).toBeVisible();
+  await fam.getByTestId('dash-family-search').fill('');
+  await expect(fam.locator('.dash-family-list li')).toHaveCount(5);
+});
+
 test('preferencias por defecto: el dashboard recuerda el periodo elegido (IT-16)', async ({
   page,
 }) => {

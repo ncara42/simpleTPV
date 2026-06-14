@@ -222,37 +222,43 @@
   color: var(--ui-text-muted);
 }
 
-/* ─── Ventas hoy vs ayer por tienda ─── */
-/* El gráfico es el <Chart> común de packages/ui (U-01); aquí solo viven la
-   leyenda y sus muestras de color. */
-/* Leyenda anclada arriba a la derecha, a la altura del título (ahorra espacio) */
-.dash-bars-legend {
-  position: absolute;
-  top: 1.4rem;
-  right: 1.5rem;
+/* ─── Ventas: comparativa por tienda ─── */
+/* El gráfico es el <Chart> común de packages/ui (U-01); en la cabecera viven el
+   título+subtítulo (columna izquierda) y, a la derecha, las pills (toggle +
+   desplegable). */
+/* Título + subtítulo apilados: el subtítulo queda pegado al título. */
+.dash-panel-titles {
   display: flex;
-  gap: 1rem;
-  font-size: 0.78rem;
-  color: var(--ui-text-muted);
+  flex-direction: column;
 }
-.dash-bars-legend span {
+.dash-panel-titles .dash-panel-sub {
+  margin: 0.2rem 0 0;
+}
+/* Fila de pills a la derecha del título (toggle + desplegable). Va centrada con
+   el título+subtítulo gracias a `align-items: center` de .dash-panel-head. */
+.dash-bars-controls {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-}
-.dash-legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  display: inline-block;
+  gap: 0.5rem;
   flex: none;
 }
-/* Muestras de color para leyenda y tooltip (mismo relleno que las barras) */
-.dash-swatch-prev {
-  background: var(--ui-border-strong);
+.dash-compare-select {
+  width: fit-content;
 }
-.dash-swatch-now {
-  background: var(--ui-brand);
+/* Misma altura exterior que las pills del header (.dash-period-select/.dash-store)
+   para que TODAS las pills de la vista sean coherentes; el default del Select es
+   2.5rem (más alto). */
+.dash-compare-select .ui-select-trigger {
+  height: calc(30px + 0.36rem + 2px);
+  border-radius: 9999px;
+}
+/* Leyenda de color implícita en el disparador del compare: gris = anterior, verde = actual. */
+.dash-compare-prev {
+  color: var(--ui-text-soft);
+}
+.dash-compare-curr {
+  color: var(--ui-success);
+  font-weight: 650;
 }
 
 /* ─── Barras horizontales: ventas por familia ─── */
@@ -334,6 +340,105 @@
   .dash-rank-meter::after {
     animation: none;
   }
+}
+
+/* Card paginada (Ventas por familia): altura estable, la lista rellena el alto
+   disponible repartiendo sus filas (no deja un hueco grande al pie). */
+.dash-panel--paged {
+  display: flex;
+  flex-direction: column;
+}
+.dash-family-list--paged {
+  flex: 1;
+  justify-content: space-between;
+}
+
+/* Controles de la cabecera de "Ventas por familia": buscador + paginador,
+   arriba a la derecha (el buscador a la izquierda de las flechas). */
+.dash-family-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.dash-mini-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 9.5rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.dash-mini-search:focus-within {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface);
+}
+.dash-mini-search svg {
+  flex: none;
+}
+.dash-mini-search input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--ui-text);
+  /* Texto/placeholder que no cabe se desvanece (coherente con .search-field). */
+  mask-image: linear-gradient(90deg, #000 calc(100% - 1.1rem), transparent);
+}
+.dash-mini-search input:focus {
+  outline: none;
+}
+.dash-mini-search input::placeholder {
+  color: var(--ui-text-muted);
+}
+/* Oculta la X nativa del type=search (se mantiene el aspecto de píldora). */
+.dash-mini-search input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.dash-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+.dash-pager-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+.dash-pager-btn:hover:not(:disabled) {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
+.dash-pager-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.dash-pager-count {
+  min-width: 2.2rem;
+  text-align: center;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-muted);
 }
 
 /* ─── Lista de roturas de stock ─── */
@@ -433,6 +538,7 @@
   width: fit-content;
 }
 .dash-rank-select .ui-select-trigger {
+  height: calc(30px + 0.36rem + 2px);
   border-radius: 9999px;
 }
 

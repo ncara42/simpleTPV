@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsEnum, IsInt, IsOptional, IsUUID, Matches, Max, Min } from 'class-validator';
 
-import type { DashboardPeriod } from './period.js';
+import type { CompareMode, DashboardPeriod } from './period.js';
 
 // Query común a los endpoints con rango temporal. `period` por defecto `today`.
 // `from`/`to` solo son obligatorios (y usados) cuando period=custom; el service
@@ -36,8 +36,13 @@ export class ProductRankingsQueryDto extends DashboardPeriodQueryDto {
   limit?: number;
 }
 
-// Solo necesita un storeId opcional (comparativa hoy vs ayer, sin rango).
+// Comparativa de ventas por tienda: storeId opcional + modo de comparación
+// (`compare`, por defecto `day` = hoy vs ayer). No usa el selector de periodo.
 export class SalesTodayQueryDto {
+  @IsOptional()
+  @IsEnum(['day', 'month', 'year'], { message: 'compare debe ser day|month|year' })
+  compare?: CompareMode;
+
   @IsOptional()
   @IsUUID()
   storeId?: string;
