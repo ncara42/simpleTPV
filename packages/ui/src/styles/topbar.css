@@ -93,23 +93,28 @@
   justify-content: center;
   width: 36px;
   height: 36px;
-  border: none;
+  /* Mismo fondo gris + hairline que el lanzador de búsqueda, para que ambos
+     controles de la zona derecha tengan idéntico acabado de reposo. */
+  border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-pill);
-  background: none;
+  background: var(--ui-surface-subtle);
   color: var(--ui-text-muted);
   cursor: pointer;
   transition:
     color 0.15s ease,
-    background 0.15s ease;
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .topbar-notif:hover {
-  background: var(--ui-surface-subtle);
+  background: var(--ui-surface);
+  border-color: var(--ui-border-strong);
   color: var(--ui-text);
 }
 
 .topbar-notif.active {
-  background: var(--ui-surface-subtle);
+  background: var(--ui-surface);
+  border-color: var(--ui-border-strong);
   color: var(--ui-text);
 }
 
@@ -134,8 +139,8 @@
   font-size: 0.625rem;
   font-weight: 700;
   line-height: 1;
-  /* Aro del color de la barra para separar el badge del icono. */
-  box-shadow: 0 0 0 2px var(--ui-surface);
+  /* Aro del color del fondo de la campana para separar el badge del icono. */
+  box-shadow: 0 0 0 2px var(--ui-surface-subtle);
 }
 
 .topbar-switch {

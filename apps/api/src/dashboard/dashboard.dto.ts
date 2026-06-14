@@ -8,8 +8,8 @@ import type { CompareMode, DashboardPeriod } from './period.js';
 // los valida en resolvePeriod. storeId opcional filtra a una tienda (vista MANAGER).
 export class DashboardPeriodQueryDto {
   @IsOptional()
-  @IsEnum(['today', 'yesterday', 'week', 'month', 'custom'], {
-    message: 'period debe ser today|yesterday|week|month|custom',
+  @IsEnum(['today', 'yesterday', 'week', 'month', 'year', 'custom'], {
+    message: 'period debe ser today|yesterday|week|month|year|custom',
   })
   period?: DashboardPeriod;
 

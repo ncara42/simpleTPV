@@ -307,6 +307,12 @@
 .dash-hour-chart .ui-chart-bar {
   max-width: 70%;
 }
+/* En barras, cada columna (.ui-chart-group) fija `cursor: default` y tapaba el `grab`
+   del lienzo. Que herede el cursor del contenedor desplazable → la mano de arrastrar
+   también aparece sobre las barras (y pasa a "grabbing" al arrastrar). */
+.dash-hour-chart .ui-chart-group {
+  cursor: inherit;
+}
 
 /* Barra fina arrastrable: indicador de posición + control directo (estilo "scrollbar
    custom"). Va a sangre bajo el gráfico; el pulgar refleja la porción visible. */

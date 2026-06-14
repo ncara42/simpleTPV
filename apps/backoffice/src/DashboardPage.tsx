@@ -5,6 +5,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { BarChart2, ChevronDown, LineChart, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
+import { DaySelector } from './components/DaySelector.js';
 import { listStores } from './lib/admin.js';
 import {
   type DashboardPeriod,
@@ -16,7 +17,7 @@ import {
   getProductRotation,
   getSalesByEmployee,
   getSalesByFamily,
-  getSalesByHour,
+  getSalesByHourOnDay,
   getSalesKpis,
   getSalesToday,
   getStockoutKpis,
@@ -43,10 +44,11 @@ import { STATUS_LABEL } from './purchases/labels.js';
 import { ALERT_LABEL, df, EXPIRY_LABEL, expiryDaysText } from './stock/labels.js';
 
 const PERIODS: Array<{ id: DashboardPeriod; label: string }> = [
-  { id: 'today', label: 'Hoy' },
   { id: 'yesterday', label: 'Ayer' },
+  { id: 'today', label: 'Hoy' },
   { id: 'week', label: 'Semana' },
   { id: 'month', label: 'Mes' },
+  { id: 'year', label: 'Año' },
 ];
 
 // Subtítulo de panel según el periodo seleccionado (más claro que "Periodo actual").
@@ -55,6 +57,18 @@ const PERIOD_SUBTITLE: Record<DashboardPeriod, string> = {
   yesterday: 'Ayer',
   week: 'Esta semana',
   month: 'Este mes',
+  year: 'Este año',
+};
+
+// Fecha completa del día elegido en "Ventas por hora" (subtítulo de la card).
+const HOUR_DAY_FMT = new Intl.DateTimeFormat('es-ES', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+});
+const formatHourDay = (iso: string): string => {
+  const s = HOUR_DAY_FMT.format(new Date(`${iso}T00:00:00`));
+  return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
 // ── Comparativa del panel de ventas (hoy vs ayer / mes vs mes / año vs año) ──
@@ -174,6 +188,11 @@ export function DashboardPage({
   const [compare, setCompare] = useState<SalesCompareMode>('day');
   // Búsqueda del panel "Ventas por familia" (la lista hace scroll vertical).
   const [familyQuery, setFamilyQuery] = useState('');
+  // "Ventas por hora" muestra siempre UN día concreto (no un agregado del rango): su
+  // día es independiente del selector de periodo y se elige con el calendario propio.
+  const [hourDay, setHourDay] = useState<string>(() =>
+    new Intl.DateTimeFormat('en-CA').format(new Date()),
+  );
   const store = storeId || undefined;
 
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
@@ -224,9 +243,10 @@ export function DashboardPage({
     placeholderData: keepPreviousData,
     enabled: vis.has('dash-family'),
   });
+  // Por DÍA (hourDay), no por periodo: refleja siempre horas reales de ese día.
   const byHour = useQuery({
-    queryKey: ['dash-hour', period, store],
-    queryFn: () => getSalesByHour(period, store),
+    queryKey: ['dash-hour', hourDay, store],
+    queryFn: () => getSalesByHourOnDay(hourDay, store),
     placeholderData: keepPreviousData,
     enabled: vis.has('dash-hour'),
   });
@@ -708,6 +728,7 @@ export function DashboardPage({
               key={preset.id}
               data={rankings.data}
               loading={rankings.isLoading}
+              subtitle={PERIOD_SUBTITLE[period]}
               initialTab={
                 vis.has('rank-sales') ? 'sales' : vis.has('rank-margin') ? 'margin' : 'rotation'
               }
@@ -813,20 +834,19 @@ export function DashboardPage({
           </div>
         )}
 
-        {/* Ventas por hora (STAT-02): mismo lenguaje que la card de Ventas — cabecera
-            con título+subtítulo a la izquierda y el toggle barras↔línea a la derecha.
-            Las 24 franjas no caben a la vez, así que viven en una pista con scroll
-            horizontal (sin barra visible): arranca en las 7h y se arrastra. */}
+        {/* Ventas por hora (STAT-02): card de UN día concreto (independiente del selector
+            de periodo). Cabecera con título + la fecha del día; a la derecha, selector de
+            día (flechas + calendario propio) y el toggle barras↔línea. Las 24 franjas se
+            recorren arrastrando el gráfico o la barra fina. */}
         {vis.has('dash-hour') && (
           <div className="dash-panel span-7" data-testid="dash-hour">
             <header className="dash-panel-head">
               <div className="dash-panel-titles">
                 <h3>Ventas por hora</h3>
-                <p className="dash-panel-sub">
-                  {PERIOD_SUBTITLE[period]} · arrastra para recorrer las 24 h
-                </p>
+                <p className="dash-panel-sub">{formatHourDay(hourDay)}</p>
               </div>
               <div className="dash-bars-controls">
+                <DaySelector value={hourDay} onChange={setHourDay} />
                 {/* U-02: toggle LOCAL a esta card (no afecta a "Ventas"). */}
                 <ChartKindToggle
                   chartKind={hourKind}
@@ -1456,25 +1476,35 @@ const RANK_OPTIONS = [
 function Rankings(props: {
   data: import('./lib/dashboard.js').ProductRankings | undefined;
   loading: boolean;
+  // Subtítulo de periodo (Hoy/Ayer/Esta semana/…), igual que el resto de paneles.
+  subtitle?: string;
   // Pestaña inicial según el preset (D-08): top ventas / top margen / peor rotación.
   initialTab?: RankTab;
 }) {
   const [tab, setTab] = useState<RankTab>(props.initialTab ?? 'sales');
+  // Cabecera común: título + subtítulo apilados a la izquierda (como Ventas/familia),
+  // selector de ranking a la derecha y centrado con ambos.
+  const head = (disabled: boolean): React.ReactNode => (
+    <header className="dash-panel-head">
+      <div className="dash-panel-titles">
+        <h3>Rankings de producto</h3>
+        {props.subtitle != null && <p className="dash-panel-sub">{props.subtitle}</p>}
+      </div>
+      <Select
+        className="dash-rank-select"
+        value={tab}
+        onChange={(v) => setTab(v as RankTab)}
+        ariaLabel="Filtrar ranking"
+        data-testid="rank-tabs"
+        options={RANK_OPTIONS}
+        disabled={disabled}
+      />
+    </header>
+  );
   if (props.loading) {
     return (
       <>
-        <header className="dash-panel-head">
-          <h3>Rankings de producto</h3>
-          <Select
-            className="dash-rank-select"
-            value={tab}
-            onChange={(v) => setTab(v as RankTab)}
-            ariaLabel="Filtrar ranking"
-            data-testid="rank-tabs"
-            options={RANK_OPTIONS}
-            disabled
-          />
-        </header>
+        {head(true)}
         <p className="catalog-empty">Cargando…</p>
       </>
     );
@@ -1505,17 +1535,7 @@ function Rankings(props: {
 
   return (
     <>
-      <header className="dash-panel-head">
-        <h3>Rankings de producto</h3>
-        <Select
-          className="dash-rank-select"
-          value={tab}
-          onChange={(v) => setTab(v as RankTab)}
-          ariaLabel="Filtrar ranking"
-          data-testid="rank-tabs"
-          options={RANK_OPTIONS}
-        />
-      </header>
+      {head(false)}
       {rows.length === 0 ? (
         <p className="catalog-empty">Sin datos.</p>
       ) : (

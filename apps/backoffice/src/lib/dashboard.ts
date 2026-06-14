@@ -1,6 +1,6 @@
 import { api } from './auth.js';
 
-export type DashboardPeriod = 'today' | 'yesterday' | 'week' | 'month';
+export type DashboardPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'year';
 
 // Modo de comparación del panel de ventas por tienda: día (hoy vs ayer), mes
 // (este mes vs el anterior) o año (este año vs el anterior). Siempre "a la misma
@@ -135,6 +135,18 @@ export function getSalesByFamily(
 
 export function getSalesByHour(period: DashboardPeriod, storeId?: string): Promise<SalesByHour[]> {
   return api.get<SalesByHour[]>('/dashboard/sales-by-hour', periodQuery(period, storeId));
+}
+
+// Ventas por hora de UN día concreto (no agregado del rango): usa el periodo `custom`
+// con from=to=día, que el backend resuelve a [día 00:00, día+1 00:00). `dayIso` es
+// 'YYYY-MM-DD' en hora local. Así la card refleja siempre horas reales de ese día.
+export function getSalesByHourOnDay(dayIso: string, storeId?: string): Promise<SalesByHour[]> {
+  return api.get<SalesByHour[]>('/dashboard/sales-by-hour', {
+    period: 'custom',
+    from: dayIso,
+    to: dayIso,
+    ...(storeId ? { storeId } : {}),
+  });
 }
 
 export function getDiscountByEmployee(

@@ -3,7 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 // Resolución de periodos del dashboard. Devuelve un rango semiabierto [from, to)
 // en hora del servidor. Las funciones son puras (reciben `now`) para que los
 // tests no dependan del reloj real.
-export type DashboardPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'custom';
+export type DashboardPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'custom';
 
 export interface DateRange {
   from: Date;
@@ -75,6 +75,8 @@ export function resolvePeriod(
       return { from: startOfWeek(now), to: tomorrowStart };
     case 'month':
       return { from: startOfMonth(now), to: tomorrowStart };
+    case 'year':
+      return { from: startOfYear(now), to: tomorrowStart };
     case 'custom': {
       if (!custom?.from || !custom?.to) {
         throw new BadRequestException('period=custom requiere from y to (YYYY-MM-DD)');
