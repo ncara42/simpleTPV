@@ -2316,39 +2316,87 @@
 }
 
 /* ── Centro de ayuda / soporte (IT-20) ──────────────────────────────────────
-   Canales de contacto en tarjetas + FAQ en acordeón. */
+   Rediseño al lenguaje de la dashboard: superficies limpias (.dash-panel),
+   espaciado generoso, radios/sombras sutiles y jerarquía tipográfica. Se
+   elimina el exceso de bordes "encajonados" (border:1px por cada card/FAQ) a
+   favor de superficies + separadores hairline solo donde aportan. */
+
+/* La página apila secciones-panel con mucho aire entre ellas (ritmo dashboard). */
+.help-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-8);
+}
+
+/* Cada sección es un panel-superficie igual que .dash-panel (sin doble marco con
+   la tabla interior de API keys). */
+.help-section {
+  padding: var(--ui-space-6) var(--ui-space-6);
+  border: 1px solid var(--ui-border);
+  border-radius: 18px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+/* Cabecera de sección: título + subtítulo muted (espejo de .dash-panel-head). */
+.help-section-head {
+  margin-bottom: var(--ui-space-6);
+}
 .help-title {
   display: flex;
   align-items: center;
   gap: var(--ui-space-2);
-  margin: 0 0 var(--ui-space-2);
+  margin: 0;
+  font-size: var(--ui-text-lg);
+  font-weight: 600;
+  letter-spacing: -0.016em;
+  color: var(--ui-text);
+}
+.help-title svg {
+  color: var(--ui-text-soft);
 }
 .help-intro {
-  margin: 0 0 var(--ui-space-5);
+  margin: var(--ui-space-2) 0 0;
+  font-size: var(--ui-text-base);
+  color: var(--ui-text-muted);
 }
+
+/* ── Canales de contacto ──────────────────────────────────────────────────── */
+/* Grid con aire (gap cómodo) que reflowa sin overflow. */
 .help-channels {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: var(--ui-space-3);
+  gap: var(--ui-space-5);
 }
+/* Tarjeta-superficie estilo .dash-card: borde sutil + sombra + radio amplio, con
+   padding cómodo. Sin acento agresivo en hover. */
 .help-channel {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--ui-space-1);
-  padding: var(--ui-space-4);
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-5);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
+  border-radius: var(--ui-radius-xl);
   background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
   color: var(--ui-text);
   text-decoration: none;
   transition:
-    border-color 0.15s var(--ui-ease),
-    background 0.15s var(--ui-ease);
+    border-color 0.18s var(--ui-ease),
+    transform 0.18s var(--ui-ease);
+}
+.help-channel svg {
+  color: var(--ui-text-soft);
 }
 .help-channel:hover {
-  border-color: var(--ui-primary);
-  background: var(--ui-surface-subtle);
+  border-color: var(--ui-border-strong);
+  transform: translateY(-1px);
+}
+.help-channel:focus-visible {
+  outline: none;
+  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-focus);
 }
 .help-channel-label {
   font-weight: 600;
@@ -2357,27 +2405,93 @@
   font-size: var(--ui-text-sm);
   color: var(--ui-text-muted);
 }
+
+/* ── FAQ (acordeón) ───────────────────────────────────────────────────────── */
+/* Un solo bloque: las preguntas se separan con hairlines sutiles (no una caja por
+   cada ítem). El indicador de abierto/cerrado es un chevron rotatorio, no la caja. */
 .help-faq {
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-2);
 }
 .help-faq-item {
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-  padding: 0 var(--ui-space-4);
+  border-bottom: 1px solid var(--ui-border);
+}
+.help-faq-item:first-child {
+  border-top: 1px solid var(--ui-border);
 }
 .help-faq-item > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
   cursor: pointer;
-  padding: var(--ui-space-3) 0;
+  padding: var(--ui-space-4) 0;
   font-weight: 500;
-  list-style: revert;
+  color: var(--ui-text);
+  /* Quita el marcador nativo (lo sustituye el chevron ::after). */
+  list-style: none;
+}
+.help-faq-item > summary::-webkit-details-marker {
+  display: none;
+}
+.help-faq-item > summary:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+  border-radius: var(--ui-radius-sm);
+}
+/* Chevron como indicador de estado: rota 90° al abrir. */
+.help-faq-item > summary::after {
+  content: '';
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 1.5px solid var(--ui-text-soft);
+  border-bottom: 1.5px solid var(--ui-text-soft);
+  transform: rotate(-45deg);
+  transition: transform 0.18s var(--ui-ease);
+}
+.help-faq-item[open] > summary::after {
+  transform: rotate(45deg);
 }
 .help-faq-item > p {
-  margin: 0 0 var(--ui-space-3);
+  margin: 0 0 var(--ui-space-4);
   color: var(--ui-text-muted);
   font-size: var(--ui-text-base);
-  line-height: 1.5;
+  line-height: 1.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .help-channel,
+  .help-faq-item > summary::after {
+    transition: none;
+  }
+}
+
+/* ── Integraciones · Claves API ───────────────────────────────────────────── */
+/* La sección de API keys queda integrada en el mismo lenguaje visual: sin su
+   marco duro propio. El .table-panel interior cede su superficie al panel de la
+   sección (sin doble borde/sombra) y solo conserva sus separadores internos. */
+.help-integrations-body .table-panel {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+/* El banner y la lista de revocadas usaban márgenes pensados para el panel con
+   padding 0; aquí el panel ya da el aire, así que basta separación vertical. */
+.help-integrations-body .apikey-banner,
+.help-integrations-body .apikey-revoked {
+  margin: var(--ui-space-4) 0 0;
+}
+/* La toolbar interna ya no necesita su banda de chrome separada por hairline:
+   se integra con el resto del contenido de la sección. SectionToolbar renderiza
+   `.users-toolbar`, que en .table-panel recibe la banda de cabecera; aquí la
+   neutralizamos para que fluya dentro del panel de la sección. */
+.help-integrations-body .table-panel > .users-toolbar {
+  min-height: 0;
+  padding: 0 0 var(--ui-space-4);
+  background: transparent;
+  border-bottom: none;
 }
 
 /* ── Stock: filtros agrupados (producto vs tienda) + lista por tienda (UX) ───── */
@@ -2839,7 +2953,9 @@
   border: 2px solid transparent;
   border-radius: 999px;
   cursor: pointer;
-  transition: transform 0.1s, border-color 0.1s;
+  transition:
+    transform 0.1s,
+    border-color 0.1s;
 }
 .fam-color-swatch:hover {
   transform: scale(1.12);
