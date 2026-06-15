@@ -1993,6 +1993,49 @@
   overflow: hidden;
   box-shadow: var(--ui-shadow-sm);
 }
+
+/* Banda de acciones de "andamiaje" de la tabla (Columnas + CSV), por ENCIMA de la
+   tabla y alineada a la derecha — fuera de la estructura visual de la tabla. */
+.table-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--ui-space-2);
+  margin-bottom: var(--ui-space-2);
+}
+
+/* Botón solo-icono (acciones secundarias como Importar/Exportar CSV): cuadrado,
+   neutro (nunca primary); el texto se muestra en hover vía tooltip y el aria-label
+   está siempre presente para a11y. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+.icon-btn:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
+.icon-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 /* Variante para paneles de CONTENIDO libre (no tabla): Ayuda, etc. La base
    .table-panel no lleva padding porque en las tablas lo aportan la cabecera y las
    celdas; cuando el panel contiene contenido suelto necesita padding propio. */

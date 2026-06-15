@@ -1,6 +1,6 @@
-import { Badge, Button, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
-import { usePageHeader } from '@simpletpv/ui';
+import { Badge, DataTable, type DataTableColumn, Select, usePageHeader } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { Download } from 'lucide-react';
 import { useState } from 'react';
 
 import { useTableColumns } from './components/useTableColumns.js';
@@ -265,15 +265,6 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
           </>
         )}
       </div>
-      {features.data_export && (
-        <Button
-          className="sales-export"
-          onClick={() => void exportCsv()}
-          data-testid="sales-export-csv"
-        >
-          Exportar CSV
-        </Button>
-      )}
     </>
   );
 
@@ -315,27 +306,36 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
 
       {columnsEditor}
 
+      <div className="table-actions">
+        {features.data_export && (
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => void exportCsv()}
+            data-testid="sales-export-csv"
+            title="Exportar CSV"
+            aria-label="Exportar CSV"
+          >
+            <Download size={18} aria-hidden="true" />
+          </button>
+        )}
+        <button
+          type="button"
+          className="ui-dt-cols-trigger"
+          onClick={toggleColumnsEditor}
+          data-testid="sales-columns-toggle"
+          aria-expanded={columnsEditorOpen}
+        >
+          Columnas
+        </button>
+      </div>
+
       <DataTable
         columns={effectiveColumns}
         rows={data?.items ?? []}
         rowKey={(r) => r.id}
         loading={query.isLoading}
-        toolbar={
-          <>
-            {toolbar}
-            <div className="ui-dt-cols">
-              <button
-                type="button"
-                className="ui-dt-cols-trigger"
-                onClick={toggleColumnsEditor}
-                data-testid="sales-columns-toggle"
-                aria-expanded={columnsEditorOpen}
-              >
-                Columnas
-              </button>
-            </div>
-          </>
-        }
+        toolbar={toolbar}
         footer={footer}
         pagination={{
           page,
