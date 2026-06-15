@@ -10,6 +10,7 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 
 import { Roles } from '../auth/roles.decorator.js';
 import type { ImportResult } from '../common/csv.js';
@@ -38,6 +39,9 @@ export class UsersController {
     return this.users.create(body);
   }
 
+  // Import en lote: hasta 500 hashes bcrypt por petición (CPU-bound). Límite de
+  // ruta más estricto que el global (2/min) para evitar DoS autenticado (DOS-03).
+  @Throttle({ default: { limit: 2, ttl: 60000 } })
   @Post('import')
   importCsv(@Body() body: ImportUsersDto): Promise<ImportResult> {
     return this.users.importCsv(body.csv);
