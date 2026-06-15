@@ -224,14 +224,14 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
             data-testid="sd-leadtime"
           />
         </label>
-        <button
+        <Button
           type="submit"
-          className="btn-primary"
+          className="supplier-save"
           disabled={saveMut.isPending}
           data-testid="sd-save"
         >
           {saveMut.isPending ? 'Guardando…' : saved ? 'Guardado ✓' : 'Guardar'}
-        </button>
+        </Button>
       </form>
       {saveMut.isError && (
         <p className="form-error">

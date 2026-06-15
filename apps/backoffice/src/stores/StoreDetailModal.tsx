@@ -1,3 +1,4 @@
+import { Button } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -159,9 +160,9 @@ export function StoreDetailModal({
                 {formErrorMessage(opsMut.error, 'No se pudo guardar el estado.')}
               </p>
             )}
-            <button
+            <Button
               type="button"
-              className="btn-primary"
+              className="store-ops-save"
               disabled={!opsDirty || opsMut.isPending}
               onClick={() => opsMut.mutate()}
               data-testid="store-ops-save"
@@ -171,7 +172,7 @@ export function StoreDetailModal({
                 : opsMut.isSuccess && !opsDirty
                   ? 'Guardado ✓'
                   : 'Guardar estado'}
-            </button>
+            </Button>
           </section>
 
           <section className="form-section" data-testid="store-device">

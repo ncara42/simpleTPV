@@ -1,4 +1,4 @@
-import { Badge, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Badge, Button, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -266,13 +266,13 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
         )}
       </div>
       {features.data_export && (
-        <button
-          className="btn-primary sales-export"
+        <Button
+          className="sales-export"
           onClick={() => void exportCsv()}
           data-testid="sales-export-csv"
         >
           Exportar CSV
-        </button>
+        </Button>
       )}
     </>
   );

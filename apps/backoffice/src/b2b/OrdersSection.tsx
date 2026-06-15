@@ -246,20 +246,30 @@ function OrderDetailModal({ orderId, onClose }: { orderId: string; onClose: () =
       <div className="modal-foot modal-foot--split">
         <div className="b2b-status-actions">
           {order &&
-            NEXT[order.status].map((next) => (
-              <button
-                key={next}
-                type="button"
-                className={next === 'CANCELLED' ? 'link-btn' : 'btn-primary'}
-                disabled={statusMut.isPending}
-                onClick={() => statusMut.mutate(next)}
-                data-testid={`b2b-order-to-${next}`}
-              >
-                {next === 'CANCELLED'
-                  ? 'Cancelar pedido'
-                  : `Marcar ${STATUS_LABEL[next].toLowerCase()}`}
-              </button>
-            ))}
+            NEXT[order.status].map((next) =>
+              next === 'CANCELLED' ? (
+                <button
+                  key={next}
+                  type="button"
+                  className="link-btn"
+                  disabled={statusMut.isPending}
+                  onClick={() => statusMut.mutate(next)}
+                  data-testid={`b2b-order-to-${next}`}
+                >
+                  Cancelar pedido
+                </button>
+              ) : (
+                <Button
+                  key={next}
+                  type="button"
+                  disabled={statusMut.isPending}
+                  onClick={() => statusMut.mutate(next)}
+                  data-testid={`b2b-order-to-${next}`}
+                >
+                  {`Marcar ${STATUS_LABEL[next].toLowerCase()}`}
+                </Button>
+              ),
+            )}
         </div>
         <div className="modal-foot-actions">
           <button type="button" onClick={onClose}>

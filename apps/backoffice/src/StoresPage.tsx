@@ -1,3 +1,4 @@
+import { Button } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -107,14 +108,14 @@ export function StoresPage({
   return (
     <section className="catalog">
       <div className="stores-toolbar">
-        <button
-          className="btn-primary stock-tabs-action"
+        <Button
+          className="stock-tabs-action"
           onClick={() => setCreating(true)}
           data-testid="new-store"
+          icon={<Plus size={16} aria-hidden="true" />}
         >
-          <Plus size={16} aria-hidden="true" />
           Nueva tienda
-        </button>
+        </Button>
       </div>
 
       {isLoading ? (

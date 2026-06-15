@@ -595,7 +595,7 @@
   color: var(--ui-warning);
 }
 /* La acción de autorizar es secundaria dentro del modal: ancho según contenido. */
-.store-detail-modal .modal-body .btn-primary {
+.store-detail-modal .modal-body .store-ops-save {
   align-self: flex-start;
 }
 
@@ -624,8 +624,8 @@
   margin-bottom: 1.5rem;
 }
 /* Botón junto a una fila de subtabs (.bo-tabs): mismo tipo de letra que los
-   tabs. La altura ya la fija .btn-primary (var --bo-control-height). */
-.btn-primary.stock-tabs-action {
+   tabs. La altura la fija el propio <Button> compartido. */
+.stock-tabs-action {
   font-size: 0.82rem;
 }
 .bo-tab {
@@ -1843,6 +1843,7 @@
 /* Botón de export: empuja a la derecha del toolbar del DataTable (IT-06). */
 .sales-export {
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* Pie de agregados del historial (count, total, margen y descuento medios). */
@@ -3098,7 +3099,7 @@
   border-color: var(--ui-primary);
   box-shadow: 0 0 0 3px var(--ui-accent-soft, rgb(0 102 204 / 0.15));
 }
-.supplier-form .btn-primary {
+.supplier-form .supplier-save {
   justify-self: start;
 }
 .supplier-detail-h {
