@@ -85,11 +85,13 @@ describe('StoresPage', () => {
 
   it('abre el modal de precios por tienda al pulsar "Precios" (#127 A)', async () => {
     renderPage();
-    await waitFor(() =>
-      expect(screen.getAllByTestId('store-open-prices').length).toBeGreaterThan(0),
-    );
-    fireEvent.click(screen.getAllByTestId('store-open-prices')[0]!);
-    // El enlace lleva stopPropagation: abre precios, no el detalle de la tienda.
+    // Las acciones viven ahora en la modal de detalle: abrir la card → modal y
+    // pulsar "Precios" dentro.
+    await waitFor(() => expect(screen.getAllByTestId('store-card').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByTestId('store-card')[0]!);
+    const pricesBtn = await screen.findByTestId('store-open-prices');
+    fireEvent.click(pricesBtn);
+    // Decisión (a): al abrir precios se cierra el detalle, no quedan dos modales.
     expect(await screen.findByTestId('store-prices-detail')).toBeInTheDocument();
     expect(screen.queryByTestId('store-detail')).not.toBeInTheDocument();
   });
