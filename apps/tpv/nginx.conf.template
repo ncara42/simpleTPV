@@ -4,6 +4,9 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # No revelar la versión de nginx en cabeceras/errores (INFRA-01).
+    server_tokens off;
+
     gzip on;
     gzip_types text/css application/javascript application/json image/svg+xml;
     gzip_min_length 1024;
@@ -13,13 +16,15 @@ server {
     # script-src 'self' impide cargar JS externo y connect-src acota a dónde se
     # puede enviar. style-src admite 'unsafe-inline' porque React/Recharts inyectan
     # estilos inline (no ejecuta JS). Sentry SaaS necesita connect-src a
-    # *.ingest.sentry.io (ajustar si se usa Sentry self-hosted). Se define como
-    # variable para reutilizarla en location = /index.html, cuyo add_header propio
-    # rompería la herencia de estas cabeceras.
+    # *.ingest.sentry.io (ajustar si se usa Sentry self-hosted). HSTS + Permissions-
+    # Policy añadidas (SEC-113). Se define como variable para reutilizarla en los
+    # location, cuyo add_header propio rompería la herencia de estas cabeceras.
     set $csp "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://*.ingest.sentry.io https://*.ingest.de.sentry.io";
     add_header Content-Security-Policy $csp always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
     # Proxy a la API: /api/* -> ${API_URL}/* (quita el prefijo /api, igual que el dev proxy de Vite).
     # Resolver de Docker (127.0.0.11) + variable en proxy_pass => la resolución DNS del upstream
@@ -46,8 +51,16 @@ server {
         add_header Content-Security-Policy $csp always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     }
     location /assets/ {
         add_header Cache-Control "public, max-age=31536000, immutable";
+        # Mismo motivo: el add_header de Cache-Control anula la herencia (INFRA-02).
+        add_header Content-Security-Policy $csp always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     }
 }
