@@ -1,4 +1,4 @@
-import { DataTable, type DataTableColumn, type DataTableSort, Select } from '@simpletpv/ui';
+import { Button, DataTable, type DataTableColumn, type DataTableSort, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Upload } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -439,10 +439,13 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
             <Upload size={16} aria-hidden="true" />
             Importar CSV
           </button>
-          <button className="btn-primary" onClick={openCreate} data-testid="new-product">
-            <Plus size={16} aria-hidden="true" />
+          <Button
+            onClick={openCreate}
+            data-testid="new-product"
+            icon={<Plus size={16} aria-hidden="true" />}
+          >
             Nuevo producto
-          </button>
+          </Button>
         </div>
       )}
     </div>

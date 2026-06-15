@@ -1,5 +1,5 @@
 import { type StockGlobalRow, stockLevel } from '@simpletpv/auth';
-import { DataTable, type DataTableColumn, type DataTableSort, Select } from '@simpletpv/ui';
+import { Button, DataTable, type DataTableColumn, type DataTableSort, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -447,15 +447,14 @@ export function GlobalStockSection({
             <button type="button" onClick={() => setAdjusting(null)}>
               Cancelar
             </button>
-            <button
+            <Button
               type="button"
-              className="btn-primary"
               onClick={saveAdjust}
               disabled={adjustMutation.isPending}
               data-testid="stock-adjust-save"
             >
               {adjustMutation.isPending ? 'Guardando…' : 'Guardar'}
-            </button>
+            </Button>
           </div>
         </Modal>
       )}

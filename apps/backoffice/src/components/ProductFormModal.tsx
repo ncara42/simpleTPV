@@ -1,4 +1,4 @@
-import { Select } from '@simpletpv/ui';
+import { Button, Select } from '@simpletpv/ui';
 
 import { fmtEur } from '../lib/format.js';
 import { Modal } from './Modal.js';
@@ -182,9 +182,9 @@ export function ProductFormModal({
         <button type="button" onClick={onClose}>
           Cancelar
         </button>
-        <button type="submit" className="btn-primary" disabled={pending} data-testid="form-save">
+        <Button type="submit" disabled={pending} data-testid="form-save">
           {primaryLabel}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

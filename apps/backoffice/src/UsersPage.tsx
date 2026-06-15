@@ -1,4 +1,4 @@
-import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Button, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Plus, Upload, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -413,10 +413,13 @@ export function UsersPage() {
                       <Upload size={16} aria-hidden="true" />
                       Importar CSV
                     </button>
-                    <button className="btn-primary" onClick={openCreate} data-testid="new-user">
-                      <Plus size={16} aria-hidden="true" />
+                    <Button
+                      onClick={openCreate}
+                      data-testid="new-user"
+                      icon={<Plus size={16} aria-hidden="true" />}
+                    >
                       Nuevo usuario
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -566,14 +569,9 @@ export function UsersPage() {
               <button type="button" onClick={closeModal}>
                 Cancelar
               </button>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={createMut.isPending}
-                data-testid="user-save"
-              >
+              <Button type="submit" disabled={createMut.isPending} data-testid="user-save">
                 {primaryLabel}
-              </button>
+              </Button>
             </div>
           </div>
         </Modal>

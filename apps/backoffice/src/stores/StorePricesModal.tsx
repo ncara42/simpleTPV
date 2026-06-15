@@ -1,4 +1,4 @@
-import { DataTable, Select } from '@simpletpv/ui';
+import { Button, DataTable, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -122,15 +122,14 @@ export function StorePricesModal({ store, onClose }: { store: Store; onClose: ()
               onChange={(e) => setPrice(e.target.value)}
               data-testid="store-price-input"
             />
-            <button
+            <Button
               type="button"
-              className="btn-primary"
               disabled={!canAdd || setMut.isPending}
               onClick={() => setMut.mutate({ productId, price: Number(price) })}
               data-testid="store-price-add"
             >
               Añadir
-            </button>
+            </Button>
           </div>
         </section>
 

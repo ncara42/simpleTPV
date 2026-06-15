@@ -1,4 +1,4 @@
-import { Select } from '@simpletpv/ui';
+import { Button, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -603,8 +603,7 @@ export function FamiliesPage({
               ]}
             />
           </div>
-          <button
-            className="btn-primary"
+          <Button
             onClick={() =>
               setForm({
                 name: '',
@@ -616,10 +615,10 @@ export function FamiliesPage({
               })
             }
             data-testid="new-family"
+            icon={<Plus size={16} aria-hidden="true" />}
           >
-            <Plus size={16} aria-hidden="true" />
             Nueva familia
-          </button>
+          </Button>
         </div>
 
         {isLoading ? (
@@ -694,16 +693,16 @@ export function FamiliesPage({
                     ))}
                   </ul>
                 )}
-                <button
+                <Button
                   type="button"
-                  className="btn-primary fam-panel-add"
+                  className="fam-panel-add"
                   onClick={() =>
                     setProductForm({ ...EMPTY_PRODUCT_FORM, familyId: selectedNode.id })
                   }
                   data-testid="fam-panel-add-product"
                 >
                   Añadir producto aquí
-                </button>
+                </Button>
               </aside>
             )}
           </div>
@@ -805,14 +804,9 @@ export function FamiliesPage({
             <button type="button" onClick={() => setForm(null)}>
               Cancelar
             </button>
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={saveMut.isPending}
-              data-testid="family-save"
-            >
+            <Button type="submit" disabled={saveMut.isPending} data-testid="family-save">
               {saveMut.isPending ? 'Guardando…' : 'Guardar'}
-            </button>
+            </Button>
           </div>
         </Modal>
       )}

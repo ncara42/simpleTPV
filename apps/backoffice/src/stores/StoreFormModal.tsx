@@ -1,3 +1,4 @@
+import { Button } from '@simpletpv/ui';
 import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
@@ -71,14 +72,13 @@ export function StoreFormModal({
         <button type="button" onClick={onClose}>
           Cancelar
         </button>
-        <button
+        <Button
           type="submit"
-          className="btn-primary"
           disabled={pending || !form.name.trim() || !form.code.trim()}
           data-testid="store-save"
         >
           {pending ? 'Guardando…' : editing ? 'Guardar' : 'Crear'}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

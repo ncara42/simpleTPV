@@ -1,5 +1,5 @@
 import type { ImportResult } from '@simpletpv/auth';
-import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Button, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -76,15 +76,15 @@ export function TransfersSection() {
     <>
       <div className="table-panel">
         <div className="sales-filters">
-          <button
+          <Button
             type="button"
-            className="btn-primary stock-toolbar-action"
+            className="stock-toolbar-action"
             onClick={() => setCreating(true)}
             data-testid="new-transfer"
+            icon={<Plus size={16} aria-hidden="true" />}
           >
-            <Plus size={16} aria-hidden="true" />
             Nuevo traspaso
-          </button>
+          </Button>
         </div>
         <DataTable
           columns={transferColumns}
@@ -245,15 +245,14 @@ function CreateTransferModal({
               data-testid="transfer-qty"
               aria-label="Cantidad"
             />
-            <button
+            <Button
               type="button"
-              className="btn-primary"
               disabled={!productId || Number(qty) <= 0}
               onClick={addManual}
               data-testid="transfer-add-line"
             >
               Añadir
-            </button>
+            </Button>
           </div>
 
           {lines.length > 0 && (
@@ -320,14 +319,13 @@ function CreateTransferModal({
         <button type="button" onClick={onClose}>
           Cancelar
         </button>
-        <button
+        <Button
           type="submit"
-          className="btn-primary"
           disabled={!canSubmit || mutation.isPending}
           data-testid="transfer-save"
         >
           {mutation.isPending ? 'Creando…' : 'Crear'}
-        </button>
+        </Button>
       </div>
     </Modal>
   );
