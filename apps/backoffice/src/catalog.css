@@ -334,11 +334,11 @@
   font-size: 0.8rem;
   color: var(--ui-text-muted);
 }
-/* Pie = control administrativo: estado + interruptor con la consecuencia escrita. */
+/* Pie = estado de la tienda. Las acciones (Stock/Ventas/Precios) viven ahora en
+   la modal de detalle, así que el pie solo alinea el texto de estado. */
 .store-card-foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.75rem;
   padding-top: 0.85rem;
   border-top: 1px solid var(--ui-border);
@@ -2722,12 +2722,14 @@
   font-weight: 600;
 }
 
-/* ── Tiendas: accesos directos en la card + token de fichaje (UX) ───────────── */
-.store-card-actions {
+/* ── Tiendas: acciones en la modal de detalle + token de fichaje (UX) ───────── */
+/* Acciones Stock/Ventas/Precios: trasladadas desde la card a la modal de detalle,
+   justo tras "Ver registros". Grupo de botones secundarios consistente. */
+.store-detail-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--ui-space-2);
-  min-width: 0;
+  margin-top: var(--ui-space-3);
 }
 .store-device-token {
   margin-top: var(--ui-space-3);
