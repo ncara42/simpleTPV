@@ -862,43 +862,8 @@
   background: none;
   border-radius: 0;
 }
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  white-space: nowrap; /* icono + texto nunca parten de línea */
-  height: var(--bo-control-height);
-  padding: 0 1.25rem;
-  border: none;
-  border-radius: 9999px;
-  font-weight: 500;
-  font-size: 0.9rem;
-  letter-spacing: -0.012em;
-  color: var(--ui-primary-fg);
-  cursor: pointer;
-  background: var(--ui-primary);
-  transition:
-    background 0.12s,
-    transform 0.06s;
-}
-.btn-primary > svg {
-  flex-shrink: 0;
-}
-.btn-primary:hover {
-  background: var(--ui-primary-hover);
-}
-.btn-primary:active {
-  transform: scale(0.96);
-}
-.btn-primary:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus);
-}
-.btn-primary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+/* Los antiguos .btn-primary se migraron al <Button> compartido (@simpletpv/ui)
+   en la Fase 2; el estilo lo aporta ahora el componente. */
 .catalog-empty {
   color: var(--ui-text-soft);
   padding: 2.5rem 0;
@@ -1630,9 +1595,6 @@
   flex-wrap: nowrap;
   align-items: flex-start;
 }
-.sales-toolbar > .btn-primary {
-  flex-shrink: 0;
-}
 
 /* Cabecera genérica de tabla: filtros/búsqueda a la izquierda y acción principal
    a la derecha (espejo de .users-toolbar, reutilizable en cualquier .table-panel,
@@ -2346,29 +2308,8 @@
 }
 
 /* ── Limpieza UX (IT-19) ────────────────────────────────────────────────────
-   Botón de acción destructiva (confirmar borrado/revocación) y modal de
-   confirmación estrecho. */
-.btn-danger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 2.5rem;
-  padding: 0 1rem;
-  border: 1px solid var(--ui-danger);
-  border-radius: var(--ui-radius-sm);
-  background: var(--ui-danger);
-  color: #fff;
-  font-weight: 500;
-  cursor: pointer;
-  transition: opacity 0.15s var(--ui-ease);
-}
-.btn-danger:hover {
-  opacity: 0.9;
-}
-.btn-danger:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
+   Modal de confirmación estrecho. (El antiguo .btn-danger se migró al <Button
+   variant="danger"> compartido en la Fase 2.) */
 .modal--confirm {
   max-width: 26rem;
 }
