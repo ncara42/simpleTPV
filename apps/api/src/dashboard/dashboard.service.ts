@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@simpletpv/db';
 
+import { num } from '../common/money.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
@@ -17,16 +18,6 @@ import {
 // Fragmento SQL vacío para componer el filtro opcional de tienda sin condicionar
 // la query (Prisma.empty se interpola a "nada").
 const EMPTY = Prisma.empty;
-
-// Los Decimal de Postgres llegan como string por el driver pg. `num` los castea
-// a number tolerando null/undefined → 0. Centralizado para no repetir Number(x ?? 0).
-function num(v: unknown): number {
-  if (v === null || v === undefined) {
-    return 0;
-  }
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
 
 @Injectable()
 export class DashboardService {

@@ -15,6 +15,8 @@
  * abrir el documento.
  */
 
+import { num } from '../common/money.js';
+
 // Forma de los datos que produce `SalesService.loadTicketData` (idéntica a la
 // salida de `getTicket`). Los Decimal de Prisma llegan como Decimal o string
 // según el driver; `num` los normaliza. `createdAt` es un Date.
@@ -45,11 +47,6 @@ export interface ReceiptData {
 // partir de los datos del ticket. Cuando VeriFactu (#63) esté activo, este enlace
 // se sustituirá por el QR/hash real encadenado.
 const AEAT_COTEJO_URL = 'https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR';
-
-function num(v: number | string | null | undefined): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
 
 // Importe en euros con formato español: coma decimal y 2 decimales ("24,90 €").
 // Formateo manual (no Intl) para que la salida sea determinista en cualquier CI.
