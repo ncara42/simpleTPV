@@ -956,31 +956,11 @@
   color: var(--ui-text-muted);
   margin-bottom: 0.9rem;
 }
-.modal input:not([type='checkbox']) {
-  /* Causa raíz de E-04: sin width, el input conserva su ancho intrínseco
-     (~250px) y desborda las columnas estrechas de .modal-row. */
-  width: 100%;
-}
-.modal input {
-  height: 2.6rem;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: 10px;
-  padding: 0 0.8rem;
-  font-size: 0.95rem;
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: -0.012em;
-  color: var(--ui-text);
-  background: var(--ui-surface);
-  transition:
-    border-color 0.12s,
-    box-shadow 0.12s;
-}
-.modal input:focus {
-  outline: none;
-  border-color: var(--ap-blue-focus);
-  box-shadow: var(--ui-focus);
-}
+/* Los inputs de texto de los modales se migraron al <Input> compartido
+   (@simpletpv/ui), que ya aporta ancho 100%, alto 2.6rem, hairline, radio 10px,
+   fuente 0.95rem y foco azul. El reset 'font: inherit' vive en @layer base, así
+   que <Input> gana sin necesidad de re-estilar desde aquí. (El checkbox conserva
+   su propia regla .modal input[type='checkbox'] más arriba.) */
 .modal-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
