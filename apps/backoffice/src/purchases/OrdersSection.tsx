@@ -1,4 +1,5 @@
 import type { PurchaseOrder } from '@simpletpv/auth';
+import { DataTable } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -35,78 +36,88 @@ export function OrdersSection({
   }
   return (
     <>
-      {orders.length === 0 && supplierId ? (
-        <p className="catalog-empty" data-testid="orders-empty">
-          Este proveedor no tiene pedidos de compra.
-        </p>
-      ) : orders.length === 0 ? (
-        <div className="purchases-empty" data-testid="orders-empty">
-          <span className="purchases-empty-icon" aria-hidden="true">
-            <svg
-              width="26"
-              height="26"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-              <path d="M3.27 6.96 12 12.01l8.73-5.05" />
-            </svg>
-          </span>
-          <p className="purchases-empty-title">Sin pedidos abiertos</p>
-          <p className="purchases-empty-text">
-            Genera una propuesta automática a partir de ventas, rotación y mínimos.
-          </p>
-        </div>
-      ) : (
-        <table className="catalog-table" data-testid="orders-table">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Líneas</th>
-              <th>Estado</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {orders.map((o) => (
-              <tr key={o.id} data-testid="order-row">
-                <td className="muted">{new Date(o.createdAt).toLocaleDateString('es-ES')}</td>
-                <td>{o.lines.length}</td>
-                <td>
-                  <span className="status-badge" data-testid="order-status">
-                    {STATUS_LABEL[o.status]}
-                  </span>
-                </td>
-                <td>
-                  {o.status === 'DRAFT' && (
-                    <button
-                      type="button"
-                      className="link-btn"
-                      disabled={confirmMut.isPending}
-                      onClick={() => confirmMut.mutate(o.id)}
-                      data-testid="order-confirm"
-                    >
-                      Confirmar
-                    </button>
-                  )}
+      <DataTable
+        data-testid="orders-table"
+        rowTestId="order-row"
+        rows={orders}
+        rowKey={(o) => o.id}
+        emptyState={
+          supplierId ? (
+            <span className="catalog-empty" data-testid="orders-empty">
+              Este proveedor no tiene pedidos de compra.
+            </span>
+          ) : (
+            <div className="purchases-empty" data-testid="orders-empty">
+              <span className="purchases-empty-icon" aria-hidden="true">
+                <svg
+                  width="26"
+                  height="26"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                  <path d="M3.27 6.96 12 12.01l8.73-5.05" />
+                </svg>
+              </span>
+              <p className="purchases-empty-title">Sin pedidos abiertos</p>
+              <p className="purchases-empty-text">
+                Genera una propuesta automática a partir de ventas, rotación y mínimos.
+              </p>
+            </div>
+          )
+        }
+        columns={[
+          {
+            key: 'date',
+            header: 'Fecha',
+            render: (o) => (
+              <span className="muted">{new Date(o.createdAt).toLocaleDateString('es-ES')}</span>
+            ),
+          },
+          { key: 'lines', header: 'Líneas', render: (o) => o.lines.length },
+          {
+            key: 'status',
+            header: 'Estado',
+            render: (o) => (
+              <span className="status-badge" data-testid="order-status">
+                {STATUS_LABEL[o.status]}
+              </span>
+            ),
+          },
+          {
+            key: 'actions',
+            header: '',
+            align: 'right',
+            render: (o) => (
+              <>
+                {o.status === 'DRAFT' && (
                   <button
                     type="button"
                     className="link-btn"
-                    onClick={() => setDetailId(o.id)}
-                    data-testid="order-detail"
+                    disabled={confirmMut.isPending}
+                    onClick={() => confirmMut.mutate(o.id)}
+                    data-testid="order-confirm"
                   >
-                    Ver
+                    Confirmar
                   </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+                )}
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => setDetailId(o.id)}
+                  data-testid="order-detail"
+                >
+                  Ver
+                </button>
+              </>
+            ),
+          },
+        ]}
+      />
       {detailId && <OrderDetailModal id={detailId} onClose={() => setDetailId(null)} />}
     </>
   );
@@ -145,37 +156,42 @@ function OrderDetailModal({ id, onClose }: { id: string; onClose: () => void }) 
             {order.kpis?.fillRate != null ? `${Math.round(order.kpis.fillRate * 100)}%` : '—'} ·
             Lead time: {order.kpis?.leadTimeDays != null ? `${order.kpis.leadTimeDays} d` : '—'}
           </p>
-          <table className="catalog-table" data-testid="order-lines">
-            <thead>
-              <tr>
-                <th>Pedido</th>
-                <th>Recibido</th>
-                {(order.status === 'CONFIRMED' || order.status === 'PARTIALLY_RECEIVED') && (
-                  <th>Recibir ahora</th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {order.lines.map((l) => (
-                <tr key={l.id} data-testid="order-line">
-                  <td>{l.quantityOrdered}</td>
-                  <td>{l.quantityReceived}</td>
-                  {(order.status === 'CONFIRMED' || order.status === 'PARTIALLY_RECEIVED') && (
-                    <td>
-                      <input
-                        type="number"
-                        min={0}
-                        value={received[l.id] ?? ''}
-                        onChange={(e) => setReceived({ ...received, [l.id]: e.target.value })}
-                        data-testid="receive-input"
-                        style={{ width: '5rem' }}
-                      />
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            data-testid="order-lines"
+            rowTestId="order-line"
+            rows={order.lines}
+            rowKey={(l) => l.id}
+            columns={[
+              {
+                key: 'ordered',
+                header: 'Pedido',
+                render: (l: PurchaseOrder['lines'][number]) => l.quantityOrdered,
+              },
+              {
+                key: 'received',
+                header: 'Recibido',
+                render: (l: PurchaseOrder['lines'][number]) => l.quantityReceived,
+              },
+              ...(order.status === 'CONFIRMED' || order.status === 'PARTIALLY_RECEIVED'
+                ? [
+                    {
+                      key: 'receive',
+                      header: 'Recibir ahora',
+                      render: (l: PurchaseOrder['lines'][number]) => (
+                        <input
+                          type="number"
+                          min={0}
+                          value={received[l.id] ?? ''}
+                          onChange={(e) => setReceived({ ...received, [l.id]: e.target.value })}
+                          data-testid="receive-input"
+                          style={{ width: '5rem' }}
+                        />
+                      ),
+                    },
+                  ]
+                : []),
+            ]}
+          />
           {(order.status === 'CONFIRMED' || order.status === 'PARTIALLY_RECEIVED') && (
             <div className="modal-foot">
               <button
