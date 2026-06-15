@@ -35,6 +35,13 @@ export interface TopBarProps {
   notificationsActive?: boolean;
 }
 
+// La campana togglea el panel: el aria-label refleja la acción ("Abrir"/"Cerrar")
+// y conserva el conteo de no leídas como contexto para lectores de pantalla.
+function notificationsAriaLabel(active: boolean, count: number): string {
+  const verb = active ? 'Cerrar notificaciones' : 'Abrir notificaciones';
+  return count > 0 ? `${verb} (${count} sin leer)` : verb;
+}
+
 function BellGlyph() {
   return (
     <svg
@@ -88,13 +95,9 @@ export function TopBar({
             type="button"
             className={`topbar-notif${notificationsActive ? ' active' : ''}`}
             onClick={onNotifications}
-            aria-label={
-              notificationCount > 0
-                ? `Notificaciones (${notificationCount} sin leer)`
-                : 'Notificaciones'
-            }
+            aria-label={notificationsAriaLabel(notificationsActive, notificationCount)}
             aria-pressed={notificationsActive}
-            title="Notificaciones"
+            title={notificationsActive ? 'Cerrar notificaciones' : 'Notificaciones'}
             data-testid="topbar-notifications"
           >
             <BellGlyph />
