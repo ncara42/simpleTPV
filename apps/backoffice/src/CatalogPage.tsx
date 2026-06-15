@@ -417,7 +417,7 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
         )}
       </div>
       {selected.length > 0 ? (
-        <div className="users-toolbar-actions">
+        <div className="ui-dt-toolbar-actions">
           <button
             type="button"
             className="users-bulk-edit"
@@ -436,16 +436,7 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
           </button>
         </div>
       ) : (
-        <div className="users-toolbar-actions">
-          <button
-            type="button"
-            className="users-sel-btn"
-            onClick={() => setImporting(true)}
-            data-testid="catalog-import"
-          >
-            <Upload size={16} aria-hidden="true" />
-            Importar CSV
-          </button>
+        <div className="ui-dt-toolbar-actions">
           <Button
             onClick={openCreate}
             data-testid="new-product"
@@ -460,31 +451,37 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
 
   return (
     <section className="catalog">
+      {columnsEditor}
+
+      <div className="table-actions">
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => setImporting(true)}
+          data-testid="catalog-import"
+          title="Importar CSV"
+          aria-label="Importar CSV"
+        >
+          <Upload size={18} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="ui-dt-cols-trigger"
+          onClick={toggleColumnsEditor}
+          data-testid="catalog-columns-toggle"
+          aria-expanded={columnsEditorOpen}
+        >
+          Columnas
+        </button>
+      </div>
+
       <div className="table-panel">
-        {columnsEditor}
         <DataTable
           columns={tableColumns}
           rows={pageRows}
           rowKey={(p) => p.id}
           loading={isLoading}
-          toolbar={
-            /* Patrón de Ventas: búsqueda/filtros/CTAs y el botón Columnas en
-               LA MISMA banda (toolbar del DataTable). */
-            <>
-              {toolbar}
-              <div className="ui-dt-cols">
-                <button
-                  type="button"
-                  className="ui-dt-cols-trigger"
-                  onClick={toggleColumnsEditor}
-                  data-testid="catalog-columns-toggle"
-                  aria-expanded={columnsEditorOpen}
-                >
-                  Columnas
-                </button>
-              </div>
-            </>
-          }
+          toolbar={toolbar}
           {...(sort ? { sort } : {})}
           onSortChange={onSortChange}
           onRowClick={(p) => toggleSelect(p.id)}
