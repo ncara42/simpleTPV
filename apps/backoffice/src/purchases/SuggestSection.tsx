@@ -1,4 +1,4 @@
-import { Button, DataTable } from '@simpletpv/ui';
+import { Button, DataTable, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -39,32 +39,28 @@ export function SuggestSection() {
       <header className="catalog-head">
         <h2>Generar propuesta de pedido</h2>
         <div className="catalog-actions">
-          <select
+          <Select
             className="catalog-search"
             value={storeId}
-            onChange={(e) => setStoreId(e.target.value)}
+            onChange={setStoreId}
+            ariaLabel="Tienda"
+            options={[
+              { value: '', label: 'Tienda…' },
+              ...stores.map((s) => ({ value: s.id, label: s.name })),
+            ]}
             data-testid="suggest-store"
-          >
-            <option value="">Tienda…</option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <select
+          />
+          <Select
             className="catalog-search"
             value={supplierId}
-            onChange={(e) => setSupplierId(e.target.value)}
+            onChange={setSupplierId}
+            ariaLabel="Proveedor"
+            options={[
+              { value: '', label: 'Proveedor…' },
+              ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+            ]}
             data-testid="suggest-supplier"
-          >
-            <option value="">Proveedor…</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          />
           <Button
             type="button"
             disabled={!storeId || suggestMut.isPending}
