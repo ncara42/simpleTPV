@@ -1,26 +1,8 @@
-import type { ImportResult } from '@simpletpv/auth';
+import type { ComparisonRow, ImportResult, SupplierPriceRow } from '@simpletpv/auth';
 
 import { api } from './auth.js';
 
-export type { ImportResult };
-
-export interface SupplierPriceRow {
-  id: string;
-  supplierId: string;
-  supplierName: string;
-  productId: string;
-  productName: string;
-  sku: string | null;
-  price: number;
-}
-
-export interface ComparisonRow {
-  productId: string;
-  productName: string;
-  sku: string | null;
-  prices: Array<{ supplierId: string; supplierName: string; price: number }>;
-  best: { supplierId: string; supplierName: string; price: number } | null;
-}
+export type { ComparisonRow, ImportResult, SupplierPriceRow };
 
 export function listSupplierPrices(supplierId?: string): Promise<SupplierPriceRow[]> {
   return api.get<SupplierPriceRow[]>('/supplier-prices', {

@@ -410,6 +410,26 @@ export interface AdjustStockInput {
   reason: string;
 }
 
+// Fila de tarifa de compra: precio de un proveedor para un producto.
+export interface SupplierPriceRow {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  productId: string;
+  productName: string;
+  sku: string | null;
+  price: number;
+}
+
+// Fila de la comparativa: un producto y su precio en cada proveedor, con el mejor.
+export interface ComparisonRow {
+  productId: string;
+  productName: string;
+  sku: string | null;
+  prices: Array<{ supplierId: string; supplierName: string; price: number }>;
+  best: { supplierId: string; supplierName: string; price: number } | null;
+}
+
 export interface InventoryCountLine {
   productId: string;
   countedQuantity: number;
