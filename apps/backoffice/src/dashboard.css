@@ -1893,6 +1893,13 @@
   z-index: 6;
   flex-wrap: nowrap;
 }
+/* La barra está abajo: la paleta de «Widget» debe abrir HACIA ARRIBA (anclada encima del
+   botón), no hacia abajo (donde quedaría fuera del lienzo y no se vería nada). */
+.dashboard--free .dash-free-toolbar-add .dash-free-palette {
+  top: auto;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
+}
 
 /* Pill de dibujo flotando justo encima de la barra inferior (centrado). */
 .dashboard--free .dash-free-draw-pill {
