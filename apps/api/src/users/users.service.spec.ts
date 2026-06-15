@@ -70,10 +70,11 @@ describe('UsersService', () => {
       'c@org.test,Corta,short,CLERK', // fila 5 · password corta
       'd@org.test,RolMalo,password123,JEFE', // fila 6 · rol inválido
       'e@org.test,Otro,password123,manager', // fila 7 · rol en minúsculas → válido
+      `f@org.test,Larga,${'a'.repeat(73)},CLERK`, // fila 8 · password > 72 (bcrypt trunca)
     ].join('\n');
     const res = await tenantStorage.run({ organizationId: ORG }, () => service.importCsv(csv));
     expect(res.inserted).toBe(2);
-    expect(res.errors.map((e) => e.row)).toEqual([3, 4, 5, 6]);
+    expect(res.errors.map((e) => e.row)).toEqual([3, 4, 5, 6, 8]);
     const createArg = prisma.user.createMany.mock.calls[0]![0] as {
       data: Array<{ role: string; passwordHash: string; organizationId: string }>;
     };

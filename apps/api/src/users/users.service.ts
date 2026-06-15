@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import { type ImportResult, parseCsv, rowNumber } from '../common/csv.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
-import type { CreateUserDto, UpdateUserDto } from './users.dto.js';
+import { type CreateUserDto, PASSWORD_MAX_LENGTH, type UpdateUserDto } from './users.dto.js';
 
 const SALT_ROUNDS = 10;
 // Email válido (mismo criterio laxo que class-validator @IsEmail para el alta manual).
@@ -82,6 +82,15 @@ export class UsersService {
       }
       if (password.length < 8) {
         errors.push({ row, message: 'La contraseña debe tener al menos 8 caracteres' });
+        return;
+      }
+      // bcryptjs trunca a 72 bytes: rechazamos lo más largo en lugar de hashear
+      // un prefijo en silencio (issue #107), igual que el alta manual.
+      if (password.length > PASSWORD_MAX_LENGTH) {
+        errors.push({
+          row,
+          message: `La contraseña no puede superar los ${PASSWORD_MAX_LENGTH} caracteres`,
+        });
         return;
       }
       if (!(roleRaw in UserRole)) {
