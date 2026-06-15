@@ -1,0 +1,599 @@
+// Composición y layout del dashboard. La COMPOSICIÓN (qué tarjetas KPI y qué paneles
+// aparecen) la dictan los presets (D-08/D-18) — no hay mostrar/ocultar manual. Lo que
+// SÍ personaliza el usuario (D-19) es la COLOCACIÓN 2D de cada elemento dentro del
+// preset, vía "Personalizar" (tablero arrastrable con snap a la rejilla), persistida por
+// preset en la preferencia `dashboard.layout`.
+
+export type PresetId = 'personalizado' | 'ventas' | 'beneficio' | 'inventario' | 'equipo';
+
+// Cards con toggle barras↔línea independiente. El tipo de gráfico es LOCAL a cada card.
+export type ChartCard = 'sales' | 'hour';
+
+export interface PresetDef {
+  id: PresetId;
+  label: string;
+  cards: string[];
+  panels: string[];
+}
+
+// Cada preset define sus tarjetas KPI Y sus paneles (D-08d), con el reparto EXACTO
+// cerrado en informe_decisiones. 'ventas' es el default. El preset activo persiste en
+// la preferencia `dashboard.layout` (D-03).
+export const PRESETS: PresetDef[] = [
+  {
+    // Lienzo en blanco: el usuario compone su dashboard desde cero (modo libre). Empieza
+    // VACÍO; en el lienzo aparece un "+" central para buscar y añadir widgets.
+    id: 'personalizado',
+    label: 'Personalizado',
+    cards: [],
+    panels: [],
+  },
+  {
+    id: 'ventas',
+    label: 'Ventas',
+    cards: ['kpi-today', 'kpi-avg-ticket', 'kpi-upt'],
+    panels: ['dash-bars', 'dash-hour', 'dash-family', 'rank-sales'],
+  },
+  {
+    id: 'beneficio',
+    label: 'Beneficio',
+    cards: ['kpi-margin', 'kpi-profit', 'kpi-discount', 'kpi-return'],
+    panels: ['rank-margin', 'dash-discount-emp', 'dash-suppliers'],
+  },
+  {
+    id: 'inventario',
+    label: 'Inventario',
+    cards: ['kpi-lost-sales'],
+    panels: [
+      'dash-stockout',
+      'dash-rotation',
+      'rank-rotation',
+      'dash-expiring',
+      'dash-purchase-orders',
+    ],
+  },
+  {
+    id: 'equipo',
+    label: 'Equipo',
+    cards: [],
+    panels: ['dash-sales-emp', 'dash-discount-emp', 'dash-timeclock'],
+  },
+];
+
+// Orden CANÓNICO de los paneles (= orden de maquetación histórico). Define el orden por
+// defecto de colocación: se filtra por los paneles que el preset incluye. El bloque de
+// rankings se representa con tres ids (uno por pestaña inicial); solo uno por preset.
+export const PANEL_CANON: string[] = [
+  'dash-bars',
+  'dash-family',
+  'dash-stockout',
+  'rank-sales',
+  'rank-margin',
+  'rank-rotation',
+  'dash-expiring',
+  'dash-purchase-orders',
+  'dash-hour',
+  'dash-sales-emp',
+  'dash-discount-emp',
+  'dash-suppliers',
+  'dash-rotation',
+  'dash-timeclock',
+];
+
+// Orden por defecto de los paneles de un preset: los del preset, en orden canónico.
+export function defaultPanelOrder(preset: PresetDef): string[] {
+  const inPreset = new Set(preset.panels);
+  return PANEL_CANON.filter((id) => inPreset.has(id));
+}
+
+// Tamaño por defecto (en unidades de rejilla de 12 columnas) de cada elemento. Las
+// tarjetas KPI ocupan 2 columnas y 1 fila; los paneles heredan su ancho histórico
+// (span 5/7/12) y un alto que encaja su contenido (gráfico ~200px o lista con scroll).
+export const BOARD_COLS = 12;
+export const CARD_SPEC = { w: 2, h: 1 };
+export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
+  // Tarjetas KPI
+  'kpi-today': CARD_SPEC,
+  'kpi-avg-ticket': CARD_SPEC,
+  'kpi-upt': CARD_SPEC,
+  'kpi-margin': CARD_SPEC,
+  'kpi-profit': CARD_SPEC,
+  'kpi-discount': CARD_SPEC,
+  'kpi-return': CARD_SPEC,
+  'kpi-lost-sales': CARD_SPEC,
+  // Paneles
+  'dash-bars': { w: 7, h: 2 },
+  // "Ventas por hora": gráfico + barra fina de navegación. El gráfico llena el alto del tile
+  // (dash-panel--fill), así que 2 filas bastan sin dejar hueco inferior.
+  'dash-hour': { w: 7, h: 2 },
+  'dash-family': { w: 5, h: 2 },
+  'rank-sales': { w: 5, h: 2 },
+  'rank-margin': { w: 7, h: 2 },
+  'rank-rotation': { w: 7, h: 2 },
+  'dash-stockout': { w: 5, h: 2 },
+  'dash-expiring': { w: 7, h: 2 },
+  'dash-purchase-orders': { w: 5, h: 2 },
+  'dash-sales-emp': { w: 7, h: 2 },
+  'dash-discount-emp': { w: 5, h: 2 },
+  'dash-suppliers': { w: 12, h: 2 },
+  'dash-rotation': { w: 12, h: 3 },
+  'dash-timeclock': { w: 12, h: 2 },
+};
+
+const DEFAULT_SPEC = { w: 4, h: 2 };
+
+// Ids (cards + paneles) de un preset, en orden canónico de colocación.
+export function presetItemIds(preset: PresetDef): string[] {
+  return [...preset.cards, ...defaultPanelOrder(preset)];
+}
+
+// Coordenadas de un elemento en la rejilla (subconjunto de LayoutItem de react-grid-layout,
+// sin acoplar este módulo a la librería). x/y/w/h en unidades de rejilla.
+export interface LayoutCoords {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+// Layout por breakpoint: { lg: [...], sm: [...] }. Lo que se persiste por preset.
+export type StoredLayouts = Record<string, LayoutCoords[]>;
+
+// Modo de presentación del dashboard (D-20): tablero con snap a rejilla (grid) o lienzo
+// edgeless con zoom/pan y colocación a píxel libre estilo Affine (free).
+export type DashboardMode = 'grid' | 'free';
+
+// ── Lienzo libre (D-20): elementos del lienzo ──
+// Base común a PÍXEL (coords de mundo). `z` = orden de apilado (mayor = delante), necesario
+// porque notas y widgets pueden solaparse. Cada elemento es una unión discriminada por `kind`.
+export interface FreeBase {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  z: number;
+}
+// Widget del catálogo (clave de ITEM_SPECS): su contenido lo renderiza la DashboardPage.
+export interface FreeWidget extends FreeBase {
+  kind: 'widget';
+  widgetId: string;
+}
+// Nota de texto enriquecido: `doc` es el documento JSON de TipTap (ProseMirror); null = vacía.
+export interface FreeNote extends FreeBase {
+  kind: 'note';
+  doc: unknown;
+  color?: string;
+}
+// Forma vectorial dibujada por el usuario. La caja (x,y,w,h) es su bounding box. Para
+// línea/flecha, `diag` indica qué diagonal de la caja une los extremos.
+export type ShapeKind = 'rect' | 'ellipse' | 'line' | 'arrow';
+export interface FreeShape extends FreeBase {
+  kind: 'shape';
+  shape: ShapeKind;
+  stroke: string;
+  strokeWidth: number;
+  fill?: string;
+  /** Solo línea/flecha: 'main' = ↘ (esq. sup-izq → inf-der), 'anti' = ↗. */
+  diag?: 'main' | 'anti';
+}
+// Trazo a mano alzada (lápiz / escritura a mano). `points` son px de mundo RELATIVOS a (x,y);
+// la caja (x,y,w,h) es su bounding box (para arrastrar/quitar como un elemento más).
+export interface FreeDraw extends FreeBase {
+  kind: 'draw';
+  points: Array<[number, number]>;
+  stroke: string;
+  strokeWidth: number;
+}
+// Texto libre: cadena plana colocable en cualquier sitio (sin caja/fondo de nota).
+export interface FreeText extends FreeBase {
+  kind: 'text';
+  text: string;
+  color: string;
+  fontSize: number;
+}
+export type FreeElement = FreeWidget | FreeNote | FreeShape | FreeDraw | FreeText;
+export type FreeLayout = FreeElement[];
+
+// Paleta y trazos por defecto de las herramientas de dibujo.
+export const DRAW_COLORS = ['#1f2933', '#2563eb', '#16a34a', '#dc2626', '#d97706'];
+export const DRAW_STROKE_WIDTH = 3;
+export const TEXT_DEFAULT = { w: 220, h: 40, fontSize: 18 };
+
+// Preferencia de layout: preset activo, modo, tipo de gráfico por card, colocación 2D del
+// tablero (grid, por breakpoint) y colocación libre (free, a píxel) — ambas por preset.
+// Las claves antiguas (cardOrder/panelOrder, hiddenByPreset, chartKind global) se ignoran.
+export interface LayoutPref {
+  preset?: PresetId;
+  /** D-20: modo de presentación (tablero con snap o lienzo libre). Global a la dashboard. */
+  mode?: DashboardMode;
+  /** U-02: representación (barras o línea) de cada card con toggle, independiente. */
+  chartKinds?: Partial<Record<ChartCard, 'bars' | 'line'>>;
+  /** D-19: colocación 2D por preset (layouts por breakpoint de react-grid-layout). */
+  layouts?: Partial<Record<PresetId, StoredLayouts>>;
+  /** D-20: colocación libre a píxel por preset (lienzo edgeless). */
+  freeLayouts?: Partial<Record<PresetId, FreeLayout>>;
+  /** D-20: pan/zoom guardado del lienzo libre por preset (evita zoom inconsistente al cambiar). */
+  freeViews?: Partial<Record<PresetId, { panX: number; panY: number; zoom: number }>>;
+  /** D-21: cards/paneles quitados del tablero (Cuadrícula) por preset, vía «Personalizar». */
+  hiddenByPreset?: Partial<Record<PresetId, string[]>>;
+}
+
+// Layout por defecto (breakpoint lg, 12 columnas): coloca primero las tarjetas KPI en una
+// banda superior (2 columnas cada una) y luego los paneles fluyendo en filas de 12, en
+// orden canónico. Reproduce la maquetación histórica como punto de partida del tablero.
+export function buildDefaultLayout(preset: PresetDef): LayoutCoords[] {
+  const items: LayoutCoords[] = [];
+  let x = 0;
+  let y = 0;
+  let rowH = 0;
+  const place = (id: string): void => {
+    const spec = ITEM_SPECS[id] ?? DEFAULT_SPEC;
+    if (x + spec.w > BOARD_COLS) {
+      x = 0;
+      y += rowH;
+      rowH = 0;
+    }
+    items.push({ i: id, x, y, w: spec.w, h: spec.h });
+    x += spec.w;
+    rowH = Math.max(rowH, spec.h);
+  };
+  for (const id of preset.cards) place(id);
+  // Salto de fila entre la banda de tarjetas y los paneles.
+  if (x > 0) {
+    x = 0;
+    y += rowH;
+    rowH = 0;
+  }
+  for (const id of defaultPanelOrder(preset)) place(id);
+  return items;
+}
+
+// Reconcilia un layout guardado con los elementos válidos actuales del preset: descarta
+// coordenadas de ids que ya no existen y AÑADE (al pie) los nuevos con su tamaño por
+// defecto. Devuelve siempre un array nuevo (inmutable).
+export function reconcileLayout(saved: LayoutCoords[], itemIds: string[]): LayoutCoords[] {
+  const valid = new Set(itemIds);
+  const kept = saved.filter((it) => valid.has(it.i));
+  const present = new Set(kept.map((it) => it.i));
+  const missing = itemIds.filter((id) => !present.has(id));
+  if (missing.length === 0) return kept;
+  // Coloca los que falten debajo de todo, en orden canónico, fluyendo en filas de 12.
+  const maxY = kept.reduce((m, it) => Math.max(m, it.y + it.h), 0);
+  let x = 0;
+  let y = maxY;
+  let rowH = 0;
+  const extra: LayoutCoords[] = [];
+  for (const id of missing) {
+    const spec = ITEM_SPECS[id] ?? DEFAULT_SPEC;
+    if (x + spec.w > BOARD_COLS) {
+      x = 0;
+      y += rowH;
+      rowH = 0;
+    }
+    extra.push({ i: id, x, y, w: spec.w, h: spec.h });
+    x += spec.w;
+    rowH = Math.max(rowH, spec.h);
+  }
+  return [...kept, ...extra];
+}
+
+// ── Lienzo libre (D-20) ──
+// Traducción de unidades de rejilla a píxeles de mundo para sembrar el lienzo. Cada celda
+// mide FREE_COL×FREE_ROW e incluye un hueco (FREE_GAP) descontado del tamaño del item, de
+// modo que la disposición inicial replica la del grid pero a píxel.
+export const FREE_COL = 100;
+export const FREE_ROW = 160;
+export const FREE_GAP = 16;
+
+// Tamaño a píxel de un elemento en el lienzo libre (derivado de su tamaño de rejilla).
+export function freeItemSize(id: string): { w: number; h: number } {
+  const spec = ITEM_SPECS[id] ?? DEFAULT_SPEC;
+  return { w: spec.w * FREE_COL - FREE_GAP, h: spec.h * FREE_ROW - FREE_GAP };
+}
+
+// Tamaño por defecto de una nota nueva (px de mundo).
+export const NOTE_DEFAULT = { w: 240, h: 180 };
+
+// Disposición libre por defecto: parte de la maquetación del grid y la pasa a píxeles, así
+// las cards aparecen donde estaban en cuadrícula y de ahí el usuario las mueve libremente.
+// Cada elemento es un widget; `z` sigue el orden canónico de colocación.
+export function buildDefaultFreeLayout(preset: PresetDef): FreeLayout {
+  return buildDefaultLayout(preset).map((it, idx) => ({
+    kind: 'widget',
+    id: it.i,
+    widgetId: it.i,
+    x: it.x * FREE_COL,
+    y: it.y * FREE_ROW,
+    w: it.w * FREE_COL - FREE_GAP,
+    h: it.h * FREE_ROW - FREE_GAP,
+    z: idx,
+  }));
+}
+
+const toFiniteNumber = (v: unknown, fallback: number): number =>
+  typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+
+// Migra UNA entrada persistida (JSON arbitrario) al modelo actual. Acepta:
+//  - formato antiguo (FreeCoords plano `{i,x,y,w,h}`) → FreeWidget;
+//  - formato nuevo (`{kind:'widget',widgetId}` o `{kind:'note',doc}`).
+// Devuelve null si la entrada es irrecuperable (se descarta).
+export function migrateFreeElement(raw: unknown, index: number): FreeElement | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const x = toFiniteNumber(o.x, 0);
+  const y = toFiniteNumber(o.y, 0);
+  const z = toFiniteNumber(o.z, index);
+  const base = {
+    id: typeof o.id === 'string' ? o.id : `${String(o.kind ?? 'el')}-${index}`,
+    x,
+    y,
+    z,
+  };
+  if (o.kind === 'note') {
+    return {
+      kind: 'note',
+      ...base,
+      w: toFiniteNumber(o.w, NOTE_DEFAULT.w),
+      h: toFiniteNumber(o.h, NOTE_DEFAULT.h),
+      doc: 'doc' in o ? o.doc : null,
+      ...(typeof o.color === 'string' ? { color: o.color } : {}),
+    };
+  }
+  if (o.kind === 'shape') {
+    const shape = (o.shape as ShapeKind) ?? 'rect';
+    return {
+      kind: 'shape',
+      ...base,
+      shape,
+      w: toFiniteNumber(o.w, 80),
+      h: toFiniteNumber(o.h, 80),
+      stroke: typeof o.stroke === 'string' ? o.stroke : DRAW_COLORS[0]!,
+      strokeWidth: toFiniteNumber(o.strokeWidth, DRAW_STROKE_WIDTH),
+      ...(typeof o.fill === 'string' ? { fill: o.fill } : {}),
+      ...(o.diag === 'anti' || o.diag === 'main' ? { diag: o.diag } : {}),
+    };
+  }
+  if (o.kind === 'draw') {
+    const pts = Array.isArray(o.points)
+      ? (o.points.filter(
+          (p): p is [number, number] =>
+            Array.isArray(p) && typeof p[0] === 'number' && typeof p[1] === 'number',
+        ) as Array<[number, number]>)
+      : [];
+    return {
+      kind: 'draw',
+      ...base,
+      w: toFiniteNumber(o.w, 0),
+      h: toFiniteNumber(o.h, 0),
+      points: pts,
+      stroke: typeof o.stroke === 'string' ? o.stroke : DRAW_COLORS[0]!,
+      strokeWidth: toFiniteNumber(o.strokeWidth, DRAW_STROKE_WIDTH),
+    };
+  }
+  if (o.kind === 'text') {
+    return {
+      kind: 'text',
+      ...base,
+      w: toFiniteNumber(o.w, TEXT_DEFAULT.w),
+      h: toFiniteNumber(o.h, TEXT_DEFAULT.h),
+      text: typeof o.text === 'string' ? o.text : '',
+      color: typeof o.color === 'string' ? o.color : DRAW_COLORS[0]!,
+      fontSize: toFiniteNumber(o.fontSize, TEXT_DEFAULT.fontSize),
+    };
+  }
+  const widgetId =
+    typeof o.widgetId === 'string' ? o.widgetId : typeof o.i === 'string' ? o.i : null;
+  if (!widgetId) return null;
+  return {
+    kind: 'widget',
+    id: typeof o.id === 'string' ? o.id : widgetId,
+    widgetId,
+    x,
+    y,
+    w: toFiniteNumber(o.w, 0),
+    h: toFiniteNumber(o.h, 0),
+    z,
+  };
+}
+
+// Migra una disposición persistida completa, descartando entradas irrecuperables.
+export function migrateFreeLayout(saved: readonly unknown[]): FreeLayout {
+  return saved.map(migrateFreeElement).filter((e): e is FreeElement => e !== null);
+}
+
+// Reconcilia la disposición libre guardada con el catálogo actual. A diferencia del grid, el
+// modo libre deja al usuario AÑADIR/QUITAR libremente, así que NO se fuerza la composición del
+// preset: solo se siembra desde el preset cuando no hay nada guardado. Con datos guardados:
+// conserva todo lo del usuario, mantiene las notas y descarta widgets cuyo id ya no exista.
+export function reconcileFreeLayout(saved: readonly unknown[], preset: PresetDef): FreeLayout {
+  const migrated = migrateFreeLayout(saved);
+  if (migrated.length === 0) return buildDefaultFreeLayout(preset);
+  // Solo los widgets dependen del catálogo: notas, formas, trazos y textos se conservan siempre.
+  return migrated.filter((e) => e.kind !== 'widget' || e.widgetId in ITEM_SPECS);
+}
+
+// Siguiente `z` (encima de todo).
+function nextZ(layout: readonly FreeElement[]): number {
+  return layout.reduce((m, e) => Math.max(m, e.z), -1) + 1;
+}
+
+// Ids de widgets del catálogo que NO están ya en el lienzo (para la paleta de "añadir").
+export function availableWidgets(layout: readonly FreeElement[]): string[] {
+  const present = new Set(
+    layout.filter((e): e is FreeWidget => e.kind === 'widget').map((e) => e.widgetId),
+  );
+  return Object.keys(ITEM_SPECS).filter((id) => !present.has(id));
+}
+
+// Añade un widget centrado en `at` (coords de mundo). No-op si el id no existe o ya está.
+export function addWidget(
+  layout: FreeLayout,
+  widgetId: string,
+  at: { x: number; y: number },
+): FreeLayout {
+  if (!(widgetId in ITEM_SPECS)) return layout;
+  if (layout.some((e) => e.kind === 'widget' && e.widgetId === widgetId)) return layout;
+  const size = freeItemSize(widgetId);
+  const el: FreeWidget = {
+    kind: 'widget',
+    id: widgetId,
+    widgetId,
+    x: at.x - size.w / 2,
+    y: at.y - size.h / 2,
+    w: size.w,
+    h: size.h,
+    z: nextZ(layout),
+  };
+  return [...layout, el];
+}
+
+// Añade una nota vacía centrada en `at`. El `id` lo genera el llamador (crypto.randomUUID).
+export function addNote(
+  layout: FreeLayout,
+  id: string,
+  at: { x: number; y: number },
+  color?: string,
+): FreeLayout {
+  const el: FreeNote = {
+    kind: 'note',
+    id,
+    x: at.x - NOTE_DEFAULT.w / 2,
+    y: at.y - NOTE_DEFAULT.h / 2,
+    w: NOTE_DEFAULT.w,
+    h: NOTE_DEFAULT.h,
+    z: nextZ(layout),
+    doc: null,
+    ...(color ? { color } : {}),
+  };
+  return [...layout, el];
+}
+
+// Añade una forma vectorial con su caja (bounding box) y estilo ya calculados por el llamador.
+export function addShape(
+  layout: FreeLayout,
+  id: string,
+  shape: ShapeKind,
+  box: { x: number; y: number; w: number; h: number },
+  opts: { stroke: string; strokeWidth: number; fill?: string; diag?: 'main' | 'anti' },
+): FreeLayout {
+  const el: FreeShape = {
+    kind: 'shape',
+    id,
+    x: box.x,
+    y: box.y,
+    w: box.w,
+    h: box.h,
+    z: nextZ(layout),
+    shape,
+    stroke: opts.stroke,
+    strokeWidth: opts.strokeWidth,
+    ...(opts.fill ? { fill: opts.fill } : {}),
+    ...(opts.diag ? { diag: opts.diag } : {}),
+  };
+  return [...layout, el];
+}
+
+// Añade un trazo a mano alzada a partir de puntos en coords de MUNDO ABSOLUTAS: calcula su
+// bounding box (con margen para el grosor) y guarda los puntos RELATIVOS a la esquina. No-op
+// si hay menos de 2 puntos.
+export function addDraw(
+  layout: FreeLayout,
+  id: string,
+  worldPoints: ReadonlyArray<readonly [number, number]>,
+  stroke: string,
+  strokeWidth: number,
+): FreeLayout {
+  if (worldPoints.length < 2) return layout;
+  const pad = strokeWidth + 2;
+  const xs = worldPoints.map((p) => p[0]);
+  const ys = worldPoints.map((p) => p[1]);
+  const minX = Math.min(...xs) - pad;
+  const minY = Math.min(...ys) - pad;
+  const maxX = Math.max(...xs) + pad;
+  const maxY = Math.max(...ys) + pad;
+  const el: FreeDraw = {
+    kind: 'draw',
+    id,
+    x: minX,
+    y: minY,
+    w: maxX - minX,
+    h: maxY - minY,
+    z: nextZ(layout),
+    points: worldPoints.map((p) => [p[0] - minX, p[1] - minY]),
+    stroke,
+    strokeWidth,
+  };
+  return [...layout, el];
+}
+
+// Añade un texto libre (cadena plana) con su esquina sup-izq en `at`.
+export function addText(
+  layout: FreeLayout,
+  id: string,
+  at: { x: number; y: number },
+  color: string,
+): FreeLayout {
+  const el: FreeText = {
+    kind: 'text',
+    id,
+    x: at.x,
+    y: at.y,
+    w: TEXT_DEFAULT.w,
+    h: TEXT_DEFAULT.h,
+    z: nextZ(layout),
+    text: '',
+    color,
+    fontSize: TEXT_DEFAULT.fontSize,
+  };
+  return [...layout, el];
+}
+
+// Quita un elemento por id.
+export function removeElement(layout: FreeLayout, id: string): FreeLayout {
+  return layout.filter((e) => e.id !== id);
+}
+
+// Aplica un parche (posición, tamaño, contenido) a un elemento por id.
+export function updateElement(
+  layout: FreeLayout,
+  id: string,
+  patch: Partial<Omit<FreeBase, 'id'>> & {
+    doc?: unknown;
+    color?: string;
+    text?: string;
+    stroke?: string;
+    fill?: string;
+  },
+): FreeLayout {
+  return layout.map((e) => (e.id === id ? ({ ...e, ...patch } as FreeElement) : e));
+}
+
+// Trae un elemento al frente (z mayor que cualquiera).
+export function bringToFront(layout: FreeLayout, id: string): FreeLayout {
+  const top = nextZ(layout);
+  return layout.map((e) => (e.id === id ? { ...e, z: top } : e));
+}
+
+// Reorganiza automáticamente todos los elementos en filas limpias (orden estable por z),
+// fluyendo en un ancho de BOARD_COLS columnas como el layout por defecto.
+export function autoArrangeFree(layout: FreeLayout): FreeLayout {
+  const ordered = [...layout].sort((a, b) => a.z - b.z);
+  const rowWidth = BOARD_COLS * FREE_COL;
+  let x = 0;
+  let y = 0;
+  let rowH = 0;
+  return ordered.map((e, idx) => {
+    const advance = e.w + FREE_GAP;
+    if (x + advance > rowWidth && x > 0) {
+      x = 0;
+      y += rowH;
+      rowH = 0;
+    }
+    const placed = { ...e, x, y, z: idx } as FreeElement;
+    x += advance;
+    rowH = Math.max(rowH, e.h + FREE_GAP);
+    return placed;
+  });
+}

@@ -1,11 +1,35 @@
 import './dashboard.css';
+import 'react-grid-layout/css/styles.css';
 
 import { Badge, Chart, Select, Sparkline } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { BarChart2, ChevronDown, LineChart, Search } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import {
+  BarChart2,
+  Check,
+  ChevronDown,
+  LayoutGrid,
+  LineChart,
+  Move,
+  Plus,
+  RotateCcw,
+  Search,
+  Undo2,
+  X,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type Layout,
+  type LayoutItem,
+  moveElement,
+  noCompactor,
+  Responsive,
+  type ResponsiveLayouts,
+  useContainerWidth,
+} from 'react-grid-layout';
 
 import { DaySelector } from './components/DaySelector.js';
+import { FreeBoard } from './components/FreeBoard.js';
+import { WidgetPalette } from './components/WidgetPalette.js';
 import { listStores } from './lib/admin.js';
 import {
   type DashboardPeriod,
@@ -24,6 +48,23 @@ import {
   type SalesByHour,
   type SalesCompareMode,
 } from './lib/dashboard.js';
+import {
+  addWidget,
+  availableWidgets,
+  buildDefaultLayout,
+  type ChartCard,
+  type DashboardMode,
+  type FreeLayout,
+  type FreeWidget,
+  type LayoutPref,
+  type PresetDef,
+  type PresetId,
+  presetItemIds,
+  PRESETS,
+  reconcileFreeLayout,
+  reconcileLayout,
+  type StoredLayouts,
+} from './lib/dashboard-layout.js';
 import {
   deltaTone,
   fmtDelta,
@@ -112,69 +153,42 @@ const compareLabelsFor = (mode: SalesCompareMode, now: Date): CompareLabels => {
 
 const COMPARE_MODES: SalesCompareMode[] = ['day', 'month', 'year'];
 
-// ── Presets del dashboard (I-15 / D-08) ──
-// Cada preset define sus tarjetas KPI Y sus paneles (D-08d), con el reparto
-// EXACTO cerrado en informe_decisiones. 'ventas' es el default. El preset
-// activo y los ocultos POR preset persisten en la preferencia
-// `dashboard.layout` (D-03); el orden de tarjetas sigue en `dashboard.cards`.
-type PresetId = 'ventas' | 'beneficio' | 'inventario' | 'equipo';
-
-interface PresetDef {
-  id: PresetId;
-  label: string;
-  cards: string[];
-  panels: string[];
-}
-
-const PRESETS: PresetDef[] = [
-  {
-    id: 'ventas',
-    label: 'Ventas',
-    cards: ['kpi-today', 'kpi-avg-ticket', 'kpi-upt'],
-    panels: ['dash-bars', 'dash-hour', 'dash-family', 'rank-sales'],
-  },
-  {
-    id: 'beneficio',
-    label: 'Beneficio',
-    cards: ['kpi-margin', 'kpi-profit', 'kpi-discount', 'kpi-return'],
-    panels: ['rank-margin', 'dash-discount-emp', 'dash-suppliers'],
-  },
-  {
-    id: 'inventario',
-    label: 'Inventario',
-    cards: ['kpi-lost-sales'],
-    panels: [
-      'dash-stockout',
-      'dash-rotation',
-      'rank-rotation',
-      'dash-expiring',
-      'dash-purchase-orders',
-    ],
-  },
-  {
-    id: 'equipo',
-    label: 'Equipo',
-    cards: [],
-    panels: ['dash-sales-emp', 'dash-discount-emp', 'dash-timeclock'],
-  },
-];
-
-// Cards con toggle barras↔línea independiente. El tipo de gráfico es LOCAL a cada
-// card: cambiarlo en "Ventas" no afecta a "Ventas por hora" ni viceversa.
-type ChartCard = 'sales' | 'hour';
-
-// Preferencia de layout (I-15, simplificada en U-03/D-18): preset activo y tipo de
-// gráfico POR card. Las claves antiguas (hiddenByPreset, dashboard.cards y el
-// `chartKind` global previo a la separación por card) se ignoran.
-interface LayoutPref {
-  preset?: PresetId;
-  /** U-02: representación (barras o línea) de cada card con toggle, independiente. */
-  chartKinds?: Partial<Record<ChartCard, 'bars' | 'line'>>;
-}
-
 // La sparkline solo tiene tonos brand/up/down; 'flat' (sin tendencia) usa el
 // neutro 'brand'. Convierte el tono semántico de una métrica al de la sparkline.
 const toSparkTone = (tone: 'up' | 'down' | 'flat'): SparkTone => (tone === 'flat' ? 'brand' : tone);
+
+// ── Tablero (react-grid-layout) ──
+// Rejilla de 12 columnas en escritorio que se reduce en pantallas estrechas; alto de fila
+// y márgenes fijos. El arrastre hace snap a estas unidades; el fondo de puntos (solo en
+// edición) es decorativo. v2 usa estos breakpoints/cols por separado.
+const BOARD_ROW_HEIGHT = 150;
+const BOARD_MARGIN: [number, number] = [16, 16];
+const BOARD_CONTAINER_PADDING: [number, number] = [0, 0];
+const BOARD_BREAKPOINTS = { lg: 1000, md: 768, sm: 640, xs: 480, xxs: 0 };
+const BOARD_COLS_BY_BP: Record<string, number> = { lg: 12, md: 12, sm: 6, xs: 4, xxs: 2 };
+// Compactor sin compactación (colocación libre con huecos) PERO con preventCollision: al
+// soltar una card sobre una celda ocupada, vuelve a su sitio en vez de solaparse. Evita que
+// las cards se oculten unas bajo otras y mantiene siempre el mismo margen entre ellas.
+const BOARD_COMPACTOR = { ...noCompactor, preventCollision: true };
+
+// Etiqueta legible de cada panel para el aria-label del tile (las tarjetas KPI usan su
+// `label` de cardDefs). Las tres pestañas de rankings comparten título.
+const PANEL_LABELS: Record<string, string> = {
+  'dash-bars': 'Ventas',
+  'dash-family': 'Ventas por familia',
+  'dash-stockout': 'Roturas de stock',
+  'rank-sales': 'Rankings de producto',
+  'rank-margin': 'Rankings de producto',
+  'rank-rotation': 'Rankings de producto',
+  'dash-expiring': 'Lotes por caducar',
+  'dash-purchase-orders': 'Pedidos de compra',
+  'dash-hour': 'Ventas por hora',
+  'dash-sales-emp': 'Ventas por vendedor',
+  'dash-discount-emp': 'Descuento por empleado',
+  'dash-suppliers': 'Comparativa de proveedores',
+  'dash-rotation': 'Rotación',
+  'dash-timeclock': 'Fichajes de hoy',
+};
 
 export function DashboardPage({
   onNavigate,
@@ -193,19 +207,94 @@ export function DashboardPage({
   const [hourDay, setHourDay] = useState<string>(() =>
     new Intl.DateTimeFormat('en-CA').format(new Date()),
   );
+  // Modo "Personalizar" (D-19): reordenar cards y paneles por arrastre. El borrador
+  // (draft) mantiene el orden mientras se edita; se confirma con Guardar o se descarta.
+  const [editing, setEditing] = useState(false);
+  // Borrador del layout del tablero mientras se edita; se confirma con Guardar o se descarta.
+  const [draftLayouts, setDraftLayouts] = useState<StoredLayouts | null>(null);
+  // D-21: cards/paneles quitados durante la edición (orden = pila de deshacer). Se inicializa
+  // con los ya ocultos del preset al entrar en edición; se confirma con Guardar.
+  const [draftHidden, setDraftHidden] = useState<string[]>([]);
+  // El fondo de puntos se desmonta tras su animación de salida: al dejar la edición se marca
+  // "saliendo" para reproducir la animación inversa antes de quitarlo del DOM.
+  const [dotsLeaving, setDotsLeaving] = useState(false);
+  // Ancho del contenedor para react-grid-layout v2 (sustituye al WidthProvider de v1).
+  const { width: boardWidth, mounted: boardMounted, containerRef: boardRef } = useContainerWidth();
+  // Breakpoint activo del tablero (lo reporta RGL); el reposicionado por teclado opera
+  // sobre el layout de ESE breakpoint.
+  const [boardBreakpoint, setBoardBreakpoint] = useState<string>('lg');
+  // Gestión de foco al entrar/salir de edición: al cambiar `editing` la cabecera
+  // intercambia su contenido, así que reubicamos el foco para no perderlo en <body>.
+  const editToggleRef = useRef<HTMLButtonElement>(null);
+  const wasEditing = useRef(false);
+  // Paleta de "Agregar widgets" en la cuadrícula de Personalizado (preset vacío).
+  const [customGridPaletteOpen, setCustomGridPaletteOpen] = useState(false);
   const store = storeId || undefined;
 
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
 
   // Preferencias ANTES de las queries: el preset activo decide qué se pinta Y
   // qué endpoints se consultan (enabled por visibilidad). D-18: la composición
-  // (tarjetas y paneles) la dictan exclusivamente los presets — no hay
-  // personalización manual; las preferencias antiguas de ocultos se ignoran.
+  // (tarjetas y paneles) la dictan exclusivamente los presets; D-19 añade el orden
+  // personalizable DENTRO de cada preset (no cambia qué aparece, solo en qué orden).
   const { prefs, setPref, loaded: prefsLoaded } = usePreferences();
   const layout = readPref<LayoutPref>(prefs, 'dashboard.layout', {});
-  const preset = PRESETS.find((p) => p.id === layout.preset) ?? PRESETS[0]!;
-  const visibleCardIds = preset.cards;
+  // Default = 'ventas' (no PRESETS[0], que ahora es 'personalizado' y va vacío).
+  const preset =
+    PRESETS.find((p) => p.id === layout.preset) ?? PRESETS.find((p) => p.id === 'ventas')!;
   const vis = new Set([...preset.cards, ...preset.panels]);
+  // Estable por preset: evita recalcular y, en modo libre, invalidar la memo de nodos del
+  // lienzo en cada re-render por datos. (renderItem sí cambia con los datos, por diseño.)
+  const itemIds = useMemo(() => presetItemIds(preset), [preset]);
+
+  // D-20: modo global (cuadrícula / libre). Ningún preset lo fuerza: el usuario decide.
+  const isCustomPreset = preset.id === 'personalizado';
+  const mode: DashboardMode = layout.mode ?? 'grid';
+  const savedFree = reconcileFreeLayout(layout.freeLayouts?.[preset.id] ?? [], preset);
+
+  // «Personalizado» no tiene items predefinidos: en cuadrícula los widgets derivan del
+  // lienzo libre (freeLayouts) para que ambos modos compartan la misma lista de widgets.
+  const customWidgetIds: string[] = isCustomPreset
+    ? savedFree.filter((e): e is FreeWidget => e.kind === 'widget').map((e) => e.widgetId)
+    : [];
+  // Ids efectivos para el tablero: para Personalizado son los widgets añadidos por el usuario.
+  const effectiveItemIds = isCustomPreset ? customWidgetIds : itemIds;
+  // D-21: cards quitadas del tablero por preset (persistidas). En edición se usa el borrador
+  // (draftHidden) para reflejar quitar/deshacer en vivo antes de Guardar.
+  const savedHidden = layout.hiddenByPreset?.[preset.id] ?? [];
+  const hiddenIds = editing ? draftHidden : savedHidden;
+  // Ids realmente visibles en el tablero (los efectivos menos los quitados).
+  const visibleItemIds = effectiveItemIds.filter((id) => !hiddenIds.includes(id));
+
+  // Habilita queries de widgets visibles:
+  // - Libre: todos los del lienzo del preset activo.
+  // - Cuadrícula de Personalizado: los widgets añadidos (mismos que el lienzo).
+  // - Cuadrícula estándar: los del preset (ya están en vis).
+  if (mode === 'free') {
+    for (const el of savedFree) {
+      if (el.kind === 'widget') vis.add(el.widgetId);
+    }
+  } else if (isCustomPreset) {
+    for (const id of customWidgetIds) vis.add(id);
+  }
+
+  // Colocación 2D en el tablero, reconciliada contra los ids efectivos del preset.
+  // Para Personalizado se reconcilia contra los widgets añadidos (no los del preset base).
+  const savedRaw = layout.layouts?.[preset.id] ?? {};
+  const savedLayouts: StoredLayouts = {};
+  {
+    const pseudoPreset: PresetDef = isCustomPreset
+      ? { ...preset, cards: customWidgetIds, panels: [] }
+      : preset;
+    for (const [bp, items] of Object.entries(savedRaw)) {
+      savedLayouts[bp] = reconcileLayout(items, visibleItemIds);
+    }
+    savedLayouts.lg = reconcileLayout(
+      savedRaw.lg ?? buildDefaultLayout(pseudoPreset),
+      visibleItemIds,
+    );
+  }
+  const activeLayouts = editing && draftLayouts ? draftLayouts : savedLayouts;
 
   // placeholderData: al cambiar de tienda/periodo se conservan los datos previos
   // durante el refetch en vez de vaciarse. Así los nodos del DOM (key estable por
@@ -345,6 +434,27 @@ export function DashboardPage({
     if (d.period && PERIODS.some((p) => p.id === d.period)) setPeriod(d.period);
     if (typeof d.storeId === 'string') setStoreId(d.storeId);
   }, [prefsLoaded, prefs]);
+  // Reubica el foco al conmutar de modo: al entrar, al primer tile (es enfocable en
+  // edición y su aria-label explica cómo moverlo con las flechas); al salir, al botón
+  // "Personalizar". No roba el foco en el montaje inicial (solo en transiciones reales).
+  useEffect(() => {
+    if (editing === wasEditing.current) return;
+    wasEditing.current = editing;
+    // preventScroll: enfocar NO debe arrastrar el scroll al tile/botón; el usuario se queda
+    // en la posición en la que estaba al pulsar Personalizar / Guardar.
+    if (editing) {
+      boardRef.current?.querySelector<HTMLElement>('.dash-tile')?.focus({ preventScroll: true });
+    } else {
+      editToggleRef.current?.focus({ preventScroll: true });
+    }
+  }, [editing, boardRef]);
+  // Red de seguridad: si la animación de salida del fondo de puntos no emite animationend
+  // (p. ej. con prefers-reduced-motion, animation:none), lo desmonta igualmente.
+  useEffect(() => {
+    if (!dotsLeaving) return;
+    const t = setTimeout(() => setDotsLeaving(false), 500);
+    return () => clearTimeout(t);
+  }, [dotsLeaving]);
   const saveDashboardDefault = (patch: { period?: DashboardPeriod; storeId?: string }): void => {
     const cur = readPref<{ period?: DashboardPeriod; storeId?: string }>(
       prefs,
@@ -468,13 +578,42 @@ export function DashboardPage({
       ),
     },
   ];
-  const visibleCards = visibleCardIds
-    .map((id) => cardDefs.find((c) => c.id === id))
-    .filter((c): c is (typeof cardDefs)[number] => Boolean(c));
 
   // Ocultar/mostrar SOLO afecta al preset activo (D-03): se escribe entera la
   // lista efectiva de ocultos del preset en dashboard.layout.
   const setPreset = (id: PresetId): void => setPref('dashboard.layout', { ...layout, preset: id });
+  // D-20: cambio de modo (grid/libre). Al cambiar de modo salimos de la edición del grid
+  // (editing/draft son conceptos del tablero RGL, no del lienzo libre).
+  const setMode = (m: DashboardMode): void => {
+    if (editing) {
+      setEditing(false);
+      setDotsLeaving(true);
+      setDraftLayouts(null);
+    }
+    setPref('dashboard.layout', { ...layout, mode: m });
+  };
+  // D-20: persiste la disposición libre del preset activo (al soltar una card).
+  const onFreeChange = (next: FreeLayout): void =>
+    setPref('dashboard.layout', {
+      ...layout,
+      freeLayouts: { ...layout.freeLayouts, [preset.id]: next },
+    });
+  // D-20: persiste pan/zoom del lienzo libre por preset (evita zoom inconsistente al cambiar).
+  const onFreeViewChange = (v: { panX: number; panY: number; zoom: number }): void =>
+    setPref('dashboard.layout', {
+      ...layout,
+      freeViews: { ...layout.freeViews, [preset.id]: v },
+    });
+  // Personalizado en cuadrícula: añade un widget a freeLayouts (fuente compartida con libre).
+  const onAddCustomGridWidget = (widgetId: string): void => {
+    const next = addWidget(savedFree, widgetId, { x: 100, y: 100 });
+    setPref('dashboard.layout', {
+      ...layout,
+      freeLayouts: { ...layout.freeLayouts, [preset.id]: next },
+    });
+    setCustomGridPaletteOpen(false);
+  };
+  const customGridAvailable = availableWidgets(savedFree);
   // U-02: toggle barras ↔ línea LOCAL a cada card (persistido por card en el layout).
   // Cambiar el de una card no toca el de la otra.
   const chartKindFor = (card: ChartCard): 'bars' | 'line' =>
@@ -487,97 +626,163 @@ export function DashboardPage({
   const salesKind = chartKindFor('sales');
   const hourKind = chartKindFor('hour');
 
-  return (
-    <section className="catalog" data-testid="dashboard">
-      <header className="catalog-head is-actions-only">
-        <div className="catalog-actions">
-          {/* Selector de preset en la cabecera (D-08c): cambiar de foco = 1 clic. */}
-          <div
-            className="dash-preset-switch"
-            role="tablist"
-            aria-label="Preset del dashboard"
-            data-testid="dash-preset"
-          >
-            {PRESETS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                role="tab"
-                aria-selected={preset.id === p.id}
-                className={preset.id === p.id ? 'is-active' : ''}
-                onClick={() => setPreset(p.id)}
-                data-testid={`dash-preset-${p.id}`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <Select
-            className="dash-period-select"
-            value={period}
-            onChange={(value) => {
-              setPeriod(value as DashboardPeriod);
-              saveDashboardDefault({ period: value as DashboardPeriod });
-            }}
-            ariaLabel="Periodo"
-            data-testid="dash-period"
-            options={PERIODS.map((p) => ({ value: p.id, label: p.label }))}
-          />
-          <Select
-            className="dash-store"
-            value={storeId}
-            onChange={(value) => {
-              setStoreId(value);
-              saveDashboardDefault({ storeId: value });
-            }}
-            ariaLabel="Tienda"
-            data-testid="dash-store"
-            options={[
-              { value: '', label: 'Todas las tiendas' },
-              ...stores.map((s) => ({ value: s.id, label: s.name })),
-            ]}
-          />
-        </div>
-      </header>
+  // ── Modo Personalizar (D-19): tablero arrastrable con snap (react-grid-layout) ──
+  // Aplica los flags de modo a cada item: en edición es arrastrable (nunca redimensionable);
+  // fuera de edición es estático (bloqueado). Los flags son de MODO y no se persisten.
+  const layoutsWithMode = (layouts: StoredLayouts): ResponsiveLayouts => {
+    const out: Record<string, LayoutItem[]> = {};
+    for (const [bp, items] of Object.entries(layouts)) {
+      out[bp] = (items ?? []).map((it) => ({
+        ...it,
+        static: !editing,
+        isDraggable: editing,
+        isResizable: false,
+      }));
+    }
+    return out;
+  };
+  // Captura los cambios del tablero en el borrador (solo en edición), guardando solo las
+  // coordenadas (sin los flags de modo) para no contaminar lo persistido.
+  const onBoardLayoutChange = (_current: Layout, all: ResponsiveLayouts): void => {
+    if (!editing) return;
+    const stripped: StoredLayouts = {};
+    for (const [bp, items] of Object.entries(all)) {
+      stripped[bp] = (items ?? []).map(({ i, x, y, w, h }) => ({ i, x, y, w, h }));
+    }
+    // Modo controlado de RGL: re-emite onLayoutChange en cada render. Si las coordenadas
+    // no cambian respecto al borrador, devolvemos el mismo array (React corta el ciclo).
+    setDraftLayouts((prev) =>
+      prev && JSON.stringify(prev) === JSON.stringify(stripped) ? prev : stripped,
+    );
+  };
+  // Entra a edición tomando una instantánea del layout guardado y de los ocultos como borrador.
+  const startEditing = (): void => {
+    setDraftLayouts(savedLayouts);
+    setDraftHidden(savedHidden);
+    setEditing(true);
+  };
+  const cancelEditing = (): void => {
+    setEditing(false);
+    setDotsLeaving(true);
+    setDraftLayouts(null);
+    setDraftHidden([]);
+  };
+  // D-21: quita una card del tablero (se apila para deshacer) y la saca del borrador de layout.
+  const removeTile = (id: string): void => {
+    setDraftHidden((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    setDraftLayouts((prev) => {
+      if (!prev) return prev;
+      const next: StoredLayouts = {};
+      for (const [bp, items] of Object.entries(prev)) {
+        next[bp] = (items ?? []).filter((it) => it.i !== id);
+      }
+      return next;
+    });
+  };
+  // D-21: deshace el último «quitar» (restaura la última card sacada del tablero).
+  const undoRemove = (): void => {
+    setDraftHidden((prev) => prev.slice(0, -1));
+  };
+  // Restablecer: restaura TODAS las cards del preset y el layout por defecto (sin salir).
+  const resetEditing = (): void => {
+    setDraftHidden([]);
+    if (isCustomPreset && customWidgetIds.length > 0) {
+      const pseudoPreset: PresetDef = { ...preset, cards: customWidgetIds, panels: [] };
+      setDraftLayouts({ lg: buildDefaultLayout(pseudoPreset) });
+    } else {
+      setDraftLayouts({ lg: buildDefaultLayout(preset) });
+    }
+  };
+  // Guardar: persiste layout + cards ocultas por preset y sale de edición.
+  const saveEditing = (): void => {
+    setPref('dashboard.layout', {
+      ...layout,
+      layouts: { ...layout.layouts, [preset.id]: draftLayouts ?? savedLayouts },
+      hiddenByPreset: { ...layout.hiddenByPreset, [preset.id]: draftHidden },
+    });
+    setEditing(false);
+    setDotsLeaving(true);
+    setDraftLayouts(null);
+    setDraftHidden([]);
+  };
+  // Accesibilidad: react-grid-layout no soporta arrastre por teclado, así que en edición
+  // cada tile es enfocable y las flechas reposicionan el elemento una celda en el layout
+  // del breakpoint activo (mismo comportamiento que el arrastre, vía moveElement).
+  const moveItem = (id: string, dx: number, dy: number): void => {
+    setDraftLayouts((prev) => {
+      const base = prev ?? savedLayouts;
+      const bp = boardBreakpoint;
+      const items = base[bp] ?? base.lg ?? [];
+      const cols = BOARD_COLS_BY_BP[bp] ?? 12;
+      const it = items.find((x) => x.i === id);
+      if (!it) return prev;
+      const nx = Math.max(0, Math.min(cols - it.w, it.x + dx));
+      const ny = Math.max(0, it.y + dy);
+      if (nx === it.x && ny === it.y) return prev;
+      // preventCollision=true: si la celda destino está ocupada, no mueve (coherente con el
+      // arrastre). compactType=null → sin reempaquetado; allowOverlap=false → sin solape.
+      const moved = moveElement(items, it, nx, ny, true, true, null, cols, false).map(
+        ({ i, x, y, w, h }) => ({ i, x, y, w, h }),
+      );
+      return { ...base, [bp]: moved };
+    });
+  };
+  const TILE_MOVES: Record<string, [number, number]> = {
+    ArrowLeft: [-1, 0],
+    ArrowRight: [1, 0],
+    ArrowUp: [0, -1],
+    ArrowDown: [0, 1],
+  };
+  const onTileKeyDown = (id: string, e: React.KeyboardEvent): void => {
+    if (!editing) return;
+    const move = TILE_MOVES[e.key];
+    if (!move) return;
+    e.preventDefault();
+    moveItem(id, move[0], move[1]);
+  };
+  // Etiqueta legible de un elemento del tablero (tarjeta KPI o panel) para el aria-label.
+  const boardItemLabel = (id: string): string =>
+    cardDefs.find((c) => c.id === id)?.label ?? PANEL_LABELS[id] ?? id;
 
-      {/* D-18 (U-03): sin personalización manual de tarjetas — el preset manda. */}
-      {visibleCards.length > 0 && (
-        <div className="dash-cards" data-testid="dash-cards">
-          {visibleCards.map((c) => c.node)}
-        </div>
-      )}
+  // El bloque de rankings se monta para la pestaña inicial que fije el preset (D-08);
+  // su data-testid histórico (dash-rankings) y el selector interno se conservan.
+  const rankingsNode = (initialTab: RankTab): React.ReactNode => (
+    <div className="dash-panel dash-panel--paged" data-testid="dash-rankings">
+      <Rankings
+        key={preset.id}
+        data={rankings.data}
+        loading={rankings.isLoading}
+        subtitle={PERIOD_SUBTITLE[period]}
+        initialTab={initialTab}
+      />
+    </div>
+  );
 
-      {/* La rejilla solo monta los paneles del preset activo (D-08d); cada uno
-          conserva su data-testid histórico. Los spans están elegidos para que
-          cada preset complete filas de 12 columnas. */}
-      <div className="dash-grid">
-        {/* Ventas: comparativa por tienda (hoy vs ayer / mes vs mes / año vs año).
-            El toggle barras↔línea y el desplegable de comparación viven DENTRO de
-            la card, en su cabecera. */}
-        {vis.has('dash-bars') &&
-          (() => {
+  // Construye un panel por id (solo se invoca para los del preset, en su orden). El span
+  // de columnas viaja al wrapper sortable; el panel ya no lleva la clase span-*.
+  const renderPanel = (id: string): { span: 5 | 7 | 12; node: React.ReactNode } | null => {
+    switch (id) {
+      // Ventas: comparativa por tienda. El toggle barras↔línea y el desplegable de
+      // comparación viven DENTRO de la card, en su cabecera.
+      case 'dash-bars':
+        return {
+          span: 7,
+          node: (() => {
             const labels = compareLabelsFor(compare, new Date());
             const comparisonData = compare === 'day' ? salesToday.data : salesComparison.data;
-            const stores = comparisonData?.byStore ?? [];
+            const barStores = comparisonData?.byStore ?? [];
             return (
-              <div className="dash-panel span-7" data-testid="dash-bars">
+              <div className="dash-panel" data-testid="dash-bars">
                 <header className="dash-panel-head">
-                  {/* Título + subtítulo en columna: el subtítulo queda pegado al
-                      título y no lo arrastra hacia abajo la altura de los controles. */}
                   <div className="dash-panel-titles">
                     <h3>Ventas</h3>
                     <p className="dash-panel-sub">Facturación neta por tienda</p>
                   </div>
-                  {/* Fila de pills a la derecha del título (toggle + desplegable),
-                      centrada verticalmente con el título+subtítulo. */}
                   <div className="dash-bars-controls">
-                    {/* U-02: toggle barras ↔ línea LOCAL a esta card (no afecta a otras). */}
                     <ChartKindToggle
                       chartKind={salesKind}
                       setChartKind={(k) => setChartKind('sales', k)}
                     />
-                    {/* Desplegable de comparación. El triggerNode colorea cada
-                        parte como leyenda implícita: gris = anterior, verde = actual. */}
                     <Select
                       className="dash-compare-select"
                       value={compare}
@@ -601,9 +806,8 @@ export function DashboardPage({
                     />
                   </div>
                 </header>
-                {/* U-01: Chart común (color constante, tooltip lateral actual/anterior/delta). */}
                 <Chart
-                  data={stores.map((s) => {
+                  data={barStores.map((s) => {
                     const tone = deltaTone(s.deltaPct);
                     const subTone = tone === 'flat' ? ('neutral' as const) : tone;
                     return {
@@ -612,14 +816,12 @@ export function DashboardPage({
                       compareValue: s.yesterday,
                       valueText: `${labels.current} ${fmtEur(s.today)}`,
                       compareText: `${labels.previous} ${fmtEur(s.yesterday)}`,
-                      // Tooltip estructurado: periodo (etiqueta) ↔ importe (derecha).
                       tipValueLabel: labels.current,
                       tipValueAmount: fmtEur(s.today),
                       tipCompareLabel: labels.previous,
                       tipCompareAmount: fmtEur(s.yesterday),
                       tipExtra: fmtDelta(s.deltaPct),
                       tipExtraTone: subTone,
-                      // Delta bajo el nombre de la tienda, coloreado por signo.
                       subValue: fmtDelta(s.deltaPct),
                       subTone,
                     };
@@ -629,37 +831,32 @@ export function DashboardPage({
                   kind={salesKind}
                   showGrid={false}
                   barValues={salesKind === 'bars'}
-                  // Modo línea a sangre: el trazo toca el filo de la card cancelando
-                  // el padding del panel (1.5rem = 24px); puntos y nombres se reinsertan.
                   edgeBleed={24}
                   animated={false}
                   ariaLabel={`Ventas por tienda · ${labels.current} vs ${labels.previous}`}
                 />
               </div>
             );
-          })()}
+          })(),
+        };
 
-        {/* Ventas por familia (barras CSS horizontales). Paginado de 5 en 5 con
-            buscador + flechas arriba a la derecha: la card no crece en altura
-            indefinidamente (antes arrastraba la card de Ventas a la izquierda). */}
-        {vis.has('dash-family') &&
-          (() => {
+      // Ventas por familia (barras CSS horizontales) con buscador y scroll vertical.
+      case 'dash-family':
+        return {
+          span: 5,
+          node: (() => {
             const fams = byFamily.data ?? [];
-            // Máximo sobre TODAS las familias: las barras son comparables al hacer scroll.
             const max = Math.max(1, ...fams.map((f) => f.total));
             const totalSum = fams.reduce((sum, f) => sum + f.total, 0);
             const q = familyQuery.trim().toLowerCase();
             const filtered = q ? fams.filter((f) => f.familyName.toLowerCase().includes(q)) : fams;
             return (
-              <div className="dash-panel span-5 dash-panel--paged" data-testid="dash-family">
+              <div className="dash-panel dash-panel--paged" data-testid="dash-family">
                 <header className="dash-panel-head">
-                  {/* Título + subtítulo apilados a la izquierda (como en Ventas),
-                      buscador a la derecha y centrado verticalmente con ambos. */}
                   <div className="dash-panel-titles">
                     <h3>Ventas por familia</h3>
                     <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]}</p>
                   </div>
-                  {/* Buscador con el mismo diseño/tamaño que el lanzador del header. */}
                   <label className="dash-family-search">
                     <Search size={15} aria-hidden="true" />
                     <input
@@ -679,435 +876,812 @@ export function DashboardPage({
                 )}
               </div>
             );
-          })()}
+          })(),
+        };
 
-        {/* Panel de roturas: alertas activas (GET /stock/alerts) + venta perdida est. */}
-        {vis.has('dash-stockout') && (
-          <div className="dash-panel span-5" data-testid="dash-stockout">
-            <h3>Roturas de stock</h3>
-            <p className="dash-panel-sub">Productos en alerta ahora</p>
-            {(() => {
-              const items = alerts.data ?? [];
-              if (items.length === 0) {
-                return <p className="catalog-empty">Sin roturas ahora.</p>;
-              }
-              return (
-                <ul className="dash-stockout-list">
-                  {items.map((a) => (
-                    <li
-                      key={a.id}
-                      className={`dash-stockout-item lvl-${a.alertType === 'OUT_OF_STOCK' ? 'red' : 'yellow'}`}
-                    >
-                      <span className="dash-stockout-info">
-                        <span className="dash-stockout-name">{a.productName}</span>
-                        <span className="dash-stockout-store">{a.storeName}</span>
-                      </span>
-                      <span className="dash-stockout-tag">{ALERT_LABEL[a.alertType]}</span>
-                    </li>
-                  ))}
-                </ul>
-              );
-            })()}
-            <div className="dash-stockout-foot">
-              <span>Venta perdida est.</span>
-              <strong className="dash-lost">{fmtEur(stockoutKpis.data?.estimatedLostSales)}</strong>
-            </div>
-          </div>
-        )}
-
-        {/* Rankings: cada preset fija su pestaña inicial (D-08 los reparte como
-            paneles distintos: top ventas / top margen / peor rotación); el
-            selector interno sigue permitiendo explorar. span-5 en Ventas para
-            completar la fila con "Ventas por hora". */}
-        {(['rank-sales', 'rank-margin', 'rank-rotation'] as const).some((id) => vis.has(id)) && (
-          <div
-            className={`dash-panel dash-panel--paged ${vis.has('rank-sales') ? 'span-5' : 'span-7'}`}
-            data-testid="dash-rankings"
-          >
-            <Rankings
-              key={preset.id}
-              data={rankings.data}
-              loading={rankings.isLoading}
-              subtitle={PERIOD_SUBTITLE[period]}
-              initialTab={
-                vis.has('rank-sales') ? 'sales' : vis.has('rank-margin') ? 'margin' : 'rotation'
-              }
-            />
-          </div>
-        )}
-
-        {/* Lotes por caducar (I-16/D-08b, preset Inventario): reusa el lenguaje
-            de la lista de roturas (rojo caducado, amarillo por caducar). */}
-        {vis.has('dash-expiring') && (
-          <div className="dash-panel span-7" data-testid="dash-expiring">
-            <header className="dash-panel-head">
-              <h3>Lotes por caducar</h3>
-              <button
-                type="button"
-                className="link-btn"
-                onClick={() => onNavigate?.('stock')}
-                data-testid="dash-expiring-link"
-              >
-                Ver stock →
-              </button>
-            </header>
-            <p className="dash-panel-sub">Caducados y próximos a caducar</p>
-            {(() => {
-              const rows = (expiring.data ?? []).slice(0, 6);
-              if (rows.length === 0) {
-                return <p className="catalog-empty">Nada caduca pronto.</p>;
-              }
-              return (
-                <ul className="dash-stockout-list">
-                  {rows.map((b) => (
-                    <li
-                      key={b.id}
-                      className={`dash-stockout-item lvl-${b.status === 'expired' ? 'red' : 'yellow'}`}
-                      data-testid="dash-expiring-row"
-                    >
-                      <span className="dash-stockout-info">
-                        <span className="dash-stockout-name">{b.productName}</span>
-                        <span className="dash-stockout-store">
-                          {b.storeName} · lote {b.lotCode} · {b.quantity} ud
-                        </span>
-                      </span>
-                      <span className="dash-stockout-tag">
-                        {EXPIRY_LABEL[b.status]} · {expiryDaysText(b.daysToExpiry)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              );
-            })()}
-          </div>
-        )}
-
-        {/* Pedidos de compra pendientes (I-16/D-08b, preset Inventario). */}
-        {vis.has('dash-purchase-orders') && (
-          <div className="dash-panel span-5" data-testid="dash-purchase-orders">
-            <header className="dash-panel-head">
-              <h3>Pedidos de compra</h3>
-              <button
-                type="button"
-                className="link-btn"
-                onClick={() => onNavigate?.('suppliers')}
-                data-testid="dash-po-link"
-              >
-                Ver proveedores →
-              </button>
-            </header>
-            <p className="dash-panel-sub">Pendientes de recibir</p>
-            {(() => {
-              const rows = (purchaseOrders.data ?? [])
-                .filter((o) => o.status !== 'RECEIVED')
-                .slice(0, 6);
-              if (rows.length === 0) {
-                return <p className="catalog-empty">Sin pedidos pendientes.</p>;
-              }
-              return (
-                <ul className="dash-po-list">
-                  {rows.map((o) => (
-                    <li key={o.id} className="dash-po-row" data-testid="dash-po-row">
-                      <span className="dash-po-info">
-                        <span className="dash-po-supplier">{o.supplier?.name ?? 'Proveedor'}</span>
-                        <span className="dash-po-meta">
-                          {df.format(new Date(o.createdAt))} · {o.lines.length}{' '}
-                          {o.lines.length === 1 ? 'línea' : 'líneas'}
-                        </span>
-                      </span>
-                      <Badge
-                        variant={
-                          o.status === 'DRAFT'
-                            ? 'muted'
-                            : o.status === 'PARTIALLY_RECEIVED'
-                              ? 'warning'
-                              : 'default'
-                        }
-                      >
-                        {STATUS_LABEL[o.status]}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              );
-            })()}
-          </div>
-        )}
-
-        {/* Ventas por hora (STAT-02): card de UN día concreto (independiente del selector
-            de periodo). Cabecera con título + la fecha del día; a la derecha, selector de
-            día (flechas + calendario propio) y el toggle barras↔línea. Las 24 franjas se
-            recorren arrastrando el gráfico o la barra fina. */}
-        {vis.has('dash-hour') && (
-          <div className="dash-panel span-7" data-testid="dash-hour">
-            <header className="dash-panel-head">
-              <div className="dash-panel-titles">
-                <h3>Ventas por hora</h3>
-                <p className="dash-panel-sub">{formatHourDay(hourDay)}</p>
-              </div>
-              <div className="dash-bars-controls">
-                <DaySelector value={hourDay} onChange={setHourDay} />
-                {/* U-02: toggle LOCAL a esta card (no afecta a "Ventas"). */}
-                <ChartKindToggle
-                  chartKind={hourKind}
-                  setChartKind={(k) => setChartKind('hour', k)}
-                />
-              </div>
-            </header>
-            <HourChart data={byHour.data ?? []} chartKind={hourKind} />
-          </div>
-        )}
-
-        {/* Ventas por vendedor (preset Equipo, D-08): facturación por empleado. */}
-        {vis.has('dash-sales-emp') && (
-          <div className="dash-panel span-7" data-testid="dash-sales-emp">
-            <h3>Ventas por vendedor</h3>
-            <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]} · facturación por empleado</p>
-            {(() => {
-              const emps = salesByEmp.data ?? [];
-              if (emps.length === 0) {
-                return <p className="catalog-empty">Sin ventas en el periodo.</p>;
-              }
-              const max = Math.max(1, ...emps.map((e) => e.total));
-              return (
-                <ul className="dash-family-list">
-                  {emps.map((e, i) => (
-                    <li key={e.userId} style={{ '--i': i } as React.CSSProperties}>
-                      <span className="dash-family-name">
-                        {e.userName}
-                        <span className="dash-rotation-arch"> · {e.salesCount} tickets</span>
-                      </span>
-                      <span className="dash-family-track">
-                        <span
-                          className="dash-family-fill"
-                          style={{ width: `${(e.total / max) * 100}%` }}
-                        />
-                        <span className="dash-family-pct">{fmtEur(e.total)}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              );
-            })()}
-          </div>
-        )}
-
-        {/* Descuento medio por empleado (STAT-04) */}
-        {vis.has('dash-discount-emp') && (
-          <div className="dash-panel span-5" data-testid="dash-discount-emp">
-            <h3>Descuento por empleado</h3>
-            <p className="dash-panel-sub">
-              {PERIOD_SUBTITLE[period]} · descuento voluntario medio (sin promociones)
-            </p>
-            {(() => {
-              const emps = discountByEmp.data ?? [];
-              const max = Math.max(0.0001, ...emps.map((e) => e.avgDiscountPct));
-              return (
-                <ul className="dash-family-list">
-                  {emps.map((e, i) => (
-                    <li key={e.userId} style={{ '--i': i } as React.CSSProperties}>
-                      <span className="dash-family-name">{e.userName}</span>
-                      <span className="dash-family-track">
-                        <span
-                          className="dash-family-fill"
-                          style={{ width: `${(e.avgDiscountPct / max) * 100}%` }}
-                        >
-                          <span className="dash-family-pct">{fmtRate(e.avgDiscountPct)}</span>
-                        </span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              );
-            })()}
-          </div>
-        )}
-
-        {/* Comparativa de proveedores (I-16/D-08b, preset Beneficio): mejor precio
-            de compra marcado por producto; reusa los chips de Proveedores. */}
-        {vis.has('dash-suppliers') && (
-          <div className="dash-panel" data-testid="dash-suppliers">
-            <header className="dash-panel-head">
-              <h3>Comparativa de proveedores</h3>
-              <button
-                type="button"
-                className="link-btn"
-                onClick={() => onNavigate?.('suppliers')}
-                data-testid="dash-suppliers-link"
-              >
-                Ver proveedores →
-              </button>
-            </header>
-            <p className="dash-panel-sub">Precios de compra por proveedor · mejor marcado</p>
-            {(() => {
-              const rows = (supplierComparison.data ?? [])
-                .filter((r) => r.prices.length > 0)
-                .slice(0, 6);
-              if (rows.length === 0) {
+      // Panel de roturas: alertas activas (GET /stock/alerts) + venta perdida est.
+      case 'dash-stockout':
+        return {
+          span: 5,
+          node: (
+            <div className="dash-panel" data-testid="dash-stockout">
+              <h3>Roturas de stock</h3>
+              <p className="dash-panel-sub">Productos en alerta ahora</p>
+              {(() => {
+                const items = alerts.data ?? [];
+                if (items.length === 0) {
+                  return <p className="catalog-empty">Sin roturas ahora.</p>;
+                }
                 return (
-                  <p className="catalog-empty">
-                    Sin tarifas de proveedor todavía. Impórtalas en Proveedores.
-                  </p>
+                  <ul className="dash-stockout-list">
+                    {items.map((a) => (
+                      <li
+                        key={a.id}
+                        className={`dash-stockout-item lvl-${a.alertType === 'OUT_OF_STOCK' ? 'red' : 'yellow'}`}
+                      >
+                        <span className="dash-stockout-info">
+                          <span className="dash-stockout-name">{a.productName}</span>
+                          <span className="dash-stockout-store">{a.storeName}</span>
+                        </span>
+                        <span className="dash-stockout-tag">{ALERT_LABEL[a.alertType]}</span>
+                      </li>
+                    ))}
+                  </ul>
                 );
-              }
-              return (
-                <ul className="dash-suppliers-list">
-                  {rows.map((r) => (
-                    <li
-                      key={r.productId}
-                      className="dash-suppliers-row"
-                      data-testid="dash-suppliers-row"
-                    >
-                      <span className="dash-suppliers-name">{r.productName}</span>
-                      <span className="sp-price-chips">
-                        {r.prices.map((pr) => (
-                          <span
-                            key={pr.supplierId}
-                            className={`sp-price-chip${r.best?.supplierId === pr.supplierId ? ' is-best' : ''}`}
-                          >
-                            {pr.supplierName}: {fmtEur(pr.price)}
-                          </span>
-                        ))}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              );
-            })()}
-          </div>
-        )}
-
-        {/* Rotación (STAT-05/06): por defecto AGREGADA POR ARQUETIPO (familia) — más
-            sólida estadísticamente; el conmutador baja al detalle por producto (IT-13). */}
-        {vis.has('dash-rotation') && (
-          <div className="dash-panel" data-testid="dash-rotation">
-            <div className="dash-toggle" role="tablist" aria-label="Nivel de rotación">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={rotationLevel === 'archetype'}
-                className={rotationLevel === 'archetype' ? 'is-active' : ''}
-                onClick={() => setRotationLevel('archetype')}
-                data-testid="rotation-by-archetype"
-              >
-                Arquetipo
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={rotationLevel === 'product'}
-                className={rotationLevel === 'product' ? 'is-active' : ''}
-                onClick={() => setRotationLevel('product')}
-                data-testid="rotation-by-product"
-              >
-                Producto
-              </button>
+              })()}
+              <div className="dash-stockout-foot">
+                <span>Venta perdida est.</span>
+                <strong className="dash-lost">
+                  {fmtEur(stockoutKpis.data?.estimatedLostSales)}
+                </strong>
+              </div>
             </div>
-            <h3>Rotación</h3>
-            <p className="dash-panel-sub">
-              {PERIOD_SUBTITLE[period]} ·{' '}
-              {rotationLevel === 'archetype'
-                ? 'por arquetipo · media/día sobre días con tienda abierta'
-                : 'por producto · unidades, días sin venta y evolución'}
-            </p>
-            <ul className="dash-rotation-list">
-              {(rotationLevel === 'archetype'
-                ? (archetypeRotation.data ?? []).map((a) => ({
-                    key: a.familyId ?? 'none',
-                    label: a.familyName,
-                    sub: `${a.productCount} productos · ${fmtNum(a.ventaMediaDiaria, 1)} ud/día`,
-                    units: a.units,
-                    days: a.daysSinceLastSale,
-                    trend: a.trend,
-                    isNew: false,
-                    archeAvg: null as number | null,
-                  }))
-                : (rotation.data ?? []).map((p) => ({
-                    key: p.productId,
-                    label: p.name,
-                    sub: null as string | null,
-                    units: p.units,
-                    days: p.daysSinceLastSale,
-                    trend: p.trend,
-                    isNew: p.isNew,
-                    archeAvg: p.archetypeAvgDaily,
-                  }))
-              ).map((r) => (
-                <li key={r.key} className="dash-rotation-row">
-                  <span className="dash-rotation-name">
-                    {r.label}
-                    {r.sub && <span className="dash-rotation-arch"> · {r.sub}</span>}
-                    {r.isNew && <span className="dash-new-tag">nuevo</span>}
-                  </span>
-                  <span className="dash-rotation-units">{fmtNum(r.units, 0)} ud</span>
-                  <span className="dash-rotation-days">
-                    {/* Producto nuevo: su día-a-día propio es poco fiable → mostramos la
-                      referencia de su arquetipo (IT-15). */}
-                    {r.isNew && r.archeAvg != null
-                      ? `~${fmtNum(r.archeAvg, 1)}/día · arquetipo`
-                      : r.days == null
-                        ? 'sin ventas'
-                        : r.days <= 0
-                          ? 'hoy'
-                          : `hace ${r.days} d`}
-                  </span>
-                  <span className="dash-rotation-spark">
-                    {r.trend.length > 1 && (
-                      <Sparkline data={r.trend} tone="brand" height={28} ariaLabel="Evolución" />
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+          ),
+        };
 
-        {/* Fichajes de hoy (preset Equipo, D-08): jornadas registradas hoy. */}
-        {vis.has('dash-timeclock') && (
-          <div className="dash-panel" data-testid="dash-timeclock">
-            <h3>Fichajes de hoy</h3>
-            <p className="dash-panel-sub">
-              {storeId ? 'Tienda filtrada' : 'Todas las tiendas'} · entrada, salida y tiempo
-              trabajado
-            </p>
-            {(() => {
-              const rows = timeclockToday.data ?? [];
-              if (rows.length === 0) {
-                return <p className="catalog-empty">Nadie ha fichado hoy todavía.</p>;
-              }
-              return (
-                <ul className="dash-timeclock-list">
-                  {rows.map((r) => (
-                    <li key={`${r.userId}-${r.storeId}`} className="dash-timeclock-row">
-                      <span className="dash-timeclock-name">{r.userName}</span>
-                      <span className="dash-timeclock-store">{r.storeName}</span>
-                      <span className="dash-timeclock-times tabular-nums">
-                        {hhmm(r.firstIn)} → {r.lastOut ? hhmm(r.lastOut) : 'en curso'}
-                      </span>
-                      <span className="dash-timeclock-worked tabular-nums">
-                        {fmtMinutes(msToMin(r.workedMs))}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              );
-            })()}
-          </div>
-        )}
-      </div>
+      // Rankings: pestaña inicial según el preset (D-08). span-5 en Ventas para
+      // completar fila con "Ventas por hora"; span-7 en Beneficio/Inventario.
+      case 'rank-sales':
+        return { span: 5, node: rankingsNode('sales') };
+      case 'rank-margin':
+        return { span: 7, node: rankingsNode('margin') };
+      case 'rank-rotation':
+        return { span: 7, node: rankingsNode('rotation') };
 
-      {/* I-17/D-06: la tabla de ventas ya no se embebe — el dashboard cierra
-          con el acceso a la page de Ventas (DataTable completo). */}
-      <footer className="dash-foot">
+      // Lotes por caducar (I-16/D-08b, preset Inventario).
+      case 'dash-expiring':
+        return {
+          span: 7,
+          node: (
+            <div className="dash-panel" data-testid="dash-expiring">
+              <header className="dash-panel-head">
+                <h3>Lotes por caducar</h3>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => onNavigate?.('stock')}
+                  data-testid="dash-expiring-link"
+                >
+                  Ver stock →
+                </button>
+              </header>
+              <p className="dash-panel-sub">Caducados y próximos a caducar</p>
+              {(() => {
+                const rows = (expiring.data ?? []).slice(0, 6);
+                if (rows.length === 0) {
+                  return <p className="catalog-empty">Nada caduca pronto.</p>;
+                }
+                return (
+                  <ul className="dash-stockout-list">
+                    {rows.map((b) => (
+                      <li
+                        key={b.id}
+                        className={`dash-stockout-item lvl-${b.status === 'expired' ? 'red' : 'yellow'}`}
+                        data-testid="dash-expiring-row"
+                      >
+                        <span className="dash-stockout-info">
+                          <span className="dash-stockout-name">{b.productName}</span>
+                          <span className="dash-stockout-store">
+                            {b.storeName} · lote {b.lotCode} · {b.quantity} ud
+                          </span>
+                        </span>
+                        <span className="dash-stockout-tag">
+                          {EXPIRY_LABEL[b.status]} · {expiryDaysText(b.daysToExpiry)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            </div>
+          ),
+        };
+
+      // Pedidos de compra pendientes (I-16/D-08b, preset Inventario).
+      case 'dash-purchase-orders':
+        return {
+          span: 5,
+          node: (
+            <div className="dash-panel" data-testid="dash-purchase-orders">
+              <header className="dash-panel-head">
+                <h3>Pedidos de compra</h3>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => onNavigate?.('suppliers')}
+                  data-testid="dash-po-link"
+                >
+                  Ver proveedores →
+                </button>
+              </header>
+              <p className="dash-panel-sub">Pendientes de recibir</p>
+              {(() => {
+                const rows = (purchaseOrders.data ?? [])
+                  .filter((o) => o.status !== 'RECEIVED')
+                  .slice(0, 6);
+                if (rows.length === 0) {
+                  return <p className="catalog-empty">Sin pedidos pendientes.</p>;
+                }
+                return (
+                  <ul className="dash-po-list">
+                    {rows.map((o) => (
+                      <li key={o.id} className="dash-po-row" data-testid="dash-po-row">
+                        <span className="dash-po-info">
+                          <span className="dash-po-supplier">
+                            {o.supplier?.name ?? 'Proveedor'}
+                          </span>
+                          <span className="dash-po-meta">
+                            {df.format(new Date(o.createdAt))} · {o.lines.length}{' '}
+                            {o.lines.length === 1 ? 'línea' : 'líneas'}
+                          </span>
+                        </span>
+                        <Badge
+                          variant={
+                            o.status === 'DRAFT'
+                              ? 'muted'
+                              : o.status === 'PARTIALLY_RECEIVED'
+                                ? 'warning'
+                                : 'default'
+                          }
+                        >
+                          {STATUS_LABEL[o.status]}
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            </div>
+          ),
+        };
+
+      // Ventas por hora (STAT-02): card de UN día concreto, navegable por arrastre.
+      case 'dash-hour':
+        return {
+          span: 7,
+          node: (
+            <div className="dash-panel dash-panel--fill" data-testid="dash-hour">
+              <header className="dash-panel-head">
+                <div className="dash-panel-titles">
+                  <h3>Ventas por hora</h3>
+                  <p className="dash-panel-sub">{formatHourDay(hourDay)}</p>
+                </div>
+                <div className="dash-bars-controls">
+                  <DaySelector value={hourDay} onChange={setHourDay} />
+                  <ChartKindToggle
+                    chartKind={hourKind}
+                    setChartKind={(k) => setChartKind('hour', k)}
+                  />
+                </div>
+              </header>
+              <HourChart data={byHour.data ?? []} chartKind={hourKind} />
+            </div>
+          ),
+        };
+
+      // Ventas por vendedor (preset Equipo, D-08): facturación por empleado.
+      case 'dash-sales-emp':
+        return {
+          span: 7,
+          node: (
+            <div className="dash-panel" data-testid="dash-sales-emp">
+              <h3>Ventas por vendedor</h3>
+              <p className="dash-panel-sub">{PERIOD_SUBTITLE[period]} · facturación por empleado</p>
+              {(() => {
+                const emps = salesByEmp.data ?? [];
+                if (emps.length === 0) {
+                  return <p className="catalog-empty">Sin ventas en el periodo.</p>;
+                }
+                const max = Math.max(1, ...emps.map((e) => e.total));
+                return (
+                  <ul className="dash-family-list">
+                    {emps.map((e, i) => (
+                      <li key={e.userId} style={{ '--i': i } as React.CSSProperties}>
+                        <span className="dash-family-name">
+                          {e.userName}
+                          <span className="dash-rotation-arch"> · {e.salesCount} tickets</span>
+                        </span>
+                        <span className="dash-family-track">
+                          <span
+                            className="dash-family-fill"
+                            style={{ width: `${(e.total / max) * 100}%` }}
+                          />
+                          <span className="dash-family-pct">{fmtEur(e.total)}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            </div>
+          ),
+        };
+
+      // Descuento medio por empleado (STAT-04).
+      case 'dash-discount-emp':
+        return {
+          span: 5,
+          node: (
+            <div className="dash-panel" data-testid="dash-discount-emp">
+              <h3>Descuento por empleado</h3>
+              <p className="dash-panel-sub">
+                {PERIOD_SUBTITLE[period]} · descuento voluntario medio (sin promociones)
+              </p>
+              {(() => {
+                const emps = discountByEmp.data ?? [];
+                const max = Math.max(0.0001, ...emps.map((e) => e.avgDiscountPct));
+                return (
+                  <ul className="dash-family-list">
+                    {emps.map((e, i) => (
+                      <li key={e.userId} style={{ '--i': i } as React.CSSProperties}>
+                        <span className="dash-family-name">{e.userName}</span>
+                        <span className="dash-family-track">
+                          <span
+                            className="dash-family-fill"
+                            style={{ width: `${(e.avgDiscountPct / max) * 100}%` }}
+                          >
+                            <span className="dash-family-pct">{fmtRate(e.avgDiscountPct)}</span>
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            </div>
+          ),
+        };
+
+      // Comparativa de proveedores (I-16/D-08b, preset Beneficio).
+      case 'dash-suppliers':
+        return {
+          span: 12,
+          node: (
+            <div className="dash-panel" data-testid="dash-suppliers">
+              <header className="dash-panel-head">
+                <h3>Comparativa de proveedores</h3>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => onNavigate?.('suppliers')}
+                  data-testid="dash-suppliers-link"
+                >
+                  Ver proveedores →
+                </button>
+              </header>
+              <p className="dash-panel-sub">Precios de compra por proveedor · mejor marcado</p>
+              {(() => {
+                const rows = (supplierComparison.data ?? [])
+                  .filter((r) => r.prices.length > 0)
+                  .slice(0, 6);
+                if (rows.length === 0) {
+                  return (
+                    <p className="catalog-empty">
+                      Sin tarifas de proveedor todavía. Impórtalas en Proveedores.
+                    </p>
+                  );
+                }
+                return (
+                  <ul className="dash-suppliers-list">
+                    {rows.map((r) => (
+                      <li
+                        key={r.productId}
+                        className="dash-suppliers-row"
+                        data-testid="dash-suppliers-row"
+                      >
+                        <span className="dash-suppliers-name">{r.productName}</span>
+                        <span className="sp-price-chips">
+                          {r.prices.map((pr) => (
+                            <span
+                              key={pr.supplierId}
+                              className={`sp-price-chip${r.best?.supplierId === pr.supplierId ? ' is-best' : ''}`}
+                            >
+                              {pr.supplierName}: {fmtEur(pr.price)}
+                            </span>
+                          ))}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            </div>
+          ),
+        };
+
+      // Rotación (STAT-05/06): por arquetipo por defecto; conmutador a producto (IT-13).
+      case 'dash-rotation':
+        return {
+          span: 12,
+          node: (
+            <div className="dash-panel" data-testid="dash-rotation">
+              <div className="dash-toggle" role="tablist" aria-label="Nivel de rotación">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={rotationLevel === 'archetype'}
+                  className={rotationLevel === 'archetype' ? 'is-active' : ''}
+                  onClick={() => setRotationLevel('archetype')}
+                  data-testid="rotation-by-archetype"
+                >
+                  Arquetipo
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={rotationLevel === 'product'}
+                  className={rotationLevel === 'product' ? 'is-active' : ''}
+                  onClick={() => setRotationLevel('product')}
+                  data-testid="rotation-by-product"
+                >
+                  Producto
+                </button>
+              </div>
+              <h3>Rotación</h3>
+              <p className="dash-panel-sub">
+                {PERIOD_SUBTITLE[period]} ·{' '}
+                {rotationLevel === 'archetype'
+                  ? 'por arquetipo · media/día sobre días con tienda abierta'
+                  : 'por producto · unidades, días sin venta y evolución'}
+              </p>
+              <ul className="dash-rotation-list">
+                {(rotationLevel === 'archetype'
+                  ? (archetypeRotation.data ?? []).map((a) => ({
+                      key: a.familyId ?? 'none',
+                      label: a.familyName,
+                      sub: `${a.productCount} productos · ${fmtNum(a.ventaMediaDiaria, 1)} ud/día`,
+                      units: a.units,
+                      days: a.daysSinceLastSale,
+                      trend: a.trend,
+                      isNew: false,
+                      archeAvg: null as number | null,
+                    }))
+                  : (rotation.data ?? []).map((p) => ({
+                      key: p.productId,
+                      label: p.name,
+                      sub: null as string | null,
+                      units: p.units,
+                      days: p.daysSinceLastSale,
+                      trend: p.trend,
+                      isNew: p.isNew,
+                      archeAvg: p.archetypeAvgDaily,
+                    }))
+                ).map((r) => (
+                  <li key={r.key} className="dash-rotation-row">
+                    <span className="dash-rotation-name">
+                      {r.label}
+                      {r.sub && <span className="dash-rotation-arch"> · {r.sub}</span>}
+                      {r.isNew && <span className="dash-new-tag">nuevo</span>}
+                    </span>
+                    <span className="dash-rotation-units">{fmtNum(r.units, 0)} ud</span>
+                    <span className="dash-rotation-days">
+                      {r.isNew && r.archeAvg != null
+                        ? `~${fmtNum(r.archeAvg, 1)}/día · arquetipo`
+                        : r.days == null
+                          ? 'sin ventas'
+                          : r.days <= 0
+                            ? 'hoy'
+                            : `hace ${r.days} d`}
+                    </span>
+                    <span className="dash-rotation-spark">
+                      {r.trend.length > 1 && (
+                        <Sparkline data={r.trend} tone="brand" height={28} ariaLabel="Evolución" />
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ),
+        };
+
+      // Fichajes de hoy (preset Equipo, D-08): jornadas registradas hoy.
+      case 'dash-timeclock':
+        return {
+          span: 12,
+          node: (
+            <div className="dash-panel" data-testid="dash-timeclock">
+              <h3>Fichajes de hoy</h3>
+              <p className="dash-panel-sub">
+                {storeId ? 'Tienda filtrada' : 'Todas las tiendas'} · entrada, salida y tiempo
+                trabajado
+              </p>
+              {(() => {
+                const rows = timeclockToday.data ?? [];
+                if (rows.length === 0) {
+                  return <p className="catalog-empty">Nadie ha fichado hoy todavía.</p>;
+                }
+                return (
+                  <ul className="dash-timeclock-list">
+                    {rows.map((r) => (
+                      <li key={`${r.userId}-${r.storeId}`} className="dash-timeclock-row">
+                        <span className="dash-timeclock-name">{r.userName}</span>
+                        <span className="dash-timeclock-store">{r.storeName}</span>
+                        <span className="dash-timeclock-times tabular-nums">
+                          {hhmm(r.firstIn)} → {r.lastOut ? hhmm(r.lastOut) : 'en curso'}
+                        </span>
+                        <span className="dash-timeclock-worked tabular-nums">
+                          {fmtMinutes(msToMin(r.workedMs))}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            </div>
+          ),
+        };
+
+      default:
+        return null;
+    }
+  };
+
+  // Nodo de un elemento del tablero por id (tarjeta KPI o panel).
+  const renderItem = (id: string): React.ReactNode => {
+    const card = cardDefs.find((c) => c.id === id);
+    return card ? card.node : (renderPanel(id)?.node ?? null);
+  };
+
+  // Acciones de modo: toggle Cuadrícula/Libre + «Personalizar» (este último solo en
+  // cuadrícula con contenido). Se renderiza en la cabecera flotante en modo Libre y en el
+  // cluster sticky en Cuadrícula (solo una de las dos a la vez → el editToggleRef no choca).
+  const modeActions = (
+    <>
+      <div
+        className="dash-mode-switch"
+        role="tablist"
+        aria-label="Modo del dashboard"
+        data-testid="dash-mode"
+      >
         <button
           type="button"
-          className="link-btn"
-          onClick={() => onNavigate?.('sales')}
-          data-testid="dash-to-sales"
+          role="tab"
+          aria-selected={mode === 'grid'}
+          className={mode === 'grid' ? 'is-active' : ''}
+          onClick={() => setMode('grid')}
+          data-testid="dash-mode-grid"
         >
-          Ver todas las ventas →
+          <LayoutGrid size={14} aria-hidden="true" />
+          Cuadrícula
         </button>
-      </footer>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'free'}
+          className={mode === 'free' ? 'is-active' : ''}
+          onClick={() => setMode('free')}
+          data-testid="dash-mode-free"
+        >
+          <Move size={14} aria-hidden="true" />
+          Libre
+        </button>
+      </div>
+      {mode === 'grid' && !(isCustomPreset && effectiveItemIds.length === 0) && (
+        <button
+          ref={editToggleRef}
+          type="button"
+          className="dash-edit-toggle"
+          onClick={startEditing}
+          data-testid="dash-edit-toggle"
+        >
+          <LayoutGrid size={15} aria-hidden="true" />
+          Personalizar
+        </button>
+      )}
+    </>
+  );
+
+  return (
+    <section
+      className={`catalog${editing ? ' is-editing-board' : ''}${mode === 'free' ? ' dashboard--free' : ''}`}
+      data-testid="dashboard"
+    >
+      {/* Lienzo de puntos a pantalla completa durante la edición (detrás del contenido;
+          el sidebar/topbar lo tapan en sus zonas por su mayor z-index). Permanece montado
+          mientras sale (dotsLeaving) para reproducir la animación inversa antes de quitarlo. */}
+      {(editing || dotsLeaving) && (
+        <div
+          className={`dash-dots${!editing && dotsLeaving ? ' dash-dots--leaving' : ''}`}
+          data-testid="dash-dots"
+          aria-hidden="true"
+          onAnimationEnd={() => {
+            if (dotsLeaving) setDotsLeaving(false);
+          }}
+        />
+      )}
+      <header className="catalog-head is-actions-only dash-head">
+        <div className="catalog-actions">
+          {editing ? (
+            // Barra del modo edición: chip de contexto + pista, separador y acciones
+            // (Restablecer/Cancelar tipo ghost · Guardar primario).
+            <div className="dash-edit-bar" data-testid="dash-edit-bar">
+              <span className="dash-edit-lead-icon" aria-hidden="true">
+                <Move size={16} />
+              </span>
+              {/* role=status: el lector de pantalla anuncia que se ha entrado en modo edición. */}
+              <span className="dash-edit-hint" role="status">
+                <strong>Editando el panel</strong>
+              </span>
+              <span className="dash-edit-sep" aria-hidden="true" />
+              <div className="dash-edit-actions">
+                <button
+                  type="button"
+                  className="dash-edit-btn"
+                  onClick={undoRemove}
+                  disabled={draftHidden.length === 0}
+                  data-testid="dash-edit-undo"
+                >
+                  <Undo2 size={15} aria-hidden="true" />
+                  Deshacer
+                </button>
+                <button
+                  type="button"
+                  className="dash-edit-btn"
+                  onClick={resetEditing}
+                  data-testid="dash-edit-reset"
+                >
+                  <RotateCcw size={15} aria-hidden="true" />
+                  Restablecer
+                </button>
+                <button
+                  type="button"
+                  className="dash-edit-btn"
+                  onClick={cancelEditing}
+                  data-testid="dash-edit-cancel"
+                >
+                  <X size={15} aria-hidden="true" />
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="dash-edit-btn is-primary"
+                  onClick={saveEditing}
+                  data-testid="dash-edit-save"
+                >
+                  <Check size={15} aria-hidden="true" />
+                  Guardar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Selector de preset en la cabecera (D-08c): cambiar de foco = 1 clic. */}
+              <div
+                className="dash-preset-switch"
+                role="tablist"
+                aria-label="Preset del dashboard"
+                data-testid="dash-preset"
+              >
+                {PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={preset.id === p.id}
+                    className={preset.id === p.id ? 'is-active' : ''}
+                    onClick={() => setPreset(p.id)}
+                    data-testid={`dash-preset-${p.id}`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <Select
+                className="dash-period-select"
+                value={period}
+                onChange={(value) => {
+                  setPeriod(value as DashboardPeriod);
+                  saveDashboardDefault({ period: value as DashboardPeriod });
+                }}
+                ariaLabel="Periodo"
+                data-testid="dash-period"
+                options={PERIODS.map((p) => ({ value: p.id, label: p.label }))}
+              />
+              <Select
+                className="dash-store"
+                value={storeId}
+                onChange={(value) => {
+                  setStoreId(value);
+                  saveDashboardDefault({ storeId: value });
+                }}
+                ariaLabel="Tienda"
+                data-testid="dash-store"
+                options={[
+                  { value: '', label: 'Todas las tiendas' },
+                  ...stores.map((s) => ({ value: s.id, label: s.name })),
+                ]}
+              />
+              {/* En modo Libre el toggle vive en la cabecera flotante centrada (en Cuadrícula
+                  va en el cluster sticky de abajo). */}
+              {mode === 'free' && <div className="dash-head-right">{modeActions}</div>}
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* Cuadrícula: el grupo [Cuadrícula·Libre] + Personalizar NO vive en la cabecera (que ya
+          no es sticky ni pinta fondo y se va con el scroll); es un cluster sticky propio,
+          pegado arriba-derecha mientras recorres el dashboard. (En Libre va en la cabecera
+          flotante centrada, ver más arriba en el header.) */}
+      {!editing && mode === 'grid' && <div className="dash-sticky-actions">{modeActions}</div>}
+
+      {/* D-20: dos modos. El div del tablero permanece SIEMPRE en el DOM para que
+          useContainerWidth mida el ancho correcto al volver a cuadrícula (sin él, boardWidth
+          sería 0 al montar y las cards aparecerían aplastadas). Se oculta via CSS cuando no
+          estamos en cuadrícula. El lienzo libre (FreeBoard) se monta/desmonta según el modo. */}
+      <div
+        ref={boardRef}
+        className={`dash-board${editing ? ' is-editing' : ''}`}
+        data-testid="dash-board"
+        style={
+          mode !== 'grid'
+            ? {
+                visibility: 'hidden',
+                height: 0,
+                minHeight: 0,
+                overflow: 'hidden',
+                pointerEvents: 'none',
+              }
+            : undefined
+        }
+      >
+        {boardMounted &&
+          mode === 'grid' &&
+          (isCustomPreset && effectiveItemIds.length === 0 ? (
+            // Estado vacío de Personalizado en cuadrícula: maqueta-fantasma que comunica que
+            // estás componiendo un tablero en rejilla, con un CTA para abrir el buscador.
+            <div className="dash-custom-empty" data-testid="dash-custom-grid-empty">
+              <div className="dash-custom-empty-inner">
+                {/* Mini-maqueta de cuadrícula: tres KPI arriba, un gráfico ancho y un panel. */}
+                <div className="dash-custom-ghost" aria-hidden="true">
+                  <span className="dash-ghost-tile" style={{ '--d': 0 } as React.CSSProperties} />
+                  <span className="dash-ghost-tile" style={{ '--d': 1 } as React.CSSProperties} />
+                  <span className="dash-ghost-tile" style={{ '--d': 2 } as React.CSSProperties} />
+                  <span
+                    className="dash-ghost-tile dash-ghost-tile--wide dash-ghost-tile--accent"
+                    style={{ '--d': 3 } as React.CSSProperties}
+                  />
+                  <span
+                    className="dash-ghost-tile dash-ghost-tile--tall"
+                    style={{ '--d': 4 } as React.CSSProperties}
+                  />
+                  <span
+                    className="dash-ghost-tile dash-ghost-tile--panel"
+                    style={{ '--d': 5 } as React.CSSProperties}
+                  />
+                </div>
+                <h2 className="dash-custom-empty-title">Diseña tu panel a medida</h2>
+                <p className="dash-custom-empty-text">
+                  Añade las tarjetas y gráficas que necesites y colócalas en la cuadrícula. Cámbiate
+                  a <strong>Libre</strong> para moverlas a cualquier sitio.
+                </p>
+                {customGridPaletteOpen ? (
+                  <WidgetPalette
+                    variant="center"
+                    items={customGridAvailable}
+                    label={boardItemLabel}
+                    onPick={onAddCustomGridWidget}
+                    onClose={() => setCustomGridPaletteOpen(false)}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="dash-custom-empty-cta"
+                    data-testid="dash-custom-grid-add"
+                    onClick={() => setCustomGridPaletteOpen(true)}
+                  >
+                    <Plus size={18} aria-hidden="true" />
+                    Agregar widgets
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <Responsive
+              width={boardWidth}
+              breakpoints={BOARD_BREAKPOINTS}
+              cols={BOARD_COLS_BY_BP}
+              rowHeight={BOARD_ROW_HEIGHT}
+              margin={BOARD_MARGIN}
+              containerPadding={BOARD_CONTAINER_PADDING}
+              // Sin compactación (las cards se quedan donde las sueltas, con huecos permitidos)
+              // pero con preventCollision: soltar sobre una celda ocupada devuelve la card a su
+              // sitio en vez de solaparse. Nunca se ocultan unas bajo otras.
+              compactor={BOARD_COMPACTOR}
+              layouts={layoutsWithMode(activeLayouts)}
+              onLayoutChange={onBoardLayoutChange}
+              onBreakpointChange={(bp) => setBoardBreakpoint(bp)}
+            >
+              {visibleItemIds.map((id) => (
+                <div
+                  key={id}
+                  className={`dash-tile${editing ? ' is-editing' : ''}`}
+                  {...(editing
+                    ? {
+                        tabIndex: 0,
+                        role: 'button',
+                        'aria-label': `${boardItemLabel(id)}. Usa las flechas para moverla en el tablero.`,
+                        onKeyDown: (e: React.KeyboardEvent) => onTileKeyDown(id, e),
+                      }
+                    : {})}
+                >
+                  {/* En edición: botón para quitar la card del tablero (con deshacer en la barra). */}
+                  {editing && (
+                    <button
+                      type="button"
+                      className="dash-tile-remove"
+                      data-testid={`dash-tile-remove-${id}`}
+                      aria-label={`Quitar ${boardItemLabel(id)}`}
+                      title="Quitar del tablero"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeTile(id);
+                      }}
+                    >
+                      <X size={13} aria-hidden="true" />
+                    </button>
+                  )}
+                  {renderItem(id)}
+                </div>
+              ))}
+            </Responsive>
+          ))}
+      </div>
+
+      {mode === 'free' && (
+        <FreeBoard
+          key={preset.id}
+          elements={savedFree}
+          renderItem={renderItem}
+          itemLabel={boardItemLabel}
+          onChange={onFreeChange}
+          {...(layout.freeViews?.[preset.id] ? { initialView: layout.freeViews[preset.id] } : {})}
+          onViewChange={onFreeViewChange}
+        />
+      )}
+
+      {/* I-17/D-06: la tabla de ventas ya no se embebe — el dashboard cierra
+          con el acceso a la page de Ventas (DataTable completo). En «Personalizado»
+          (lienzo a medida del usuario) no aplica: el acceso a Ventas sobra. */}
+      {!isCustomPreset && (
+        <footer className="dash-foot">
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => onNavigate?.('sales')}
+            data-testid="dash-to-sales"
+          >
+            Ver todas las ventas →
+          </button>
+        </footer>
+      )}
+
+      {/* Personalizado en Cuadrícula con widgets: botón «+» circular flotante para seguir
+          añadiendo (en el estado vacío el CTA central ya cubre la primera vez). */}
+      {mode === 'grid' && isCustomPreset && effectiveItemIds.length > 0 && (
+        <div className="dash-custom-fab" data-testid="dash-custom-fab">
+          {customGridPaletteOpen && (
+            <WidgetPalette
+              items={customGridAvailable}
+              label={boardItemLabel}
+              onPick={onAddCustomGridWidget}
+              onClose={() => setCustomGridPaletteOpen(false)}
+            />
+          )}
+          <button
+            type="button"
+            className="dash-custom-fab-btn"
+            data-testid="dash-custom-fab-add"
+            aria-label="Agregar widgets"
+            aria-expanded={customGridPaletteOpen}
+            onClick={() => setCustomGridPaletteOpen((o) => !o)}
+          >
+            <Plus size={24} aria-hidden="true" />
+          </button>
+        </div>
+      )}
     </section>
   );
 }
@@ -1246,6 +1820,7 @@ function ChartKindToggle({
         className={chartKind === 'bars' ? 'is-active' : ''}
         onClick={() => setChartKind('bars')}
         data-testid="dash-chart-kind-bars"
+        aria-label="Barras"
         title="Barras"
       >
         <BarChart2 size={15} aria-hidden="true" />
@@ -1257,6 +1832,7 @@ function ChartKindToggle({
         className={chartKind === 'line' ? 'is-active' : ''}
         onClick={() => setChartKind('line')}
         data-testid="dash-chart-kind-line"
+        aria-label="Línea"
         title="Línea"
       >
         <LineChart size={15} aria-hidden="true" />
@@ -1276,6 +1852,7 @@ const HOUR_FIRST = 7;
 const HOUR_VISIBLE = 11; // 7..17 visibles por defecto
 const HOUR_COL_MIN = 42; // ancho mínimo por franja → barra cómoda (~24px)
 const HOUR_KEY_FRACTION = 0.45; // cuánto del ancho visible avanza cada flecha del teclado
+const HOUR_CHART_MIN_H = 180; // alto mínimo del gráfico (fallback hasta medir el tile)
 
 function HourChart({ data, chartKind }: { data: SalesByHour[]; chartKind: 'bars' | 'line' }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1285,6 +1862,9 @@ function HourChart({ data, chartKind }: { data: SalesByHour[]; chartKind: 'bars'
   // Pulgar de la barra fina (en % del ancho de la pista) y estado de arrastre (cursor).
   const [thumb, setThumb] = useState({ left: 0, width: 100 });
   const [dragging, setDragging] = useState(false);
+  // Alto del gráfico: llena el alto disponible del tile (lo mide el ResizeObserver) para no
+  // dejar hueco inferior. Arranca en un fallback razonable hasta la primera medida.
+  const [chartH, setChartH] = useState(HOUR_CHART_MIN_H);
   // Origen del arrastre activo: el lienzo (grab-to-pan) o el pulgar de la barra.
   const panFrom = useRef<number | null>(null);
   const thumbFrom = useRef<number | null>(null);
@@ -1313,6 +1893,9 @@ function HourChart({ data, chartKind }: { data: SalesByHour[]; chartKind: 'bars'
     const size = (): void => {
       const col = Math.max(HOUR_COL_MIN, el.clientWidth / HOUR_VISIBLE);
       track.style.width = `${24 * col}px`;
+      // El scroll es flex:1 (min-height:0): su clientHeight es el alto que el tile deja
+      // libre bajo la cabecera (y sobre la barra fina). El gráfico se dimensiona a él.
+      if (el.clientHeight > 0) setChartH(Math.max(HOUR_CHART_MIN_H, el.clientHeight));
       if (!didScroll.current) {
         el.scrollLeft = HOUR_FIRST * col;
         didScroll.current = true;
@@ -1429,7 +2012,7 @@ function HourChart({ data, chartKind }: { data: SalesByHour[]; chartKind: 'bars'
           <Chart
             className="dash-hour-chart"
             data={hours}
-            height={200}
+            height={chartH}
             formatValue={fmtEurCompact}
             kind={chartKind}
             showGrid={false}

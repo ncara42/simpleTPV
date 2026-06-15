@@ -28,26 +28,8 @@
 }
 
 /* ════════════════════════════════════════════════════════════
-   BANDA DE KPIs
+   TARJETAS KPI (ahora tiles del tablero; la rejilla la gestiona react-grid-layout)
    ════════════════════════════════════════════════════════════ */
-.dash-cards {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 0.85rem;
-  margin-bottom: 1.5rem;
-}
-
-@media (max-width: 1100px) {
-  .dash-cards {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 640px) {
-  .dash-cards {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
 
 /* Wrapper relativo: la card conserva overflow:hidden (recorta la sparkline) y el chip
    de tendencia se posiciona como overlay a caballo del borde superior sin recortarse.
@@ -176,35 +158,17 @@
 }
 
 /* ════════════════════════════════════════════════════════════
-   REJILLA EDITORIAL DE PANELES (12 columnas)
+   PANELES (ahora tiles del tablero; ancho/alto/colocación los da react-grid-layout)
    ════════════════════════════════════════════════════════════ */
-.dash-grid {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: 1rem;
-}
-
+/* El panel ya no es el hijo directo de un grid CSS: es el contenido de un tile del
+   tablero (.dash-tile) que lo rellena. Aquí solo su superficie. */
 .dash-panel {
   position: relative; /* ancla leyendas/controles en la esquina del panel */
-  grid-column: span 12;
   padding: 1.4rem 1.5rem;
   border: 1px solid var(--ui-border);
   border-radius: 18px;
   background: var(--ui-surface);
   min-width: 0;
-}
-.dash-panel.span-7 {
-  grid-column: span 7;
-}
-.dash-panel.span-5 {
-  grid-column: span 5;
-}
-
-@media (max-width: 1000px) {
-  .dash-panel.span-7,
-  .dash-panel.span-5 {
-    grid-column: span 12;
-  }
 }
 
 .dash-panel h3 {
@@ -271,6 +235,26 @@
   /* A sangre: cancela el padding horizontal de la card (1.5rem) para que las franjas
      entren y salgan justo por los filos del panel en vez de respetar el margen. */
   margin-inline: -1.5rem;
+}
+/* El panel de "Ventas por hora" llena el alto del tile: cabecera arriba, gráfico
+   estirado (mide su alto y se dibuja a él) y barra fina al pie. Sin hueco inferior. */
+.dash-panel--fill {
+  display: flex;
+  flex-direction: column;
+}
+.dash-panel--fill .dash-hour-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: -0.2rem;
+}
+.dash-panel--fill .dash-hour-scroll {
+  flex: 1;
+  min-height: 0;
+}
+.dash-panel--fill .dash-hour-track {
+  height: 100%;
 }
 .dash-hour-scroll {
   overflow-x: auto;
@@ -1076,4 +1060,1361 @@
   justify-content: center;
   margin-top: 1rem;
   padding: 0.5rem 0;
+}
+
+/* ════════════════════════════════════════════════════════════
+   PERSONALIZAR (D-19): tablero 2D con snap (react-grid-layout v2)
+   Modo edición: cada card/panel se coloca en 2D. El preset sigue
+   dictando QUÉ aparece; aquí solo se decide DÓNDE.
+   ════════════════════════════════════════════════════════════ */
+
+/* Botón "Personalizar" en la cabecera: pill coherente con el resto de controles. */
+.dash-edit-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: calc(30px + 0.36rem + 2px);
+  padding: 0 0.85rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.dash-edit-toggle:hover {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface-subtle);
+}
+.dash-edit-toggle svg {
+  flex: none;
+  color: var(--ui-text-soft);
+}
+
+/* ── Barra del modo edición ────────────────────────────────────────────────────
+   Misma ALTURA, diseño (píldora con borde, sin sombra) y posición que la barra de
+   controles del dashboard, para que conmutar a «Personalizar» no salte: chip de icono
+   con acento + etiqueta en una línea, separador hairline y acciones (ghost + Guardar). */
+.dash-edit-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: calc(30px + 0.36rem + 2px);
+  padding: 0 0.4rem 0 0.5rem;
+  box-sizing: border-box;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  animation: dash-edit-in 0.3s var(--ui-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+.dash-edit-lead-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background: var(--ui-brand-soft, rgba(0, 102, 204, 0.08));
+  color: var(--ui-primary);
+}
+.dash-edit-hint {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+.dash-edit-hint strong {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+}
+.dash-edit-hint span {
+  font-size: 0.78rem;
+  letter-spacing: -0.005em;
+  color: var(--ui-text-muted);
+}
+.dash-edit-sep {
+  align-self: stretch;
+  width: 1px;
+  margin: 0.4rem 0.1rem;
+  background: var(--ui-border);
+}
+.dash-edit-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.dash-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 1.75rem;
+  padding: 0 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease,
+    transform 0.14s ease,
+    box-shadow 0.14s ease;
+}
+.dash-edit-btn:hover {
+  background: var(--ui-surface-subtle);
+}
+.dash-edit-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.dash-edit-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.dash-edit-btn:disabled:hover {
+  background: transparent;
+}
+.dash-edit-btn svg {
+  flex: none;
+  color: var(--ui-text-soft);
+}
+.dash-edit-btn.is-primary {
+  padding: 0 1.05rem;
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg);
+}
+.dash-edit-btn.is-primary svg {
+  color: currentColor;
+}
+.dash-edit-btn.is-primary:hover {
+  background: var(--ui-primary-hover, var(--ui-primary));
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--ui-primary) 30%, transparent);
+}
+.dash-edit-btn.is-primary:active {
+  transform: translateY(0);
+}
+@keyframes dash-edit-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-edit-bar {
+    animation: none;
+  }
+}
+
+/* ── Tablero (react-grid-layout v2) ──
+   Cada tile (.react-grid-item) lo posiciona RGL con un transform inline; la card/panel
+   real rellena el tile en alto y ancho. RGL fija el alto del tile (filas × rowHeight). */
+.dash-board {
+  position: relative;
+  width: 100%;
+  /* Nunca colapsa a 0px: un preset sin composición (p. ej. «Personalizado» en cuadrícula)
+     conserva alto visible en vez de desaparecer. */
+  min-height: 8rem;
+}
+/* Que el chip de tendencia de las KPI pueda asomar por el borde del tile (como antes). */
+.dash-board .react-grid-item {
+  overflow: visible;
+}
+.dash-tile {
+  display: flex;
+  min-width: 0;
+}
+.dash-tile > * {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+/* Los paneles hacen scroll vertical interno si su contenido excede el alto del tile
+   (clip horizontal para no sacar barra con el sangrado de "Ventas por hora"). La barra
+   se oculta (igual que las listas de familia) para no ensuciar el tile. */
+.dash-tile > .dash-panel {
+  overflow: hidden auto;
+  scrollbar-width: none;
+}
+.dash-tile > .dash-panel::-webkit-scrollbar {
+  display: none;
+}
+
+/* Transición de colocación de RGL; el item que se arrastra va por encima. */
+.dash-board .react-grid-item.cssTransforms {
+  transition-property: transform;
+}
+.dash-board .react-grid-item.react-draggable-dragging {
+  z-index: 5;
+  cursor: grabbing;
+}
+.dash-board .react-grid-item.react-draggable-dragging .dash-card,
+.dash-board .react-grid-item.react-draggable-dragging .dash-panel {
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.18);
+  border-color: var(--ui-border-strong);
+}
+/* Placeholder (hueco donde caerá el item): superficie tenue con el acento de marca. */
+.dash-board .react-grid-placeholder {
+  background: color-mix(in srgb, var(--ui-primary) 16%, transparent);
+  border: 1.5px dashed var(--ui-primary);
+  border-radius: 18px;
+  opacity: 1;
+}
+
+/* ── Modo edición ── */
+/* Lienzo de rejilla de puntos a PANTALLA COMPLETA (solo al personalizar). Va fijo detrás
+   de todo a z-index 0; el sidebar (fixed, z-index 30) y el topbar (sticky, z-index 20) lo
+   tapan en sus zonas, así que los puntos solo se ven en el área de contenido. El contenido
+   del dashboard se sube a z-index 1 para quedar por encima. */
+.dash-dots {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  --dot: color-mix(in srgb, var(--ui-text-muted) 40%, transparent);
+  background-image: radial-gradient(var(--dot) 1.5px, transparent 1.6px);
+  background-size: 24px 24px;
+  background-position: -1px -1px;
+  /* Aparece con una transición suave al entrar en «Personalizar» (se monta con el modo). */
+  animation: dash-dots-in 0.4s var(--ui-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+/* Fade + leve acercamiento del retículo (transform/opacity → compositor-friendly). */
+@keyframes dash-dots-in {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/* Salida (al Guardar/Cancelar): la misma animación pero inversa. */
+.dash-dots--leaving {
+  animation: dash-dots-out 0.4s var(--ui-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+@keyframes dash-dots-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-dots,
+  .dash-dots--leaving {
+    animation: none;
+  }
+}
+.catalog.is-editing-board > header,
+.catalog.is-editing-board > .dash-board,
+.catalog.is-editing-board > footer {
+  position: relative;
+  z-index: 1;
+}
+/* El tile invita a arrastrar (grab) y desactiva la interacción interna del contenido
+   para que TODO el tile sea superficie de arrastre. */
+.dash-tile.is-editing {
+  cursor: grab;
+}
+.dash-tile.is-editing > * {
+  pointer-events: none;
+  user-select: none;
+}
+/* D-21: botón para quitar la card en edición. MISMO diseño que el «×» del Modo Libre
+   (.dash-free-remove): círculo discreto que aparece al pasar el ratón y se vuelve danger
+   suave al hover. Exento del pointer-events:none del tile (debe ser clicable). */
+.dash-tile-remove {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  z-index: 4;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.12s ease,
+    color 0.12s ease,
+    background 0.12s ease;
+}
+.dash-tile.is-editing > .dash-tile-remove {
+  pointer-events: auto;
+}
+.dash-tile.is-editing:hover .dash-tile-remove,
+.dash-tile.is-editing:focus-within .dash-tile-remove {
+  opacity: 1;
+}
+.dash-tile-remove:hover {
+  background: var(--ui-danger-soft, var(--ui-surface-subtle));
+  color: var(--ui-danger, var(--ui-text));
+}
+.dash-tile-remove:focus-visible {
+  opacity: 1;
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+/* En edición el tile entero se arrastra: el panel no hace scroll. La KPI conserva
+   overflow visible (su chip de tendencia asoma por el borde y no debe recortarse). */
+.dash-tile.is-editing > .dash-panel {
+  overflow: hidden;
+}
+/* Borde discontinuo sobre la card/panel; al pasar el ratón se OSCURECE y se COLOREA. */
+.dash-tile.is-editing .dash-card,
+.dash-tile.is-editing .dash-panel {
+  outline: 1.5px dashed var(--ui-border-strong);
+  outline-offset: -1px;
+  transition:
+    outline-color 0.15s ease,
+    filter 0.15s ease;
+}
+.dash-tile.is-editing:hover .dash-card,
+.dash-tile.is-editing:hover .dash-panel {
+  outline-color: var(--ui-primary);
+  filter: brightness(0.95);
+}
+
+/* Temblor estilo iOS sobre el CONTENIDO (no el tile, que lleva el transform de RGL).
+   Pausado en el item que se arrastra. */
+.dash-tile.is-editing .dash-card,
+.dash-tile.is-editing .dash-panel {
+  transform-origin: center;
+  animation: dash-wiggle 0.55s ease-in-out infinite;
+}
+.dash-board .react-grid-item.react-draggable-dragging .dash-card,
+.dash-board .react-grid-item.react-draggable-dragging .dash-panel {
+  animation: none;
+}
+@keyframes dash-wiggle {
+  0%,
+  100% {
+    transform: rotate(-0.45deg);
+  }
+  50% {
+    transform: rotate(0.45deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-board .react-grid-item.cssTransforms,
+  .dash-board .react-grid-item.react-draggable-dragging {
+    transition: none !important;
+  }
+  .dash-tile.is-editing .dash-card,
+  .dash-tile.is-editing .dash-panel {
+    animation: none;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   MODO LIBRE (D-20): lienzo edgeless con zoom/pan, estilo Affine
+   ════════════════════════════════════════════════════════════ */
+
+/* Toggle Cuadrícula | Libre: mismo lenguaje que el switch de presets, empujado a la
+   derecha de la cabecera ("arriba a la derecha"). */
+/* Grupo de acciones al extremo derecho de la cabecera (Personalizar + modo). */
+/* La fila de controles ocupa todo el ancho para que margin-left:auto del grupo de la
+   derecha (modo + Personalizar) lo empuje al extremo del contenedor, separándolo del
+   resto de píldoras (presets/periodo/tienda). flex-wrap evita que se monte en estrecho. */
+.dash-head .catalog-actions {
+  width: 100%;
+  flex-wrap: wrap;
+}
+.dash-head-right {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.dash-mode-switch {
+  display: inline-flex;
+  gap: 0.15rem;
+  padding: 0.18rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface-subtle);
+}
+.dash-mode-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 1.8rem;
+  border: none;
+  background: none;
+  padding: 0.28rem 0.8rem;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.dash-mode-switch button svg {
+  flex: none;
+}
+.dash-mode-switch button.is-active {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+/* Viewport del lienzo: recorta, recibe gestos y pinta la rejilla de puntos (que sigue al
+   pan/zoom vía background-position/size en estilo inline). Alto generoso del área visible. */
+.dash-free {
+  position: relative;
+  overflow: hidden;
+  height: calc(100vh - 12rem);
+  min-height: 460px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg, 18px);
+  background-color: var(--ui-surface-subtle);
+  --dot: color-mix(in srgb, var(--ui-text-muted) 38%, transparent);
+  background-image: radial-gradient(var(--dot) 1.5px, transparent 1.6px);
+  touch-action: none;
+  cursor: grab;
+  overscroll-behavior: contain;
+}
+.dash-free:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+/* Mundo transformable (translate·scale). transform-origin 0 0 es imprescindible para que
+   la matemática screen = world·zoom + pan cuadre. */
+.dash-free-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+/* Card del lienzo: posicionada por translate en px de MUNDO; el scale del mundo la escala.
+   El contenido es inerte para que el arrastre funcione sobre los gráficos. */
+.dash-free-item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.dash-free-item:focus-visible {
+  outline: 2px solid var(--ui-primary);
+  outline-offset: 3px;
+  border-radius: 18px;
+}
+.dash-free-item-body {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+/* La card/panel rellena el item; los paneles recortan su contenido (sin scrollbar). */
+.dash-free-item-body > * {
+  width: 100%;
+  height: 100%;
+}
+.dash-free-item-body > .dash-panel {
+  overflow: hidden;
+}
+
+/* Controles de zoom flotantes (abajo a la derecha del lienzo). */
+.dash-free-zoom {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.25rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.08);
+}
+.dash-free-zoom button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.9rem;
+  height: 1.9rem;
+  padding: 0 0.4rem;
+  border: none;
+  background: none;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.dash-free-zoom button:hover {
+  background: var(--ui-surface-subtle);
+}
+.dash-free-zoom-pct {
+  min-width: 3rem;
+}
+
+/* ── Lienzo libre: edición (toolbar, paleta), notas, minimapa y orientación ── */
+
+/* Envoltorio: la toolbar de edición vive encima del viewport del lienzo. */
+.dash-free-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* Barra de acciones del lienzo (añadir widget/nota, deshacer, ordenar). */
+.dash-free-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.dash-free-toolbar-add {
+  position: relative;
+}
+.dash-free-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ui-text);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.dash-free-tool:hover {
+  background: var(--ui-surface-subtle);
+  border-color: var(--ui-border-strong, var(--ui-border));
+}
+.dash-free-tool:active {
+  box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.1);
+}
+.dash-free-tool:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.dash-free-tool:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Popover de "añadir widget". */
+.dash-free-palette {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 5;
+  width: 16rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  padding: 0.4rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: var(--ui-surface);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.16);
+}
+.dash-free-palette-empty {
+  margin: 0;
+  padding: 0.6rem;
+  font-size: 0.82rem;
+  color: var(--ui-text-muted);
+}
+.dash-free-palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.dash-free-palette-list button {
+  width: 100%;
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  font-size: 0.84rem;
+  color: var(--ui-text);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+.dash-free-palette-list button:hover {
+  background: var(--ui-surface-subtle);
+}
+.dash-free-palette-list button:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* Botón quitar (×): aparece al pasar por encima del elemento. */
+.dash-free-remove {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.12s ease,
+    color 0.12s ease,
+    background 0.12s ease;
+}
+.dash-free-item:hover .dash-free-remove,
+.dash-free-item:focus-within .dash-free-remove {
+  opacity: 1;
+}
+.dash-free-remove:hover {
+  background: var(--ui-danger-soft, var(--ui-surface-subtle));
+  color: var(--ui-danger, var(--ui-text));
+}
+.dash-free-remove:focus-visible {
+  opacity: 1;
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* Nota: tarjeta con cabecera arrastrable y cuerpo (editor) interactivo. */
+.dash-free-item--note {
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-note-bg, #fff7d6);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.1);
+  /* SIN overflow:hidden: recortaba el «×» (a -9px, por fuera de la card). El redondeo se
+     mantiene redondeando cabecera (arriba) y cuerpo (abajo) por separado. */
+}
+.dash-free-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+  background: rgb(0 0 0 / 0.05);
+  border-radius: 11px 11px 0 0;
+  cursor: grab;
+  touch-action: none;
+}
+.dash-free-note-header:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.dash-free-note-grip {
+  width: 2.2rem;
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(0 0 0 / 0.22);
+}
+.dash-free-note-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* Recorta el contenido del editor a las esquinas inferiores redondeadas (antes lo hacía
+     el overflow:hidden del item, ahora retirado para no recortar el «×»). */
+  border-radius: 0 0 11px 11px;
+  overflow: hidden;
+}
+.dash-free-note-rte {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dash-free-note-toolbar {
+  display: flex;
+  gap: 0.15rem;
+  padding: 0.25rem 0.35rem;
+  border-bottom: 1px solid rgb(0 0 0 / 0.08);
+}
+.dash-free-note-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--ui-text);
+  cursor: pointer;
+}
+.dash-free-note-toolbar button:hover {
+  background: rgb(0 0 0 / 0.08);
+}
+.dash-free-note-toolbar button.is-active {
+  background: var(--ui-primary, #2563eb);
+  color: var(--ui-primary-fg, #fff);
+}
+.dash-free-note-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.86rem;
+  line-height: 1.4;
+  color: var(--ui-text);
+}
+.dash-free-note-content:focus {
+  outline: none;
+}
+.dash-free-note-content p {
+  margin: 0 0 0.35rem;
+}
+.dash-free-note-content ul,
+.dash-free-note-content ol {
+  margin: 0 0 0.35rem;
+  padding-left: 1.1rem;
+}
+.dash-free-note-loading {
+  padding: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--ui-text-muted);
+}
+
+/* Minimapa (esquina superior derecha del lienzo). */
+.dash-free-minimap {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ui-surface) 88%, transparent);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.08);
+  overflow: hidden;
+  cursor: pointer;
+}
+.dash-free-minimap-item {
+  position: absolute;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ui-text-muted) 45%, transparent);
+}
+.dash-free-minimap-item--note {
+  background: color-mix(in srgb, var(--ui-warning, #d9a400) 60%, transparent);
+}
+.dash-free-minimap-view {
+  position: absolute;
+  border: 1.5px solid var(--ui-primary, #2563eb);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ui-primary, #2563eb) 12%, transparent);
+  pointer-events: none;
+}
+
+/* Flecha de orientación: pegada a un margen, apunta al contenido fuera de vista. */
+.dash-free-arrow {
+  position: absolute;
+  z-index: 4;
+  width: 2.1rem;
+  height: 2.1rem;
+  translate: -50% -50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 9999px;
+  background: var(--ui-primary, #2563eb);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
+  cursor: pointer;
+}
+.dash-free-arrow::after {
+  content: '';
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 6px 0 6px 10px;
+  border-color: transparent transparent transparent var(--ui-primary-fg, #fff);
+}
+.dash-free-arrow:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* ── Pill horizontal de herramientas de dibujo (encima de la barra inferior) ── */
+.dash-free-draw-pill {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--ui-surface) 86%, transparent);
+  box-shadow: 0 8px 26px rgb(0 0 0 / 0.14);
+  backdrop-filter: blur(12px);
+}
+.dash-free-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: var(--ui-text);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.dash-free-tool-btn:hover {
+  background: var(--ui-surface-subtle);
+}
+.dash-free-tool-btn.is-active {
+  background: var(--ui-primary, #2563eb);
+  color: var(--ui-primary-fg, #fff);
+}
+.dash-free-tool-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.dash-free-tools-sep {
+  width: 1px;
+  height: 1.4rem;
+  margin: 0 0.25rem;
+  background: var(--ui-border);
+}
+.dash-free-swatch {
+  width: 1.3rem;
+  height: 1.3rem;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--ui-border);
+}
+.dash-free-swatch.is-active {
+  border-color: var(--ui-text);
+}
+.dash-free-swatch:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* En modo dibujo: cursor de cruz y elementos inertes para que el gesto llegue al fondo. */
+.dash-free--drawing {
+  cursor: crosshair;
+}
+.dash-free--drawing .dash-free-item {
+  pointer-events: none;
+}
+
+/* SVG de formas/dibujos: ocupa la caja sin recortar puntas de flecha/strokes al borde. */
+.dash-free-shape-svg {
+  display: block;
+  overflow: visible;
+}
+.dash-free-draft {
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+/* ── Texto libre ── */
+.dash-free-item--text {
+  cursor: grab;
+}
+.dash-free-item--text.is-editing {
+  cursor: text;
+}
+.dash-free-text-view,
+.dash-free-text-input {
+  width: 100%;
+  margin: 0;
+  padding: 0.1rem 0.15rem;
+  font-family: inherit;
+  line-height: 1.3;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.dash-free-text-view {
+  pointer-events: none;
+  min-height: 1em;
+}
+.dash-free-text-placeholder {
+  color: var(--ui-text-soft);
+}
+.dash-free-text-input {
+  border: 1px dashed var(--ui-primary, #2563eb);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ui-surface) 92%, transparent);
+  resize: none;
+  overflow: hidden;
+  min-height: 2em;
+  outline: none;
+}
+
+/* ── Modo libre a PANTALLA COMPLETA del viewport ──
+   La PROPIA section es la capa fija que ocupa todo el viewport (por encima del chrome de la
+   app: sidebar z-30, topbar z-20). Así no colapsa a 0px aunque sus hijos sean overlays. El
+   shell la rellena y los controles flotan por encima en píldoras de cristal: dashboard
+   arriba-centro, toolbar abajo-centro, herramientas izq-centro, minimapa abajo-izq, zoom abajo-der. */
+.dashboard--free {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  /* La section .catalog se centra con max-width + margin auto: anúlalo para cubrir el viewport. */
+  width: auto;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: var(--ui-surface-subtle);
+}
+.dashboard--free .dash-free-shell {
+  position: absolute;
+  inset: 0;
+  gap: 0;
+}
+.dashboard--free .dash-free {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+}
+.dashboard--free .dash-foot {
+  display: none;
+}
+
+/* Píldora de cristal compartida por los clústeres flotantes. */
+.dashboard--free .catalog-actions,
+.dashboard--free .dash-free-toolbar {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--ui-surface) 84%, transparent);
+  box-shadow: 0 8px 26px rgb(0 0 0 / 0.14);
+  backdrop-filter: blur(12px);
+}
+
+/* Controles del dashboard (preset · periodo · tienda · modo) flotando arriba-centro. La
+   cabecera normal estira los hijos a lo ancho (margin-left:auto en el toggle de modo); aquí
+   la píldora se ciñe a su contenido en UNA fila. */
+.dashboard--free .catalog-head {
+  position: absolute;
+  top: 0.85rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  width: max-content;
+  max-width: calc(100vw - 1.5rem);
+  margin: 0;
+  padding: 0;
+}
+.dashboard--free .catalog-actions {
+  width: auto;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 0.45rem;
+}
+/* Sin crecer/encoger ni `margin-left:auto`: el toggle de modo no salta de línea. */
+.dashboard--free .catalog-actions > * {
+  margin: 0;
+  flex: none;
+}
+
+/* Toolbar de edición del lienzo flotando abajo-centro. */
+.dashboard--free .dash-free-toolbar {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  flex-wrap: nowrap;
+}
+/* La barra está abajo: la paleta de «Widget» debe abrir HACIA ARRIBA (anclada encima del
+   botón), no hacia abajo (donde quedaría fuera del lienzo y no se vería nada). */
+.dashboard--free .dash-free-toolbar-add .dash-free-palette {
+  top: auto;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
+}
+
+/* Pill de dibujo flotando justo encima de la barra inferior (centrado). */
+.dashboard--free .dash-free-draw-pill {
+  position: absolute;
+  bottom: 4.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+}
+
+/* Minimapa a abajo-izquierda para no chocar con los controles superiores. */
+.dashboard--free .dash-free-minimap {
+  top: auto;
+  bottom: 1rem;
+  left: 1rem;
+  right: auto;
+}
+
+/* La cabecera (presets · periodo · tienda) NO es sticky ni pinta fondo: se va con el scroll
+   como el resto del contenido. Solo el cluster de acciones (Cuadrícula/Libre + Personalizar)
+   permanece pegado arriba (.dash-sticky-actions). */
+.catalog:not(.dashboard--free) .dash-head {
+  margin-bottom: 0.75rem;
+  /* Reserva la franja derecha donde se superpone el cluster sticky de acciones, para que
+     los controles de la izquierda (presets/periodo/tienda) no queden tapados por él. */
+  padding-right: 21rem;
+}
+@media (max-width: 900px) {
+  .catalog:not(.dashboard--free) .dash-head {
+    padding-right: 0;
+  }
+}
+/* En edición SÍ se fija la cabecera (solo la pill «Editando el panel», que es opaca y no
+   necesita banda) para no perder Guardar/Cancelar al recorrer un panel largo. */
+.catalog.is-editing-board .dash-head {
+  position: sticky;
+  top: calc(64px + 0.85rem);
+  z-index: 19;
+  padding-right: 0;
+}
+
+/* Cluster sticky de acciones: hijo de .catalog (alto → persiste todo el scroll). Se ancla
+   bajo el topbar (64px) DEJANDO un hueco para que no quede pegado a él al scrollear. Se
+   superpone a la fila de la cabecera con un margin-top negativo (sin empujar el contenido);
+   el resto de la fila deja pasar el ratón. */
+.catalog:not(.dashboard--free) .dash-sticky-actions {
+  position: sticky;
+  top: calc(64px + 0.85rem);
+  z-index: 19;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.6rem;
+  /* Sube el cluster a la MISMA línea que las pills del header: descuenta la altura de la
+     fila del header (≈ altura de pill) + su margin-bottom. */
+  margin-top: calc(-1 * (30px + 0.36rem + 2px) - 0.75rem);
+  margin-bottom: 0.75rem;
+  pointer-events: none;
+}
+.catalog:not(.dashboard--free) .dash-sticky-actions > * {
+  pointer-events: auto;
+}
+/* En modo libre el cluster no aplica (la cabecera ya es un overlay flotante con su toggle). */
+.dashboard--free .dash-sticky-actions {
+  display: none;
+}
+
+/* ── Estado vacío del lienzo (preset «Personalizado» o lienzo vaciado): "+" central que
+   abre el buscador de widgets. No se transforma con pan/zoom (es ayuda fija del viewport). ── */
+.dash-free-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  pointer-events: none;
+}
+.dash-free-empty-add {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border: 1.5px dashed var(--ui-border-strong, var(--ui-border));
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  box-shadow: 0 6px 22px rgb(0 0 0 / 0.1);
+  transition:
+    transform 0.14s ease,
+    color 0.14s ease,
+    border-color 0.14s ease;
+}
+.dash-free-empty-add:hover {
+  transform: translateY(-2px);
+  color: var(--ui-primary, #2563eb);
+  border-color: var(--ui-primary, #2563eb);
+}
+.dash-free-empty-add:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.dash-free-empty-hint {
+  pointer-events: none;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ui-text-muted);
+}
+
+/* ── Estado vacío de «Personalizado» en Cuadrícula ─────────────────────────────
+   Maqueta-fantasma (mini-tablero de tiles punteados) + título, copy y CTA azul.
+   A diferencia de .dash-free-empty (overlay del lienzo), ocupa flujo propio con
+   alto generoso para tener presencia, no apretarse en el min-height del tablero. */
+.dash-custom-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: clamp(360px, 56vh, 580px);
+  padding: 2rem 1.25rem;
+}
+.dash-custom-empty-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 30rem;
+  animation: dash-custom-rise 0.5s var(--ui-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+/* Mini-maqueta: rejilla 3×3 de tiles punteados que evoca un dashboard real. */
+.dash-custom-ghost {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  width: 13.5rem;
+  margin-bottom: 1.75rem;
+}
+.dash-ghost-tile {
+  height: 1.9rem;
+  border: 1.5px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm, 8px);
+  background: color-mix(in srgb, var(--ui-surface) 60%, transparent);
+  /* Entrada escalonada por tile (--d = índice) tras el bloque contenedor. */
+  opacity: 0;
+  animation: dash-ghost-pop 0.42s var(--ui-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation-delay: calc(0.12s + var(--d, 0) * 0.06s);
+}
+.dash-ghost-tile--wide {
+  grid-column: span 2;
+  height: 3.4rem;
+}
+.dash-ghost-tile--tall {
+  height: 3.4rem;
+}
+.dash-ghost-tile--panel {
+  grid-column: span 3;
+  height: 2.2rem;
+}
+/* Un tile tintado de azul: ancla el acento y sugiere "aquí va tu contenido". */
+.dash-ghost-tile--accent {
+  border-color: color-mix(in srgb, var(--ui-primary) 45%, var(--ui-border-strong));
+  background: var(--ui-brand-soft, rgba(0, 102, 204, 0.08));
+}
+
+.dash-custom-empty-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: -0.018em;
+  color: var(--ui-text);
+}
+.dash-custom-empty-text {
+  margin: 0 0 1.6rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--ui-text-muted);
+}
+.dash-custom-empty-text strong {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+
+/* CTA primario: relleno Action Blue, con elevación sutil al hover (transform/opacity). */
+.dash-custom-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.6rem;
+  padding: 0 1.35rem;
+  border: none;
+  border-radius: 9999px;
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg, #fff);
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition:
+    transform 0.16s var(--ui-ease-out, ease),
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.dash-custom-empty-cta:hover {
+  background: var(--ui-primary-hover, var(--ui-primary));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--ui-primary) 28%, transparent);
+}
+.dash-custom-empty-cta:active {
+  transform: translateY(0);
+}
+.dash-custom-empty-cta:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.dash-custom-empty-cta svg {
+  flex: none;
+}
+
+@keyframes dash-custom-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes dash-ghost-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-custom-empty-inner,
+  .dash-ghost-tile {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* ── FAB «+» para seguir añadiendo widgets (Personalizado · Cuadrícula con contenido) ──
+   Botón circular flotante abajo-derecha; al pulsarlo despliega la paleta de widgets
+   ANCLADA encima del botón (no debajo, para no salirse por el borde inferior). */
+.dash-custom-fab {
+  position: fixed;
+  right: 2rem;
+  bottom: 2rem;
+  z-index: 30;
+}
+.dash-custom-fab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border: none;
+  border-radius: 9999px;
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg, #fff);
+  cursor: pointer;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--ui-primary) 34%, transparent);
+  transition:
+    transform 0.16s var(--ui-ease-out, ease),
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.dash-custom-fab-btn:hover {
+  background: var(--ui-primary-hover, var(--ui-primary));
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--ui-primary) 42%, transparent);
+}
+.dash-custom-fab-btn:active {
+  transform: translateY(0) scale(1);
+}
+.dash-custom-fab-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.dash-custom-fab-btn svg {
+  transition: transform 0.2s var(--ui-ease-out, ease);
+}
+.dash-custom-fab-btn[aria-expanded='true'] svg {
+  transform: rotate(45deg);
+}
+/* La paleta cuelga ENCIMA y alineada a la derecha del FAB. */
+.dash-custom-fab .dash-free-palette {
+  top: auto;
+  bottom: calc(100% + 0.6rem);
+  left: auto;
+  right: 0;
+}
+
+/* Buscador dentro de la paleta de widgets + variante centrada (estado vacío). */
+.dash-free-palette--center {
+  pointer-events: auto;
+  position: static;
+  width: 20rem;
+  max-height: 50vh;
+}
+.dash-free-palette-search {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  margin-bottom: 0.3rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.dash-free-palette-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 0.86rem;
+  color: var(--ui-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-mode-switch button,
+  .dash-free-zoom button,
+  .dash-free-tool,
+  .dash-free-remove,
+  .dash-free-empty-add {
+    transition: none;
+  }
 }
