@@ -220,7 +220,9 @@ export function DashboardPage({
   // personalizable DENTRO de cada preset (no cambia qué aparece, solo en qué orden).
   const { prefs, setPref, loaded: prefsLoaded } = usePreferences();
   const layout = readPref<LayoutPref>(prefs, 'dashboard.layout', {});
-  const preset = PRESETS.find((p) => p.id === layout.preset) ?? PRESETS[0]!;
+  // Default = 'ventas' (no PRESETS[0], que ahora es 'personalizado' y va vacío).
+  const preset =
+    PRESETS.find((p) => p.id === layout.preset) ?? PRESETS.find((p) => p.id === 'ventas')!;
   const vis = new Set([...preset.cards, ...preset.panels]);
   // Elementos del preset (cards + paneles) y su colocación 2D. La COMPOSICIÓN la dicta el
   // preset; aquí solo se coloca en el tablero y se persiste por preset (D-19). El layout
@@ -527,7 +529,14 @@ export function DashboardPage({
 
   // Ocultar/mostrar SOLO afecta al preset activo (D-03): se escribe entera la
   // lista efectiva de ocultos del preset en dashboard.layout.
-  const setPreset = (id: PresetId): void => setPref('dashboard.layout', { ...layout, preset: id });
+  const setPreset = (id: PresetId): void =>
+    setPref('dashboard.layout', {
+      ...layout,
+      preset: id,
+      // 'Personalizado' es un lienzo en blanco: por naturaleza es modo libre, así que al
+      // elegirlo entramos en Libre (en la MISMA escritura, sin competir con otro PUT).
+      ...(id === 'personalizado' ? { mode: 'free' as DashboardMode } : {}),
+    });
   // D-20: cambio de modo (grid/libre). Al cambiar de modo salimos de la edición del grid
   // (editing/draft son conceptos del tablero RGL, no del lienzo libre).
   const setMode = (m: DashboardMode): void => {
@@ -1232,7 +1241,7 @@ export function DashboardPage({
       {/* Lienzo de puntos a pantalla completa durante la edición (detrás del contenido;
           el sidebar/topbar lo tapan en sus zonas por su mayor z-index). */}
       {editing && <div className="dash-dots" data-testid="dash-dots" aria-hidden="true" />}
-      <header className="catalog-head is-actions-only">
+      <header className="catalog-head is-actions-only dash-head">
         <div className="catalog-actions">
           {editing ? (
             // Barra de acciones del modo edición: pista + Restablecer / Cancelar / Guardar.
@@ -1317,49 +1326,53 @@ export function DashboardPage({
                   ...stores.map((s) => ({ value: s.id, label: s.name })),
                 ]}
               />
-              {/* "Personalizar" solo en cuadrícula (en Libre las cards ya son arrastrables). */}
-              {mode === 'grid' && (
-                <button
-                  ref={editToggleRef}
-                  type="button"
-                  className="dash-edit-toggle"
-                  onClick={startEditing}
-                  data-testid="dash-edit-toggle"
+              {/* Acciones de la derecha (Personalizar + modo): agrupadas al extremo derecho y
+                  sticky con la cabecera, para poder cambiar de modo o editar a mitad de scroll. */}
+              <div className="dash-head-right">
+                {/* "Personalizar" solo en cuadrícula (en Libre las cards ya son arrastrables). */}
+                {mode === 'grid' && (
+                  <button
+                    ref={editToggleRef}
+                    type="button"
+                    className="dash-edit-toggle"
+                    onClick={startEditing}
+                    data-testid="dash-edit-toggle"
+                  >
+                    <LayoutGrid size={15} aria-hidden="true" />
+                    Personalizar
+                  </button>
+                )}
+                {/* D-20: modo de presentación. Cuadrícula = tablero con snap; Libre = lienzo
+                    edgeless con zoom/pan y colocación a píxel. */}
+                <div
+                  className="dash-mode-switch"
+                  role="tablist"
+                  aria-label="Modo del dashboard"
+                  data-testid="dash-mode"
                 >
-                  <LayoutGrid size={15} aria-hidden="true" />
-                  Personalizar
-                </button>
-              )}
-              {/* D-20: modo de presentación, arriba a la derecha. Cuadrícula = tablero con
-                  snap; Libre = lienzo edgeless con zoom/pan y colocación a píxel. */}
-              <div
-                className="dash-mode-switch"
-                role="tablist"
-                aria-label="Modo del dashboard"
-                data-testid="dash-mode"
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === 'grid'}
-                  className={mode === 'grid' ? 'is-active' : ''}
-                  onClick={() => setMode('grid')}
-                  data-testid="dash-mode-grid"
-                >
-                  <LayoutGrid size={14} aria-hidden="true" />
-                  Cuadrícula
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === 'free'}
-                  className={mode === 'free' ? 'is-active' : ''}
-                  onClick={() => setMode('free')}
-                  data-testid="dash-mode-free"
-                >
-                  <Move size={14} aria-hidden="true" />
-                  Libre
-                </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === 'grid'}
+                    className={mode === 'grid' ? 'is-active' : ''}
+                    onClick={() => setMode('grid')}
+                    data-testid="dash-mode-grid"
+                  >
+                    <LayoutGrid size={14} aria-hidden="true" />
+                    Cuadrícula
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === 'free'}
+                    className={mode === 'free' ? 'is-active' : ''}
+                    onClick={() => setMode('free')}
+                    data-testid="dash-mode-free"
+                  >
+                    <Move size={14} aria-hidden="true" />
+                    Libre
+                  </button>
+                </div>
               </div>
             </>
           )}

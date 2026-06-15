@@ -4,7 +4,7 @@
 // preset, vía "Personalizar" (tablero arrastrable con snap a la rejilla), persistida por
 // preset en la preferencia `dashboard.layout`.
 
-export type PresetId = 'ventas' | 'beneficio' | 'inventario' | 'equipo';
+export type PresetId = 'personalizado' | 'ventas' | 'beneficio' | 'inventario' | 'equipo';
 
 // Cards con toggle barras↔línea independiente. El tipo de gráfico es LOCAL a cada card.
 export type ChartCard = 'sales' | 'hour';
@@ -20,6 +20,14 @@ export interface PresetDef {
 // cerrado en informe_decisiones. 'ventas' es el default. El preset activo persiste en
 // la preferencia `dashboard.layout` (D-03).
 export const PRESETS: PresetDef[] = [
+  {
+    // Lienzo en blanco: el usuario compone su dashboard desde cero (modo libre). Empieza
+    // VACÍO; en el lienzo aparece un "+" central para buscar y añadir widgets.
+    id: 'personalizado',
+    label: 'Personalizado',
+    cards: [],
+    panels: [],
+  },
   {
     id: 'ventas',
     label: 'Ventas',

@@ -115,6 +115,7 @@ export function FreeBoard({ elements, renderItem, itemLabel, onChange }: FreeBoa
   const [drawOpen, setDrawOpen] = useState(false);
   const [drawColor, setDrawColor] = useState<string>(DRAW_COLORS[0]!);
   const [draft, setDraft] = useState<FreeShape | FreeDraw | null>(null);
+  const [emptyPaletteOpen, setEmptyPaletteOpen] = useState(false);
 
   // Espejos síncronos para listeners no-React (wheel) y handlers de gesto (sin closures viejos).
   const viewRef = useRef(view);
@@ -727,6 +728,35 @@ export function FreeBoard({ elements, renderItem, itemLabel, onChange }: FreeBoa
             </div>
           )}
         </div>
+
+        {/* Estado vacío (p. ej. preset «Personalizado»): "+" central que abre el buscador de
+            widgets para componer el lienzo desde cero. */}
+        {els.length === 0 && (
+          <div className="dash-free-empty" data-testid="dash-free-empty">
+            <button
+              type="button"
+              className="dash-free-empty-add"
+              data-testid="dash-free-empty-add"
+              aria-label="Añadir widget"
+              onClick={() => setEmptyPaletteOpen(true)}
+            >
+              <Plus size={30} aria-hidden="true" />
+            </button>
+            <p className="dash-free-empty-hint">Lienzo en blanco · añade los widgets que quieras</p>
+            {emptyPaletteOpen && (
+              <WidgetPalette
+                variant="center"
+                items={available}
+                label={itemLabel}
+                onPick={(id) => {
+                  onAddWidget(id);
+                  setEmptyPaletteOpen(false);
+                }}
+                onClose={() => setEmptyPaletteOpen(false)}
+              />
+            )}
+          </div>
+        )}
 
         {/* Flecha de orientación off-screen: persiste mientras el contenido no se vea. */}
         {arrow && (

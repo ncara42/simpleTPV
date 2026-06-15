@@ -303,6 +303,11 @@ test('Modo Libre (D-20): toggle a lienzo edgeless, mover una card a píxel y per
   await expect(page.getByTestId('dash-free-zoom')).toBeVisible();
   await expect(page.getByTestId('dash-board')).toHaveCount(0);
 
+  // Normaliza la disposición (Ordenar) para que las cards estén a la vista y a un zoom usable:
+  // robusto frente al "drift" que acumulan las ejecuciones locales repetidas de este test.
+  await page.getByTestId('dash-free-arrange').click();
+  await page.waitForTimeout(400);
+
   // Las cards del preset se pintan en el lienzo (a píxel). Mover "Facturación hoy".
   const item = page.locator('.dash-free-item', { has: page.getByTestId('kpi-today') });
   await expect(item).toBeVisible();
@@ -471,6 +476,40 @@ test('Modo Libre: herramientas de dibujo (forma, lápiz a mano y texto libre)', 
     if (await undoBtn.isDisabled()) break;
     await undoBtn.click();
   }
+  await page.getByTestId('dash-mode-grid').click();
+  await expect(page.getByTestId('dash-board')).toBeVisible();
+});
+
+test('Modo Libre · Personalizado: lienzo vacío con + que abre el buscador de widgets', async ({
+  page,
+}) => {
+  // Seleccionar «Personalizado» entra en modo libre con un lienzo en blanco.
+  await page.getByTestId('dash-preset-personalizado').click();
+  await expect(page.getByTestId('dash-free')).toBeVisible();
+  await expect(page.getByTestId('dash-mode-free')).toHaveAttribute('aria-selected', 'true');
+
+  // Limpia widgets que pudieran haber quedado de ejecuciones previas (estado persistido).
+  const widgets = page.locator('.dash-free-item--widget');
+  for (let n = await widgets.count(); n > 0; n = await widgets.count()) {
+    await widgets.first().locator('.dash-free-remove').dispatchEvent('click');
+    await expect(widgets).toHaveCount(n - 1);
+  }
+
+  // Estado vacío: "+" central.
+  await expect(page.getByTestId('dash-free-empty')).toBeVisible();
+  await page.getByTestId('dash-free-empty-add').click();
+
+  // Buscador: filtra el catálogo y añade un widget.
+  const search = page.getByTestId('dash-free-palette-search');
+  await expect(search).toBeVisible();
+  await search.fill('familia');
+  await page.locator('.dash-free-palette-list button').first().click();
+  await expect(widgets).toHaveCount(1);
+  await expect(page.getByTestId('dash-free-empty')).toHaveCount(0);
+
+  // Limpieza: quita el widget y vuelve a Ventas + Cuadrícula para el resto de tests.
+  await widgets.first().locator('.dash-free-remove').dispatchEvent('click');
+  await page.getByTestId('dash-preset-ventas').click();
   await page.getByTestId('dash-mode-grid').click();
   await expect(page.getByTestId('dash-board')).toBeVisible();
 });

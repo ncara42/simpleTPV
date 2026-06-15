@@ -1131,6 +1131,9 @@
 .dash-board {
   position: relative;
   width: 100%;
+  /* Nunca colapsa a 0px: un preset sin composición (p. ej. «Personalizado» en cuadrícula)
+     conserva alto visible en vez de desaparecer. */
+  min-height: 8rem;
 }
 /* Que el chip de tendencia de las KPI pueda asomar por el borde del tile (como antes). */
 .dash-board .react-grid-item {
@@ -1264,8 +1267,14 @@
 
 /* Toggle Cuadrícula | Libre: mismo lenguaje que el switch de presets, empujado a la
    derecha de la cabecera ("arriba a la derecha"). */
-.dash-mode-switch {
+/* Grupo de acciones al extremo derecho de la cabecera (Personalizar + modo). */
+.dash-head-right {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.dash-mode-switch {
   display: inline-flex;
   gap: 0.15rem;
   padding: 0.18rem;
@@ -1895,11 +1904,110 @@
   right: auto;
 }
 
+/* ── Cabecera sticky (solo en Cuadrícula): se queda pegada bajo el topbar (64px) para
+   poder cambiar de preset/periodo/modo o pulsar Personalizar a mitad de scroll. Sangra a
+   los lados (padding de .bo-main) para un barrido frosted a todo el ancho. En modo libre la
+   cabecera es un overlay flotante (`.dashboard--free .catalog-head`), no sticky. ── */
+.catalog:not(.dashboard--free) .dash-head {
+  position: sticky;
+  top: 64px;
+  z-index: 19;
+  margin-inline: -2.5rem;
+  margin-bottom: 0.75rem;
+  padding: 0.85rem 2.5rem;
+  background: color-mix(in srgb, var(--ui-surface) 80%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--ui-border);
+}
+@media (max-width: 767px) {
+  .catalog:not(.dashboard--free) .dash-head {
+    margin-inline: -1.1rem;
+    padding-inline: 1.1rem;
+  }
+}
+
+/* ── Estado vacío del lienzo (preset «Personalizado» o lienzo vaciado): "+" central que
+   abre el buscador de widgets. No se transforma con pan/zoom (es ayuda fija del viewport). ── */
+.dash-free-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  pointer-events: none;
+}
+.dash-free-empty-add {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border: 1.5px dashed var(--ui-border-strong, var(--ui-border));
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  box-shadow: 0 6px 22px rgb(0 0 0 / 0.1);
+  transition:
+    transform 0.14s ease,
+    color 0.14s ease,
+    border-color 0.14s ease;
+}
+.dash-free-empty-add:hover {
+  transform: translateY(-2px);
+  color: var(--ui-primary, #2563eb);
+  border-color: var(--ui-primary, #2563eb);
+}
+.dash-free-empty-add:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.dash-free-empty-hint {
+  pointer-events: none;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ui-text-muted);
+}
+
+/* Buscador dentro de la paleta de widgets + variante centrada (estado vacío). */
+.dash-free-palette--center {
+  pointer-events: auto;
+  position: static;
+  width: 20rem;
+  max-height: 50vh;
+}
+.dash-free-palette-search {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  margin-bottom: 0.3rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.dash-free-palette-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 0.86rem;
+  color: var(--ui-text);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dash-mode-switch button,
   .dash-free-zoom button,
   .dash-free-tool,
-  .dash-free-remove {
+  .dash-free-remove,
+  .dash-free-empty-add {
     transition: none;
   }
 }

@@ -299,6 +299,21 @@ describe('helpers de añadir/quitar/orden', () => {
   });
 });
 
+describe('preset Personalizado (lienzo vacío)', () => {
+  const custom = PRESETS.find((p) => p.id === 'personalizado')!;
+
+  it('existe y va sin cards ni paneles', () => {
+    expect(custom).toBeDefined();
+    expect(custom.cards).toEqual([]);
+    expect(custom.panels).toEqual([]);
+  });
+
+  it('arranca con un lienzo libre vacío', () => {
+    expect(buildDefaultFreeLayout(custom)).toEqual([]);
+    expect(reconcileFreeLayout([], custom)).toEqual([]);
+  });
+});
+
 describe('herramientas de dibujo (formas, trazos, texto)', () => {
   it('addShape crea una forma con su caja y estilo al frente', () => {
     const layout = addShape(
