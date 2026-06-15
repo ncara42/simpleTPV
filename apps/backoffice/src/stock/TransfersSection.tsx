@@ -257,34 +257,32 @@ function CreateTransferModal({
           </div>
 
           {lines.length > 0 && (
-            <table className="catalog-table" data-testid="transfer-lines">
-              <thead>
-                <tr>
-                  <th>Producto</th>
-                  <th>Cantidad</th>
-                  <th aria-label="Acciones" />
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((l) => (
-                  <tr key={l.productId} data-testid="transfer-line-row">
-                    <td>{productName(l.productId)}</td>
-                    <td>{l.qty}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="link-btn"
-                        onClick={() =>
-                          setLines((prev) => prev.filter((x) => x.productId !== l.productId))
-                        }
-                      >
-                        Quitar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              data-testid="transfer-lines"
+              rowTestId="transfer-line-row"
+              rows={lines}
+              rowKey={(l) => l.productId}
+              columns={[
+                { key: 'product', header: 'Producto', render: (l) => productName(l.productId) },
+                { key: 'qty', header: 'Cantidad', render: (l) => l.qty },
+                {
+                  key: 'actions',
+                  header: '',
+                  align: 'right',
+                  render: (l) => (
+                    <button
+                      type="button"
+                      className="link-btn"
+                      onClick={() =>
+                        setLines((prev) => prev.filter((x) => x.productId !== l.productId))
+                      }
+                    >
+                      Quitar
+                    </button>
+                  ),
+                },
+              ]}
+            />
           )}
 
           <button

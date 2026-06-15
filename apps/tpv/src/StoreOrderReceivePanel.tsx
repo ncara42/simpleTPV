@@ -1,5 +1,5 @@
 import { ApiError, type StoreOrder } from '@simpletpv/auth';
-import { Alert, Button, Select } from '@simpletpv/ui';
+import { Alert, Button, DataTable, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Clock, PackageCheck, X } from 'lucide-react';
 import { useState } from 'react';
@@ -130,69 +130,72 @@ export function StoreOrderReceivePanel() {
               />
             </div>
           </div>
-          {isLoading ? (
-            <p className="catalog-empty">Cargando…</p>
-          ) : orders.length === 0 ? (
-            <p className="catalog-empty" data-testid="store-order-empty">
-              No hay pedidos pendientes de recibir.
-            </p>
-          ) : visibleOrders.length === 0 ? (
-            <p className="catalog-empty" data-testid="store-order-no-results">
-              Sin pedidos que coincidan con el filtro.
-            </p>
-          ) : (
-            <table className="catalog-table" data-testid="store-order-list">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Origen</th>
-                  <th>Líneas</th>
-                  <th>Estado</th>
-                  <th aria-label="Acción" />
-                </tr>
-              </thead>
-              <tbody>
-                {visibleOrders.map((t) => {
+          <DataTable
+            data-testid="store-order-list"
+            rowTestId="store-order-item"
+            rows={visibleOrders}
+            rowKey={(t) => t.id}
+            loading={isLoading}
+            emptyState={
+              orders.length === 0 ? (
+                <span className="catalog-empty" data-testid="store-order-empty">
+                  No hay pedidos pendientes de recibir.
+                </span>
+              ) : (
+                <span className="catalog-empty" data-testid="store-order-no-results">
+                  Sin pedidos que coincidan con el filtro.
+                </span>
+              )
+            }
+            columns={[
+              {
+                key: 'date',
+                header: 'Fecha',
+                render: (t) => <span className="muted">{fmt(t.sentAt ?? t.createdAt)}</span>,
+              },
+              { key: 'origin', header: 'Origen', render: () => 'Central' },
+              { key: 'lines', header: 'Líneas', render: (t) => t.lines.length },
+              {
+                key: 'status',
+                header: 'Estado',
+                render: (t) => {
                   const received = t.status === 'RECEIVED';
                   return (
-                    <tr key={t.id} data-testid="store-order-item">
-                      <td className="muted">{fmt(t.sentAt ?? t.createdAt)}</td>
-                      <td>Central</td>
-                      <td>{t.lines.length}</td>
-                      <td>
-                        <span
-                          className={`order-state ${received ? 'received' : 'pending'}`}
-                          data-testid="store-order-status"
-                        >
-                          <span className="order-state__icon">
-                            {received ? (
-                              <Check size={13} strokeWidth={3} aria-hidden="true" />
-                            ) : (
-                              <Clock size={13} strokeWidth={2.5} aria-hidden="true" />
-                            )}
-                          </span>
-                          {received ? 'Recibido' : 'Pendiente'}
-                        </span>
-                      </td>
-                      <td className="catalog-table__action">
-                        {!received && (
-                          <button
-                            type="button"
-                            className="link-btn link-btn--receive"
-                            onClick={() => openOrder(t)}
-                            data-testid="store-order-open"
-                          >
-                            <PackageCheck size={15} strokeWidth={2.25} aria-hidden="true" />
-                            Recibir
-                          </button>
+                    <span
+                      className={`order-state ${received ? 'received' : 'pending'}`}
+                      data-testid="store-order-status"
+                    >
+                      <span className="order-state__icon">
+                        {received ? (
+                          <Check size={13} strokeWidth={3} aria-hidden="true" />
+                        ) : (
+                          <Clock size={13} strokeWidth={2.5} aria-hidden="true" />
                         )}
-                      </td>
-                    </tr>
+                      </span>
+                      {received ? 'Recibido' : 'Pendiente'}
+                    </span>
                   );
-                })}
-              </tbody>
-            </table>
-          )}
+                },
+              },
+              {
+                key: 'action',
+                header: '',
+                align: 'right',
+                render: (t) =>
+                  t.status !== 'RECEIVED' ? (
+                    <button
+                      type="button"
+                      className="link-btn link-btn--receive"
+                      onClick={() => openOrder(t)}
+                      data-testid="store-order-open"
+                    >
+                      <PackageCheck size={15} strokeWidth={2.25} aria-hidden="true" />
+                      Recibir
+                    </button>
+                  ) : null,
+              },
+            ]}
+          />
         </div>
       </div>
 
