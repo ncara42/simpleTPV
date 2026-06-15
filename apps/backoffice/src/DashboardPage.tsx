@@ -990,7 +990,7 @@ export function DashboardPage({
         return {
           span: 7,
           node: (
-            <div className="dash-panel" data-testid="dash-hour">
+            <div className="dash-panel dash-panel--fill" data-testid="dash-hour">
               <header className="dash-panel-head">
                 <div className="dash-panel-titles">
                   <h3>Ventas por hora</h3>
@@ -1756,6 +1756,7 @@ const HOUR_FIRST = 7;
 const HOUR_VISIBLE = 11; // 7..17 visibles por defecto
 const HOUR_COL_MIN = 42; // ancho mínimo por franja → barra cómoda (~24px)
 const HOUR_KEY_FRACTION = 0.45; // cuánto del ancho visible avanza cada flecha del teclado
+const HOUR_CHART_MIN_H = 180; // alto mínimo del gráfico (fallback hasta medir el tile)
 
 function HourChart({ data, chartKind }: { data: SalesByHour[]; chartKind: 'bars' | 'line' }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1765,6 +1766,9 @@ function HourChart({ data, chartKind }: { data: SalesByHour[]; chartKind: 'bars'
   // Pulgar de la barra fina (en % del ancho de la pista) y estado de arrastre (cursor).
   const [thumb, setThumb] = useState({ left: 0, width: 100 });
   const [dragging, setDragging] = useState(false);
+  // Alto del gráfico: llena el alto disponible del tile (lo mide el ResizeObserver) para no
+  // dejar hueco inferior. Arranca en un fallback razonable hasta la primera medida.
+  const [chartH, setChartH] = useState(HOUR_CHART_MIN_H);
   // Origen del arrastre activo: el lienzo (grab-to-pan) o el pulgar de la barra.
   const panFrom = useRef<number | null>(null);
   const thumbFrom = useRef<number | null>(null);
@@ -1793,6 +1797,9 @@ function HourChart({ data, chartKind }: { data: SalesByHour[]; chartKind: 'bars'
     const size = (): void => {
       const col = Math.max(HOUR_COL_MIN, el.clientWidth / HOUR_VISIBLE);
       track.style.width = `${24 * col}px`;
+      // El scroll es flex:1 (min-height:0): su clientHeight es el alto que el tile deja
+      // libre bajo la cabecera (y sobre la barra fina). El gráfico se dimensiona a él.
+      if (el.clientHeight > 0) setChartH(Math.max(HOUR_CHART_MIN_H, el.clientHeight));
       if (!didScroll.current) {
         el.scrollLeft = HOUR_FIRST * col;
         didScroll.current = true;
@@ -1909,7 +1916,7 @@ function HourChart({ data, chartKind }: { data: SalesByHour[]; chartKind: 'bars'
           <Chart
             className="dash-hour-chart"
             data={hours}
-            height={200}
+            height={chartH}
             formatValue={fmtEurCompact}
             kind={chartKind}
             showGrid={false}

@@ -103,8 +103,9 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'kpi-lost-sales': CARD_SPEC,
   // Paneles
   'dash-bars': { w: 7, h: 2 },
-  // "Ventas por hora" lleva una barra fina de navegación bajo el gráfico → una fila más.
-  'dash-hour': { w: 7, h: 3 },
+  // "Ventas por hora": gráfico + barra fina de navegación. El gráfico llena el alto del tile
+  // (dash-panel--fill), así que 2 filas bastan sin dejar hueco inferior.
+  'dash-hour': { w: 7, h: 2 },
   'dash-family': { w: 5, h: 2 },
   'rank-sales': { w: 5, h: 2 },
   'rank-margin': { w: 7, h: 2 },

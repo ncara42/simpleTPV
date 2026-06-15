@@ -236,6 +236,26 @@
      entren y salgan justo por los filos del panel en vez de respetar el margen. */
   margin-inline: -1.5rem;
 }
+/* El panel de "Ventas por hora" llena el alto del tile: cabecera arriba, gráfico
+   estirado (mide su alto y se dibuja a él) y barra fina al pie. Sin hueco inferior. */
+.dash-panel--fill {
+  display: flex;
+  flex-direction: column;
+}
+.dash-panel--fill .dash-hour-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: -0.2rem;
+}
+.dash-panel--fill .dash-hour-scroll {
+  flex: 1;
+  min-height: 0;
+}
+.dash-panel--fill .dash-hour-track {
+  height: 100%;
+}
 .dash-hour-scroll {
   overflow-x: auto;
   overflow-y: hidden;
@@ -2000,6 +2020,12 @@
   margin-bottom: 0.75rem;
   padding-block: 0.6rem;
   background: var(--content-bg);
+}
+/* En edición la cabecera NO pinta su banda de fondo: la pill «Editando el panel» flota
+   sobre la rejilla de puntos (su propia superficie blanca + sombra la separan). El
+   contenedor de acciones, aunque sea ancho, queda transparente → no hay barra a lo ancho. */
+.catalog.is-editing-board .dash-head {
+  background: transparent;
 }
 
 /* ── Estado vacío del lienzo (preset «Personalizado» o lienzo vaciado): "+" central que
