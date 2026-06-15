@@ -1,4 +1,4 @@
-import { Select } from '@simpletpv/ui';
+import { DataTable, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -287,64 +287,67 @@ export function PromotionsPage() {
           )}
         </div>
 
-        {visible.length === 0 ? (
-          <p className="catalog-empty" data-testid="promos-empty">
-            No hay promociones con ese estado.
-          </p>
-        ) : (
-          <table
-            className={`catalog-table promo-table${selected.length ? ' has-selection' : ''}`}
-            data-testid="promo-list"
-          >
-            <thead>
-              <tr>
-                <th className="users-select-col" aria-label="Selección" />
-                <th>Promoción</th>
-                <th>Condición</th>
-                <th>Descuento</th>
-                <th>Vigencia</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((p) => {
+        <DataTable
+          className={`promo-table${selected.length ? ' has-selection' : ''}`}
+          data-testid="promo-list"
+          rowTestId="promo-card"
+          rows={visible}
+          rowKey={(p) => p.id}
+          onRowClick={(p) => toggleSelect(p.id)}
+          rowClassName={(p) => (selectedSet.has(p.id) ? 'is-selected' : undefined)}
+          rowAriaSelected={(p) => selectedSet.has(p.id)}
+          emptyState={
+            <span className="catalog-empty" data-testid="promos-empty">
+              No hay promociones con ese estado.
+            </span>
+          }
+          columns={[
+            {
+              key: 'select',
+              header: '',
+              width: '3rem',
+              render: (p) => (
+                <input
+                  type="checkbox"
+                  className="user-check"
+                  aria-label={`Seleccionar ${p.name}`}
+                  data-testid="promo-select"
+                  checked={selectedSet.has(p.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => toggleSelect(p.id)}
+                />
+              ),
+            },
+            { key: 'name', header: 'Promoción', render: (p) => p.name },
+            {
+              key: 'condition',
+              header: 'Condición',
+              render: (p) => <span className="muted">{conditionShort(p)}</span>,
+            },
+            {
+              key: 'discount',
+              header: 'Descuento',
+              render: (p) => <span className="promo-discount">{discountShort(p)}</span>,
+            },
+            {
+              key: 'validity',
+              header: 'Vigencia',
+              render: (p) => <span className="muted">{dateRange(p.startDate, p.endDate)}</span>,
+            },
+            {
+              key: 'status',
+              header: 'Estado',
+              render: (p) => {
                 const status = promoStatus(p);
-                const isSel = selectedSet.has(p.id);
                 return (
-                  <tr
-                    key={p.id}
-                    className={isSel ? 'is-selected' : undefined}
-                    aria-selected={isSel}
-                    onClick={() => toggleSelect(p.id)}
-                    data-testid="promo-card"
-                  >
-                    <td className="users-select-col" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        className="user-check"
-                        aria-label={`Seleccionar ${p.name}`}
-                        data-testid="promo-select"
-                        checked={isSel}
-                        onChange={() => toggleSelect(p.id)}
-                      />
-                    </td>
-                    <td className="promo-name-cell">{p.name}</td>
-                    <td className="muted">{conditionShort(p)}</td>
-                    <td>
-                      <span className="promo-discount">{discountShort(p)}</span>
-                    </td>
-                    <td className="muted">{dateRange(p.startDate, p.endDate)}</td>
-                    <td>
-                      <span className={`promo-badge promo-${status}`} data-testid="promo-status">
-                        {STATUS_LABEL[status]}
-                      </span>
-                    </td>
-                  </tr>
+                  <span className={`promo-badge promo-${status}`} data-testid="promo-status">
+                    {STATUS_LABEL[status]}
+                  </span>
                 );
-              })}
-            </tbody>
-          </table>
-        )}
+              },
+            },
+          ]}
+        />
       </div>
 
       {form && (
