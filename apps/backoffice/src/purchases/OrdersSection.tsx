@@ -1,5 +1,5 @@
 import type { PurchaseOrder } from '@simpletpv/auth';
-import { Button, DataTable } from '@simpletpv/ui';
+import { Badge, Button, DataTable } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -83,9 +83,9 @@ export function OrdersSection({
             key: 'status',
             header: 'Estado',
             render: (o) => (
-              <span className="status-badge" data-testid="order-status">
+              <Badge variant="muted" data-testid="order-status">
                 {STATUS_LABEL[o.status]}
-              </span>
+              </Badge>
             ),
           },
           {

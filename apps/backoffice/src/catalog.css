@@ -31,32 +31,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Píldora de estado canónica: fondo -soft + texto ink (patrón del design system).
-   Variantes por tono; neutral por defecto. Unifica los badges de estado del
-   backoffice (traspasos, compras, etc.). El <Badge> de packages/ui rinde igual. */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ui-space-1);
-  padding: var(--ui-space-1) var(--ui-space-2);
-  border-radius: var(--ui-radius-pill);
-  font-size: var(--ui-text-xs);
-  font-weight: 600;
-  background: var(--ui-surface-subtle);
-  color: var(--ui-text-muted);
-}
-.status-badge--success {
-  background: var(--ui-success-soft);
-  color: var(--ui-success);
-}
-.status-badge--warning {
-  background: var(--ui-warning-soft);
-  color: var(--ui-warning);
-}
-.status-badge--danger {
-  background: var(--ui-danger-soft);
-  color: var(--ui-danger);
-}
+/* Las píldoras de estado .status-badge se migraron al <Badge> compartido
+   (@simpletpv/ui) en la Fase 2; rinde igual (fondo -soft + texto por tono). */
 
 /* Rol de usuario: misma píldora, tono de marca/éxito fijo. */
 .role-badge {

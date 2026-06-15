@@ -1,5 +1,5 @@
 import type { ImportResult } from '@simpletpv/auth';
-import { Button, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Badge, Button, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -48,9 +48,9 @@ export function TransfersSection() {
       key: 'status',
       header: 'Estado',
       render: (t) => (
-        <span className="status-badge" data-testid="transfer-status">
+        <Badge variant="muted" data-testid="transfer-status">
           {STATUS_LABEL[t.status] ?? t.status}
-        </span>
+        </Badge>
       ),
     },
     {
