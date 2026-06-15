@@ -2003,6 +2003,14 @@
   gap: var(--ui-space-2);
   margin-bottom: var(--ui-space-2);
 }
+/* Cuando la banda vive DENTRO del .table-panel (p. ej. Tarifas de proveedor, que
+   mete la cabecera de pestañas y la tabla en el mismo panel), va entre el toolbar
+   y la tabla: alinea su padding horizontal con el de las celdas (1rem) y separa
+   con un poco de aire arriba/abajo sin romper el marco del panel. */
+.table-panel > .table-actions {
+  margin: 0;
+  padding: var(--ui-space-2) 1rem;
+}
 
 /* Botón solo-icono (acciones secundarias como Importar/Exportar CSV): cuadrado,
    neutro (nunca primary); el texto se muestra en hover vía tooltip y el aria-label

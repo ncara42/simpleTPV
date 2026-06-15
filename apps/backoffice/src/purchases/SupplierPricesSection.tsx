@@ -1,5 +1,6 @@
 import { Button, Chart, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Upload } from 'lucide-react';
 import { useState } from 'react';
 
 import { CsvDropzone } from '../components/CsvDropzone.js';
@@ -203,35 +204,15 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
                 ]}
               />
             )}
-            <button
-              type="button"
-              className="users-sel-btn"
-              disabled={!supplierId}
-              title={supplierId ? undefined : 'Elige un proveedor para importar su tarifa'}
-              onClick={() => setImporting(true)}
-              data-testid="sp-import"
-            >
-              Importar CSV
-            </button>
-            <Button
-              type="button"
-              disabled={!supplierId}
-              onClick={() => setAdding(true)}
-              data-testid="sp-add"
-            >
-              Añadir tarifa
-            </Button>
-            {/* Botón Columnas en el MISMO contenedor que el resto de controles. */}
-            <div className="ui-dt-cols">
-              <button
+            <div className="ui-dt-toolbar-actions">
+              <Button
                 type="button"
-                className="ui-dt-cols-trigger"
-                onClick={toggleColumnsEditor}
-                data-testid="sp-columns-toggle"
-                aria-expanded={columnsEditorOpen}
+                disabled={!supplierId}
+                onClick={() => setAdding(true)}
+                data-testid="sp-add"
               >
-                Columnas
-              </button>
+                Añadir tarifa
+              </Button>
             </div>
           </div>
         ) : (
@@ -259,6 +240,28 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
       {view === 'tarifas' ? (
         <>
           {columnsEditor}
+          <div className="table-actions">
+            <button
+              type="button"
+              className="icon-btn"
+              disabled={!supplierId}
+              title={supplierId ? 'Importar CSV' : 'Elige un proveedor para importar su tarifa'}
+              aria-label="Importar CSV"
+              onClick={() => setImporting(true)}
+              data-testid="sp-import"
+            >
+              <Upload size={18} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="ui-dt-cols-trigger"
+              onClick={toggleColumnsEditor}
+              data-testid="sp-columns-toggle"
+              aria-expanded={columnsEditorOpen}
+            >
+              Columnas
+            </button>
+          </div>
           <DataTable
             columns={[...effectiveColumns, deleteColumn]}
             rows={priceSorted}
