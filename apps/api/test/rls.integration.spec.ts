@@ -86,4 +86,39 @@ describe('RLS aislamiento multi-tenant', () => {
       expect(org2Users).toEqual([]);
     });
   });
+
+  // RLS-06: WITH CHECK debe bloquear escrituras cross-tenant. Sin él, una policy
+  // solo filtra la LECTURA; un INSERT/UPDATE con organizationId ajeno colaría una
+  // fila invisible para org1 pero visible para org2. Estos tests fallarían si la
+  // migración 20260616120000_rls_with_check no se aplicara.
+  it('org1 no puede crear un Customer asignado a org2 (WITH CHECK bloquea INSERT)', async () => {
+    await tenantStorage.run({ organizationId: org1Id }, async () => {
+      await expect(
+        prisma.customer.create({
+          data: {
+            organizationId: org2Id,
+            name: 'Cliente inyectado cross-tenant',
+          },
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  it('org1 no puede mover un Customer propio a org2 (WITH CHECK bloquea UPDATE)', async () => {
+    await tenantStorage.run({ organizationId: org1Id }, async () => {
+      const created = await prisma.customer.create({
+        data: { organizationId: org1Id, name: 'Cliente para test de UPDATE cross-tenant' },
+      });
+
+      await expect(
+        prisma.customer.update({
+          where: { id: created.id },
+          data: { organizationId: org2Id },
+        }),
+      ).rejects.toThrow();
+
+      // Limpieza: la fila sigue en org1, así que org1 puede borrarla.
+      await prisma.customer.delete({ where: { id: created.id } });
+    });
+  });
 });
