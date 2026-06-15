@@ -166,6 +166,10 @@ const BOARD_MARGIN: [number, number] = [16, 16];
 const BOARD_CONTAINER_PADDING: [number, number] = [0, 0];
 const BOARD_BREAKPOINTS = { lg: 1000, md: 768, sm: 640, xs: 480, xxs: 0 };
 const BOARD_COLS_BY_BP: Record<string, number> = { lg: 12, md: 12, sm: 6, xs: 4, xxs: 2 };
+// Compactor sin compactación (colocación libre con huecos) PERO con preventCollision: al
+// soltar una card sobre una celda ocupada, vuelve a su sitio en vez de solaparse. Evita que
+// las cards se oculten unas bajo otras y mantiene siempre el mismo margen entre ellas.
+const BOARD_COMPACTOR = { ...noCompactor, preventCollision: true };
 
 // Etiqueta legible de cada panel para el aria-label del tile (las tarjetas KPI usan su
 // `label` de cardDefs). Las tres pestañas de rankings comparten título.
@@ -700,9 +704,9 @@ export function DashboardPage({
       const nx = Math.max(0, Math.min(cols - it.w, it.x + dx));
       const ny = Math.max(0, it.y + dy);
       if (nx === it.x && ny === it.y) return prev;
-      // moveElement empuja a los que colisionen (sin compactar, sin solapar), igual que el
-      // arrastre. compactType=null → sin reempaquetado; allowOverlap=false → sin solape.
-      const moved = moveElement(items, it, nx, ny, true, false, null, cols, false).map(
+      // preventCollision=true: si la celda destino está ocupada, no mueve (coherente con el
+      // arrastre). compactType=null → sin reempaquetado; allowOverlap=false → sin solape.
+      const moved = moveElement(items, it, nx, ny, true, true, null, cols, false).map(
         ({ i, x, y, w, h }) => ({ i, x, y, w, h }),
       );
       return { ...base, [bp]: moved };
@@ -1547,10 +1551,10 @@ export function DashboardPage({
               rowHeight={BOARD_ROW_HEIGHT}
               margin={BOARD_MARGIN}
               containerPadding={BOARD_CONTAINER_PADDING}
-              // Sin compactación: las cards se quedan EXACTAMENTE donde las sueltas (colocación
-              // libre "a cualquier sitio"), permitiendo huecos. El arrastre empuja a los demás
-              // para no solapar, pero no reempaqueta todo hacia arriba.
-              compactor={noCompactor}
+              // Sin compactación (las cards se quedan donde las sueltas, con huecos permitidos)
+              // pero con preventCollision: soltar sobre una celda ocupada devuelve la card a su
+              // sitio en vez de solaparse. Nunca se ocultan unas bajo otras.
+              compactor={BOARD_COMPACTOR}
               layouts={layoutsWithMode(activeLayouts)}
               onLayoutChange={onBoardLayoutChange}
               onBreakpointChange={(bp) => setBoardBreakpoint(bp)}
