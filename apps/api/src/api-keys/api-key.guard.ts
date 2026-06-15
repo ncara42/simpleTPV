@@ -2,6 +2,7 @@ import {
   type CanActivate,
   type ExecutionContext,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 
@@ -19,6 +20,8 @@ export interface ApiKeyContext {
 // NO corre vía APP_GUARD: se aplica per-ruta con @UseGuards(ApiKeyGuard).
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
+  private readonly logger = new Logger(ApiKeyGuard.name);
+
   constructor(private readonly lookup: ApiKeyLookupService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -40,7 +43,13 @@ export class ApiKeyGuard implements CanActivate {
     if (record.revokedAt) throw new UnauthorizedException('API key revocada');
 
     // Actualiza lastUsedAt de forma asíncrona — sin bloquear la respuesta.
-    void this.lookup.touchLastUsed(record.id);
+    // El `.catch()` evita una unhandled rejection y deja traza si la
+    // actualización falla (la autenticación ya es válida, no debe abortarse).
+    void this.lookup.touchLastUsed(record.id).catch((err: unknown) => {
+      this.logger.warn(
+        `No se pudo actualizar lastUsedAt de la API key ${record.id}: ${String(err)}`,
+      );
+    });
 
     req.user = { organizationId: record.organizationId };
     req.apiKey = {

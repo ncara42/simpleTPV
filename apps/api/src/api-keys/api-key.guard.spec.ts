@@ -152,6 +152,23 @@ describe('ApiKeyGuard.canActivate', () => {
     expect(lookup.findByHash).toHaveBeenCalledWith(expectedHash);
   });
 
+  it('no propaga el error si touchLastUsed rechaza (catch silencioso)', async () => {
+    const lookup = {
+      findByHash: vi.fn(async () => makeRecord({ id: 'kid-fail' })),
+      touchLastUsed: vi.fn(async () => {
+        throw new Error('db down');
+      }),
+    };
+    const guard = new ApiKeyGuard(lookup as never);
+    const ctx = makeCtx({ 'x-api-key': VALID_KEY });
+
+    // La autenticación es válida: el fallo de touchLastUsed no debe abortarla
+    // ni dejar una unhandled rejection.
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    await Promise.resolve(); // deja correr la microtask del .catch()
+    expect(lookup.touchLastUsed).toHaveBeenCalledWith('kid-fail');
+  });
+
   it('no llama touchLastUsed si la key es desconocida', async () => {
     const lookup = makeLookup(null);
     const guard = new ApiKeyGuard(lookup as never);

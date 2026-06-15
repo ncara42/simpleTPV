@@ -22,14 +22,21 @@ function prismaError(code: string, meta?: Record<string, unknown>) {
 }
 
 describe('PrismaExceptionFilter', () => {
-  it('P2002 (unique) → 409 con el campo en conflicto', () => {
+  it('P2002 (unique) → 409 con mensaje genérico (sin nombre de columna)', () => {
     const { host, status, json } = makeHost();
     new PrismaExceptionFilter().catch(prismaError('P2002', { target: ['email'] }), host);
     expect(status).toHaveBeenCalledWith(409);
     expect(json.mock.calls[0]![0]).toMatchObject({
       statusCode: 409,
-      message: 'Ya existe un registro con ese email',
+      message: 'Ya existe un registro con esos datos',
     });
+  });
+
+  it('P2002 no filtra el nombre de columna interno (p.ej. hashedKey)', () => {
+    const { host, json } = makeHost();
+    new PrismaExceptionFilter().catch(prismaError('P2002', { target: ['hashedKey'] }), host);
+    const message = (json.mock.calls[0]![0] as { message: string }).message;
+    expect(message).not.toContain('hashedKey');
   });
 
   it('P2003 (FK) → 409 con causa de registros relacionados', () => {
