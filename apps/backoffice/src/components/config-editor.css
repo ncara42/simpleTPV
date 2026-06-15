@@ -1,5 +1,5 @@
 /* Editor de visibilidad/orden reutilizable (IT-16). El botón "Columnas" vive
-   ahora en la toolbar del DataTable (.ui-dt-cols), no en una banda flotante. */
+   ahora en la banda .table-actions, por ENCIMA de la tabla, no dentro del toolbar. */
 .config-trigger {
   border: 1px solid var(--ui-border);
   background: var(--ui-surface);

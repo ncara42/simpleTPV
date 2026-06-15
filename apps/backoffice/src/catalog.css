@@ -1762,11 +1762,6 @@
 .sales-view-remove:hover {
   color: var(--ui-danger, var(--ui-danger));
 }
-/* Botón de export: empuja a la derecha del toolbar del DataTable (IT-06). */
-.sales-export {
-  margin-left: auto;
-  flex-shrink: 0;
-}
 
 /* Pie de agregados del historial (count, total, margen y descuento medios). */
 .sales-totals {
@@ -2431,30 +2426,18 @@
   line-height: 1.5;
 }
 
-/* ── Stock: filtros agrupados (producto vs tienda) + lista por tienda (UX) ───── */
+/* ── Stock: filtros (búsqueda + familia + rotación + tienda) + lista por tienda ─── */
 .stock-filters {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   flex-wrap: wrap;
-  gap: var(--ui-space-5);
+  gap: var(--ui-space-2);
 }
 .stock-filter-group {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--ui-space-2);
-}
-/* Separador sutil entre el grupo "Producto" y el grupo "Tienda". */
-.stock-filter-group + .stock-filter-group {
-  padding-left: var(--ui-space-5);
-  border-left: 1px solid var(--ui-border);
-}
-.stock-filter-label {
-  font-size: var(--ui-text-2xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--ui-text-soft);
 }
 
 /* Lista compacta de existencias por tienda: punto de nivel + nombre + cantidad.
@@ -2749,28 +2732,6 @@
   margin: var(--ui-space-3) 0 0;
   font-size: var(--ui-text-sm);
   color: var(--ui-text-muted);
-}
-/* Chip de filtro "solo en alerta". */
-.stock-alert-toggle {
-  padding: var(--ui-space-1) var(--ui-space-3);
-  border: 1px solid var(--ui-border-strong, var(--ui-border));
-  border-radius: var(--ui-radius-pill);
-  background: var(--ui-surface);
-  cursor: pointer;
-  font-size: var(--ui-text-sm);
-  transition:
-    background 0.12s var(--ui-ease),
-    border-color 0.12s var(--ui-ease),
-    color 0.12s var(--ui-ease);
-}
-.stock-alert-toggle:hover {
-  background: var(--ui-surface-subtle);
-}
-.stock-alert-toggle.is-on {
-  background: var(--ui-danger-soft);
-  border-color: var(--ui-danger);
-  color: var(--ui-danger);
-  font-weight: 600;
 }
 
 /* ── Tiendas: accesos directos en la card + token de fichaje (UX) ───────────── */
