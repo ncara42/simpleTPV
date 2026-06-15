@@ -1,7 +1,7 @@
 import { Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { useConfirm } from './components/ConfirmProvider.js';
 import { Modal } from './components/Modal.js';
@@ -320,12 +320,18 @@ export function FamiliesPage({
     queryKey: ['products'],
     queryFn: () => listProducts(),
   });
-  const directCount = new Map<string, number>();
-  for (const p of allProducts) {
-    if (p.familyId) directCount.set(p.familyId, (directCount.get(p.familyId) ?? 0) + 1);
-  }
-  const subtreeCount = (n: FamilyNode): number =>
-    (directCount.get(n.id) ?? 0) + n.children.reduce((acc, c) => acc + subtreeCount(c), 0);
+  // Contador de productos del subárbol por nodo. Memoizado: el mapa de conteo
+  // directo se reconstruye solo cuando cambia la lista de productos, no en cada
+  // render (antes era O(productos) + recursión por CADA fila renderizada).
+  const subtreeCount = useMemo(() => {
+    const directCount = new Map<string, number>();
+    for (const p of allProducts) {
+      if (p.familyId) directCount.set(p.familyId, (directCount.get(p.familyId) ?? 0) + 1);
+    }
+    const count = (n: FamilyNode): number =>
+      (directCount.get(n.id) ?? 0) + n.children.reduce((acc, c) => acc + count(c), 0);
+    return count;
+  }, [allProducts]);
 
   // Vista filtrada por la toolbar (no muta el árbol: el reordenado y "Mover a"
   // siguen operando sobre `view`). Una raíz que coincide se muestra entera; si solo

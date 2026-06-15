@@ -1514,17 +1514,20 @@ function Rankings(props: {
   const rows =
     tab === 'sales'
       ? (props.data?.topSales ?? []).map((r) => ({
+          id: r.productId,
           name: r.name,
           raw: r.total,
           value: fmtEur(r.total),
         }))
       : tab === 'margin'
         ? (props.data?.topMargin ?? []).map((r) => ({
+            id: r.productId,
             name: r.name,
             raw: r.margin,
             value: fmtEur(r.margin),
           }))
         : (props.data?.worstRotation ?? []).map((r) => ({
+            id: r.productId,
             name: r.name,
             raw: r.units,
             value: `${fmtNum(r.units, 0)} ud`,
@@ -1545,7 +1548,7 @@ function Rankings(props: {
           resetKey={`${tab}-${rows.length}`}
         >
           {rows.map((r, i) => (
-            <li key={`${r.name}-${i}`} style={{ '--i': i } as React.CSSProperties}>
+            <li key={r.id} style={{ '--i': i } as React.CSSProperties}>
               <span className="dash-family-pos">{i + 1}</span>
               <span className="dash-family-name">{r.name}</span>
               <span className="dash-family-amount">{r.value}</span>
