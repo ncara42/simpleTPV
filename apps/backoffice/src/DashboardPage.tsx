@@ -1351,7 +1351,6 @@ export function DashboardPage({
               {/* role=status: el lector de pantalla anuncia que se ha entrado en modo edición. */}
               <span className="dash-edit-hint" role="status">
                 <strong>Editando el panel</strong>
-                <span>· arrastra o quita cards</span>
               </span>
               <span className="dash-edit-sep" aria-hidden="true" />
               <div className="dash-edit-actions">
