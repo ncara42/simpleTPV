@@ -328,113 +328,113 @@ export function UsersPage() {
 
   return (
     <section className="catalog">
+      {columnsEditor}
+
+      <div className="table-actions">
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => setImporting(true)}
+          data-testid="users-import"
+          title="Importar CSV"
+          aria-label="Importar CSV"
+        >
+          <Upload size={18} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="ui-dt-cols-trigger"
+          onClick={toggleColumnsEditor}
+          data-testid="users-columns-toggle"
+          aria-expanded={columnsEditorOpen}
+        >
+          Columnas
+        </button>
+      </div>
+
       <div className="table-panel">
-        {columnsEditor}
         <DataTable
           columns={tableColumns}
           rows={sortDesc ? [...filtered].reverse() : filtered}
           rowKey={(u) => u.id}
           loading={isLoading}
           toolbar={
-            /* Patrón de Ventas: filtros/CTAs y botón Columnas en la misma banda. */
-            <>
-              <div className="users-toolbar">
-                <div className="sales-filters">
-                  <span className="search-field">
-                    <Input
-                      className="catalog-search"
-                      placeholder="Buscar por nombre…"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      data-testid="users-search"
-                    />
-                  </span>
-                  <Select
+            <div className="users-toolbar">
+              <div className="sales-filters">
+                <span className="search-field">
+                  <Input
                     className="catalog-search"
-                    value={storeFilter}
-                    onChange={setStoreFilter}
-                    ariaLabel="Filtrar por tienda"
-                    data-testid="users-store"
-                    options={[
-                      { value: '', label: 'Todas las tiendas' },
-                      ...stores.map((s) => ({ value: s.id, label: s.name })),
-                    ]}
+                    placeholder="Buscar por nombre…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    data-testid="users-search"
                   />
-                  {selected.length > 0 && (
-                    <>
-                      {!allFilteredSelected && (
-                        <button
-                          type="button"
-                          className="users-sel-btn"
-                          onClick={selectAllFiltered}
-                          data-testid="users-select-all"
-                        >
-                          Seleccionar todo
-                        </button>
-                      )}
+                </span>
+                <Select
+                  className="catalog-search"
+                  value={storeFilter}
+                  onChange={setStoreFilter}
+                  ariaLabel="Filtrar por tienda"
+                  data-testid="users-store"
+                  options={[
+                    { value: '', label: 'Todas las tiendas' },
+                    ...stores.map((s) => ({ value: s.id, label: s.name })),
+                  ]}
+                />
+                {selected.length > 0 && (
+                  <>
+                    {!allFilteredSelected && (
                       <button
                         type="button"
                         className="users-sel-btn"
-                        onClick={clearSelection}
-                        data-testid="users-clear"
+                        onClick={selectAllFiltered}
+                        data-testid="users-select-all"
                       >
-                        Quitar selección
+                        Seleccionar todo
                       </button>
-                    </>
-                  )}
-                </div>
-                {selected.length > 0 ? (
-                  <div className="users-toolbar-actions">
-                    <button
-                      type="button"
-                      className="users-bulk-edit"
-                      onClick={openBulkEdit}
-                      data-testid="users-edit"
-                    >
-                      Editar{selected.length > 1 ? ` (${selected.length})` : ''}
-                    </button>
-                    <button
-                      type="button"
-                      className="users-bulk-del"
-                      onClick={removeSelected}
-                      data-testid="users-delete"
-                    >
-                      Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="users-toolbar-actions">
+                    )}
                     <button
                       type="button"
                       className="users-sel-btn"
-                      onClick={() => setImporting(true)}
-                      data-testid="users-import"
+                      onClick={clearSelection}
+                      data-testid="users-clear"
                     >
-                      <Upload size={16} aria-hidden="true" />
-                      Importar CSV
+                      Quitar selección
                     </button>
-                    <Button
-                      onClick={openCreate}
-                      data-testid="new-user"
-                      icon={<Plus size={16} aria-hidden="true" />}
-                    >
-                      Nuevo usuario
-                    </Button>
-                  </div>
+                  </>
                 )}
               </div>
-              <div className="ui-dt-cols">
-                <button
-                  type="button"
-                  className="ui-dt-cols-trigger"
-                  onClick={toggleColumnsEditor}
-                  data-testid="users-columns-toggle"
-                  aria-expanded={columnsEditorOpen}
-                >
-                  Columnas
-                </button>
-              </div>
-            </>
+              {selected.length > 0 ? (
+                <div className="ui-dt-toolbar-actions">
+                  <button
+                    type="button"
+                    className="users-bulk-edit"
+                    onClick={openBulkEdit}
+                    data-testid="users-edit"
+                  >
+                    Editar{selected.length > 1 ? ` (${selected.length})` : ''}
+                  </button>
+                  <button
+                    type="button"
+                    className="users-bulk-del"
+                    onClick={removeSelected}
+                    data-testid="users-delete"
+                  >
+                    Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
+                  </button>
+                </div>
+              ) : (
+                <div className="ui-dt-toolbar-actions">
+                  <Button
+                    onClick={openCreate}
+                    data-testid="new-user"
+                    icon={<Plus size={16} aria-hidden="true" />}
+                  >
+                    Nuevo usuario
+                  </Button>
+                </div>
+              )}
+            </div>
           }
           sort={{ key: 'name', dir: sortDesc ? 'desc' : 'asc' }}
           onSortChange={() => setSortDesc((d) => !d)}
