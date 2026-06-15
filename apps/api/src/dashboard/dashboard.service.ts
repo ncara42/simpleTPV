@@ -827,19 +827,7 @@ export class DashboardService {
       );
 
       // Días con tienda abierta en el periodo (IT-14): denominador de la media.
-      const sessionDays = await tx.$queryRaw<Array<{ day: Date }>>`
-        SELECT DISTINCT DATE("openedAt") AS day
-        FROM "CashSession"
-        WHERE "organizationId" = ${organizationId}::uuid
-          AND "openedAt" >= ${range.from}
-          AND "openedAt" < ${range.to}
-          ${storeId ? this.eqStore('"storeId"', storeId) : EMPTY}
-      `;
-      const periodDays = Math.max(
-        1,
-        Math.round((range.to.getTime() - range.from.getTime()) / dayMs),
-      );
-      const diasDisponibles = sessionDays.length > 0 ? sessionDays.length : periodDays;
+      const diasDisponibles = await this.diasDisponibles(tx, organizationId, range, storeId);
 
       // Tendencia: unidades por día y producto en el periodo (evolución, STAT-06).
       // Ordenadas por día → al agrupar por producto queda la serie cronológica.
@@ -965,19 +953,7 @@ export class DashboardService {
       // para que los días cerrados (festivos, descanso) no diluyan la media ni generen
       // falsas señales. Si no hay datos de caja, se usan los días naturales del periodo.
       // (El "días sin stock" por producto requiere histórico de niveles y queda fuera.)
-      const sessionDays = await tx.$queryRaw<Array<{ day: Date }>>`
-        SELECT DISTINCT DATE("openedAt") AS day
-        FROM "CashSession"
-        WHERE "organizationId" = ${organizationId}::uuid
-          AND "openedAt" >= ${range.from}
-          AND "openedAt" < ${range.to}
-          ${storeId ? this.eqStore('"storeId"', storeId) : EMPTY}
-      `;
-      const periodDays = Math.max(
-        1,
-        Math.round((range.to.getTime() - range.from.getTime()) / dayMsConst),
-      );
-      const diasDisponibles = sessionDays.length > 0 ? sessionDays.length : periodDays;
+      const diasDisponibles = await this.diasDisponibles(tx, organizationId, range, storeId);
 
       return summary.map((r) => {
         const units = num(r.units);
@@ -1002,5 +978,26 @@ export class DashboardService {
   // usar Prisma.raw para el nombre de columna; el valor sí va parametrizado.
   private eqStore(column: string, storeId: string): Prisma.Sql {
     return Prisma.sql`AND ${Prisma.raw(column)} = ${storeId}::uuid`;
+  }
+
+  // Días con tienda abierta en el periodo (IT-14): denominador de la media de
+  // rotación. Si no hay sesiones de caja en el rango, cae a los días naturales.
+  private async diasDisponibles(
+    tx: TxClient,
+    organizationId: string,
+    range: DateRange,
+    storeId: string | undefined,
+  ): Promise<number> {
+    const dayMs = 24 * 60 * 60 * 1000;
+    const sessionDays = await tx.$queryRaw<Array<{ day: Date }>>`
+      SELECT DISTINCT DATE("openedAt") AS day
+      FROM "CashSession"
+      WHERE "organizationId" = ${organizationId}::uuid
+        AND "openedAt" >= ${range.from}
+        AND "openedAt" < ${range.to}
+        ${storeId ? this.eqStore('"storeId"', storeId) : EMPTY}
+    `;
+    const periodDays = Math.max(1, Math.round((range.to.getTime() - range.from.getTime()) / dayMs));
+    return sessionDays.length > 0 ? sessionDays.length : periodDays;
   }
 }
