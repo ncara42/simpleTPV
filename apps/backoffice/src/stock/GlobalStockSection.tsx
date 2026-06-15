@@ -42,8 +42,6 @@ export function GlobalStockSection({
   const [storeId, setStoreId] = useState(initialStoreId ?? '');
   const [rotation, setRotation] = useState('');
   const [adjusting, setAdjusting] = useState<AdjustState | null>(null);
-  // Solo productos con alguna tienda en alerta (rotura o bajo mínimo).
-  const [alertsOnly, setAlertsOnly] = useState(false);
   const [sort, setSort] = useState<DataTableSort | undefined>(undefined);
   // Desglose por tienda plegado por defecto: la fila no crece con N tiendas. Se
   // expande bajo demanda mostrando la mini-tabla por tienda.
@@ -112,10 +110,6 @@ export function GlobalStockSection({
     if (search && !row.productName.toLowerCase().includes(search.toLowerCase())) return false;
     if (storeId && !row.stores.some((s) => s.storeId === storeId)) return false;
     if (rotation && row.rotation !== rotation) return false;
-    if (alertsOnly) {
-      const scope = storeId ? row.stores.filter((s) => s.storeId === storeId) : row.stores;
-      if (!scope.some((s) => s.level !== 'green')) return false;
-    }
     return true;
   });
 
@@ -281,19 +275,29 @@ export function GlobalStockSection({
         </div>
       )}
 
+      {columnsEditor}
+
+      <div className="table-actions">
+        <button
+          type="button"
+          className="ui-dt-cols-trigger"
+          onClick={toggleColumnsEditor}
+          data-testid="stock-columns-toggle"
+          aria-expanded={columnsEditorOpen}
+        >
+          Columnas
+        </button>
+      </div>
+
       <div className="table-panel">
-        {columnsEditor}
         <DataTable
           columns={tableColumns}
           rows={sortedRows}
           rowKey={(r) => r.productId}
           loading={isLoading}
           toolbar={
-            /* Patrón de Ventas: filtros y botón Columnas en LA MISMA banda
-               (el toolbar del DataTable), no en contenedores separados. */
-            <>
+            <div className="stock-filters">
               <div className="stock-filter-group">
-                <span className="stock-filter-label">Producto</span>
                 <span className="search-field">
                   <Input
                     className="catalog-search"
@@ -327,9 +331,6 @@ export function GlobalStockSection({
                     { value: 'baja', label: 'Rotación baja' },
                   ]}
                 />
-              </div>
-              <div className="stock-filter-group">
-                <span className="stock-filter-label">Tienda</span>
                 <Select
                   className="catalog-search"
                   value={storeId}
@@ -342,30 +343,7 @@ export function GlobalStockSection({
                   ]}
                 />
               </div>
-              <div className="stock-filter-group">
-                <span className="stock-filter-label">Roturas</span>
-                <button
-                  type="button"
-                  className={`stock-alert-toggle${alertsOnly ? ' is-on' : ''}`}
-                  onClick={() => setAlertsOnly((v) => !v)}
-                  aria-pressed={alertsOnly}
-                  data-testid="stock-alerts-only"
-                >
-                  Solo en alerta
-                </button>
-              </div>
-              <div className="ui-dt-cols">
-                <button
-                  type="button"
-                  className="ui-dt-cols-trigger"
-                  onClick={toggleColumnsEditor}
-                  data-testid="stock-columns-toggle"
-                  aria-expanded={columnsEditorOpen}
-                >
-                  Columnas
-                </button>
-              </div>
-            </>
+            </div>
           }
           {...(sort ? { sort } : {})}
           onSortChange={(key) =>
