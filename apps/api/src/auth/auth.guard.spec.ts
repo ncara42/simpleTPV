@@ -92,8 +92,26 @@ describe('AuthGuard', () => {
     await expect(guard.canActivate(ctx)).rejects.toThrow();
   });
 
-  it('fail-open: si la revalidación falla (BD caída) acepta el token válido', async () => {
+  it('fail-closed: si la revalidación falla (BD caída) rechaza (401) a un ADMIN', async () => {
     const token = await tokenWith({ role: 'ADMIN' });
+    const guard = makeGuard({
+      getState: () => Promise.reject(new Error('db down')),
+    });
+    const { ctx } = ctxWithAuth(`Bearer ${token}`);
+    await expect(guard.canActivate(ctx)).rejects.toThrow();
+  });
+
+  it('fail-closed: si la revalidación falla (BD caída) rechaza (401) a un MANAGER', async () => {
+    const token = await tokenWith({ role: 'MANAGER' });
+    const guard = makeGuard({
+      getState: () => Promise.reject(new Error('db down')),
+    });
+    const { ctx } = ctxWithAuth(`Bearer ${token}`);
+    await expect(guard.canActivate(ctx)).rejects.toThrow();
+  });
+
+  it('fail-open: si la revalidación falla (BD caída) acepta a un CLERK con token válido', async () => {
+    const token = await tokenWith({ role: 'CLERK' });
     const guard = makeGuard({
       getState: () => Promise.reject(new Error('db down')),
     });
