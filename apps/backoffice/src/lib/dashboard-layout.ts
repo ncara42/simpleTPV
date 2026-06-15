@@ -90,7 +90,7 @@ export function defaultPanelOrder(preset: PresetDef): string[] {
 // tarjetas KPI ocupan 2 columnas y 1 fila; los paneles heredan su ancho histórico
 // (span 5/7/12) y un alto que encaja su contenido (gráfico ~200px o lista con scroll).
 export const BOARD_COLS = 12;
-export const CARD_SPEC = { w: 2, h: 1 };
+const CARD_SPEC = { w: 2, h: 1 };
 export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   // Tarjetas KPI
   'kpi-today': CARD_SPEC,
@@ -161,7 +161,7 @@ export interface FreeWidget extends FreeBase {
   widgetId: string;
 }
 // Nota de texto enriquecido: `doc` es el documento JSON de TipTap (ProseMirror); null = vacía.
-export interface FreeNote extends FreeBase {
+interface FreeNote extends FreeBase {
   kind: 'note';
   doc: unknown;
   color?: string;
@@ -319,7 +319,7 @@ const toFiniteNumber = (v: unknown, fallback: number): number =>
 //  - formato antiguo (FreeCoords plano `{i,x,y,w,h}`) → FreeWidget;
 //  - formato nuevo (`{kind:'widget',widgetId}` o `{kind:'note',doc}`).
 // Devuelve null si la entrada es irrecuperable (se descarta).
-export function migrateFreeElement(raw: unknown, index: number): FreeElement | null {
+function migrateFreeElement(raw: unknown, index: number): FreeElement | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as Record<string, unknown>;
   const x = toFiniteNumber(o.x, 0);
