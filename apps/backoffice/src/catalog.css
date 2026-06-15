@@ -1060,7 +1060,11 @@
   gap: 0.6rem;
   margin-top: 0.5rem;
 }
-.modal-foot button:not(.btn-primary) {
+/* Botones secundarios del pie de modal: los <button> crudos (Cancelar/Cerrar).
+   Se excluye `.ui-btn` para no pisar el estilo del <Button> compartido, que
+   aporta el suyo propio (su CSS vive en una @layer de Tailwind y, al ser
+   catalog.css sin capa, un selector amplio aquí ganaría la cascada). */
+.modal-foot button:not(.ui-btn) {
   height: var(--bo-control-height);
   padding: 0 1.1rem;
   border: 1px solid var(--ui-border-strong);
@@ -1075,10 +1079,10 @@
     background 0.12s,
     transform 0.06s;
 }
-.modal-foot button:not(.btn-primary):hover {
+.modal-foot button:not(.ui-btn):hover {
   background: var(--ui-surface-subtle);
 }
-.modal-foot button:not(.btn-primary):active {
+.modal-foot button:not(.ui-btn):active {
   transform: scale(0.96);
 }
 

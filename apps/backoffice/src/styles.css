@@ -3,6 +3,12 @@
 @import '@simpletpv/ui/theme-apple.css';
 @import '@simpletpv/ui/sidebar.css';
 
+/* Tailwind v4 detecta automáticamente el contenido del propio app, pero NO los
+   paquetes hermanos del workspace. Las utilidades que solo usan los componentes
+   compartidos (<Button>, <Badge>, …) viven en @simpletpv/ui, así que hay que
+   declarar su código fuente como origen explícito o no se generan sus clases. */
+@source '../../../packages/ui/src/**/*.{ts,tsx}';
+
 /* La Fundación Apple compartida (tokens, body, shell, topbar) vive en
    @simpletpv/ui/theme-apple.css. Aquí solo lo específico del backoffice. */
 
