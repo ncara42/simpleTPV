@@ -2096,24 +2096,52 @@
   right: auto;
 }
 
-/* ── Cabecera sticky (solo en Cuadrícula): se queda pegada bajo el topbar (64px) para
-   poder cambiar de preset/periodo/modo o pulsar Personalizar a mitad de scroll. SIN barra
-   blanca ni sangrado (que provocaba overflow horizontal): el fondo iguala al de la página
-   (--content-bg) para tapar el contenido al hacer scroll sin verse como una barra. En modo
-   libre la cabecera es un overlay flotante (`.dashboard--free .catalog-head`), no sticky. ── */
+/* La cabecera (presets · periodo · tienda) NO es sticky ni pinta fondo: se va con el scroll
+   como el resto del contenido. Solo el cluster de acciones (Cuadrícula/Libre + Personalizar)
+   permanece pegado arriba (.dash-sticky-actions). */
 .catalog:not(.dashboard--free) .dash-head {
+  margin-bottom: 0.75rem;
+  /* Reserva la franja derecha donde se superpone el cluster sticky de acciones, para que
+     los controles de la izquierda (presets/periodo/tienda) no queden tapados por él. */
+  padding-right: 21rem;
+}
+@media (max-width: 900px) {
+  .catalog:not(.dashboard--free) .dash-head {
+    padding-right: 0;
+  }
+}
+/* En edición SÍ se fija la cabecera (solo la pill «Editando el panel», que es opaca y no
+   necesita banda) para no perder Guardar/Cancelar al recorrer un panel largo. */
+.catalog.is-editing-board .dash-head {
   position: sticky;
   top: 64px;
   z-index: 19;
-  margin-bottom: 0.75rem;
-  padding-block: 0.6rem;
-  background: var(--content-bg);
+  padding-right: 0;
 }
-/* En edición la cabecera NO pinta su banda de fondo: la pill «Editando el panel» flota
-   sobre la rejilla de puntos (su propia superficie blanca + sombra la separan). El
-   contenedor de acciones, aunque sea ancho, queda transparente → no hay barra a lo ancho. */
-.catalog.is-editing-board .dash-head {
-  background: transparent;
+
+/* Cluster sticky de acciones: hijo de .catalog (alto → persiste todo el scroll). Se ancla a
+   top:64px (bajo el topbar) alineado a la derecha. Se superpone a la fila de la cabecera con
+   un margin-top negativo (sin empujar el contenido); el resto de la fila deja pasar el ratón. */
+.catalog:not(.dashboard--free) .dash-sticky-actions {
+  position: sticky;
+  top: 64px;
+  z-index: 19;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.6rem;
+  /* Sube el cluster a la MISMA línea que las pills del header: descuenta la altura de la
+     fila del header (≈ altura de pill) + su margin-bottom. */
+  margin-top: calc(-1 * (30px + 0.36rem + 2px) - 0.75rem);
+  margin-bottom: 0.75rem;
+  pointer-events: none;
+}
+.catalog:not(.dashboard--free) .dash-sticky-actions > * {
+  pointer-events: auto;
+}
+/* En modo libre el cluster no aplica (la cabecera ya es un overlay flotante con su toggle). */
+.dashboard--free .dash-sticky-actions {
+  display: none;
 }
 
 /* ── Estado vacío del lienzo (preset «Personalizado» o lienzo vaciado): "+" central que

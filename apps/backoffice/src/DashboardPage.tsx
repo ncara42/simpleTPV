@@ -1321,6 +1321,55 @@ export function DashboardPage({
     return card ? card.node : (renderPanel(id)?.node ?? null);
   };
 
+  // Acciones de modo: toggle Cuadrícula/Libre + «Personalizar» (este último solo en
+  // cuadrícula con contenido). Se renderiza en la cabecera flotante en modo Libre y en el
+  // cluster sticky en Cuadrícula (solo una de las dos a la vez → el editToggleRef no choca).
+  const modeActions = (
+    <>
+      <div
+        className="dash-mode-switch"
+        role="tablist"
+        aria-label="Modo del dashboard"
+        data-testid="dash-mode"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'grid'}
+          className={mode === 'grid' ? 'is-active' : ''}
+          onClick={() => setMode('grid')}
+          data-testid="dash-mode-grid"
+        >
+          <LayoutGrid size={14} aria-hidden="true" />
+          Cuadrícula
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'free'}
+          className={mode === 'free' ? 'is-active' : ''}
+          onClick={() => setMode('free')}
+          data-testid="dash-mode-free"
+        >
+          <Move size={14} aria-hidden="true" />
+          Libre
+        </button>
+      </div>
+      {mode === 'grid' && !(isCustomPreset && effectiveItemIds.length === 0) && (
+        <button
+          ref={editToggleRef}
+          type="button"
+          className="dash-edit-toggle"
+          onClick={startEditing}
+          data-testid="dash-edit-toggle"
+        >
+          <LayoutGrid size={15} aria-hidden="true" />
+          Personalizar
+        </button>
+      )}
+    </>
+  );
+
   return (
     <section
       className={`catalog${editing ? ' is-editing-board' : ''}${mode === 'free' ? ' dashboard--free' : ''}`}
@@ -1441,58 +1490,19 @@ export function DashboardPage({
                   ...stores.map((s) => ({ value: s.id, label: s.name })),
                 ]}
               />
-              {/* Acciones de la derecha: [Cuadrícula·Libre] [Personalizar].
-                  margin-left: auto en dash-head-right separa visualmente de Tiendas. */}
-              <div className="dash-head-right">
-                {/* D-20: toggle Cuadrícula / Libre (disponible para todos los presets). */}
-                <div
-                  className="dash-mode-switch"
-                  role="tablist"
-                  aria-label="Modo del dashboard"
-                  data-testid="dash-mode"
-                >
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === 'grid'}
-                    className={mode === 'grid' ? 'is-active' : ''}
-                    onClick={() => setMode('grid')}
-                    data-testid="dash-mode-grid"
-                  >
-                    <LayoutGrid size={14} aria-hidden="true" />
-                    Cuadrícula
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === 'free'}
-                    className={mode === 'free' ? 'is-active' : ''}
-                    onClick={() => setMode('free')}
-                    data-testid="dash-mode-free"
-                  >
-                    <Move size={14} aria-hidden="true" />
-                    Libre
-                  </button>
-                </div>
-                {/* "Personalizar": solo en cuadrícula con widgets (en Libre ya son arrastrables;
-                    en cuadrícula vacía de Personalizado no hay nada que reordenar). */}
-                {mode === 'grid' && !(isCustomPreset && effectiveItemIds.length === 0) && (
-                  <button
-                    ref={editToggleRef}
-                    type="button"
-                    className="dash-edit-toggle"
-                    onClick={startEditing}
-                    data-testid="dash-edit-toggle"
-                  >
-                    <LayoutGrid size={15} aria-hidden="true" />
-                    Personalizar
-                  </button>
-                )}
-              </div>
+              {/* En modo Libre el toggle vive en la cabecera flotante centrada (en Cuadrícula
+                  va en el cluster sticky de abajo). */}
+              {mode === 'free' && <div className="dash-head-right">{modeActions}</div>}
             </>
           )}
         </div>
       </header>
+
+      {/* Cuadrícula: el grupo [Cuadrícula·Libre] + Personalizar NO vive en la cabecera (que ya
+          no es sticky ni pinta fondo y se va con el scroll); es un cluster sticky propio,
+          pegado arriba-derecha mientras recorres el dashboard. (En Libre va en la cabecera
+          flotante centrada, ver más arriba en el header.) */}
+      {!editing && mode === 'grid' && <div className="dash-sticky-actions">{modeActions}</div>}
 
       {/* D-20: dos modos. El div del tablero permanece SIEMPRE en el DOM para que
           useContainerWidth mida el ancho correcto al volver a cuadrícula (sin él, boardWidth
