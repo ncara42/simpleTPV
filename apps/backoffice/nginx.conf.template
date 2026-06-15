@@ -4,6 +4,10 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # No revelar la versión de nginx en la cabecera Server ni en páginas de error
+    # (fingerprinting, A05:2021 / CWE-693).
+    server_tokens off;
+
     gzip on;
     gzip_types text/css application/javascript application/json image/svg+xml;
     gzip_min_length 1024;
@@ -13,11 +17,15 @@ server {
     # script-src 'self' impide cargar JS externo y connect-src acota a dónde se
     # puede enviar. style-src admite 'unsafe-inline' porque React/Recharts inyectan
     # estilos inline (no ejecuta JS). Sentry SaaS necesita connect-src a
-    # *.ingest.sentry.io (ajustar si se usa Sentry self-hosted). Se define como
-    # variable para reutilizarla en location = /index.html, cuyo add_header propio
-    # rompería la herencia de estas cabeceras.
+    # *.ingest.sentry.io (ajustar si se usa Sentry self-hosted). Se definen como
+    # variables para reutilizarlas en los location con add_header propio (= /index.html
+    # y /assets/), cuyo add_header rompería la herencia de estas cabeceras del server.
     set $csp "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://*.ingest.sentry.io https://*.ingest.de.sentry.io";
+    set $hsts "max-age=31536000; includeSubDomains";
+    set $permissions_policy "camera=(), microphone=(), geolocation=()";
     add_header Content-Security-Policy $csp always;
+    add_header Strict-Transport-Security $hsts always;
+    add_header Permissions-Policy $permissions_policy always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
@@ -44,10 +52,19 @@ server {
         add_header Cache-Control "no-cache";
         # Repetidas porque un add_header en el location anula la herencia del server.
         add_header Content-Security-Policy $csp always;
+        add_header Strict-Transport-Security $hsts always;
+        add_header Permissions-Policy $permissions_policy always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     }
     location /assets/ {
         add_header Cache-Control "public, max-age=31536000, immutable";
+        # Repetidas porque un add_header en el location anula la herencia del server:
+        # sin esto los assets se servirían sin cabeceras de seguridad.
+        add_header Content-Security-Policy $csp always;
+        add_header Strict-Transport-Security $hsts always;
+        add_header Permissions-Policy $permissions_policy always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     }
 }
