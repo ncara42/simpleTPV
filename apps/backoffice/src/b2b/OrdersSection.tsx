@@ -1,4 +1,4 @@
-import { DataTable, Select } from '@simpletpv/ui';
+import { Button, DataTable, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowUpRight } from 'lucide-react';
 import { useState } from 'react';
@@ -171,14 +171,9 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
         <button type="button" onClick={onClose}>
           Cancelar
         </button>
-        <button
-          type="submit"
-          className="btn-primary"
-          disabled={!canSubmit}
-          data-testid="b2b-order-save"
-        >
+        <Button type="submit" disabled={!canSubmit} data-testid="b2b-order-save">
           {createMut.isPending ? 'Creando…' : 'Crear pedido'}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

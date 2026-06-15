@@ -1,4 +1,4 @@
-import { DataTable, Select } from '@simpletpv/ui';
+import { Button, DataTable, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -276,14 +276,13 @@ export function PromotionsPage() {
               </button>
             </div>
           ) : (
-            <button
-              className="btn-primary"
+            <Button
               onClick={() => setForm({ ...EMPTY })}
               data-testid="new-promo"
+              icon={<Plus size={16} aria-hidden="true" />}
             >
-              <Plus size={16} aria-hidden="true" />
               Nueva promoción
-            </button>
+            </Button>
           )}
         </div>
 
@@ -488,9 +487,9 @@ function PromoModal({
         <button type="button" onClick={onClose}>
           Cancelar
         </button>
-        <button type="submit" className="btn-primary" disabled={!valid} data-testid="promo-save">
+        <Button type="submit" disabled={!valid} data-testid="promo-save">
           {form.id ? 'Guardar' : 'Crear'}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

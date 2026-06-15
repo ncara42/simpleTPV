@@ -1,4 +1,4 @@
-import { DataTable } from '@simpletpv/ui';
+import { Button, DataTable } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -65,15 +65,14 @@ export function SuggestSection() {
               </option>
             ))}
           </select>
-          <button
+          <Button
             type="button"
-            className="btn-primary"
             disabled={!storeId || suggestMut.isPending}
             onClick={() => suggestMut.mutate({ storeId })}
             data-testid="suggest-generate"
           >
             Generar
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -125,9 +124,8 @@ export function SuggestSection() {
       />
       {rows.length > 0 && (
         <div className="modal-foot">
-          <button
+          <Button
             type="button"
-            className="btn-primary"
             disabled={!supplierId || createMut.isPending}
             onClick={() =>
               createMut.mutate({
@@ -144,7 +142,7 @@ export function SuggestSection() {
             data-testid="suggest-create-order"
           >
             Crear pedido (selecciona proveedor)
-          </button>
+          </Button>
         </div>
       )}
     </>

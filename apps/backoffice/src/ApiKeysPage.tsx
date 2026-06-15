@@ -1,4 +1,4 @@
-import { DataTable } from '@simpletpv/ui';
+import { Button, DataTable } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useState } from 'react';
@@ -275,13 +275,9 @@ export function ApiKeysSection() {
             <button type="button" onClick={() => setShowCreate(false)}>
               Cancelar
             </button>
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={!form.name.trim() || createMut.isPending}
-            >
+            <Button type="submit" disabled={!form.name.trim() || createMut.isPending}>
               {createMut.isPending ? 'Creando…' : 'Crear'}
-            </button>
+            </Button>
           </div>
         </Modal>
       )}

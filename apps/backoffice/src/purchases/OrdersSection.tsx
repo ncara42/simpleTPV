@@ -1,5 +1,5 @@
 import type { PurchaseOrder } from '@simpletpv/auth';
-import { DataTable } from '@simpletpv/ui';
+import { Button, DataTable } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -194,15 +194,14 @@ function OrderDetailModal({ id, onClose }: { id: string; onClose: () => void }) 
           />
           {(order.status === 'CONFIRMED' || order.status === 'PARTIALLY_RECEIVED') && (
             <div className="modal-foot">
-              <button
+              <Button
                 type="button"
-                className="btn-primary"
                 disabled={receiveMut.isPending}
                 onClick={() => receiveMut.mutate(order)}
                 data-testid="receive-confirm"
               >
                 Confirmar recepción
-              </button>
+              </Button>
             </div>
           )}
         </>

@@ -1,4 +1,4 @@
-import { Chart, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Button, Chart, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -213,15 +213,14 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
             >
               Importar CSV
             </button>
-            <button
+            <Button
               type="button"
-              className="btn-primary"
               disabled={!supplierId}
               onClick={() => setAdding(true)}
               data-testid="sp-add"
             >
               Añadir tarifa
-            </button>
+            </Button>
             {/* Botón Columnas en el MISMO contenedor que el resto de controles. */}
             <div className="ui-dt-cols">
               <button
@@ -425,14 +424,13 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
             <button type="button" onClick={() => setAdding(false)}>
               Cancelar
             </button>
-            <button
+            <Button
               type="submit"
-              className="btn-primary"
               disabled={!addProduct || !addPrice || upsertMut.isPending}
               data-testid="sp-add-save"
             >
               Guardar
-            </button>
+            </Button>
           </div>
         </Modal>
       )}

@@ -1,5 +1,5 @@
 import type { Supplier } from '@simpletpv/auth';
-import { DataTable } from '@simpletpv/ui';
+import { Button, DataTable } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -60,15 +60,14 @@ export function SuppliersSection() {
             data-testid="supplier-leadtime"
             style={{ width: '6rem' }}
           />
-          <button
+          <Button
             type="button"
-            className="btn-primary"
             disabled={!name || createMut.isPending}
             onClick={() => createMut.mutate({ name, leadTimeDays: Number(leadTime) })}
             data-testid="supplier-create"
           >
             Añadir
-          </button>
+          </Button>
         </div>
       </header>
       {/* Fila clicable → vista detalle (I-18); las acciones no propagan (stopPropagation). */}

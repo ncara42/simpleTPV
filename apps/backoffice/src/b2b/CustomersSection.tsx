@@ -1,4 +1,4 @@
-import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Button, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -260,14 +260,13 @@ export function CustomersSection() {
               <button type="button" onClick={() => setForm(null)}>
                 Cancelar
               </button>
-              <button
+              <Button
                 type="submit"
-                className="btn-primary"
                 disabled={!form.name.trim() || saveMut.isPending}
                 data-testid="b2b-customer-save"
               >
                 {saveMut.isPending ? 'Guardando…' : 'Guardar'}
-              </button>
+              </Button>
             </div>
           </div>
         </Modal>

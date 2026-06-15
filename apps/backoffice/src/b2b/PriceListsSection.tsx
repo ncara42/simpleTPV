@@ -1,4 +1,4 @@
-import { DataTable, Select } from '@simpletpv/ui';
+import { Button, DataTable, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -133,15 +133,14 @@ function PriceListDetail({
               onChange={(e) => setPrice(e.target.value)}
               data-testid="b2b-item-price"
             />
-            <button
+            <Button
               type="button"
-              className="btn-primary"
               disabled={!canAdd || setItemMut.isPending}
               onClick={() => setItemMut.mutate({ productId, price: Number(price) })}
               data-testid="b2b-item-add"
             >
               Añadir
-            </button>
+            </Button>
           </div>
         </section>
       </div>
@@ -285,13 +284,9 @@ export function PriceListsSection() {
             <button type="button" onClick={() => setCreating(false)}>
               Cancelar
             </button>
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={!newName.trim() || createMut.isPending}
-            >
+            <Button type="submit" disabled={!newName.trim() || createMut.isPending}>
               Crear
-            </button>
+            </Button>
           </div>
         </Modal>
       )}
