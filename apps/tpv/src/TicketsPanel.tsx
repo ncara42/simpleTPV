@@ -1,5 +1,5 @@
 import { ApiError, type Sale, type SaleTicket } from '@simpletpv/auth';
-import { Button, Select } from '@simpletpv/ui';
+import { Button, DataTable, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Check, Download, Printer, RotateCcw } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -182,45 +182,49 @@ export function TicketsPanel({ storeId }: { storeId: string | null }) {
               />
             </div>
           </div>
-          {sales.isLoading ? (
-            <p className="catalog-empty">Cargando…</p>
-          ) : items.length === 0 ? (
-            <p className="catalog-empty">Sin tickets.</p>
-          ) : visible.length === 0 ? (
-            <p className="catalog-empty">Sin tickets que coincidan con el filtro.</p>
-          ) : (
-            <table className="catalog-table" data-testid="tickets-list">
-              <thead>
-                <tr>
-                  <th>Ticket</th>
-                  <th>Fecha</th>
-                  <th>Método</th>
-                  <th>Estado</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((item) => (
-                  <tr
-                    key={item.id}
-                    data-testid="ticket-row"
-                    onClick={() => {
-                      setSelectedId(item.id);
-                      setReturning(false);
-                    }}
-                  >
-                    <td>
-                      <strong>{item.ticketNumber}</strong>
-                    </td>
-                    <td className="muted">{new Date(item.createdAt).toLocaleString()}</td>
-                    <td>{methodLabel(item.paymentMethod)}</td>
-                    <td>{statusBadge(item.status)}</td>
-                    <td className="tabular-nums">{Number(item.total).toFixed(2)} €</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <DataTable
+            data-testid="tickets-list"
+            rowTestId="ticket-row"
+            rows={visible}
+            rowKey={(item) => item.id}
+            loading={sales.isLoading}
+            onRowClick={(item) => {
+              setSelectedId(item.id);
+              setReturning(false);
+            }}
+            emptyState={
+              <span className="catalog-empty">
+                {items.length === 0 ? 'Sin tickets.' : 'Sin tickets que coincidan con el filtro.'}
+              </span>
+            }
+            columns={[
+              {
+                key: 'ticket',
+                header: 'Ticket',
+                render: (item) => <strong>{item.ticketNumber}</strong>,
+              },
+              {
+                key: 'date',
+                header: 'Fecha',
+                render: (item) => (
+                  <span className="muted">{new Date(item.createdAt).toLocaleString()}</span>
+                ),
+              },
+              {
+                key: 'method',
+                header: 'Método',
+                render: (item) => methodLabel(item.paymentMethod),
+              },
+              { key: 'status', header: 'Estado', render: (item) => statusBadge(item.status) },
+              {
+                key: 'total',
+                header: 'Total',
+                render: (item) => (
+                  <span className="tabular-nums">{Number(item.total).toFixed(2)} €</span>
+                ),
+              },
+            ]}
+          />
         </div>
       )}
     </div>

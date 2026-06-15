@@ -62,8 +62,9 @@ describe('NotificationsPage', () => {
     ] as never);
     renderPage();
 
-    await waitFor(() => expect(screen.getByTestId('expiring-table')).toBeInTheDocument());
-    const rows = screen.getAllByTestId('expiring-row');
+    // DataTable monta el contenedor (expiring-table) siempre, con skeleton durante la carga;
+    // por eso esperamos a las FILAS, no a la tabla, para confirmar que llegaron los datos.
+    const rows = await screen.findAllByTestId('expiring-row');
     expect(rows).toHaveLength(2);
     expect(screen.getByText('Caducado')).toBeInTheDocument();
     expect(screen.getByText('Por caducar')).toBeInTheDocument();

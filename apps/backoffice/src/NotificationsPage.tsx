@@ -1,3 +1,4 @@
+import { DataTable } from '@simpletpv/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
@@ -53,58 +54,57 @@ export function NotificationsPage({ onResolve }: { onResolve?: NotifResolve }) {
           {alerts.length > 0 && <span className="notif-section-count">{alerts.length}</span>}
         </div>
         <div className="table-panel">
-          {loadingAlerts ? (
-            <p className="catalog-empty">Cargando…</p>
-          ) : alerts.length === 0 ? (
-            <p className="catalog-empty" data-testid="alerts-empty">
-              No hay alertas de stock.
-            </p>
-          ) : (
-            <table className="catalog-table" data-testid="alerts-table">
-              <thead>
-                <tr>
-                  <th>Producto</th>
-                  <th>Tienda</th>
-                  <th>Alerta</th>
-                  <th aria-label="Acción" />
-                </tr>
-              </thead>
-              <tbody>
-                {alerts.map((a) => (
-                  <tr key={a.id} data-testid="alert-row">
-                    <td>{a.productName}</td>
-                    <td>{a.storeName}</td>
-                    <td>
-                      {/* Degradación por arquetipo: una rotura con sustituto en la
-                          familia se pinta como aviso (amarillo), no como crítica (rojo). */}
-                      <span className="notif-status">
-                        <span
-                          className={`stock-tag stock-${a.severity === 'critical' ? 'red' : 'yellow'}`}
-                        >
-                          {ALERT_LABEL[a.alertType] ?? a.alertType}
-                        </span>
-                        {a.hasSubstituteStock && (
-                          <span className="alert-substitute" data-testid="alert-substitute">
-                            hay sustituto
-                          </span>
-                        )}
+          <DataTable
+            data-testid="alerts-table"
+            rowTestId="alert-row"
+            rows={alerts}
+            rowKey={(a) => a.id}
+            loading={loadingAlerts}
+            emptyState={
+              <span className="catalog-empty" data-testid="alerts-empty">
+                No hay alertas de stock.
+              </span>
+            }
+            columns={[
+              { key: 'product', header: 'Producto', render: (a) => a.productName },
+              { key: 'store', header: 'Tienda', render: (a) => a.storeName },
+              {
+                key: 'alert',
+                header: 'Alerta',
+                // Degradación por arquetipo: una rotura con sustituto en la familia se pinta
+                // como aviso (amarillo), no como crítica (rojo).
+                render: (a) => (
+                  <span className="notif-status">
+                    <span
+                      className={`stock-tag stock-${a.severity === 'critical' ? 'red' : 'yellow'}`}
+                    >
+                      {ALERT_LABEL[a.alertType] ?? a.alertType}
+                    </span>
+                    {a.hasSubstituteStock && (
+                      <span className="alert-substitute" data-testid="alert-substitute">
+                        hay sustituto
                       </span>
-                    </td>
-                    <td className="notif-action-cell">
-                      <button
-                        type="button"
-                        className="config-trigger"
-                        onClick={() => onResolve?.resolveStock(a.storeId, a.productName)}
-                        data-testid="alert-resolve"
-                      >
-                        Resolver
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                    )}
+                  </span>
+                ),
+              },
+              {
+                key: 'action',
+                header: '',
+                align: 'right',
+                render: (a) => (
+                  <button
+                    type="button"
+                    className="config-trigger"
+                    onClick={() => onResolve?.resolveStock(a.storeId, a.productName)}
+                    data-testid="alert-resolve"
+                  >
+                    Resolver
+                  </button>
+                ),
+              },
+            ]}
+          />
         </div>
       </div>
 
@@ -114,56 +114,57 @@ export function NotificationsPage({ onResolve }: { onResolve?: NotifResolve }) {
           {expiring.length > 0 && <span className="notif-section-count">{expiring.length}</span>}
         </div>
         <div className="table-panel">
-          {loadingExpiring ? (
-            <p className="catalog-empty">Cargando…</p>
-          ) : expiring.length === 0 ? (
-            <p className="catalog-empty" data-testid="expiring-empty">
-              No hay lotes caducados ni próximos a caducar.
-            </p>
-          ) : (
-            <table className="catalog-table" data-testid="expiring-table">
-              <thead>
-                <tr>
-                  <th>Producto</th>
-                  <th>Tienda</th>
-                  <th className="notif-hide-narrow">Lote</th>
-                  <th className="notif-hide-narrow">Caducidad</th>
-                  <th>Cantidad</th>
-                  <th>Estado</th>
-                  <th aria-label="Acción" />
-                </tr>
-              </thead>
-              <tbody>
-                {expiring.map((b) => (
-                  <tr key={b.id} data-testid="expiring-row">
-                    <td>{b.productName}</td>
-                    <td>{b.storeName}</td>
-                    <td className="notif-hide-narrow">{b.lotCode}</td>
-                    <td className="notif-hide-narrow">{df.format(new Date(b.expiryDate))}</td>
-                    <td>{b.quantity}</td>
-                    <td>
-                      <span className="notif-status">
-                        <span className={`expiry-tag expiry-${b.status}`}>
-                          {EXPIRY_LABEL[b.status] ?? b.status}
-                        </span>
-                        <span className="expiry-when">{expiryDaysText(b.daysToExpiry)}</span>
-                      </span>
-                    </td>
-                    <td className="notif-action-cell">
-                      <button
-                        type="button"
-                        className="config-trigger"
-                        onClick={() => onResolve?.resolveStock(b.storeId, b.productName)}
-                        data-testid="expiring-resolve"
-                      >
-                        Ver en stock
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <DataTable
+            data-testid="expiring-table"
+            rowTestId="expiring-row"
+            rows={expiring}
+            rowKey={(b) => b.id}
+            loading={loadingExpiring}
+            emptyState={
+              <span className="catalog-empty" data-testid="expiring-empty">
+                No hay lotes caducados ni próximos a caducar.
+              </span>
+            }
+            columns={[
+              { key: 'product', header: 'Producto', render: (b) => b.productName },
+              { key: 'store', header: 'Tienda', render: (b) => b.storeName },
+              { key: 'lot', header: 'Lote', hideOnNarrow: true, render: (b) => b.lotCode },
+              {
+                key: 'expiry',
+                header: 'Caducidad',
+                hideOnNarrow: true,
+                render: (b) => df.format(new Date(b.expiryDate)),
+              },
+              { key: 'qty', header: 'Cantidad', render: (b) => b.quantity },
+              {
+                key: 'status',
+                header: 'Estado',
+                render: (b) => (
+                  <span className="notif-status">
+                    <span className={`expiry-tag expiry-${b.status}`}>
+                      {EXPIRY_LABEL[b.status] ?? b.status}
+                    </span>
+                    <span className="expiry-when">{expiryDaysText(b.daysToExpiry)}</span>
+                  </span>
+                ),
+              },
+              {
+                key: 'action',
+                header: '',
+                align: 'right',
+                render: (b) => (
+                  <button
+                    type="button"
+                    className="config-trigger"
+                    onClick={() => onResolve?.resolveStock(b.storeId, b.productName)}
+                    data-testid="expiring-resolve"
+                  >
+                    Ver en stock
+                  </button>
+                ),
+              },
+            ]}
+          />
         </div>
       </div>
     </section>
