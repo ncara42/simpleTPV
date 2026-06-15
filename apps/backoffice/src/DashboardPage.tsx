@@ -1539,17 +1539,45 @@ export function DashboardPage({
       )}
 
       {/* I-17/D-06: la tabla de ventas ya no se embebe — el dashboard cierra
-          con el acceso a la page de Ventas (DataTable completo). */}
-      <footer className="dash-foot">
-        <button
-          type="button"
-          className="link-btn"
-          onClick={() => onNavigate?.('sales')}
-          data-testid="dash-to-sales"
-        >
-          Ver todas las ventas →
-        </button>
-      </footer>
+          con el acceso a la page de Ventas (DataTable completo). En «Personalizado»
+          (lienzo a medida del usuario) no aplica: el acceso a Ventas sobra. */}
+      {!isCustomPreset && (
+        <footer className="dash-foot">
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => onNavigate?.('sales')}
+            data-testid="dash-to-sales"
+          >
+            Ver todas las ventas →
+          </button>
+        </footer>
+      )}
+
+      {/* Personalizado en Cuadrícula con widgets: botón «+» circular flotante para seguir
+          añadiendo (en el estado vacío el CTA central ya cubre la primera vez). */}
+      {mode === 'grid' && isCustomPreset && effectiveItemIds.length > 0 && (
+        <div className="dash-custom-fab" data-testid="dash-custom-fab">
+          {customGridPaletteOpen && (
+            <WidgetPalette
+              items={customGridAvailable}
+              label={boardItemLabel}
+              onPick={onAddCustomGridWidget}
+              onClose={() => setCustomGridPaletteOpen(false)}
+            />
+          )}
+          <button
+            type="button"
+            className="dash-custom-fab-btn"
+            data-testid="dash-custom-fab-add"
+            aria-label="Agregar widgets"
+            aria-expanded={customGridPaletteOpen}
+            onClick={() => setCustomGridPaletteOpen((o) => !o)}
+          >
+            <Plus size={24} aria-hidden="true" />
+          </button>
+        </div>
+      )}
     </section>
   );
 }
