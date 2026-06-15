@@ -346,9 +346,15 @@ jobs:
             -d "{\"applicationId\":\"$DOKPLOY_API_APP_ID\"}" \
             "${DOKPLOY_API_URL%/}/api/application.deploy")
           echo "Dokploy application.deploy HTTP $code"
-          # Un fallo del deploy NO debe tumbar el CI de main: el código ya pasó
-          # quality+e2e. Se avisa y se sale OK; revisa los secrets si no se dispara.
+          # Fail-fast (SEC-115): una respuesta no-2xx (p.ej. 401 por API key
+          # caducada) significa que el redeploy NO se disparó. Antes solo emitía un
+          # ::warning:: y el job salía verde, así que un deploy fallido pasaba
+          # inadvertido (incidente documentado del 401 de Dokploy). Ahora se sale
+          # con error para que el deploy fallido sea visible en el CI de main.
           case "$code" in
             2*) echo "Redeploy disparado." ;;
-            *) echo "::warning::Dokploy application.deploy devolvió $code (esperado 2xx) — deploy no disparado, revisa los secrets DOKPLOY_API_*" ;;
+            *)
+              echo "::error::Dokploy application.deploy devolvió $code (esperado 2xx) — deploy NO disparado, revisa los secrets DOKPLOY_API_* o la API key"
+              exit 1
+              ;;
           esac
