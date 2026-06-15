@@ -298,11 +298,12 @@ test('Modo Libre (D-20): toggle a lienzo edgeless, mover una card a píxel y per
   // Por defecto se entra en Cuadrícula.
   await expect(page.getByTestId('dash-board')).toBeVisible();
 
-  // Cambiar a Libre: aparece el lienzo y sus controles de zoom; desaparece el tablero.
+  // Cambiar a Libre: aparece el lienzo y sus controles de zoom; el tablero se oculta
+  // (sigue MONTADO con visibility:hidden para que useContainerWidth mida su ancho al volver).
   await page.getByTestId('dash-mode-free').click();
   await expect(page.getByTestId('dash-free')).toBeVisible();
   await expect(page.getByTestId('dash-free-zoom')).toBeVisible();
-  await expect(page.getByTestId('dash-board')).toHaveCount(0);
+  await expect(page.getByTestId('dash-board')).toBeHidden();
 
   // Normaliza la disposición (Ordenar) para que las cards estén a la vista y a un zoom usable:
   // robusto frente al "drift" que acumulan las ejecuciones locales repetidas de este test.
@@ -384,13 +385,21 @@ test('Modo Libre: añadir nota y widget, quitar, deshacer y ordenar; minimapa vi
   await page.getByTestId('dash-free-undo').click();
   await expect(items).toHaveCount(baseCount);
 
-  // Ordenar (reorganizar automático): recoloca → cambia el transform de mundo de una card.
+  // Ordenar (reorganizar automático): primero desplazamos una card fuera de su sitio (kpi-today
+  // por sí sola ya cae en (0,0) y Ordenar no la movería), luego Ordenar la recoloca → su
+  // transform de mundo cambia respecto a la posición desplazada.
   const first = page.locator('.dash-free-item', { has: page.getByTestId('kpi-today') });
-  const tf0 = await first.evaluate((el) => (el as HTMLElement).style.transform);
+  const fb = await first.boundingBox();
+  if (!fb) throw new Error('sin bounding box de la card');
+  await page.mouse.move(fb.x + fb.width / 2, fb.y + fb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(fb.x + fb.width / 2 + 160, fb.y + fb.height / 2 + 120, { steps: 12 });
+  await page.mouse.up();
+  const tfMoved = await first.evaluate((el) => (el as HTMLElement).style.transform);
   await page.getByTestId('dash-free-arrange').click();
   await expect
     .poll(() => first.evaluate((el) => (el as HTMLElement).style.transform))
-    .not.toBe(tf0);
+    .not.toBe(tfMoved);
 
   // Restaurar el modo por defecto para el resto de tests.
   await page.getByTestId('dash-mode-grid').click();
