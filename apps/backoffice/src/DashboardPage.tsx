@@ -795,16 +795,16 @@ export function DashboardPage({
                       data-testid="dash-compare"
                       triggerNode={
                         <>
-                          <span className="dash-compare-prev">{labels.previous}</span>
+                          <span className="dash-compare-curr">{labels.current}</span>
                           {' vs '}
-                          <span className="dash-compare-curr">{labels.current.toLowerCase()}</span>
+                          <span className="dash-compare-prev">{labels.previous.toLowerCase()}</span>
                         </>
                       }
                       options={COMPARE_MODES.map((mode) => {
                         const l = compareLabelsFor(mode, new Date());
                         return {
                           value: mode,
-                          label: `${l.previous} vs ${l.current.toLowerCase()}`,
+                          label: `${l.current} vs ${l.previous.toLowerCase()}`,
                         };
                       })}
                     />
