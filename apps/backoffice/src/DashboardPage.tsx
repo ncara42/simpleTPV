@@ -686,12 +686,16 @@ export function DashboardPage({
   // Restablecer: restaura TODAS las cards del preset y el layout por defecto (sin salir).
   const resetEditing = (): void => {
     setDraftHidden([]);
-    if (isCustomPreset && customWidgetIds.length > 0) {
-      const pseudoPreset: PresetDef = { ...preset, cards: customWidgetIds, panels: [] };
-      setDraftLayouts({ lg: buildDefaultLayout(pseudoPreset) });
-    } else {
-      setDraftLayouts({ lg: buildDefaultLayout(preset) });
-    }
+    const target: PresetDef =
+      isCustomPreset && customWidgetIds.length > 0
+        ? { ...preset, cards: customWidgetIds, panels: [] }
+        : preset;
+    const def = buildDefaultLayout(target);
+    // Restablece también el breakpoint ACTIVO, no solo lg: moveItem edita base[boardBreakpoint]
+    // (que es md cuando el tablero mide <1000px), y RGL no re-deriva el layout del bp actual
+    // desde lg mientras no cambie de breakpoint. Sin limpiar el bp activo, el movimiento
+    // persistiría tras pulsar Restablecer.
+    setDraftLayouts(boardBreakpoint === 'lg' ? { lg: def } : { lg: def, [boardBreakpoint]: def });
   };
   // Guardar: persiste layout + cards ocultas por preset y sale de edición.
   const saveEditing = (): void => {
