@@ -332,6 +332,17 @@
   font-size: 0.84rem;
   margin: 0.4rem 0 0;
 }
+.settings-warning {
+  display: block;
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--ui-warning);
+  background: var(--ui-warning-soft);
+  border: 1px solid var(--ui-warning);
+  border-radius: var(--ui-radius-sm, 8px);
+}
 .settings-actions {
   display: flex;
   gap: 0.6rem;

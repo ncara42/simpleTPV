@@ -34,3 +34,11 @@ export {
   usePageHeader,
   usePageHeaderValue,
 } from './lib/pageHeader.js';
+export {
+  type BrandContrastReport,
+  type BrandSurfaces,
+  contrastRatio,
+  evaluateBrandColor,
+  type WcagLevel,
+  wcagLevel,
+} from './lib/wcag.js';

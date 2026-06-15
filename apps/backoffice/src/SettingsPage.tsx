@@ -1,15 +1,17 @@
-import { Button, Input } from '@simpletpv/ui';
+import { Button, evaluateBrandColor, Input } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { getBranding, updateBranding } from './lib/branding.js';
 import { formErrorMessage } from './lib/form-error.js';
+import { readThemeSurfaces } from './lib/theme-surfaces.js';
 
 // Límite del logo alineado con el DTO de la API (~64KB reales en base64).
 const LOGO_MAX_CHARS = 90_000;
 const HEX = /^#[0-9a-f]{6}$/i;
+const DEFAULT_BRAND = '#0e7c6b';
 
 // U-08: ajustes de la organización — sección Marca. El color elegido se aplica
 // como tema (tokens --ui-brand*/--ui-primary*) en TODA la app (backoffice y TPV)
@@ -69,6 +71,14 @@ export function SettingsPage() {
 
   const colorValid = color === '' || HEX.test(color);
 
+  // Aviso de legibilidad WCAG: evalúa el color elegido contra las superficies
+  // reales del tema vigente. No bloquea el guardado; es una guía para el usuario.
+  const effectiveColor = HEX.test(color) ? color : DEFAULT_BRAND;
+  const contrast = useMemo(
+    () => evaluateBrandColor(effectiveColor, readThemeSurfaces()),
+    [effectiveColor],
+  );
+
   return (
     <section className="catalog" data-testid="settings-page">
       <div className="table-panel settings-panel">
@@ -108,6 +118,18 @@ export function SettingsPage() {
               />
             </div>
             {!colorValid && <p className="settings-error">Formato esperado: #rrggbb</p>}
+            {colorValid && !contrast.ok && (
+              <p
+                className="settings-warning"
+                role="status"
+                aria-live="polite"
+                data-testid="settings-color-warning"
+              >
+                Este color puede no leerse bien. Contraste del texto del botón{' '}
+                {contrast.buttonText.ratio.toFixed(1)}:1 y del color sobre fondo blanco{' '}
+                {contrast.onSurface.ratio.toFixed(1)}:1 (mín. recomendado 4,5:1).
+              </p>
+            )}
           </div>
 
           <div className="settings-field">
