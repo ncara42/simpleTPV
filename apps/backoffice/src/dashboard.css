@@ -2114,17 +2114,18 @@
    necesita banda) para no perder Guardar/Cancelar al recorrer un panel largo. */
 .catalog.is-editing-board .dash-head {
   position: sticky;
-  top: 64px;
+  top: calc(64px + 0.85rem);
   z-index: 19;
   padding-right: 0;
 }
 
-/* Cluster sticky de acciones: hijo de .catalog (alto → persiste todo el scroll). Se ancla a
-   top:64px (bajo el topbar) alineado a la derecha. Se superpone a la fila de la cabecera con
-   un margin-top negativo (sin empujar el contenido); el resto de la fila deja pasar el ratón. */
+/* Cluster sticky de acciones: hijo de .catalog (alto → persiste todo el scroll). Se ancla
+   bajo el topbar (64px) DEJANDO un hueco para que no quede pegado a él al scrollear. Se
+   superpone a la fila de la cabecera con un margin-top negativo (sin empujar el contenido);
+   el resto de la fila deja pasar el ratón. */
 .catalog:not(.dashboard--free) .dash-sticky-actions {
   position: sticky;
-  top: 64px;
+  top: calc(64px + 0.85rem);
   z-index: 19;
   display: flex;
   justify-content: flex-end;
