@@ -1442,29 +1442,53 @@ export function DashboardPage({
         {boardMounted &&
           mode === 'grid' &&
           (isCustomPreset && effectiveItemIds.length === 0 ? (
-            // Estado vacío de Personalizado en cuadrícula: lienzo en blanco con "Agregar".
-            <div className="dash-free-empty" data-testid="dash-custom-grid-empty">
-              <button
-                type="button"
-                className="dash-free-empty-add"
-                data-testid="dash-custom-grid-add"
-                aria-label="Agregar widgets"
-                onClick={() => setCustomGridPaletteOpen(true)}
-              >
-                <Plus size={30} aria-hidden="true" />
-              </button>
-              <p className="dash-free-empty-hint">
-                Panel en blanco · añade los widgets que quieras
-              </p>
-              {customGridPaletteOpen && (
-                <WidgetPalette
-                  variant="center"
-                  items={customGridAvailable}
-                  label={boardItemLabel}
-                  onPick={onAddCustomGridWidget}
-                  onClose={() => setCustomGridPaletteOpen(false)}
-                />
-              )}
+            // Estado vacío de Personalizado en cuadrícula: maqueta-fantasma que comunica que
+            // estás componiendo un tablero en rejilla, con un CTA para abrir el buscador.
+            <div className="dash-custom-empty" data-testid="dash-custom-grid-empty">
+              <div className="dash-custom-empty-inner">
+                {/* Mini-maqueta de cuadrícula: tres KPI arriba, un gráfico ancho y un panel. */}
+                <div className="dash-custom-ghost" aria-hidden="true">
+                  <span className="dash-ghost-tile" style={{ '--d': 0 } as React.CSSProperties} />
+                  <span className="dash-ghost-tile" style={{ '--d': 1 } as React.CSSProperties} />
+                  <span className="dash-ghost-tile" style={{ '--d': 2 } as React.CSSProperties} />
+                  <span
+                    className="dash-ghost-tile dash-ghost-tile--wide dash-ghost-tile--accent"
+                    style={{ '--d': 3 } as React.CSSProperties}
+                  />
+                  <span
+                    className="dash-ghost-tile dash-ghost-tile--tall"
+                    style={{ '--d': 4 } as React.CSSProperties}
+                  />
+                  <span
+                    className="dash-ghost-tile dash-ghost-tile--panel"
+                    style={{ '--d': 5 } as React.CSSProperties}
+                  />
+                </div>
+                <h2 className="dash-custom-empty-title">Diseña tu panel a medida</h2>
+                <p className="dash-custom-empty-text">
+                  Añade las tarjetas y gráficas que necesites y colócalas en la cuadrícula. Cámbiate
+                  a <strong>Libre</strong> para moverlas a cualquier sitio.
+                </p>
+                {customGridPaletteOpen ? (
+                  <WidgetPalette
+                    variant="center"
+                    items={customGridAvailable}
+                    label={boardItemLabel}
+                    onPick={onAddCustomGridWidget}
+                    onClose={() => setCustomGridPaletteOpen(false)}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="dash-custom-empty-cta"
+                    data-testid="dash-custom-grid-add"
+                    onClick={() => setCustomGridPaletteOpen(true)}
+                  >
+                    <Plus size={18} aria-hidden="true" />
+                    Agregar widgets
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <Responsive

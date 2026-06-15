@@ -1965,6 +1965,143 @@
   color: var(--ui-text-muted);
 }
 
+/* ── Estado vacío de «Personalizado» en Cuadrícula ─────────────────────────────
+   Maqueta-fantasma (mini-tablero de tiles punteados) + título, copy y CTA azul.
+   A diferencia de .dash-free-empty (overlay del lienzo), ocupa flujo propio con
+   alto generoso para tener presencia, no apretarse en el min-height del tablero. */
+.dash-custom-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: clamp(360px, 56vh, 580px);
+  padding: 2rem 1.25rem;
+}
+.dash-custom-empty-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 30rem;
+  animation: dash-custom-rise 0.5s var(--ui-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+/* Mini-maqueta: rejilla 3×3 de tiles punteados que evoca un dashboard real. */
+.dash-custom-ghost {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  width: 13.5rem;
+  margin-bottom: 1.75rem;
+}
+.dash-ghost-tile {
+  height: 1.9rem;
+  border: 1.5px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm, 8px);
+  background: color-mix(in srgb, var(--ui-surface) 60%, transparent);
+  /* Entrada escalonada por tile (--d = índice) tras el bloque contenedor. */
+  opacity: 0;
+  animation: dash-ghost-pop 0.42s var(--ui-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation-delay: calc(0.12s + var(--d, 0) * 0.06s);
+}
+.dash-ghost-tile--wide {
+  grid-column: span 2;
+  height: 3.4rem;
+}
+.dash-ghost-tile--tall {
+  height: 3.4rem;
+}
+.dash-ghost-tile--panel {
+  grid-column: span 3;
+  height: 2.2rem;
+}
+/* Un tile tintado de azul: ancla el acento y sugiere "aquí va tu contenido". */
+.dash-ghost-tile--accent {
+  border-color: color-mix(in srgb, var(--ui-primary) 45%, var(--ui-border-strong));
+  background: var(--ui-brand-soft, rgba(0, 102, 204, 0.08));
+}
+
+.dash-custom-empty-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: -0.018em;
+  color: var(--ui-text);
+}
+.dash-custom-empty-text {
+  margin: 0 0 1.6rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--ui-text-muted);
+}
+.dash-custom-empty-text strong {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+
+/* CTA primario: relleno Action Blue, con elevación sutil al hover (transform/opacity). */
+.dash-custom-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.6rem;
+  padding: 0 1.35rem;
+  border: none;
+  border-radius: 9999px;
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg, #fff);
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition:
+    transform 0.16s var(--ui-ease-out, ease),
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.dash-custom-empty-cta:hover {
+  background: var(--ui-primary-hover, var(--ui-primary));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--ui-primary) 28%, transparent);
+}
+.dash-custom-empty-cta:active {
+  transform: translateY(0);
+}
+.dash-custom-empty-cta:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.dash-custom-empty-cta svg {
+  flex: none;
+}
+
+@keyframes dash-custom-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes dash-ghost-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-custom-empty-inner,
+  .dash-ghost-tile {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 /* Buscador dentro de la paleta de widgets + variante centrada (estado vacío). */
 .dash-free-palette--center {
   pointer-events: auto;
