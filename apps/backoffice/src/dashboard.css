@@ -1179,6 +1179,13 @@
   outline: none;
   box-shadow: var(--ui-focus);
 }
+.dash-edit-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.dash-edit-btn:disabled:hover {
+  background: transparent;
+}
 .dash-edit-btn svg {
   flex: none;
   color: var(--ui-text-soft);
@@ -1299,6 +1306,45 @@
 .dash-tile.is-editing > * {
   pointer-events: none;
   user-select: none;
+}
+/* D-21: botón para quitar la card en edición. Exento del pointer-events:none del tile
+   (debe ser clicable) y por encima del contenido. Círculo con la gramática Apple. */
+.dash-tile-remove {
+  position: absolute;
+  top: -0.55rem;
+  right: -0.55rem;
+  z-index: 4;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.14);
+  transition:
+    background 0.14s ease,
+    color 0.14s ease,
+    border-color 0.14s ease,
+    transform 0.14s ease;
+}
+.dash-tile.is-editing > .dash-tile-remove {
+  pointer-events: auto;
+}
+.dash-tile-remove:hover {
+  background: var(--ui-danger, #d70015);
+  border-color: var(--ui-danger, #d70015);
+  color: #fff;
+  transform: scale(1.08);
+}
+.dash-tile-remove:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
 }
 /* En edición el tile entero se arrastra: el panel no hace scroll. La KPI conserva
    overflow visible (su chip de tendencia asoma por el borde y no debe recortarse). */

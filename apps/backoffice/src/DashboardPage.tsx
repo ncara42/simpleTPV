@@ -13,6 +13,7 @@ import {
   Plus,
   RotateCcw,
   Search,
+  Undo2,
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -207,6 +208,9 @@ export function DashboardPage({
   const [editing, setEditing] = useState(false);
   // Borrador del layout del tablero mientras se edita; se confirma con Guardar o se descarta.
   const [draftLayouts, setDraftLayouts] = useState<StoredLayouts | null>(null);
+  // D-21: cards/paneles quitados durante la edición (orden = pila de deshacer). Se inicializa
+  // con los ya ocultos del preset al entrar en edición; se confirma con Guardar.
+  const [draftHidden, setDraftHidden] = useState<string[]>([]);
   // Ancho del contenedor para react-grid-layout v2 (sustituye al WidthProvider de v1).
   const { width: boardWidth, mounted: boardMounted, containerRef: boardRef } = useContainerWidth();
   // Breakpoint activo del tablero (lo reporta RGL); el reposicionado por teclado opera
@@ -248,6 +252,12 @@ export function DashboardPage({
     : [];
   // Ids efectivos para el tablero: para Personalizado son los widgets añadidos por el usuario.
   const effectiveItemIds = isCustomPreset ? customWidgetIds : itemIds;
+  // D-21: cards quitadas del tablero por preset (persistidas). En edición se usa el borrador
+  // (draftHidden) para reflejar quitar/deshacer en vivo antes de Guardar.
+  const savedHidden = layout.hiddenByPreset?.[preset.id] ?? [];
+  const hiddenIds = editing ? draftHidden : savedHidden;
+  // Ids realmente visibles en el tablero (los efectivos menos los quitados).
+  const visibleItemIds = effectiveItemIds.filter((id) => !hiddenIds.includes(id));
 
   // Habilita queries de widgets visibles:
   // - Libre: todos los del lienzo del preset activo.
@@ -270,11 +280,11 @@ export function DashboardPage({
       ? { ...preset, cards: customWidgetIds, panels: [] }
       : preset;
     for (const [bp, items] of Object.entries(savedRaw)) {
-      savedLayouts[bp] = reconcileLayout(items, effectiveItemIds);
+      savedLayouts[bp] = reconcileLayout(items, visibleItemIds);
     }
     savedLayouts.lg = reconcileLayout(
       savedRaw.lg ?? buildDefaultLayout(pseudoPreset),
-      effectiveItemIds,
+      visibleItemIds,
     );
   }
   const activeLayouts = editing && draftLayouts ? draftLayouts : savedLayouts;
@@ -628,17 +638,36 @@ export function DashboardPage({
       prev && JSON.stringify(prev) === JSON.stringify(stripped) ? prev : stripped,
     );
   };
-  // Entra a edición tomando una instantánea del layout guardado como borrador.
+  // Entra a edición tomando una instantánea del layout guardado y de los ocultos como borrador.
   const startEditing = (): void => {
     setDraftLayouts(savedLayouts);
+    setDraftHidden(savedHidden);
     setEditing(true);
   };
   const cancelEditing = (): void => {
     setEditing(false);
     setDraftLayouts(null);
+    setDraftHidden([]);
   };
-  // Restablecer: vuelve el borrador al layout por defecto del preset (sin salir de edición).
+  // D-21: quita una card del tablero (se apila para deshacer) y la saca del borrador de layout.
+  const removeTile = (id: string): void => {
+    setDraftHidden((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    setDraftLayouts((prev) => {
+      if (!prev) return prev;
+      const next: StoredLayouts = {};
+      for (const [bp, items] of Object.entries(prev)) {
+        next[bp] = (items ?? []).filter((it) => it.i !== id);
+      }
+      return next;
+    });
+  };
+  // D-21: deshace el último «quitar» (restaura la última card sacada del tablero).
+  const undoRemove = (): void => {
+    setDraftHidden((prev) => prev.slice(0, -1));
+  };
+  // Restablecer: restaura TODAS las cards del preset y el layout por defecto (sin salir).
   const resetEditing = (): void => {
+    setDraftHidden([]);
     if (isCustomPreset && customWidgetIds.length > 0) {
       const pseudoPreset: PresetDef = { ...preset, cards: customWidgetIds, panels: [] };
       setDraftLayouts({ lg: buildDefaultLayout(pseudoPreset) });
@@ -646,14 +675,16 @@ export function DashboardPage({
       setDraftLayouts({ lg: buildDefaultLayout(preset) });
     }
   };
-  // Guardar: persiste el layout del borrador por preset y sale de edición.
+  // Guardar: persiste layout + cards ocultas por preset y sale de edición.
   const saveEditing = (): void => {
     setPref('dashboard.layout', {
       ...layout,
       layouts: { ...layout.layouts, [preset.id]: draftLayouts ?? savedLayouts },
+      hiddenByPreset: { ...layout.hiddenByPreset, [preset.id]: draftHidden },
     });
     setEditing(false);
     setDraftLayouts(null);
+    setDraftHidden([]);
   };
   // Accesibilidad: react-grid-layout no soporta arrastre por teclado, así que en edición
   // cada tile es enfocable y las flechas reposicionan el elemento una celda en el layout
@@ -1293,10 +1324,20 @@ export function DashboardPage({
               {/* role=status: el lector de pantalla anuncia que se ha entrado en modo edición. */}
               <span className="dash-edit-hint" role="status">
                 <strong>Editando el panel</strong>
-                <span>Arrastra las tarjetas para colocarlas a tu gusto</span>
+                <span>Arrastra para recolocar · pulsa la × para quitar una card</span>
               </span>
               <span className="dash-edit-sep" aria-hidden="true" />
               <div className="dash-edit-actions">
+                <button
+                  type="button"
+                  className="dash-edit-btn"
+                  onClick={undoRemove}
+                  disabled={draftHidden.length === 0}
+                  data-testid="dash-edit-undo"
+                >
+                  <Undo2 size={15} aria-hidden="true" />
+                  Deshacer
+                </button>
                 <button
                   type="button"
                   className="dash-edit-btn"
@@ -1514,7 +1555,7 @@ export function DashboardPage({
               onLayoutChange={onBoardLayoutChange}
               onBreakpointChange={(bp) => setBoardBreakpoint(bp)}
             >
-              {effectiveItemIds.map((id) => (
+              {visibleItemIds.map((id) => (
                 <div
                   key={id}
                   className={`dash-tile${editing ? ' is-editing' : ''}`}
@@ -1527,6 +1568,23 @@ export function DashboardPage({
                       }
                     : {})}
                 >
+                  {/* En edición: botón para quitar la card del tablero (con deshacer en la barra). */}
+                  {editing && (
+                    <button
+                      type="button"
+                      className="dash-tile-remove"
+                      data-testid={`dash-tile-remove-${id}`}
+                      aria-label={`Quitar ${boardItemLabel(id)}`}
+                      title="Quitar del tablero"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeTile(id);
+                      }}
+                    >
+                      <X size={14} aria-hidden="true" />
+                    </button>
+                  )}
                   {renderItem(id)}
                 </div>
               ))}
