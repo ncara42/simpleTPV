@@ -1097,20 +1097,20 @@
   color: var(--ui-text-soft);
 }
 
-/* Barra de acciones del modo edición: pista + Restablecer / Cancelar / Guardar. */
 /* ── Barra del modo edición ────────────────────────────────────────────────────
-   Superficie cohesiva (no píldoras sueltas): chip de icono con acento + etiqueta a
-   dos líneas, separador hairline y grupo de acciones (ghost + Guardar primario). */
+   Misma ALTURA, diseño (píldora con borde, sin sombra) y posición que la barra de
+   controles del dashboard, para que conmutar a «Personalizar» no salte: chip de icono
+   con acento + etiqueta en una línea, separador hairline y acciones (ghost + Guardar). */
 .dash-edit-bar {
   display: inline-flex;
   align-items: center;
-  gap: 0.7rem;
-  padding: 0.4rem 0.5rem 0.4rem 0.55rem;
+  gap: 0.5rem;
+  height: calc(30px + 0.36rem + 2px);
+  padding: 0 0.4rem 0 0.5rem;
+  box-sizing: border-box;
   border: 1px solid var(--ui-border);
   border-radius: 9999px;
   background: var(--ui-surface);
-  box-shadow: 0 6px 22px rgb(0 0 0 / 0.07);
-  flex-wrap: wrap;
   animation: dash-edit-in 0.3s var(--ui-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
 }
 .dash-edit-lead-icon {
@@ -1118,51 +1118,51 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 2rem;
-  height: 2rem;
+  width: 1.5rem;
+  height: 1.5rem;
   border-radius: 9999px;
   background: var(--ui-brand-soft, rgba(0, 102, 204, 0.08));
   color: var(--ui-primary);
 }
 .dash-edit-hint {
-  display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
-  line-height: 1.25;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  white-space: nowrap;
 }
 .dash-edit-hint strong {
-  font-size: 0.85rem;
-  font-weight: 650;
-  letter-spacing: -0.012em;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--ui-text);
 }
 .dash-edit-hint span {
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   letter-spacing: -0.005em;
   color: var(--ui-text-muted);
 }
 .dash-edit-sep {
   align-self: stretch;
   width: 1px;
-  margin: 0.25rem 0.1rem;
+  margin: 0.4rem 0.1rem;
   background: var(--ui-border);
 }
 .dash-edit-actions {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.2rem;
 }
 .dash-edit-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  height: 2.2rem;
-  padding: 0 0.85rem;
+  height: 1.75rem;
+  padding: 0 0.7rem;
   border: 1px solid transparent;
   border-radius: 9999px;
   background: transparent;
   color: var(--ui-text);
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
@@ -1305,8 +1305,23 @@
     transform: scale(1);
   }
 }
+/* Salida (al Guardar/Cancelar): la misma animación pero inversa. */
+.dash-dots--leaving {
+  animation: dash-dots-out 0.4s var(--ui-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+@keyframes dash-dots-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .dash-dots {
+  .dash-dots,
+  .dash-dots--leaving {
     animation: none;
   }
 }

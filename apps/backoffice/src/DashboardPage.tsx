@@ -215,6 +215,9 @@ export function DashboardPage({
   // D-21: cards/paneles quitados durante la edición (orden = pila de deshacer). Se inicializa
   // con los ya ocultos del preset al entrar en edición; se confirma con Guardar.
   const [draftHidden, setDraftHidden] = useState<string[]>([]);
+  // El fondo de puntos se desmonta tras su animación de salida: al dejar la edición se marca
+  // "saliendo" para reproducir la animación inversa antes de quitarlo del DOM.
+  const [dotsLeaving, setDotsLeaving] = useState(false);
   // Ancho del contenedor para react-grid-layout v2 (sustituye al WidthProvider de v1).
   const { width: boardWidth, mounted: boardMounted, containerRef: boardRef } = useContainerWidth();
   // Breakpoint activo del tablero (lo reporta RGL); el reposicionado por teclado opera
@@ -443,6 +446,13 @@ export function DashboardPage({
       editToggleRef.current?.focus();
     }
   }, [editing, boardRef]);
+  // Red de seguridad: si la animación de salida del fondo de puntos no emite animationend
+  // (p. ej. con prefers-reduced-motion, animation:none), lo desmonta igualmente.
+  useEffect(() => {
+    if (!dotsLeaving) return;
+    const t = setTimeout(() => setDotsLeaving(false), 500);
+    return () => clearTimeout(t);
+  }, [dotsLeaving]);
   const saveDashboardDefault = (patch: { period?: DashboardPeriod; storeId?: string }): void => {
     const cur = readPref<{ period?: DashboardPeriod; storeId?: string }>(
       prefs,
@@ -575,6 +585,7 @@ export function DashboardPage({
   const setMode = (m: DashboardMode): void => {
     if (editing) {
       setEditing(false);
+      setDotsLeaving(true);
       setDraftLayouts(null);
     }
     setPref('dashboard.layout', { ...layout, mode: m });
@@ -650,6 +661,7 @@ export function DashboardPage({
   };
   const cancelEditing = (): void => {
     setEditing(false);
+    setDotsLeaving(true);
     setDraftLayouts(null);
     setDraftHidden([]);
   };
@@ -687,6 +699,7 @@ export function DashboardPage({
       hiddenByPreset: { ...layout.hiddenByPreset, [preset.id]: draftHidden },
     });
     setEditing(false);
+    setDotsLeaving(true);
     setDraftLayouts(null);
     setDraftHidden([]);
   };
@@ -1314,8 +1327,18 @@ export function DashboardPage({
       data-testid="dashboard"
     >
       {/* Lienzo de puntos a pantalla completa durante la edición (detrás del contenido;
-          el sidebar/topbar lo tapan en sus zonas por su mayor z-index). */}
-      {editing && <div className="dash-dots" data-testid="dash-dots" aria-hidden="true" />}
+          el sidebar/topbar lo tapan en sus zonas por su mayor z-index). Permanece montado
+          mientras sale (dotsLeaving) para reproducir la animación inversa antes de quitarlo. */}
+      {(editing || dotsLeaving) && (
+        <div
+          className={`dash-dots${!editing && dotsLeaving ? ' dash-dots--leaving' : ''}`}
+          data-testid="dash-dots"
+          aria-hidden="true"
+          onAnimationEnd={() => {
+            if (dotsLeaving) setDotsLeaving(false);
+          }}
+        />
+      )}
       <header className="catalog-head is-actions-only dash-head">
         <div className="catalog-actions">
           {editing ? (
@@ -1328,7 +1351,7 @@ export function DashboardPage({
               {/* role=status: el lector de pantalla anuncia que se ha entrado en modo edición. */}
               <span className="dash-edit-hint" role="status">
                 <strong>Editando el panel</strong>
-                <span>Arrastra para recolocar · pulsa la × para quitar una card</span>
+                <span>· arrastra o quita cards</span>
               </span>
               <span className="dash-edit-sep" aria-hidden="true" />
               <div className="dash-edit-actions">
