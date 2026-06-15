@@ -31,9 +31,21 @@ export function initSentry(): boolean {
 }
 
 /**
+ * Campos sensibles que se borran de `event.extra` en capturas manuales
+ * (`captureException` con contexto extra) por si arrastran credenciales.
+ */
+const SENSITIVE_EXTRA_KEYS = ['password', 'token', 'secret', 'authorization'] as const;
+
+/**
  * beforeSend de Sentry: muta el evento in-place (válido para beforeSend) para
- * eliminar cabeceras sensibles como defensa en profundidad, por si el SDK las
- * adjuntara. También etiqueta el evento con el organization_id del tenant actual
+ * eliminar datos sensibles como defensa en profundidad, por si el SDK los
+ * adjuntara. Borra:
+ * - Cabeceras `authorization` y `cookie` de la request.
+ * - `request.data` (el body), que en endpoints de login/registro/cambio de
+ *   contraseña podría contener la contraseña en claro (CFG-08, CWE-532).
+ * - Campos sensibles en `event.extra` para futuros `captureException` manuales.
+ *
+ * También etiqueta el evento con el organization_id del tenant actual
  * (AsyncLocalStorage) para filtrar fácilmente por organización en el panel de Sentry.
  */
 function scrubSensitive(event: Sentry.ErrorEvent): Sentry.ErrorEvent {
@@ -41,6 +53,16 @@ function scrubSensitive(event: Sentry.ErrorEvent): Sentry.ErrorEvent {
   if (headers) {
     delete headers.authorization;
     delete headers.cookie;
+  }
+
+  if (event.request) {
+    delete event.request.data;
+  }
+
+  if (event.extra) {
+    for (const key of SENSITIVE_EXTRA_KEYS) {
+      delete event.extra[key];
+    }
   }
 
   const tenant = getCurrentTenant();

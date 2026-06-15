@@ -71,6 +71,43 @@ describe('initSentry (API)', () => {
     expect(scrubbed.request.headers['x-org-id']).toBe('keep');
   });
 
+  it('beforeSend elimina request.data (body con posibles credenciales)', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.SENTRY_DSN = 'https://abc@o1.ingest.sentry.io/1';
+    initSentry();
+    const opts = initMock.mock.calls[0]![0] as {
+      beforeSend: (e: Record<string, unknown>) => Record<string, unknown>;
+    };
+    const scrubbed = opts.beforeSend({
+      request: { method: 'POST', data: { email: 'a@b.c', password: 'secreta' } },
+    }) as { request: { method: string; data?: unknown } };
+    expect(scrubbed.request.data).toBeUndefined();
+    expect(scrubbed.request.method).toBe('POST');
+  });
+
+  it('beforeSend elimina campos sensibles de event.extra', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.SENTRY_DSN = 'https://abc@o1.ingest.sentry.io/1';
+    initSentry();
+    const opts = initMock.mock.calls[0]![0] as {
+      beforeSend: (e: Record<string, unknown>) => Record<string, unknown>;
+    };
+    const scrubbed = opts.beforeSend({
+      extra: {
+        password: 'secreta',
+        token: 'jwt',
+        secret: 's',
+        authorization: 'Bearer x',
+        keep: 'ok',
+      },
+    }) as { extra: Record<string, unknown> };
+    expect(scrubbed.extra.password).toBeUndefined();
+    expect(scrubbed.extra.token).toBeUndefined();
+    expect(scrubbed.extra.secret).toBeUndefined();
+    expect(scrubbed.extra.authorization).toBeUndefined();
+    expect(scrubbed.extra.keep).toBe('ok');
+  });
+
   it('beforeSend añade organization_id como tag cuando hay tenant', () => {
     currentTenant = { organizationId: 'org-123' };
     process.env.NODE_ENV = 'production';
