@@ -1,0 +1,1026 @@
+import {
+  ArrowUpRight,
+  Circle,
+  LayoutGrid,
+  Maximize2,
+  Minus,
+  MousePointer2,
+  Pencil,
+  Plus,
+  Shapes,
+  Slash,
+  Square,
+  StickyNote,
+  Type,
+  Undo2,
+  X,
+} from 'lucide-react';
+import {
+  memo,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+
+import {
+  addDraw,
+  addNote,
+  addShape,
+  addText,
+  addWidget,
+  autoArrangeFree,
+  availableWidgets,
+  bringToFront,
+  DRAW_COLORS,
+  DRAW_STROKE_WIDTH,
+  type FreeDraw,
+  type FreeElement,
+  type FreeLayout,
+  type FreeShape,
+  removeElement,
+  type ShapeKind,
+  updateElement,
+} from '../lib/dashboard-layout.js';
+import {
+  contentBounds,
+  minimapClickToPan,
+  minimapProjection,
+  offscreenArrow,
+} from '../lib/free-geometry.js';
+import { FreeMinimap } from './FreeMinimap.js';
+import { FreeNote } from './FreeNote.js';
+import { FreeShapeView } from './FreeShapeView.js';
+import { FreeText } from './FreeText.js';
+import { WidgetPalette } from './WidgetPalette.js';
+
+// Lienzo "edgeless" estilo Affine: los elementos viven en coordenadas de MUNDO (px) dentro de
+// un `world` con transform translate(pan)·scale(zoom) y transform-origin 0 0; el viewport
+// recorta y recibe los gestos. screen = world·zoom + pan ⇒ world = (screen − pan)/zoom.
+const ZOOM_MIN = 0.25;
+const ZOOM_MAX = 3;
+const ZOOM_STEP = 1.2;
+const PAN_THRESHOLD = 4; // px para distinguir pan de click
+const FIT_PADDING = 48;
+const WHEEL_ZOOM_SENSITIVITY = 0.002;
+const KEY_PAN = 48; // px de pan por flecha en el fondo
+const KEY_MOVE = 10; // px de mundo por flecha al mover un elemento enfocado
+const HISTORY_MAX = 50; // tope de la pila de deshacer
+const MINIMAP_SIZE = { width: 180, height: 130 };
+const MIN_SHAPE = 4; // px de mundo mínimos para crear una forma (evita formas de un clic)
+
+// Herramienta activa del lienzo. 'select' = navegar/arrastrar; el resto crea elementos al
+// arrastrar sobre el fondo. El texto NO es una herramienta de lienzo: se crea con un botón.
+type ToolId = 'select' | 'pen' | 'rect' | 'ellipse' | 'line' | 'arrow';
+const TOOLS: Array<{ id: ToolId; label: string; Icon: typeof MousePointer2 }> = [
+  { id: 'select', label: 'Seleccionar y mover', Icon: MousePointer2 },
+  { id: 'pen', label: 'Lápiz · dibujar o escribir a mano', Icon: Pencil },
+  { id: 'rect', label: 'Rectángulo', Icon: Square },
+  { id: 'ellipse', label: 'Elipse', Icon: Circle },
+  { id: 'line', label: 'Línea', Icon: Slash },
+  { id: 'arrow', label: 'Flecha', Icon: ArrowUpRight },
+];
+
+interface View {
+  panX: number;
+  panY: number;
+  zoom: number;
+}
+
+const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
+
+interface FreeBoardProps {
+  /** Disposición inicial (ya migrada/reconciliada con el preset). */
+  elements: FreeLayout;
+  /** Renderiza el contenido de un widget por su id de catálogo. */
+  renderItem: (widgetId: string) => ReactNode;
+  /** Etiqueta legible de un widget (paleta + aria). */
+  itemLabel: (widgetId: string) => string;
+  /** Se invoca con la disposición completa a persistir tras cada cambio confirmado. */
+  onChange: (layout: FreeLayout) => void;
+  /** Vista inicial (pan/zoom) guardada; si se omite, fit-to-content al montar. */
+  initialView?: { panX: number; panY: number; zoom: number };
+  /** Se invoca (debounced 500 ms) cuando el usuario cambia la vista (pan/zoom). */
+  onViewChange?: (view: { panX: number; panY: number; zoom: number }) => void;
+}
+
+export function FreeBoard({
+  elements,
+  renderItem,
+  itemLabel,
+  onChange,
+  initialView,
+  onViewChange,
+}: FreeBoardProps) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [els, setEls] = useState<FreeElement[]>(elements);
+  const [past, setPast] = useState<FreeElement[][]>([]);
+  // Captura el valor en el primer render (antes de cualquier efecto); con key={preset.id}
+  // el componente remonta en cada cambio de preset, así que este ref es siempre fresco.
+  const initialViewRef = useRef(initialView);
+  const [view, setView] = useState<View>(
+    () => initialViewRef.current ?? { panX: 0, panY: 0, zoom: 1 },
+  );
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const [tool, setTool] = useState<ToolId>('select');
+  const [drawOpen, setDrawOpen] = useState(false);
+  const [drawColor, setDrawColor] = useState<string>(DRAW_COLORS[0]!);
+  const [draft, setDraft] = useState<FreeShape | FreeDraw | null>(null);
+  const [emptyPaletteOpen, setEmptyPaletteOpen] = useState(false);
+
+  // Espejos síncronos para listeners no-React (wheel) y handlers de gesto (sin closures viejos).
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const zoomRef = useRef(view.zoom);
+  zoomRef.current = view.zoom;
+  const elsRef = useRef(els);
+  elsRef.current = els;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const toolRef = useRef(tool);
+  toolRef.current = tool;
+  const colorRef = useRef(drawColor);
+  colorRef.current = drawColor;
+  const dragSnapshot = useRef<FreeElement[] | null>(null);
+  const idCounter = useRef(0);
+
+  const newId = useCallback((prefix: string): string => {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+    idCounter.current += 1;
+    return `${prefix}-${idCounter.current}`;
+  }, []);
+
+  // ── Historial / persistencia ──
+  const pushHistory = useCallback((snapshot: FreeElement[]): void => {
+    setPast((p) => [...p.slice(-(HISTORY_MAX - 1)), snapshot]);
+  }, []);
+
+  const mutate = useCallback(
+    (next: FreeElement[]): void => {
+      pushHistory(elsRef.current);
+      setEls(next);
+      onChangeRef.current(next);
+    },
+    [pushHistory],
+  );
+
+  const undo = useCallback((): void => {
+    setPast((p) => {
+      if (p.length === 0) return p;
+      const prev = p[p.length - 1]!;
+      setEls(prev);
+      onChangeRef.current(prev);
+      return p.slice(0, -1);
+    });
+  }, []);
+
+  // Centro del viewport en coordenadas de mundo (para colocar lo nuevo a la vista).
+  const viewCenterWorld = useCallback((): { x: number; y: number } => {
+    const el = viewportRef.current;
+    const { panX, panY, zoom } = viewRef.current;
+    const cx = (el?.clientWidth ?? 0) / 2;
+    const cy = (el?.clientHeight ?? 0) / 2;
+    return { x: (cx - panX) / zoom, y: (cy - panY) / zoom };
+  }, []);
+
+  // Pantalla → mundo a partir del rect del viewport y el pan/zoom actuales.
+  const screenToWorld = useCallback(
+    (clientX: number, clientY: number): { x: number; y: number } => {
+      const rect = viewportRef.current?.getBoundingClientRect();
+      const { panX, panY, zoom } = viewRef.current;
+      const sx = clientX - (rect?.left ?? 0);
+      const sy = clientY - (rect?.top ?? 0);
+      return { x: (sx - panX) / zoom, y: (sy - panY) / zoom };
+    },
+    [],
+  );
+
+  // ── Nodos de widgets, memoizados por el CONJUNTO de ids de widget: pan/zoom/mover NO los
+  // recrea (solo añadir/quitar). Notas/formas/textos se renderizan aparte. ──
+  const widgetIdsKey = els
+    .filter((e) => e.kind === 'widget')
+    .map((e) => e.id)
+    .join('|');
+  const widgetNodes = useMemo(() => {
+    const map = new Map<string, ReactNode>();
+    for (const e of elsRef.current) {
+      if (e.kind === 'widget') map.set(e.id, renderItem(e.widgetId));
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widgetIdsKey, renderItem]);
+
+  // ── Zoom centrado (botones) / fit / reset ──
+  const zoomAtCenter = useCallback((factor: number): void => {
+    const el = viewportRef.current;
+    if (!el) return;
+    setView((v) => {
+      const cx = el.clientWidth / 2;
+      const cy = el.clientHeight / 2;
+      const nz = clamp(v.zoom * factor, ZOOM_MIN, ZOOM_MAX);
+      const wx = (cx - v.panX) / v.zoom;
+      const wy = (cy - v.panY) / v.zoom;
+      return { zoom: nz, panX: cx - wx * nz, panY: cy - wy * nz };
+    });
+  }, []);
+
+  const reset100 = useCallback((): void => {
+    const el = viewportRef.current;
+    if (!el) return;
+    setView((v) => {
+      const cx = el.clientWidth / 2;
+      const cy = el.clientHeight / 2;
+      const wx = (cx - v.panX) / v.zoom;
+      const wy = (cy - v.panY) / v.zoom;
+      return { zoom: 1, panX: cx - wx, panY: cy - wy };
+    });
+  }, []);
+
+  const fitToContent = useCallback((): void => {
+    const el = viewportRef.current;
+    const list = elsRef.current;
+    if (!el || list.length === 0) return;
+    const b = contentBounds(list);
+    if (!b) return;
+    const cw = b.maxX - b.minX;
+    const ch = b.maxY - b.minY;
+    if (cw <= 0 || ch <= 0) return;
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    const zoom = clamp(
+      Math.min((w - 2 * FIT_PADDING) / cw, (h - 2 * FIT_PADDING) / ch),
+      ZOOM_MIN,
+      ZOOM_MAX,
+    );
+    setView({
+      zoom,
+      panX: (w - (b.maxX + b.minX) * zoom) / 2,
+      panY: (h - (b.maxY + b.minY) * zoom) / 2,
+    });
+  }, []);
+
+  // Encaja el contenido al montar (si no hay vista guardada) y mide el viewport.
+  useLayoutEffect(() => {
+    if (!initialViewRef.current) fitToContent();
+    const el = viewportRef.current;
+    if (el) setViewportSize({ width: el.clientWidth, height: el.clientHeight });
+  }, [fitToContent]);
+
+  // Persiste pan/zoom debounced (500 ms) para que el padre lo guarde entre presets.
+  const onViewChangeRef = useRef(onViewChange);
+  onViewChangeRef.current = onViewChange;
+  useEffect(() => {
+    const t = setTimeout(() => onViewChangeRef.current?.(view), 500);
+    return () => clearTimeout(t);
+  }, [view]);
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      setViewportSize({ width: el.clientWidth, height: el.clientHeight });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // ── Rueda: ctrl/⌘ (o pellizco de trackpad) = zoom hacia el cursor; resto = pan. ──
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent): void => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const mult = e.deltaMode === 1 ? 16 : 1;
+      const { panX, panY, zoom } = viewRef.current;
+      if (e.ctrlKey || e.metaKey) {
+        const factor = Math.exp(-e.deltaY * mult * WHEEL_ZOOM_SENSITIVITY);
+        const nz = clamp(zoom * factor, ZOOM_MIN, ZOOM_MAX);
+        const wx = (sx - panX) / zoom;
+        const wy = (sy - panY) / zoom;
+        setView({ zoom: nz, panX: sx - wx * nz, panY: sy - wy * nz });
+      } else {
+        setView({ zoom, panX: panX - e.deltaX * mult, panY: panY - e.deltaY * mult });
+      }
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // ── Gesto sobre el fondo del lienzo: pan (select) o creación (herramienta de dibujo) ──
+  const panState = useRef<{
+    x: number;
+    y: number;
+    panX: number;
+    panY: number;
+    moved: boolean;
+  } | null>(null);
+  const drawGesture = useRef<
+    | { kind: 'pen'; points: Array<[number, number]> }
+    | { kind: 'shape'; shape: ShapeKind; startX: number; startY: number }
+    | null
+  >(null);
+
+  const onPointerDown = (e: React.PointerEvent): void => {
+    if (e.button !== 0) return;
+    // Solo gestos que empiezan en el FONDO (los elementos paran la propagación; en modo dibujo
+    // están además inertes por CSS para que el gesto llegue siempre aquí).
+    if (e.target !== e.currentTarget) return;
+    const t = toolRef.current;
+    if (t !== 'select') {
+      const w = screenToWorld(e.clientX, e.clientY);
+      viewportRef.current?.setPointerCapture(e.pointerId);
+      drawGesture.current =
+        t === 'pen'
+          ? { kind: 'pen', points: [[w.x, w.y]] }
+          : { kind: 'shape', shape: t, startX: w.x, startY: w.y };
+      return;
+    }
+    viewportRef.current?.setPointerCapture(e.pointerId);
+    const { panX, panY } = viewRef.current;
+    panState.current = { x: e.clientX, y: e.clientY, panX, panY, moved: false };
+  };
+
+  const onPointerMove = (e: React.PointerEvent): void => {
+    const g = drawGesture.current;
+    if (g) {
+      const w = screenToWorld(e.clientX, e.clientY);
+      if (g.kind === 'pen') {
+        g.points.push([w.x, w.y]);
+        const made = addDraw([], 'draft', g.points, colorRef.current, DRAW_STROKE_WIDTH)[0];
+        setDraft((made as FreeDraw | undefined) ?? null);
+      } else {
+        const x = Math.min(g.startX, w.x);
+        const y = Math.min(g.startY, w.y);
+        const diag = (w.x - g.startX) * (w.y - g.startY) >= 0 ? 'main' : 'anti';
+        const box = { x, y, w: Math.abs(w.x - g.startX), h: Math.abs(w.y - g.startY) };
+        setDraft(
+          addShape([], 'draft', g.shape, box, {
+            stroke: colorRef.current,
+            strokeWidth: DRAW_STROKE_WIDTH,
+            diag,
+          })[0] as FreeShape,
+        );
+      }
+      return;
+    }
+    const s = panState.current;
+    if (!s) return;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    if (!s.moved && Math.hypot(dx, dy) < PAN_THRESHOLD) return;
+    s.moved = true;
+    setView((v) => ({ ...v, panX: s.panX + dx, panY: s.panY + dy }));
+  };
+
+  const endGesture = (e: React.PointerEvent, commit: boolean): void => {
+    const g = drawGesture.current;
+    if (g) {
+      viewportRef.current?.releasePointerCapture(e.pointerId);
+      drawGesture.current = null;
+      setDraft(null);
+      if (!commit) return;
+      const w = screenToWorld(e.clientX, e.clientY);
+      if (g.kind === 'pen') {
+        mutate(
+          addDraw(elsRef.current, newId('draw'), g.points, colorRef.current, DRAW_STROKE_WIDTH),
+        );
+      } else {
+        const width = Math.abs(w.x - g.startX);
+        const height = Math.abs(w.y - g.startY);
+        if (width >= MIN_SHAPE || height >= MIN_SHAPE) {
+          const diag = (w.x - g.startX) * (w.y - g.startY) >= 0 ? 'main' : 'anti';
+          mutate(
+            addShape(
+              elsRef.current,
+              newId('shape'),
+              g.shape,
+              { x: Math.min(g.startX, w.x), y: Math.min(g.startY, w.y), w: width, h: height },
+              { stroke: colorRef.current, strokeWidth: DRAW_STROKE_WIDTH, diag },
+            ),
+          );
+        }
+      }
+      return;
+    }
+    if (panState.current) viewportRef.current?.releasePointerCapture(e.pointerId);
+    panState.current = null;
+  };
+  const onPointerUp = (e: React.PointerEvent): void => endGesture(e, true);
+  const onPointerCancel = (e: React.PointerEvent): void => endGesture(e, false);
+
+  // ── Mover / enfocar (z) / quitar / editar elementos ──
+  const onDragStart = useCallback((): void => {
+    dragSnapshot.current = elsRef.current;
+  }, []);
+  const moveEl = useCallback((id: string, dx: number, dy: number): void => {
+    setEls((prev) => prev.map((e) => (e.id === id ? { ...e, x: e.x + dx, y: e.y + dy } : e)));
+  }, []);
+  const commitMove = useCallback((): void => {
+    const snap = dragSnapshot.current ?? elsRef.current;
+    dragSnapshot.current = null;
+    pushHistory(snap);
+    onChangeRef.current(elsRef.current);
+  }, [pushHistory]);
+
+  const focusEl = useCallback((id: string): void => {
+    const cur = elsRef.current;
+    const top = cur.reduce((m, e) => Math.max(m, e.z), -1);
+    const el = cur.find((e) => e.id === id);
+    if (!el || el.z === top) return;
+    setEls(bringToFront(cur, id));
+  }, []);
+
+  const removeEl = useCallback(
+    (id: string): void => {
+      mutate(removeElement(elsRef.current, id));
+    },
+    [mutate],
+  );
+
+  const onNoteChange = useCallback(
+    (id: string, doc: unknown): void => {
+      mutate(updateElement(elsRef.current, id, { doc }));
+    },
+    [mutate],
+  );
+
+  // Texto libre: durante la escritura solo se actualiza el estado LOCAL; al salir del foco se
+  // persiste una vez (y se descarta el texto vacío). El snapshot de deshacer se toma al empezar.
+  const onTextEditStart = useCallback((): void => {
+    dragSnapshot.current = elsRef.current;
+  }, []);
+  const onTextChange = useCallback((id: string, text: string): void => {
+    setEls((prev) => updateElement(prev, id, { text }));
+  }, []);
+  const onTextBlur = useCallback(
+    (id: string): void => {
+      const el = elsRef.current.find((e) => e.id === id);
+      if (el && el.kind === 'text' && el.text.trim() === '') {
+        const next = removeElement(elsRef.current, id);
+        dragSnapshot.current = null;
+        setEls(next);
+        onChangeRef.current(next);
+        return;
+      }
+      pushHistory(dragSnapshot.current ?? elsRef.current);
+      dragSnapshot.current = null;
+      onChangeRef.current(elsRef.current);
+    },
+    [pushHistory],
+  );
+
+  // ── Acciones de toolbar ──
+  const onAddWidget = useCallback(
+    (widgetId: string): void => {
+      mutate(addWidget(elsRef.current, widgetId, viewCenterWorld()));
+      setPaletteOpen(false);
+    },
+    [mutate, viewCenterWorld],
+  );
+  const onAddNote = useCallback((): void => {
+    mutate(addNote(elsRef.current, newId('note'), viewCenterWorld()));
+  }, [mutate, viewCenterWorld, newId]);
+  // Texto libre desde botón (no por clic en el lienzo): se crea centrado y entra en edición.
+  // Crearlo desde un botón evita que el lienzo (tabIndex) robe el foco y borre el texto vacío.
+  const onAddText = useCallback((): void => {
+    const center = viewCenterWorld();
+    mutate(
+      addText(
+        elsRef.current,
+        newId('text'),
+        { x: center.x - 110, y: center.y - 20 },
+        colorRef.current,
+      ),
+    );
+  }, [mutate, viewCenterWorld, newId]);
+  // Abre/cierra el pill de dibujo. Al abrir activa el lápiz; al cerrar vuelve a seleccionar.
+  const toggleDraw = useCallback((): void => {
+    setDrawOpen((open) => {
+      const next = !open;
+      setTool(next ? 'pen' : 'select');
+      return next;
+    });
+  }, []);
+  const onArrange = useCallback((): void => {
+    mutate(autoArrangeFree(elsRef.current));
+    requestAnimationFrame(() => fitToContent());
+  }, [mutate, fitToContent]);
+
+  // ── Teclado en el fondo: flechas = pan, +/− = zoom, 0 = 100%, f = ajustar, Esc = seleccionar. ──
+  const onViewportKeyDown = (e: React.KeyboardEvent): void => {
+    switch (e.key) {
+      case 'ArrowLeft':
+        setView((v) => ({ ...v, panX: v.panX + KEY_PAN }));
+        break;
+      case 'ArrowRight':
+        setView((v) => ({ ...v, panX: v.panX - KEY_PAN }));
+        break;
+      case 'ArrowUp':
+        setView((v) => ({ ...v, panY: v.panY + KEY_PAN }));
+        break;
+      case 'ArrowDown':
+        setView((v) => ({ ...v, panY: v.panY - KEY_PAN }));
+        break;
+      case '+':
+      case '=':
+        zoomAtCenter(ZOOM_STEP);
+        break;
+      case '-':
+        zoomAtCenter(1 / ZOOM_STEP);
+        break;
+      case '0':
+        reset100();
+        break;
+      case 'f':
+        fitToContent();
+        break;
+      case 'Escape':
+        setTool('select');
+        setDrawOpen(false);
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+  };
+
+  const zoomPct = Math.round(view.zoom * 100);
+  const ordered = [...els].sort((a, b) => a.z - b.z);
+  const available = availableWidgets(els);
+  const drawing = tool !== 'select';
+
+  // Minimapa + flecha de orientación (solo con viewport medido y algún elemento).
+  const hasViewport = viewportSize.width > 0 && viewportSize.height > 0;
+  const projection =
+    hasViewport && els.length > 0 ? minimapProjection(els, view, viewportSize, MINIMAP_SIZE) : null;
+  const arrow =
+    hasViewport && els.length > 0 ? offscreenArrow(contentBounds(els), view, viewportSize) : null;
+
+  const onMinimapNavigate = (miniX: number, miniY: number): void => {
+    if (!projection) return;
+    setView((v) => ({ ...v, ...minimapClickToPan(projection, miniX, miniY, v, viewportSize) }));
+  };
+
+  const labelFor = (el: FreeElement): string => {
+    switch (el.kind) {
+      case 'widget':
+        return itemLabel(el.widgetId);
+      case 'note':
+        return 'Nota';
+      case 'text':
+        return 'Texto';
+      case 'draw':
+        return 'Dibujo';
+      default:
+        return 'Forma';
+    }
+  };
+
+  return (
+    <div className="dash-free-shell">
+      {/* Pill horizontal de herramientas de dibujo, encima de la barra inferior (al pulsar Dibujar). */}
+      {drawOpen && (
+        <div
+          className="dash-free-draw-pill"
+          data-testid="dash-free-draw-pill"
+          role="toolbar"
+          aria-label="Herramientas de dibujo"
+        >
+          {TOOLS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className={`dash-free-tool-btn${tool === t.id ? ' is-active' : ''}`}
+              data-testid={`dash-free-tool-${t.id}`}
+              aria-pressed={tool === t.id}
+              aria-label={t.label}
+              title={t.label}
+              onClick={() => setTool(t.id)}
+            >
+              <t.Icon size={17} aria-hidden="true" />
+            </button>
+          ))}
+          <span className="dash-free-tools-sep" aria-hidden="true" />
+          {DRAW_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`dash-free-swatch${drawColor === c ? ' is-active' : ''}`}
+              data-testid={`dash-free-color-${c.replace('#', '')}`}
+              style={{ background: c }}
+              aria-label={`Color ${c}`}
+              aria-pressed={drawColor === c}
+              title={`Color ${c}`}
+              onClick={() => setDrawColor(c)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Toolbar de acciones del lienzo (barra inferior). */}
+      <div className="dash-free-toolbar" data-testid="dash-free-toolbar">
+        <div className="dash-free-toolbar-add">
+          <button
+            type="button"
+            className="dash-free-tool"
+            data-testid="dash-free-add-widget"
+            aria-haspopup="menu"
+            aria-expanded={paletteOpen}
+            onClick={() => setPaletteOpen((o) => !o)}
+          >
+            <Plus size={15} aria-hidden="true" /> Widget
+          </button>
+          {paletteOpen && (
+            <WidgetPalette
+              items={available}
+              label={itemLabel}
+              onPick={onAddWidget}
+              onClose={() => setPaletteOpen(false)}
+            />
+          )}
+        </div>
+        <button
+          type="button"
+          className="dash-free-tool"
+          data-testid="dash-free-add-note"
+          onClick={onAddNote}
+        >
+          <StickyNote size={15} aria-hidden="true" /> Nota
+        </button>
+        <button
+          type="button"
+          className={`dash-free-tool${drawOpen ? ' is-active' : ''}`}
+          data-testid="dash-free-draw"
+          aria-pressed={drawOpen}
+          onClick={toggleDraw}
+        >
+          <Shapes size={15} aria-hidden="true" /> Dibujar
+        </button>
+        <button
+          type="button"
+          className="dash-free-tool"
+          data-testid="dash-free-add-text"
+          onClick={onAddText}
+        >
+          <Type size={15} aria-hidden="true" /> Texto
+        </button>
+        <button
+          type="button"
+          className="dash-free-tool"
+          data-testid="dash-free-undo"
+          onClick={undo}
+          disabled={past.length === 0}
+        >
+          <Undo2 size={15} aria-hidden="true" /> Deshacer
+        </button>
+        <button
+          type="button"
+          className="dash-free-tool"
+          data-testid="dash-free-arrange"
+          onClick={onArrange}
+        >
+          <LayoutGrid size={15} aria-hidden="true" /> Ordenar
+        </button>
+      </div>
+
+      <div
+        ref={viewportRef}
+        className={`dash-free${drawing ? ' dash-free--drawing' : ''}`}
+        data-testid="dash-free"
+        tabIndex={0}
+        role="application"
+        aria-label="Lienzo libre · arrastra los elementos, arrastra el fondo para mover la vista, ⌘/Ctrl+rueda para hacer zoom"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onKeyDown={onViewportKeyDown}
+        style={{
+          backgroundSize: `${24 * view.zoom}px ${24 * view.zoom}px`,
+          backgroundPosition: `${view.panX}px ${view.panY}px`,
+        }}
+      >
+        <div
+          className="dash-free-world"
+          style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})` }}
+        >
+          {ordered.map((el) => (
+            <ElementView
+              key={el.id}
+              el={el}
+              zoomRef={zoomRef}
+              label={labelFor(el)}
+              onDragStart={onDragStart}
+              onMove={moveEl}
+              onCommit={commitMove}
+              onFocus={focusEl}
+              onRemove={removeEl}
+              onTextEditStart={onTextEditStart}
+              onTextChange={onTextChange}
+              onTextBlur={onTextBlur}
+            >
+              {el.kind === 'widget' ? (
+                widgetNodes.get(el.id)
+              ) : el.kind === 'note' ? (
+                <FreeNote doc={el.doc} onChange={(doc) => onNoteChange(el.id, doc)} />
+              ) : null}
+            </ElementView>
+          ))}
+
+          {/* Vista previa del elemento en curso de dibujo. */}
+          {draft && (
+            <div
+              className="dash-free-item dash-free-draft"
+              style={{
+                transform: `translate(${draft.x}px, ${draft.y}px)`,
+                width: draft.w,
+                height: draft.h,
+              }}
+              aria-hidden="true"
+            >
+              <div className="dash-free-item-body">
+                <FreeShapeView el={draft} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Estado vacío (p. ej. preset «Personalizado»): "+" central que abre el buscador de
+            widgets para componer el lienzo desde cero. */}
+        {els.length === 0 && (
+          <div className="dash-free-empty" data-testid="dash-free-empty">
+            <button
+              type="button"
+              className="dash-free-empty-add"
+              data-testid="dash-free-empty-add"
+              aria-label="Añadir widget"
+              onClick={() => setEmptyPaletteOpen(true)}
+            >
+              <Plus size={30} aria-hidden="true" />
+            </button>
+            <p className="dash-free-empty-hint">Lienzo en blanco · añade los widgets que quieras</p>
+            {emptyPaletteOpen && (
+              <WidgetPalette
+                variant="center"
+                items={available}
+                label={itemLabel}
+                onPick={(id) => {
+                  onAddWidget(id);
+                  setEmptyPaletteOpen(false);
+                }}
+                onClose={() => setEmptyPaletteOpen(false)}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Flecha de orientación off-screen: persiste mientras el contenido no se vea. */}
+        {arrow && (
+          <button
+            type="button"
+            className={`dash-free-arrow dash-free-arrow--${arrow.edge}`}
+            data-testid="dash-free-arrow"
+            aria-label="Volver al dashboard"
+            title="Volver al dashboard"
+            onClick={() => fitToContent()}
+            style={{ left: arrow.x, top: arrow.y, transform: `rotate(${arrow.angle}deg)` }}
+          />
+        )}
+
+        {/* Minimapa (esquina del lienzo). */}
+        {projection && (
+          <FreeMinimap projection={projection} size={MINIMAP_SIZE} onNavigate={onMinimapNavigate} />
+        )}
+
+        {/* Controles de zoom (abajo a la derecha del lienzo). */}
+        <div className="dash-free-zoom" data-testid="dash-free-zoom">
+          <button
+            type="button"
+            onClick={() => zoomAtCenter(1 / ZOOM_STEP)}
+            aria-label="Alejar"
+            title="Alejar"
+          >
+            <Minus size={16} aria-hidden="true" />
+          </button>
+          <button type="button" onClick={reset100} className="dash-free-zoom-pct" title="Zoom 100%">
+            {zoomPct}%
+          </button>
+          <button
+            type="button"
+            onClick={() => zoomAtCenter(ZOOM_STEP)}
+            aria-label="Acercar"
+            title="Acercar"
+          >
+            <Plus size={16} aria-hidden="true" />
+          </button>
+          <button type="button" onClick={() => fitToContent()} aria-label="Ajustar" title="Ajustar">
+            <Maximize2 size={15} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ElementViewProps {
+  el: FreeElement;
+  zoomRef: RefObject<number>;
+  label: string;
+  onDragStart: () => void;
+  onMove: (id: string, dx: number, dy: number) => void;
+  onCommit: () => void;
+  onFocus: (id: string) => void;
+  onRemove: (id: string) => void;
+  onTextEditStart: () => void;
+  onTextChange: (id: string, text: string) => void;
+  onTextBlur: (id: string) => void;
+  children: ReactNode;
+}
+
+// Elemento del lienzo. WIDGETS/FORMAS/DIBUJOS: cuerpo inerte, se arrastra por cualquier parte.
+// NOTAS: cuerpo interactivo, se arrastra por la cabecera. TEXTO: arrastrable; doble clic edita.
+// Memoizado: solo se re-renderiza si cambia SU estado, no al hacer pan/zoom del lienzo.
+const ElementView = memo(function ElementView({
+  el,
+  zoomRef,
+  label,
+  onDragStart,
+  onMove,
+  onCommit,
+  onFocus,
+  onRemove,
+  onTextEditStart,
+  onTextChange,
+  onTextBlur,
+  children,
+}: ElementViewProps) {
+  const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const [editingText, setEditingText] = useState(el.kind === 'text' && el.text === '');
+
+  // Un texto recién creado (vacío) entra directamente en edición.
+  useEffect(() => {
+    if (el.kind === 'text' && el.text === '') onTextEditStart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const startDrag = (e: React.PointerEvent): void => {
+    e.stopPropagation(); // no arranques el pan del fondo
+    if (e.button !== 0) return;
+    onFocus(el.id);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { x: e.clientX, y: e.clientY, moved: false };
+  };
+  const moveDrag = (e: React.PointerEvent): void => {
+    const d = drag.current;
+    if (!d) return;
+    const z = zoomRef.current || 1;
+    if (!d.moved) onDragStart();
+    d.moved = true;
+    onMove(el.id, (e.clientX - d.x) / z, (e.clientY - d.y) / z);
+    d.x = e.clientX;
+    d.y = e.clientY;
+  };
+  const endDrag = (e: React.PointerEvent): void => {
+    const d = drag.current;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    drag.current = null;
+    if (d?.moved) onCommit();
+  };
+  const onKeyDown = (e: React.KeyboardEvent): void => {
+    const moves: Record<string, [number, number]> = {
+      ArrowLeft: [-KEY_MOVE, 0],
+      ArrowRight: [KEY_MOVE, 0],
+      ArrowUp: [0, -KEY_MOVE],
+      ArrowDown: [0, KEY_MOVE],
+    };
+    const m = moves[e.key];
+    if (!m) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onDragStart();
+    onMove(el.id, m[0], m[1]);
+    onCommit();
+  };
+
+  const dragHandlers = {
+    onPointerDown: startDrag,
+    onPointerMove: moveDrag,
+    onPointerUp: endDrag,
+    onPointerCancel: endDrag,
+  };
+
+  const removeBtn = (
+    <button
+      type="button"
+      className="dash-free-remove"
+      data-testid={`dash-free-remove-${el.id}`}
+      aria-label={`Quitar ${label}`}
+      title="Quitar"
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onRemove(el.id);
+      }}
+    >
+      <X size={13} aria-hidden="true" />
+    </button>
+  );
+
+  // ── Nota: cabecera arrastrable + cuerpo interactivo (editor). ──
+  if (el.kind === 'note') {
+    return (
+      <div
+        className="dash-free-item dash-free-item--note"
+        style={{
+          transform: `translate(${el.x}px, ${el.y}px)`,
+          width: el.w,
+          height: el.h,
+          zIndex: el.z,
+          ...(el.color ? { background: el.color } : null),
+        }}
+        role="group"
+        aria-label={label}
+        onPointerDownCapture={() => onFocus(el.id)}
+      >
+        <div
+          className="dash-free-note-header"
+          {...dragHandlers}
+          onKeyDown={onKeyDown}
+          role="button"
+          tabIndex={0}
+          aria-label={`${label}. Arrastra para mover; usa las flechas para ajustar.`}
+        >
+          <span className="dash-free-note-grip" aria-hidden="true" />
+          {removeBtn}
+        </div>
+        <div className="dash-free-note-body">{children}</div>
+      </div>
+    );
+  }
+
+  // ── Texto libre: arrastrable cuando NO se edita; doble clic entra en edición. ──
+  if (el.kind === 'text') {
+    return (
+      <div
+        className={`dash-free-item dash-free-item--text${editingText ? ' is-editing' : ''}`}
+        style={{
+          transform: `translate(${el.x}px, ${el.y}px)`,
+          width: el.w,
+          minHeight: el.h,
+          zIndex: el.z,
+        }}
+        role="group"
+        aria-label={label}
+        tabIndex={0}
+        onPointerDownCapture={() => onFocus(el.id)}
+        onDoubleClick={() => {
+          onTextEditStart();
+          setEditingText(true);
+        }}
+        {...(editingText ? {} : { ...dragHandlers, onKeyDown })}
+      >
+        {removeBtn}
+        <FreeText
+          el={el}
+          editing={editingText}
+          onChange={(text) => onTextChange(el.id, text)}
+          onBlur={() => {
+            setEditingText(false);
+            onTextBlur(el.id);
+          }}
+        />
+      </div>
+    );
+  }
+
+  // ── Widget / forma / dibujo: cuerpo inerte, arrastre por toda la caja. ──
+  const body = el.kind === 'shape' || el.kind === 'draw' ? <FreeShapeView el={el} /> : children;
+
+  return (
+    <div
+      className={`dash-free-item dash-free-item--${el.kind}`}
+      style={{
+        transform: `translate(${el.x}px, ${el.y}px)`,
+        width: el.w,
+        height: el.h,
+        zIndex: el.z,
+      }}
+      {...dragHandlers}
+      onKeyDown={onKeyDown}
+      role="group"
+      tabIndex={0}
+      aria-label={`${label}. Usa las flechas para moverla.`}
+    >
+      {removeBtn}
+      <div className="dash-free-item-body">{body}</div>
+    </div>
+  );
+});
