@@ -8,8 +8,10 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
 
+import type { JwtPayload } from '../auth/jwt-payload.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { CreateDeviceDto, ListDevicesQueryDto, PairDeviceDto } from './devices.dto.js';
 import { DevicesService } from './devices.service.js';
@@ -40,8 +42,11 @@ export class DevicesController {
   // tecleando el token que le da el encargado: el token ES la autorización.
   @Post('pair')
   @Roles('ADMIN', 'MANAGER', 'CLERK')
-  pair(@Body() body: PairDeviceDto) {
-    return this.devices.pair(body.pairingToken);
+  pair(@Body() body: PairDeviceDto, @Req() req: { user: JwtPayload }) {
+    return this.devices.pair(body.pairingToken, {
+      userId: req.user.sub,
+      role: req.user.role,
+    });
   }
 
   @Delete(':id')

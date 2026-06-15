@@ -24,6 +24,7 @@ function makeRecord(overrides: Partial<ApiKeyRecord> = {}): ApiKeyRecord {
     organizationId: '11111111-1111-1111-1111-111111111111',
     priceListId: null,
     revokedAt: null,
+    expiresAt: null,
     ...overrides,
   };
 }
@@ -78,6 +79,31 @@ describe('ApiKeyGuard.canActivate', () => {
     const ctx = makeCtx({ 'x-api-key': VALID_KEY });
 
     await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('lanza UnauthorizedException si la key está caducada (expiresAt en el pasado)', async () => {
+    const expired = makeRecord({ expiresAt: new Date(Date.now() - 1000) });
+    const guard = new ApiKeyGuard(makeLookup(expired) as never);
+    const ctx = makeCtx({ 'x-api-key': VALID_KEY });
+
+    await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('acepta una key con expiresAt en el futuro', async () => {
+    const future = makeRecord({ expiresAt: new Date(Date.now() + 60_000) });
+    const guard = new ApiKeyGuard(makeLookup(future) as never);
+    const ctx = makeCtx({ 'x-api-key': VALID_KEY });
+
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+  });
+
+  it('no llama touchLastUsed si la key está caducada', async () => {
+    const lookup = makeLookup(makeRecord({ expiresAt: new Date(Date.now() - 1000) }));
+    const guard = new ApiKeyGuard(lookup as never);
+    const ctx = makeCtx({ 'x-api-key': VALID_KEY });
+
+    await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
+    expect(lookup.touchLastUsed).not.toHaveBeenCalled();
   });
 
   it('devuelve true para una key válida y activa', async () => {

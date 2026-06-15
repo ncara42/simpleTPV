@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class CreateDeviceDto {
   @IsUUID()
@@ -10,8 +10,11 @@ export class CreateDeviceDto {
 }
 
 export class PairDeviceDto {
+  // Token de 12 caracteres hexadecimales en mayúsculas (6 bytes). KEY-03.
   @IsString()
-  @MinLength(6)
+  @MinLength(12)
+  @MaxLength(12)
+  @Matches(/^[A-F0-9]{12}$/)
   pairingToken!: string;
 }
 

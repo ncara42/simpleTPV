@@ -41,6 +41,9 @@ export class ApiKeyGuard implements CanActivate {
 
     if (!record) throw new UnauthorizedException('API key no reconocida');
     if (record.revokedAt) throw new UnauthorizedException('API key revocada');
+    if (record.expiresAt && record.expiresAt.getTime() <= Date.now()) {
+      throw new UnauthorizedException('API key caducada');
+    }
 
     // Actualiza lastUsedAt de forma asíncrona — sin bloquear la respuesta.
     // El `.catch()` evita una unhandled rejection y deja traza si la

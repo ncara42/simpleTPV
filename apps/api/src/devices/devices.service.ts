@@ -1,7 +1,8 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 import { Injectable, NotFoundException } from '@nestjs/common';
 
+import { assertStoreAccess } from '../auth/store-access.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
 
@@ -17,18 +18,20 @@ export class DevicesService {
     if (!store) {
       throw new NotFoundException(`Tienda ${input.storeId} no encontrada`);
     }
+    // El token plano se devuelve UNA VEZ al crear; en BD solo se guarda su hash.
+    const plainToken = this.newPairingToken();
     const device = await this.prisma.officialDevice.create({
       data: {
         organizationId: tenant.organizationId,
         storeId: input.storeId,
         name: input.name.trim(),
-        pairingToken: this.newPairingToken(),
+        pairingToken: this.hashToken(plainToken),
         authorized: false,
       },
     });
     return {
       ...this.publicDevice(device),
-      pairingToken: device.pairingToken,
+      pairingToken: plainToken,
       authorized: device.authorized,
     };
   }
@@ -64,7 +67,7 @@ export class DevicesService {
       return { authorized: false, device: null };
     }
     const device = await this.prisma.officialDevice.findFirst({
-      where: { pairingToken, organizationId: tenant.organizationId },
+      where: { pairingToken: this.hashToken(pairingToken), organizationId: tenant.organizationId },
     });
     if (!device || !device.authorized) {
       return { authorized: false, device: null };
@@ -76,14 +79,21 @@ export class DevicesService {
     return { authorized: true, device: this.publicDevice(updated) };
   }
 
-  async pair(pairingToken: string) {
+  async pair(pairingToken: string, caller: { userId: string; role: string }) {
     const tenant = requireTenant();
     const device = await this.prisma.officialDevice.findFirst({
-      where: { pairingToken, organizationId: tenant.organizationId },
+      where: { pairingToken: this.hashToken(pairingToken), organizationId: tenant.organizationId },
     });
     if (!device) {
       throw new NotFoundException('Token de dispositivo no encontrado');
     }
+    // BOLA intra-tenant (KEY-03): un CLERK solo empareja dispositivos de sus
+    // tiendas. ADMIN/MANAGER operan sobre toda la organización (org-wide).
+    await assertStoreAccess(this.prisma, {
+      userId: caller.userId,
+      role: caller.role,
+      storeId: device.storeId,
+    });
     const updated = await this.prisma.officialDevice.update({
       where: { id: device.id },
       data: { authorized: true, pairedAt: device.pairedAt ?? new Date(), lastSeenAt: new Date() },
@@ -109,5 +119,10 @@ export class DevicesService {
 
   private newPairingToken(): string {
     return randomBytes(6).toString('hex').toUpperCase();
+  }
+
+  // Hash determinista del token para buscar/persistir sin guardar el plano.
+  private hashToken(plaintext: string): string {
+    return createHash('sha256').update(plaintext).digest('hex');
   }
 }
