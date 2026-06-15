@@ -21,14 +21,18 @@ peerDependencyRules:
     eslint: '10'
 
 # Overrides:
-# - esbuild: vite 8 acepta 0.25 sin problema, pero por defecto pnpm puede
-#   resolver 0.28 que tiene breaking change con target ES2020 (transform fails
-#   en destructuring). Pinneamos a ~0.25 (versión fixed para el CVE
-#   GHSA-67mh-4wv8-2f99 que OSV detectó como transitivo).
+# - esbuild: subido a >=0.28.1 para el aviso GHSA-gv7w-rqvm-qjhr (CVSS 8.1) que
+#   OSV detecta en <0.28.1 (transitivo). Antes pinneábamos ~0.25 por un breaking
+#   change de 0.28 con target ES2020 (transform de destructuring), corregido ya en
+#   0.28.1; vite 8 declara su peer esbuild como ^0.27 || ^0.28, así que 0.28.1 es
+#   justo lo que espera. Build y tests verificados verdes con esta versión.
+# - js-yaml: subido a >=4.2.0 para GHSA-h67p-54hq-rp68 (CVSS 5.3) en <4.2.0,
+#   arrastrado por cosmiconfig 8 (acepta ^4.1.0, 4.2.0 encaja sin breaking).
 # - @hono/node-server: OSV detectó GHSA-92pp-h63x-v22m (CVSS 5.3) en versiones
 #   <1.19.13, arrastrado por prisma 7 (su HTTP server interno usa hono).
 overrides:
-  esbuild: ~0.25.0
+  esbuild: '>=0.28.1'
+  js-yaml: '>=4.2.0'
   '@hono/node-server': '>=1.19.13'
 
 allowBuilds:

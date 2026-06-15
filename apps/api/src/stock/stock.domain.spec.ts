@@ -34,6 +34,19 @@ describe('allocateFefo', () => {
     expect(r.shortfall).toBe(0);
   });
 
+  it('corta en cuanto cubre la cantidad: no recorre lotes posteriores', () => {
+    // El primer lote satisface la salida → el bucle sale (break) sin tocar B.
+    const r = allocateFefo(
+      [
+        { lotCode: 'A', quantity: 10 },
+        { lotCode: 'B', quantity: 5 },
+      ],
+      4,
+    );
+    expect(r.consumed).toEqual([{ lotCode: 'A', qty: 4 }]);
+    expect(r.shortfall).toBe(0);
+  });
+
   it('consume en orden FEFO: agota el primero y parte del segundo', () => {
     const r = allocateFefo(
       [
@@ -112,6 +125,20 @@ describe('allocateReturnToBatches', () => {
       { batchId: 'A', qty: 3 },
       { batchId: 'B', qty: 2 },
     ]);
+    expect(r.noLot).toBe(0);
+  });
+
+  it('corta en cuanto reingresa lo devuelto: no recorre lotes posteriores', () => {
+    // Se reingresa todo en el primer lote → el bucle sale (break) sin tocar B.
+    const r = allocateReturnToBatches(
+      [
+        { batchId: 'A', qty: 3 },
+        { batchId: 'B', qty: 2 },
+      ],
+      {},
+      3,
+    );
+    expect(r.perBatch).toEqual([{ batchId: 'A', qty: 3 }]);
     expect(r.noLot).toBe(0);
   });
 
