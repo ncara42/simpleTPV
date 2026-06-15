@@ -1582,7 +1582,7 @@ export function DashboardPage({
                         removeTile(id);
                       }}
                     >
-                      <X size={14} aria-hidden="true" />
+                      <X size={13} aria-hidden="true" />
                     </button>
                   )}
                   {renderItem(id)}
