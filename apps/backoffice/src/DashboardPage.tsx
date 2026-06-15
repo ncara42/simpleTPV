@@ -1284,39 +1284,47 @@ export function DashboardPage({
       <header className="catalog-head is-actions-only dash-head">
         <div className="catalog-actions">
           {editing ? (
-            // Barra de acciones del modo edición: pista + Restablecer / Cancelar / Guardar.
+            // Barra del modo edición: chip de contexto + pista, separador y acciones
+            // (Restablecer/Cancelar tipo ghost · Guardar primario).
             <div className="dash-edit-bar" data-testid="dash-edit-bar">
+              <span className="dash-edit-lead-icon" aria-hidden="true">
+                <Move size={16} />
+              </span>
               {/* role=status: el lector de pantalla anuncia que se ha entrado en modo edición. */}
               <span className="dash-edit-hint" role="status">
-                Arrastra las tarjetas para colocarlas a tu gusto
+                <strong>Editando el panel</strong>
+                <span>Arrastra las tarjetas para colocarlas a tu gusto</span>
               </span>
-              <button
-                type="button"
-                className="dash-edit-btn"
-                onClick={resetEditing}
-                data-testid="dash-edit-reset"
-              >
-                <RotateCcw size={15} aria-hidden="true" />
-                Restablecer
-              </button>
-              <button
-                type="button"
-                className="dash-edit-btn"
-                onClick={cancelEditing}
-                data-testid="dash-edit-cancel"
-              >
-                <X size={15} aria-hidden="true" />
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="dash-edit-btn is-primary"
-                onClick={saveEditing}
-                data-testid="dash-edit-save"
-              >
-                <Check size={15} aria-hidden="true" />
-                Guardar
-              </button>
+              <span className="dash-edit-sep" aria-hidden="true" />
+              <div className="dash-edit-actions">
+                <button
+                  type="button"
+                  className="dash-edit-btn"
+                  onClick={resetEditing}
+                  data-testid="dash-edit-reset"
+                >
+                  <RotateCcw size={15} aria-hidden="true" />
+                  Restablecer
+                </button>
+                <button
+                  type="button"
+                  className="dash-edit-btn"
+                  onClick={cancelEditing}
+                  data-testid="dash-edit-cancel"
+                >
+                  <X size={15} aria-hidden="true" />
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="dash-edit-btn is-primary"
+                  onClick={saveEditing}
+                  data-testid="dash-edit-save"
+                >
+                  <Check size={15} aria-hidden="true" />
+                  Guardar
+                </button>
+              </div>
             </div>
           ) : (
             <>

@@ -1078,51 +1078,121 @@
 }
 
 /* Barra de acciones del modo edición: pista + Restablecer / Cancelar / Guardar. */
+/* ── Barra del modo edición ────────────────────────────────────────────────────
+   Superficie cohesiva (no píldoras sueltas): chip de icono con acento + etiqueta a
+   dos líneas, separador hairline y grupo de acciones (ghost + Guardar primario). */
 .dash-edit-bar {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.7rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.55rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  box-shadow: 0 6px 22px rgb(0 0 0 / 0.07);
   flex-wrap: wrap;
+  animation: dash-edit-in 0.3s var(--ui-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+.dash-edit-lead-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  background: var(--ui-brand-soft, rgba(0, 102, 204, 0.08));
+  color: var(--ui-primary);
 }
 .dash-edit-hint {
-  margin-right: 0.35rem;
-  font-size: 0.82rem;
-  letter-spacing: -0.01em;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  line-height: 1.25;
+}
+.dash-edit-hint strong {
+  font-size: 0.85rem;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+}
+.dash-edit-hint span {
+  font-size: 0.76rem;
+  letter-spacing: -0.005em;
   color: var(--ui-text-muted);
+}
+.dash-edit-sep {
+  align-self: stretch;
+  width: 1px;
+  margin: 0.25rem 0.1rem;
+  background: var(--ui-border);
+}
+.dash-edit-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 .dash-edit-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  height: calc(30px + 0.36rem + 2px);
-  padding: 0 0.8rem;
-  border: 1px solid var(--ui-border);
+  height: 2.2rem;
+  padding: 0 0.85rem;
+  border: 1px solid transparent;
   border-radius: 9999px;
-  background: var(--ui-surface);
+  background: transparent;
   color: var(--ui-text);
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
+    background 0.14s ease,
+    color 0.14s ease,
+    transform 0.14s ease,
+    box-shadow 0.14s ease;
 }
 .dash-edit-btn:hover {
-  border-color: var(--ui-border-strong);
   background: var(--ui-surface-subtle);
+}
+.dash-edit-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
 }
 .dash-edit-btn svg {
   flex: none;
+  color: var(--ui-text-soft);
 }
 .dash-edit-btn.is-primary {
-  border-color: transparent;
+  padding: 0 1.05rem;
   background: var(--ui-primary);
   color: var(--ui-primary-fg);
 }
+.dash-edit-btn.is-primary svg {
+  color: currentColor;
+}
 .dash-edit-btn.is-primary:hover {
-  background: var(--ui-primary);
-  filter: brightness(0.96);
+  background: var(--ui-primary-hover, var(--ui-primary));
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--ui-primary) 30%, transparent);
+}
+.dash-edit-btn.is-primary:active {
+  transform: translateY(0);
+}
+@keyframes dash-edit-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-edit-bar {
+    animation: none;
+  }
 }
 
 /* ── Tablero (react-grid-layout v2) ──
