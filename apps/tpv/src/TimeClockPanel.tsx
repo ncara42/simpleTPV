@@ -1,4 +1,5 @@
 import { ApiError, type TimeClockType } from '@simpletpv/auth';
+import { DataTable } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -202,36 +203,45 @@ export function TimeClockPanel({ storeId }: { storeId: string | null }) {
           </div>
         </div>
 
-        {historyQuery.isLoading ? (
-          <p className="catalog-empty">Cargando…</p>
-        ) : rows.length === 0 ? (
-          <p className="catalog-empty" data-testid="time-clock-empty">
-            Sin fichajes para la fecha seleccionada.
-          </p>
-        ) : (
-          <table className="catalog-table" data-testid="time-clock-table">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Entrada</th>
-                <th>Salida</th>
-                <th>Pausas</th>
-                <th>Horas</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.date} data-testid="time-clock-row">
-                  <td className="muted tabular-nums">{row.date}</td>
-                  <td className="muted tabular-nums">{fmtClock(row.firstIn)}</td>
-                  <td className="muted tabular-nums">{fmtClock(row.lastOut)}</td>
-                  <td className="muted tabular-nums">{fmtHm(row.breakMs)}</td>
-                  <td className="tabular-nums">{fmtHm(row.workedMs)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <DataTable
+          data-testid="time-clock-table"
+          rowTestId="time-clock-row"
+          rows={rows}
+          rowKey={(row) => row.date}
+          loading={historyQuery.isLoading}
+          emptyState={
+            <span className="catalog-empty" data-testid="time-clock-empty">
+              Sin fichajes para la fecha seleccionada.
+            </span>
+          }
+          columns={[
+            {
+              key: 'date',
+              header: 'Fecha',
+              render: (row) => <span className="muted tabular-nums">{row.date}</span>,
+            },
+            {
+              key: 'firstIn',
+              header: 'Entrada',
+              render: (row) => <span className="muted tabular-nums">{fmtClock(row.firstIn)}</span>,
+            },
+            {
+              key: 'lastOut',
+              header: 'Salida',
+              render: (row) => <span className="muted tabular-nums">{fmtClock(row.lastOut)}</span>,
+            },
+            {
+              key: 'breakMs',
+              header: 'Pausas',
+              render: (row) => <span className="muted tabular-nums">{fmtHm(row.breakMs)}</span>,
+            },
+            {
+              key: 'workedMs',
+              header: 'Horas',
+              render: (row) => <span className="tabular-nums">{fmtHm(row.workedMs)}</span>,
+            },
+          ]}
+        />
       </div>
 
       {pendingPunch && (

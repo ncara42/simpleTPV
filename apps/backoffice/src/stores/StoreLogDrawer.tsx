@@ -1,3 +1,5 @@
+import { DataTable } from '@simpletpv/ui';
+
 import { fmtDayMonth } from '../lib/format.js';
 import type { StoreLogEntry } from '../lib/time-clock.js';
 
@@ -43,32 +45,36 @@ export function StoreLogDrawer({
           </p>
         ) : (
           <div className="store-log-table-wrap">
-            <table className="catalog-table store-log-table" data-testid="store-log-table">
-              <thead>
-                <tr>
-                  <th>Empleado</th>
-                  <th>Fecha</th>
-                  <th>Hora</th>
-                  <th>Movimiento</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((e) => (
-                  <tr key={`${e.date}-${e.time}-${e.type}`}>
-                    <td>{e.name}</td>
-                    <td className="muted">{fmtDayMonth(e.date)}</td>
-                    <td className="store-log-time">{e.time}</td>
-                    <td>
-                      <span
-                        className={`store-log-tag ${e.type === 'apertura' ? 'is-open' : 'is-close'}`}
-                      >
-                        {e.type === 'apertura' ? 'Apertura' : 'Cierre'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              className="store-log-table"
+              data-testid="store-log-table"
+              rows={entries}
+              rowKey={(e) => `${e.date}-${e.time}-${e.type}`}
+              columns={[
+                { key: 'name', header: 'Empleado', render: (e) => e.name },
+                {
+                  key: 'date',
+                  header: 'Fecha',
+                  render: (e) => <span className="muted">{fmtDayMonth(e.date)}</span>,
+                },
+                {
+                  key: 'time',
+                  header: 'Hora',
+                  render: (e) => <span className="store-log-time">{e.time}</span>,
+                },
+                {
+                  key: 'type',
+                  header: 'Movimiento',
+                  render: (e) => (
+                    <span
+                      className={`store-log-tag ${e.type === 'apertura' ? 'is-open' : 'is-close'}`}
+                    >
+                      {e.type === 'apertura' ? 'Apertura' : 'Cierre'}
+                    </span>
+                  ),
+                },
+              ]}
+            />
           </div>
         )}
       </aside>

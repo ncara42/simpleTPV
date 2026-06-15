@@ -1,3 +1,4 @@
+import { DataTable } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -29,33 +30,33 @@ export function ProductMovements({ productId }: { productId: string }) {
         >
           Ver movimientos
         </button>
-      ) : isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : !data || data.items.length === 0 ? (
-        <p className="catalog-empty" data-testid="movements-empty">
-          Sin movimientos.
-        </p>
       ) : (
-        <table className="catalog-table" data-testid="movements-table">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Tipo</th>
-              <th>Cantidad</th>
-              <th>Motivo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.items.map((m) => (
-              <tr key={m.id} data-testid="movement-row">
-                <td className="muted">{dt.format(new Date(m.createdAt))}</td>
-                <td>{MOVEMENT_LABEL[m.type] ?? m.type}</td>
-                <td>{m.quantity}</td>
-                <td className="muted">{m.reason ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          data-testid="movements-table"
+          rowTestId="movement-row"
+          rows={data?.items ?? []}
+          rowKey={(m) => m.id}
+          loading={isLoading}
+          emptyState={
+            <span className="catalog-empty" data-testid="movements-empty">
+              Sin movimientos.
+            </span>
+          }
+          columns={[
+            {
+              key: 'createdAt',
+              header: 'Fecha',
+              render: (m) => <span className="muted">{dt.format(new Date(m.createdAt))}</span>,
+            },
+            { key: 'type', header: 'Tipo', render: (m) => MOVEMENT_LABEL[m.type] ?? m.type },
+            { key: 'quantity', header: 'Cantidad', render: (m) => m.quantity },
+            {
+              key: 'reason',
+              header: 'Motivo',
+              render: (m) => <span className="muted">{m.reason ?? '—'}</span>,
+            },
+          ]}
+        />
       )}
     </section>
   );
