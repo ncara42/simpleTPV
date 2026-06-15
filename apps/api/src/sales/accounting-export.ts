@@ -13,6 +13,7 @@
  * coma decimal y separador `;`) queda pendiente de confirmar QUÉ software usa la
  * gestoría del cliente; este CSV estándar es la base sobre la que añadirlo.
  */
+import { escapeCsvField } from '../common/csv.js';
 import { round2 } from '../common/money.js';
 import { buildTaxBreakdown } from './sales.domain.js';
 
@@ -26,10 +27,9 @@ export interface AccountingSale {
   lines: Array<{ taxRate: number; lineTotal: number }>;
 }
 
-// Escapa comillas/comas/saltos (mismo criterio que generateExportCsv).
-function esc(v: string): string {
-  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
-}
+// Escapa comillas/comas/saltos y neutraliza inyección de fórmulas (común a todos
+// los exportadores, vía common/csv.ts).
+const esc = escapeCsvField;
 
 const HEADER = 'fecha,numero,tienda,metodo_pago,tipo_iva,base,cuota,total';
 

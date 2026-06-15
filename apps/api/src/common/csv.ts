@@ -48,3 +48,22 @@ export function parseCsv(csv: string): Array<Record<string, string>> {
 export function rowNumber(index: number): number {
   return index + 2;
 }
+
+// Caracteres con los que una hoja de cálculo (Excel/LibreOffice/Sheets) interpreta
+// el campo como FÓRMULA al abrir el CSV: si el primer carácter es uno de estos,
+// el contenido se evalúa en el equipo del receptor (CSV/formula injection,
+// CWE-1236 / INJ-01). Incluye `\t` y `\r` porque algunos parsers los tratan como
+// inicio de celda equivalente a `=`.
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
+
+// Escapa un campo de texto para CSV de EXPORTACIÓN de forma segura:
+//   1. Neutraliza la inyección de fórmulas prefijando con comilla simple cualquier
+//      campo cuyo primer carácter dispare la evaluación de la hoja de cálculo.
+//   2. Aplica entrecomillado RFC 4180 (comilla doble duplicada) cuando el campo
+//      contiene comas, comillas o saltos de línea.
+// Centraliza el criterio para los tres exportadores (ventas, contabilidad,
+// compras) que antes definían un `esc` que NO neutralizaba las fórmulas.
+export function escapeCsvField(value: string): string {
+  const prefixed = FORMULA_TRIGGER.test(value) ? `'${value}` : value;
+  return /[",\n]/.test(prefixed) ? `"${prefixed.replace(/"/g, '""')}"` : prefixed;
+}

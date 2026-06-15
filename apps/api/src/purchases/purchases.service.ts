@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { escapeCsvField } from '../common/csv.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
@@ -212,7 +213,8 @@ export class PurchasesService {
 
   /**
    * Exporta un pedido a CSV (#48): cabecera + una fila por línea (producto,
-   * pedido, recibido, coste). RLS vía get(). Escapa comillas/comas básicas.
+   * pedido, recibido, coste). RLS vía get(). Escapa comillas/comas/saltos y
+   * neutraliza inyección de fórmulas (común a todos los exportadores).
    */
   async exportCsv(id: string): Promise<string> {
     const order = await this.get(id);
@@ -221,7 +223,7 @@ export class PurchasesService {
       select: { id: true, name: true },
     });
     const nameById = new Map(products.map((p) => [p.id, p.name]));
-    const esc = (v: string): string => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const esc = escapeCsvField;
 
     const header = 'producto,cantidad_pedida,cantidad_recibida,coste_unitario';
     const rows = order.lines.map((l) =>

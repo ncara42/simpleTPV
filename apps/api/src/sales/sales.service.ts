@@ -9,6 +9,7 @@ import {
 import { Prisma, type SaleStatus } from '@simpletpv/db';
 
 import { assertStoreAccess } from '../auth/store-access.js';
+import { escapeCsvField } from '../common/csv.js';
 import { num, round2 } from '../common/money.js';
 import { EVENT_BUS, type EventBus } from '../events/event-bus.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -666,8 +667,9 @@ export class SalesService {
         store: { select: { name: true, code: true } },
       },
     });
-    // Escapa comillas/comas/saltos (mismo criterio que purchases.exportCsv).
-    const esc = (v: string): string => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    // Escapa comillas/comas/saltos y neutraliza inyección de fórmulas (común a
+    // todos los exportadores, vía common/csv.ts).
+    const esc = escapeCsvField;
     const header = 'ticket,fecha,tienda,vendedor,estado,metodo_pago,subtotal,descuento,total';
     const lines = rows.map((r) =>
       [
