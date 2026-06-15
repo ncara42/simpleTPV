@@ -440,10 +440,12 @@ export function DashboardPage({
   useEffect(() => {
     if (editing === wasEditing.current) return;
     wasEditing.current = editing;
+    // preventScroll: enfocar NO debe arrastrar el scroll al tile/botón; el usuario se queda
+    // en la posición en la que estaba al pulsar Personalizar / Guardar.
     if (editing) {
-      boardRef.current?.querySelector<HTMLElement>('.dash-tile')?.focus();
+      boardRef.current?.querySelector<HTMLElement>('.dash-tile')?.focus({ preventScroll: true });
     } else {
-      editToggleRef.current?.focus();
+      editToggleRef.current?.focus({ preventScroll: true });
     }
   }, [editing, boardRef]);
   // Red de seguridad: si la animación de salida del fondo de puntos no emite animationend
