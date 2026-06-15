@@ -8,8 +8,9 @@ import {
   Optional,
 } from '@nestjs/common';
 import { type SaleStatus } from '@simpletpv/db';
-import { Queue, type RedisOptions, Worker } from 'bullmq';
+import { Queue, Worker } from 'bullmq';
 
+import { JOB_RETENTION, redisOptionsFromUrl } from '../common/redis-options.js';
 import { FeatureFlagService } from '../feature-flags/feature-flags.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant, tenantStorage } from '../prisma/tenant-context.js';
@@ -70,12 +71,7 @@ export class SalesExportService implements OnModuleInit, OnModuleDestroy {
       // Sin Redis (dev/test): sin cola; el export se genera en el momento.
       return;
     }
-    const parsed = new URL(url);
-    const connection: RedisOptions = {
-      host: parsed.hostname,
-      port: Number(parsed.port || 6379),
-      ...(parsed.password ? { password: parsed.password } : {}),
-    };
+    const connection = redisOptionsFromUrl(url);
     this.queue = new Queue(QUEUE_NAME, { connection });
     this.worker = new Worker(
       QUEUE_NAME,
@@ -140,7 +136,7 @@ export class SalesExportService implements OnModuleInit, OnModuleDestroy {
       filters: stored,
     };
     if (this.queue) {
-      await this.queue.add('export', job, { attempts: 1 });
+      await this.queue.add('export', job, { attempts: 1, ...JOB_RETENTION });
       return { id: created.id, status: 'PENDING' };
     }
     await this.process(job);

@@ -1,7 +1,29 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { tenantStorage } from '../prisma/tenant-context.js';
 import { SalesExportService } from './sales-export.service.js';
+
+// Stub de bullmq: Queue/Worker no abren conexiones reales a Redis. Capturamos las
+// `connection` con las que se construyen para verificar el endurecimiento TLS y la
+// retención de jobs (#118) sin necesitar un Redis vivo.
+const queueAdd = vi.fn(async (..._args: unknown[]) => undefined);
+const queueClose = vi.fn(async () => undefined);
+const workerClose = vi.fn(async () => undefined);
+const ctorConnections: unknown[] = [];
+vi.mock('bullmq', () => ({
+  Queue: class {
+    add = queueAdd;
+    close = queueClose;
+    constructor(_name: string, opts: { connection: unknown }) {
+      ctorConnections.push(opts.connection);
+    }
+  },
+  Worker: class {
+    close = workerClose;
+    on = vi.fn();
+    constructor() {}
+  },
+}));
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const USER = '22222222-2222-2222-2222-222222222222';
@@ -281,5 +303,47 @@ describe('SalesExportService', () => {
     const { service } = makeService(makePrisma());
     // Sin Redis, queue y worker son null → onModuleDestroy no debe lanzar.
     await expect(service.onModuleDestroy()).resolves.toBeUndefined();
+  });
+
+  // ── Inicialización con Redis: endurecimiento BullMQ (#118) ────────────────
+  describe('onModuleInit con Redis', () => {
+    afterEach(() => {
+      ctorConnections.length = 0;
+      queueAdd.mockClear();
+      delete process.env.REDIS_URL;
+    });
+
+    it('sin REDIS_URL no crea cola (degrada a procesado en el momento)', () => {
+      const { service } = makeService(makePrisma());
+      service.onModuleInit();
+      expect(ctorConnections.length).toBe(0);
+    });
+
+    it('con rediss:// fuerza tls en la conexión de la cola', () => {
+      process.env.REDIS_URL = 'rediss://cache:6380';
+      const { service } = makeService(makePrisma());
+      service.onModuleInit();
+      expect(ctorConnections[0]).toMatchObject({
+        host: 'cache',
+        port: 6380,
+        tls: { rejectUnauthorized: true },
+      });
+    });
+
+    it('encola el export con removeOnComplete/removeOnFail (retención acotada)', async () => {
+      process.env.REDIS_URL = 'redis://cache:6379';
+      const prisma = makePrisma();
+      const { service } = makeService(prisma);
+      service.onModuleInit();
+      await tenantStorage.run({ organizationId: ORG }, () =>
+        service.requestExport({}, USER, 'ADMIN'),
+      );
+      const opts = queueAdd.mock.calls[0]![2] as {
+        removeOnComplete: unknown;
+        removeOnFail: unknown;
+      };
+      expect(opts.removeOnComplete).toEqual({ count: 100 });
+      expect(opts.removeOnFail).toEqual({ count: 50 });
+    });
   });
 });

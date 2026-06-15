@@ -194,7 +194,9 @@ jobs:
         ports:
           - 5432:5432
       redis:
-        image: redis:7-alpine
+        # Pin a 7.4 (>=7.4.3 corrige CVE-2025-49844 / RediShell). Evita que la
+        # etiqueta mutable `7-alpine` resuelva a una build vulnerable en CI.
+        image: redis:7.4-alpine
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 3s
