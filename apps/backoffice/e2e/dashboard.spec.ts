@@ -24,13 +24,8 @@ test.beforeEach(async ({ page }) => {
   // El modo (D-20) se persiste global en /me/preferences. Si una ejecución previa dejó
   // "Libre" (p. ej. un fallo a mitad del test de modo), volvemos a "Cuadrícula" para que
   // los tests que esperan el tablero (dash-board) no arranquen rotos.
+  // El toggle Cuadrícula/Libre está siempre visible (para todos los presets).
   const grid = page.getByTestId('dash-mode-grid');
-  // «Personalizado» es libre-only y oculta el toggle: si quedó persistido, elige un preset
-  // normal para recuperar el toggle de modo antes de forzar cuadrícula.
-  if ((await grid.count()) === 0) {
-    await page.getByTestId('dash-preset-ventas').click();
-    await expect(grid).toBeVisible();
-  }
   if ((await grid.getAttribute('aria-selected')) !== 'true') {
     await grid.click();
     await expect(page.getByTestId('dash-board')).toBeVisible();
@@ -489,30 +484,43 @@ test('Modo Libre: herramientas de dibujo (forma, lápiz a mano y texto libre)', 
 test('Modo Libre · Personalizado: lienzo vacío con + que abre el buscador de widgets', async ({
   page,
 }) => {
-  // Seleccionar «Personalizado» entra en modo libre con un lienzo en blanco. Es libre-only:
-  // el toggle Cuadrícula/Libre se oculta (no tendría sentido un tablero vacío).
+  // «Personalizado» en cuadrícula: lienzo en blanco con "+" para agregar widgets.
+  // El toggle Cuadrícula/Libre se muestra (Personalizado ya no es libre-only).
   await page.getByTestId('dash-preset-personalizado').click();
-  await expect(page.getByTestId('dash-free')).toBeVisible();
-  await expect(page.getByTestId('dash-mode')).toHaveCount(0);
+  await expect(page.getByTestId('dash-mode')).toBeVisible();
+  await expect(page.getByTestId('dash-mode-grid')).toHaveAttribute('aria-selected', 'true');
 
   // Limpia widgets que pudieran haber quedado de ejecuciones previas (estado persistido).
+  // En cuadrícula vacía, cambia a libre para poder limpiar los widgets del lienzo.
+  const freeBtn = page.getByTestId('dash-mode-free');
   const widgets = page.locator('.dash-free-item--widget');
-  for (let n = await widgets.count(); n > 0; n = await widgets.count()) {
-    await widgets.first().locator('.dash-free-remove').dispatchEvent('click');
-    await expect(widgets).toHaveCount(n - 1);
+  if ((await page.getByTestId('dash-custom-grid-empty').count()) === 0) {
+    await freeBtn.click();
+    await expect(page.getByTestId('dash-free')).toBeVisible();
+    for (let n = await widgets.count(); n > 0; n = await widgets.count()) {
+      await widgets.first().locator('.dash-free-remove').dispatchEvent('click');
+      await expect(widgets).toHaveCount(n - 1);
+    }
+    await page.getByTestId('dash-mode-grid').click();
   }
 
-  // Estado vacío: "+" central.
-  await expect(page.getByTestId('dash-free-empty')).toBeVisible();
-  await page.getByTestId('dash-free-empty-add').click();
+  // Estado vacío en cuadrícula: "+" central que abre el buscador.
+  await expect(page.getByTestId('dash-custom-grid-empty')).toBeVisible();
+  await page.getByTestId('dash-custom-grid-add').click();
 
   // Buscador: filtra el catálogo y añade un widget.
   const search = page.getByTestId('dash-free-palette-search');
   await expect(search).toBeVisible();
   await search.fill('familia');
   await page.locator('.dash-free-palette-list button').first().click();
+  // El widget aparece en el tablero cuadrícula (el estado vacío desaparece).
+  await expect(page.getByTestId('dash-custom-grid-empty')).toHaveCount(0);
+  await expect(page.getByTestId('dash-board')).toBeVisible();
+
+  // El mismo widget también aparece en Libre (comparten la fuente de datos).
+  await freeBtn.click();
+  await expect(page.getByTestId('dash-free')).toBeVisible();
   await expect(widgets).toHaveCount(1);
-  await expect(page.getByTestId('dash-free-empty')).toHaveCount(0);
 
   // Limpieza: quita el widget y vuelve a Ventas + Cuadrícula para el resto de tests.
   await widgets.first().locator('.dash-free-remove').dispatchEvent('click');

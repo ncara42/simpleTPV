@@ -102,13 +102,29 @@ interface FreeBoardProps {
   itemLabel: (widgetId: string) => string;
   /** Se invoca con la disposición completa a persistir tras cada cambio confirmado. */
   onChange: (layout: FreeLayout) => void;
+  /** Vista inicial (pan/zoom) guardada; si se omite, fit-to-content al montar. */
+  initialView?: { panX: number; panY: number; zoom: number };
+  /** Se invoca (debounced 500 ms) cuando el usuario cambia la vista (pan/zoom). */
+  onViewChange?: (view: { panX: number; panY: number; zoom: number }) => void;
 }
 
-export function FreeBoard({ elements, renderItem, itemLabel, onChange }: FreeBoardProps) {
+export function FreeBoard({
+  elements,
+  renderItem,
+  itemLabel,
+  onChange,
+  initialView,
+  onViewChange,
+}: FreeBoardProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [els, setEls] = useState<FreeElement[]>(elements);
   const [past, setPast] = useState<FreeElement[][]>([]);
-  const [view, setView] = useState<View>({ panX: 0, panY: 0, zoom: 1 });
+  // Captura el valor en el primer render (antes de cualquier efecto); con key={preset.id}
+  // el componente remonta en cada cambio de preset, así que este ref es siempre fresco.
+  const initialViewRef = useRef(initialView);
+  const [view, setView] = useState<View>(
+    () => initialViewRef.current ?? { panX: 0, panY: 0, zoom: 1 },
+  );
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [tool, setTool] = useState<ToolId>('select');
@@ -248,12 +264,20 @@ export function FreeBoard({ elements, renderItem, itemLabel, onChange }: FreeBoa
     });
   }, []);
 
-  // Encaja el contenido al montar y mide el viewport (para minimapa y flecha).
+  // Encaja el contenido al montar (si no hay vista guardada) y mide el viewport.
   useLayoutEffect(() => {
-    fitToContent();
+    if (!initialViewRef.current) fitToContent();
     const el = viewportRef.current;
     if (el) setViewportSize({ width: el.clientWidth, height: el.clientHeight });
   }, [fitToContent]);
+
+  // Persiste pan/zoom debounced (500 ms) para que el padre lo guarde entre presets.
+  const onViewChangeRef = useRef(onViewChange);
+  onViewChangeRef.current = onViewChange;
+  useEffect(() => {
+    const t = setTimeout(() => onViewChangeRef.current?.(view), 500);
+    return () => clearTimeout(t);
+  }, [view]);
 
   useEffect(() => {
     const el = viewportRef.current;

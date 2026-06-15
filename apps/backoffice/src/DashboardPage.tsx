@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   LineChart,
   Move,
+  Plus,
   RotateCcw,
   Search,
   X,
@@ -27,6 +28,7 @@ import {
 
 import { DaySelector } from './components/DaySelector.js';
 import { FreeBoard } from './components/FreeBoard.js';
+import { WidgetPalette } from './components/WidgetPalette.js';
 import { listStores } from './lib/admin.js';
 import {
   type DashboardPeriod,
@@ -46,11 +48,15 @@ import {
   type SalesCompareMode,
 } from './lib/dashboard.js';
 import {
+  addWidget,
+  availableWidgets,
   buildDefaultLayout,
   type ChartCard,
   type DashboardMode,
   type FreeLayout,
+  type FreeWidget,
   type LayoutPref,
+  type PresetDef,
   type PresetId,
   presetItemIds,
   PRESETS,
@@ -210,6 +216,8 @@ export function DashboardPage({
   // intercambia su contenido, así que reubicamos el foco para no perderlo en <body>.
   const editToggleRef = useRef<HTMLButtonElement>(null);
   const wasEditing = useRef(false);
+  // Paleta de "Agregar widgets" en la cuadrícula de Personalizado (preset vacío).
+  const [customGridPaletteOpen, setCustomGridPaletteOpen] = useState(false);
   const store = storeId || undefined;
 
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
@@ -224,37 +232,52 @@ export function DashboardPage({
   const preset =
     PRESETS.find((p) => p.id === layout.preset) ?? PRESETS.find((p) => p.id === 'ventas')!;
   const vis = new Set([...preset.cards, ...preset.panels]);
-  // Elementos del preset (cards + paneles) y su colocación 2D. La COMPOSICIÓN la dicta el
-  // preset; aquí solo se coloca en el tablero y se persiste por preset (D-19). El layout
-  // guardado (o el de por defecto) se reconcilia con los elementos actuales del preset.
   // Estable por preset: evita recalcular y, en modo libre, invalidar la memo de nodos del
   // lienzo en cada re-render por datos. (renderItem sí cambia con los datos, por diseño.)
   const itemIds = useMemo(() => presetItemIds(preset), [preset]);
-  const savedRaw = layout.layouts?.[preset.id] ?? {};
-  // Reconciliamos CADA breakpoint guardado (no solo lg): si la composición del preset
-  // cambió entre versiones, evita que un breakpoint estrecho deje ids obsoletos o pinte
-  // elementos nuevos como celdas 1×1. `lg` siempre presente (cae a buildDefaultLayout).
-  const savedLayouts: StoredLayouts = {};
-  for (const [bp, items] of Object.entries(savedRaw)) {
-    savedLayouts[bp] = reconcileLayout(items, itemIds);
-  }
-  savedLayouts.lg = reconcileLayout(savedRaw.lg ?? buildDefaultLayout(preset), itemIds);
-  const activeLayouts = editing && draftLayouts ? draftLayouts : savedLayouts;
 
-  // D-20: modo de presentación (global) y disposición libre por preset (reconciliada con
-  // los elementos del preset: posición guardada por card o, si falta, la de por defecto).
-  // «Personalizado» es un lienzo en blanco: SIEMPRE en modo libre (no tendría sentido en
-  // cuadrícula, donde saldría un tablero vacío). Se fuerza al render sin tocar el modo global.
+  // D-20: modo global (cuadrícula / libre). Ningún preset lo fuerza: el usuario decide.
   const isCustomPreset = preset.id === 'personalizado';
-  const mode: DashboardMode = isCustomPreset ? 'free' : (layout.mode ?? 'grid');
+  const mode: DashboardMode = layout.mode ?? 'grid';
   const savedFree = reconcileFreeLayout(layout.freeLayouts?.[preset.id] ?? [], preset);
-  // En modo libre la composición la elige el usuario (añade/quita), no el preset: habilita las
-  // queries de los widgets presentes en el lienzo para que un widget añadido tenga sus datos.
+
+  // «Personalizado» no tiene items predefinidos: en cuadrícula los widgets derivan del
+  // lienzo libre (freeLayouts) para que ambos modos compartan la misma lista de widgets.
+  const customWidgetIds: string[] = isCustomPreset
+    ? savedFree.filter((e): e is FreeWidget => e.kind === 'widget').map((e) => e.widgetId)
+    : [];
+  // Ids efectivos para el tablero: para Personalizado son los widgets añadidos por el usuario.
+  const effectiveItemIds = isCustomPreset ? customWidgetIds : itemIds;
+
+  // Habilita queries de widgets visibles:
+  // - Libre: todos los del lienzo del preset activo.
+  // - Cuadrícula de Personalizado: los widgets añadidos (mismos que el lienzo).
+  // - Cuadrícula estándar: los del preset (ya están en vis).
   if (mode === 'free') {
     for (const el of savedFree) {
       if (el.kind === 'widget') vis.add(el.widgetId);
     }
+  } else if (isCustomPreset) {
+    for (const id of customWidgetIds) vis.add(id);
   }
+
+  // Colocación 2D en el tablero, reconciliada contra los ids efectivos del preset.
+  // Para Personalizado se reconcilia contra los widgets añadidos (no los del preset base).
+  const savedRaw = layout.layouts?.[preset.id] ?? {};
+  const savedLayouts: StoredLayouts = {};
+  {
+    const pseudoPreset: PresetDef = isCustomPreset
+      ? { ...preset, cards: customWidgetIds, panels: [] }
+      : preset;
+    for (const [bp, items] of Object.entries(savedRaw)) {
+      savedLayouts[bp] = reconcileLayout(items, effectiveItemIds);
+    }
+    savedLayouts.lg = reconcileLayout(
+      savedRaw.lg ?? buildDefaultLayout(pseudoPreset),
+      effectiveItemIds,
+    );
+  }
+  const activeLayouts = editing && draftLayouts ? draftLayouts : savedLayouts;
 
   // placeholderData: al cambiar de tienda/periodo se conservan los datos previos
   // durante el refetch en vez de vaciarse. Así los nodos del DOM (key estable por
@@ -548,6 +571,22 @@ export function DashboardPage({
       ...layout,
       freeLayouts: { ...layout.freeLayouts, [preset.id]: next },
     });
+  // D-20: persiste pan/zoom del lienzo libre por preset (evita zoom inconsistente al cambiar).
+  const onFreeViewChange = (v: { panX: number; panY: number; zoom: number }): void =>
+    setPref('dashboard.layout', {
+      ...layout,
+      freeViews: { ...layout.freeViews, [preset.id]: v },
+    });
+  // Personalizado en cuadrícula: añade un widget a freeLayouts (fuente compartida con libre).
+  const onAddCustomGridWidget = (widgetId: string): void => {
+    const next = addWidget(savedFree, widgetId, { x: 100, y: 100 });
+    setPref('dashboard.layout', {
+      ...layout,
+      freeLayouts: { ...layout.freeLayouts, [preset.id]: next },
+    });
+    setCustomGridPaletteOpen(false);
+  };
+  const customGridAvailable = availableWidgets(savedFree);
   // U-02: toggle barras ↔ línea LOCAL a cada card (persistido por card en el layout).
   // Cambiar el de una card no toca el de la otra.
   const chartKindFor = (card: ChartCard): 'bars' | 'line' =>
@@ -600,7 +639,12 @@ export function DashboardPage({
   };
   // Restablecer: vuelve el borrador al layout por defecto del preset (sin salir de edición).
   const resetEditing = (): void => {
-    setDraftLayouts({ lg: buildDefaultLayout(preset) });
+    if (isCustomPreset && customWidgetIds.length > 0) {
+      const pseudoPreset: PresetDef = { ...preset, cards: customWidgetIds, panels: [] };
+      setDraftLayouts({ lg: buildDefaultLayout(pseudoPreset) });
+    } else {
+      setDraftLayouts({ lg: buildDefaultLayout(preset) });
+    }
   };
   // Guardar: persiste el layout del borrador por preset y sale de edición.
   const saveEditing = (): void => {
@@ -1322,11 +1366,42 @@ export function DashboardPage({
                   ...stores.map((s) => ({ value: s.id, label: s.name })),
                 ]}
               />
-              {/* Acciones de la derecha (Personalizar + modo): agrupadas al extremo derecho y
-                  sticky con la cabecera, para poder cambiar de modo o editar a mitad de scroll. */}
+              {/* Acciones de la derecha: [Cuadrícula·Libre] [Personalizar].
+                  margin-left: auto en dash-head-right separa visualmente de Tiendas. */}
               <div className="dash-head-right">
-                {/* "Personalizar" solo en cuadrícula (en Libre las cards ya son arrastrables). */}
-                {mode === 'grid' && (
+                {/* D-20: toggle Cuadrícula / Libre (disponible para todos los presets). */}
+                <div
+                  className="dash-mode-switch"
+                  role="tablist"
+                  aria-label="Modo del dashboard"
+                  data-testid="dash-mode"
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === 'grid'}
+                    className={mode === 'grid' ? 'is-active' : ''}
+                    onClick={() => setMode('grid')}
+                    data-testid="dash-mode-grid"
+                  >
+                    <LayoutGrid size={14} aria-hidden="true" />
+                    Cuadrícula
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === 'free'}
+                    className={mode === 'free' ? 'is-active' : ''}
+                    onClick={() => setMode('free')}
+                    data-testid="dash-mode-free"
+                  >
+                    <Move size={14} aria-hidden="true" />
+                    Libre
+                  </button>
+                </div>
+                {/* "Personalizar": solo en cuadrícula con widgets (en Libre ya son arrastrables;
+                    en cuadrícula vacía de Personalizado no hay nada que reordenar). */}
+                {mode === 'grid' && !(isCustomPreset && effectiveItemIds.length === 0) && (
                   <button
                     ref={editToggleRef}
                     type="button"
@@ -1338,55 +1413,60 @@ export function DashboardPage({
                     Personalizar
                   </button>
                 )}
-                {/* D-20: modo de presentación. Cuadrícula = tablero con snap; Libre = lienzo
-                    edgeless. En «Personalizado» no aplica (siempre libre): se oculta. */}
-                {!isCustomPreset && (
-                  <div
-                    className="dash-mode-switch"
-                    role="tablist"
-                    aria-label="Modo del dashboard"
-                    data-testid="dash-mode"
-                  >
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={mode === 'grid'}
-                      className={mode === 'grid' ? 'is-active' : ''}
-                      onClick={() => setMode('grid')}
-                      data-testid="dash-mode-grid"
-                    >
-                      <LayoutGrid size={14} aria-hidden="true" />
-                      Cuadrícula
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={mode === 'free'}
-                      className={mode === 'free' ? 'is-active' : ''}
-                      onClick={() => setMode('free')}
-                      data-testid="dash-mode-free"
-                    >
-                      <Move size={14} aria-hidden="true" />
-                      Libre
-                    </button>
-                  </div>
-                )}
               </div>
             </>
           )}
         </div>
       </header>
 
-      {/* D-20: dos modos. CUADRÍCULA (D-19): tablero con snap a rejilla; la composición la
-          dicta el preset y cada card se coloca en 2D con snap. LIBRE: lienzo edgeless con
-          zoom/pan donde cada card va a píxel donde quieras (estilo Affine). */}
-      {mode === 'grid' ? (
-        <div
-          ref={boardRef}
-          className={`dash-board${editing ? ' is-editing' : ''}`}
-          data-testid="dash-board"
-        >
-          {boardMounted && (
+      {/* D-20: dos modos. El div del tablero permanece SIEMPRE en el DOM para que
+          useContainerWidth mida el ancho correcto al volver a cuadrícula (sin él, boardWidth
+          sería 0 al montar y las cards aparecerían aplastadas). Se oculta via CSS cuando no
+          estamos en cuadrícula. El lienzo libre (FreeBoard) se monta/desmonta según el modo. */}
+      <div
+        ref={boardRef}
+        className={`dash-board${editing ? ' is-editing' : ''}`}
+        data-testid="dash-board"
+        style={
+          mode !== 'grid'
+            ? {
+                visibility: 'hidden',
+                height: 0,
+                minHeight: 0,
+                overflow: 'hidden',
+                pointerEvents: 'none',
+              }
+            : undefined
+        }
+      >
+        {boardMounted &&
+          mode === 'grid' &&
+          (isCustomPreset && effectiveItemIds.length === 0 ? (
+            // Estado vacío de Personalizado en cuadrícula: lienzo en blanco con "Agregar".
+            <div className="dash-free-empty" data-testid="dash-custom-grid-empty">
+              <button
+                type="button"
+                className="dash-free-empty-add"
+                data-testid="dash-custom-grid-add"
+                aria-label="Agregar widgets"
+                onClick={() => setCustomGridPaletteOpen(true)}
+              >
+                <Plus size={30} aria-hidden="true" />
+              </button>
+              <p className="dash-free-empty-hint">
+                Panel en blanco · añade los widgets que quieras
+              </p>
+              {customGridPaletteOpen && (
+                <WidgetPalette
+                  variant="center"
+                  items={customGridAvailable}
+                  label={boardItemLabel}
+                  onPick={onAddCustomGridWidget}
+                  onClose={() => setCustomGridPaletteOpen(false)}
+                />
+              )}
+            </div>
+          ) : (
             <Responsive
               width={boardWidth}
               breakpoints={BOARD_BREAKPOINTS}
@@ -1402,7 +1482,7 @@ export function DashboardPage({
               onLayoutChange={onBoardLayoutChange}
               onBreakpointChange={(bp) => setBoardBreakpoint(bp)}
             >
-              {itemIds.map((id) => (
+              {effectiveItemIds.map((id) => (
                 <div
                   key={id}
                   className={`dash-tile${editing ? ' is-editing' : ''}`}
@@ -1419,15 +1499,18 @@ export function DashboardPage({
                 </div>
               ))}
             </Responsive>
-          )}
-        </div>
-      ) : (
+          ))}
+      </div>
+
+      {mode === 'free' && (
         <FreeBoard
           key={preset.id}
           elements={savedFree}
           renderItem={renderItem}
           itemLabel={boardItemLabel}
           onChange={onFreeChange}
+          {...(layout.freeViews?.[preset.id] ? { initialView: layout.freeViews[preset.id] } : {})}
+          onViewChange={onFreeViewChange}
         />
       )}
 

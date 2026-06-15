@@ -213,6 +213,8 @@ export interface LayoutPref {
   layouts?: Partial<Record<PresetId, StoredLayouts>>;
   /** D-20: colocación libre a píxel por preset (lienzo edgeless). */
   freeLayouts?: Partial<Record<PresetId, FreeLayout>>;
+  /** D-20: pan/zoom guardado del lienzo libre por preset (evita zoom inconsistente al cambiar). */
+  freeViews?: Partial<Record<PresetId, { panX: number; panY: number; zoom: number }>>;
 }
 
 // Layout por defecto (breakpoint lg, 12 columnas): coloca primero las tarjetas KPI en una
