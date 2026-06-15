@@ -1,4 +1,4 @@
-import { Select } from '@simpletpv/ui';
+import { DataTable, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -78,38 +78,41 @@ function PriceListDetail({
         <h3>Tarifa · {priceList.name}</h3>
       </header>
       <div className="modal-body">
-        {items.length === 0 ? (
-          <p className="catalog-empty">Sin precios. Añade el primero abajo.</p>
-        ) : (
-          <table className="catalog-table">
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>PVP</th>
-                <th>Precio mayorista</th>
-                <th aria-label="Acciones" />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((it) => (
-                <tr key={it.id} data-testid="b2b-pricelist-item">
-                  <td>{it.product?.name ?? it.productId}</td>
-                  <td className="muted">{it.product ? eur(it.product.salePrice) : '—'}</td>
-                  <td>{eur(it.price)}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="link-btn"
-                      onClick={() => removeItemMut.mutate(it.productId)}
-                    >
-                      Quitar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <DataTable
+          rowTestId="b2b-pricelist-item"
+          rows={items}
+          rowKey={(it) => it.id}
+          emptyState={<span className="catalog-empty">Sin precios. Añade el primero abajo.</span>}
+          columns={[
+            {
+              key: 'product',
+              header: 'Producto',
+              render: (it) => it.product?.name ?? it.productId,
+            },
+            {
+              key: 'pvp',
+              header: 'PVP',
+              render: (it) => (
+                <span className="muted">{it.product ? eur(it.product.salePrice) : '—'}</span>
+              ),
+            },
+            { key: 'price', header: 'Precio mayorista', render: (it) => eur(it.price) },
+            {
+              key: 'actions',
+              header: '',
+              align: 'right',
+              render: (it) => (
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => removeItemMut.mutate(it.productId)}
+                >
+                  Quitar
+                </button>
+              ),
+            },
+          ]}
+        />
 
         <section className="form-section">
           <span className="form-section-title">Añadir / actualizar precio</span>
@@ -196,55 +199,59 @@ export function PriceListsSection() {
         </span>
       </SectionToolbar>
 
-      {isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : priceLists.length === 0 ? (
-        <p className="catalog-empty">Aún no hay tarifas. Crea la primera.</p>
-      ) : (
-        <table className="catalog-table" data-testid="b2b-pricelists-table">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Precios</th>
-              <th>Clientes</th>
-              <th>Estado</th>
-              <th aria-label="Acciones" />
-            </tr>
-          </thead>
-          <tbody>
-            {priceLists.map((p) => (
-              <tr key={p.id} data-testid="b2b-pricelist-row">
-                <td>{p.name}</td>
-                <td className="muted">{p.itemCount}</td>
-                <td className="muted">{p.customerCount}</td>
-                <td>
-                  <span className="role-badge">{p.active ? 'Activa' : 'Inactiva'}</span>
-                </td>
-                <td>
-                  <button type="button" className="link-btn" onClick={() => setDetailOf(p)}>
-                    Precios
-                  </button>
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        title: 'Eliminar tarifa',
-                        message: `¿Eliminar la tarifa "${p.name}"? Los clientes que la usen quedarán sin tarifa.`,
-                        confirmLabel: 'Eliminar',
-                        danger: true,
-                      });
-                      if (ok) removeMut.mutate(p.id);
-                    }}
-                  >
-                    Borrar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <DataTable
+        data-testid="b2b-pricelists-table"
+        rowTestId="b2b-pricelist-row"
+        rows={priceLists}
+        rowKey={(p) => p.id}
+        loading={isLoading}
+        emptyState={<span className="catalog-empty">Aún no hay tarifas. Crea la primera.</span>}
+        columns={[
+          { key: 'name', header: 'Nombre', render: (p) => p.name },
+          {
+            key: 'items',
+            header: 'Precios',
+            render: (p) => <span className="muted">{p.itemCount}</span>,
+          },
+          {
+            key: 'customers',
+            header: 'Clientes',
+            render: (p) => <span className="muted">{p.customerCount}</span>,
+          },
+          {
+            key: 'status',
+            header: 'Estado',
+            render: (p) => <span className="role-badge">{p.active ? 'Activa' : 'Inactiva'}</span>,
+          },
+          {
+            key: 'actions',
+            header: '',
+            align: 'right',
+            render: (p) => (
+              <>
+                <button type="button" className="link-btn" onClick={() => setDetailOf(p)}>
+                  Precios
+                </button>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: 'Eliminar tarifa',
+                      message: `¿Eliminar la tarifa "${p.name}"? Los clientes que la usen quedarán sin tarifa.`,
+                      confirmLabel: 'Eliminar',
+                      danger: true,
+                    });
+                    if (ok) removeMut.mutate(p.id);
+                  }}
+                >
+                  Borrar
+                </button>
+              </>
+            ),
+          },
+        ]}
+      />
 
       {creating && (
         <Modal

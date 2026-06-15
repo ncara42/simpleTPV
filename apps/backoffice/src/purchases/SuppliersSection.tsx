@@ -1,4 +1,5 @@
 import type { Supplier } from '@simpletpv/auth';
+import { DataTable } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -70,55 +71,60 @@ export function SuppliersSection() {
           </button>
         </div>
       </header>
-      {isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : suppliers.length === 0 ? (
-        <p className="catalog-empty" data-testid="suppliers-empty">
-          Sin proveedores.
-        </p>
-      ) : (
-        <table className="catalog-table" data-testid="suppliers-table">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Lead time</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {suppliers.map((s) => (
-              // Fila clicable → vista detalle (I-18); las acciones no propagan.
-              <tr
-                key={s.id}
-                className="row-clickable"
-                data-testid="supplier-row"
-                onClick={() => setDetailId(s.id)}
-              >
-                <td>{s.name}</td>
-                <td className="muted">{s.leadTimeDays} días</td>
-                <td onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => setDetailId(s.id)}
-                    data-testid="supplier-open"
-                  >
-                    Ver
-                  </button>
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => delMut.mutate(s.id)}
-                    data-testid="supplier-delete"
-                  >
-                    Eliminar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      {/* Fila clicable → vista detalle (I-18); las acciones no propagan (stopPropagation). */}
+      <DataTable
+        data-testid="suppliers-table"
+        rowTestId="supplier-row"
+        rows={suppliers}
+        rowKey={(s) => s.id}
+        loading={isLoading}
+        rowClassName={() => 'row-clickable'}
+        onRowClick={(s) => setDetailId(s.id)}
+        emptyState={
+          <span className="catalog-empty" data-testid="suppliers-empty">
+            Sin proveedores.
+          </span>
+        }
+        columns={[
+          { key: 'name', header: 'Nombre', render: (s) => s.name },
+          {
+            key: 'leadTime',
+            header: 'Lead time',
+            render: (s) => <span className="muted">{s.leadTimeDays} días</span>,
+          },
+          {
+            key: 'actions',
+            header: '',
+            align: 'right',
+            render: (s) => (
+              <>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDetailId(s.id);
+                  }}
+                  data-testid="supplier-open"
+                >
+                  Ver
+                </button>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    delMut.mutate(s.id);
+                  }}
+                  data-testid="supplier-delete"
+                >
+                  Eliminar
+                </button>
+              </>
+            ),
+          },
+        ]}
+      />
     </>
   );
 }

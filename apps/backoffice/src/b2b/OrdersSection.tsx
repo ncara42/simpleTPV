@@ -1,4 +1,4 @@
-import { Select } from '@simpletpv/ui';
+import { DataTable, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowUpRight } from 'lucide-react';
 import { useState } from 'react';
@@ -217,34 +217,33 @@ function OrderDetailModal({ orderId, onClose }: { orderId: string; onClose: () =
               {fmtDate(order.createdAt)} ·{' '}
               <span className="role-badge">{STATUS_LABEL[order.status]}</span>
             </p>
-            <table className="catalog-table">
-              <thead>
-                <tr>
-                  <th>Producto</th>
-                  <th>Cant.</th>
-                  <th>Precio</th>
-                  <th>Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.lines.map((l) => (
-                  <tr key={l.id}>
-                    <td>{l.product?.name ?? l.productId}</td>
-                    <td className="muted">{Number(l.qty)}</td>
-                    <td className="muted">{eur(l.unitPrice)}</td>
-                    <td>{eur(l.lineTotal)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan={3}>Total</td>
-                  <td>
-                    <strong>{eur(order.total)}</strong>
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+            <DataTable
+              rows={order.lines}
+              rowKey={(l) => l.id}
+              footer={
+                <span>
+                  Total <strong>{eur(order.total)}</strong>
+                </span>
+              }
+              columns={[
+                {
+                  key: 'product',
+                  header: 'Producto',
+                  render: (l) => l.product?.name ?? l.productId,
+                },
+                {
+                  key: 'qty',
+                  header: 'Cant.',
+                  render: (l) => <span className="muted">{Number(l.qty)}</span>,
+                },
+                {
+                  key: 'price',
+                  header: 'Precio',
+                  render: (l) => <span className="muted">{eur(l.unitPrice)}</span>,
+                },
+                { key: 'subtotal', header: 'Subtotal', render: (l) => eur(l.lineTotal) },
+              ]}
+            />
             {order.notes && <p className="muted">Notas: {order.notes}</p>}
           </>
         )}
@@ -317,42 +316,45 @@ export function OrdersSection() {
         />
       </SectionToolbar>
 
-      {isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : orders.length === 0 ? (
-        <p className="catalog-empty">No hay pedidos mayoristas para este filtro.</p>
-      ) : (
-        <table className="catalog-table" data-testid="b2b-orders-table">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Cliente</th>
-              <th>Estado</th>
-              <th>Líneas</th>
-              <th>Total</th>
-              <th aria-label="Acciones" />
-            </tr>
-          </thead>
-          <tbody>
-            {orders.map((o) => (
-              <tr key={o.id} data-testid="b2b-order-row">
-                <td className="muted">{fmtDate(o.createdAt)}</td>
-                <td>{o.customerName}</td>
-                <td>
-                  <span className="role-badge">{STATUS_LABEL[o.status]}</span>
-                </td>
-                <td className="muted">{o.lineCount}</td>
-                <td>{eur(o.total)}</td>
-                <td>
-                  <button type="button" className="link-btn" onClick={() => setDetailId(o.id)}>
-                    Ver
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <DataTable
+        data-testid="b2b-orders-table"
+        rowTestId="b2b-order-row"
+        rows={orders}
+        rowKey={(o) => o.id}
+        loading={isLoading}
+        emptyState={
+          <span className="catalog-empty">No hay pedidos mayoristas para este filtro.</span>
+        }
+        columns={[
+          {
+            key: 'date',
+            header: 'Fecha',
+            render: (o) => <span className="muted">{fmtDate(o.createdAt)}</span>,
+          },
+          { key: 'customer', header: 'Cliente', render: (o) => o.customerName },
+          {
+            key: 'status',
+            header: 'Estado',
+            render: (o) => <span className="role-badge">{STATUS_LABEL[o.status]}</span>,
+          },
+          {
+            key: 'lines',
+            header: 'Líneas',
+            render: (o) => <span className="muted">{o.lineCount}</span>,
+          },
+          { key: 'total', header: 'Total', render: (o) => eur(o.total) },
+          {
+            key: 'actions',
+            header: '',
+            align: 'right',
+            render: (o) => (
+              <button type="button" className="link-btn" onClick={() => setDetailId(o.id)}>
+                Ver
+              </button>
+            ),
+          },
+        ]}
+      />
 
       {creating && (
         <NewOrderModal
