@@ -84,14 +84,19 @@ test('Tiendas: orden por ventas y acceso directo a stock (UX)', async ({ page })
   await expect(page.getByTestId('store-sales').first()).toBeVisible();
   // El panel ya no tiene filtros (solo crea y observa).
   await expect(page.getByTestId('store-status-filter')).toHaveCount(0);
+  // Las acciones Stock/Ventas/Precios viven ahora en la modal de detalle:
+  // primero se abre la card → modal, luego se pulsa el botón dentro.
+  await page.getByTestId('store-card').first().click();
+  await expect(page.getByTestId('store-detail-actions')).toBeVisible();
   // Acceso directo "Stock" → lleva a la página de Stock.
-  await page.getByTestId('store-card').first().getByTestId('store-open-stock').click();
+  await page.getByTestId('store-open-stock').click();
   await expect(page.getByTestId('stock-page')).toBeVisible();
   // Acceso directo "Ventas" → page de Ventas PREFILTRADA por la tienda (I-17).
   await navTo(page, 'stores');
   const card = page.getByTestId('store-card').first();
   const storeName = (await card.locator('.store-card-name').textContent()) ?? '';
-  await card.getByTestId('store-open-sales').click();
+  await card.click();
+  await page.getByTestId('store-open-sales').click();
   await expect(page.getByTestId('sales-table')).toBeVisible();
   await expect(page.getByTestId('sales-store')).toContainText(storeName);
 });
