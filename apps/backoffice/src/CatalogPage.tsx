@@ -1,7 +1,7 @@
 import { DataTable, type DataTableColumn, type DataTableSort, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Upload } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { CsvDropzone } from './components/CsvDropzone.js';
 import { Modal } from './components/Modal.js';
@@ -140,22 +140,25 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
   usePageHeader('Catálogo', `${filtered.length} productos activos`, 'catalog-count');
 
   // Orden cliente (numérico para precios/margen/stock; texto para el resto).
-  const sortValue = (p: Product, key: string): number | string => {
-    switch (key) {
-      case 'salePrice':
-        return Number(p.salePrice);
-      case 'costPrice':
-        return Number(p.costPrice);
-      case 'margin':
-        return Number(p.salePrice) - Number(p.costPrice);
-      case 'stock':
-        return stockByProduct.get(p.id) ?? 0;
-      case 'family':
-        return familyPathLabel(families, p.familyId);
-      default:
-        return p.name.toLocaleLowerCase();
-    }
-  };
+  const sortValue = useCallback(
+    (p: Product, key: string): number | string => {
+      switch (key) {
+        case 'salePrice':
+          return Number(p.salePrice);
+        case 'costPrice':
+          return Number(p.costPrice);
+        case 'margin':
+          return Number(p.salePrice) - Number(p.costPrice);
+        case 'stock':
+          return stockByProduct.get(p.id) ?? 0;
+        case 'family':
+          return familyPathLabel(families, p.familyId);
+        default:
+          return p.name.toLocaleLowerCase();
+      }
+    },
+    [families, stockByProduct],
+  );
   const sorted = useMemo(() => {
     if (!sort) return filtered;
     const dir = sort.dir === 'desc' ? -1 : 1;
@@ -165,8 +168,7 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
       if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
       return String(va).localeCompare(String(vb)) * dir;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered, sort, families, stockByProduct]);
+  }, [filtered, sort, sortValue]);
 
   const PAGE_SIZE = 25;
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));

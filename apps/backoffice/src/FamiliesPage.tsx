@@ -237,6 +237,7 @@ function FamilyRow({
           )}
           {!node.isArchetype && (
             <button
+              type="button"
               className="fam-action-btn"
               onClick={() => actions.onAddChild(node.id)}
               data-testid="fam-add-child"
@@ -247,6 +248,7 @@ function FamilyRow({
             </button>
           )}
           <button
+            type="button"
             className="fam-action-btn"
             onClick={() => actions.onEdit(node)}
             title="Editar"
@@ -255,6 +257,7 @@ function FamilyRow({
             <Pencil size={15} aria-hidden="true" />
           </button>
           <button
+            type="button"
             className="fam-action-btn danger"
             onClick={() => void actions.onDelete(node)}
             title="Borrar"

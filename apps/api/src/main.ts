@@ -6,7 +6,7 @@ import { config } from 'dotenv';
 
 config({ path: resolve(import.meta.dirname, '../../.env.local') });
 
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -96,12 +96,15 @@ async function bootstrap(): Promise<void> {
 
   const port = Number(process.env.PORT ?? 3001);
   await app.listen(port);
-  console.log(
+  new Logger('Bootstrap').log(
     `API escuchando en :${port}${swaggerEnabled ? ' (Swagger en /docs)' : ' (Swagger desactivado en producción)'}`,
   );
 }
 
 bootstrap().catch((err) => {
-  console.error('Fallo arrancando API:', err);
+  new Logger('Bootstrap').error(
+    'Fallo arrancando API',
+    err instanceof Error ? err.stack : String(err),
+  );
   process.exit(1);
 });
