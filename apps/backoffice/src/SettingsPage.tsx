@@ -1,11 +1,11 @@
 import { Button, Input } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { getBranding, updateBranding } from './lib/branding.js';
 import { formErrorMessage } from './lib/form-error.js';
-import { usePageHeader } from './lib/pageHeader.js';
 
 // Límite del logo alineado con el DTO de la API (~64KB reales en base64).
 const LOGO_MAX_CHARS = 90_000;

@@ -2,6 +2,7 @@ import './dashboard.css';
 import 'react-grid-layout/css/styles.css';
 
 import { Badge, Chart, Input, Select, Sparkline } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   BarChart2,
@@ -75,7 +76,6 @@ import {
   invertTone,
   seriesTrend,
 } from './lib/format.js';
-import { usePageHeader } from './lib/pageHeader.js';
 import { readPref, usePreferences } from './lib/preferences.js';
 import { listPurchaseOrders } from './lib/purchases.js';
 import { listAlerts, listExpiringBatches } from './lib/stock.js';

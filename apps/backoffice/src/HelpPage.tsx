@@ -1,8 +1,8 @@
+import { usePageHeader } from '@simpletpv/ui';
 import { LifeBuoy, Mail, MessageCircle, Phone } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { ApiKeysSection } from './ApiKeysPage.js';
-import { usePageHeader } from './lib/pageHeader.js';
 
 // Canales de soporte. Configurables por despliegue (VITE_SUPPORT_*) con defaults
 // para que el panel funcione sin configuración. El WhatsApp es el número en

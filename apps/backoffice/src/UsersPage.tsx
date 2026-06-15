@@ -1,4 +1,5 @@
 import { Button, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Plus, Upload, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -18,7 +19,6 @@ import {
   type User,
 } from './lib/admin.js';
 import { formErrorMessage } from './lib/form-error.js';
-import { usePageHeader } from './lib/pageHeader.js';
 
 type Role = NewUser['role'];
 

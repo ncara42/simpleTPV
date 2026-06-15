@@ -6,6 +6,7 @@ import {
   Input,
   Select,
 } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Upload } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -23,7 +24,6 @@ import { type FamilyNode, listFamilies } from './lib/families.js';
 import { findNodePath, flattenTree, isDescendantOf } from './lib/family-tree.js';
 import { formErrorMessage } from './lib/form-error.js';
 import { fmtEur } from './lib/format.js';
-import { usePageHeader } from './lib/pageHeader.js';
 import {
   createProduct,
   deleteProduct,

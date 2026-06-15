@@ -1,9 +1,9 @@
 import { DataTable } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { api } from './lib/auth.js';
-import { usePageHeader } from './lib/pageHeader.js';
 import { listAlerts, listExpiringBatches } from './lib/stock.js';
 import { ALERT_LABEL, df, EXPIRY_LABEL, expiryDaysText } from './stock/labels.js';
 

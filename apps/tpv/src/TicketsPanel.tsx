@@ -1,10 +1,10 @@
 import { ApiError, type Sale, type SaleTicket } from '@simpletpv/auth';
 import { Button, DataTable, Select } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Check, Download, Printer, RotateCcw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { usePageHeader } from './lib/pageHeader.js';
 import { downloadReceiptHtml, printReceiptHtml } from './lib/receipt.js';
 import { createReturn, listReturns } from './lib/returns.js';
 import { findSaleByTicket, getReceiptHtml, getTicket, listSales } from './lib/sales.js';

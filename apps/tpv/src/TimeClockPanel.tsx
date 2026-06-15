@@ -1,11 +1,11 @@
 import { ApiError, type TimeClockType } from '@simpletpv/auth';
 import { DataTable } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { ConfirmModal } from './ConfirmModal.js';
 import { fmtHm, formatDuration } from './lib/format.js';
-import { usePageHeader } from './lib/pageHeader.js';
 import { createTimeClockEntry, pairDevice, timeClockHistory } from './lib/time-clock.js';
 import { useTimeClock } from './lib/useTimeClock.js';
 

@@ -1,10 +1,10 @@
 import { Button, DataTable, Input, Select } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Modal } from './components/Modal.js';
-import { usePageHeader } from './lib/pageHeader.js';
 import {
   createPromotion,
   type CreatePromotionInput,

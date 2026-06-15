@@ -1,10 +1,10 @@
 import { ApiError, type StoreOrder } from '@simpletpv/auth';
 import { Alert, Button, DataTable, Select } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Clock, PackageCheck, X } from 'lucide-react';
 import { useState } from 'react';
 
-import { usePageHeader } from './lib/pageHeader.js';
 import { listStores } from './lib/sales.js';
 import { listIncomingStoreOrders, receiveStoreOrder } from './lib/store-orders.js';
 

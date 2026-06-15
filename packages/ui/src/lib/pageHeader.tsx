@@ -11,12 +11,13 @@ import {
  * Cabecera de la vista activa, elevada a la TopBar. Cada vista declara su título
  * y descripción con `usePageHeader(...)` y el shell los pinta en la barra superior,
  * de modo que el contenido no repite ese bloque y gana espacio vertical.
- * Duplicado del backoffice (apps/backoffice/src/lib/pageHeader.tsx) para coherencia.
+ *
+ * Compartido por backoffice y tpv (antes duplicado en cada app).
  */
 export interface PageHeader {
   title: string;
   description?: string | undefined;
-  /** data-testid opcional para la descripción (preserva hooks e2e). */
+  /** data-testid opcional para la descripción (preserva hooks e2e como `catalog-count`). */
   descriptionTestId?: string | undefined;
 }
 

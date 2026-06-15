@@ -7,6 +7,7 @@ import './catalog.css';
 import './styles.css';
 
 import { LoginForm, type NavGroup, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
+import { PageHeaderProvider, usePageHeaderValue } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeftRight,
@@ -39,7 +40,6 @@ import { useBranding } from './lib/branding.js';
 import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { switchApp, type Tab } from './lib/nav.js';
-import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
 import { listAlerts } from './lib/stock.js';
 import { NotificationsPage } from './NotificationsPage.js';
 import { PromotionsPage } from './PromotionsPage.js';

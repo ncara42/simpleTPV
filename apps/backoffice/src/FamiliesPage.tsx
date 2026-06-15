@@ -1,4 +1,5 @@
 import { Button, Input, Select } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -31,7 +32,6 @@ import {
 } from './lib/family-tree.js';
 import { formErrorMessage } from './lib/form-error.js';
 import { fmtEur } from './lib/format.js';
-import { usePageHeader } from './lib/pageHeader.js';
 import { createProduct, listProducts, updateProduct } from './lib/products.js';
 
 interface FormState {

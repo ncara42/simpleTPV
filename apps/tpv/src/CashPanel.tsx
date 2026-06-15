@@ -1,5 +1,6 @@
 import { ApiError, type CashSession } from '@simpletpv/auth';
 import { Select } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -15,7 +16,6 @@ import {
   openCashSession,
 } from './lib/cash.js';
 import { eur } from './lib/format.js';
-import { usePageHeader } from './lib/pageHeader.js';
 
 export function CashPanel({ storeId }: { storeId: string | null }) {
   usePageHeader('Caja', 'Apertura, cierre y arqueo de caja');

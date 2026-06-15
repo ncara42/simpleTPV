@@ -1,4 +1,5 @@
 import { Badge, Button, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -13,7 +14,6 @@ import {
 import { type FamilyNode, listFamilies } from './lib/families.js';
 import { useFeatures } from './lib/features.js';
 import { fmtEur, fmtRate } from './lib/format.js';
-import { usePageHeader } from './lib/pageHeader.js';
 
 const hour = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
 const PAYMENT_LABEL: Record<string, string> = { CASH: 'Efectivo', CARD: 'Tarjeta' };
