@@ -3,6 +3,12 @@
 @import '@simpletpv/ui/theme-apple.css';
 @import '@simpletpv/ui/sidebar.css';
 
+/* Tailwind v4 autodetecta el contenido del propio app pero NO los paquetes
+   hermanos del workspace: sin esto, las utilidades que solo usan los componentes
+   compartidos (<Button>, <Alert>, …) de @simpletpv/ui no se generan y se
+   renderizan sin estilo. Mismo fix que en el backoffice. */
+@source '../../../packages/ui/src/**/*.{ts,tsx}';
+
 /* La escala de radios de Tailwind apunta a los tokens del design system, de
    modo que `rounded-lg` y `var(--ui-radius-lg)` rinden el mismo valor en toda
    la app (utilidades en componentes + reglas en CSS comparten fuente). */
@@ -40,7 +46,6 @@
   border-radius: 9999px;
 }
 
-.btn-primary,
 .cart-checkout,
 .cart-create,
 .cart-discount,

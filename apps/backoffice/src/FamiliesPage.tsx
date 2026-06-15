@@ -1,7 +1,8 @@
-import { Select } from '@simpletpv/ui';
+import { Button, Input, Select } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { useConfirm } from './components/ConfirmProvider.js';
 import { Modal } from './components/Modal.js';
@@ -31,7 +32,6 @@ import {
 } from './lib/family-tree.js';
 import { formErrorMessage } from './lib/form-error.js';
 import { fmtEur } from './lib/format.js';
-import { usePageHeader } from './lib/pageHeader.js';
 import { createProduct, listProducts, updateProduct } from './lib/products.js';
 
 interface FormState {
@@ -237,6 +237,7 @@ function FamilyRow({
           )}
           {!node.isArchetype && (
             <button
+              type="button"
               className="fam-action-btn"
               onClick={() => actions.onAddChild(node.id)}
               data-testid="fam-add-child"
@@ -247,6 +248,7 @@ function FamilyRow({
             </button>
           )}
           <button
+            type="button"
             className="fam-action-btn"
             onClick={() => actions.onEdit(node)}
             title="Editar"
@@ -255,6 +257,7 @@ function FamilyRow({
             <Pencil size={15} aria-hidden="true" />
           </button>
           <button
+            type="button"
             className="fam-action-btn danger"
             onClick={() => void actions.onDelete(node)}
             title="Borrar"
@@ -317,12 +320,18 @@ export function FamiliesPage({
     queryKey: ['products'],
     queryFn: () => listProducts(),
   });
-  const directCount = new Map<string, number>();
-  for (const p of allProducts) {
-    if (p.familyId) directCount.set(p.familyId, (directCount.get(p.familyId) ?? 0) + 1);
-  }
-  const subtreeCount = (n: FamilyNode): number =>
-    (directCount.get(n.id) ?? 0) + n.children.reduce((acc, c) => acc + subtreeCount(c), 0);
+  // Contador de productos del subárbol por nodo. Memoizado: el mapa de conteo
+  // directo se reconstruye solo cuando cambia la lista de productos, no en cada
+  // render (antes era O(productos) + recursión por CADA fila renderizada).
+  const subtreeCount = useMemo(() => {
+    const directCount = new Map<string, number>();
+    for (const p of allProducts) {
+      if (p.familyId) directCount.set(p.familyId, (directCount.get(p.familyId) ?? 0) + 1);
+    }
+    const count = (n: FamilyNode): number =>
+      (directCount.get(n.id) ?? 0) + n.children.reduce((acc, c) => acc + count(c), 0);
+    return count;
+  }, [allProducts]);
 
   // Vista filtrada por la toolbar (no muta el árbol: el reordenado y "Mover a"
   // siguen operando sobre `view`). Una raíz que coincide se muestra entera; si solo
@@ -574,7 +583,7 @@ export function FamiliesPage({
         <div className="table-toolbar">
           <div className="sales-filters">
             <span className="search-field">
-              <input
+              <Input
                 className="catalog-search"
                 placeholder="Buscar familia…"
                 value={search}
@@ -594,8 +603,7 @@ export function FamiliesPage({
               ]}
             />
           </div>
-          <button
-            className="btn-primary"
+          <Button
             onClick={() =>
               setForm({
                 name: '',
@@ -607,10 +615,10 @@ export function FamiliesPage({
               })
             }
             data-testid="new-family"
+            icon={<Plus size={16} aria-hidden="true" />}
           >
-            <Plus size={16} aria-hidden="true" />
             Nueva familia
-          </button>
+          </Button>
         </div>
 
         {isLoading ? (
@@ -685,16 +693,16 @@ export function FamiliesPage({
                     ))}
                   </ul>
                 )}
-                <button
+                <Button
                   type="button"
-                  className="btn-primary fam-panel-add"
+                  className="fam-panel-add"
                   onClick={() =>
                     setProductForm({ ...EMPTY_PRODUCT_FORM, familyId: selectedNode.id })
                   }
                   data-testid="fam-panel-add-product"
                 >
                   Añadir producto aquí
-                </button>
+                </Button>
               </aside>
             )}
           </div>
@@ -734,7 +742,7 @@ export function FamiliesPage({
           </h3>
           <label>
             Nombre
-            <input
+            <Input
               required
               autoFocus
               value={form.name}
@@ -796,14 +804,9 @@ export function FamiliesPage({
             <button type="button" onClick={() => setForm(null)}>
               Cancelar
             </button>
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={saveMut.isPending}
-              data-testid="family-save"
-            >
+            <Button type="submit" disabled={saveMut.isPending} data-testid="family-save">
               {saveMut.isPending ? 'Guardando…' : 'Guardar'}
-            </button>
+            </Button>
           </div>
         </Modal>
       )}

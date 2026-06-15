@@ -1,4 +1,4 @@
-import { Select } from '@simpletpv/ui';
+import { Button, Input, Select } from '@simpletpv/ui';
 
 import { fmtEur } from '../lib/format.js';
 import { Modal } from './Modal.js';
@@ -84,7 +84,7 @@ export function ProductFormModal({
           <span className="form-section-title">Datos básicos</span>
           <label>
             Nombre
-            <input
+            <Input
               required
               autoFocus
               value={form.name}
@@ -95,7 +95,7 @@ export function ProductFormModal({
           <div className="modal-row">
             <label>
               SKU
-              <input
+              <Input
                 value={form.sku ?? ''}
                 onChange={(e) => onChange({ ...form, sku: e.target.value })}
                 data-testid="form-sku"
@@ -103,7 +103,7 @@ export function ProductFormModal({
             </label>
             <label>
               Código de barras
-              <input
+              <Input
                 value={form.barcode ?? ''}
                 onChange={(e) => onChange({ ...form, barcode: e.target.value })}
                 data-testid="form-barcode"
@@ -117,7 +117,7 @@ export function ProductFormModal({
           <div className="modal-row">
             <label>
               Precio venta (€)
-              <input
+              <Input
                 type="number"
                 step="0.01"
                 min={0}
@@ -129,7 +129,7 @@ export function ProductFormModal({
             </label>
             <label>
               Coste (€)
-              <input
+              <Input
                 type="number"
                 step="0.01"
                 min={0}
@@ -142,7 +142,7 @@ export function ProductFormModal({
           <div className="modal-row">
             <label>
               IVA (%)
-              <input
+              <Input
                 type="number"
                 step="1"
                 min={0}
@@ -182,9 +182,9 @@ export function ProductFormModal({
         <button type="button" onClick={onClose}>
           Cancelar
         </button>
-        <button type="submit" className="btn-primary" disabled={pending} data-testid="form-save">
+        <Button type="submit" disabled={pending} data-testid="form-save">
           {primaryLabel}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

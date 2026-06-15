@@ -1,4 +1,5 @@
 import { Alert, Select } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -16,7 +17,6 @@ import { currentCashSession } from './lib/cash.js';
 import { findByBarcode, listFamilies, type Product, searchProducts } from './lib/catalog.js';
 import { eur } from './lib/format.js';
 import { useHealthCheck } from './lib/health.js';
-import { usePageHeader } from './lib/pageHeader.js';
 import { listStores } from './lib/sales.js';
 import { getStoreStock, type StockRow } from './lib/stock.js';
 import { BARCODE_MIN_LENGTH, useBarcodeScanner } from './lib/useBarcodeScanner.js';

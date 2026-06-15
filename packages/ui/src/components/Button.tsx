@@ -23,7 +23,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       className={cn(
         // U-16: forma pill, alineada con la convención de CTAs del design system
         // (DESIGN_SYSTEM §10), para que Button sea un drop-in de los .btn-primary.
-        'inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border text-sm font-medium whitespace-nowrap transition select-none active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0',
+        // `ui-btn` es el gancho estable del design system: permite que el CSS de
+        // cada app distinga este componente de los <button> crudos (p. ej. para no
+        // pisar su estilo con selectores amplios como `.modal-foot button`).
+        'ui-btn inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border text-sm font-medium whitespace-nowrap transition select-none active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0',
         size === 'sm' && 'h-8 px-3 text-xs',
         size === 'md' && 'h-9 px-4',
         size === 'lg' && 'h-11 px-5 text-base',

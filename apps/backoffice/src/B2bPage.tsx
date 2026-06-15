@@ -1,9 +1,9 @@
+import { usePageHeader } from '@simpletpv/ui';
 import { useState } from 'react';
 
 import { CustomersSection } from './b2b/CustomersSection.js';
 import { OrdersSection } from './b2b/OrdersSection.js';
 import { PriceListsSection } from './b2b/PriceListsSection.js';
-import { usePageHeader } from './lib/pageHeader.js';
 
 type Section = 'customers' | 'pricelists' | 'orders';
 

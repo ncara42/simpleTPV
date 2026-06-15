@@ -1,5 +1,5 @@
 import type { ImportResult } from '@simpletpv/auth';
-import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Badge, Button, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -48,9 +48,9 @@ export function TransfersSection() {
       key: 'status',
       header: 'Estado',
       render: (t) => (
-        <span className="status-badge" data-testid="transfer-status">
+        <Badge variant="muted" data-testid="transfer-status">
           {STATUS_LABEL[t.status] ?? t.status}
-        </span>
+        </Badge>
       ),
     },
     {
@@ -76,15 +76,15 @@ export function TransfersSection() {
     <>
       <div className="table-panel">
         <div className="sales-filters">
-          <button
+          <Button
             type="button"
-            className="btn-primary stock-toolbar-action"
+            className="stock-toolbar-action"
             onClick={() => setCreating(true)}
             data-testid="new-transfer"
+            icon={<Plus size={16} aria-hidden="true" />}
           >
-            <Plus size={16} aria-hidden="true" />
             Nuevo traspaso
-          </button>
+          </Button>
         </div>
         <DataTable
           columns={transferColumns}
@@ -237,7 +237,7 @@ function CreateTransferModal({
                 ...products.map((p) => ({ value: p.id, label: p.name })),
               ]}
             />
-            <input
+            <Input
               type="number"
               min={1}
               value={qty}
@@ -245,46 +245,43 @@ function CreateTransferModal({
               data-testid="transfer-qty"
               aria-label="Cantidad"
             />
-            <button
+            <Button
               type="button"
-              className="btn-primary"
               disabled={!productId || Number(qty) <= 0}
               onClick={addManual}
               data-testid="transfer-add-line"
             >
               Añadir
-            </button>
+            </Button>
           </div>
 
           {lines.length > 0 && (
-            <table className="catalog-table" data-testid="transfer-lines">
-              <thead>
-                <tr>
-                  <th>Producto</th>
-                  <th>Cantidad</th>
-                  <th aria-label="Acciones" />
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((l) => (
-                  <tr key={l.productId} data-testid="transfer-line-row">
-                    <td>{productName(l.productId)}</td>
-                    <td>{l.qty}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="link-btn"
-                        onClick={() =>
-                          setLines((prev) => prev.filter((x) => x.productId !== l.productId))
-                        }
-                      >
-                        Quitar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              data-testid="transfer-lines"
+              rowTestId="transfer-line-row"
+              rows={lines}
+              rowKey={(l) => l.productId}
+              columns={[
+                { key: 'product', header: 'Producto', render: (l) => productName(l.productId) },
+                { key: 'qty', header: 'Cantidad', render: (l) => l.qty },
+                {
+                  key: 'actions',
+                  header: '',
+                  align: 'right',
+                  render: (l) => (
+                    <button
+                      type="button"
+                      className="link-btn"
+                      onClick={() =>
+                        setLines((prev) => prev.filter((x) => x.productId !== l.productId))
+                      }
+                    >
+                      Quitar
+                    </button>
+                  ),
+                },
+              ]}
+            />
           )}
 
           <button
@@ -322,14 +319,13 @@ function CreateTransferModal({
         <button type="button" onClick={onClose}>
           Cancelar
         </button>
-        <button
+        <Button
           type="submit"
-          className="btn-primary"
           disabled={!canSubmit || mutation.isPending}
           data-testid="transfer-save"
         >
           {mutation.isPending ? 'Creando…' : 'Crear'}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

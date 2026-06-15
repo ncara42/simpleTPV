@@ -1,10 +1,10 @@
+import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ClipboardList, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { useAuthStore } from './lib/auth.js';
 import { type Product, searchProducts } from './lib/catalog.js';
-import { usePageHeader } from './lib/pageHeader.js';
 import { confirmInventoryCount, getStoreStock } from './lib/stock.js';
 import { useDebounce } from './lib/useDebounce.js';
 

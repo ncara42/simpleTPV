@@ -1,3 +1,4 @@
+import { Input } from '@simpletpv/ui';
 import { Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -57,7 +58,7 @@ export function WidgetPalette({
     >
       <div className="dash-free-palette-search">
         <Search size={15} aria-hidden="true" />
-        <input
+        <Input
           ref={inputRef}
           type="text"
           value={query}

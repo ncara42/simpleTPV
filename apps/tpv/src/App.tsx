@@ -6,6 +6,7 @@ import './sale.css';
 import './styles.css';
 
 import { LoginForm, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
+import { PageHeaderProvider, usePageHeaderValue } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 import { Banknote, ClipboardCheck, Clock, ReceiptText, ShoppingBag, Truck } from 'lucide-react';
 import { useState } from 'react';
@@ -19,7 +20,6 @@ import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { formatDuration } from './lib/format.js';
 import { switchApp } from './lib/nav.js';
-import { PageHeaderProvider, usePageHeaderValue } from './lib/pageHeader.js';
 import { listStores } from './lib/sales.js';
 import { useOfflineSync } from './lib/useOfflineSync.js';
 import { useTimeClock } from './lib/useTimeClock.js';

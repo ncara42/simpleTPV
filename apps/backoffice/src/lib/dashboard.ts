@@ -133,10 +133,6 @@ export function getSalesByFamily(
   return api.get<FamilySales[]>('/dashboard/sales-by-family', periodQuery(period, storeId));
 }
 
-export function getSalesByHour(period: DashboardPeriod, storeId?: string): Promise<SalesByHour[]> {
-  return api.get<SalesByHour[]>('/dashboard/sales-by-hour', periodQuery(period, storeId));
-}
-
 // Ventas por hora de UN día concreto (no agregado del rango): usa el periodo `custom`
 // con from=to=día, que el backend resuelve a [día 00:00, día+1 00:00). `dayIso` es
 // 'YYYY-MM-DD' en hora local. Así la card refleja siempre horas reales de ese día.

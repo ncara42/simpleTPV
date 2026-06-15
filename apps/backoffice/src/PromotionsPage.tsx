@@ -1,10 +1,10 @@
-import { Select } from '@simpletpv/ui';
+import { Button, DataTable, Input, Select } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Modal } from './components/Modal.js';
-import { usePageHeader } from './lib/pageHeader.js';
 import {
   createPromotion,
   type CreatePromotionInput,
@@ -276,75 +276,77 @@ export function PromotionsPage() {
               </button>
             </div>
           ) : (
-            <button
-              className="btn-primary"
+            <Button
               onClick={() => setForm({ ...EMPTY })}
               data-testid="new-promo"
+              icon={<Plus size={16} aria-hidden="true" />}
             >
-              <Plus size={16} aria-hidden="true" />
               Nueva promoción
-            </button>
+            </Button>
           )}
         </div>
 
-        {visible.length === 0 ? (
-          <p className="catalog-empty" data-testid="promos-empty">
-            No hay promociones con ese estado.
-          </p>
-        ) : (
-          <table
-            className={`catalog-table promo-table${selected.length ? ' has-selection' : ''}`}
-            data-testid="promo-list"
-          >
-            <thead>
-              <tr>
-                <th className="users-select-col" aria-label="Selección" />
-                <th>Promoción</th>
-                <th>Condición</th>
-                <th>Descuento</th>
-                <th>Vigencia</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((p) => {
+        <DataTable
+          className={`promo-table${selected.length ? ' has-selection' : ''}`}
+          data-testid="promo-list"
+          rowTestId="promo-card"
+          rows={visible}
+          rowKey={(p) => p.id}
+          onRowClick={(p) => toggleSelect(p.id)}
+          rowClassName={(p) => (selectedSet.has(p.id) ? 'is-selected' : undefined)}
+          rowAriaSelected={(p) => selectedSet.has(p.id)}
+          emptyState={
+            <span className="catalog-empty" data-testid="promos-empty">
+              No hay promociones con ese estado.
+            </span>
+          }
+          columns={[
+            {
+              key: 'select',
+              header: '',
+              width: '3rem',
+              render: (p) => (
+                <input
+                  type="checkbox"
+                  className="user-check"
+                  aria-label={`Seleccionar ${p.name}`}
+                  data-testid="promo-select"
+                  checked={selectedSet.has(p.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => toggleSelect(p.id)}
+                />
+              ),
+            },
+            { key: 'name', header: 'Promoción', render: (p) => p.name },
+            {
+              key: 'condition',
+              header: 'Condición',
+              render: (p) => <span className="muted">{conditionShort(p)}</span>,
+            },
+            {
+              key: 'discount',
+              header: 'Descuento',
+              render: (p) => <span className="promo-discount">{discountShort(p)}</span>,
+            },
+            {
+              key: 'validity',
+              header: 'Vigencia',
+              render: (p) => <span className="muted">{dateRange(p.startDate, p.endDate)}</span>,
+            },
+            {
+              key: 'status',
+              header: 'Estado',
+              render: (p) => {
                 const status = promoStatus(p);
-                const isSel = selectedSet.has(p.id);
                 return (
-                  <tr
-                    key={p.id}
-                    className={isSel ? 'is-selected' : undefined}
-                    aria-selected={isSel}
-                    onClick={() => toggleSelect(p.id)}
-                    data-testid="promo-card"
-                  >
-                    <td className="users-select-col" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        className="user-check"
-                        aria-label={`Seleccionar ${p.name}`}
-                        data-testid="promo-select"
-                        checked={isSel}
-                        onChange={() => toggleSelect(p.id)}
-                      />
-                    </td>
-                    <td className="promo-name-cell">{p.name}</td>
-                    <td className="muted">{conditionShort(p)}</td>
-                    <td>
-                      <span className="promo-discount">{discountShort(p)}</span>
-                    </td>
-                    <td className="muted">{dateRange(p.startDate, p.endDate)}</td>
-                    <td>
-                      <span className={`promo-badge promo-${status}`} data-testid="promo-status">
-                        {STATUS_LABEL[status]}
-                      </span>
-                    </td>
-                  </tr>
+                  <span className={`promo-badge promo-${status}`} data-testid="promo-status">
+                    {STATUS_LABEL[status]}
+                  </span>
                 );
-              })}
-            </tbody>
-          </table>
-        )}
+              },
+            },
+          ]}
+        />
       </div>
 
       {form && (
@@ -384,7 +386,7 @@ function PromoModal({
       <h3>{form.id ? 'Editar promoción' : 'Nueva promoción'}</h3>
       <label>
         Nombre
-        <input
+        <Input
           required
           value={form.name}
           onChange={(e) => onChange({ ...form, name: e.target.value })}
@@ -407,7 +409,7 @@ function PromoModal({
         </label>
         <label>
           Umbral
-          <input
+          <Input
             type="number"
             min={1}
             value={form.threshold}
@@ -432,7 +434,7 @@ function PromoModal({
         </label>
         <label>
           Valor
-          <input
+          <Input
             type="number"
             min={1}
             value={form.discountValue}
@@ -444,7 +446,7 @@ function PromoModal({
       <div className="modal-row">
         <label>
           Inicio
-          <input
+          <Input
             type="date"
             value={form.startDate}
             onChange={(e) => onChange({ ...form, startDate: e.target.value })}
@@ -453,7 +455,7 @@ function PromoModal({
         </label>
         <label>
           Fin
-          <input
+          <Input
             type="date"
             value={form.endDate}
             onChange={(e) => onChange({ ...form, endDate: e.target.value })}
@@ -485,9 +487,9 @@ function PromoModal({
         <button type="button" onClick={onClose}>
           Cancelar
         </button>
-        <button type="submit" className="btn-primary" disabled={!valid} data-testid="promo-save">
+        <Button type="submit" disabled={!valid} data-testid="promo-save">
           {form.id ? 'Guardar' : 'Crear'}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

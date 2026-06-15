@@ -1,4 +1,5 @@
 import type { Supplier } from '@simpletpv/auth';
+import { Button, DataTable, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -41,7 +42,7 @@ export function SuppliersSection() {
         <h2>Proveedores</h2>
         <div className="catalog-actions">
           <span className="search-field">
-            <input
+            <Input
               className="catalog-search"
               placeholder="Nombre del proveedor"
               value={name}
@@ -49,7 +50,7 @@ export function SuppliersSection() {
               data-testid="supplier-name"
             />
           </span>
-          <input
+          <Input
             className="catalog-search"
             type="number"
             min={0}
@@ -59,66 +60,70 @@ export function SuppliersSection() {
             data-testid="supplier-leadtime"
             style={{ width: '6rem' }}
           />
-          <button
+          <Button
             type="button"
-            className="btn-primary"
             disabled={!name || createMut.isPending}
             onClick={() => createMut.mutate({ name, leadTimeDays: Number(leadTime) })}
             data-testid="supplier-create"
           >
             Añadir
-          </button>
+          </Button>
         </div>
       </header>
-      {isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : suppliers.length === 0 ? (
-        <p className="catalog-empty" data-testid="suppliers-empty">
-          Sin proveedores.
-        </p>
-      ) : (
-        <table className="catalog-table" data-testid="suppliers-table">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Lead time</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {suppliers.map((s) => (
-              // Fila clicable → vista detalle (I-18); las acciones no propagan.
-              <tr
-                key={s.id}
-                className="row-clickable"
-                data-testid="supplier-row"
-                onClick={() => setDetailId(s.id)}
-              >
-                <td>{s.name}</td>
-                <td className="muted">{s.leadTimeDays} días</td>
-                <td onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => setDetailId(s.id)}
-                    data-testid="supplier-open"
-                  >
-                    Ver
-                  </button>
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => delMut.mutate(s.id)}
-                    data-testid="supplier-delete"
-                  >
-                    Eliminar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      {/* Fila clicable → vista detalle (I-18); las acciones no propagan (stopPropagation). */}
+      <DataTable
+        data-testid="suppliers-table"
+        rowTestId="supplier-row"
+        rows={suppliers}
+        rowKey={(s) => s.id}
+        loading={isLoading}
+        rowClassName={() => 'row-clickable'}
+        onRowClick={(s) => setDetailId(s.id)}
+        emptyState={
+          <span className="catalog-empty" data-testid="suppliers-empty">
+            Sin proveedores.
+          </span>
+        }
+        columns={[
+          { key: 'name', header: 'Nombre', render: (s) => s.name },
+          {
+            key: 'leadTime',
+            header: 'Lead time',
+            render: (s) => <span className="muted">{s.leadTimeDays} días</span>,
+          },
+          {
+            key: 'actions',
+            header: '',
+            align: 'right',
+            render: (s) => (
+              <>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDetailId(s.id);
+                  }}
+                  data-testid="supplier-open"
+                >
+                  Ver
+                </button>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    delMut.mutate(s.id);
+                  }}
+                  data-testid="supplier-delete"
+                >
+                  Eliminar
+                </button>
+              </>
+            ),
+          },
+        ]}
+      />
     </>
   );
 }
@@ -176,7 +181,7 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
       >
         <label>
           Nombre
-          <input
+          <Input
             required
             value={form.name}
             onChange={(e) => set({ name: e.target.value })}
@@ -185,7 +190,7 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
         </label>
         <label>
           NIF
-          <input
+          <Input
             value={form.nif}
             onChange={(e) => set({ nif: e.target.value })}
             data-testid="sd-nif"
@@ -193,7 +198,7 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
         </label>
         <label>
           Email
-          <input
+          <Input
             type="email"
             value={form.email}
             onChange={(e) => set({ email: e.target.value })}
@@ -202,7 +207,7 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
         </label>
         <label>
           Teléfono
-          <input
+          <Input
             value={form.phone}
             onChange={(e) => set({ phone: e.target.value })}
             data-testid="sd-phone"
@@ -210,7 +215,7 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
         </label>
         <label>
           Lead time (días)
-          <input
+          <Input
             type="number"
             min={0}
             required
@@ -219,14 +224,14 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
             data-testid="sd-leadtime"
           />
         </label>
-        <button
+        <Button
           type="submit"
-          className="btn-primary"
+          className="supplier-save"
           disabled={saveMut.isPending}
           data-testid="sd-save"
         >
           {saveMut.isPending ? 'Guardando…' : saved ? 'Guardado ✓' : 'Guardar'}
-        </button>
+        </Button>
       </form>
       {saveMut.isError && (
         <p className="form-error">

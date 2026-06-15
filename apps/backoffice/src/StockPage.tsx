@@ -1,8 +1,8 @@
+import { usePageHeader } from '@simpletpv/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { api } from './lib/auth.js';
-import { usePageHeader } from './lib/pageHeader.js';
 import { GlobalStockSection } from './stock/GlobalStockSection.js';
 
 export function StockPage({

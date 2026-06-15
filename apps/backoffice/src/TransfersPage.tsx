@@ -1,4 +1,5 @@
-import { usePageHeader } from './lib/pageHeader.js';
+import { usePageHeader } from '@simpletpv/ui';
+
 import { TransfersSection } from './stock/TransfersSection.js';
 
 // Traspasos entre tiendas: apartado propio del sidebar, separado de Stock.

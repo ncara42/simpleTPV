@@ -94,9 +94,9 @@ describe('buildDefaultLayout', () => {
     // Primera fila de paneles bajo las tarjetas: bars(7) + family(5) = 12.
     expect(byId['dash-bars']).toEqual({ i: 'dash-bars', x: 0, y: 1, w: 7, h: 2 });
     expect(byId['dash-family']).toEqual({ i: 'dash-family', x: 7, y: 1, w: 5, h: 2 });
-    // Segunda fila de paneles: rank-sales(5) + hour(7) = 12 (hour ocupa 3 filas de alto).
+    // Segunda fila de paneles: rank-sales(5) + hour(7) = 12.
     expect(byId['rank-sales']).toEqual({ i: 'rank-sales', x: 0, y: 3, w: 5, h: 2 });
-    expect(byId['dash-hour']).toEqual({ i: 'dash-hour', x: 5, y: 3, w: 7, h: 3 });
+    expect(byId['dash-hour']).toEqual({ i: 'dash-hour', x: 5, y: 3, w: 7, h: 2 });
   });
 
   it('ningún elemento se sale de las 12 columnas', () => {

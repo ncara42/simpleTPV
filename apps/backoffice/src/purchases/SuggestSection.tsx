@@ -1,3 +1,4 @@
+import { Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -38,110 +39,107 @@ export function SuggestSection() {
       <header className="catalog-head">
         <h2>Generar propuesta de pedido</h2>
         <div className="catalog-actions">
-          <select
+          <Select
             className="catalog-search"
             value={storeId}
-            onChange={(e) => setStoreId(e.target.value)}
+            onChange={setStoreId}
+            ariaLabel="Tienda"
+            options={[
+              { value: '', label: 'Tienda…' },
+              ...stores.map((s) => ({ value: s.id, label: s.name })),
+            ]}
             data-testid="suggest-store"
-          >
-            <option value="">Tienda…</option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <select
+          />
+          <Select
             className="catalog-search"
             value={supplierId}
-            onChange={(e) => setSupplierId(e.target.value)}
+            onChange={setSupplierId}
+            ariaLabel="Proveedor"
+            options={[
+              { value: '', label: 'Proveedor…' },
+              ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+            ]}
             data-testid="suggest-supplier"
-          >
-            <option value="">Proveedor…</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <button
+          />
+          <Button
             type="button"
-            className="btn-primary"
             disabled={!storeId || suggestMut.isPending}
             onClick={() => suggestMut.mutate({ storeId })}
             data-testid="suggest-generate"
           >
             Generar
-          </button>
+          </Button>
         </div>
       </header>
 
-      {rows.length === 0 ? (
-        <p className="catalog-empty" data-testid="suggest-empty">
-          {suggestMut.isSuccess
-            ? 'No hay nada que reponer.'
-            : 'Genera una propuesta para una tienda.'}
-        </p>
-      ) : (
-        <>
-          <table className="catalog-table" data-testid="suggest-table">
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Stock</th>
-                <th>Mín</th>
-                <th>Venta media/día</th>
-                <th>Cobertura</th>
-                <th>Pedir</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.productId} data-testid="suggest-row">
-                  <td>{r.productName}</td>
-                  <td>{r.stockActual}</td>
-                  <td className="muted">{r.minStock}</td>
-                  <td className="muted">{r.ventaMediaDiaria}</td>
-                  <td className="muted">
-                    {r.coberturaDias != null ? `${r.coberturaDias} d` : '—'}
-                  </td>
-                  <td>
-                    <input
-                      type="number"
-                      min={0}
-                      value={qty[r.productId] ?? ''}
-                      onChange={(e) => setQty({ ...qty, [r.productId]: e.target.value })}
-                      data-testid="suggest-qty"
-                      style={{ width: '5rem' }}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="modal-foot">
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={!supplierId || createMut.isPending}
-              onClick={() =>
-                createMut.mutate({
-                  supplierId,
-                  storeId,
-                  lines: rows
-                    .filter((r) => Number(qty[r.productId] ?? 0) > 0)
-                    .map((r) => ({
-                      productId: r.productId,
-                      quantityOrdered: Number(qty[r.productId]),
-                    })),
-                })
-              }
-              data-testid="suggest-create-order"
-            >
-              Crear pedido (selecciona proveedor)
-            </button>
-          </div>
-        </>
+      <DataTable
+        data-testid="suggest-table"
+        rowTestId="suggest-row"
+        rows={rows}
+        rowKey={(r) => r.productId}
+        emptyState={
+          <span className="catalog-empty" data-testid="suggest-empty">
+            {suggestMut.isSuccess
+              ? 'No hay nada que reponer.'
+              : 'Genera una propuesta para una tienda.'}
+          </span>
+        }
+        columns={[
+          { key: 'product', header: 'Producto', render: (r) => r.productName },
+          { key: 'stock', header: 'Stock', render: (r) => r.stockActual },
+          { key: 'min', header: 'Mín', render: (r) => <span className="muted">{r.minStock}</span> },
+          {
+            key: 'avg',
+            header: 'Venta media/día',
+            render: (r) => <span className="muted">{r.ventaMediaDiaria}</span>,
+          },
+          {
+            key: 'coverage',
+            header: 'Cobertura',
+            render: (r) => (
+              <span className="muted">
+                {r.coberturaDias != null ? `${r.coberturaDias} d` : '—'}
+              </span>
+            ),
+          },
+          {
+            key: 'order',
+            header: 'Pedir',
+            render: (r) => (
+              <Input
+                type="number"
+                min={0}
+                value={qty[r.productId] ?? ''}
+                onChange={(e) => setQty({ ...qty, [r.productId]: e.target.value })}
+                data-testid="suggest-qty"
+                style={{ width: '5rem' }}
+              />
+            ),
+          },
+        ]}
+      />
+      {rows.length > 0 && (
+        <div className="modal-foot">
+          <Button
+            type="button"
+            disabled={!supplierId || createMut.isPending}
+            onClick={() =>
+              createMut.mutate({
+                supplierId,
+                storeId,
+                lines: rows
+                  .filter((r) => Number(qty[r.productId] ?? 0) > 0)
+                  .map((r) => ({
+                    productId: r.productId,
+                    quantityOrdered: Number(qty[r.productId]),
+                  })),
+              })
+            }
+            data-testid="suggest-create-order"
+          >
+            Crear pedido (selecciona proveedor)
+          </Button>
+        </div>
       )}
     </>
   );

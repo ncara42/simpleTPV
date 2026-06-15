@@ -1,3 +1,4 @@
+import { Input } from '@simpletpv/ui';
 import { Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -97,7 +98,7 @@ export function CommandPalette({
     >
       <div className="cmdk-field">
         <Search size={18} aria-hidden="true" className="cmdk-icon" />
-        <input
+        <Input
           type="text"
           className="cmdk-input"
           autoComplete="off"

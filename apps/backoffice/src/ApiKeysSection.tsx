@@ -1,3 +1,4 @@
+import { Button, DataTable, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useState } from 'react';
@@ -138,80 +139,95 @@ export function ApiKeysSection() {
           </div>
         )}
 
-        {isLoading ? (
-          <p className="catalog-empty">Cargando…</p>
-        ) : active.length === 0 ? (
-          <p className="catalog-empty">
-            No hay API keys activas. Crea una para dar acceso externo.
-          </p>
-        ) : (
-          <table className="catalog-table" data-testid="apikeys-table">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Prefijo</th>
-                <th>Tarifa</th>
-                <th>Creada</th>
-                <th>Último uso</th>
-                <th aria-label="Acciones" />
-              </tr>
-            </thead>
-            <tbody>
-              {active.map((k) => (
-                <tr key={k.id}>
-                  <td>{k.name}</td>
-                  <td className="muted">
-                    <code>stpv_{k.prefix}_…</code>
-                  </td>
-                  <td className="muted">{k.priceListId ?? '—'}</td>
-                  <td className="muted">{fmtDate(k.createdAt)}</td>
-                  <td className="muted">{fmtDate(k.lastUsedAt)}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="link-btn"
-                      onClick={async () => {
-                        const ok = await confirm({
-                          title: 'Revocar API key',
-                          message: `¿Revocar la API key "${k.name}"? El acceso externo dejará de funcionar de inmediato. Es irreversible.`,
-                          confirmLabel: 'Revocar',
-                          danger: true,
-                        });
-                        if (ok) revokeMut.mutate(k.id);
-                      }}
-                    >
-                      Revocar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <DataTable
+          data-testid="apikeys-table"
+          rows={active}
+          rowKey={(k) => k.id}
+          loading={isLoading}
+          emptyState={
+            <span className="catalog-empty">
+              No hay API keys activas. Crea una para dar acceso externo.
+            </span>
+          }
+          columns={[
+            { key: 'name', header: 'Nombre', render: (k) => k.name },
+            {
+              key: 'prefix',
+              header: 'Prefijo',
+              render: (k) => (
+                <span className="muted">
+                  <code>stpv_{k.prefix}_…</code>
+                </span>
+              ),
+            },
+            {
+              key: 'priceList',
+              header: 'Tarifa',
+              render: (k) => <span className="muted">{k.priceListId ?? '—'}</span>,
+            },
+            {
+              key: 'created',
+              header: 'Creada',
+              render: (k) => <span className="muted">{fmtDate(k.createdAt)}</span>,
+            },
+            {
+              key: 'lastUsed',
+              header: 'Último uso',
+              render: (k) => <span className="muted">{fmtDate(k.lastUsedAt)}</span>,
+            },
+            {
+              key: 'actions',
+              header: '',
+              align: 'right',
+              render: (k) => (
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: 'Revocar API key',
+                      message: `¿Revocar la API key "${k.name}"? El acceso externo dejará de funcionar de inmediato. Es irreversible.`,
+                      confirmLabel: 'Revocar',
+                      danger: true,
+                    });
+                    if (ok) revokeMut.mutate(k.id);
+                  }}
+                >
+                  Revocar
+                </button>
+              ),
+            },
+          ]}
+        />
 
         {revoked.length > 0 && (
           <details className="apikey-revoked">
             <summary className="muted">Revocadas ({revoked.length})</summary>
-            <table className="catalog-table">
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Prefijo</th>
-                  <th>Revocada</th>
-                </tr>
-              </thead>
-              <tbody>
-                {revoked.map((k) => (
-                  <tr key={k.id}>
-                    <td className="muted">{k.name}</td>
-                    <td className="muted">
+            <DataTable
+              rows={revoked}
+              rowKey={(k) => k.id}
+              columns={[
+                {
+                  key: 'name',
+                  header: 'Nombre',
+                  render: (k) => <span className="muted">{k.name}</span>,
+                },
+                {
+                  key: 'prefix',
+                  header: 'Prefijo',
+                  render: (k) => (
+                    <span className="muted">
                       <code>stpv_{k.prefix}_…</code>
-                    </td>
-                    <td className="muted">{fmtDate(k.revokedAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </span>
+                  ),
+                },
+                {
+                  key: 'revoked',
+                  header: 'Revocada',
+                  render: (k) => <span className="muted">{fmtDate(k.revokedAt)}</span>,
+                },
+              ]}
+            />
           </details>
         )}
       </div>
@@ -233,7 +249,7 @@ export function ApiKeysSection() {
             <section className="form-section">
               <label>
                 Nombre
-                <input
+                <Input
                   autoFocus
                   required
                   placeholder="ERP, mayorista externo…"
@@ -244,7 +260,7 @@ export function ApiKeysSection() {
               </label>
               <label>
                 Tarifa (opcional)
-                <input
+                <Input
                   placeholder="ID de tarifa mayorista"
                   value={form.priceListId}
                   onChange={(e) => setForm((f) => ({ ...f, priceListId: e.target.value }))}
@@ -259,13 +275,9 @@ export function ApiKeysSection() {
             <button type="button" onClick={() => setShowCreate(false)}>
               Cancelar
             </button>
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={!form.name.trim() || createMut.isPending}
-            >
+            <Button type="submit" disabled={!form.name.trim() || createMut.isPending}>
               {createMut.isPending ? 'Creando…' : 'Crear'}
-            </button>
+            </Button>
           </div>
         </Modal>
       )}

@@ -1,7 +1,8 @@
 import './dashboard.css';
 import 'react-grid-layout/css/styles.css';
 
-import { Badge, Chart, Select, Sparkline } from '@simpletpv/ui';
+import { Badge, Chart, Input, Select, Sparkline } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   BarChart2,
@@ -75,7 +76,6 @@ import {
   invertTone,
   seriesTrend,
 } from './lib/format.js';
-import { usePageHeader } from './lib/pageHeader.js';
 import { readPref, usePreferences } from './lib/preferences.js';
 import { listPurchaseOrders } from './lib/purchases.js';
 import { listAlerts, listExpiringBatches } from './lib/stock.js';
@@ -686,12 +686,16 @@ export function DashboardPage({
   // Restablecer: restaura TODAS las cards del preset y el layout por defecto (sin salir).
   const resetEditing = (): void => {
     setDraftHidden([]);
-    if (isCustomPreset && customWidgetIds.length > 0) {
-      const pseudoPreset: PresetDef = { ...preset, cards: customWidgetIds, panels: [] };
-      setDraftLayouts({ lg: buildDefaultLayout(pseudoPreset) });
-    } else {
-      setDraftLayouts({ lg: buildDefaultLayout(preset) });
-    }
+    const target: PresetDef =
+      isCustomPreset && customWidgetIds.length > 0
+        ? { ...preset, cards: customWidgetIds, panels: [] }
+        : preset;
+    const def = buildDefaultLayout(target);
+    // Restablece también el breakpoint ACTIVO, no solo lg: moveItem edita base[boardBreakpoint]
+    // (que es md cuando el tablero mide <1000px), y RGL no re-deriva el layout del bp actual
+    // desde lg mientras no cambie de breakpoint. Sin limpiar el bp activo, el movimiento
+    // persistiría tras pulsar Restablecer.
+    setDraftLayouts(boardBreakpoint === 'lg' ? { lg: def } : { lg: def, [boardBreakpoint]: def });
   };
   // Guardar: persiste layout + cards ocultas por preset y sale de edición.
   const saveEditing = (): void => {
@@ -859,7 +863,7 @@ export function DashboardPage({
                   </div>
                   <label className="dash-family-search">
                     <Search size={15} aria-hidden="true" />
-                    <input
+                    <Input
                       type="search"
                       value={familyQuery}
                       onChange={(e) => setFamilyQuery(e.target.value)}
@@ -2097,17 +2101,20 @@ function Rankings(props: {
   const rows =
     tab === 'sales'
       ? (props.data?.topSales ?? []).map((r) => ({
+          id: r.productId,
           name: r.name,
           raw: r.total,
           value: fmtEur(r.total),
         }))
       : tab === 'margin'
         ? (props.data?.topMargin ?? []).map((r) => ({
+            id: r.productId,
             name: r.name,
             raw: r.margin,
             value: fmtEur(r.margin),
           }))
         : (props.data?.worstRotation ?? []).map((r) => ({
+            id: r.productId,
             name: r.name,
             raw: r.units,
             value: `${fmtNum(r.units, 0)} ud`,
@@ -2128,7 +2135,7 @@ function Rankings(props: {
           resetKey={`${tab}-${rows.length}`}
         >
           {rows.map((r, i) => (
-            <li key={`${r.name}-${i}`} style={{ '--i': i } as React.CSSProperties}>
+            <li key={r.id} style={{ '--i': i } as React.CSSProperties}>
               <span className="dash-family-pos">{i + 1}</span>
               <span className="dash-family-name">{r.name}</span>
               <span className="dash-family-amount">{r.value}</span>

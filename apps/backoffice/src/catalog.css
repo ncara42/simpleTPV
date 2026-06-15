@@ -31,32 +31,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Píldora de estado canónica: fondo -soft + texto ink (patrón del design system).
-   Variantes por tono; neutral por defecto. Unifica los badges de estado del
-   backoffice (traspasos, compras, etc.). El <Badge> de packages/ui rinde igual. */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ui-space-1);
-  padding: var(--ui-space-1) var(--ui-space-2);
-  border-radius: var(--ui-radius-pill);
-  font-size: var(--ui-text-xs);
-  font-weight: 600;
-  background: var(--ui-surface-subtle);
-  color: var(--ui-text-muted);
-}
-.status-badge--success {
-  background: var(--ui-success-soft);
-  color: var(--ui-success);
-}
-.status-badge--warning {
-  background: var(--ui-warning-soft);
-  color: var(--ui-warning);
-}
-.status-badge--danger {
-  background: var(--ui-danger-soft);
-  color: var(--ui-danger);
-}
+/* Las píldoras de estado .status-badge se migraron al <Badge> compartido
+   (@simpletpv/ui) en la Fase 2; rinde igual (fondo -soft + texto por tono). */
 
 /* Rol de usuario: misma píldora, tono de marca/éxito fijo. */
 .role-badge {
@@ -358,11 +334,11 @@
   font-size: 0.8rem;
   color: var(--ui-text-muted);
 }
-/* Pie = control administrativo: estado + interruptor con la consecuencia escrita. */
+/* Pie = estado de la tienda. Las acciones (Stock/Ventas/Precios) viven ahora en
+   la modal de detalle, así que el pie solo alinea el texto de estado. */
 .store-card-foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.75rem;
   padding-top: 0.85rem;
   border-top: 1px solid var(--ui-border);
@@ -595,7 +571,7 @@
   color: var(--ui-warning);
 }
 /* La acción de autorizar es secundaria dentro del modal: ancho según contenido. */
-.store-detail-modal .modal-body .btn-primary {
+.store-detail-modal .modal-body .store-ops-save {
   align-self: flex-start;
 }
 
@@ -624,8 +600,8 @@
   margin-bottom: 1.5rem;
 }
 /* Botón junto a una fila de subtabs (.bo-tabs): mismo tipo de letra que los
-   tabs. La altura ya la fija .btn-primary (var --bo-control-height). */
-.btn-primary.stock-tabs-action {
+   tabs. La altura la fija el propio <Button> compartido. */
+.stock-tabs-action {
   font-size: 0.82rem;
 }
 .bo-tab {
@@ -862,43 +838,8 @@
   background: none;
   border-radius: 0;
 }
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  white-space: nowrap; /* icono + texto nunca parten de línea */
-  height: var(--bo-control-height);
-  padding: 0 1.25rem;
-  border: none;
-  border-radius: 9999px;
-  font-weight: 500;
-  font-size: 0.9rem;
-  letter-spacing: -0.012em;
-  color: var(--ui-primary-fg);
-  cursor: pointer;
-  background: var(--ui-primary);
-  transition:
-    background 0.12s,
-    transform 0.06s;
-}
-.btn-primary > svg {
-  flex-shrink: 0;
-}
-.btn-primary:hover {
-  background: var(--ui-primary-hover);
-}
-.btn-primary:active {
-  transform: scale(0.96);
-}
-.btn-primary:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus);
-}
-.btn-primary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+/* Los antiguos .btn-primary se migraron al <Button> compartido (@simpletpv/ui)
+   en la Fase 2; el estilo lo aporta ahora el componente. */
 .catalog-empty {
   color: var(--ui-text-soft);
   padding: 2.5rem 0;
@@ -1015,31 +956,11 @@
   color: var(--ui-text-muted);
   margin-bottom: 0.9rem;
 }
-.modal input:not([type='checkbox']) {
-  /* Causa raíz de E-04: sin width, el input conserva su ancho intrínseco
-     (~250px) y desborda las columnas estrechas de .modal-row. */
-  width: 100%;
-}
-.modal input {
-  height: 2.6rem;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: 10px;
-  padding: 0 0.8rem;
-  font-size: 0.95rem;
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: -0.012em;
-  color: var(--ui-text);
-  background: var(--ui-surface);
-  transition:
-    border-color 0.12s,
-    box-shadow 0.12s;
-}
-.modal input:focus {
-  outline: none;
-  border-color: var(--ap-blue-focus);
-  box-shadow: var(--ui-focus);
-}
+/* Los inputs de texto de los modales se migraron al <Input> compartido
+   (@simpletpv/ui), que ya aporta ancho 100%, alto 2.6rem, hairline, radio 10px,
+   fuente 0.95rem y foco azul. El reset 'font: inherit' vive en @layer base, así
+   que <Input> gana sin necesidad de re-estilar desde aquí. (El checkbox conserva
+   su propia regla .modal input[type='checkbox'] más arriba.) */
 .modal-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1060,7 +981,11 @@
   gap: 0.6rem;
   margin-top: 0.5rem;
 }
-.modal-foot button:not(.btn-primary) {
+/* Botones secundarios del pie de modal: los <button> crudos (Cancelar/Cerrar).
+   Se excluye `.ui-btn` para no pisar el estilo del <Button> compartido, que
+   aporta el suyo propio (su CSS vive en una @layer de Tailwind y, al ser
+   catalog.css sin capa, un selector amplio aquí ganaría la cascada). */
+.modal-foot button:not(.ui-btn) {
   height: var(--bo-control-height);
   padding: 0 1.1rem;
   border: 1px solid var(--ui-border-strong);
@@ -1075,10 +1000,10 @@
     background 0.12s,
     transform 0.06s;
 }
-.modal-foot button:not(.btn-primary):hover {
+.modal-foot button:not(.ui-btn):hover {
   background: var(--ui-surface-subtle);
 }
-.modal-foot button:not(.btn-primary):active {
+.modal-foot button:not(.ui-btn):active {
   transform: scale(0.96);
 }
 
@@ -1626,9 +1551,6 @@
   flex-wrap: nowrap;
   align-items: flex-start;
 }
-.sales-toolbar > .btn-primary {
-  flex-shrink: 0;
-}
 
 /* Cabecera genérica de tabla: filtros/búsqueda a la izquierda y acción principal
    a la derecha (espejo de .users-toolbar, reutilizable en cualquier .table-panel,
@@ -1839,10 +1761,6 @@
 }
 .sales-view-remove:hover {
   color: var(--ui-danger, var(--ui-danger));
-}
-/* Botón de export: empuja a la derecha del toolbar del DataTable (IT-06). */
-.sales-export {
-  margin-left: auto;
 }
 
 /* Pie de agregados del historial (count, total, margen y descuento medios). */
@@ -2069,6 +1987,57 @@
   background: var(--ui-surface);
   overflow: hidden;
   box-shadow: var(--ui-shadow-sm);
+}
+
+/* Banda de acciones de "andamiaje" de la tabla (Columnas + CSV), por ENCIMA de la
+   tabla y alineada a la derecha — fuera de la estructura visual de la tabla. */
+.table-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--ui-space-2);
+  margin-bottom: var(--ui-space-2);
+}
+/* Cuando la banda vive DENTRO del .table-panel (p. ej. Tarifas de proveedor, que
+   mete la cabecera de pestañas y la tabla en el mismo panel), va entre el toolbar
+   y la tabla: alinea su padding horizontal con el de las celdas (1rem) y separa
+   con un poco de aire arriba/abajo sin romper el marco del panel. */
+.table-panel > .table-actions {
+  margin: 0;
+  padding: var(--ui-space-2) 1rem;
+}
+
+/* Botón solo-icono (acciones secundarias como Importar/Exportar CSV): cuadrado,
+   neutro (nunca primary); el texto se muestra en hover vía tooltip y el aria-label
+   está siempre presente para a11y. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+.icon-btn:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
+.icon-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 /* Variante para paneles de CONTENIDO libre (no tabla): Ayuda, etc. La base
    .table-panel no lleva padding porque en las tablas lo aportan la cabecera y las
@@ -2341,29 +2310,8 @@
 }
 
 /* ── Limpieza UX (IT-19) ────────────────────────────────────────────────────
-   Botón de acción destructiva (confirmar borrado/revocación) y modal de
-   confirmación estrecho. */
-.btn-danger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 2.5rem;
-  padding: 0 1rem;
-  border: 1px solid var(--ui-danger);
-  border-radius: var(--ui-radius-sm);
-  background: var(--ui-danger);
-  color: #fff;
-  font-weight: 500;
-  cursor: pointer;
-  transition: opacity 0.15s var(--ui-ease);
-}
-.btn-danger:hover {
-  opacity: 0.9;
-}
-.btn-danger:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
+   Modal de confirmación estrecho. (El antiguo .btn-danger se migró al <Button
+   variant="danger"> compartido en la Fase 2.) */
 .modal--confirm {
   max-width: 26rem;
 }
@@ -2414,39 +2362,87 @@
 }
 
 /* ── Centro de ayuda / soporte (IT-20) ──────────────────────────────────────
-   Canales de contacto en tarjetas + FAQ en acordeón. */
+   Rediseño al lenguaje de la dashboard: superficies limpias (.dash-panel),
+   espaciado generoso, radios/sombras sutiles y jerarquía tipográfica. Se
+   elimina el exceso de bordes "encajonados" (border:1px por cada card/FAQ) a
+   favor de superficies + separadores hairline solo donde aportan. */
+
+/* La página apila secciones-panel con mucho aire entre ellas (ritmo dashboard). */
+.help-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-8);
+}
+
+/* Cada sección es un panel-superficie igual que .dash-panel (sin doble marco con
+   la tabla interior de API keys). */
+.help-section {
+  padding: var(--ui-space-6) var(--ui-space-6);
+  border: 1px solid var(--ui-border);
+  border-radius: 18px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+/* Cabecera de sección: título + subtítulo muted (espejo de .dash-panel-head). */
+.help-section-head {
+  margin-bottom: var(--ui-space-6);
+}
 .help-title {
   display: flex;
   align-items: center;
   gap: var(--ui-space-2);
-  margin: 0 0 var(--ui-space-2);
+  margin: 0;
+  font-size: var(--ui-text-lg);
+  font-weight: 600;
+  letter-spacing: -0.016em;
+  color: var(--ui-text);
+}
+.help-title svg {
+  color: var(--ui-text-soft);
 }
 .help-intro {
-  margin: 0 0 var(--ui-space-5);
+  margin: var(--ui-space-2) 0 0;
+  font-size: var(--ui-text-base);
+  color: var(--ui-text-muted);
 }
+
+/* ── Canales de contacto ──────────────────────────────────────────────────── */
+/* Grid con aire (gap cómodo) que reflowa sin overflow. */
 .help-channels {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: var(--ui-space-3);
+  gap: var(--ui-space-5);
 }
+/* Tarjeta-superficie estilo .dash-card: borde sutil + sombra + radio amplio, con
+   padding cómodo. Sin acento agresivo en hover. */
 .help-channel {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--ui-space-1);
-  padding: var(--ui-space-4);
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-5);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
+  border-radius: var(--ui-radius-xl);
   background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
   color: var(--ui-text);
   text-decoration: none;
   transition:
-    border-color 0.15s var(--ui-ease),
-    background 0.15s var(--ui-ease);
+    border-color 0.18s var(--ui-ease),
+    transform 0.18s var(--ui-ease);
+}
+.help-channel svg {
+  color: var(--ui-text-soft);
 }
 .help-channel:hover {
-  border-color: var(--ui-primary);
-  background: var(--ui-surface-subtle);
+  border-color: var(--ui-border-strong);
+  transform: translateY(-1px);
+}
+.help-channel:focus-visible {
+  outline: none;
+  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-focus);
 }
 .help-channel-label {
   font-weight: 600;
@@ -2455,53 +2451,107 @@
   font-size: var(--ui-text-sm);
   color: var(--ui-text-muted);
 }
+
+/* ── FAQ (acordeón) ───────────────────────────────────────────────────────── */
+/* Un solo bloque: las preguntas se separan con hairlines sutiles (no una caja por
+   cada ítem). El indicador de abierto/cerrado es un chevron rotatorio, no la caja. */
 .help-faq {
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-2);
 }
 .help-faq-item {
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-  padding: 0 var(--ui-space-4);
+  border-bottom: 1px solid var(--ui-border);
+}
+.help-faq-item:first-child {
+  border-top: 1px solid var(--ui-border);
 }
 .help-faq-item > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
   cursor: pointer;
-  padding: var(--ui-space-3) 0;
+  padding: var(--ui-space-4) 0;
   font-weight: 500;
-  list-style: revert;
+  color: var(--ui-text);
+  /* Quita el marcador nativo (lo sustituye el chevron ::after). */
+  list-style: none;
+}
+.help-faq-item > summary::-webkit-details-marker {
+  display: none;
+}
+.help-faq-item > summary:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+  border-radius: var(--ui-radius-sm);
+}
+/* Chevron como indicador de estado: rota 90° al abrir. */
+.help-faq-item > summary::after {
+  content: '';
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 1.5px solid var(--ui-text-soft);
+  border-bottom: 1.5px solid var(--ui-text-soft);
+  transform: rotate(-45deg);
+  transition: transform 0.18s var(--ui-ease);
+}
+.help-faq-item[open] > summary::after {
+  transform: rotate(45deg);
 }
 .help-faq-item > p {
-  margin: 0 0 var(--ui-space-3);
+  margin: 0 0 var(--ui-space-4);
   color: var(--ui-text-muted);
   font-size: var(--ui-text-base);
-  line-height: 1.5;
+  line-height: 1.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .help-channel,
+  .help-faq-item > summary::after {
+    transition: none;
+  }
 }
 
-/* ── Stock: filtros agrupados (producto vs tienda) + lista por tienda (UX) ───── */
+/* ── Integraciones · Claves API ───────────────────────────────────────────── */
+/* La sección de API keys queda integrada en el mismo lenguaje visual: sin su
+   marco duro propio. El .table-panel interior cede su superficie al panel de la
+   sección (sin doble borde/sombra) y solo conserva sus separadores internos. */
+.help-integrations-body .table-panel {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+/* El banner y la lista de revocadas usaban márgenes pensados para el panel con
+   padding 0; aquí el panel ya da el aire, así que basta separación vertical. */
+.help-integrations-body .apikey-banner,
+.help-integrations-body .apikey-revoked {
+  margin: var(--ui-space-4) 0 0;
+}
+/* La toolbar interna ya no necesita su banda de chrome separada por hairline:
+   se integra con el resto del contenido de la sección. SectionToolbar renderiza
+   `.users-toolbar`, que en .table-panel recibe la banda de cabecera; aquí la
+   neutralizamos para que fluya dentro del panel de la sección. */
+.help-integrations-body .table-panel > .users-toolbar {
+  min-height: 0;
+  padding: 0 0 var(--ui-space-4);
+  background: transparent;
+  border-bottom: none;
+}
+
+/* ── Stock: filtros (búsqueda + familia + rotación + tienda) + lista por tienda ─── */
 .stock-filters {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   flex-wrap: wrap;
-  gap: var(--ui-space-5);
+  gap: var(--ui-space-2);
 }
 .stock-filter-group {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--ui-space-2);
-}
-/* Separador sutil entre el grupo "Producto" y el grupo "Tienda". */
-.stock-filter-group + .stock-filter-group {
-  padding-left: var(--ui-space-5);
-  border-left: 1px solid var(--ui-border);
-}
-.stock-filter-label {
-  font-size: var(--ui-text-2xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--ui-text-soft);
 }
 
 /* Lista compacta de existencias por tienda: punto de nivel + nombre + cantidad.
@@ -2797,35 +2847,15 @@
   font-size: var(--ui-text-sm);
   color: var(--ui-text-muted);
 }
-/* Chip de filtro "solo en alerta". */
-.stock-alert-toggle {
-  padding: var(--ui-space-1) var(--ui-space-3);
-  border: 1px solid var(--ui-border-strong, var(--ui-border));
-  border-radius: var(--ui-radius-pill);
-  background: var(--ui-surface);
-  cursor: pointer;
-  font-size: var(--ui-text-sm);
-  transition:
-    background 0.12s var(--ui-ease),
-    border-color 0.12s var(--ui-ease),
-    color 0.12s var(--ui-ease);
-}
-.stock-alert-toggle:hover {
-  background: var(--ui-surface-subtle);
-}
-.stock-alert-toggle.is-on {
-  background: var(--ui-danger-soft);
-  border-color: var(--ui-danger);
-  color: var(--ui-danger);
-  font-weight: 600;
-}
 
-/* ── Tiendas: accesos directos en la card + token de fichaje (UX) ───────────── */
-.store-card-actions {
+/* ── Tiendas: acciones en la modal de detalle + token de fichaje (UX) ───────── */
+/* Acciones Stock/Ventas/Precios: trasladadas desde la card a la modal de detalle,
+   justo tras "Ver registros". Grupo de botones secundarios consistente. */
+.store-detail-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--ui-space-2);
-  min-width: 0;
+  margin-top: var(--ui-space-3);
 }
 .store-device-token {
   margin-top: var(--ui-space-3);
@@ -2937,7 +2967,9 @@
   border: 2px solid transparent;
   border-radius: 999px;
   cursor: pointer;
-  transition: transform 0.1s, border-color 0.1s;
+  transition:
+    transform 0.1s,
+    border-color 0.1s;
 }
 .fam-color-swatch:hover {
   transform: scale(1.12);
@@ -3098,7 +3130,7 @@
   border-color: var(--ui-primary);
   box-shadow: 0 0 0 3px var(--ui-accent-soft, rgb(0 102 204 / 0.15));
 }
-.supplier-form .btn-primary {
+.supplier-form .supplier-save {
   justify-self: start;
 }
 .supplier-detail-h {

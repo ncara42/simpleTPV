@@ -1,3 +1,5 @@
+import { Button } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -6,7 +8,6 @@ import { useConfirm } from './components/ConfirmProvider.js';
 import { createStore, deleteStore, listStores, type Store, updateStore } from './lib/admin.js';
 import { getSalesToday } from './lib/dashboard.js';
 import { formErrorMessage } from './lib/form-error.js';
-import { usePageHeader } from './lib/pageHeader.js';
 import { StoreCard } from './stores/StoreCard.js';
 import { StoreDetailModal } from './stores/StoreDetailModal.js';
 import { type StoreForm, StoreFormModal } from './stores/StoreFormModal.js';
@@ -107,14 +108,14 @@ export function StoresPage({
   return (
     <section className="catalog">
       <div className="stores-toolbar">
-        <button
-          className="btn-primary stock-tabs-action"
+        <Button
+          className="stock-tabs-action"
           onClick={() => setCreating(true)}
           data-testid="new-store"
+          icon={<Plus size={16} aria-hidden="true" />}
         >
-          <Plus size={16} aria-hidden="true" />
           Nueva tienda
-        </button>
+        </Button>
       </div>
 
       {isLoading ? (
@@ -133,9 +134,6 @@ export function StoresPage({
               sales={salesByStore.get(s.id) ?? 0}
               periodLabel={SALES_LABEL[period]}
               onSelect={() => setDetail(s)}
-              onOpenStock={() => onOpenStoreView('stock', s.id)}
-              onOpenSales={() => onOpenStoreView('sales', s.id)}
-              onOpenPrices={() => setPricesFor(s)}
             />
           ))}
         </div>
@@ -159,6 +157,14 @@ export function StoresPage({
             deleteMut.isError ? formErrorMessage(deleteMut.error, 'No se pudo borrar.') : null
           }
           onClose={() => setDetail(null)}
+          onOpenStock={() => onOpenStoreView('stock', detail.id)}
+          onOpenSales={() => onOpenStoreView('sales', detail.id)}
+          // Decisión (a) del plan: cerrar el detalle al abrir Precios para no apilar
+          // dos modales. StorePricesModal se renderiza desde esta página.
+          onOpenPrices={() => {
+            setPricesFor(detail);
+            setDetail(null);
+          }}
         />
       )}
 

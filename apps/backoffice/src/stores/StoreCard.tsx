@@ -7,18 +7,12 @@ export function StoreCard({
   sales,
   periodLabel,
   onSelect,
-  onOpenStock,
-  onOpenSales,
-  onOpenPrices,
 }: {
   store: Store;
   active: boolean;
   sales: number;
   periodLabel: string;
   onSelect: () => void;
-  onOpenStock: () => void;
-  onOpenSales: () => void;
-  onOpenPrices: () => void;
 }) {
   return (
     <div
@@ -79,41 +73,6 @@ export function StoreCard({
       <div className="store-card-foot">
         <span className={`store-status-text${active ? '' : ' muted'}`} data-testid="store-status">
           {active ? 'Activa' : 'Dormida'}
-        </span>
-        <span className="store-card-actions">
-          <button
-            type="button"
-            className="link-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenStock();
-            }}
-            data-testid="store-open-stock"
-          >
-            Stock
-          </button>
-          <button
-            type="button"
-            className="link-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenSales();
-            }}
-            data-testid="store-open-sales"
-          >
-            Ventas
-          </button>
-          <button
-            type="button"
-            className="link-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenPrices();
-            }}
-            data-testid="store-open-prices"
-          >
-            Precios
-          </button>
         </span>
       </div>
     </div>

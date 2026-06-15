@@ -1,3 +1,4 @@
+import { Button } from '@simpletpv/ui';
 import { type ReactNode } from 'react';
 
 interface SectionToolbarProps {
@@ -11,7 +12,8 @@ interface SectionToolbarProps {
 
 // Barra superior de sección (contador/filtros a la izquierda + acción primaria a
 // la derecha), antes duplicada en las secciones de B2B y API Keys. Mantiene las
-// clases users-toolbar/sales-filters/btn-primary de catalog.css.
+// clases users-toolbar/sales-filters de catalog.css; la acción usa el <Button>
+// compartido (@simpletpv/ui).
 export function SectionToolbar({
   children,
   actionLabel,
@@ -22,9 +24,9 @@ export function SectionToolbar({
     <div className="users-toolbar">
       <div className="sales-filters">{children}</div>
       {actionLabel && (
-        <button className="btn-primary" onClick={onAction} data-testid={actionTestId}>
+        <Button onClick={onAction} data-testid={actionTestId}>
           {actionLabel}
-        </button>
+        </Button>
       )}
     </div>
   );

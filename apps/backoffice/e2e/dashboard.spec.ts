@@ -133,8 +133,11 @@ test('Personalizar (D-19): mover una card por teclado persiste y Restablecer lo 
   await page.getByTestId('dash-preset-ventas').click();
   await expect(page.getByTestId('dash-board')).toBeVisible();
 
-  // El tile (react-grid-item) que contiene la card "Facturación hoy".
-  const tile = page.locator('.dash-tile', { has: page.getByTestId('kpi-today') });
+  // El tile de la KPI "UPT" (kpi-upt): es el KPI más a la derecha (x:4) y tiene columnas
+  // libres a su derecha. El tablero usa preventCollision (como el arrastre): una card solo
+  // se mueve a celdas VACÍAS, no empuja a sus vecinas. Por eso movemos kpi-upt (con hueco),
+  // no kpi-today (encajonado por kpi-avg-ticket, que bloquearía el movimiento).
+  const tile = page.locator('.dash-tile', { has: page.getByTestId('kpi-upt') });
   await expect(tile).toBeVisible();
   const start = await tile.boundingBox();
   if (!start) throw new Error('sin bounding box de la card');
@@ -149,6 +152,12 @@ test('Personalizar (D-19): mover una card por teclado persiste y Restablecer lo 
   await tile.focus();
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowRight');
+  // Guardar persiste el layout con un PUT optimista a /me/preferences/dashboard.layout:
+  // espera la confirmación del servidor antes de recargar, o el reload puede correr antes
+  // que el PUT y la posición movida no se habría persistido aún.
+  const persisted = page.waitForResponse(
+    (r) => r.url().includes('/me/preferences/dashboard.layout') && r.request().method() === 'PUT',
+  );
   await page.getByTestId('dash-edit-save').click();
 
   // La card cambió de columna respecto al inicio.
@@ -159,22 +168,23 @@ test('Personalizar (D-19): mover una card por teclado persiste y Restablecer lo 
   await expect.poll(sameXAsStart).toBe(false);
   const moved = await tile.boundingBox();
   if (!moved) throw new Error('sin bounding box tras mover');
+  await persisted;
+  // Umbral robusto: punto medio entre la posición por defecto (start) y la movida (moved). Se
+  // compara con tolerancia, NO a píxel exacto, porque el ancho del tablero puede variar entre
+  // captura/recarga/reset (scrollbar, recálculo de breakpoint); la columna destino es estable.
+  const xMid = (Math.round(start.x) + Math.round(moved.x)) / 2;
+  const tileX = async (): Promise<number> => Math.round((await tile.boundingBox())?.x ?? 0);
 
-  // Persiste tras recargar (preferencia dashboard.layout en /me/preferences).
+  // Persiste tras recargar: la card sigue a la derecha del punto medio (no revirtió).
   await page.reload();
   await expect(page.getByTestId('dash-board')).toBeVisible({ timeout: 15000 });
-  await expect
-    .poll(async () => {
-      const b = await tile.boundingBox();
-      return !!b && Math.round(b.x) === Math.round(moved.x);
-    })
-    .toBe(true);
+  await expect.poll(tileX).toBeGreaterThan(xMid);
 
-  // Restablecer devuelve la colocación por defecto (limpia el estado para otros tests).
+  // Restablecer devuelve la card a su columna por defecto: queda a la izquierda del punto medio.
   await page.getByTestId('dash-edit-toggle').click();
   await page.getByTestId('dash-edit-reset').click();
   await page.getByTestId('dash-edit-save').click();
-  await expect.poll(sameXAsStart).toBe(true);
+  await expect.poll(tileX).toBeLessThan(xMid);
 });
 
 test('Ventas es page propia: el dashboard no embebe la tabla y enlaza al final (I-17, D-06)', async ({
@@ -298,11 +308,12 @@ test('Modo Libre (D-20): toggle a lienzo edgeless, mover una card a píxel y per
   // Por defecto se entra en Cuadrícula.
   await expect(page.getByTestId('dash-board')).toBeVisible();
 
-  // Cambiar a Libre: aparece el lienzo y sus controles de zoom; desaparece el tablero.
+  // Cambiar a Libre: aparece el lienzo y sus controles de zoom; el tablero se oculta
+  // (sigue MONTADO con visibility:hidden para que useContainerWidth mida su ancho al volver).
   await page.getByTestId('dash-mode-free').click();
   await expect(page.getByTestId('dash-free')).toBeVisible();
   await expect(page.getByTestId('dash-free-zoom')).toBeVisible();
-  await expect(page.getByTestId('dash-board')).toHaveCount(0);
+  await expect(page.getByTestId('dash-board')).toBeHidden();
 
   // Normaliza la disposición (Ordenar) para que las cards estén a la vista y a un zoom usable:
   // robusto frente al "drift" que acumulan las ejecuciones locales repetidas de este test.
@@ -384,13 +395,21 @@ test('Modo Libre: añadir nota y widget, quitar, deshacer y ordenar; minimapa vi
   await page.getByTestId('dash-free-undo').click();
   await expect(items).toHaveCount(baseCount);
 
-  // Ordenar (reorganizar automático): recoloca → cambia el transform de mundo de una card.
+  // Ordenar (reorganizar automático): primero desplazamos una card fuera de su sitio (kpi-today
+  // por sí sola ya cae en (0,0) y Ordenar no la movería), luego Ordenar la recoloca → su
+  // transform de mundo cambia respecto a la posición desplazada.
   const first = page.locator('.dash-free-item', { has: page.getByTestId('kpi-today') });
-  const tf0 = await first.evaluate((el) => (el as HTMLElement).style.transform);
+  const fb = await first.boundingBox();
+  if (!fb) throw new Error('sin bounding box de la card');
+  await page.mouse.move(fb.x + fb.width / 2, fb.y + fb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(fb.x + fb.width / 2 + 160, fb.y + fb.height / 2 + 120, { steps: 12 });
+  await page.mouse.up();
+  const tfMoved = await first.evaluate((el) => (el as HTMLElement).style.transform);
   await page.getByTestId('dash-free-arrange').click();
   await expect
     .poll(() => first.evaluate((el) => (el as HTMLElement).style.transform))
-    .not.toBe(tf0);
+    .not.toBe(tfMoved);
 
   // Restaurar el modo por defecto para el resto de tests.
   await page.getByTestId('dash-mode-grid').click();

@@ -190,7 +190,7 @@ const PRODUCT_DETAILS: Record<string, { description: string; weight?: boolean }>
 };
 
 /** Añade descripción a todos los productos y pasa las flores a granel (g). */
-export async function seedProductDetails(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedProductDetails(prisma: PrismaClient, orgId: string): Promise<void> {
   const products = await prisma.product.findMany({ where: { organizationId: orgId } });
   for (const p of products) {
     const detail = PRODUCT_DETAILS[p.name];
@@ -214,7 +214,7 @@ const USER_PINS: Record<string, string> = {
   'jon@demo.simpletpv': '4444',
 };
 
-export async function seedUserPins(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedUserPins(prisma: PrismaClient, orgId: string): Promise<void> {
   for (const [email, pin] of Object.entries(USER_PINS)) {
     const user = await prisma.user.findFirst({ where: { organizationId: orgId, email } });
     if (!user || user.pinHash) continue;
@@ -227,7 +227,7 @@ export async function seedUserPins(prisma: PrismaClient, orgId: string): Promise
 
 // ─── Tiendas: estado operativo manual (D-10) ─────────────────────────────────
 
-export async function seedStoreOps(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedStoreOps(prisma: PrismaClient, orgId: string): Promise<void> {
   const opsByCode: Record<string, { verified: boolean; incident: string | null }> = {
     '01': { verified: true, incident: null },
     '02': { verified: true, incident: null },
@@ -247,7 +247,7 @@ export async function seedStoreOps(prisma: PrismaClient, orgId: string): Promise
 
 // ─── Dispositivos oficiales (emparejados, pendientes, sin conexión) ──────────
 
-export async function seedDevices(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedDevices(prisma: PrismaClient, orgId: string): Promise<void> {
   // OJO: nada en la tienda Sur (03): el e2e del backoffice (pages.spec #100/I-08)
   // genera y revoca tokens en Sur y asume que empieza SIN dispositivos.
   const devices = [
@@ -352,7 +352,7 @@ const TRANSFERS: TransferSpec[] = [
   },
 ];
 
-export async function seedTransfers(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedTransfers(prisma: PrismaClient, orgId: string): Promise<void> {
   const admin = await prisma.user.findFirst({
     where: { organizationId: orgId, role: UserRole.ADMIN },
   });
@@ -453,7 +453,7 @@ export async function seedTransfers(prisma: PrismaClient, orgId: string): Promis
 
 // ─── Devoluciones (con ticket y sin ticket autorizada por PIN) ───────────────
 
-export async function seedReturns(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedReturns(prisma: PrismaClient, orgId: string): Promise<void> {
   const existing = await prisma.return.count({ where: { organizationId: orgId } });
   if (existing > 0) return;
 
@@ -620,7 +620,7 @@ export async function seedReturns(prisma: PrismaClient, orgId: string): Promise<
 
 // ─── Movimientos de caja (entradas/salidas del turno) ────────────────────────
 
-export async function seedCashMovements(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedCashMovements(prisma: PrismaClient, orgId: string): Promise<void> {
   const manager = await prisma.user.findFirst({
     where: { organizationId: orgId, role: UserRole.MANAGER },
   });
@@ -736,7 +736,7 @@ export async function seedCashMovements(prisma: PrismaClient, orgId: string): Pr
 
 // ─── Fichaje: pausas pasadas + turno vivo de hoy (trabajando / en pausa) ─────
 
-export async function seedTimeClockBreaks(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedTimeClockBreaks(prisma: PrismaClient, orgId: string): Promise<void> {
   const users = await prisma.user.findMany({
     where: { organizationId: orgId, role: { in: [UserRole.MANAGER, UserRole.CLERK] } },
   });
@@ -864,7 +864,7 @@ const CURATED_STOCK: Array<{ product: string; storeCode: string; qty: number }> 
   { product: 'Camiseta marca', storeCode: '02', qty: 0 },
 ];
 
-export async function seedRestock(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedRestock(prisma: PrismaClient, orgId: string): Promise<void> {
   const admin = await prisma.user.findFirst({
     where: { organizationId: orgId, role: UserRole.ADMIN },
   });
@@ -910,7 +910,7 @@ export async function seedRestock(prisma: PrismaClient, orgId: string): Promise<
  * RESUELVE las que ya no aplican (igual que hace el flujo de movimientos).
  * Las resueltas quedan como histórico en la vista de notificaciones.
  */
-export async function seedStockAlertsFromStock(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedStockAlertsFromStock(prisma: PrismaClient, orgId: string): Promise<void> {
   // Mismo alcance que seedRestock (todas las tiendas): las alertas reflejan el
   // stock real de cada tienda con fila de stock, activa o no.
   const stocks = await prisma.stock.findMany({ where: { organizationId: orgId } });
@@ -952,7 +952,7 @@ export async function seedStockAlertsFromStock(prisma: PrismaClient, orgId: stri
 
 // ─── Pedidos de compra: recepción parcial y recepción completa ───────────────
 
-export async function seedPurchaseOrderStates(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedPurchaseOrderStates(prisma: PrismaClient, orgId: string): Promise<void> {
   const admin = await prisma.user.findFirst({
     where: { organizationId: orgId, role: UserRole.ADMIN },
   });
@@ -1060,7 +1060,7 @@ export async function seedPurchaseOrderStates(prisma: PrismaClient, orgId: strin
 
 // ─── B2B: tercer cliente y pedidos mayoristas en todos los estados ───────────
 
-export async function seedWholesaleStates(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedWholesaleStates(prisma: PrismaClient, orgId: string): Promise<void> {
   let growshop = await prisma.customer.findFirst({
     where: { organizationId: orgId, nif: 'B11223344' },
   });
@@ -1150,7 +1150,7 @@ export async function seedWholesaleStates(prisma: PrismaClient, orgId: string): 
 
 // ─── VeriFactu: registros PENDING y FAILED (la cola con reintentos) ──────────
 
-export async function seedVerifactuStates(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedVerifactuStates(prisma: PrismaClient, orgId: string): Promise<void> {
   const pendingExists = await prisma.verifactuRecord.findFirst({
     where: {
       organizationId: orgId,
@@ -1210,7 +1210,7 @@ export async function seedVerifactuStates(prisma: PrismaClient, orgId: string): 
 
 // ─── Exports de ventas (COMPLETED con CSV, FAILED y PENDING) ─────────────────
 
-export async function seedSalesExports(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedSalesExports(prisma: PrismaClient, orgId: string): Promise<void> {
   const existing = await prisma.salesExport.count({ where: { organizationId: orgId } });
   if (existing > 0) return;
 
@@ -1273,7 +1273,7 @@ export async function seedSalesExports(prisma: PrismaClient, orgId: string): Pro
 // Mismo formato que ApiKeysService: stpv_<prefix8>_<random>, sha256 en BD.
 export const DEMO_API_KEY = 'stpv_demoseed_q7VxZk31fWp9rLtH2mYcAbD5uJnE8gKs0iO4PvRwTxQ';
 
-export async function seedApiKeys(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedApiKeys(prisma: PrismaClient, orgId: string): Promise<void> {
   const priceList = await prisma.priceList.findFirst({
     where: { organizationId: orgId, name: 'Tarifa Mayorista Demo' },
   });
@@ -1310,7 +1310,7 @@ export async function seedApiKeys(prisma: PrismaClient, orgId: string): Promise<
 
 // ─── Ventas especiales: anulada, con descuentos y con cambio de efectivo ─────
 
-export async function seedSpecialSales(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedSpecialSales(prisma: PrismaClient, orgId: string): Promise<void> {
   const store01 = await storeByCode(prisma, orgId, '01');
   if (!store01) return;
   const markerTicket = `${store01.code}-${yyyymmdd(dateDaysAgo(1, 0, 0))}-901`;
@@ -1482,7 +1482,7 @@ export async function seedSpecialSales(prisma: PrismaClient, orgId: string): Pro
 
 // ─── Auditoría (mismo formato que AuditInterceptor: action=verbo HTTP) ───────
 
-export async function seedAuditLogs(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedAuditLogs(prisma: PrismaClient, orgId: string): Promise<void> {
   const existing = await prisma.auditLog.count({ where: { organizationId: orgId } });
   if (existing >= 10) return;
 
@@ -1535,7 +1535,7 @@ export async function seedAuditLogs(prisma: PrismaClient, orgId: string): Promis
 
 // ─── Backfill: coste congelado en líneas históricas (margen real en stats) ───
 
-export async function backfillSaleLineCosts(prisma: PrismaClient, orgId: string): Promise<void> {
+async function backfillSaleLineCosts(prisma: PrismaClient, orgId: string): Promise<void> {
   const products = await prisma.product.findMany({
     where: { organizationId: orgId, costPrice: { gt: 0 } },
     select: { id: true, costPrice: true },

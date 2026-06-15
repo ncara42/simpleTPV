@@ -1,6 +1,6 @@
+import { usePageHeader } from '@simpletpv/ui';
 import { useState } from 'react';
 
-import { usePageHeader } from './lib/pageHeader.js';
 import { OrdersSection as PurchaseOrdersSection } from './purchases/OrdersSection.js';
 import { SuggestSection } from './purchases/SuggestSection.js';
 import { SupplierPricesSection } from './purchases/SupplierPricesSection.js';

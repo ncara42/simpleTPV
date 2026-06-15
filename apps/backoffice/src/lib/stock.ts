@@ -1,4 +1,5 @@
 import type {
+  AdjustStockInput,
   CreateTransferInput,
   ExpiringBatch,
   SetMinStockInput,
@@ -10,7 +11,7 @@ import type {
 
 import { api } from './auth.js';
 
-export type { ExpiringBatch, StockAlert, StockGlobalRow, Transfer };
+export type { AdjustStockInput, ExpiringBatch, StockAlert, StockGlobalRow, Transfer };
 
 export function getGlobalStock(): Promise<StockGlobalRow[]> {
   return api.get<StockGlobalRow[]>('/stock/global');
@@ -42,13 +43,6 @@ export function createTransfer(input: CreateTransferInput): Promise<Transfer> {
 
 export function sendTransfer(id: string): Promise<Transfer> {
   return api.post<Transfer>(`/transfers/${id}/send`);
-}
-
-export interface AdjustStockInput {
-  productId: string;
-  storeId: string;
-  newQuantity: number;
-  reason: string;
 }
 
 export function adjustStock(input: AdjustStockInput): Promise<unknown> {

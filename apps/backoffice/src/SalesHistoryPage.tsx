@@ -1,5 +1,6 @@
-import { Badge, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Badge, DataTable, type DataTableColumn, Select, usePageHeader } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { Download } from 'lucide-react';
 import { useState } from 'react';
 
 import { useTableColumns } from './components/useTableColumns.js';
@@ -13,7 +14,6 @@ import {
 import { type FamilyNode, listFamilies } from './lib/families.js';
 import { useFeatures } from './lib/features.js';
 import { fmtEur, fmtRate } from './lib/format.js';
-import { usePageHeader } from './lib/pageHeader.js';
 
 const hour = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
 const PAYMENT_LABEL: Record<string, string> = { CASH: 'Efectivo', CARD: 'Tarjeta' };
@@ -265,15 +265,6 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
           </>
         )}
       </div>
-      {features.data_export && (
-        <button
-          className="btn-primary sales-export"
-          onClick={() => void exportCsv()}
-          data-testid="sales-export-csv"
-        >
-          Exportar CSV
-        </button>
-      )}
     </>
   );
 
@@ -315,27 +306,36 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
 
       {columnsEditor}
 
+      <div className="table-actions">
+        {features.data_export && (
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => void exportCsv()}
+            data-testid="sales-export-csv"
+            title="Exportar CSV"
+            aria-label="Exportar CSV"
+          >
+            <Download size={18} aria-hidden="true" />
+          </button>
+        )}
+        <button
+          type="button"
+          className="ui-dt-cols-trigger"
+          onClick={toggleColumnsEditor}
+          data-testid="sales-columns-toggle"
+          aria-expanded={columnsEditorOpen}
+        >
+          Columnas
+        </button>
+      </div>
+
       <DataTable
         columns={effectiveColumns}
         rows={data?.items ?? []}
         rowKey={(r) => r.id}
         loading={query.isLoading}
-        toolbar={
-          <>
-            {toolbar}
-            <div className="ui-dt-cols">
-              <button
-                type="button"
-                className="ui-dt-cols-trigger"
-                onClick={toggleColumnsEditor}
-                data-testid="sales-columns-toggle"
-                aria-expanded={columnsEditorOpen}
-              >
-                Columnas
-              </button>
-            </div>
-          </>
-        }
+        toolbar={toolbar}
         footer={footer}
         pagination={{
           page,

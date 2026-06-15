@@ -1,3 +1,4 @@
+import { Button } from '@simpletpv/ui';
 import { createContext, type ReactNode, useCallback, useContext, useState } from 'react';
 
 import { Modal } from './Modal.js';
@@ -55,14 +56,14 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             <button type="button" onClick={() => close(false)} data-testid="confirm-cancel">
               {pending.opts.cancelLabel ?? 'Cancelar'}
             </button>
-            <button
+            <Button
               type="button"
-              className={pending.opts.danger ? 'btn-danger' : 'btn-primary'}
+              variant={pending.opts.danger ? 'danger' : 'primary'}
               onClick={() => close(true)}
               data-testid="confirm-accept"
             >
               {pending.opts.confirmLabel ?? 'Aceptar'}
-            </button>
+            </Button>
           </div>
         </Modal>
       )}

@@ -22,3 +22,16 @@
 export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
+
+/**
+ * Normaliza a `number` un valor que puede venir como Decimal (string del driver
+ * pg), number, o null/undefined. Cualquier valor no finito cae a 0.
+ *
+ * Centralizado para no repetir el cast tolerante en cada servicio que lee
+ * agregados o columnas DECIMAL (estaba triplicado en dashboard, sales y
+ * sales-receipt con variantes sutilmente distintas).
+ */
+export function num(v: unknown): number {
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+}

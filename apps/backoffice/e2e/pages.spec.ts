@@ -84,14 +84,19 @@ test('Tiendas: orden por ventas y acceso directo a stock (UX)', async ({ page })
   await expect(page.getByTestId('store-sales').first()).toBeVisible();
   // El panel ya no tiene filtros (solo crea y observa).
   await expect(page.getByTestId('store-status-filter')).toHaveCount(0);
+  // Las acciones Stock/Ventas/Precios viven ahora en la modal de detalle:
+  // primero se abre la card → modal, luego se pulsa el botón dentro.
+  await page.getByTestId('store-card').first().click();
+  await expect(page.getByTestId('store-detail-actions')).toBeVisible();
   // Acceso directo "Stock" → lleva a la página de Stock.
-  await page.getByTestId('store-card').first().getByTestId('store-open-stock').click();
+  await page.getByTestId('store-open-stock').click();
   await expect(page.getByTestId('stock-page')).toBeVisible();
   // Acceso directo "Ventas" → page de Ventas PREFILTRADA por la tienda (I-17).
   await navTo(page, 'stores');
   const card = page.getByTestId('store-card').first();
   const storeName = (await card.locator('.store-card-name').textContent()) ?? '';
-  await card.getByTestId('store-open-sales').click();
+  await card.click();
+  await page.getByTestId('store-open-sales').click();
   await expect(page.getByTestId('sales-table')).toBeVisible();
   await expect(page.getByTestId('sales-store')).toContainText(storeName);
 });
@@ -659,7 +664,7 @@ test('U-04: sidebar contraído a rail — flyout lateral con anclaje y navegaci�
   await expect(page.getByTestId('nav-stock')).toBeVisible();
   await page.getByTestId('nav-stock').click();
   // Navega a Stock y el flyout se cierra.
-  await expect(page.getByTestId('stock-alerts-only')).toBeVisible();
+  await expect(page.getByTestId('stock-page')).toBeVisible();
   await expect(page.getByTestId('nav-stock')).toBeHidden();
   // Vuelta a expandido.
   await page.getByTestId('sidebar-collapse').click();
@@ -743,6 +748,30 @@ test('U-11/U-12: la campana abre Notificaciones y "Resolver" lleva a Stock del p
   await firstAlert.getByTestId('alert-resolve').click();
   await expect(page.getByTestId('stock-page')).toBeVisible();
   await expect(page.getByTestId('stock-search')).toHaveValue(productName);
+});
+
+test('La campana togglea Notificaciones y vuelve a la página anterior', async ({ page }) => {
+  const bell = page.getByTestId('topbar-notifications');
+
+  // Desde Stock: abrir Notificaciones con la campana, cerrarla y volver a Stock.
+  await navTo(page, 'stock');
+  await expect(page.getByTestId('stock-page')).toBeVisible();
+  await bell.click();
+  await expect(page.getByTestId('notifications-page')).toBeVisible();
+  await expect(bell).toHaveAttribute('aria-pressed', 'true');
+  await bell.click();
+  await expect(page.getByTestId('stock-page')).toBeVisible();
+  await expect(page.getByTestId('notifications-page')).toHaveCount(0);
+  await expect(bell).toHaveAttribute('aria-pressed', 'false');
+
+  // Mismo toggle desde otra página de origen (Catálogo) → vuelve a Catálogo.
+  await navTo(page, 'catalog');
+  await expect(page.getByTestId('catalog-table')).toBeVisible();
+  await bell.click();
+  await expect(page.getByTestId('notifications-page')).toBeVisible();
+  await bell.click();
+  await expect(page.getByTestId('catalog-table')).toBeVisible();
+  await expect(page.getByTestId('notifications-page')).toHaveCount(0);
 });
 
 test('Proveedores · Comparativa: gráficos de media/mediana y de producto buscado', async ({

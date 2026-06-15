@@ -9,7 +9,7 @@ import {
 import { Prisma, type SaleStatus } from '@simpletpv/db';
 
 import { assertStoreAccess } from '../auth/store-access.js';
-import { round2 } from '../common/money.js';
+import { num, round2 } from '../common/money.js';
 import { EVENT_BUS, type EventBus } from '../events/event-bus.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
@@ -31,13 +31,6 @@ import {
 } from './sales.domain.js';
 import type { CreateSaleDto } from './sales.dto.js';
 import { type ReceiptData, renderReceiptHtml } from './sales-receipt.js';
-
-// Los Decimal de Postgres llegan como string por el driver pg (y como Decimal por
-// Prisma en los aggregate). `num` los normaliza a number con fallback a 0.
-function num(v: unknown): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
 
 // Filtros del historial de ventas, compartidos por el listado (findSales), sus
 // agregados y el export (generateExportCsv). Todos opcionales.

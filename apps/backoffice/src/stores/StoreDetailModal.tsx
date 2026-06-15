@@ -1,3 +1,4 @@
+import { Button, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -17,12 +18,18 @@ export function StoreDetailModal({
   onDelete,
   deleteError,
   onClose,
+  onOpenStock,
+  onOpenSales,
+  onOpenPrices,
 }: {
   store: Store;
   onEdit: () => void;
   onDelete: () => void;
   deleteError: string | null;
   onClose: () => void;
+  onOpenStock: () => void;
+  onOpenSales: () => void;
+  onOpenPrices: () => void;
 }) {
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -129,6 +136,20 @@ export function StoreDetailModal({
             >
               Ver registros
             </button>
+            {/* Acciones de tienda: trasladadas desde la card. Stock/Ventas navegan a
+                su página filtrada; Precios abre la modal de precios. Se conservan los
+                data-testid (store-open-*) en los que se apoyan los E2E. */}
+            <div className="store-detail-actions" data-testid="store-detail-actions">
+              <Button variant="secondary" onClick={onOpenStock} data-testid="store-open-stock">
+                Stock
+              </Button>
+              <Button variant="secondary" onClick={onOpenSales} data-testid="store-open-sales">
+                Ventas
+              </Button>
+              <Button variant="secondary" onClick={onOpenPrices} data-testid="store-open-prices">
+                Precios
+              </Button>
+            </div>
           </section>
 
           <section className="form-section" data-testid="store-ops">
@@ -147,7 +168,7 @@ export function StoreDetailModal({
             </label>
             <label>
               Incidencias / notas
-              <input
+              <Input
                 placeholder="p. ej. persiana rota, obras en la calle…"
                 value={opsIncident}
                 onChange={(e) => setOpsIncident(e.target.value)}
@@ -159,9 +180,9 @@ export function StoreDetailModal({
                 {formErrorMessage(opsMut.error, 'No se pudo guardar el estado.')}
               </p>
             )}
-            <button
+            <Button
               type="button"
-              className="btn-primary"
+              className="store-ops-save"
               disabled={!opsDirty || opsMut.isPending}
               onClick={() => opsMut.mutate()}
               data-testid="store-ops-save"
@@ -171,7 +192,7 @@ export function StoreDetailModal({
                 : opsMut.isSuccess && !opsDirty
                   ? 'Guardado ✓'
                   : 'Guardar estado'}
-            </button>
+            </Button>
           </section>
 
           <section className="form-section" data-testid="store-device">

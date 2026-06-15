@@ -40,7 +40,7 @@ export function contentBounds(layout: readonly FreeElement[]): Bounds | null {
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
-export type Edge = 'top' | 'right' | 'bottom' | 'left';
+type Edge = 'top' | 'right' | 'bottom' | 'left';
 
 export interface OrientationArrow {
   /** Posición (px de pantalla) donde fijar la flecha, ya con margen aplicado. */
@@ -96,14 +96,14 @@ export function offscreenArrow(
   return { x, y, angle, edge };
 }
 
-export interface MiniRect {
+interface MiniRect {
   x: number;
   y: number;
   w: number;
   h: number;
 }
 
-export interface MiniItem extends MiniRect {
+interface MiniItem extends MiniRect {
   id: string;
   kind: FreeElement['kind'];
 }

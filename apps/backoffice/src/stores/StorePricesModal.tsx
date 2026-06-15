@@ -1,4 +1,4 @@
-import { Select } from '@simpletpv/ui';
+import { Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -68,38 +68,40 @@ export function StorePricesModal({ store, onClose }: { store: Store; onClose: ()
         </p>
       </header>
       <div className="modal-body">
-        {overrides.length === 0 ? (
-          <p className="catalog-empty">Sin precios propios. Esta tienda vende todo a su PVP.</p>
-        ) : (
-          <table className="catalog-table" data-testid="store-prices-table">
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>PVP</th>
-                <th>Precio en tienda</th>
-                <th aria-label="Acciones" />
-              </tr>
-            </thead>
-            <tbody>
-              {overrides.map((o) => (
-                <tr key={o.id} data-testid="store-price-row">
-                  <td>{o.product.name}</td>
-                  <td className="muted">{fmtEur(Number(o.product.salePrice))}</td>
-                  <td>{fmtEur(Number(o.price))}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="link-btn"
-                      onClick={() => removeMut.mutate(o.productId)}
-                    >
-                      Quitar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <DataTable
+          data-testid="store-prices-table"
+          rowTestId="store-price-row"
+          rows={overrides}
+          rowKey={(o) => o.id}
+          emptyState={
+            <span className="catalog-empty">
+              Sin precios propios. Esta tienda vende todo a su PVP.
+            </span>
+          }
+          columns={[
+            { key: 'product', header: 'Producto', render: (o) => o.product.name },
+            {
+              key: 'pvp',
+              header: 'PVP',
+              render: (o) => <span className="muted">{fmtEur(Number(o.product.salePrice))}</span>,
+            },
+            { key: 'price', header: 'Precio en tienda', render: (o) => fmtEur(Number(o.price)) },
+            {
+              key: 'actions',
+              header: '',
+              align: 'right',
+              render: (o) => (
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => removeMut.mutate(o.productId)}
+                >
+                  Quitar
+                </button>
+              ),
+            },
+          ]}
+        />
 
         <section className="form-section">
           <span className="form-section-title">Añadir / actualizar precio</span>
@@ -111,7 +113,7 @@ export function StorePricesModal({ store, onClose }: { store: Store; onClose: ()
               options={productOptions}
               data-testid="store-price-product"
             />
-            <input
+            <Input
               type="number"
               min="0"
               step="0.01"
@@ -120,15 +122,14 @@ export function StorePricesModal({ store, onClose }: { store: Store; onClose: ()
               onChange={(e) => setPrice(e.target.value)}
               data-testid="store-price-input"
             />
-            <button
+            <Button
               type="button"
-              className="btn-primary"
               disabled={!canAdd || setMut.isPending}
               onClick={() => setMut.mutate({ productId, price: Number(price) })}
               data-testid="store-price-add"
             >
               Añadir
-            </button>
+            </Button>
           </div>
         </section>
 

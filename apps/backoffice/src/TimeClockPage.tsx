@@ -1,8 +1,8 @@
 import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
-import { usePageHeader } from './lib/pageHeader.js';
 import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
 
 interface Filters {

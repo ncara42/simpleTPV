@@ -1,3 +1,4 @@
+import { Button, Input } from '@simpletpv/ui';
 import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
@@ -42,7 +43,7 @@ export function StoreFormModal({
       <h3>{editing ? 'Editar tienda' : 'Nueva tienda'}</h3>
       <label>
         Nombre
-        <input
+        <Input
           required
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -51,7 +52,7 @@ export function StoreFormModal({
       </label>
       <label>
         Código (p.ej. &quot;01&quot;)
-        <input
+        <Input
           required
           value={form.code}
           onChange={(e) => setForm({ ...form, code: e.target.value })}
@@ -60,7 +61,7 @@ export function StoreFormModal({
       </label>
       <label>
         Dirección
-        <input
+        <Input
           value={form.address}
           onChange={(e) => setForm({ ...form, address: e.target.value })}
           data-testid="store-address"
@@ -71,14 +72,13 @@ export function StoreFormModal({
         <button type="button" onClick={onClose}>
           Cancelar
         </button>
-        <button
+        <Button
           type="submit"
-          className="btn-primary"
           disabled={pending || !form.name.trim() || !form.code.trim()}
           data-testid="store-save"
         >
           {pending ? 'Guardando…' : editing ? 'Guardar' : 'Crear'}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

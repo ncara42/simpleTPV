@@ -1,7 +1,15 @@
-import { DataTable, type DataTableColumn, type DataTableSort, Select } from '@simpletpv/ui';
+import {
+  Button,
+  DataTable,
+  type DataTableColumn,
+  type DataTableSort,
+  Input,
+  Select,
+} from '@simpletpv/ui';
+import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Upload } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { CsvDropzone } from './components/CsvDropzone.js';
 import { Modal } from './components/Modal.js';
@@ -16,7 +24,6 @@ import { type FamilyNode, listFamilies } from './lib/families.js';
 import { findNodePath, flattenTree, isDescendantOf } from './lib/family-tree.js';
 import { formErrorMessage } from './lib/form-error.js';
 import { fmtEur } from './lib/format.js';
-import { usePageHeader } from './lib/pageHeader.js';
 import {
   createProduct,
   deleteProduct,
@@ -140,22 +147,25 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
   usePageHeader('Catálogo', `${filtered.length} productos activos`, 'catalog-count');
 
   // Orden cliente (numérico para precios/margen/stock; texto para el resto).
-  const sortValue = (p: Product, key: string): number | string => {
-    switch (key) {
-      case 'salePrice':
-        return Number(p.salePrice);
-      case 'costPrice':
-        return Number(p.costPrice);
-      case 'margin':
-        return Number(p.salePrice) - Number(p.costPrice);
-      case 'stock':
-        return stockByProduct.get(p.id) ?? 0;
-      case 'family':
-        return familyPathLabel(families, p.familyId);
-      default:
-        return p.name.toLocaleLowerCase();
-    }
-  };
+  const sortValue = useCallback(
+    (p: Product, key: string): number | string => {
+      switch (key) {
+        case 'salePrice':
+          return Number(p.salePrice);
+        case 'costPrice':
+          return Number(p.costPrice);
+        case 'margin':
+          return Number(p.salePrice) - Number(p.costPrice);
+        case 'stock':
+          return stockByProduct.get(p.id) ?? 0;
+        case 'family':
+          return familyPathLabel(families, p.familyId);
+        default:
+          return p.name.toLocaleLowerCase();
+      }
+    },
+    [families, stockByProduct],
+  );
   const sorted = useMemo(() => {
     if (!sort) return filtered;
     const dir = sort.dir === 'desc' ? -1 : 1;
@@ -165,8 +175,7 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
       if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
       return String(va).localeCompare(String(vb)) * dir;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered, sort, families, stockByProduct]);
+  }, [filtered, sort, sortValue]);
 
   const PAGE_SIZE = 25;
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
@@ -368,7 +377,7 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
     <div className="users-toolbar">
       <div className="sales-filters">
         <span className="search-field">
-          <input
+          <Input
             className="catalog-search"
             placeholder="Buscar por nombre, SKU o código…"
             value={search}
@@ -408,7 +417,7 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
         )}
       </div>
       {selected.length > 0 ? (
-        <div className="users-toolbar-actions">
+        <div className="ui-dt-toolbar-actions">
           <button
             type="button"
             className="users-bulk-edit"
@@ -427,20 +436,14 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
           </button>
         </div>
       ) : (
-        <div className="users-toolbar-actions">
-          <button
-            type="button"
-            className="users-sel-btn"
-            onClick={() => setImporting(true)}
-            data-testid="catalog-import"
+        <div className="ui-dt-toolbar-actions">
+          <Button
+            onClick={openCreate}
+            data-testid="new-product"
+            icon={<Plus size={16} aria-hidden="true" />}
           >
-            <Upload size={16} aria-hidden="true" />
-            Importar CSV
-          </button>
-          <button className="btn-primary" onClick={openCreate} data-testid="new-product">
-            <Plus size={16} aria-hidden="true" />
             Nuevo producto
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -448,31 +451,37 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
 
   return (
     <section className="catalog">
+      {columnsEditor}
+
+      <div className="table-actions">
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => setImporting(true)}
+          data-testid="catalog-import"
+          title="Importar CSV"
+          aria-label="Importar CSV"
+        >
+          <Upload size={18} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="ui-dt-cols-trigger"
+          onClick={toggleColumnsEditor}
+          data-testid="catalog-columns-toggle"
+          aria-expanded={columnsEditorOpen}
+        >
+          Columnas
+        </button>
+      </div>
+
       <div className="table-panel">
-        {columnsEditor}
         <DataTable
           columns={tableColumns}
           rows={pageRows}
           rowKey={(p) => p.id}
           loading={isLoading}
-          toolbar={
-            /* Patrón de Ventas: búsqueda/filtros/CTAs y el botón Columnas en
-               LA MISMA banda (toolbar del DataTable). */
-            <>
-              {toolbar}
-              <div className="ui-dt-cols">
-                <button
-                  type="button"
-                  className="ui-dt-cols-trigger"
-                  onClick={toggleColumnsEditor}
-                  data-testid="catalog-columns-toggle"
-                  aria-expanded={columnsEditorOpen}
-                >
-                  Columnas
-                </button>
-              </div>
-            </>
-          }
+          toolbar={toolbar}
           {...(sort ? { sort } : {})}
           onSortChange={onSortChange}
           onRowClick={(p) => toggleSelect(p.id)}

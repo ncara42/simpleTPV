@@ -28,3 +28,17 @@ export { applyBrandColor, type Branding, relativeLuminance } from './lib/brand.j
 export { cn } from './lib/cn.js';
 export { initials } from './lib/initials.js';
 export { siblingAppUrl } from './lib/nav.js';
+export {
+  type PageHeader,
+  PageHeaderProvider,
+  usePageHeader,
+  usePageHeaderValue,
+} from './lib/pageHeader.js';
+export {
+  type BrandContrastReport,
+  type BrandSurfaces,
+  contrastRatio,
+  evaluateBrandColor,
+  type WcagLevel,
+  wcagLevel,
+} from './lib/wcag.js';

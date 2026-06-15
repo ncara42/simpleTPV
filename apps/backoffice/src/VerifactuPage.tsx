@@ -1,6 +1,6 @@
+import { usePageHeader } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 
-import { usePageHeader } from './lib/pageHeader.js';
 import { listVerifactuRecords, summarizeVerifactu } from './lib/verifactu.js';
 
 // "hace N s/min/h/d" desde un ISO; texto de respaldo si aún no hay envíos.

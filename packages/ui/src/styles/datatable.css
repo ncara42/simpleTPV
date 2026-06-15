@@ -8,24 +8,28 @@
   overflow: hidden;
 }
 
-/* Slot superior (filtros/acciones). */
+/* Slot superior (filtros/acciones): filtros a la izquierda, CTA primario a la
+   derecha (en .ui-dt-toolbar-actions), todo centrado verticalmente. */
 .ui-dt-toolbar {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: var(--ui-space-3, 0.75rem);
   flex-wrap: wrap;
   padding: 0.6rem 0.85rem;
   background: var(--ui-surface-subtle);
   border-bottom: 1px solid var(--ui-border);
 }
 
-/* Control de columnas dentro de la toolbar de la tabla (ya no flota suelto
-   entre la toolbar de página y las cabeceras). Anclado a la derecha. */
-.ui-dt-cols {
+/* Zona derecha del toolbar: empuja el CTA primario al extremo. */
+.ui-dt-toolbar-actions {
   margin-left: auto;
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  gap: var(--ui-space-2, 0.5rem);
 }
+
+/* Disparador del editor de columnas. Vive en la banda .table-actions, por ENCIMA
+   de la tabla (ya no dentro del toolbar del DataTable). Pill neutra, nunca primary. */
 .ui-dt-cols-trigger {
   border: 1px solid var(--ui-border);
   background: var(--ui-surface);

@@ -1,8 +1,8 @@
+import { usePageHeader } from '@simpletpv/ui';
 import { LifeBuoy, Mail, MessageCircle, Phone } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { ApiKeysSection } from './ApiKeysPage.js';
-import { usePageHeader } from './lib/pageHeader.js';
+import { ApiKeysSection } from './ApiKeysSection.js';
 
 // Canales de soporte. Configurables por despliegue (VITE_SUPPORT_*) con defaults
 // para que el panel funcione sin configuración. El WhatsApp es el número en
@@ -61,14 +61,16 @@ export function HelpPage() {
   usePageHeader('Ayuda', 'Soporte y preguntas frecuentes');
 
   return (
-    <section className="catalog" data-testid="help-page">
-      <div className="table-panel table-panel--content">
-        <h3 className="help-title">
-          <LifeBuoy size={18} aria-hidden="true" /> ¿Necesitas ayuda?
-        </h3>
-        <p className="muted help-intro">
-          Escríbenos por cualquiera de estos canales. Horario de soporte: L-V de 9:00 a 19:00.
-        </p>
+    <section className="catalog help-page" data-testid="help-page">
+      <section className="help-section">
+        <header className="help-section-head">
+          <h3 className="help-title">
+            <LifeBuoy size={18} aria-hidden="true" /> ¿Necesitas ayuda?
+          </h3>
+          <p className="help-intro">
+            Escríbenos por cualquiera de estos canales. Horario de soporte: L-V de 9:00 a 19:00.
+          </p>
+        </header>
         <div className="help-channels">
           <a
             className="help-channel"
@@ -92,10 +94,12 @@ export function HelpPage() {
             <span className="help-channel-value">{SUPPORT_PHONE}</span>
           </a>
         </div>
-      </div>
+      </section>
 
-      <div className="table-panel table-panel--content">
-        <h3 className="help-title">Preguntas frecuentes</h3>
+      <section className="help-section">
+        <header className="help-section-head">
+          <h3 className="help-title">Preguntas frecuentes</h3>
+        </header>
         <div className="help-faq" data-testid="help-faq">
           {FAQ.map((f) => (
             <details key={f.q} className="help-faq-item" data-testid="faq-item">
@@ -104,17 +108,23 @@ export function HelpPage() {
             </details>
           ))}
         </div>
+      </section>
 
-        {/* Integraciones (D-09b): la gestión de claves API vive aquí — una page
-            propia en el menú era overkill para una función que se toca poco. */}
-        <div className="help-integrations" id="integraciones" data-testid="help-integrations">
-          <h3>Integraciones · Claves API</h3>
-          <p className="muted">
+      {/* Integraciones (D-09b): la gestión de claves API vive aquí — una page
+          propia en el menú era overkill para una función que se toca poco. */}
+      <section
+        className="help-section help-integrations"
+        id="integraciones"
+        data-testid="help-integrations"
+      >
+        <header className="help-section-head">
+          <h3 className="help-title">Integraciones · Claves API</h3>
+          <p className="help-intro">
             Acceso externo de solo lectura al stock para integraciones (webs, ERPs…).
           </p>
-          <ApiKeysSection />
-        </div>
-      </div>
+        </header>
+        <ApiKeysSection />
+      </section>
     </section>
   );
 }

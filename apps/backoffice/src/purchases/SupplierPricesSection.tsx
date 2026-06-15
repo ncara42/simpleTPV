@@ -1,5 +1,6 @@
-import { Chart, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Button, Chart, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Upload } from 'lucide-react';
 import { useState } from 'react';
 
 import { CsvDropzone } from '../components/CsvDropzone.js';
@@ -203,36 +204,15 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
                 ]}
               />
             )}
-            <button
-              type="button"
-              className="users-sel-btn"
-              disabled={!supplierId}
-              title={supplierId ? undefined : 'Elige un proveedor para importar su tarifa'}
-              onClick={() => setImporting(true)}
-              data-testid="sp-import"
-            >
-              Importar CSV
-            </button>
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={!supplierId}
-              onClick={() => setAdding(true)}
-              data-testid="sp-add"
-            >
-              Añadir tarifa
-            </button>
-            {/* Botón Columnas en el MISMO contenedor que el resto de controles. */}
-            <div className="ui-dt-cols">
-              <button
+            <div className="ui-dt-toolbar-actions">
+              <Button
                 type="button"
-                className="ui-dt-cols-trigger"
-                onClick={toggleColumnsEditor}
-                data-testid="sp-columns-toggle"
-                aria-expanded={columnsEditorOpen}
+                disabled={!supplierId}
+                onClick={() => setAdding(true)}
+                data-testid="sp-add"
               >
-                Columnas
-              </button>
+                Añadir tarifa
+              </Button>
             </div>
           </div>
         ) : (
@@ -260,6 +240,28 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
       {view === 'tarifas' ? (
         <>
           {columnsEditor}
+          <div className="table-actions">
+            <button
+              type="button"
+              className="icon-btn"
+              disabled={!supplierId}
+              title={supplierId ? 'Importar CSV' : 'Elige un proveedor para importar su tarifa'}
+              aria-label="Importar CSV"
+              onClick={() => setImporting(true)}
+              data-testid="sp-import"
+            >
+              <Upload size={18} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="ui-dt-cols-trigger"
+              onClick={toggleColumnsEditor}
+              data-testid="sp-columns-toggle"
+              aria-expanded={columnsEditorOpen}
+            >
+              Columnas
+            </button>
+          </div>
           <DataTable
             columns={[...effectiveColumns, deleteColumn]}
             rows={priceSorted}
@@ -326,7 +328,7 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
                 {activeRow ? `Comparativa · ${activeRow.productName}` : 'Comparar un producto'}
               </h3>
               <span className="search-field sp-cmp-search-row">
-                <input
+                <Input
                   className="catalog-search"
                   placeholder="Buscar producto o arquetipo…"
                   value={cmpSearch}
@@ -406,7 +408,7 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
           </label>
           <label>
             Precio de compra (€)
-            <input
+            <Input
               type="number"
               min={0}
               step="0.01"
@@ -425,14 +427,13 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
             <button type="button" onClick={() => setAdding(false)}>
               Cancelar
             </button>
-            <button
+            <Button
               type="submit"
-              className="btn-primary"
               disabled={!addProduct || !addPrice || upsertMut.isPending}
               data-testid="sp-add-save"
             >
               Guardar
-            </button>
+            </Button>
           </div>
         </Modal>
       )}
