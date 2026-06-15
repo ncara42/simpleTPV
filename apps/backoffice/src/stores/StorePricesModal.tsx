@@ -1,4 +1,4 @@
-import { Button, DataTable, Select } from '@simpletpv/ui';
+import { Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -113,7 +113,7 @@ export function StorePricesModal({ store, onClose }: { store: Store; onClose: ()
               options={productOptions}
               data-testid="store-price-product"
             />
-            <input
+            <Input
               type="number"
               min="0"
               step="0.01"

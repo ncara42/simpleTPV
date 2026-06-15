@@ -1,7 +1,7 @@
 import './dashboard.css';
 import 'react-grid-layout/css/styles.css';
 
-import { Badge, Chart, Select, Sparkline } from '@simpletpv/ui';
+import { Badge, Chart, Input, Select, Sparkline } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   BarChart2,
@@ -863,7 +863,7 @@ export function DashboardPage({
                   </div>
                   <label className="dash-family-search">
                     <Search size={15} aria-hidden="true" />
-                    <input
+                    <Input
                       type="search"
                       value={familyQuery}
                       onChange={(e) => setFamilyQuery(e.target.value)}

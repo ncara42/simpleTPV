@@ -1,4 +1,4 @@
-import { Button, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Button, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Plus, Upload, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -341,7 +341,7 @@ export function UsersPage() {
               <div className="users-toolbar">
                 <div className="sales-filters">
                   <span className="search-field">
-                    <input
+                    <Input
                       className="catalog-search"
                       placeholder="Buscar por nombre…"
                       value={search}
@@ -467,7 +467,7 @@ export function UsersPage() {
             <section className="form-section">
               <label>
                 Nombre
-                <input
+                <Input
                   required
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -476,7 +476,7 @@ export function UsersPage() {
               </label>
               <label>
                 Email
-                <input
+                <Input
                   type="email"
                   required
                   value={form.email}
@@ -486,7 +486,7 @@ export function UsersPage() {
               </label>
               <label>
                 {wizard ? 'Contraseña (opcional)' : 'Contraseña'}
-                <input
+                <Input
                   type="password"
                   required={!wizard}
                   placeholder={wizard ? 'Dejar en blanco para mantener' : undefined}

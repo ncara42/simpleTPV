@@ -1,4 +1,4 @@
-import { Button, DataTable, Select } from '@simpletpv/ui';
+import { Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -106,7 +106,7 @@ export function SuggestSection() {
             key: 'order',
             header: 'Pedir',
             render: (r) => (
-              <input
+              <Input
                 type="number"
                 min={0}
                 value={qty[r.productId] ?? ''}

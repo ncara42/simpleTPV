@@ -1,4 +1,4 @@
-import { Button } from '@simpletpv/ui';
+import { Button, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -83,7 +83,7 @@ export function SettingsPage() {
           <div className="settings-field">
             <label htmlFor="brand-color">Color corporativo</label>
             <div className="settings-color-row">
-              <input
+              <Input
                 id="brand-color"
                 type="color"
                 value={HEX.test(color) ? color : '#0e7c6b'}
@@ -94,7 +94,7 @@ export function SettingsPage() {
                 data-testid="brand-color-picker"
                 aria-label="Selector de color corporativo"
               />
-              <input
+              <Input
                 type="text"
                 className="settings-hex"
                 placeholder="#0e7c6b"

@@ -1,4 +1,4 @@
-import { Button, Chart, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Button, Chart, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -325,7 +325,7 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
                 {activeRow ? `Comparativa · ${activeRow.productName}` : 'Comparar un producto'}
               </h3>
               <span className="search-field sp-cmp-search-row">
-                <input
+                <Input
                   className="catalog-search"
                   placeholder="Buscar producto o arquetipo…"
                   value={cmpSearch}
@@ -405,7 +405,7 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
           </label>
           <label>
             Precio de compra (€)
-            <input
+            <Input
               type="number"
               min={0}
               step="0.01"

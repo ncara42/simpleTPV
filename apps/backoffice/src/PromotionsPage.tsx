@@ -1,4 +1,4 @@
-import { Button, DataTable, Select } from '@simpletpv/ui';
+import { Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -386,7 +386,7 @@ function PromoModal({
       <h3>{form.id ? 'Editar promoción' : 'Nueva promoción'}</h3>
       <label>
         Nombre
-        <input
+        <Input
           required
           value={form.name}
           onChange={(e) => onChange({ ...form, name: e.target.value })}
@@ -409,7 +409,7 @@ function PromoModal({
         </label>
         <label>
           Umbral
-          <input
+          <Input
             type="number"
             min={1}
             value={form.threshold}
@@ -434,7 +434,7 @@ function PromoModal({
         </label>
         <label>
           Valor
-          <input
+          <Input
             type="number"
             min={1}
             value={form.discountValue}
@@ -446,7 +446,7 @@ function PromoModal({
       <div className="modal-row">
         <label>
           Inicio
-          <input
+          <Input
             type="date"
             value={form.startDate}
             onChange={(e) => onChange({ ...form, startDate: e.target.value })}
@@ -455,7 +455,7 @@ function PromoModal({
         </label>
         <label>
           Fin
-          <input
+          <Input
             type="date"
             value={form.endDate}
             onChange={(e) => onChange({ ...form, endDate: e.target.value })}

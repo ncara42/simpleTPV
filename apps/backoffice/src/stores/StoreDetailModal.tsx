@@ -1,4 +1,4 @@
-import { Button } from '@simpletpv/ui';
+import { Button, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -148,7 +148,7 @@ export function StoreDetailModal({
             </label>
             <label>
               Incidencias / notas
-              <input
+              <Input
                 placeholder="p. ej. persiana rota, obras en la calle…"
                 value={opsIncident}
                 onChange={(e) => setOpsIncident(e.target.value)}

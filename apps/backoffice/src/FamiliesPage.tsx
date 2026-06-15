@@ -1,4 +1,4 @@
-import { Button, Select } from '@simpletpv/ui';
+import { Button, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -583,7 +583,7 @@ export function FamiliesPage({
         <div className="table-toolbar">
           <div className="sales-filters">
             <span className="search-field">
-              <input
+              <Input
                 className="catalog-search"
                 placeholder="Buscar familia…"
                 value={search}
@@ -742,7 +742,7 @@ export function FamiliesPage({
           </h3>
           <label>
             Nombre
-            <input
+            <Input
               required
               autoFocus
               value={form.name}

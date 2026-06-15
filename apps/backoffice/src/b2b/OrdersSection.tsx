@@ -1,4 +1,4 @@
-import { Badge, Button, DataTable, Select } from '@simpletpv/ui';
+import { Badge, Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowUpRight } from 'lucide-react';
 import { useState } from 'react';
@@ -125,7 +125,7 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
                 options={productOptions}
                 data-testid="b2b-order-line-product"
               />
-              <input
+              <Input
                 type="number"
                 min="0"
                 step="0.001"
@@ -158,7 +158,7 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
         <section className="form-section">
           <label>
             Notas
-            <input value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
           </label>
         </section>
       </div>

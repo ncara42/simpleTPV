@@ -1,4 +1,11 @@
-import { Button, DataTable, type DataTableColumn, type DataTableSort, Select } from '@simpletpv/ui';
+import {
+  Button,
+  DataTable,
+  type DataTableColumn,
+  type DataTableSort,
+  Input,
+  Select,
+} from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Upload } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -370,7 +377,7 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
     <div className="users-toolbar">
       <div className="sales-filters">
         <span className="search-field">
-          <input
+          <Input
             className="catalog-search"
             placeholder="Buscar por nombre, SKU o código…"
             value={search}

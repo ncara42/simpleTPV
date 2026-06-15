@@ -1,5 +1,5 @@
 import type { PurchaseOrder } from '@simpletpv/auth';
-import { Badge, Button, DataTable } from '@simpletpv/ui';
+import { Badge, Button, DataTable, Input } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -178,7 +178,7 @@ function OrderDetailModal({ id, onClose }: { id: string; onClose: () => void }) 
                       key: 'receive',
                       header: 'Recibir ahora',
                       render: (l: PurchaseOrder['lines'][number]) => (
-                        <input
+                        <Input
                           type="number"
                           min={0}
                           value={received[l.id] ?? ''}

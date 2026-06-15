@@ -1,4 +1,4 @@
-import { Button, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Button, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -193,7 +193,7 @@ export function CustomersSection() {
             <section className="form-section">
               <label>
                 Nombre
-                <input
+                <Input
                   required
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -202,14 +202,14 @@ export function CustomersSection() {
               </label>
               <label>
                 NIF
-                <input
+                <Input
                   value={form.nif}
                   onChange={(e) => setForm({ ...form, nif: e.target.value })}
                 />
               </label>
               <label>
                 Email
-                <input
+                <Input
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -217,14 +217,14 @@ export function CustomersSection() {
               </label>
               <label>
                 Teléfono
-                <input
+                <Input
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 />
               </label>
               <label>
                 Dirección
-                <input
+                <Input
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
                 />

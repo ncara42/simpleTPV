@@ -1,5 +1,5 @@
 import type { ImportResult } from '@simpletpv/auth';
-import { Badge, Button, DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
+import { Badge, Button, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -237,7 +237,7 @@ function CreateTransferModal({
                 ...products.map((p) => ({ value: p.id, label: p.name })),
               ]}
             />
-            <input
+            <Input
               type="number"
               min={1}
               value={qty}

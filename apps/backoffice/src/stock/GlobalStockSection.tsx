@@ -1,5 +1,12 @@
 import { type StockGlobalRow, stockLevel } from '@simpletpv/auth';
-import { Button, DataTable, type DataTableColumn, type DataTableSort, Select } from '@simpletpv/ui';
+import {
+  Button,
+  DataTable,
+  type DataTableColumn,
+  type DataTableSort,
+  Input,
+  Select,
+} from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -288,7 +295,7 @@ export function GlobalStockSection({
               <div className="stock-filter-group">
                 <span className="stock-filter-label">Producto</span>
                 <span className="search-field">
-                  <input
+                  <Input
                     className="catalog-search"
                     placeholder="Buscar producto…"
                     value={search}
@@ -410,7 +417,7 @@ export function GlobalStockSection({
           <div className="modal-row">
             <label>
               Existencias
-              <input
+              <Input
                 type="number"
                 min={0}
                 value={adjusting.quantity}
@@ -420,7 +427,7 @@ export function GlobalStockSection({
             </label>
             <label>
               Stock mínimo
-              <input
+              <Input
                 type="number"
                 min={0}
                 value={adjusting.min}
@@ -431,7 +438,7 @@ export function GlobalStockSection({
           </div>
           <label>
             Motivo
-            <input
+            <Input
               placeholder="Recuento, merma, rotura…"
               value={adjusting.reason}
               onChange={(e) => setAdjusting({ ...adjusting, reason: e.target.value })}

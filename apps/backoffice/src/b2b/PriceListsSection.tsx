@@ -1,4 +1,4 @@
-import { Button, DataTable, Select } from '@simpletpv/ui';
+import { Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -124,7 +124,7 @@ function PriceListDetail({
               options={productOptions}
               data-testid="b2b-item-product"
             />
-            <input
+            <Input
               type="number"
               min="0"
               step="0.01"
@@ -269,7 +269,7 @@ export function PriceListsSection() {
             <section className="form-section">
               <label>
                 Nombre
-                <input
+                <Input
                   required
                   autoFocus
                   placeholder="Mayorista, distribuidor…"

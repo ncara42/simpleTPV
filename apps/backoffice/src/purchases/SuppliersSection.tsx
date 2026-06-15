@@ -1,5 +1,5 @@
 import type { Supplier } from '@simpletpv/auth';
-import { Button, DataTable } from '@simpletpv/ui';
+import { Button, DataTable, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -42,7 +42,7 @@ export function SuppliersSection() {
         <h2>Proveedores</h2>
         <div className="catalog-actions">
           <span className="search-field">
-            <input
+            <Input
               className="catalog-search"
               placeholder="Nombre del proveedor"
               value={name}
@@ -50,7 +50,7 @@ export function SuppliersSection() {
               data-testid="supplier-name"
             />
           </span>
-          <input
+          <Input
             className="catalog-search"
             type="number"
             min={0}
@@ -181,7 +181,7 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
       >
         <label>
           Nombre
-          <input
+          <Input
             required
             value={form.name}
             onChange={(e) => set({ name: e.target.value })}
@@ -190,7 +190,7 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
         </label>
         <label>
           NIF
-          <input
+          <Input
             value={form.nif}
             onChange={(e) => set({ nif: e.target.value })}
             data-testid="sd-nif"
@@ -198,7 +198,7 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
         </label>
         <label>
           Email
-          <input
+          <Input
             type="email"
             value={form.email}
             onChange={(e) => set({ email: e.target.value })}
@@ -207,7 +207,7 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
         </label>
         <label>
           Teléfono
-          <input
+          <Input
             value={form.phone}
             onChange={(e) => set({ phone: e.target.value })}
             data-testid="sd-phone"
@@ -215,7 +215,7 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
         </label>
         <label>
           Lead time (días)
-          <input
+          <Input
             type="number"
             min={0}
             required

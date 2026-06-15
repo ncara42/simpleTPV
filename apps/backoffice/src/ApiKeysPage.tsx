@@ -1,4 +1,4 @@
-import { Button, DataTable } from '@simpletpv/ui';
+import { Button, DataTable, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useState } from 'react';
@@ -249,7 +249,7 @@ export function ApiKeysSection() {
             <section className="form-section">
               <label>
                 Nombre
-                <input
+                <Input
                   autoFocus
                   required
                   placeholder="ERP, mayorista externo…"
@@ -260,7 +260,7 @@ export function ApiKeysSection() {
               </label>
               <label>
                 Tarifa (opcional)
-                <input
+                <Input
                   placeholder="ID de tarifa mayorista"
                   value={form.priceListId}
                   onChange={(e) => setForm((f) => ({ ...f, priceListId: e.target.value }))}
