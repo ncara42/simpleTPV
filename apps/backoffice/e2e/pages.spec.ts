@@ -750,6 +750,30 @@ test('U-11/U-12: la campana abre Notificaciones y "Resolver" lleva a Stock del p
   await expect(page.getByTestId('stock-search')).toHaveValue(productName);
 });
 
+test('La campana togglea Notificaciones y vuelve a la página anterior', async ({ page }) => {
+  const bell = page.getByTestId('topbar-notifications');
+
+  // Desde Stock: abrir Notificaciones con la campana, cerrarla y volver a Stock.
+  await navTo(page, 'stock');
+  await expect(page.getByTestId('stock-page')).toBeVisible();
+  await bell.click();
+  await expect(page.getByTestId('notifications-page')).toBeVisible();
+  await expect(bell).toHaveAttribute('aria-pressed', 'true');
+  await bell.click();
+  await expect(page.getByTestId('stock-page')).toBeVisible();
+  await expect(page.getByTestId('notifications-page')).toHaveCount(0);
+  await expect(bell).toHaveAttribute('aria-pressed', 'false');
+
+  // Mismo toggle desde otra página de origen (Catálogo) → vuelve a Catálogo.
+  await navTo(page, 'catalog');
+  await expect(page.getByTestId('catalog-table')).toBeVisible();
+  await bell.click();
+  await expect(page.getByTestId('notifications-page')).toBeVisible();
+  await bell.click();
+  await expect(page.getByTestId('catalog-table')).toBeVisible();
+  await expect(page.getByTestId('notifications-page')).toHaveCount(0);
+});
+
 test('Proveedores · Comparativa: gráficos de media/mediana y de producto buscado', async ({
   page,
 }) => {

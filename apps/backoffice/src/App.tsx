@@ -126,6 +126,20 @@ function ShellTopBar({
 function Home() {
   const logout = useAuthStore((s) => s.clear);
   const [tab, setTab] = useState<Tab>('dashboard');
+  // Tab al que volver cuando se cierra Notificaciones desde la campana (no hay
+  // router → el "volver" es explícito vía prevTab). Fallback robusto a dashboard.
+  const [prevTab, setPrevTab] = useState<Tab>('dashboard');
+  // La campana togglea Notificaciones: si está abierta, vuelve a la página previa;
+  // si no, recuerda la actual y abre Notificaciones. Lee tab/prevTab del render
+  // actual (sin updater anidado) para no chocar con la regla de hooks/setState.
+  const toggleNotifications = (): void => {
+    if (tab === 'notifications') {
+      setTab(prevTab === 'notifications' ? 'dashboard' : prevTab);
+    } else {
+      setPrevTab(tab);
+      setTab('notifications');
+    }
+  };
   // U-08: tema corporativo (color aplicado como tokens; el logo va al sidebar).
   const branding = useBranding();
   // Feature flags (#127 B): oculta del menú los módulos apagados a nivel org (el
@@ -195,7 +209,7 @@ function Home() {
               setNavSearch(null);
               setTab(t);
             }}
-            onNotifications={() => setTab('notifications')}
+            onNotifications={toggleNotifications}
             notificationCount={alerts.length}
             notificationsActive={tab === 'notifications'}
           />
