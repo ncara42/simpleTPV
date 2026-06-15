@@ -47,7 +47,13 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @simpletpv/db exec prisma generate
 
-      - name: Audit dependencies
+      # Aviso informativo, NO gate. El gate de vulnerabilidades de dependencias
+      # que bloquea el merge vive en `security.yml` (OSV Scanner sobre
+      # pnpm-lock.yaml, sin continue-on-error) + Trivy filesystem. `pnpm audit`
+      # usa la base de avisos de npm (distinta de OSV) y se mantiene como señal
+      # temprana no bloqueante para evitar falsos rojos por divergencia entre
+      # bases; si reporta algo, se revisa contra el resultado de OSV.
+      - name: Audit dependencies (informativo — gate real en security.yml/OSV)
         run: pnpm audit --audit-level=high --prod
         continue-on-error: true
 

@@ -7,6 +7,7 @@ settings:
 overrides:
   esbuild: '>=0.28.1'
   js-yaml: '>=4.2.0'
+  yaml: '>=2.8.1'
   '@hono/node-server': '>=1.19.13'
 
 importers:
@@ -5745,7 +5746,7 @@ packages:
       sugarss: ^5.0.0
       terser: ^5.16.0
       tsx: ^4.8.1
-      yaml: ^2.4.2
+      yaml: '>=2.8.1'
     peerDependenciesMeta:
       '@types/node':
         optional: true

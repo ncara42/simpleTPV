@@ -30,9 +30,14 @@ peerDependencyRules:
 #   arrastrado por cosmiconfig 8 (acepta ^4.1.0, 4.2.0 encaja sin breaking).
 # - @hono/node-server: OSV detectó GHSA-92pp-h63x-v22m (CVSS 5.3) en versiones
 #   <1.19.13, arrastrado por prisma 7 (su HTTP server interno usa hono).
+# - yaml (eemeli/yaml, distinto de js-yaml): floor por GHSA-48c2-rrv3-qjmp
+#   (DoS por stack overflow, CWE-674) que afecta a <2.8.1. La resolución actual
+#   ya trae 2.9.0 vía vite, así que esto es un guard de regresión que impide que
+#   un cambio transitivo futuro vuelva a bajar a una versión vulnerable.
 overrides:
   esbuild: '>=0.28.1'
   js-yaml: '>=4.2.0'
+  yaml: '>=2.8.1'
   '@hono/node-server': '>=1.19.13'
 
 allowBuilds:
