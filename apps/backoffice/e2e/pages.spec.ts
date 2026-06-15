@@ -659,7 +659,7 @@ test('U-04: sidebar contraído a rail — flyout lateral con anclaje y navegaci�
   await expect(page.getByTestId('nav-stock')).toBeVisible();
   await page.getByTestId('nav-stock').click();
   // Navega a Stock y el flyout se cierra.
-  await expect(page.getByTestId('stock-alerts-only')).toBeVisible();
+  await expect(page.getByTestId('stock-page')).toBeVisible();
   await expect(page.getByTestId('nav-stock')).toBeHidden();
   // Vuelta a expandido.
   await page.getByTestId('sidebar-collapse').click();
