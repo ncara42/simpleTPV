@@ -134,9 +134,6 @@ export function StoresPage({
               sales={salesByStore.get(s.id) ?? 0}
               periodLabel={SALES_LABEL[period]}
               onSelect={() => setDetail(s)}
-              onOpenStock={() => onOpenStoreView('stock', s.id)}
-              onOpenSales={() => onOpenStoreView('sales', s.id)}
-              onOpenPrices={() => setPricesFor(s)}
             />
           ))}
         </div>
@@ -160,6 +157,14 @@ export function StoresPage({
             deleteMut.isError ? formErrorMessage(deleteMut.error, 'No se pudo borrar.') : null
           }
           onClose={() => setDetail(null)}
+          onOpenStock={() => onOpenStoreView('stock', detail.id)}
+          onOpenSales={() => onOpenStoreView('sales', detail.id)}
+          // Decisión (a) del plan: cerrar el detalle al abrir Precios para no apilar
+          // dos modales. StorePricesModal se renderiza desde esta página.
+          onOpenPrices={() => {
+            setPricesFor(detail);
+            setDetail(null);
+          }}
         />
       )}
 

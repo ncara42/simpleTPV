@@ -18,12 +18,18 @@ export function StoreDetailModal({
   onDelete,
   deleteError,
   onClose,
+  onOpenStock,
+  onOpenSales,
+  onOpenPrices,
 }: {
   store: Store;
   onEdit: () => void;
   onDelete: () => void;
   deleteError: string | null;
   onClose: () => void;
+  onOpenStock: () => void;
+  onOpenSales: () => void;
+  onOpenPrices: () => void;
 }) {
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -130,6 +136,20 @@ export function StoreDetailModal({
             >
               Ver registros
             </button>
+            {/* Acciones de tienda: trasladadas desde la card. Stock/Ventas navegan a
+                su página filtrada; Precios abre la modal de precios. Se conservan los
+                data-testid (store-open-*) en los que se apoyan los E2E. */}
+            <div className="store-detail-actions" data-testid="store-detail-actions">
+              <Button variant="secondary" onClick={onOpenStock} data-testid="store-open-stock">
+                Stock
+              </Button>
+              <Button variant="secondary" onClick={onOpenSales} data-testid="store-open-sales">
+                Ventas
+              </Button>
+              <Button variant="secondary" onClick={onOpenPrices} data-testid="store-open-prices">
+                Precios
+              </Button>
+            </div>
           </section>
 
           <section className="form-section" data-testid="store-ops">
