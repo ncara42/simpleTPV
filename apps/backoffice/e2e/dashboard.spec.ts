@@ -25,6 +25,12 @@ test.beforeEach(async ({ page }) => {
   // "Libre" (p. ej. un fallo a mitad del test de modo), volvemos a "Cuadrícula" para que
   // los tests que esperan el tablero (dash-board) no arranquen rotos.
   const grid = page.getByTestId('dash-mode-grid');
+  // «Personalizado» es libre-only y oculta el toggle: si quedó persistido, elige un preset
+  // normal para recuperar el toggle de modo antes de forzar cuadrícula.
+  if ((await grid.count()) === 0) {
+    await page.getByTestId('dash-preset-ventas').click();
+    await expect(grid).toBeVisible();
+  }
   if ((await grid.getAttribute('aria-selected')) !== 'true') {
     await grid.click();
     await expect(page.getByTestId('dash-board')).toBeVisible();
@@ -483,10 +489,11 @@ test('Modo Libre: herramientas de dibujo (forma, lápiz a mano y texto libre)', 
 test('Modo Libre · Personalizado: lienzo vacío con + que abre el buscador de widgets', async ({
   page,
 }) => {
-  // Seleccionar «Personalizado» entra en modo libre con un lienzo en blanco.
+  // Seleccionar «Personalizado» entra en modo libre con un lienzo en blanco. Es libre-only:
+  // el toggle Cuadrícula/Libre se oculta (no tendría sentido un tablero vacío).
   await page.getByTestId('dash-preset-personalizado').click();
   await expect(page.getByTestId('dash-free')).toBeVisible();
-  await expect(page.getByTestId('dash-mode-free')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('dash-mode')).toHaveCount(0);
 
   // Limpia widgets que pudieran haber quedado de ejecuciones previas (estado persistido).
   const widgets = page.locator('.dash-free-item--widget');

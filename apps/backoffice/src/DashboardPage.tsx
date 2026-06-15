@@ -243,7 +243,10 @@ export function DashboardPage({
 
   // D-20: modo de presentación (global) y disposición libre por preset (reconciliada con
   // los elementos del preset: posición guardada por card o, si falta, la de por defecto).
-  const mode: DashboardMode = layout.mode ?? 'grid';
+  // «Personalizado» es un lienzo en blanco: SIEMPRE en modo libre (no tendría sentido en
+  // cuadrícula, donde saldría un tablero vacío). Se fuerza al render sin tocar el modo global.
+  const isCustomPreset = preset.id === 'personalizado';
+  const mode: DashboardMode = isCustomPreset ? 'free' : (layout.mode ?? 'grid');
   const savedFree = reconcileFreeLayout(layout.freeLayouts?.[preset.id] ?? [], preset);
   // En modo libre la composición la elige el usuario (añade/quita), no el preset: habilita las
   // queries de los widgets presentes en el lienzo para que un widget añadido tenga sus datos.
@@ -529,14 +532,7 @@ export function DashboardPage({
 
   // Ocultar/mostrar SOLO afecta al preset activo (D-03): se escribe entera la
   // lista efectiva de ocultos del preset en dashboard.layout.
-  const setPreset = (id: PresetId): void =>
-    setPref('dashboard.layout', {
-      ...layout,
-      preset: id,
-      // 'Personalizado' es un lienzo en blanco: por naturaleza es modo libre, así que al
-      // elegirlo entramos en Libre (en la MISMA escritura, sin competir con otro PUT).
-      ...(id === 'personalizado' ? { mode: 'free' as DashboardMode } : {}),
-    });
+  const setPreset = (id: PresetId): void => setPref('dashboard.layout', { ...layout, preset: id });
   // D-20: cambio de modo (grid/libre). Al cambiar de modo salimos de la edición del grid
   // (editing/draft son conceptos del tablero RGL, no del lienzo libre).
   const setMode = (m: DashboardMode): void => {
@@ -1343,36 +1339,38 @@ export function DashboardPage({
                   </button>
                 )}
                 {/* D-20: modo de presentación. Cuadrícula = tablero con snap; Libre = lienzo
-                    edgeless con zoom/pan y colocación a píxel. */}
-                <div
-                  className="dash-mode-switch"
-                  role="tablist"
-                  aria-label="Modo del dashboard"
-                  data-testid="dash-mode"
-                >
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === 'grid'}
-                    className={mode === 'grid' ? 'is-active' : ''}
-                    onClick={() => setMode('grid')}
-                    data-testid="dash-mode-grid"
+                    edgeless. En «Personalizado» no aplica (siempre libre): se oculta. */}
+                {!isCustomPreset && (
+                  <div
+                    className="dash-mode-switch"
+                    role="tablist"
+                    aria-label="Modo del dashboard"
+                    data-testid="dash-mode"
                   >
-                    <LayoutGrid size={14} aria-hidden="true" />
-                    Cuadrícula
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === 'free'}
-                    className={mode === 'free' ? 'is-active' : ''}
-                    onClick={() => setMode('free')}
-                    data-testid="dash-mode-free"
-                  >
-                    <Move size={14} aria-hidden="true" />
-                    Libre
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={mode === 'grid'}
+                      className={mode === 'grid' ? 'is-active' : ''}
+                      onClick={() => setMode('grid')}
+                      data-testid="dash-mode-grid"
+                    >
+                      <LayoutGrid size={14} aria-hidden="true" />
+                      Cuadrícula
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={mode === 'free'}
+                      className={mode === 'free' ? 'is-active' : ''}
+                      onClick={() => setMode('free')}
+                      data-testid="dash-mode-free"
+                    >
+                      <Move size={14} aria-hidden="true" />
+                      Libre
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}

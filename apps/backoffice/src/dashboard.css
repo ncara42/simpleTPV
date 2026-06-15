@@ -1905,26 +1905,17 @@
 }
 
 /* ── Cabecera sticky (solo en Cuadrícula): se queda pegada bajo el topbar (64px) para
-   poder cambiar de preset/periodo/modo o pulsar Personalizar a mitad de scroll. Sangra a
-   los lados (padding de .bo-main) para un barrido frosted a todo el ancho. En modo libre la
-   cabecera es un overlay flotante (`.dashboard--free .catalog-head`), no sticky. ── */
+   poder cambiar de preset/periodo/modo o pulsar Personalizar a mitad de scroll. SIN barra
+   blanca ni sangrado (que provocaba overflow horizontal): el fondo iguala al de la página
+   (--content-bg) para tapar el contenido al hacer scroll sin verse como una barra. En modo
+   libre la cabecera es un overlay flotante (`.dashboard--free .catalog-head`), no sticky. ── */
 .catalog:not(.dashboard--free) .dash-head {
   position: sticky;
   top: 64px;
   z-index: 19;
-  margin-inline: -2.5rem;
   margin-bottom: 0.75rem;
-  padding: 0.85rem 2.5rem;
-  background: color-mix(in srgb, var(--ui-surface) 80%, transparent);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
-  border-bottom: 1px solid var(--ui-border);
-}
-@media (max-width: 767px) {
-  .catalog:not(.dashboard--free) .dash-head {
-    margin-inline: -1.1rem;
-    padding-inline: 1.1rem;
-  }
+  padding-block: 0.6rem;
+  background: var(--content-bg);
 }
 
 /* ── Estado vacío del lienzo (preset «Personalizado» o lienzo vaciado): "+" central que
