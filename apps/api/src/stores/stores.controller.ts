@@ -12,7 +12,7 @@ import {
 import type { Store } from '@simpletpv/db';
 
 import { Roles } from '../auth/roles.decorator.js';
-import { CreateStoreDto, UpdateStoreDto } from './stores.dto.js';
+import { CreateStoreDto, MarkCentralDto, UpdateStoreDto } from './stores.dto.js';
 import { StoresService } from './stores.service.js';
 
 // Gestión de tiendas: solo ADMIN (incluida la lectura, igual que UsersController).
@@ -34,6 +34,16 @@ export class StoresController {
   @Patch(':id')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateStoreDto): Promise<Store> {
     return this.stores.update(id, body);
+  }
+
+  // Designa la tienda central de la organización (#146). Por defecto la marca
+  // (desmarcando la anterior); isCentral=false la desmarca. Solo ADMIN (clase).
+  @Patch(':id/central')
+  setCentral(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: MarkCentralDto,
+  ): Promise<Store> {
+    return this.stores.setCentral(id, body.isCentral ?? true);
   }
 
   @Delete(':id')

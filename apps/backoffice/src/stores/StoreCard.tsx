@@ -23,7 +23,14 @@ export function StoreCard({
     >
       <div className="store-card-head">
         <span className="store-card-text">
-          <span className="store-card-name">{store.name}</span>
+          <span className="store-card-name">
+            {store.name}
+            {store.isCentral && (
+              <span className="store-central-badge" data-testid="store-central-badge">
+                Central
+              </span>
+            )}
+          </span>
           <span className="store-card-addr">{store.address ?? '—'}</span>
         </span>
         <span

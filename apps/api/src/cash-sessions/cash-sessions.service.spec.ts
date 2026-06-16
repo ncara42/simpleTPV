@@ -86,10 +86,30 @@ function makePrisma() {
       groupBy: vi.fn(
         async (
           _a?: unknown,
-        ): Promise<Array<{ type: 'IN' | 'OUT'; _sum: { amount: number | null } }>> => [],
+        ): Promise<
+          Array<{ type: 'IN' | 'OUT' | 'TRANSFER_OUT'; _sum: { amount: number | null } }>
+        > => [],
       ),
       findMany: vi.fn(async (_a?: unknown): Promise<unknown[]> => []),
-      create: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'cm-1' })),
+      findFirst: vi.fn(async (_a?: unknown): Promise<unknown> => null),
+      create: vi.fn(
+        async (a?: unknown): Promise<unknown> => ({
+          id: 'cm-1',
+          amount: 10,
+          storeId: STORE,
+          type: 'IN',
+          ...(a as { data?: Record<string, unknown> } | undefined)?.data,
+        }),
+      ),
+      updateMany: vi.fn(async (_a?: unknown): Promise<{ count: number }> => ({ count: 1 })),
+      findFirstOrThrow: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'cm-1' })),
+    },
+    // Tienda central para resolver el destino de los traspasos (#146). Por defecto
+    // hay una central distinta del origen.
+    store: {
+      findFirst: vi.fn(
+        async (_a?: unknown): Promise<{ id: string } | null> => ({ id: 'central-store' }),
+      ),
     },
     // Lock pesimista del fix TOCTOU (RACE-02): withTenantTx fija el tenant con
     // set_config y createMovement ejecuta SELECT ... FOR UPDATE sobre la sesión.
@@ -107,8 +127,13 @@ function makeBase(prisma: ReturnType<typeof makePrisma>) {
   };
 }
 
-function makeService(prisma: ReturnType<typeof makePrisma>) {
-  return new CashSessionsService(prisma as never, makeBase(prisma) as never);
+// Bus de eventos mock: solo observamos publish (cash.movement.requested, #146).
+function makeEvents() {
+  return { publish: vi.fn(async (): Promise<void> => undefined) };
+}
+
+function makeService(prisma: ReturnType<typeof makePrisma>, events = makeEvents()) {
+  return new CashSessionsService(prisma as never, makeBase(prisma) as never, events as never);
 }
 
 describe('CashSessionsService.open', () => {
@@ -416,7 +441,12 @@ describe('CashSessionsService.createMovement', () => {
 
     await expect(
       tenantStorage.run({ organizationId: ORG }, () =>
-        service.createMovement('cs-1', { type: 'OUT', amount: 10, reason: 'retirada' }, 'user-1'),
+        service.createMovement(
+          'cs-1',
+          { type: 'OUT', amount: 10, reason: 'retirada' },
+          'user-1',
+          'ADMIN',
+        ),
       ),
     ).rejects.toThrow(NotFoundException);
   });
@@ -428,7 +458,12 @@ describe('CashSessionsService.createMovement', () => {
 
     await expect(
       tenantStorage.run({ organizationId: ORG }, () =>
-        service.createMovement('cs-1', { type: 'OUT', amount: 10, reason: 'retirada' }, 'user-1'),
+        service.createMovement(
+          'cs-1',
+          { type: 'OUT', amount: 10, reason: 'retirada' },
+          'user-1',
+          'ADMIN',
+        ),
       ),
     ).rejects.toThrow(BadRequestException);
   });
@@ -447,7 +482,12 @@ describe('CashSessionsService.createMovement', () => {
     const service = makeService(prisma);
 
     const result = (await tenantStorage.run({ organizationId: ORG }, () =>
-      service.createMovement('cs-1', { type: 'IN', amount: 30, reason: '  Fondo  ' }, 'user-1'),
+      service.createMovement(
+        'cs-1',
+        { type: 'IN', amount: 30, reason: '  Fondo  ' },
+        'user-1',
+        'ADMIN',
+      ),
     )) as Record<string, unknown>;
 
     const arg = prisma.cashMovement.create.mock.calls[0]![0] as { data: Record<string, unknown> };
@@ -478,7 +518,7 @@ describe('CashSessionsService.createMovement', () => {
     const service = makeService(prisma);
 
     await tenantStorage.run({ organizationId: ORG }, () =>
-      service.createMovement('cs-1', { type: 'IN', amount: 10, reason: 'fondo' }, 'user-1'),
+      service.createMovement('cs-1', { type: 'IN', amount: 10, reason: 'fondo' }, 'user-1', 'ADMIN'),
     );
 
     // El lock pesimista debe adquirirse antes de comprobar status (sin él, un
@@ -494,7 +534,12 @@ describe('CashSessionsService.createMovement', () => {
 
     await expect(
       tenantStorage.run({ organizationId: ORG }, () =>
-        service.createMovement('cs-1', { type: 'OUT', amount: 10, reason: 'retirada' }, 'user-1'),
+        service.createMovement(
+          'cs-1',
+          { type: 'OUT', amount: 10, reason: 'retirada' },
+          'user-1',
+          'ADMIN',
+        ),
       ),
     ).rejects.toThrow(BadRequestException);
     expect(prisma.cashMovement.create).not.toHaveBeenCalled();
@@ -534,5 +579,340 @@ describe('CashSessionsService.listClosed', () => {
       ),
     ).rejects.toThrow(ForbiddenException);
     expect(prisma.cashSession.findMany).not.toHaveBeenCalled();
+  });
+});
+
+// ── #146 · flujo de aprobación ──────────────────────────────────────────────
+
+describe('CashSessionsService.createMovement (alta directa APPROVED, #146)', () => {
+  it('crea el movimiento ya APPROVED con requestedBy = reviewedBy = el actor', async () => {
+    const prisma = makePrisma();
+    prisma.cashSession.findFirst = vi.fn(async () => ({ id: 'cs-1', status: 'OPEN', storeId: STORE }));
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.createMovement('cs-1', { type: 'IN', amount: 30, reason: 'fondo' }, 'admin-1', 'ADMIN'),
+    );
+
+    const arg = prisma.cashMovement.create.mock.calls[0]![0] as { data: Record<string, unknown> };
+    expect(arg.data.status).toBe('APPROVED');
+    expect(arg.data.requestedById).toBe('admin-1');
+    expect(arg.data.reviewedById).toBe('admin-1');
+    expect(arg.data.reviewedAt).toBeInstanceOf(Date);
+  });
+
+  it('TRANSFER_OUT directo fija targetStoreId = tienda central', async () => {
+    const prisma = makePrisma();
+    prisma.cashSession.findFirst = vi.fn(async () => ({ id: 'cs-1', status: 'OPEN', storeId: STORE }));
+    prisma.store.findFirst = vi.fn(async () => ({ id: 'central-store' }));
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.createMovement(
+        'cs-1',
+        { type: 'TRANSFER_OUT', amount: 50, reason: 'a central' },
+        'admin-1',
+        'ADMIN',
+      ),
+    );
+
+    const arg = prisma.cashMovement.create.mock.calls[0]![0] as { data: Record<string, unknown> };
+    expect(arg.data.type).toBe('TRANSFER_OUT');
+    expect(arg.data.targetStoreId).toBe('central-store');
+  });
+});
+
+describe('CashSessionsService.requestMovement (#146)', () => {
+  it('crea el movimiento PENDING con requestedById y emite cash.movement.requested', async () => {
+    const prisma = makePrisma();
+    prisma.cashSession.findFirst = vi.fn(async () => ({ id: 'cs-1', status: 'OPEN', storeId: STORE }));
+    const events = makeEvents();
+    const service = makeService(prisma, events);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.requestMovement('cs-1', { type: 'OUT', amount: 20, reason: 'retirada' }, 'clerk-1', 'CLERK'),
+    );
+
+    const arg = prisma.cashMovement.create.mock.calls[0]![0] as { data: Record<string, unknown> };
+    expect(arg.data.status).toBe('PENDING');
+    expect(arg.data.requestedById).toBe('clerk-1');
+    expect(arg.data.reviewedById).toBeUndefined();
+    // El evento se publica tras el commit (afterCommit de withTenantTx).
+    expect(events.publish).toHaveBeenCalledTimes(1);
+    const [org, event] = events.publish.mock.calls[0]! as unknown as [string, { type: string }];
+    expect(org).toBe(ORG);
+    expect(event.type).toBe('cash.movement.requested');
+  });
+
+  it('TRANSFER_OUT fija targetStoreId = tienda central', async () => {
+    const prisma = makePrisma();
+    prisma.cashSession.findFirst = vi.fn(async () => ({ id: 'cs-1', status: 'OPEN', storeId: STORE }));
+    prisma.store.findFirst = vi.fn(async () => ({ id: 'central-store' }));
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.requestMovement(
+        'cs-1',
+        { type: 'TRANSFER_OUT', amount: 50, reason: 'a central' },
+        'clerk-1',
+        'CLERK',
+      ),
+    );
+
+    const arg = prisma.cashMovement.create.mock.calls[0]![0] as { data: Record<string, unknown> };
+    expect(arg.data.targetStoreId).toBe('central-store');
+  });
+
+  it('400 si no hay tienda central configurada para el traspaso', async () => {
+    const prisma = makePrisma();
+    prisma.cashSession.findFirst = vi.fn(async () => ({ id: 'cs-1', status: 'OPEN', storeId: STORE }));
+    prisma.store.findFirst = vi.fn(async () => null);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () =>
+        service.requestMovement(
+          'cs-1',
+          { type: 'TRANSFER_OUT', amount: 50, reason: 'a central' },
+          'clerk-1',
+          'CLERK',
+        ),
+      ),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.cashMovement.create).not.toHaveBeenCalled();
+  });
+
+  it('400 si la propia tienda central intenta traspasarse a sí misma', async () => {
+    const prisma = makePrisma();
+    prisma.cashSession.findFirst = vi.fn(async () => ({ id: 'cs-1', status: 'OPEN', storeId: STORE }));
+    // La central resuelta coincide con el origen de la sesión.
+    prisma.store.findFirst = vi.fn(async () => ({ id: STORE }));
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () =>
+        service.requestMovement(
+          'cs-1',
+          { type: 'TRANSFER_OUT', amount: 50, reason: 'a central' },
+          'clerk-1',
+          'CLERK',
+        ),
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('404 si la sesión no existe', async () => {
+    const prisma = makePrisma();
+    prisma.cashSession.findFirst = vi.fn(async () => null);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () =>
+        service.requestMovement('cs-1', { type: 'IN', amount: 10, reason: 'x' }, 'clerk-1', 'CLERK'),
+      ),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('400 si la caja está cerrada', async () => {
+    const prisma = makePrisma();
+    prisma.cashSession.findFirst = vi.fn(async () => ({ id: 'cs-1', status: 'CLOSED', storeId: STORE }));
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () =>
+        service.requestMovement('cs-1', { type: 'IN', amount: 10, reason: 'x' }, 'clerk-1', 'CLERK'),
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('SEC-01: un CLERK sin acceso a la tienda recibe 403 y no crea nada', async () => {
+    const prisma = makePrisma();
+    prisma.cashSession.findFirst = vi.fn(async () => ({ id: 'cs-1', status: 'OPEN', storeId: STORE }));
+    prisma.userStore.findFirst = vi.fn(async () => null);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () =>
+        service.requestMovement('cs-1', { type: 'IN', amount: 10, reason: 'x' }, 'clerk-9', 'CLERK'),
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.cashMovement.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('CashSessionsService.approveMovement (#146)', () => {
+  it('transiciona PENDING → APPROVED con reviewedById y reviewedAt', async () => {
+    const prisma = makePrisma();
+    prisma.cashMovement.findFirst = vi.fn(async () => ({
+      id: 'cm-1',
+      storeId: STORE,
+      cashSessionId: 'cs-1',
+      status: 'PENDING',
+    }));
+    prisma.cashSession.findFirst = vi.fn(async () => ({ status: 'OPEN' }));
+    prisma.cashMovement.updateMany = vi.fn(async () => ({ count: 1 }));
+    prisma.cashMovement.findFirstOrThrow = vi.fn(async () => ({ id: 'cm-1', status: 'APPROVED' }));
+    const service = makeService(prisma);
+
+    const result = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.approveMovement('cm-1', 'mgr-1', 'MANAGER'),
+    );
+
+    const arg = prisma.cashMovement.updateMany.mock.calls[0]![0] as {
+      where: { status: string };
+      data: { status: string; reviewedById: string; reviewedAt: Date };
+    };
+    expect(arg.where.status).toBe('PENDING');
+    expect(arg.data.status).toBe('APPROVED');
+    expect(arg.data.reviewedById).toBe('mgr-1');
+    expect(arg.data.reviewedAt).toBeInstanceOf(Date);
+    expect(result).toMatchObject({ status: 'APPROVED' });
+  });
+
+  it('404 si el movimiento no existe', async () => {
+    const prisma = makePrisma();
+    prisma.cashMovement.findFirst = vi.fn(async () => null);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.approveMovement('cm-1', 'a', 'ADMIN')),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('400 si la caja ya está cerrada (no se puede aprobar contra una sesión CLOSED)', async () => {
+    const prisma = makePrisma();
+    prisma.cashMovement.findFirst = vi.fn(async () => ({
+      id: 'cm-1',
+      storeId: STORE,
+      cashSessionId: 'cs-1',
+      status: 'PENDING',
+    }));
+    prisma.cashSession.findFirst = vi.fn(async () => ({ status: 'CLOSED' }));
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.approveMovement('cm-1', 'a', 'ADMIN')),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.cashMovement.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('400 si el movimiento ya no está PENDING (updateMany afecta 0 filas)', async () => {
+    const prisma = makePrisma();
+    prisma.cashMovement.findFirst = vi.fn(async () => ({
+      id: 'cm-1',
+      storeId: STORE,
+      cashSessionId: 'cs-1',
+      status: 'PENDING',
+    }));
+    prisma.cashSession.findFirst = vi.fn(async () => ({ status: 'OPEN' }));
+    prisma.cashMovement.updateMany = vi.fn(async () => ({ count: 0 }));
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.approveMovement('cm-1', 'a', 'ADMIN')),
+    ).rejects.toThrow(BadRequestException);
+  });
+});
+
+describe('CashSessionsService.denyMovement (#146)', () => {
+  it('transiciona PENDING → DENIED con reviewedById y reviewedAt', async () => {
+    const prisma = makePrisma();
+    prisma.cashMovement.findFirst = vi.fn(async () => ({ id: 'cm-1', storeId: STORE }));
+    prisma.cashMovement.updateMany = vi.fn(async () => ({ count: 1 }));
+    prisma.cashMovement.findFirstOrThrow = vi.fn(async () => ({ id: 'cm-1', status: 'DENIED' }));
+    const service = makeService(prisma);
+
+    const result = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.denyMovement('cm-1', 'mgr-1', 'MANAGER'),
+    );
+
+    const arg = prisma.cashMovement.updateMany.mock.calls[0]![0] as {
+      where: { status: string };
+      data: { status: string; reviewedById: string };
+    };
+    expect(arg.where.status).toBe('PENDING');
+    expect(arg.data.status).toBe('DENIED');
+    expect(arg.data.reviewedById).toBe('mgr-1');
+    expect(result).toMatchObject({ status: 'DENIED' });
+  });
+
+  it('404 si el movimiento no existe', async () => {
+    const prisma = makePrisma();
+    prisma.cashMovement.findFirst = vi.fn(async () => null);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.denyMovement('cm-1', 'a', 'ADMIN')),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('400 si el movimiento ya no está PENDING (updateMany afecta 0 filas)', async () => {
+    const prisma = makePrisma();
+    prisma.cashMovement.findFirst = vi.fn(async () => ({ id: 'cm-1', storeId: STORE }));
+    prisma.cashMovement.updateMany = vi.fn(async () => ({ count: 0 }));
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () => service.denyMovement('cm-1', 'a', 'ADMIN')),
+    ).rejects.toThrow(BadRequestException);
+  });
+});
+
+describe('CashSessionsService.listPendingMovements (#146)', () => {
+  it('lista los PENDING de la organización, recientes primero', async () => {
+    const prisma = makePrisma();
+    const rows = [{ id: 'cm-2' }, { id: 'cm-1' }];
+    prisma.cashMovement.findMany = vi.fn(async () => rows);
+    const service = makeService(prisma);
+
+    const result = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.listPendingMovements(),
+    );
+
+    expect(result).toBe(rows);
+    const arg = prisma.cashMovement.findMany.mock.calls[0]![0] as {
+      where: { organizationId: string; status: string };
+      orderBy: { createdAt: 'desc' };
+    };
+    expect(arg.where.organizationId).toBe(ORG);
+    expect(arg.where.status).toBe('PENDING');
+    expect(arg.orderBy.createdAt).toBe('desc');
+  });
+});
+
+describe('CashSessionsService.close · solo cuenta APPROVED y auto-deniega PENDING (#146)', () => {
+  it('la agregación filtra status APPROVED y se auto-deniegan los PENDING', async () => {
+    const prisma = makePrisma();
+    prisma.cashSession.findFirst = vi.fn(async () => ({
+      id: 'cs-1',
+      status: 'OPEN',
+      storeId: STORE,
+      openingAmount: 100,
+      openedAt: new Date('2026-06-16T08:00:00Z'),
+    }));
+    prisma.sale.aggregate = vi.fn(async () => ({ _sum: { total: 0 } }));
+    prisma.cashMovement.groupBy = vi.fn(async () => [{ type: 'IN', _sum: { amount: 40 } }]);
+    prisma.cashSession.updateMany = vi.fn(async () => ({ count: 1 }));
+    prisma.cashSession.findFirstOrThrow = vi.fn(async () => ({ id: 'cs-1', status: 'CLOSED' }));
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.close('cs-1', { countedAmount: 140 }, 'mgr-1', 'MANAGER'),
+    );
+
+    // La agregación de movimientos solo cuenta APPROVED.
+    const groupArg = prisma.cashMovement.groupBy.mock.calls[0]![0] as {
+      where: { status: string };
+    };
+    expect(groupArg.where.status).toBe('APPROVED');
+
+    // Las solicitudes PENDING de la sesión se auto-deniegan en la misma tx.
+    const denyArg = prisma.cashMovement.updateMany.mock.calls[0]![0] as {
+      where: { cashSessionId: string; status: string };
+      data: { status: string };
+    };
+    expect(denyArg.where.cashSessionId).toBe('cs-1');
+    expect(denyArg.where.status).toBe('PENDING');
+    expect(denyArg.data.status).toBe('DENIED');
   });
 });

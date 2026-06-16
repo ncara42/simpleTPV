@@ -207,6 +207,25 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Distintivo de tienda central (#146): chip junto al nombre en la card. */
+.store-central-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+  background: color-mix(in oklab, var(--ui-accent, #4f46e5) 16%, transparent);
+  color: var(--ui-accent, #4f46e5);
+}
+/* Botones inline de Aprobar/Denegar en la campana (#146). */
+.notif-actions {
+  display: inline-flex;
+  gap: 0.4rem;
+}
 .store-card-addr {
   font-size: 0.82rem;
   color: var(--ui-text-soft);

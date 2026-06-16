@@ -687,6 +687,12 @@ async function seedCashMovements(prisma: PrismaClient, orgId: string): Promise<v
           type: m.type,
           amount: m.amount,
           reason: m.reason,
+          // Movimientos directos del encargado: nacen APPROVED y cuentan en el
+          // cuadre (#146), igual que el alta directa del servicio.
+          status: 'APPROVED',
+          requestedById: manager.id,
+          reviewedById: manager.id,
+          reviewedAt: dateDaysAgo(0, m.hour, m.minute),
           createdAt: dateDaysAgo(0, m.hour, m.minute),
         },
       });
@@ -720,6 +726,11 @@ async function seedCashMovements(prisma: PrismaClient, orgId: string): Promise<v
       type: CashMovementType.OUT,
       amount: 150,
       reason: 'Retirada a banco',
+      // APPROVED para que cuente en el cuadre del cierre (#146).
+      status: 'APPROVED',
+      requestedById: manager.id,
+      reviewedById: manager.id,
+      reviewedAt: dateDaysAgo(1, 19, 45),
       createdAt: dateDaysAgo(1, 19, 45),
     },
   });

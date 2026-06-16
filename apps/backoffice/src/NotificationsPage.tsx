@@ -1,11 +1,25 @@
+import type { CashMovementType } from '@simpletpv/auth';
 import { DataTable } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { api } from './lib/auth.js';
+import {
+  approveCashMovement,
+  denyCashMovement,
+  listPendingCashMovements,
+} from './lib/cash.js';
+import { fmtEur } from './lib/format.js';
 import { listAlerts, listExpiringBatches } from './lib/stock.js';
 import { ALERT_LABEL, df, EXPIRY_LABEL, expiryDaysText } from './stock/labels.js';
+
+// Etiqueta del tipo de movimiento de efectivo para la campana (#146).
+const CASH_TYPE_LABEL: Record<CashMovementType, string> = {
+  IN: 'Ingreso',
+  OUT: 'Retirada',
+  TRANSFER_OUT: 'Traspaso a central',
+};
 
 // U-12: cada notificación lleva A LA ACCIÓN que la resuelve. El destino reutiliza
 // la navegación del shell (Stock filtrado por tienda + búsqueda por producto), así
@@ -29,9 +43,27 @@ export function NotificationsPage({ onResolve }: { onResolve?: NotifResolve }) {
     queryKey: ['expiring-batches'],
     queryFn: () => listExpiringBatches(),
   });
+  // Solicitudes de movimiento de efectivo pendientes de aprobación (#146).
+  const { data: pendingCash = [], isLoading: loadingCash } = useQuery({
+    queryKey: ['pending-cash-movements'],
+    queryFn: () => listPendingCashMovements(),
+  });
+
+  const invalidateCash = (): void => {
+    void qc.invalidateQueries({ queryKey: ['pending-cash-movements'] });
+  };
+  const approveMut = useMutation({
+    mutationFn: (movId: string) => approveCashMovement(movId),
+    onSuccess: invalidateCash,
+  });
+  const denyMut = useMutation({
+    mutationFn: (movId: string) => denyCashMovement(movId),
+    onSuccess: invalidateCash,
+  });
 
   // Tiempo real (#33): el SSE refresca las alertas al crearse, y los lotes por
   // caducar cuando cambia el stock (una venta/recepción mueve cantidades de lote).
+  // Una solicitud de movimiento (#146) refresca las aprobaciones pendientes.
   useEffect(() => {
     const unsubscribe = api.subscribeEvents((event) => {
       if (event.type === 'alert.created') {
@@ -39,6 +71,9 @@ export function NotificationsPage({ onResolve }: { onResolve?: NotifResolve }) {
       }
       if (event.type === 'stock.changed') {
         void qc.invalidateQueries({ queryKey: ['expiring-batches'] });
+      }
+      if (event.type === 'cash.movement.requested') {
+        void qc.invalidateQueries({ queryKey: ['pending-cash-movements'] });
       }
     });
     return unsubscribe;
@@ -48,6 +83,77 @@ export function NotificationsPage({ onResolve }: { onResolve?: NotifResolve }) {
 
   return (
     <section className="catalog" data-testid="notifications-page">
+      <div className="notif-section" data-testid="cash-approvals-section">
+        <div className="notif-section-head">
+          <h2 className="notif-section-title">Aprobaciones de caja</h2>
+          {pendingCash.length > 0 && (
+            <span className="notif-section-count">{pendingCash.length}</span>
+          )}
+        </div>
+        <div className="table-panel">
+          <DataTable
+            data-testid="cash-approvals-table"
+            rowTestId="cash-approval-row"
+            rows={pendingCash}
+            rowKey={(m) => m.id}
+            loading={loadingCash}
+            emptyState={
+              <span className="catalog-empty" data-testid="cash-approvals-empty">
+                No hay solicitudes de caja pendientes.
+              </span>
+            }
+            columns={[
+              { key: 'store', header: 'Tienda', render: (m) => m.store.name },
+              {
+                key: 'type',
+                header: 'Tipo',
+                render: (m) => CASH_TYPE_LABEL[m.type] ?? m.type,
+              },
+              {
+                key: 'amount',
+                header: 'Importe',
+                align: 'right',
+                render: (m) => fmtEur(Number(m.amount)),
+              },
+              {
+                key: 'requestedBy',
+                header: 'Solicitante',
+                hideOnNarrow: true,
+                render: (m) => m.requestedBy.name,
+              },
+              { key: 'reason', header: 'Motivo', hideOnNarrow: true, render: (m) => m.reason },
+              {
+                key: 'action',
+                header: '',
+                align: 'right',
+                render: (m) => (
+                  <span className="notif-actions">
+                    <button
+                      type="button"
+                      className="config-trigger"
+                      disabled={approveMut.isPending || denyMut.isPending}
+                      onClick={() => approveMut.mutate(m.id)}
+                      data-testid="cash-approve"
+                    >
+                      Aprobar
+                    </button>
+                    <button
+                      type="button"
+                      className="config-trigger danger"
+                      disabled={approveMut.isPending || denyMut.isPending}
+                      onClick={() => denyMut.mutate(m.id)}
+                      data-testid="cash-deny"
+                    >
+                      Denegar
+                    </button>
+                  </span>
+                ),
+              },
+            ]}
+          />
+        </div>
+      </div>
+
       <div className="notif-section">
         <div className="notif-section-head">
           <h2 className="notif-section-title">Alertas de stock</h2>
