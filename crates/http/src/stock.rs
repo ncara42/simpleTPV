@@ -1,7 +1,17 @@
 //! Handlers HTTP del stock (`/stock`) — port (parcial) de `stock.controller.ts`.
-//! Slice A: ajustes/mínimos/recuento (ADMIN/MANAGER) + caducidad/movimientos
-//! (cualquier rol). Las vistas byStore/global/alerts (con acceso por tienda,
-//! rotación y arquetipo) llegan en el siguiente sub-PR.
+//! Slice A: ajustes/mínimos/recuento (ADMIN/MANAGER) + caducidad/movimientos.
+//! Slice B: lecturas dashboard (byStore/to-reorder/byProduct/alerts). `global`
+//! (rotación) queda para slice C.
+//!
+//! ALCANCE DE `assertStoreAccess` (SEC-01) — PARIDAD CON NESTJS: solo `byStore` y
+//! `to_reorder` (las vistas "operar sobre una tienda") acotan por tienda al CLERK
+//! vía UserStore. `by_product`, `alerts`, `expiring` y `movements` son
+//! **org-scoped por RLS** (un CLERK ve esas lecturas de TODAS las tiendas de su
+//! organización), EXACTAMENTE como el backend NestJS de origen: su auditoría
+//! SEC-01 limitó la comprobación por tienda a los endpoints operativos, no a estos
+//! agregados de lectura. Endurecerlos aquí divergiría del comportamiento auditado
+//! durante el corte (strangler) y podría romper el frontend; si se decide reforzar,
+//! hágase de forma deliberada y coordinada (no es una regresión introducida aquí).
 
 use axum::extract::{Path, Query, State};
 use axum::Json;
