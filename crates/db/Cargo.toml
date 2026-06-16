@@ -1,0 +1,19 @@
+[package]
+name = "simpletpv-db"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+simpletpv-shared = { path = "../shared" }
+sqlx.workspace = true
+uuid.workspace = true
+tracing.workspace = true
+anyhow.workspace = true
+# `tokio::spawn` para contener panics de los efectos post-commit (rt).
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
