@@ -17,6 +17,7 @@ function makeController() {
     movements: vi.fn(async (_id: string) => [{ id: 'cm-1', type: 'OUT' }]),
     createMovement: vi.fn(async (_id: string, _dto: unknown, _userId: string) => ({ id: 'cm-1' })),
     current: vi.fn(async (_storeId: string) => ({ id: 'cs-1', status: 'OPEN' })),
+    listClosed: vi.fn(async (_storeId: string) => [{ id: 'cs-2', status: 'CLOSED' }]),
   } as unknown as CashSessionsService;
   return { controller: new CashSessionsController(service), service };
 }
@@ -88,5 +89,24 @@ describe('CashSessionsController', () => {
 
     expect(service.createMovement).toHaveBeenCalledWith('cs-1', dto, 'user-1');
     expect(res.id).toBe('cm-1');
+  });
+
+  it('GET /cash-sessions/closed delega en listClosed con storeId, usuario y limit', async () => {
+    const { controller, service } = makeController();
+
+    const res = (await controller.listClosed({ storeId: STORE, limit: 10 }, req())) as Array<{
+      id: string;
+    }>;
+
+    expect(service.listClosed).toHaveBeenCalledWith(STORE, 'user-1', 'ADMIN', 10);
+    expect(res[0]!.id).toBe('cs-2');
+  });
+
+  it('GET /cash-sessions/closed usa el tope por defecto (30) cuando no se indica limit', async () => {
+    const { controller, service } = makeController();
+
+    await controller.listClosed({ storeId: STORE }, req());
+
+    expect(service.listClosed).toHaveBeenCalledWith(STORE, 'user-1', 'ADMIN', 30);
   });
 });
