@@ -99,6 +99,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/sales", post(sales::create).get(sales::list))
         .route("/sales/ticket-block", post(sales::ticket_block))
         .route("/sales/by-ticket/{ticket}", get(sales::by_ticket))
+        .route("/sales/{id}/void", post(sales::void))
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)

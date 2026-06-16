@@ -15,7 +15,9 @@ use time::PrimitiveDateTime;
 use uuid::Uuid;
 
 use crate::stock::model::MovementType;
-use crate::stock::service::{apply_fefo_outflow, apply_movement, ApplyMovementInput};
+use crate::stock::service::{
+    apply_batched_return, apply_fefo_outflow, apply_movement, ApplyMovementInput,
+};
 use crate::store_access::has_store_access;
 
 use super::domain::{
@@ -23,7 +25,7 @@ use super::domain::{
     TicketDiscount,
 };
 use super::input::CreateSale;
-use super::model::{Sale, SaleLine, SaleWithLines, SalesPage, TicketBlock};
+use super::model::{Sale, SaleLine, SaleStatus, SaleWithLines, SalesPage, TicketBlock};
 
 const MAX_SALES_PAGE_SIZE: i64 = 100;
 
@@ -394,6 +396,87 @@ pub async fn list(
         })
     })
     .await
+}
+
+/// `POST /sales/:id/void` — anula una venta (ADMIN/MANAGER) y repone el stock al
+/// lote original. Lock pesimista + transición condicional (status=COMPLETED) para
+/// que dos anulaciones concurrentes no tengan ambas éxito. Rechaza si ya está
+/// anulada (`BadRequest`) o si tiene devoluciones (`BadRequest`).
+pub async fn void(
+    pool: &PgPool,
+    org: Uuid,
+    sale_id: Uuid,
+    user_id: Uuid,
+) -> Result<Sale, AppError> {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        // Lock pesimista sobre la fila (S-10): serializa con devoluciones concurrentes.
+        sqlx::query(r#"SELECT id FROM "Sale" WHERE id = $1 FOR UPDATE"#)
+            .bind(sale_id)
+            .execute(&mut **tx)
+            .await?;
+
+        let Some(sale) = load_sale_by_id(tx, sale_id).await? else {
+            return Ok(Err(AppError::NotFound));
+        };
+        if sale.status == SaleStatus::Voided {
+            return Ok(Err(AppError::BadRequest)); // ya anulada
+        }
+        let returns: i64 = sqlx::query_scalar(r#"SELECT count(*) FROM "Return" WHERE "saleId" = $1"#)
+            .bind(sale_id)
+            .fetch_one(&mut **tx)
+            .await?;
+        if returns > 0 {
+            return Ok(Err(AppError::BadRequest)); // no se anula una venta con devoluciones
+        }
+
+        // Transición atómica condicionada al estado COMPLETED.
+        let updated = sqlx::query(
+            r#"UPDATE "Sale" SET status = 'VOIDED'::"SaleStatus", "voidedAt" = now(), "voidedBy" = $2
+               WHERE id = $1 AND status = 'COMPLETED'::"SaleStatus""#,
+        )
+        .bind(sale_id)
+        .bind(user_id)
+        .execute(&mut **tx)
+        .await?
+        .rows_affected();
+        if updated == 0 {
+            return Ok(Err(AppError::BadRequest)); // anulada entre la lectura y el update
+        }
+
+        // Repone el stock de cada línea al lote original (sin devoluciones previas →
+        // revierte el 100% del consumo). referenceId = saleId.
+        let lines = load_lines(tx, sale_id).await?;
+        for l in &lines {
+            apply_batched_return(
+                tx,
+                org,
+                l.product_id,
+                sale.store_id,
+                Some(sale_id),
+                l.qty,
+                Some(sale_id),
+                Some(user_id),
+            )
+            .await?;
+        }
+
+        let voided = load_sale_by_id(tx, sale_id)
+            .await?
+            .expect("la venta existe; se acaba de anular en esta tx");
+        Ok(Ok(voided))
+    })
+    .await?
+}
+
+async fn load_sale_by_id(
+    tx: &mut Transaction<'_, Postgres>,
+    id: Uuid,
+) -> Result<Option<Sale>, sqlx::Error> {
+    let sql = format!(r#"SELECT {SALE_COLS} FROM "Sale" WHERE id = $1 LIMIT 1"#);
+    sqlx::query_as(&sql)
+        .bind(id)
+        .fetch_optional(&mut **tx)
+        .await
 }
 
 async fn load_sale_by_client(

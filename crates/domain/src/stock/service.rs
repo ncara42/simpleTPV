@@ -15,8 +15,8 @@ use time::{Date, Duration, OffsetDateTime, PrimitiveDateTime};
 use uuid::Uuid;
 
 use super::domain::{
-    alert_type_for, alert_urgency, allocate_fefo, days_until, expiry_cutoff, expiry_status,
-    stock_level, FefoBatch, EXPIRY_THRESHOLD_DAYS,
+    alert_type_for, alert_urgency, allocate_fefo, allocate_return_to_batches, days_until,
+    expiry_cutoff, expiry_status, stock_level, ConsumedBatch, FefoBatch, EXPIRY_THRESHOLD_DAYS,
 };
 use super::input::{Adjust, InventoryCount, SetMin};
 use super::model::{
@@ -894,6 +894,146 @@ fn rotation_of(units: Option<Decimal>) -> Rotation {
     } else {
         Rotation::Media
     }
+}
+
+// --- Reingreso a lote original (#137), usado por devoluciones y anulación ---
+
+/// Reingreso de `quantity` de una salida previa al/los lote(s) originales (espejo
+/// de FEFO). Para producto sin lote o devolución ciega (`origin_sale_id` None),
+/// entra SIN lote. Para producto con lote, reconstruye lo consumido por la venta
+/// (movimientos SALE con `batchId`), descuenta lo ya reingresado en devoluciones
+/// previas (idempotencia D3) y reparte el reingreso capado por lote. DEBE correr
+/// dentro de un `with_tenant_tx`.
+#[allow(clippy::too_many_arguments)]
+pub async fn apply_batched_return(
+    tx: &mut Transaction<'_, Postgres>,
+    org: Uuid,
+    product_id: Uuid,
+    store_id: Uuid,
+    origin_sale_id: Option<Uuid>,
+    quantity: Decimal,
+    reference_id: Option<Uuid>,
+    user_id: Option<Uuid>,
+) -> Result<Decimal, sqlx::Error> {
+    let movement = |qty: Decimal, batch: Option<BatchRef>| ApplyMovementInput {
+        organization_id: org,
+        product_id,
+        store_id,
+        movement_type: MovementType::Return,
+        quantity: qty,
+        reference_id,
+        reason: None,
+        user_id,
+        batch,
+    };
+
+    // Devolución ciega (sin venta de origen) → reingreso SIN lote (D6a).
+    let Some(sale_id) = origin_sale_id else {
+        return apply_movement(tx, movement(quantity, None)).await;
+    };
+
+    // Producto sin lote → reingreso SIN lote (flujo de siempre).
+    let tracks_batch: Option<bool> =
+        sqlx::query_scalar(r#"SELECT "tracksBatch" FROM "Product" WHERE id = $1"#)
+            .bind(product_id)
+            .fetch_optional(&mut **tx)
+            .await?;
+    if tracks_batch != Some(true) {
+        return apply_movement(tx, movement(quantity, None)).await;
+    }
+
+    // Lotes consumidos por la venta (SALE con batchId), agregados conservando el
+    // orden FEFO (createdAt asc) del primer avistamiento de cada lote.
+    let sale_movs: Vec<(Option<Uuid>, Decimal)> = sqlx::query_as(
+        r#"SELECT "batchId", quantity FROM "StockMovement"
+           WHERE "productId" = $1 AND type = 'SALE'::"MovementType" AND "referenceId" = $2
+           ORDER BY "createdAt" ASC"#,
+    )
+    .bind(product_id)
+    .bind(sale_id)
+    .fetch_all(&mut **tx)
+    .await?;
+    let mut consumed: Vec<ConsumedBatch> = Vec::new();
+    for (batch_id, qty) in sale_movs {
+        let Some(batch_id) = batch_id else { continue };
+        if let Some(c) = consumed.iter_mut().find(|c| c.batch_id == batch_id) {
+            c.qty += qty.abs();
+        } else {
+            consumed.push(ConsumedBatch {
+                batch_id,
+                qty: qty.abs(),
+            });
+        }
+    }
+
+    // Ya reingresado por lote en devoluciones previas de ESTA venta (referenceId =
+    // returnId de los Return de la venta, o el propio saleId en la anulación).
+    let mut ref_ids: Vec<Uuid> =
+        sqlx::query_scalar(r#"SELECT id FROM "Return" WHERE "saleId" = $1"#)
+            .bind(sale_id)
+            .fetch_all(&mut **tx)
+            .await?;
+    ref_ids.push(sale_id);
+    let ret_movs: Vec<(Option<Uuid>, Decimal)> = sqlx::query_as(
+        r#"SELECT "batchId", quantity FROM "StockMovement"
+           WHERE "productId" = $1 AND type = 'RETURN'::"MovementType" AND "referenceId" = ANY($2)"#,
+    )
+    .bind(product_id)
+    .bind(&ref_ids)
+    .fetch_all(&mut **tx)
+    .await?;
+    let mut already_returned: std::collections::HashMap<Uuid, Decimal> =
+        std::collections::HashMap::new();
+    for (batch_id, qty) in ret_movs {
+        if let Some(batch_id) = batch_id {
+            *already_returned.entry(batch_id).or_insert(Decimal::ZERO) += qty;
+        }
+    }
+
+    let allocation = allocate_return_to_batches(&consumed, &already_returned, quantity);
+
+    // batchId → lotCode (el reingreso reactiva el lote por lotCode, sin tocar la
+    // caducidad).
+    let batch_ids: Vec<Uuid> = allocation.per_batch.iter().map(|p| p.batch_id).collect();
+    let lot_rows: Vec<(Uuid, String)> = if batch_ids.is_empty() {
+        Vec::new()
+    } else {
+        sqlx::query_as(r#"SELECT id, "lotCode" FROM "StockBatch" WHERE id = ANY($1)"#)
+            .bind(&batch_ids)
+            .fetch_all(&mut **tx)
+            .await?
+    };
+    let lot_by: std::collections::HashMap<Uuid, String> = lot_rows.into_iter().collect();
+
+    let mut resulting: Decimal = sqlx::query_scalar(
+        r#"SELECT quantity FROM "Stock" WHERE "productId" = $1 AND "storeId" = $2"#,
+    )
+    .bind(product_id)
+    .bind(store_id)
+    .fetch_optional(&mut **tx)
+    .await?
+    .unwrap_or(Decimal::ZERO);
+
+    for p in &allocation.per_batch {
+        let Some(lot_code) = lot_by.get(&p.batch_id) else {
+            continue;
+        };
+        resulting = apply_movement(
+            tx,
+            movement(
+                p.qty,
+                Some(BatchRef {
+                    lot_code: lot_code.clone(),
+                    expiry_date: None,
+                }),
+            ),
+        )
+        .await?;
+    }
+    if allocation.no_lot > Decimal::ZERO {
+        resulting = apply_movement(tx, movement(allocation.no_lot, None)).await?;
+    }
+    Ok(resulting)
 }
 
 #[cfg(test)]
