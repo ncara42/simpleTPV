@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::http::{header, HeaderValue, StatusCode};
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum::Router;
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::SmartIpKeyExtractor;
@@ -18,6 +18,7 @@ use tower_http::trace::TraceLayer;
 use crate::products;
 use crate::routes;
 use crate::state::AppState;
+use crate::stock;
 
 const REQUEST_TIMEOUT_SECS: u64 = 30;
 // Límite de body (DoS backstop; NestJS usaba 512kb). 64kb sobra para JSON de API.
@@ -63,6 +64,18 @@ pub fn build_router(state: AppState) -> Router {
                 .patch(products::update)
                 .delete(products::remove),
         )
+        // Stock (Fase 2, slice A): ajustes/mínimos/recuento + caducidad/movimientos.
+        .route("/stock/min", put(stock::set_min))
+        .route("/stock/adjust", post(stock::adjust))
+        .route("/stock/inventory-count", post(stock::inventory_count))
+        .route("/stock/expiring", get(stock::expiring))
+        .route("/stock/movements", get(stock::movements))
+        // Stock (slice B): lecturas dashboard (byStore/to-reorder/byProduct/alerts).
+        .route("/stock", get(stock::by_store))
+        .route("/stock/to-reorder", get(stock::to_reorder))
+        .route("/stock/alerts", get(stock::alerts))
+        .route("/stock/global", get(stock::global))
+        .route("/stock/product/{product_id}", get(stock::by_product))
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)

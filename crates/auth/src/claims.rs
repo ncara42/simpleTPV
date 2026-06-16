@@ -25,6 +25,13 @@ impl Role {
         }
     }
 
+    /// ¿El rol accede a TODA la organización (no acotado por tienda)?
+    /// ADMIN/MANAGER operan sobre cualquier tienda; CLERK queda acotado a las
+    /// suyas (UserStore). Espeja `isOrgWideRole` de NestJS (SEC-01).
+    pub fn is_org_wide(self) -> bool {
+        matches!(self, Role::Admin | Role::Manager)
+    }
+
     /// Parsea el `role::text` leído de la BD. Un valor desconocido es un fallo
     /// interno (no debería existir), nunca se expone al cliente.
     pub fn from_db(s: &str) -> Result<Self, AppError> {

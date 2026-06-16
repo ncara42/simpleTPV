@@ -88,32 +88,17 @@ pub struct Product {
     pub sku: Option<String>,
     pub sale_unit: SaleUnit,
     pub unit_symbol: String,
-    #[serde(serialize_with = "decimal_str")]
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
     pub sale_price: Decimal,
-    #[serde(serialize_with = "decimal_str")]
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
     pub cost_price: Decimal,
-    #[serde(serialize_with = "decimal_str")]
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
     pub tax_rate: Decimal,
     pub image_url: Option<String>,
     pub active: bool,
     pub tracks_batch: bool,
-    #[serde(serialize_with = "iso_utc")]
+    #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
     pub created_at: PrimitiveDateTime,
-    #[serde(serialize_with = "iso_utc")]
+    #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
     pub updated_at: PrimitiveDateTime,
-}
-
-/// Serializa un `Decimal` como string NORMALIZADO (sin ceros finales), igual que
-/// `Decimal.toJSON` de Prisma (`9.9900` → `"9.99"`, `21.00` → `"21"`).
-fn decimal_str<S: serde::Serializer>(d: &Decimal, s: S) -> Result<S::Ok, S::Error> {
-    s.serialize_str(&d.normalize().to_string())
-}
-
-/// Serializa un `TIMESTAMP` (sin tz, almacenado en UTC) como ISO-8601 con `Z`.
-fn iso_utc<S: serde::Serializer>(dt: &PrimitiveDateTime, s: S) -> Result<S::Ok, S::Error> {
-    let formatted = dt
-        .assume_utc()
-        .format(&time::format_description::well_known::Rfc3339)
-        .map_err(serde::ser::Error::custom)?;
-    s.serialize_str(&formatted)
 }
