@@ -1,0 +1,43 @@
+[workspace]
+resolver = "2"
+members = ["shared", "db", "app"]
+
+# Migración del backend a Rust — workspace Cargo.
+# Arquitectura por capas (ver docs/migration-rust/02 §3):
+#   shared  → tipos comunes: config (fail-fast), errores (thiserror)
+#   db      → SQLx: pool + transacción RLS por tenant (set_config $1, true)
+#   app     → bootstrap: Axum + Tokio + tracing + graceful shutdown
+# Las capas http/domain/auth se añaden en fases posteriores (02 §4).
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.85"
+license = "UNLICENSED"
+publish = false
+
+# Versiones centralizadas (DRY). Cada crate las consume con `dep.workspace = true`.
+# Todas las crates y su justificación documentadas en docs/migration-rust/02-08.
+[workspace.dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net"] }
+axum = "0.8"
+tower-http = { version = "0.6", features = ["trace"] }
+sqlx = { version = "0.8", default-features = false, features = [
+  "runtime-tokio",
+  "tls-rustls",
+  "postgres",
+  "uuid",
+] }
+uuid = { version = "1", features = ["v4", "serde"] }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+secrecy = "0.10"
+
+# Perfil de release: binario pequeño y rápido (corte en producción, doc 02 §4 Fase 6).
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
