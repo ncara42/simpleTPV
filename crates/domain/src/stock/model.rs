@@ -133,6 +133,41 @@ pub enum AlertSeverity {
     Soft,
 }
 
+/// Rotación (velocidad de venta) de un producto en la ventana reciente.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Rotation {
+    Alta,
+    Media,
+    Baja,
+}
+
+/// Stock de un producto en una tienda (dentro de la vista global).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlobalStoreEntry {
+    pub store_id: Uuid,
+    pub store_name: String,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub quantity: Decimal,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub min_stock: Decimal,
+    pub level: StockLevel,
+}
+
+/// Stock agregado por producto (todas las tiendas + total + rotación) — vista
+/// `GET /stock/global`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlobalStockEntry {
+    pub product_id: Uuid,
+    pub product_name: String,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub total: Decimal,
+    pub stores: Vec<GlobalStoreEntry>,
+    pub rotation: Rotation,
+}
+
 /// Alerta de stock enriquecida (vista `GET /stock/alerts`).
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

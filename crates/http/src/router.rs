@@ -74,6 +74,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/stock", get(stock::by_store))
         .route("/stock/to-reorder", get(stock::to_reorder))
         .route("/stock/alerts", get(stock::alerts))
+        .route("/stock/global", get(stock::global))
         .route("/stock/product/{product_id}", get(stock::by_product))
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))

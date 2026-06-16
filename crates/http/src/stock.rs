@@ -17,7 +17,7 @@ use axum::extract::{Path, Query, State};
 use axum::Json;
 use serde::Deserialize;
 use simpletpv_auth::Role;
-use simpletpv_domain::stock::model::{AlertView, StockByProduct, StockByStore};
+use simpletpv_domain::stock::model::{AlertView, GlobalStockEntry, StockByProduct, StockByStore};
 use simpletpv_domain::stock::service::{self, MovementsFilter};
 use simpletpv_domain::stock::{
     Adjust, ExpiringBatch, InventoryCount, InventoryCountResult, MovementsPage, SetMin, StockView,
@@ -162,6 +162,15 @@ pub async fn to_reorder(
         user.role.is_org_wide(),
     )
     .await?;
+    Ok(Json(rows))
+}
+
+/// `GET /stock/global` (cualquier rol): stock agregado por producto + rotación.
+pub async fn global(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> Result<Json<Vec<GlobalStockEntry>>, ApiError> {
+    let rows = service::global(state.db(), user.organization_id).await?;
     Ok(Json(rows))
 }
 

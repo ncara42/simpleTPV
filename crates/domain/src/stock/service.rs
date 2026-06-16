@@ -11,7 +11,7 @@ use rust_decimal::Decimal;
 use simpletpv_db::with_tenant_tx;
 use simpletpv_shared::AppError;
 use sqlx::{PgPool, Postgres, QueryBuilder, Transaction};
-use time::{Date, OffsetDateTime, PrimitiveDateTime};
+use time::{Date, Duration, OffsetDateTime, PrimitiveDateTime};
 use uuid::Uuid;
 
 use super::domain::{
@@ -20,8 +20,9 @@ use super::domain::{
 };
 use super::input::{Adjust, InventoryCount, SetMin};
 use super::model::{
-    AlertSeverity, AlertType, AlertView, ExpiringBatch, InventoryCountResult, MovementType,
-    MovementsPage, StockByProduct, StockByStore, StockMovement, StockView,
+    AlertSeverity, AlertType, AlertView, ExpiringBatch, GlobalStockEntry, GlobalStoreEntry,
+    InventoryCountResult, MovementType, MovementsPage, Rotation, StockByProduct, StockByStore,
+    StockMovement, StockView,
 };
 
 /// Tope del tamaño de página de `GET /stock/movements` (SEC-09).
@@ -797,4 +798,115 @@ async fn has_store_access(
     .fetch_optional(&mut **tx)
     .await?;
     Ok(found.is_some())
+}
+
+// --- Vista global (slice C) ---
+
+#[derive(sqlx::FromRow)]
+struct GlobalRow {
+    product_id: Uuid,
+    product_name: String,
+    store_id: Uuid,
+    store_name: String,
+    quantity: Decimal,
+    min_stock: Decimal,
+}
+
+const ROTATION_WINDOW_DAYS: i64 = 30;
+
+/// `GET /stock/global`: stock agregado por producto (todas las tiendas + total) con
+/// rotación (unidades vendidas COMPLETED en la ventana reciente, en bandas). RLS.
+pub async fn global(pool: &PgPool, org: Uuid) -> Result<Vec<GlobalStockEntry>, AppError> {
+    let now = OffsetDateTime::now_utc();
+    let since_odt = now - Duration::days(ROTATION_WINDOW_DAYS);
+    let since = PrimitiveDateTime::new(since_odt.date(), since_odt.time());
+
+    let (rows, sold): (Vec<GlobalRow>, Vec<(Uuid, Decimal)>) =
+        with_tenant_tx(pool, org, async move |tx, _after| {
+            let rows: Vec<GlobalRow> = sqlx::query_as(
+                r#"SELECT s."productId" AS product_id, p.name AS product_name,
+                     s."storeId" AS store_id, st.name AS store_name, s.quantity,
+                     s."minStock" AS min_stock
+                   FROM "Stock" s
+                   JOIN "Product" p ON p.id = s."productId"
+                   JOIN "Store" st ON st.id = s."storeId"
+                   ORDER BY p.name ASC, st.name ASC"#,
+            )
+            .fetch_all(&mut **tx)
+            .await?;
+
+            // Rotación: unidades vendidas (ventas COMPLETED) en la ventana. Va por la
+            // conexión con RLS (no $queryRaw crudo) para respetar el tenant.
+            let sold: Vec<(Uuid, Decimal)> = sqlx::query_as(
+                r#"SELECT sl."productId", COALESCE(SUM(sl.qty), 0)
+                   FROM "SaleLine" sl
+                   JOIN "Sale" s ON s.id = sl."saleId"
+                   WHERE s.status = 'COMPLETED'::"SaleStatus" AND s."createdAt" >= $1
+                   GROUP BY sl."productId""#,
+            )
+            .bind(since)
+            .fetch_all(&mut **tx)
+            .await?;
+            Ok((rows, sold))
+        })
+        .await?;
+
+    let units_by_product: std::collections::HashMap<Uuid, Decimal> = sold.into_iter().collect();
+
+    // Agrega por producto preservando determinismo (la query ya ordena por nombre).
+    let mut order: Vec<Uuid> = Vec::new();
+    let mut entries: std::collections::HashMap<Uuid, GlobalStockEntry> =
+        std::collections::HashMap::new();
+    for r in rows {
+        let entry = entries.entry(r.product_id).or_insert_with(|| {
+            order.push(r.product_id);
+            GlobalStockEntry {
+                product_id: r.product_id,
+                product_name: r.product_name.clone(),
+                total: Decimal::ZERO,
+                stores: Vec::new(),
+                rotation: rotation_of(units_by_product.get(&r.product_id).copied()),
+            }
+        });
+        entry.total += r.quantity;
+        entry.stores.push(GlobalStoreEntry {
+            store_id: r.store_id,
+            store_name: r.store_name,
+            quantity: r.quantity,
+            min_stock: r.min_stock,
+            level: stock_level(r.quantity, r.min_stock),
+        });
+    }
+
+    Ok(order
+        .into_iter()
+        .filter_map(|id| entries.remove(&id))
+        .collect())
+}
+
+/// Bandas de rotación (paridad NestJS): ≥30 uds → alta, <6 → baja, resto media.
+fn rotation_of(units: Option<Decimal>) -> Rotation {
+    let units = units.unwrap_or(Decimal::ZERO);
+    if units >= Decimal::new(30, 0) {
+        Rotation::Alta
+    } else if units < Decimal::new(6, 0) {
+        Rotation::Baja
+    } else {
+        Rotation::Media
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rotation_bandas() {
+        assert_eq!(rotation_of(Some(Decimal::new(30, 0))), Rotation::Alta);
+        assert_eq!(rotation_of(Some(Decimal::new(50, 0))), Rotation::Alta);
+        assert_eq!(rotation_of(Some(Decimal::new(6, 0))), Rotation::Media);
+        assert_eq!(rotation_of(Some(Decimal::new(29, 0))), Rotation::Media);
+        assert_eq!(rotation_of(Some(Decimal::new(5, 0))), Rotation::Baja);
+        assert_eq!(rotation_of(None), Rotation::Baja);
+    }
 }
