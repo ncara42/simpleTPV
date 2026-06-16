@@ -46,7 +46,11 @@ RUN chmod +x ./docker-entrypoint.sh
 # Prisma necesita libssl y poder leer/escribir el binario del schema-engine.
 # node:22-slim no trae libssl; y node_modules es root:root mientras el runtime
 # corre como `node`. Instalamos libssl3 y damos al usuario node el dir de engines.
+# Hardening de la capa base (#112): `apt-get upgrade` trae los parches de los
+# paquetes del SO Debian de node:22-slim (CVEs ya corregidos upstream) sin tocar
+# la app, antes de limpiar las listas de apt.
 RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends libssl3 \
     && rm -rf /var/lib/apt/lists/* \
     && chown -R node:node /app/node_modules/.pnpm
