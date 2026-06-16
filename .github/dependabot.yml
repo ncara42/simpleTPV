@@ -1,26 +1,20 @@
 version: 2
 
+# Solo actualizaciones de SEGURIDAD.
+# open-pull-requests-limit: 0 desactiva las PRs de versiones rutinarias.
+# Las PRs de vulnerabilidades (Dependabot security updates) NO están sujetas
+# a este límite y se siguen abriendo si hay un aviso de seguridad.
 updates:
-  # GitHub Actions — mantiene los SHAs pinneados actualizados
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-      day: monday
-      time: '08:00'
+    open-pull-requests-limit: 0
     labels: [dependencies, ci-cd]
 
-  # npm — el monorepo pnpm tiene un único lockfile en la raíz;
-  # Dependabot descubre todos los workspaces desde ahí.
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
-      day: monday
-      time: '08:00'
+    open-pull-requests-limit: 0
     labels: [dependencies]
-    open-pull-requests-limit: 10
-    groups:
-      dev-dependencies:
-        dependency-type: development
-        update-types: [minor, patch]
