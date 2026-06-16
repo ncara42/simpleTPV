@@ -3,12 +3,13 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::http::{header, HeaderValue, StatusCode};
+use axum::http::{header, HeaderValue, Method, StatusCode};
 use axum::routing::{get, post};
 use axum::Router;
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::SmartIpKeyExtractor;
 use tower_governor::GovernorLayer;
+use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::sensitive_headers::SetSensitiveRequestHeadersLayer;
 use tower_http::set_header::SetResponseHeaderLayer;
@@ -24,6 +25,11 @@ const MAX_BODY_BYTES: usize = 64 * 1024;
 // Login: 5/min/IP (SEC, doc 06). Token bucket: burst 5 + repone 1 cada 12s.
 const LOGIN_REFILL_SECS: u64 = 12;
 const LOGIN_BURST: u32 = 5;
+// Refresh: 10/min/IP (paridad con NestJS). Token bucket: burst 10 + repone 1 cada 6s.
+const REFRESH_REFILL_SECS: u64 = 6;
+const REFRESH_BURST: u32 = 10;
+// Cacheo de preflight CORS en el navegador (1h): reduce OPTIONS repetidos.
+const CORS_MAX_AGE_SECS: u64 = 3600;
 
 pub fn build_router(state: AppState) -> Router {
     let login_rl = GovernorConfigBuilder::default()
@@ -32,6 +38,16 @@ pub fn build_router(state: AppState) -> Router {
         .key_extractor(SmartIpKeyExtractor)
         .finish()
         .expect("config de rate-limit de login válida");
+    let refresh_rl = GovernorConfigBuilder::default()
+        .period(Duration::from_secs(REFRESH_REFILL_SECS))
+        .burst_size(REFRESH_BURST)
+        .key_extractor(SmartIpKeyExtractor)
+        .finish()
+        .expect("config de rate-limit de refresh válida");
+
+    // CORS desde la config (orígenes resueltos con fail-fast en prod, SEC-18).
+    // Con `allow_credentials` los orígenes deben ser explícitos (nunca `Any`).
+    let cors = build_cors(state.cors_origins());
 
     let auth = Router::new()
         .route(
@@ -40,20 +56,25 @@ pub fn build_router(state: AppState) -> Router {
                 config: Arc::new(login_rl),
             }),
         )
-        // TODO(hardening): rate-limit también /refresh (NestJS 10/min) — diferido
-        // (los tests por cookie tendrían que aportar X-Forwarded-For); bajo riesgo
-        // porque el refresh exige un token válido y rotatorio.
-        .route("/refresh", post(routes::refresh))
+        // Rate-limit del refresh: exige IP (X-Forwarded-For tras proxy, o la del
+        // peer vía ConnectInfo). 10/min/IP, defensa ante abuso de rotación.
+        .route(
+            "/refresh",
+            post(routes::refresh).route_layer(GovernorLayer {
+                config: Arc::new(refresh_rl),
+            }),
+        )
         .route("/logout", post(routes::logout));
 
-    // TODO(integración frontends): CORS fail-fast por env (CORS_ORIGINS) +
-    // allow_credentials, antes de exponer la API a los SPA (doc 06 SEC-18).
     Router::new()
         .nest("/auth", auth)
         .route("/me", get(routes::me))
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)
+        // CORS para los SPA (TPV y backoffice). Antes que las cabeceras de
+        // seguridad para que la respuesta de preflight las arrastre también.
+        .layer(cors)
         // Capas (outermost = la última). Cabeceras de seguridad (sustituye parte
         // de Helmet): nosniff, frame DENY, referrer-policy.
         .layer(SetResponseHeaderLayer::if_not_present(
@@ -86,4 +107,42 @@ pub fn build_router(state: AppState) -> Router {
             header::AUTHORIZATION,
             header::COOKIE,
         ]))
+}
+
+/// Construye la capa CORS con orígenes explícitos + credenciales. Los orígenes
+/// inválidos (no parseables como `HeaderValue`) se descartan con aviso: la lista
+/// ya se validó al resolver la config, esto es defensa en profundidad.
+fn build_cors(origins: &[String]) -> CorsLayer {
+    let allowed: Vec<HeaderValue> = origins
+        .iter()
+        .filter_map(|o| match o.parse::<HeaderValue>() {
+            Ok(v) => Some(v),
+            Err(_) => {
+                tracing::error!(origin = %o, "origen CORS inválido, ignorado");
+                None
+            }
+        })
+        .collect();
+
+    if allowed.is_empty() {
+        // En prod la config ya habría abortado el arranque (SEC-18); aquí solo
+        // puede ocurrir en dev/test. Avisar para no diagnosticar a ciegas un
+        // "todas las peticiones cross-origin rechazadas".
+        tracing::warn!(
+            "ningún origen CORS válido configurado: se rechazarán las peticiones cross-origin"
+        );
+    }
+
+    CorsLayer::new()
+        .allow_origin(allowed)
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::PATCH,
+            Method::DELETE,
+        ])
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
+        .allow_credentials(true)
+        .max_age(Duration::from_secs(CORS_MAX_AGE_SECS))
 }

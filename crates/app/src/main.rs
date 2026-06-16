@@ -7,7 +7,7 @@
 use std::net::SocketAddr;
 
 use secrecy::ExposeSecret;
-use simpletpv_auth::{AuthConfig, AuthService};
+use simpletpv_auth::{AuthConfig, AuthService, DbUserStateLookup, UserStateService};
 use simpletpv_http::{build_router, AppState};
 use simpletpv_shared::AppConfig;
 use tokio::net::TcpListener;
@@ -30,6 +30,10 @@ async fn main() -> anyhow::Result<()> {
     let admin = simpletpv_db::build_pool(config.database_url_admin.expose_secret()).await?;
     tracing::info!("conectado a la base de datos (roles app + app_admin)");
 
+    // Revalidación A-04: lookup BYPASSRLS sobre el MISMO pool admin (clon barato:
+    // PgPool es Arc por dentro) + caché TTL corto. Se construye antes de mover
+    // `admin` a `AuthService`.
+    let user_state = UserStateService::new(DbUserStateLookup::new(admin.clone()));
     let auth = AuthService::new(admin, auth_config);
     // Cookie `Secure` configurable en runtime (COOKIE_SECURE); por defecto activo
     // en release. Permite release-tras-proxy-http (off) y dev-sobre-https (on).
@@ -37,7 +41,13 @@ async fn main() -> anyhow::Result<()> {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(cfg!(not(debug_assertions)));
-    let app = build_router(AppState::new(auth, db, cookie_secure));
+    let app = build_router(AppState::new(
+        auth,
+        user_state,
+        db,
+        cookie_secure,
+        config.cors_origins,
+    ));
 
     let addr: SocketAddr = config.bind_addr.parse()?;
     let listener = TcpListener::bind(addr).await?;
