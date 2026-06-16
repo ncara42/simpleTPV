@@ -104,6 +104,11 @@ export class AuthController {
   // inválido, reuso, sesión revocada) limpia la cookie para forzar un login.
   @Post('refresh')
   @Public()
+  // Throttle dedicado (AUTH-04): la rotación de sesión es sensible, así que la
+  // acotamos más que el límite global (120/min) para dificultar el sondeo/abuso
+  // de la rotación del refresh token. 10/min por IP cubre de sobra el uso legítimo
+  // (un cliente renueva el access token con poca frecuencia).
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async refresh(
     @Req() req: RequestLike,
     @Ip() ip: string,

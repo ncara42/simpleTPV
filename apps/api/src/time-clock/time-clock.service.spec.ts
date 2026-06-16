@@ -290,6 +290,78 @@ describe('TimeClockService', () => {
     expect(arg.where.createdAt.lte.getTime()).toBe(endOfLocalDay(new Date('2026-06-03')).getTime());
   });
 
+  it('history recorta el rango pedido a la ventana máxima de 90 días (DOS-02)', async () => {
+    const prisma = makePrisma();
+    prisma.timeClockEntry.findMany = vi.fn(async () => []);
+    const service = makeService(prisma);
+
+    // Rango abusivo de ~2 años: el service debe acotar `from` a 90 días antes de `to`.
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.history({ storeId: STORE, from: '2024-01-01', to: '2026-06-05' }, 'ADMIN', 'admin-1'),
+    );
+
+    const arg = prisma.timeClockEntry.findMany.mock.calls[0]![0] as {
+      where: { createdAt: { gte: Date; lte: Date } };
+    };
+    const to = endOfLocalDay(new Date('2026-06-05'));
+    const minFrom = startOfLocalDay(new Date(to.getTime() - 90 * 24 * 60 * 60 * 1000));
+    expect(arg.where.createdAt.lte.getTime()).toBe(to.getTime());
+    expect(arg.where.createdAt.gte.getTime()).toBe(minFrom.getTime());
+  });
+
+  it('history respeta un rango dentro de la cota sin recortarlo', async () => {
+    const prisma = makePrisma();
+    prisma.timeClockEntry.findMany = vi.fn(async () => []);
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.history({ storeId: STORE, from: '2026-06-01', to: '2026-06-03' }, 'ADMIN', 'admin-1'),
+    );
+
+    const arg = prisma.timeClockEntry.findMany.mock.calls[0]![0] as {
+      where: { createdAt: { gte: Date; lte: Date } };
+    };
+    // 3 días < 90 → from se mantiene tal cual lo pidió el cliente.
+    expect(arg.where.createdAt.gte.getTime()).toBe(
+      startOfLocalDay(new Date('2026-06-01')).getTime(),
+    );
+    expect(arg.where.createdAt.lte.getTime()).toBe(endOfLocalDay(new Date('2026-06-03')).getTime());
+  });
+
+  it('historyAll recorta el rango pedido a la ventana máxima de 90 días (DOS-04)', async () => {
+    const prisma = makePrisma();
+    prisma.timeClockEntry.findMany = vi.fn(async () => []);
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.historyAll({ from: '2020-01-01', to: '2026-06-05' }),
+    );
+
+    const arg = prisma.timeClockEntry.findMany.mock.calls[0]![0] as {
+      where: { createdAt: { gte: Date; lte: Date } };
+    };
+    const to = endOfLocalDay(new Date('2026-06-05'));
+    const minFrom = startOfLocalDay(new Date(to.getTime() - 90 * 24 * 60 * 60 * 1000));
+    expect(arg.where.createdAt.gte.getTime()).toBe(minFrom.getTime());
+  });
+
+  it('entries recorta el rango pedido a la ventana máxima de 90 días (DOS-04)', async () => {
+    const prisma = makePrisma();
+    prisma.timeClockEntry.findMany = vi.fn(async () => []);
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.entries({ storeId: STORE, from: '2020-01-01', to: '2026-06-05' }, 'ADMIN', 'admin-1'),
+    );
+
+    const arg = prisma.timeClockEntry.findMany.mock.calls[0]![0] as {
+      where: { createdAt: { gte: Date; lte: Date } };
+    };
+    const to = endOfLocalDay(new Date('2026-06-05'));
+    const minFrom = startOfLocalDay(new Date(to.getTime() - 90 * 24 * 60 * 60 * 1000));
+    expect(arg.where.createdAt.gte.getTime()).toBe(minFrom.getTime());
+  });
+
   it('history lanza 403 para un CLERK sin acceso a la tienda', async () => {
     const prisma = makePrisma();
     prisma.userStore.findFirst = vi.fn(async () => null);

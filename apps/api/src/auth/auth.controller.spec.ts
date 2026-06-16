@@ -1,3 +1,5 @@
+import 'reflect-metadata';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { AuthController } from './auth.controller.js';
@@ -95,6 +97,18 @@ describe('AuthController', () => {
     const res = makeRes();
     await ctrl.logout({ headers: { cookie: 'refreshToken=ref' } } as never, res as never);
     expect(res.clearCookie).toHaveBeenCalledWith('refreshToken', { path: '/' });
+  });
+
+  // AUTH-04: /auth/refresh debe tener un throttle dedicado más estricto que el global
+  // (120/min), igual de espíritu que el de /login, para dificultar el abuso de la
+  // rotación de sesión. @Throttle({ default: { limit, ttl } }) deja la metadata
+  // 'THROTTLER:LIMITdefault' / 'THROTTLER:TTLdefault' sobre el método.
+  it('POST /auth/refresh declara un @Throttle dedicado (10/min)', () => {
+    const refresh = AuthController.prototype.refresh;
+    const limit = Reflect.getMetadata('THROTTLER:LIMITdefault', refresh) as unknown;
+    const ttl = Reflect.getMetadata('THROTTLER:TTLdefault', refresh) as unknown;
+    expect(limit).toBe(10);
+    expect(ttl).toBe(60000);
   });
 
   it('GET /auth/me devuelve el usuario del request', () => {
