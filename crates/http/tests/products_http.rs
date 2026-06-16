@@ -10,7 +10,7 @@ use axum::http::{HeaderMap, Request, StatusCode};
 use axum::Router;
 use http_body_util::BodyExt;
 use secrecy::SecretString;
-use simpletpv_auth::{AuthConfig, AuthService};
+use simpletpv_auth::{AuthConfig, AuthService, DbUserStateLookup, UserStateService};
 use simpletpv_http::{build_router, AppState};
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use tower::ServiceExt;
@@ -42,8 +42,12 @@ fn auth_config() -> AuthConfig {
 async fn build() -> (Router, PgPool) {
     let admin = pool("DATABASE_URL_ADMIN", DEV_ADMIN_URL).await;
     let db = pool("DATABASE_URL_APP", DEV_APP_URL).await;
+    let user_state = UserStateService::new(DbUserStateLookup::new(admin.clone()));
     let auth = AuthService::new(admin.clone(), auth_config());
-    (build_router(AppState::new(auth, db, false)), admin)
+    (
+        build_router(AppState::new(auth, user_state, db, false, Vec::new())),
+        admin,
+    )
 }
 
 async fn send(app: &Router, req: Request<Body>) -> (StatusCode, HeaderMap, String) {

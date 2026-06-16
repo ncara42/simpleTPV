@@ -10,7 +10,7 @@ use axum::http::{HeaderMap, Request, StatusCode};
 use axum::Router;
 use http_body_util::BodyExt;
 use secrecy::SecretString;
-use simpletpv_auth::{AuthConfig, AuthService};
+use simpletpv_auth::{AuthConfig, AuthService, DbUserStateLookup, UserStateService};
 use simpletpv_http::{build_router, AppState};
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use tower::ServiceExt;
@@ -42,9 +42,13 @@ fn auth_config() -> AuthConfig {
 async fn build() -> (Router, PgPool) {
     let admin = pool("DATABASE_URL_ADMIN", DEV_ADMIN_URL).await;
     let db = pool("DATABASE_URL_APP", DEV_APP_URL).await;
+    // Revalidación A-04 contra el MISMO pool admin (lookup real del seed).
+    let user_state = UserStateService::new(DbUserStateLookup::new(admin.clone()));
     let auth = AuthService::new(admin.clone(), auth_config());
-    // cookie_secure=false: los tests van sobre http (oneshot).
-    (build_router(AppState::new(auth, db, false)), admin)
+    // cookie_secure=false: los tests van sobre http (oneshot). CORS vacío: los
+    // tests no envían cabecera Origin.
+    let state = AppState::new(auth, user_state, db, false, Vec::new());
+    (build_router(state), admin)
 }
 
 async fn cleanup(admin: &PgPool, email: &str) {
@@ -67,6 +71,18 @@ fn login_req(email: &str, password: &str, ip: &str) -> Request<Body> {
         .body(Body::from(format!(
             r#"{{"email":"{email}","password":"{password}"}}"#
         )))
+        .unwrap()
+}
+
+/// Petición a `/auth/refresh` con la cookie del refresh. Aporta X-Forwarded-For
+/// porque la ruta está rate-limited por IP (SmartIpKeyExtractor).
+fn refresh_req(cookie: &str, ip: &str) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri("/auth/refresh")
+        .header(COOKIE, cookie)
+        .header("x-forwarded-for", ip)
+        .body(Body::empty())
         .unwrap()
 }
 
@@ -144,25 +160,16 @@ async fn refresh_over_cookie_rotates_and_detects_reuse() {
     let cookie1 = refresh_cookie_pair(&headers);
 
     // Refresh con la cookie → 200 + nueva cookie.
-    let refresh_req = Request::builder()
-        .method("POST")
-        .uri("/auth/refresh")
-        .header(COOKIE, &cookie1)
-        .body(Body::empty())
-        .unwrap();
-    let (st_r, headers_r, _) = send(&app, refresh_req).await;
+    let (st_r, headers_r, _) = send(&app, refresh_req(&cookie1, "9.9.9.3")).await;
     assert_eq!(st_r, StatusCode::OK);
     let cookie2 = refresh_cookie_pair(&headers_r);
     assert_ne!(cookie1, cookie2, "la rotación cambia el refresh token");
 
     // Reuso de la cookie vieja → 401 (familia revocada).
-    let reuse = Request::builder()
-        .method("POST")
-        .uri("/auth/refresh")
-        .header(COOKIE, &cookie1)
-        .body(Body::empty())
-        .unwrap();
-    assert_eq!(send(&app, reuse).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        send(&app, refresh_req(&cookie1, "9.9.9.3")).await.0,
+        StatusCode::UNAUTHORIZED
+    );
 
     cleanup(&admin, email).await;
 }
@@ -226,15 +233,38 @@ async fn logout_revokes_and_clears_cookie_securely() {
     );
 
     // Tras logout, la familia está revocada → refresh con la cookie vieja 401.
-    let reuse = Request::builder()
-        .method("POST")
-        .uri("/auth/refresh")
-        .header(COOKIE, &cookie)
-        .body(Body::empty())
-        .unwrap();
-    assert_eq!(send(&app, reuse).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        send(&app, refresh_req(&cookie, "9.9.9.4")).await.0,
+        StatusCode::UNAUTHORIZED
+    );
 
     cleanup(&admin, email).await;
+}
+
+#[tokio::test]
+async fn refresh_is_rate_limited_per_ip() {
+    let (app, _admin) = build().await;
+    // Cookie inexistente ⇒ el handler responde 401 sin tocar la BD; el limiter
+    // actúa igual sobre la ruta. burst 10 ⇒ las 10 primeras llegan al handler
+    // (401), la 11ª la corta el limiter (429).
+    let ip = "9.9.9.240";
+    let mut statuses = Vec::new();
+    for _ in 0..11 {
+        let (st, _, _) = send(&app, refresh_req("refreshToken=nope", ip)).await;
+        statuses.push(st);
+    }
+    assert!(
+        statuses
+            .iter()
+            .take(10)
+            .all(|s| *s == StatusCode::UNAUTHORIZED),
+        "las primeras 10 deben pasar el limiter: {statuses:?}"
+    );
+    assert_eq!(
+        statuses[10],
+        StatusCode::TOO_MANY_REQUESTS,
+        "la 11ª petición debe ser rechazada por rate-limit"
+    );
 }
 
 #[tokio::test]
