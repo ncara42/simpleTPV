@@ -263,6 +263,9 @@ pub async fn create(
 }
 
 /// `GET /sales/by-ticket/:ticketNumber` — venta con líneas (404 si no existe).
+/// Org-scoped por RLS (NO acota por tienda al CLERK): paridad con NestJS
+/// `findByTicket`, que tampoco llama a `assertStoreAccess` (la comprobación por
+/// tienda en NestJS solo está en `create` y `reserveTicketBlock`).
 pub async fn find_by_ticket(
     pool: &PgPool,
     org: Uuid,
@@ -281,13 +284,20 @@ pub async fn find_by_ticket(
 }
 
 /// `POST /sales/ticket-block` — reserva `size` números de ticket para uso offline.
+/// Es una ESCRITURA sobre `Store.ticketCounter`: el CLERK solo puede reservar en
+/// sus tiendas (SEC-01, paridad con NestJS `reserveTicketBlock`).
 pub async fn reserve_ticket_block(
     pool: &PgPool,
     org: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
     store_id: Uuid,
     size: i64,
 ) -> Result<TicketBlock, AppError> {
-    let block: Option<TicketBlock> = with_tenant_tx(pool, org, async move |tx, _after| {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        if !is_org_wide && !has_store_access(tx, user_id, store_id).await? {
+            return Ok(Err(AppError::Forbidden));
+        }
         let row: Option<(String, i64)> = sqlx::query_as(
             r#"UPDATE "Store" SET "ticketCounter" = "ticketCounter" + $2
                WHERE id = $1 RETURNING code, "ticketCounter"::bigint"#,
@@ -296,14 +306,16 @@ pub async fn reserve_ticket_block(
         .bind(size)
         .fetch_optional(&mut **tx)
         .await?;
-        Ok(row.map(|(code, counter)| TicketBlock {
-            code,
-            from: counter - size + 1,
-            to: counter,
-        }))
+        match row {
+            Some((code, counter)) => Ok(Ok(TicketBlock {
+                code,
+                from: counter - size + 1,
+                to: counter,
+            })),
+            None => Ok(Err(AppError::NotFound)),
+        }
     })
-    .await?;
-    block.ok_or(AppError::NotFound)
+    .await?
 }
 
 /// Filtros de `GET /sales`.

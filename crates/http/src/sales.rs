@@ -1,6 +1,11 @@
 //! Handlers HTTP de ventas (`/sales`) — core (crear, reservar bloque, listar,
 //! consultar por ticket). `void`/recibos llegan en slices posteriores. Todas las
-//! rutas exigen sesión; la escritura valida acceso por tienda al CLERK (SEC-01).
+//! rutas exigen sesión.
+//!
+//! ALCANCE store-scope (SEC-01, paridad NestJS): las ESCRITURAS por tienda
+//! (`create`, `ticket-block`) acotan al CLERK a sus tiendas (UserStore). `list`
+//! también lo acota (subselect). `by-ticket` es org-scoped por RLS (como
+//! `findByTicket` de NestJS, que no llama a `assertStoreAccess`).
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -45,9 +50,15 @@ pub async fn ticket_block(
     ValidatedJson(body): ValidatedJson<ReserveTicketBlock>,
 ) -> Result<Json<TicketBlock>, ApiError> {
     body.validate()?;
-    let block =
-        service::reserve_ticket_block(state.db(), user.organization_id, body.store_id, body.size)
-            .await?;
+    let block = service::reserve_ticket_block(
+        state.db(),
+        user.organization_id,
+        user.user_id,
+        user.role.is_org_wide(),
+        body.store_id,
+        body.size,
+    )
+    .await?;
     Ok(Json(block))
 }
 

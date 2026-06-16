@@ -269,6 +269,25 @@ async fn sin_caja_abierta_rechaza_con_conflict() {
 }
 
 #[tokio::test]
+async fn reservar_bloque_acota_por_tienda_al_clerk() {
+    let c = setup().await;
+    let clerk: Uuid =
+        sqlx::query_scalar(r#"SELECT id FROM "User" WHERE email = 'clerk@org1.test'"#)
+            .fetch_one(&c.admin)
+            .await
+            .unwrap();
+    // CLERK sin asignación a la tienda → Forbidden (SEC-01).
+    let denied = service::reserve_ticket_block(&c.app, c.org, clerk, false, c.store, 5).await;
+    assert_eq!(denied.err(), Some(AppError::Forbidden));
+    // ADMIN (org-wide) sí reserva: rango de 5.
+    let block = service::reserve_ticket_block(&c.app, c.org, c.user, true, c.store, 5)
+        .await
+        .unwrap();
+    assert_eq!(block.to - block.from + 1, 5);
+    teardown(&c, &[]).await;
+}
+
+#[tokio::test]
 async fn clerk_supera_el_limite_de_descuento() {
     let c = setup().await;
     open_cash_session(&c).await;
