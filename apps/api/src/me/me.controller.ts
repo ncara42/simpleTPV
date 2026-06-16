@@ -71,14 +71,30 @@ export class MeController {
     return this.prefs.set(req.user.sub, key, body.value);
   }
 
-  // Perfil del usuario autenticado: rol + tiendas asignadas.
-  // El backoffice lo usa para restringir la vista del MANAGER a sus tiendas.
+  // Perfil del usuario autenticado: rol + tiendas asignadas + identidad (nombre y
+  // email). El backoffice lo usa para restringir la vista del MANAGER a sus tiendas;
+  // el TPV, para mostrar el nombre real del empleado en la cabecera (el JWT solo
+  // lleva sub/organizationId/role). El nombre/email se leen bajo el contexto de
+  // tenant (RLS `tenant_isolation` en "User"): solo se ve a sí mismo dentro de su org.
   @Get()
-  async me(@Req() req: { user: JwtPayload }): Promise<{ role: string; storeIds: string[] }> {
-    const rows = await this.prisma.userStore.findMany({
-      where: { userId: req.user.sub },
-      select: { storeId: true },
-    });
-    return { role: req.user.role, storeIds: rows.map((r) => r.storeId) };
+  async me(
+    @Req() req: { user: JwtPayload },
+  ): Promise<{ role: string; storeIds: string[]; name: string; email: string }> {
+    const [rows, user] = await Promise.all([
+      this.prisma.userStore.findMany({
+        where: { userId: req.user.sub },
+        select: { storeId: true },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: req.user.sub },
+        select: { name: true, email: true },
+      }),
+    ]);
+    return {
+      role: req.user.role,
+      storeIds: rows.map((r) => r.storeId),
+      name: user?.name ?? '',
+      email: user?.email ?? '',
+    };
   }
 }

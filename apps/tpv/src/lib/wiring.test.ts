@@ -11,6 +11,8 @@ vi.mock('./auth.js', () => ({
 import { api } from './auth.js';
 import * as cash from './cash.js';
 import * as catalog from './catalog.js';
+import * as dashboard from './dashboard.js';
+import * as me from './me.js';
 import * as sales from './sales.js';
 import * as stock from './stock.js';
 import * as storeOrders from './store-orders.js';
@@ -113,6 +115,25 @@ describe('cableado API real', () => {
       page: '2',
       pageSize: '10',
     });
+  });
+
+  it('me: getMe pega a GET /me', async () => {
+    await me.getMe();
+    expect(get).toHaveBeenCalledWith('/me');
+  });
+
+  it('me.roleLabel mapea cada rol a su etiqueta (y CLERK por defecto)', () => {
+    expect(me.roleLabel('ADMIN')).toBe('Administrador');
+    expect(me.roleLabel('MANAGER')).toBe('Encargado');
+    expect(me.roleLabel('CLERK')).toBe('Dependiente');
+    expect(me.roleLabel(undefined)).toBe('Dependiente');
+  });
+
+  it('dashboard: getSalesToday pega al endpoint propio del TPV (CLERK)', async () => {
+    await dashboard.getSalesToday('store-1');
+    expect(get).toHaveBeenCalledWith('/tpv/dashboard/sales-today', { storeId: 'store-1' });
+    await dashboard.getSalesToday();
+    expect(get).toHaveBeenLastCalledWith('/tpv/dashboard/sales-today', {});
   });
 
   it('store-orders: lista SENT filtrando por tienda destino y recibe', async () => {

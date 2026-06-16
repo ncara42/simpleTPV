@@ -87,6 +87,38 @@ export interface UpdateUserInput {
   password?: string;
 }
 
+// Perfil del usuario autenticado (GET /me): rol + tiendas asignadas + identidad.
+// Lo usan TPV y backoffice para personalizar la cabecera (nombre del empleado) y
+// restringir la vista del MANAGER a sus tiendas. La autoridad real sigue siendo el
+// backend en cada petición (el JWT solo lleva sub/organizationId/role; el nombre y
+// el email se leen aquí del usuario en BD bajo su contexto de tenant).
+export interface MeProfile {
+  role: UserRole;
+  storeIds: string[];
+  name: string;
+  email: string;
+}
+
+// Comparativa de ventas hoy vs ayer (o mes/año) por tienda + total org (STAT-01).
+// La sirve GET /dashboard/sales-today (backoffice, ADMIN/MANAGER) y
+// GET /tpv/dashboard/sales-today (TPV, también CLERK, acotado a su tienda). Los
+// campos `today`/`yesterday` representan "periodo actual"/"anterior". `intraday`
+// es el acumulado de hoy por hora con ventas (sparkline); vacío en mes/año.
+export interface SalesTodayResponse {
+  today: { total: number; count: number };
+  yesterday: { total: number; count: number };
+  deltaPct: number | null;
+  byStore: Array<{
+    storeId: string;
+    storeName: string;
+    today: number;
+    yesterday: number;
+    deltaPct: number | null;
+  }>;
+  series?: number[];
+  intraday?: number[];
+}
+
 export interface Store {
   id: string;
   name: string;
