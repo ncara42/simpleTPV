@@ -128,18 +128,18 @@ export function StoreDetailModal({
                 )}
               </div>
             </div>
-            <button
-              type="button"
-              className="link-btn"
-              onClick={() => setLogOpen(true)}
-              data-testid="store-log-open"
-            >
-              Ver registros
-            </button>
-            {/* Acciones de tienda: trasladadas desde la card. Stock/Ventas navegan a
-                su página filtrada; Precios abre la modal de precios. Se conservan los
-                data-testid (store-open-*) en los que se apoyan los E2E. */}
+            {/* Acciones de la tienda con el mismo peso visual: registro de fichajes +
+                Stock/Ventas/Precios, todos <Button secondary> en una fila flex uniforme
+                (antes "Ver registros" era un link-btn suelto de tamaño distinto). Se
+                conservan los data-testid en los que se apoyan los E2E. */}
             <div className="store-detail-actions" data-testid="store-detail-actions">
+              <Button
+                variant="secondary"
+                onClick={() => setLogOpen(true)}
+                data-testid="store-log-open"
+              >
+                Ver registros
+              </Button>
               <Button variant="secondary" onClick={onOpenStock} data-testid="store-open-stock">
                 Stock
               </Button>

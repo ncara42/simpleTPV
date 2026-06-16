@@ -13,7 +13,7 @@ export function B2bPage() {
   const [section, setSection] = useState<Section>('customers');
   usePageHeader('Clientes B2B', 'Clientes, tarifas de venta y pedidos salientes');
   return (
-    <section className="catalog" data-testid="b2b-page">
+    <section className="catalog b2b-page" data-testid="b2b-page">
       <nav className="bo-tabs" data-testid="b2b-subtabs">
         <button
           className={`bo-tab ${section === 'customers' ? 'active' : ''}`}

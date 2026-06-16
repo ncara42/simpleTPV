@@ -1,17 +1,25 @@
 import type { Supplier } from '@simpletpv/auth';
 import { Button, DataTable, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
+import { CsvActionButton } from '../components/CsvActionButton.js';
+import { CsvDropzone } from '../components/CsvDropzone.js';
+import { Modal } from '../components/Modal.js';
+import { exportRowsToCsv, importRowsViaCreate } from '../lib/csv.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { createSupplier, deleteSupplier, listSuppliers, updateSupplier } from '../lib/purchases.js';
 import { OrdersSection } from './OrdersSection.js';
+import { SupplierFormModal } from './SupplierFormModal.js';
 import { SupplierPricesSection } from './SupplierPricesSection.js';
 
 export function SuppliersSection() {
   const qc = useQueryClient();
-  const [name, setName] = useState('');
-  const [leadTime, setLeadTime] = useState('7');
+  const [search, setSearch] = useState('');
+  const [creating, setCreating] = useState(false);
+  // Modal de importación de proveedores por CSV (alta en lote).
+  const [importing, setImporting] = useState(false);
   // Vista detalle (I-18/D-07): fila clicable → todo lo del proveedor en una vista.
   const [detailId, setDetailId] = useState<string | null>(null);
 
@@ -22,7 +30,7 @@ export function SuppliersSection() {
   const createMut = useMutation({
     mutationFn: createSupplier,
     onSuccess: () => {
-      setName('');
+      setCreating(false);
       void qc.invalidateQueries({ queryKey: ['suppliers'] });
     },
   });
@@ -36,49 +44,76 @@ export function SuppliersSection() {
     return <SupplierDetail supplier={detail} onBack={() => setDetailId(null)} />;
   }
 
+  const term = search.trim().toLowerCase();
+  const filtered = term ? suppliers.filter((s) => s.name.toLowerCase().includes(term)) : suppliers;
+
+  // Exporta los proveedores filtrados a CSV (Nombre + Lead time en días).
+  const handleExport = (): void => {
+    const headers = ['Nombre', 'Lead time (días)'];
+    const rows = filtered.map((s) => [s.name, String(s.leadTimeDays)]);
+    exportRowsToCsv('proveedores.csv', headers, rows);
+  };
+
+  // Import por-fila (sin endpoint bulk): cada fila se da de alta con createSupplier.
+  // mapRow LANZA si el nombre viene vacío para que se reporte como fila con error.
+  const onImportCsv = (csv: string) =>
+    importRowsViaCreate(
+      csv,
+      (row) => {
+        const name = (row.nombre ?? row.name ?? '').trim();
+        if (!name) throw new Error('Nombre vacío');
+        return {
+          name,
+          leadTimeDays: Number(row.leadtimedias ?? row['lead time'] ?? row.leadtime ?? 7),
+        };
+      },
+      createSupplier,
+    );
+
   return (
     <>
-      <header className="catalog-head">
-        <h2>Proveedores</h2>
-        <div className="catalog-actions">
-          <span className="search-field">
-            <Input
-              className="catalog-search"
-              placeholder="Nombre del proveedor"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              data-testid="supplier-name"
-            />
-          </span>
-          <Input
-            className="catalog-search"
-            type="number"
-            min={0}
-            value={leadTime}
-            onChange={(e) => setLeadTime(e.target.value)}
-            title="Lead time (días)"
-            data-testid="supplier-leadtime"
-            style={{ width: '6rem' }}
-          />
-          <Button
-            type="button"
-            disabled={!name || createMut.isPending}
-            onClick={() => createMut.mutate({ name, leadTimeDays: Number(leadTime) })}
-            data-testid="supplier-create"
-          >
-            Añadir
-          </Button>
-        </div>
-      </header>
+      <div className="table-actions">
+        <CsvActionButton kind="export" onClick={handleExport} testId="suppliers-export" />
+        <CsvActionButton
+          kind="import"
+          onClick={() => setImporting(true)}
+          testId="suppliers-import"
+        />
+      </div>
       {/* Fila clicable → vista detalle (I-18); las acciones no propagan (stopPropagation). */}
       <DataTable
         data-testid="suppliers-table"
         rowTestId="supplier-row"
-        rows={suppliers}
+        rows={filtered}
         rowKey={(s) => s.id}
         loading={isLoading}
         rowClassName={() => 'row-clickable'}
         onRowClick={(s) => setDetailId(s.id)}
+        toolbar={
+          <div className="users-toolbar">
+            <div className="sales-filters">
+              <span className="search-field">
+                <Input
+                  className="catalog-search"
+                  placeholder="Buscar proveedor…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  data-testid="supplier-search"
+                />
+              </span>
+            </div>
+            <div className="ui-dt-toolbar-actions">
+              <Button
+                type="button"
+                onClick={() => setCreating(true)}
+                data-testid="new-supplier"
+                icon={<Plus size={16} aria-hidden="true" />}
+              >
+                Nuevo proveedor
+              </Button>
+            </div>
+          </div>
+        }
         emptyState={
           <span className="catalog-empty" data-testid="suppliers-empty">
             Sin proveedores.
@@ -124,6 +159,45 @@ export function SuppliersSection() {
           },
         ]}
       />
+      {creating && (
+        <SupplierFormModal
+          onClose={() => setCreating(false)}
+          onSubmit={(form) =>
+            createMut.mutate({ name: form.name, leadTimeDays: Number(form.leadTimeDays) })
+          }
+          pending={createMut.isPending}
+          error={
+            createMut.isError
+              ? formErrorMessage(createMut.error, 'No se pudo crear el proveedor.')
+              : null
+          }
+        />
+      )}
+      {importing && (
+        <Modal
+          onClose={() => setImporting(false)}
+          className="modal--form"
+          testId="suppliers-import-modal"
+          ariaLabel="Importar proveedores desde CSV"
+        >
+          <h3>Importar proveedores desde CSV</h3>
+          <CsvDropzone
+            columns={['nombre', 'leadtimedias']}
+            example={['Distribuciones Norte', '7']}
+            templateName="proveedores"
+            testId="suppliers-csv"
+            onImport={onImportCsv}
+            onImported={() => {
+              void qc.invalidateQueries({ queryKey: ['suppliers'] });
+            }}
+          />
+          <div className="modal-foot">
+            <button type="button" onClick={() => setImporting(false)}>
+              Cerrar
+            </button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }

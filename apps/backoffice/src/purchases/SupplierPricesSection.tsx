@@ -1,6 +1,6 @@
 import { Button, Chart, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Upload } from 'lucide-react';
+import { Plus, Upload } from 'lucide-react';
 import { useState } from 'react';
 
 import { CsvDropzone } from '../components/CsvDropzone.js';
@@ -169,77 +169,30 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
   }));
 
   return (
-    <div className="table-panel">
-      <div className="table-toolbar">
-        {!fixedSupplierId && (
-          <nav className="bo-tabs" data-testid="sp-view-tabs">
-            <button
-              className={`bo-tab ${view === 'tarifas' ? 'active' : ''}`}
-              onClick={() => setView('tarifas')}
-              data-testid="sp-view-tarifas"
-            >
-              Tarifas por proveedor
-            </button>
-            <button
-              className={`bo-tab ${view === 'comparativa' ? 'active' : ''}`}
-              onClick={() => setView('comparativa')}
-              data-testid="sp-view-comparativa"
-            >
-              Comparativa
-            </button>
-          </nav>
-        )}
-        {view === 'tarifas' ? (
-          <div className="sales-filters">
-            {!fixedSupplierId && (
-              <Select
-                className="catalog-search"
-                value={supplierId}
-                onChange={setSupplierId}
-                ariaLabel="Proveedor"
-                data-testid="sp-supplier"
-                options={[
-                  { value: '', label: 'Todos los proveedores' },
-                  ...suppliers.map((s) => ({ value: s.id, label: s.name })),
-                ]}
-              />
-            )}
-            <div className="ui-dt-toolbar-actions">
-              <Button
-                type="button"
-                disabled={!supplierId}
-                onClick={() => setAdding(true)}
-                data-testid="sp-add"
-              >
-                Añadir tarifa
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="sales-filters">
-            <Select
-              className="catalog-search"
-              value={familyId}
-              onChange={setFamilyId}
-              ariaLabel="Arquetipo"
-              data-testid="sp-family"
-              options={[
-                { value: '', label: 'Todos los arquetipos' },
-                // Solo nodos ARQUETIPO: la comparativa agrupa productos casi
-                // idénticos; filtrar por una familia raíz no casa con el árbol
-                // canónico (los comparables cuelgan de arquetipos hoja).
-                ...flattenTree(families)
-                  .filter((f) => f.node.isArchetype)
-                  .map((f) => ({ value: f.node.id, label: f.node.name })),
-              ]}
-            />
-          </div>
-        )}
-      </div>
+    <section className="catalog">
+      {!fixedSupplierId && (
+        <nav className="bo-tabs" data-testid="sp-view-tabs">
+          <button
+            className={`bo-tab ${view === 'tarifas' ? 'active' : ''}`}
+            onClick={() => setView('tarifas')}
+            data-testid="sp-view-tarifas"
+          >
+            Tarifas por proveedor
+          </button>
+          <button
+            className={`bo-tab ${view === 'comparativa' ? 'active' : ''}`}
+            onClick={() => setView('comparativa')}
+            data-testid="sp-view-comparativa"
+          >
+            Comparativa
+          </button>
+        </nav>
+      )}
 
       {view === 'tarifas' ? (
         <>
           {columnsEditor}
+
           <div className="table-actions">
             <button
               type="button"
@@ -262,28 +215,83 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
               Columnas
             </button>
           </div>
-          <DataTable
-            columns={[...effectiveColumns, deleteColumn]}
-            rows={priceSorted}
-            rowKey={(r) => r.id}
-            loading={pricesLoading}
-            {...(sort ? { sort } : {})}
-            onSortChange={(key) =>
-              setSort((cur) =>
-                cur?.key === key
-                  ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' }
-                  : { key, dir: 'asc' },
-              )
-            }
-            rowTestId="sp-row"
-            emptyState={
-              <span data-testid="sp-empty">Sin tarifas. Añade una o impórtalas por CSV.</span>
-            }
-            data-testid="sp-table"
-          />
+
+          <div className="table-panel">
+            <DataTable
+              columns={[...effectiveColumns, deleteColumn]}
+              rows={priceSorted}
+              rowKey={(r) => r.id}
+              loading={pricesLoading}
+              toolbar={
+                <div className="users-toolbar">
+                  <div className="sales-filters">
+                    {!fixedSupplierId && (
+                      <Select
+                        className="catalog-search"
+                        value={supplierId}
+                        onChange={setSupplierId}
+                        ariaLabel="Proveedor"
+                        data-testid="sp-supplier"
+                        options={[
+                          { value: '', label: 'Todos los proveedores' },
+                          ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+                        ]}
+                      />
+                    )}
+                  </div>
+                  <div className="ui-dt-toolbar-actions">
+                    <Button
+                      type="button"
+                      disabled={!supplierId}
+                      onClick={() => setAdding(true)}
+                      data-testid="sp-add"
+                      icon={<Plus size={16} aria-hidden="true" />}
+                    >
+                      Añadir tarifa
+                    </Button>
+                  </div>
+                </div>
+              }
+              {...(sort ? { sort } : {})}
+              onSortChange={(key) =>
+                setSort((cur) =>
+                  cur?.key === key
+                    ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' }
+                    : { key, dir: 'asc' },
+                )
+              }
+              rowTestId="sp-row"
+              emptyState={
+                <span data-testid="sp-empty">Sin tarifas. Añade una o impórtalas por CSV.</span>
+              }
+              data-testid="sp-table"
+            />
+          </div>
         </>
       ) : (
         <>
+          <div className="table-panel">
+            <div className="table-toolbar">
+              <div className="sales-filters">
+                <Select
+                  className="catalog-search"
+                  value={familyId}
+                  onChange={setFamilyId}
+                  ariaLabel="Arquetipo"
+                  data-testid="sp-family"
+                  options={[
+                    { value: '', label: 'Todos los arquetipos' },
+                    // Solo nodos ARQUETIPO: la comparativa agrupa productos casi
+                    // idénticos; filtrar por una familia raíz no casa con el árbol
+                    // canónico (los comparables cuelgan de arquetipos hoja).
+                    ...flattenTree(families)
+                      .filter((f) => f.node.isArchetype)
+                      .map((f) => ({ value: f.node.id, label: f.node.name })),
+                  ]}
+                />
+              </div>
+            </div>
+          </div>
           {/* Comparativa gráfica: media/mediana por proveedor + producto concreto.
               Apilados para que cada gráfico respire; con ≤3 proveedores las barras
               caben de sobra y los dos paneles van en línea. Responden al toggle
@@ -467,6 +475,6 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
           </div>
         </Modal>
       )}
-    </div>
+    </section>
   );
 }

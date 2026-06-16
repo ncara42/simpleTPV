@@ -8,9 +8,10 @@ import {
 } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Upload } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
+import { CsvActionButton } from './components/CsvActionButton.js';
 import { CsvDropzone } from './components/CsvDropzone.js';
 import { Modal } from './components/Modal.js';
 import {
@@ -20,6 +21,7 @@ import {
 } from './components/ProductFormModal.js';
 import { ProductMovements } from './components/ProductMovements.js';
 import { useTableColumns } from './components/useTableColumns.js';
+import { exportRowsToCsv } from './lib/csv.js';
 import { type FamilyNode, listFamilies } from './lib/families.js';
 import { findNodePath, flattenTree, isDescendantOf } from './lib/family-tree.js';
 import { formErrorMessage } from './lib/form-error.js';
@@ -145,6 +147,21 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
   );
 
   usePageHeader('Catálogo', `${filtered.length} productos activos`, 'catalog-count');
+
+  // Exporta a CSV las filas actualmente filtradas en memoria.
+  const handleExport = (): void => {
+    const headers = ['Nombre', 'SKU', 'EAN', 'Familia', 'PVP', 'Coste', 'Stock'];
+    const rows = filtered.map((p) => [
+      p.name,
+      p.sku ?? '',
+      p.barcode ?? '',
+      familyPathLabel(families, p.familyId),
+      fmtEur(Number(p.salePrice)),
+      fmtEur(Number(p.costPrice)),
+      String(stockByProduct.get(p.id) ?? 0),
+    ]);
+    exportRowsToCsv('catalogo.csv', headers, rows);
+  };
 
   // Orden cliente (numérico para precios/margen/stock; texto para el resto).
   const sortValue = useCallback(
@@ -454,16 +471,8 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
       {columnsEditor}
 
       <div className="table-actions">
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={() => setImporting(true)}
-          data-testid="catalog-import"
-          title="Importar CSV"
-          aria-label="Importar CSV"
-        >
-          <Upload size={18} aria-hidden="true" />
-        </button>
+        <CsvActionButton kind="export" onClick={handleExport} testId="catalog-export" />
+        <CsvActionButton kind="import" onClick={() => setImporting(true)} testId="catalog-import" />
         <button
           type="button"
           className="ui-dt-cols-trigger"

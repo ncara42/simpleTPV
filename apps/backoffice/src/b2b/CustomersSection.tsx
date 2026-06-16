@@ -1,8 +1,11 @@
 import { Button, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { useConfirm } from '../components/ConfirmProvider.js';
+import { CsvActionButton } from '../components/CsvActionButton.js';
+import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
 import { SectionToolbar } from '../components/SectionToolbar.js';
 import { useToast } from '../components/ToastProvider.js';
@@ -15,6 +18,7 @@ import {
   listPriceLists,
   updateCustomer,
 } from '../lib/b2b.js';
+import { exportRowsToCsv, importRowsViaCreate } from '../lib/csv.js';
 import { formErrorMessage } from '../lib/form-error.js';
 
 interface Form {
@@ -70,6 +74,9 @@ export function CustomersSection() {
   const confirm = useConfirm();
   const toast = useToast();
   const [form, setForm] = useState<Form | null>(null);
+  const [search, setSearch] = useState('');
+  // Modal de importación de clientes por CSV (alta en lote).
+  const [importing, setImporting] = useState(false);
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ['b2b-customers'],
@@ -105,6 +112,46 @@ export function CustomersSection() {
     { value: '', label: 'Sin tarifa (PVP)' },
     ...priceLists.map((p) => ({ value: p.id, label: p.name })),
   ];
+
+  // Filtrado cliente-side sobre la lista ya cargada en memoria (nombre / NIF / contacto).
+  const query = search.trim().toLowerCase();
+  const filtered = query
+    ? customers.filter((c) =>
+        [c.name, c.nif, c.email, c.phone].some((field) =>
+          (field ?? '').toLowerCase().includes(query),
+        ),
+      )
+    : customers;
+
+  // Exporta a CSV las filas actualmente filtradas en memoria.
+  const handleExport = (): void => {
+    const headers = ['Nombre', 'NIF', 'Contacto', 'Tarifa', 'Estado'];
+    const rows = filtered.map((c) => [
+      c.name,
+      c.nif ?? '',
+      c.email ?? c.phone ?? '',
+      c.priceList?.name ?? 'PVP',
+      c.active ? 'Activo' : 'Inactivo',
+    ]);
+    exportRowsToCsv('clientes.csv', headers, rows);
+  };
+
+  // Import por-fila (alta simple): nombre + NIF/email opcionales. La tarifa queda
+  // por defecto (PVP); no se intenta resolver por nombre.
+  const onImportCsv = (csv: string) =>
+    importRowsViaCreate(
+      csv,
+      (row): CustomerInput => {
+        const name = (row.nombre ?? row.name ?? '').trim();
+        if (!name) throw new Error('Nombre vacío');
+        return {
+          name,
+          ...(row.nif ? { nif: row.nif.trim() } : {}),
+          ...(row.email ? { email: row.email.trim() } : {}),
+        };
+      },
+      createCustomer,
+    );
 
   type CustomerRow = (typeof customers)[number];
   const customerColumns: DataTableColumn<CustomerRow>[] = [
@@ -155,122 +202,173 @@ export function CustomersSection() {
   ];
 
   return (
-    <div className="table-panel" data-testid="b2b-customers">
-      <SectionToolbar
-        actionLabel="Nuevo cliente"
-        onAction={() => setForm({ ...EMPTY })}
-        actionTestId="b2b-new-customer"
-      >
-        <span className="muted">
-          {customers.length} cliente{customers.length !== 1 ? 's' : ''}
-        </span>
-      </SectionToolbar>
+    <>
+      <div className="table-actions">
+        <CsvActionButton kind="export" onClick={handleExport} testId="b2b-customers-export" />
+        <CsvActionButton
+          kind="import"
+          onClick={() => setImporting(true)}
+          testId="b2b-customers-import"
+        />
+      </div>
 
-      <DataTable
-        columns={customerColumns}
-        rows={customers}
-        rowKey={(c) => c.id}
-        loading={isLoading}
-        rowTestId="b2b-customer-row"
-        emptyState="Aún no hay clientes mayoristas. Crea el primero."
-        data-testid="b2b-customers-table"
-      />
-
-      {form && (
-        <Modal
-          onClose={() => setForm(null)}
-          className="modal--form"
-          testId="b2b-customer-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            saveMut.mutate(form);
-          }}
+      <div className="table-panel" data-testid="b2b-customers">
+        <SectionToolbar
+          actionLabel="Nuevo cliente"
+          onAction={() => setForm({ ...EMPTY })}
+          actionTestId="b2b-new-customer"
+          actionIcon={<Plus size={16} aria-hidden="true" />}
         >
-          <header className="modal-head">
-            <h3>{form.id ? 'Editar cliente' : 'Nuevo cliente'}</h3>
-          </header>
-          <div className="modal-body">
-            <section className="form-section">
-              <label>
-                Nombre
-                <Input
-                  required
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  data-testid="b2b-customer-name"
+          <span className="search-field">
+            <Input
+              className="catalog-search"
+              placeholder="Buscar cliente…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              data-testid="b2b-customers-search"
+            />
+          </span>
+          <span className="muted">
+            {filtered.length} cliente{filtered.length !== 1 ? 's' : ''}
+          </span>
+        </SectionToolbar>
+
+        <DataTable
+          columns={customerColumns}
+          rows={filtered}
+          rowKey={(c) => c.id}
+          loading={isLoading}
+          rowTestId="b2b-customer-row"
+          emptyState="Aún no hay clientes mayoristas. Crea el primero."
+          data-testid="b2b-customers-table"
+        />
+
+        {form && (
+          <Modal
+            onClose={() => setForm(null)}
+            className="modal--form"
+            testId="b2b-customer-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveMut.mutate(form);
+            }}
+          >
+            <header className="modal-head">
+              <h3>{form.id ? 'Editar cliente' : 'Nuevo cliente'}</h3>
+            </header>
+            <div className="modal-body">
+              <section className="form-section">
+                <label>
+                  Nombre
+                  <Input
+                    required
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    data-testid="b2b-customer-name"
+                  />
+                </label>
+                <label>
+                  NIF
+                  <Input
+                    value={form.nif}
+                    onChange={(e) => setForm({ ...form, nif: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Email
+                  <Input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Teléfono
+                  <Input
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Dirección
+                  <Input
+                    value={form.address}
+                    onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  />
+                </label>
+              </section>
+              <section className="form-section">
+                <span className="form-section-title">Tarifa mayorista</span>
+                <Select
+                  value={form.priceListId}
+                  onChange={(v) => setForm({ ...form, priceListId: v })}
+                  ariaLabel="Tarifa"
+                  options={tariffOptions}
+                  data-testid="b2b-customer-tariff"
                 />
-              </label>
-              <label>
-                NIF
-                <Input
-                  value={form.nif}
-                  onChange={(e) => setForm({ ...form, nif: e.target.value })}
-                />
-              </label>
-              <label>
-                Email
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                />
-              </label>
-              <label>
-                Teléfono
-                <Input
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                />
-              </label>
-              <label>
-                Dirección
-                <Input
-                  value={form.address}
-                  onChange={(e) => setForm({ ...form, address: e.target.value })}
-                />
-              </label>
-            </section>
-            <section className="form-section">
-              <span className="form-section-title">Tarifa mayorista</span>
-              <Select
-                value={form.priceListId}
-                onChange={(v) => setForm({ ...form, priceListId: v })}
-                ariaLabel="Tarifa"
-                options={tariffOptions}
-                data-testid="b2b-customer-tariff"
-              />
-            </section>
-          </div>
-          {saveMut.isError && (
-            <p className="form-error">{formErrorMessage(saveMut.error, 'No se pudo guardar.')}</p>
-          )}
-          <div className="modal-foot modal-foot--split">
-            <label className="switch">
-              <input
-                type="checkbox"
-                checked={form.active}
-                onChange={(e) => setForm({ ...form, active: e.target.checked })}
-              />
-              <span className="switch-track">
-                <span className="switch-thumb" />
-              </span>
-              <span className="switch-text">Cliente activo</span>
-            </label>
-            <div className="modal-foot-actions">
-              <button type="button" onClick={() => setForm(null)}>
-                Cancelar
-              </button>
-              <Button
-                type="submit"
-                disabled={!form.name.trim() || saveMut.isPending}
-                data-testid="b2b-customer-save"
-              >
-                {saveMut.isPending ? 'Guardando…' : 'Guardar'}
-              </Button>
+              </section>
             </div>
-          </div>
-        </Modal>
-      )}
-    </div>
+            {saveMut.isError && (
+              <p className="form-error">{formErrorMessage(saveMut.error, 'No se pudo guardar.')}</p>
+            )}
+            <div className="modal-foot modal-foot--split">
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={form.active}
+                  onChange={(e) => setForm({ ...form, active: e.target.checked })}
+                />
+                <span className="switch-track">
+                  <span className="switch-thumb" />
+                </span>
+                <span className="switch-text">Cliente activo</span>
+              </label>
+              <div className="modal-foot-actions">
+                <button type="button" onClick={() => setForm(null)}>
+                  Cancelar
+                </button>
+                <Button
+                  type="submit"
+                  disabled={!form.name.trim() || saveMut.isPending}
+                  data-testid="b2b-customer-save"
+                >
+                  {saveMut.isPending ? 'Guardando…' : 'Guardar'}
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {importing && (
+          <Modal
+            onClose={() => setImporting(false)}
+            className="modal--form"
+            testId="b2b-customers-import-modal"
+            ariaLabel="Importar clientes desde CSV"
+          >
+            <h3>Importar clientes desde CSV</h3>
+            <CsvDropzone
+              columns={['nombre', 'nif', 'email']}
+              example={['Farmacia Centro', 'B12345678', 'pedidos@farmacia.com']}
+              templateName="clientes"
+              help={
+                <>
+                  Columnas: <code>nombre,nif,email</code>. Solo <code>nombre</code> es obligatorio;
+                  la tarifa se asigna después por defecto (PVP).
+                </>
+              }
+              onImport={onImportCsv}
+              onImported={() => qc.invalidateQueries({ queryKey: ['b2b-customers'] })}
+              testId="b2b-customers-csv"
+            />
+            <div className="modal-foot">
+              <button type="button" onClick={() => setImporting(false)}>
+                Cerrar
+              </button>
+            </div>
+          </Modal>
+        )}
+      </div>
+    </>
   );
 }

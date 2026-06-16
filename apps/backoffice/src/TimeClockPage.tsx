@@ -3,6 +3,8 @@ import { usePageHeader } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
+import { CsvActionButton } from './components/CsvActionButton.js';
+import { exportRowsToCsv } from './lib/csv.js';
 import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
 
 interface Filters {
@@ -90,62 +92,82 @@ export function TimeClockPage() {
     },
   ];
 
+  const handleExport = (): void => {
+    exportRowsToCsv(
+      'control-horario.csv',
+      ['Empleado', 'Tienda', 'Fecha', 'Entrada', 'Salida', 'Pausas', 'Horas'],
+      filtered.map((r) => [
+        r.userName,
+        r.storeName,
+        r.date,
+        hhmm(r.firstIn),
+        hhmm(r.lastOut),
+        fmtMinutes(msToMin(r.breakMs)),
+        fmtMinutes(msToMin(r.workedMs)),
+      ]),
+    );
+  };
+
   return (
     <section className="catalog">
+      <div className="table-actions">
+        <CsvActionButton kind="export" onClick={handleExport} testId="timeclock-export" />
+      </div>
       <div className="table-panel">
-        <div className="users-toolbar sales-toolbar">
-          <div className="sales-filters">
-            <Select
-              className="catalog-search"
-              value={filters.storeId}
-              onChange={(value) => setFilter({ storeId: value })}
-              ariaLabel="Filtrar por tienda"
-              data-testid="timeclock-store"
-              options={[
-                { value: '', label: 'Todas las tiendas' },
-                ...storeOptions.map(([id, name]) => ({ value: id, label: name })),
-              ]}
-            />
-            <Select
-              className="catalog-search"
-              value={filters.userId}
-              onChange={(value) => setFilter({ userId: value })}
-              ariaLabel="Filtrar por empleado"
-              data-testid="timeclock-employee"
-              options={[
-                { value: '', label: 'Todos los empleados' },
-                ...employeeOptions.map(([id, name]) => ({ value: id, label: name })),
-              ]}
-            />
-            <Select
-              className="catalog-search"
-              value={filters.date}
-              onChange={(value) => setFilter({ date: value })}
-              ariaLabel="Filtrar por fecha"
-              data-testid="timeclock-date"
-              options={[
-                { value: '', label: 'Todas las fechas' },
-                ...dateOptions.map((d) => ({ value: d, label: d })),
-              ]}
-            />
-            {hasFilters && (
-              <button
-                type="button"
-                className="users-sel-btn"
-                onClick={() => setFilters(NO_FILTERS)}
-                data-testid="timeclock-clear"
-              >
-                Limpiar
-              </button>
-            )}
-          </div>
-        </div>
-
         <DataTable
           columns={timeclockColumns}
           rows={filtered}
           rowKey={(r) => `${r.userId}-${r.storeId}-${r.date}`}
           rowTestId="timeclock-row"
+          toolbar={
+            <div className="users-toolbar">
+              <div className="sales-filters">
+                <Select
+                  className="catalog-search"
+                  value={filters.storeId}
+                  onChange={(value) => setFilter({ storeId: value })}
+                  ariaLabel="Filtrar por tienda"
+                  data-testid="timeclock-store"
+                  options={[
+                    { value: '', label: 'Todas las tiendas' },
+                    ...storeOptions.map(([id, name]) => ({ value: id, label: name })),
+                  ]}
+                />
+                <Select
+                  className="catalog-search"
+                  value={filters.userId}
+                  onChange={(value) => setFilter({ userId: value })}
+                  ariaLabel="Filtrar por empleado"
+                  data-testid="timeclock-employee"
+                  options={[
+                    { value: '', label: 'Todos los empleados' },
+                    ...employeeOptions.map(([id, name]) => ({ value: id, label: name })),
+                  ]}
+                />
+                <Select
+                  className="catalog-search"
+                  value={filters.date}
+                  onChange={(value) => setFilter({ date: value })}
+                  ariaLabel="Filtrar por fecha"
+                  data-testid="timeclock-date"
+                  options={[
+                    { value: '', label: 'Todas las fechas' },
+                    ...dateOptions.map((d) => ({ value: d, label: d })),
+                  ]}
+                />
+                {hasFilters && (
+                  <button
+                    type="button"
+                    className="users-sel-btn"
+                    onClick={() => setFilters(NO_FILTERS)}
+                    data-testid="timeclock-clear"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+            </div>
+          }
           footer={
             <span data-testid="timeclock-totals">
               {totals.count} jornadas · pausas {fmtMinutes(totals.breaks)} · trabajadas{' '}

@@ -1535,6 +1535,11 @@
   gap: 1rem;
   margin-bottom: 1rem;
   flex-wrap: wrap;
+  /* Ocupa todo el ancho del .ui-dt-toolbar para que el CTA quede SIEMPRE fijado a
+     la derecha por space-between, incluso cuando los filtros de la izquierda están
+     vacíos o son pocos (p. ej. Traspasos). Sin esto, como flex-item se encogía al
+     ancho del contenido y el CTA acababa pegado a la izquierda. */
+  width: 100%;
 }
 .users-toolbar .sales-filters {
   margin-bottom: 0;
@@ -2039,6 +2044,70 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Botón Exportar/Importar CSV con animación hover-expand: en reposo es un icono
+   cuadrado (como .icon-btn); en hover/focus se ALARGA y revela el texto. Se animan
+   solo max-width/opacidad (compositor-friendly). aria-label siempre presente. */
+.csv-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  height: 36px;
+  max-width: 36px;
+  padding: 0 9px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  /* Misma tipografía que el botón "Columnas" (.ui-dt-cols-trigger): 0.8rem / 600. */
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition:
+    max-width 0.2s var(--ui-ease),
+    gap 0.2s var(--ui-ease),
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+.csv-action__label {
+  max-width: 0;
+  opacity: 0;
+  transition:
+    max-width 0.2s var(--ui-ease),
+    opacity 0.2s var(--ui-ease);
+}
+.csv-action:hover,
+.csv-action:focus-visible {
+  max-width: 9rem;
+  gap: 6px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
+.csv-action:hover .csv-action__label,
+.csv-action:focus-visible .csv-action__label {
+  max-width: 7rem;
+  opacity: 1;
+}
+.csv-action:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.csv-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+@media (prefers-reduced-motion: reduce) {
+  .csv-action,
+  .csv-action__label {
+    transition:
+      background 0.12s,
+      color 0.12s;
+  }
+}
 /* Variante para paneles de CONTENIDO libre (no tabla): Ayuda, etc. La base
    .table-panel no lleva padding porque en las tablas lo aportan la cabecera y las
    celdas; cuando el panel contiene contenido suelto necesita padding propio. */
@@ -2248,6 +2317,19 @@
 /* ── B2B mayorista (IT-17) ──────────────────────────────────────────────────
    Fila de alta de precio (tarifa) y de línea de pedido: selector + número +
    acción, alineados horizontalmente. */
+
+/* En las 3 sub-pestañas de B2B (Clientes/Tarifas/Pedidos) la toolbar (SectionToolbar)
+   se renderiza como HERMANA del DataTable dentro del .table-panel, así que el .ui-dt
+   reintroduce su propio marco redondeado bajo la banda → "fase intermedia" con esquinas
+   redondeadas (doble marco). El panel exterior ya aporta el redondeo: la tabla interior
+   cede su borde y su radio para que toolbar + tabla se lean como una sola superficie
+   continua con esquinas rectas en la junta. Scopeado a .b2b-page; no afecta a otras pages. */
+.b2b-page .table-panel > .ui-dt {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
 .b2b-item-form {
   display: flex;
   align-items: center;
@@ -2780,6 +2862,10 @@
    Hereda el chrome de .table-panel; aquí solo el espaciado inferior y el límite
    de alto para que no empuje la tabla demasiado abajo. */
 .stock-alerts-panel {
+  /* El panel de roturas no contiene una tabla (la base .table-panel no lleva
+     padding propio), así que necesita su propio aire interior para que la
+     cabecera y las tarjetas de aviso no queden pegadas a los bordes. */
+  padding: var(--ui-space-4) var(--ui-space-4) var(--ui-space-5);
   margin-bottom: var(--ui-space-5);
   max-height: 22rem;
   overflow-y: auto;
@@ -2870,24 +2956,66 @@
   flex-wrap: wrap;
   gap: var(--ui-space-2);
 }
+/* Tags de filtro (no son CTAs): lenguaje de "tag" sobrio, no de botón sólido.
+   Inactivo = ghost neutro silenciado; Activo = tinte suave del acento + check.
+   Así dejan de competir con el botón primario "Nueva promoción". */
 .promo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-1);
   padding: var(--ui-space-1) var(--ui-space-3);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-pill);
-  background: var(--ui-surface);
-  color: var(--ui-text-muted);
+  background: transparent;
+  color: var(--ui-text-soft);
   font-size: var(--ui-text-sm);
   font-weight: 500;
+  letter-spacing: -0.01em;
   cursor: pointer;
   transition:
     background 0.12s var(--ui-ease),
     color 0.12s var(--ui-ease),
     border-color 0.12s var(--ui-ease);
 }
+.promo-chip:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+.promo-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+  border-color: var(--ui-brand);
+}
 .promo-chip.is-on {
-  background: var(--ui-primary);
-  color: var(--ui-primary-fg);
-  border-color: var(--ui-primary);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-ink);
+  border-color: var(--ui-brand);
+  font-weight: 600;
+}
+.promo-chip.is-on:hover {
+  background: var(--ui-brand-soft-2);
+}
+/* El check solo aparece en el chip seleccionado; entra por opacidad/escala/ancho
+   (sin reflow brusco) y se respeta prefers-reduced-motion. */
+.promo-chip__check {
+  width: 0;
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    width 0.12s var(--ui-ease),
+    opacity 0.12s var(--ui-ease),
+    transform 0.12s var(--ui-ease);
+}
+.promo-chip.is-on .promo-chip__check {
+  width: 14px;
+  opacity: 1;
+  transform: scale(1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .promo-chip,
+  .promo-chip__check {
+    transition: none;
+  }
 }
 
 /* Matriz de Módulos (#127 B): scroll horizontal si hay muchas tiendas + selects de

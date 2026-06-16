@@ -1,10 +1,12 @@
 import { Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Check, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { CsvActionButton } from './components/CsvActionButton.js';
 import { Modal } from './components/Modal.js';
+import { exportRowsToCsv } from './lib/csv.js';
 import {
   createPromotion,
   type CreatePromotionInput,
@@ -190,102 +192,28 @@ export function PromotionsPage() {
     });
   };
 
+  const handleExport = (): void => {
+    exportRowsToCsv(
+      'promociones.csv',
+      ['Promoción', 'Condición', 'Descuento', 'Vigencia', 'Estado'],
+      visible.map((p) => [
+        p.name,
+        conditionShort(p),
+        discountShort(p),
+        dateRange(p.startDate, p.endDate),
+        STATUS_LABEL[promoStatus(p)],
+      ]),
+    );
+  };
+
   usePageHeader('Promociones', 'Descuentos y reglas programables');
 
   return (
     <section className="catalog">
+      <div className="table-actions">
+        <CsvActionButton kind="export" onClick={handleExport} testId="promotions-export" />
+      </div>
       <div className="table-panel">
-        <div className="users-toolbar">
-          <div className="sales-filters">
-            <div className="promo-chips" role="group" aria-label="Filtrar por estado">
-              {PROMO_GROUPS.map((g) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  className={`promo-chip${groups.has(g.id) ? ' is-on' : ''}`}
-                  aria-pressed={groups.has(g.id)}
-                  onClick={() => toggleGroup(g.id)}
-                  data-testid={`promo-group-${g.id}`}
-                >
-                  {g.label}
-                </button>
-              ))}
-            </div>
-            {selected.length > 0 && (
-              <>
-                {!allVisibleSelected && (
-                  <button
-                    type="button"
-                    className="users-sel-btn"
-                    onClick={selectAllVisible}
-                    data-testid="promo-select-all"
-                  >
-                    Seleccionar todo
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="users-sel-btn"
-                  onClick={clearSelection}
-                  data-testid="promo-clear"
-                >
-                  Quitar selección
-                </button>
-              </>
-            )}
-          </div>
-          {selected.length > 0 ? (
-            <div className="users-toolbar-actions">
-              {selected.length === 1 && (
-                <button
-                  type="button"
-                  className="users-bulk-edit"
-                  onClick={editSelected}
-                  data-testid="promo-edit"
-                >
-                  Editar
-                </button>
-              )}
-              {activeSel.length > 0 && (
-                <button
-                  type="button"
-                  className="promo-bulk-toggle"
-                  onClick={pauseSelected}
-                  data-testid="promo-pause"
-                >
-                  Pausar{activeSel.length > 1 ? ` (${activeSel.length})` : ''}
-                </button>
-              )}
-              {pausedSel.length > 0 && (
-                <button
-                  type="button"
-                  className="promo-bulk-toggle"
-                  onClick={activateSelected}
-                  data-testid="promo-activate"
-                >
-                  Activar{pausedSel.length > 1 ? ` (${pausedSel.length})` : ''}
-                </button>
-              )}
-              <button
-                type="button"
-                className="users-bulk-del"
-                onClick={removeSelected}
-                data-testid="promo-delete"
-              >
-                Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
-              </button>
-            </div>
-          ) : (
-            <Button
-              onClick={() => setForm({ ...EMPTY })}
-              data-testid="new-promo"
-              icon={<Plus size={16} aria-hidden="true" />}
-            >
-              Nueva promoción
-            </Button>
-          )}
-        </div>
-
         <DataTable
           className={`promo-table${selected.length ? ' has-selection' : ''}`}
           data-testid="promo-list"
@@ -295,6 +223,101 @@ export function PromotionsPage() {
           onRowClick={(p) => toggleSelect(p.id)}
           rowClassName={(p) => (selectedSet.has(p.id) ? 'is-selected' : undefined)}
           rowAriaSelected={(p) => selectedSet.has(p.id)}
+          toolbar={
+            <div className="users-toolbar">
+              <div className="sales-filters">
+                <div className="promo-chips" role="group" aria-label="Filtrar por estado">
+                  {PROMO_GROUPS.map((g) => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      className={`promo-chip${groups.has(g.id) ? ' is-on' : ''}`}
+                      aria-pressed={groups.has(g.id)}
+                      onClick={() => toggleGroup(g.id)}
+                      data-testid={`promo-group-${g.id}`}
+                    >
+                      <Check size={14} className="promo-chip__check" aria-hidden="true" />
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
+                {selected.length > 0 && (
+                  <>
+                    {!allVisibleSelected && (
+                      <button
+                        type="button"
+                        className="users-sel-btn"
+                        onClick={selectAllVisible}
+                        data-testid="promo-select-all"
+                      >
+                        Seleccionar todo
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="users-sel-btn"
+                      onClick={clearSelection}
+                      data-testid="promo-clear"
+                    >
+                      Quitar selección
+                    </button>
+                  </>
+                )}
+              </div>
+              {selected.length > 0 ? (
+                <div className="ui-dt-toolbar-actions">
+                  {selected.length === 1 && (
+                    <button
+                      type="button"
+                      className="users-bulk-edit"
+                      onClick={editSelected}
+                      data-testid="promo-edit"
+                    >
+                      Editar
+                    </button>
+                  )}
+                  {activeSel.length > 0 && (
+                    <button
+                      type="button"
+                      className="promo-bulk-toggle"
+                      onClick={pauseSelected}
+                      data-testid="promo-pause"
+                    >
+                      Pausar{activeSel.length > 1 ? ` (${activeSel.length})` : ''}
+                    </button>
+                  )}
+                  {pausedSel.length > 0 && (
+                    <button
+                      type="button"
+                      className="promo-bulk-toggle"
+                      onClick={activateSelected}
+                      data-testid="promo-activate"
+                    >
+                      Activar{pausedSel.length > 1 ? ` (${pausedSel.length})` : ''}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="users-bulk-del"
+                    onClick={removeSelected}
+                    data-testid="promo-delete"
+                  >
+                    Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
+                  </button>
+                </div>
+              ) : (
+                <div className="ui-dt-toolbar-actions">
+                  <Button
+                    onClick={() => setForm({ ...EMPTY })}
+                    data-testid="new-promo"
+                    icon={<Plus size={16} aria-hidden="true" />}
+                  >
+                    Nueva promoción
+                  </Button>
+                </div>
+              )}
+            </div>
+          }
           emptyState={
             <span className="catalog-empty" data-testid="promos-empty">
               No hay promociones con ese estado.

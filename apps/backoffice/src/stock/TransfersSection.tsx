@@ -4,10 +4,11 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
+import { CsvActionButton } from '../components/CsvActionButton.js';
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
 import { listStores } from '../lib/admin.js';
-import { parseCsvRows } from '../lib/csv.js';
+import { exportRowsToCsv, parseCsvRows } from '../lib/csv.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { listProducts } from '../lib/products.js';
 import { createTransfer, listTransfers, sendTransfer } from '../lib/stock.js';
@@ -21,11 +22,19 @@ interface DraftLine {
 export function TransfersSection() {
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
+  // Modal de importación de traspasos en lote por CSV.
+  const [importing, setImporting] = useState(false);
 
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ['transfers'],
     queryFn: () => listTransfers(),
     placeholderData: keepPreviousData,
+  });
+  // Catálogos para resolver el CSV de import: código/nombre de tienda → id y SKU → id.
+  const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
+  const { data: products = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => listProducts(),
   });
 
   const sendMutation = useMutation({
@@ -72,25 +81,106 @@ export function TransfersSection() {
     },
   ];
 
+  const handleExport = (): void => {
+    exportRowsToCsv(
+      'traspasos.csv',
+      ['Fecha', 'Líneas', 'Estado'],
+      transfers.map((t) => [
+        dt.format(new Date(t.createdAt)),
+        String(t.lines.length),
+        STATUS_LABEL[t.status] ?? t.status,
+      ]),
+    );
+  };
+
+  // Import en lote: CSV con una línea por producto (origen, destino, sku, cantidad).
+  // Se agrupan las filas con el mismo (origen, destino) en un único traspaso BORRADOR.
+  // Resuelve tiendas por código o nombre y productos por SKU contra los catálogos
+  // cargados; las filas no resolubles se reportan como error sin abortar el lote.
+  const onImportCsv = async (csv: string): Promise<ImportResult> => {
+    const storeByKey = new Map<string, string>();
+    for (const s of stores) {
+      storeByKey.set(s.code.toLowerCase(), s.id);
+      storeByKey.set(s.name.toLowerCase(), s.id);
+    }
+    const productBySku = new Map(
+      products.filter((p) => p.sku).map((p) => [p.sku!.toLowerCase(), p.id] as const),
+    );
+    const groups = new Map<
+      string,
+      {
+        originStoreId: string;
+        destStoreId: string;
+        lines: { productId: string; quantitySent: number }[];
+      }
+    >();
+    const errors: ImportResult['errors'] = [];
+    parseCsvRows(csv).forEach((row, i) => {
+      const rowNum = i + 2;
+      const origin = storeByKey.get((row.origen ?? '').toLowerCase());
+      const dest = storeByKey.get((row.destino ?? '').toLowerCase());
+      const productId = productBySku.get((row.sku ?? '').toLowerCase());
+      const qty = Number(row.cantidad ?? row.qty ?? 0);
+      if (!origin)
+        return void errors.push({ row: rowNum, message: `Origen no encontrado: ${row.origen}` });
+      if (!dest)
+        return void errors.push({ row: rowNum, message: `Destino no encontrado: ${row.destino}` });
+      if (origin === dest)
+        return void errors.push({ row: rowNum, message: 'Origen y destino iguales' });
+      if (!productId)
+        return void errors.push({ row: rowNum, message: `SKU no encontrado: ${row.sku}` });
+      if (!(qty > 0)) return void errors.push({ row: rowNum, message: 'Cantidad inválida' });
+      const key = `${origin}|${dest}`;
+      const group = groups.get(key) ?? { originStoreId: origin, destStoreId: dest, lines: [] };
+      group.lines.push({ productId, quantitySent: qty });
+      groups.set(key, group);
+    });
+    let inserted = 0;
+    for (const group of groups.values()) {
+      try {
+        await createTransfer(group);
+        inserted += group.lines.length;
+      } catch (e) {
+        errors.push({
+          row: 0,
+          message: e instanceof Error ? e.message : 'No se pudo crear el traspaso',
+        });
+      }
+    }
+    return { inserted, errors };
+  };
+
   return (
     <>
+      <div className="table-actions">
+        <CsvActionButton kind="export" onClick={handleExport} testId="transfers-export" />
+        <CsvActionButton
+          kind="import"
+          onClick={() => setImporting(true)}
+          testId="transfers-import"
+        />
+      </div>
       <div className="table-panel">
-        <div className="sales-filters">
-          <Button
-            type="button"
-            className="stock-toolbar-action"
-            onClick={() => setCreating(true)}
-            data-testid="new-transfer"
-            icon={<Plus size={16} aria-hidden="true" />}
-          >
-            Nuevo traspaso
-          </Button>
-        </div>
         <DataTable
           columns={transferColumns}
           rows={transfers}
           rowKey={(t) => t.id}
           loading={isLoading}
+          toolbar={
+            <div className="users-toolbar">
+              <div className="sales-filters" />
+              <div className="ui-dt-toolbar-actions">
+                <Button
+                  type="button"
+                  onClick={() => setCreating(true)}
+                  data-testid="new-transfer"
+                  icon={<Plus size={16} aria-hidden="true" />}
+                >
+                  Nuevo traspaso
+                </Button>
+              </div>
+            </div>
+          }
           rowTestId="transfer-row"
           emptyState={<span data-testid="transfers-empty">Sin traspasos.</span>}
           data-testid="transfers-table"
@@ -105,6 +195,33 @@ export function TransfersSection() {
             void qc.invalidateQueries({ queryKey: ['transfers'] });
           }}
         />
+      )}
+
+      {importing && (
+        <Modal
+          onClose={() => setImporting(false)}
+          className="modal--form"
+          testId="transfers-import-modal"
+          ariaLabel="Importar traspasos desde CSV"
+        >
+          <h3>Importar traspasos desde CSV</h3>
+          <CsvDropzone
+            columns={['origen', 'destino', 'sku', 'cantidad']}
+            example={['Centro', 'Norte', 'CBD-10-30', '5']}
+            templateName="traspasos"
+            help="Una línea por producto. Las filas con el mismo origen y destino se agrupan en un traspaso borrador. Origen/destino por código o nombre de tienda."
+            testId="transfers-csv"
+            onImport={onImportCsv}
+            onImported={() => {
+              void qc.invalidateQueries({ queryKey: ['transfers'] });
+            }}
+          />
+          <div className="modal-foot">
+            <button type="button" onClick={() => setImporting(false)}>
+              Cerrar
+            </button>
+          </div>
+        </Modal>
       )}
     </>
   );

@@ -5,6 +5,7 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { useConfirm } from './components/ConfirmProvider.js';
+import { CsvActionButton } from './components/CsvActionButton.js';
 import { Modal } from './components/Modal.js';
 import {
   EMPTY_PRODUCT_FORM,
@@ -33,6 +34,16 @@ import {
 import { formErrorMessage } from './lib/form-error.js';
 import { fmtEur } from './lib/format.js';
 import { createProduct, listProducts, updateProduct } from './lib/products.js';
+
+// Forma del JSON de intercambio del árbol de familias (export/import). Anidada
+// con `children`, sin ids (se recrean en el import).
+interface JsonFamily {
+  name: string;
+  color?: string | null;
+  icon?: string | null;
+  isArchetype?: boolean;
+  children?: JsonFamily[];
+}
 
 interface FormState {
   id?: string;
@@ -333,6 +344,111 @@ export function FamiliesPage({
     return count;
   }, [allProducts]);
 
+  // Exporta el árbol APLANADO en orden DFS: cada fila es un nodo con su tipo
+  // (familia/subfamilia/arquetipo), el contador real de productos de su subárbol
+  // y la ruta de ancestros. La ruta se construye en el recorrido (flattenTree solo
+  // anota la profundidad, no los nombres de ancestros).
+  // La tabla de Familias es un ÁRBOL jerárquico: un CSV plano lo aplanaría y
+  // perdería la anidación. Por eso su intercambio es JSON (estructura anidada con
+  // children), que conserva el árbol completo en export e import.
+  const [importing, setImporting] = useState(false);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importResult, setImportResult] = useState<{ created: number; errors: string[] } | null>(
+    null,
+  );
+
+  const downloadJson = (filename: string, data: unknown): void => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: 'application/json;charset=utf-8;',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const toJsonFamily = (n: FamilyNode): JsonFamily => ({
+    name: n.name,
+    ...(n.color ? { color: n.color } : {}),
+    ...(n.icon ? { icon: n.icon } : {}),
+    isArchetype: n.isArchetype,
+    ...(n.children.length ? { children: n.children.map(toJsonFamily) } : {}),
+  });
+
+  const handleExport = (): void => downloadJson('familias.json', view.map(toJsonFamily));
+
+  const downloadTemplate = (): void =>
+    downloadJson('familias-plantilla.json', [
+      {
+        name: 'Aceites',
+        children: [
+          { name: 'Aceites CBD', children: [{ name: 'Aceite CBD 10%', isArchetype: true }] },
+        ],
+      },
+    ]);
+
+  // Crea el árbol recursivamente: cada nodo con createFamily heredando el id del
+  // padre ya creado. Acumula creadas + errores sin abortar el lote.
+  const createTreeRecursive = async (
+    nodes: JsonFamily[],
+    parentId: string | null,
+  ): Promise<{ created: number; errors: string[] }> => {
+    let created = 0;
+    const errors: string[] = [];
+    for (const node of nodes) {
+      const name = typeof node?.name === 'string' ? node.name.trim() : '';
+      if (!name) {
+        errors.push('Nodo sin nombre');
+        continue;
+      }
+      try {
+        const fam = await createFamily({
+          name,
+          parentId,
+          ...(node.color ? { color: node.color } : {}),
+          ...(node.icon ? { icon: node.icon } : {}),
+          ...(typeof node.isArchetype === 'boolean' ? { isArchetype: node.isArchetype } : {}),
+        });
+        created += 1;
+        if (Array.isArray(node.children) && node.children.length) {
+          const sub = await createTreeRecursive(node.children, fam.id);
+          created += sub.created;
+          errors.push(...sub.errors);
+        }
+      } catch (e) {
+        errors.push(`${name}: ${e instanceof Error ? e.message : 'error'}`);
+      }
+    }
+    return { created, errors };
+  };
+
+  const onImportFile = async (file: File): Promise<void> => {
+    setImportBusy(true);
+    setImportResult(null);
+    try {
+      const data: unknown = JSON.parse(await file.text());
+      const nodes = Array.isArray(data)
+        ? (data as JsonFamily[])
+        : Array.isArray((data as { familias?: JsonFamily[] })?.familias)
+          ? (data as { familias: JsonFamily[] }).familias
+          : null;
+      if (!nodes) throw new Error('El JSON debe ser un array de familias (o { familias: [...] }).');
+      const res = await createTreeRecursive(nodes, null);
+      setImportResult(res);
+      // Refresca el árbol con los datos frescos del servidor (incluye las familias
+      // nuevas). Se fija directamente para evitar la carrera del useEffect de sync.
+      const fresh = await listFamilies();
+      qc.setQueryData(['families'], fresh);
+      setTree(fresh.map((n) => ({ ...n, children: n.children.map((c) => ({ ...c })) })));
+    } catch (e) {
+      setImportResult({ created: 0, errors: [e instanceof Error ? e.message : 'JSON inválido'] });
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
   // Vista filtrada por la toolbar (no muta el árbol: el reordenado y "Mover a"
   // siguen operando sobre `view`). Una raíz que coincide se muestra entera; si solo
   // coinciden hijas, se muestra la raíz con esas hijas. Búsqueda insensible a
@@ -579,6 +695,14 @@ export function FamiliesPage({
 
   return (
     <section className="catalog">
+      <div className="table-actions">
+        <CsvActionButton kind="export" onClick={handleExport} testId="families-export" />
+        <CsvActionButton
+          kind="import"
+          onClick={() => setImporting(true)}
+          testId="families-import"
+        />
+      </div>
       <div className="table-panel">
         <div className="table-toolbar">
           <div className="sales-filters">
@@ -807,6 +931,53 @@ export function FamiliesPage({
             <Button type="submit" disabled={saveMut.isPending} data-testid="family-save">
               {saveMut.isPending ? 'Guardando…' : 'Guardar'}
             </Button>
+          </div>
+        </Modal>
+      )}
+
+      {importing && (
+        <Modal
+          onClose={() => setImporting(false)}
+          className="modal--form"
+          testId="families-import-modal"
+          ariaLabel="Importar familias desde JSON"
+        >
+          <h3>Importar familias desde JSON</h3>
+          <p className="muted">
+            Sube un <code>.json</code> con un árbol de familias anidadas (<code>name</code>,{' '}
+            <code>color?</code>, <code>icon?</code>, <code>isArchetype?</code>,{' '}
+            <code>children?</code>). Se crean bajo la raíz.
+          </p>
+          <button type="button" className="link-btn" onClick={downloadTemplate}>
+            Descargar plantilla JSON
+          </button>
+          <label className="settings-file">
+            <span>Elegir archivo JSON</span>
+            <input
+              className="settings-file-input"
+              type="file"
+              accept="application/json,.json"
+              data-testid="families-json-input"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void onImportFile(file);
+              }}
+            />
+          </label>
+          {importBusy && <p className="muted">Importando…</p>}
+          {importResult && (
+            <p
+              className={importResult.errors.length ? 'form-error' : 'muted'}
+              data-testid="families-import-result"
+            >
+              {importResult.created} familia(s) creada(s)
+              {importResult.errors.length ? ` · ${importResult.errors.length} error(es)` : ''}
+            </p>
+          )}
+          <div className="modal-foot">
+            <button type="button" onClick={() => setImporting(false)}>
+              Cerrar
+            </button>
           </div>
         </Modal>
       )}

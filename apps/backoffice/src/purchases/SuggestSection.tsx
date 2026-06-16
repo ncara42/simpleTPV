@@ -1,5 +1,6 @@
 import { Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
 import { listStores } from '../lib/admin.js';
@@ -36,47 +37,50 @@ export function SuggestSection() {
 
   return (
     <>
-      <header className="catalog-head">
-        <h2>Generar propuesta de pedido</h2>
-        <div className="catalog-actions">
-          <Select
-            className="catalog-search"
-            value={storeId}
-            onChange={setStoreId}
-            ariaLabel="Tienda"
-            options={[
-              { value: '', label: 'Tienda…' },
-              ...stores.map((s) => ({ value: s.id, label: s.name })),
-            ]}
-            data-testid="suggest-store"
-          />
-          <Select
-            className="catalog-search"
-            value={supplierId}
-            onChange={setSupplierId}
-            ariaLabel="Proveedor"
-            options={[
-              { value: '', label: 'Proveedor…' },
-              ...suppliers.map((s) => ({ value: s.id, label: s.name })),
-            ]}
-            data-testid="suggest-supplier"
-          />
-          <Button
-            type="button"
-            disabled={!storeId || suggestMut.isPending}
-            onClick={() => suggestMut.mutate({ storeId })}
-            data-testid="suggest-generate"
-          >
-            Generar
-          </Button>
-        </div>
-      </header>
-
       <DataTable
         data-testid="suggest-table"
         rowTestId="suggest-row"
         rows={rows}
         rowKey={(r) => r.productId}
+        toolbar={
+          <div className="users-toolbar">
+            <div className="sales-filters">
+              <Select
+                className="catalog-search"
+                value={storeId}
+                onChange={setStoreId}
+                ariaLabel="Tienda"
+                options={[
+                  { value: '', label: 'Tienda…' },
+                  ...stores.map((s) => ({ value: s.id, label: s.name })),
+                ]}
+                data-testid="suggest-store"
+              />
+              <Select
+                className="catalog-search"
+                value={supplierId}
+                onChange={setSupplierId}
+                ariaLabel="Proveedor"
+                options={[
+                  { value: '', label: 'Proveedor…' },
+                  ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+                ]}
+                data-testid="suggest-supplier"
+              />
+            </div>
+            <div className="ui-dt-toolbar-actions">
+              <Button
+                type="button"
+                disabled={!storeId || suggestMut.isPending}
+                onClick={() => suggestMut.mutate({ storeId })}
+                data-testid="suggest-generate"
+                icon={<Sparkles size={16} aria-hidden="true" />}
+              >
+                Generar
+              </Button>
+            </div>
+          </div>
+        }
         emptyState={
           <span className="catalog-empty" data-testid="suggest-empty">
             {suggestMut.isSuccess
