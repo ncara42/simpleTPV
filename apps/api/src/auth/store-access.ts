@@ -5,6 +5,13 @@ import { ForbiddenException } from '@nestjs/common';
 // de su organización por diseño; el resto (CLERK) queda acotado a sus tiendas.
 const ORG_WIDE_ROLES: ReadonlySet<string> = new Set(['ADMIN', 'MANAGER']);
 
+// ¿El rol accede a toda la organización (sin acotar por tienda)? Lo usan los
+// endpoints que, sin `storeId`, agregan toda la org: para esos, un rol no-org-wide
+// (CLERK) debe acotar a su tienda en vez de ver el agregado global.
+export function isOrgWideRole(role: string): boolean {
+  return ORG_WIDE_ROLES.has(role);
+}
+
 // Puerto mínimo de lectura sobre UserStore. Lo cumplen tanto el cliente Prisma
 // extendido (this.prisma) como el transaccional (el `tx` de withTenantTx), para
 // poder comprobar el acceso dentro o fuera de una transacción.

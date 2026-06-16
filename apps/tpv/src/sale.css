@@ -1051,7 +1051,156 @@
 }
 
 .sale-store-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
   margin-bottom: 0.75rem;
+}
+
+/* Nombre de la tienda activa cuando solo hay una (sin selector): chip de solo
+   lectura para que el cajero siempre vea en qué tienda opera (#1). */
+.sale-store-name {
+  font-weight: 700;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text);
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-subtle);
+}
+
+/* Recuento diario (#5): facturación de hoy vs ayer de la tienda activa. Compacto,
+   alineado a la derecha de la fila de tienda. */
+/* Se alinea a la derecha de la fila vía `justify-content: space-between` del
+   contenedor (.sale-store-row): tienda a la izquierda, recuento a la derecha. */
+.sales-counter {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.sales-counter-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--ui-text-xs);
+  font-weight: 700;
+  color: var(--ui-text-soft);
+}
+
+.sales-counter-today {
+  color: var(--ui-text);
+  font-size: var(--ui-text-base);
+}
+
+.sales-counter-sep {
+  color: var(--ui-border);
+}
+
+.sales-counter-delta {
+  font-weight: 700;
+  padding: 0.05rem 0.4rem;
+  border-radius: var(--ui-radius-xs);
+}
+
+.sales-counter-delta.trend-up {
+  color: var(--ui-success);
+  background: var(--ui-success-soft);
+}
+
+.sales-counter-delta.trend-down {
+  color: var(--ui-danger);
+  background: var(--ui-danger-soft);
+}
+
+.sales-counter-delta.trend-flat {
+  color: var(--ui-text-soft);
+  background: var(--ui-surface-subtle);
+}
+
+/* ─── Registro de cierres de caja (#145) ──────────────────── */
+.cash-closures {
+  margin-top: 1rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+  padding: 1rem 1.2rem;
+}
+
+.cash-closures-title {
+  margin: 0 0 0.6rem;
+  font-size: var(--ui-text-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ui-text-soft);
+}
+
+.cash-closures-empty {
+  margin: 0;
+  color: var(--ui-text-soft);
+  font-size: var(--ui-text-sm);
+}
+
+.cash-closures-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.cash-closure-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-subtle);
+  font-size: var(--ui-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.cash-closure-date {
+  font-weight: 600;
+  color: var(--ui-text);
+  white-space: nowrap;
+}
+
+.cash-closure-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 1rem;
+  color: var(--ui-text-soft);
+  margin-left: auto;
+}
+
+.cash-closure-diff {
+  font-weight: 700;
+  padding: 0.05rem 0.45rem;
+  border-radius: var(--ui-radius-xs);
+  white-space: nowrap;
+}
+
+.cash-closure-diff.diff-ok {
+  color: var(--ui-text-soft);
+  background: var(--ui-surface);
+}
+
+.cash-closure-diff.diff-over {
+  color: var(--ui-success);
+  background: var(--ui-success-soft);
+}
+
+.cash-closure-diff.diff-under {
+  color: var(--ui-danger);
+  background: var(--ui-danger-soft);
 }
 
 /* La confirmación de venta usa ahora el componente Alert de @simpletpv/ui

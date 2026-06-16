@@ -1,4 +1,10 @@
+import type { SalesTodayResponse } from '@simpletpv/auth';
+
 import { api } from './auth.js';
+
+// Tipo compartido (fuente de verdad en @simpletpv/auth): lo re-exportamos para no
+// romper los imports existentes (`./lib/dashboard`) de StoresPage/DashboardPage.
+export type { SalesTodayResponse };
 
 export type DashboardPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'year';
 
@@ -6,21 +12,6 @@ export type DashboardPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'year';
 // (este mes vs el anterior) o año (este año vs el anterior). Siempre "a la misma
 // altura". En `today`/`yesterday` del response, hoy=actual y ayer=anterior.
 export type SalesCompareMode = 'day' | 'month' | 'year';
-
-export interface SalesTodayResponse {
-  today: { total: number; count: number };
-  yesterday: { total: number; count: number };
-  deltaPct: number | null;
-  byStore: Array<{
-    storeId: string;
-    storeName: string;
-    today: number;
-    yesterday: number;
-    deltaPct: number | null;
-  }>;
-  series?: number[];
-  intraday?: number[];
-}
 
 export interface FamilySales {
   familyId: string | null;

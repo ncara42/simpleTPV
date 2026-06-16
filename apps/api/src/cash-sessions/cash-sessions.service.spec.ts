@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
 import { tenantStorage } from '../prisma/tenant-context.js';
@@ -54,9 +54,19 @@ function makePrisma() {
   return {
     cashSession: {
       findFirst: vi.fn(async (_a?: unknown): Promise<unknown> => null),
+      findMany: vi.fn(async (_a?: unknown): Promise<unknown[]> => []),
       create: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'cs-1' })),
       updateMany: vi.fn(async (_a?: unknown): Promise<{ count: number }> => ({ count: 1 })),
       findFirstOrThrow: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'cs-1' })),
+    },
+    // Acceso por tienda (assertStoreAccess): por defecto el usuario está asignado.
+    // Los tests de roles org-wide (ADMIN/MANAGER) ni lo consultan.
+    userStore: {
+      findFirst: vi.fn(
+        async (_a?: unknown): Promise<{ storeId: string } | null> => ({
+          storeId: STORE,
+        }),
+      ),
     },
     sale: {
       aggregate: vi.fn(
@@ -488,5 +498,41 @@ describe('CashSessionsService.createMovement', () => {
       ),
     ).rejects.toThrow(BadRequestException);
     expect(prisma.cashMovement.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('CashSessionsService.listClosed', () => {
+  it('devuelve las sesiones CLOSED de la tienda, recientes primero y con tope', async () => {
+    const prisma = makePrisma();
+    const rows = [{ id: 'cs-2' }, { id: 'cs-1' }];
+    prisma.cashSession.findMany = vi.fn(async () => rows);
+    const service = makeService(prisma);
+
+    const result = await tenantStorage.run({ organizationId: ORG }, () =>
+      service.listClosed(STORE, 'user-1', 'ADMIN', 10),
+    );
+
+    expect(result).toBe(rows);
+    const arg = prisma.cashSession.findMany.mock.calls[0]![0] as {
+      where: Record<string, unknown>;
+      orderBy: Record<string, unknown>;
+      take: number;
+    };
+    expect(arg.where).toEqual({ storeId: STORE, organizationId: ORG, status: 'CLOSED' });
+    expect(arg.orderBy).toEqual({ closedAt: 'desc' });
+    expect(arg.take).toBe(10);
+  });
+
+  it('SEC-01: un CLERK sin acceso a la tienda recibe 403 y no consulta cierres', async () => {
+    const prisma = makePrisma();
+    prisma.userStore.findFirst = vi.fn(async () => null);
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () =>
+        service.listClosed(STORE, 'clerk-1', 'CLERK', 30),
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.cashSession.findMany).not.toHaveBeenCalled();
   });
 });

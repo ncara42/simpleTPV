@@ -8,17 +8,27 @@ import './styles.css';
 import { LoginForm, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
 import { PageHeaderProvider, usePageHeaderValue } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
-import { Banknote, ClipboardCheck, Clock, ReceiptText, ShoppingBag, Truck } from 'lucide-react';
+import {
+  Banknote,
+  ClipboardCheck,
+  Clock,
+  HelpCircle,
+  ReceiptText,
+  ShoppingBag,
+  Truck,
+} from 'lucide-react';
 import { useState } from 'react';
 
 import { CashPanel } from './CashPanel.js';
 import { ConnectivityBanner } from './ConnectivityBanner.js';
+import { HelpPage } from './HelpPage.js';
 import { InventoryPanel } from './InventoryPanel.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { useBranding } from './lib/branding.js';
 import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { formatDuration } from './lib/format.js';
+import { getMe, roleLabel } from './lib/me.js';
 import { switchApp } from './lib/nav.js';
 import { listStores } from './lib/sales.js';
 import { useOfflineSync } from './lib/useOfflineSync.js';
@@ -28,7 +38,7 @@ import { StoreOrderReceivePanel } from './StoreOrderReceivePanel.js';
 import { TicketsPanel } from './TicketsPanel.js';
 import { TimeClockPanel } from './TimeClockPanel.js';
 
-type View = 'sale' | 'tickets' | 'orders' | 'inventory' | 'cash' | 'clock';
+type View = 'sale' | 'tickets' | 'orders' | 'inventory' | 'cash' | 'clock' | 'help';
 
 const TPV_NAV: NavItem[] = [
   { id: 'sale', label: 'Venta', icon: <ShoppingBag size={18} /> },
@@ -37,6 +47,7 @@ const TPV_NAV: NavItem[] = [
   { id: 'inventory', label: 'Inventario', icon: <ClipboardCheck size={18} /> },
   { id: 'cash', label: 'Caja', icon: <Banknote size={18} /> },
   { id: 'clock', label: 'Fichaje', icon: <Clock size={18} /> },
+  { id: 'help', label: 'Ayuda', icon: <HelpCircle size={18} /> },
 ];
 
 function ShellTopBar() {
@@ -59,6 +70,8 @@ function Home() {
   const branding = useBranding();
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
   const activeStore = stores[0]?.id ?? null;
+  // Identidad del empleado autenticado para la cabecera (el JWT no lleva el nombre).
+  const { data: me } = useQuery({ queryKey: ['me'], queryFn: getMe });
 
   const queuedCount = useOfflineSync(activeStore);
 
@@ -84,7 +97,7 @@ function Home() {
           ) : undefined
         }
         brand={{ title: 'SimpleTPV', subtitle: 'Punto de venta' }}
-        account={{ name: 'Usuario', subtitle: 'Dependiente' }}
+        account={{ name: me?.name || 'Usuario', subtitle: roleLabel(me?.role) }}
         onLogout={logout}
       />
       <div className="app-content">
@@ -98,6 +111,7 @@ function Home() {
             {view === 'inventory' && <InventoryPanel storeId={activeStore} />}
             {view === 'cash' && <CashPanel storeId={activeStore} />}
             {view === 'clock' && <TimeClockPanel storeId={activeStore} />}
+            {view === 'help' && <HelpPage />}
           </main>
         </PageHeaderProvider>
       </div>

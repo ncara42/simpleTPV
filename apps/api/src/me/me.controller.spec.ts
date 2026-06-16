@@ -19,6 +19,9 @@ function makeController() {
     userStore: {
       findMany: vi.fn(async () => [{ storeId: STORE_1 }, { storeId: STORE_2 }]),
     },
+    user: {
+      findUnique: vi.fn(async () => ({ name: 'Ana Pérez', email: 'ana@tienda.es' })),
+    },
   };
   const prefs = {
     getAll: vi.fn(async () => ({ 'dashboard.cards': { hidden: ['kpi-upt'] } })),
@@ -61,7 +64,7 @@ describe('MeController', () => {
     expect(res).toEqual([{ id: STORE_1, name: 'Tienda Centro' }]);
   });
 
-  it('GET /me devuelve rol y tiendas asignadas del usuario autenticado', async () => {
+  it('GET /me devuelve rol, tiendas e identidad del usuario autenticado', async () => {
     const { controller, prisma } = makeController();
 
     const res = await controller.me(
@@ -72,7 +75,25 @@ describe('MeController', () => {
       where: { userId: 'user-1' },
       select: { storeId: true },
     });
-    expect(res).toEqual({ role: 'MANAGER', storeIds: [STORE_1, STORE_2] });
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      select: { name: true, email: true },
+    });
+    expect(res).toEqual({
+      role: 'MANAGER',
+      storeIds: [STORE_1, STORE_2],
+      name: 'Ana Pérez',
+      email: 'ana@tienda.es',
+    });
+  });
+
+  it('GET /me tolera un usuario sin fila (name/email vacíos)', async () => {
+    const { controller, prisma } = makeController();
+    prisma.user.findUnique.mockResolvedValueOnce(null as never);
+
+    const res = await controller.me(req({ sub: 'ghost', organizationId: 'o', role: 'CLERK' }));
+
+    expect(res).toEqual({ role: 'CLERK', storeIds: [STORE_1, STORE_2], name: '', email: '' });
   });
 
   it('GET /me/features delega en FeatureFlagService.resolveAll con el storeId', async () => {
