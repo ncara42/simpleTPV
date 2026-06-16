@@ -17,6 +17,7 @@ import {
   CreateCashMovementDto,
   ListClosedCashSessionsDto,
   OpenCashSessionDto,
+  RequestCashMovementDto,
 } from './cash-sessions.dto.js';
 import { CashSessionsService } from './cash-sessions.service.js';
 
@@ -57,7 +58,42 @@ export class CashSessionsController {
     @Body() body: CreateCashMovementDto,
     @Req() req: { user: JwtPayload },
   ) {
-    return this.cashSessions.createMovement(id, body, req.user.sub);
+    return this.cashSessions.createMovement(id, body, req.user.sub, req.user.role);
+  }
+
+  // Solicitud de movimiento desde el TPV (#146): cualquier rol operativo, incluido
+  // el CLERK. Nace PENDING a la espera de aprobación.
+  @Post(':id/movements/request')
+  @Roles('ADMIN', 'MANAGER', 'CLERK')
+  requestMovement(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: RequestCashMovementDto,
+    @Req() req: { user: JwtPayload },
+  ) {
+    return this.cashSessions.requestMovement(id, body, req.user.sub, req.user.role);
+  }
+
+  // Solicitudes pendientes de la organización (fuente de la campana, #146). Ruta
+  // estática previa a `:id/...`; los segmentos no colisionan con `:id/movements`.
+  @Get('movements/pending')
+  @Roles('ADMIN', 'MANAGER')
+  pendingMovements() {
+    return this.cashSessions.listPendingMovements();
+  }
+
+  // Aprobación / denegación de una solicitud (#146). Solo ADMIN/MANAGER.
+  @Post('movements/:movId/approve')
+  @Roles('ADMIN', 'MANAGER')
+  @HttpCode(200)
+  approveMovement(@Param('movId', ParseUUIDPipe) movId: string, @Req() req: { user: JwtPayload }) {
+    return this.cashSessions.approveMovement(movId, req.user.sub, req.user.role);
+  }
+
+  @Post('movements/:movId/deny')
+  @Roles('ADMIN', 'MANAGER')
+  @HttpCode(200)
+  denyMovement(@Param('movId', ParseUUIDPipe) movId: string, @Req() req: { user: JwtPayload }) {
+    return this.cashSessions.denyMovement(movId, req.user.sub, req.user.role);
   }
 
   // Registro de cierres de caja de una tienda (#145): sesiones CLOSED con su

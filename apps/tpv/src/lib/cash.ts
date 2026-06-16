@@ -48,3 +48,13 @@ export function createCashMovement(
 ): Promise<CashMovement> {
   return api.post<CashMovement>(`/cash-sessions/${cashSessionId}/movements`, input);
 }
+
+// Solicitud de movimiento desde el TPV (#146): nace PENDING a la espera de que un
+// ADMIN/MANAGER la apruebe o deniegue. El destino del traspaso (tienda central) lo
+// resuelve el backend.
+export function requestCashMovement(
+  cashSessionId: string,
+  input: { type: CashMovementType; amount: number; reason: string },
+): Promise<CashMovement> {
+  return api.post<CashMovement>(`/cash-sessions/${cashSessionId}/movements/request`, input);
+}

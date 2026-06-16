@@ -16,6 +16,13 @@ function makeController() {
     close: vi.fn(async (_id: string, _dto: unknown) => ({ id: 'cs-1', status: 'CLOSED' })),
     movements: vi.fn(async (_id: string) => [{ id: 'cm-1', type: 'OUT' }]),
     createMovement: vi.fn(async (_id: string, _dto: unknown, _userId: string) => ({ id: 'cm-1' })),
+    requestMovement: vi.fn(async (_id: string, _dto: unknown, _userId: string) => ({
+      id: 'cm-1',
+      status: 'PENDING',
+    })),
+    listPendingMovements: vi.fn(async () => [{ id: 'cm-1', status: 'PENDING' }]),
+    approveMovement: vi.fn(async (_movId: string) => ({ id: 'cm-1', status: 'APPROVED' })),
+    denyMovement: vi.fn(async (_movId: string) => ({ id: 'cm-1', status: 'DENIED' })),
     current: vi.fn(async (_storeId: string) => ({ id: 'cs-1', status: 'OPEN' })),
     listClosed: vi.fn(async (_storeId: string) => [{ id: 'cs-2', status: 'CLOSED' }]),
   } as unknown as CashSessionsService;
@@ -87,8 +94,45 @@ describe('CashSessionsController', () => {
     const dto = { type: 'OUT' as const, amount: 20, reason: 'Retirada' };
     const res = (await controller.createMovement('cs-1', dto, req)) as { id: string };
 
-    expect(service.createMovement).toHaveBeenCalledWith('cs-1', dto, 'user-1');
+    expect(service.createMovement).toHaveBeenCalledWith('cs-1', dto, 'user-1', 'MANAGER');
     expect(res.id).toBe('cm-1');
+  });
+
+  it('POST /cash-sessions/:id/movements/request delega en requestMovement con sub y rol', async () => {
+    const { controller, service } = makeController();
+    const dto = { type: 'TRANSFER_OUT' as const, amount: 30, reason: 'A central' };
+
+    const res = (await controller.requestMovement('cs-1', dto, req('CLERK'))) as { status: string };
+
+    expect(service.requestMovement).toHaveBeenCalledWith('cs-1', dto, 'user-1', 'CLERK');
+    expect(res.status).toBe('PENDING');
+  });
+
+  it('GET /cash-sessions/movements/pending delega en listPendingMovements', async () => {
+    const { controller, service } = makeController();
+
+    const res = (await controller.pendingMovements()) as Array<{ status: string }>;
+
+    expect(service.listPendingMovements).toHaveBeenCalledOnce();
+    expect(res[0]!.status).toBe('PENDING');
+  });
+
+  it('POST /cash-sessions/movements/:movId/approve delega en approveMovement con sub y rol', async () => {
+    const { controller, service } = makeController();
+
+    const res = (await controller.approveMovement('cm-1', req('MANAGER'))) as { status: string };
+
+    expect(service.approveMovement).toHaveBeenCalledWith('cm-1', 'user-1', 'MANAGER');
+    expect(res.status).toBe('APPROVED');
+  });
+
+  it('POST /cash-sessions/movements/:movId/deny delega en denyMovement con sub y rol', async () => {
+    const { controller, service } = makeController();
+
+    const res = (await controller.denyMovement('cm-1', req('ADMIN'))) as { status: string };
+
+    expect(service.denyMovement).toHaveBeenCalledWith('cm-1', 'user-1', 'ADMIN');
+    expect(res.status).toBe('DENIED');
   });
 
   it('GET /cash-sessions/closed delega en listClosed con storeId, usuario y limit', async () => {

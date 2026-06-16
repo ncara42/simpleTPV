@@ -21,12 +21,14 @@ import { applyTenantExtension, PrismaService } from '../src/prisma/prisma.servic
 import { tenantStorage } from '../src/prisma/tenant-context.js';
 import { SalesService } from '../src/sales/sales.service.js';
 import { StockService } from '../src/stock/stock.service.js';
+import { StoresService } from '../src/stores/stores.service.js';
 import { stubVerifactu } from './helpers/stub-verifactu.js';
 
 describe('Sesiones de caja — integración', () => {
   let base: PrismaService;
   let prisma: ReturnType<typeof applyTenantExtension>;
   let service: CashSessionsService;
+  let storesService: StoresService;
   let sales: SalesService;
   let admin: PrismaClient;
   let org1Id: string;
@@ -40,7 +42,12 @@ describe('Sesiones de caja — integración', () => {
     base = new PrismaService();
     await base.onModuleInit();
     prisma = applyTenantExtension(base);
-    service = new CashSessionsService(prisma as unknown as PrismaService, base);
+    service = new CashSessionsService(
+      prisma as unknown as PrismaService,
+      base,
+      new InMemoryEventBus(),
+    );
+    storesService = new StoresService(prisma as unknown as PrismaService, base);
     // SalesService crea las ventas del turno (mismo patrón de dos clientes).
     sales = new SalesService(
       prisma as unknown as PrismaService,
@@ -95,9 +102,12 @@ describe('Sesiones de caja — integración', () => {
   });
 
   afterAll(async () => {
-    // Limpiamos las sesiones creadas para no dejar cajas OPEN que rompan reruns.
+    // Limpiamos las sesiones creadas para no dejar cajas OPEN que rompan reruns
+    // (CashMovement cae en cascada al borrar su CashSession).
     await admin.$executeRaw`DELETE FROM "CashSession" WHERE "organizationId" = ${org1Id}::uuid`;
     await admin.$executeRaw`DELETE FROM "CashSession" WHERE "organizationId" = ${org2Id}::uuid`;
+    // Reseteamos la designación de tienda central (#146) para no contaminar reruns.
+    await admin.$executeRaw`UPDATE "Store" SET "isCentral" = false WHERE "organizationId" = ${org1Id}::uuid`;
     await admin.$disconnect();
     await base.onModuleDestroy();
   });
@@ -294,6 +304,7 @@ describe('Sesiones de caja — integración', () => {
             session.id,
             { type: 'IN', amount: MOVEMENT, reason: `fondo-${i}` },
             user1Id,
+            'ADMIN',
           ),
         ),
       ]);
@@ -328,5 +339,143 @@ describe('Sesiones de caja — integración', () => {
         expect(expectedAmount).toBeCloseTo(OPENING, 2);
       }
     }
+  });
+
+  // ── #146 · flujo de solicitud → aprobación ────────────────────────────────
+
+  it('request crea PENDING; el cuadre solo cuenta los APPROVED', async () => {
+    const session = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.open({ storeId: store1Id, openingAmount: 100 }, user1Id, 'ADMIN'),
+    );
+
+    // El cajero solicita un ingreso (40) y una retirada (10): ambos PENDING.
+    const inMov = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.requestMovement(session.id, { type: 'IN', amount: 40, reason: 'fondo' }, user1Id, 'MANAGER'),
+    );
+    const outMov = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.requestMovement(session.id, { type: 'OUT', amount: 10, reason: 'gasto' }, user1Id, 'MANAGER'),
+    );
+    expect(inMov.status).toBe('PENDING');
+    expect(inMov.requestedById).toBe(user1Id);
+    expect(outMov.status).toBe('PENDING');
+
+    // Aprobamos el ingreso, denegamos la retirada.
+    const approved = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.approveMovement(inMov.id, user1Id, 'MANAGER'),
+    );
+    const denied = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.denyMovement(outMov.id, user1Id, 'MANAGER'),
+    );
+    expect(approved.status).toBe('APPROVED');
+    expect(approved.reviewedById).toBe(user1Id);
+    expect(approved.reviewedAt).toBeInstanceOf(Date);
+    expect(denied.status).toBe('DENIED');
+
+    // Cierre: solo el ingreso APPROVED (40) cuenta; la retirada DENIED no.
+    const closed = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.close(session.id, { countedAmount: 140 }, user1Id, 'ADMIN'),
+    );
+    expect(Number(closed.expectedAmount)).toBeCloseTo(140, 2); // 100 + 40
+    expect(Number(closed.difference)).toBeCloseTo(0, 2);
+  });
+
+  it('listPendingMovements devuelve solo las solicitudes PENDING de la org', async () => {
+    const session = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.open({ storeId: store1Id, openingAmount: 0 }, user1Id, 'ADMIN'),
+    );
+    const pendingMov = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.requestMovement(session.id, { type: 'IN', amount: 5, reason: 'x' }, user1Id, 'MANAGER'),
+    );
+
+    const pending = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.listPendingMovements(),
+    );
+    expect(pending.some((m) => m.id === pendingMov.id)).toBe(true);
+    expect(pending.every((m) => m.status === 'PENDING')).toBe(true);
+
+    // org2 no ve las solicitudes de org1 (RLS).
+    const otherOrg = await tenantStorage.run({ organizationId: org2Id }, async () =>
+      service.listPendingMovements(),
+    );
+    expect(otherOrg.some((m) => m.id === pendingMov.id)).toBe(false);
+
+    // Cierre: la PENDING se auto-deniega.
+    await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.close(session.id, { countedAmount: 0 }, user1Id, 'ADMIN'),
+    );
+    const afterClose = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      prisma.cashMovement.findUniqueOrThrow({ where: { id: pendingMov.id } }),
+    );
+    expect(afterClose.status).toBe('DENIED');
+  });
+
+  it('TRANSFER_OUT exige central, fija targetStoreId y resta del cuadre', async () => {
+    // Sin central configurada el traspaso se rechaza con 400.
+    const session = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.open({ storeId: store1Id, openingAmount: 100 }, user1Id, 'ADMIN'),
+    );
+    await expect(
+      tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.requestMovement(
+          session.id,
+          { type: 'TRANSFER_OUT', amount: 20, reason: 'a central' },
+          user1Id,
+          'MANAGER',
+        ),
+      ),
+    ).rejects.toThrow(/central/i);
+
+    // Designamos store2 como central y reintentamos el traspaso desde store1.
+    await tenantStorage.run({ organizationId: org1Id }, async () =>
+      storesService.setCentral(store2Id, true),
+    );
+    const transfer = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.requestMovement(
+        session.id,
+        { type: 'TRANSFER_OUT', amount: 20, reason: 'a central' },
+        user1Id,
+        'MANAGER',
+      ),
+    );
+    expect(transfer.type).toBe('TRANSFER_OUT');
+    expect(transfer.targetStoreId).toBe(store2Id);
+
+    await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.approveMovement(transfer.id, user1Id, 'ADMIN'),
+    );
+    // El traspaso sale del cajón: expected = 100 − 20 = 80.
+    const closed = await tenantStorage.run({ organizationId: org1Id }, async () =>
+      service.close(session.id, { countedAmount: 80 }, user1Id, 'ADMIN'),
+    );
+    expect(Number(closed.expectedAmount)).toBeCloseTo(80, 2);
+    expect(Number(closed.difference)).toBeCloseTo(0, 2);
+
+    await tenantStorage.run({ organizationId: org1Id }, async () =>
+      storesService.setCentral(store2Id, false),
+    );
+  });
+
+  it('one_central_per_org: designar una segunda central desmarca la anterior', async () => {
+    await tenantStorage.run({ organizationId: org1Id }, async () =>
+      storesService.setCentral(store1Id, true),
+    );
+    await tenantStorage.run({ organizationId: org1Id }, async () =>
+      storesService.setCentral(store2Id, true),
+    );
+    const centrals = await admin.$queryRaw<Array<{ id: string }>>`
+      SELECT id::text FROM "Store" WHERE "organizationId" = ${org1Id}::uuid AND "isCentral" = true
+    `;
+    expect(centrals).toHaveLength(1);
+    expect(centrals[0]!.id).toBe(store2Id);
+
+    // Defensa en DB: marcar dos centrales a la vez (saltándose el servicio) viola
+    // el índice único parcial.
+    await expect(
+      admin.$executeRaw`UPDATE "Store" SET "isCentral" = true WHERE "organizationId" = ${org1Id}::uuid AND id = ${store1Id}::uuid`,
+    ).rejects.toThrow();
+
+    await tenantStorage.run({ organizationId: org1Id }, async () =>
+      storesService.setCentral(store2Id, false),
+    );
   });
 });

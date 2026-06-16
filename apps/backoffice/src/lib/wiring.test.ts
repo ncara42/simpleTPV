@@ -8,6 +8,7 @@ vi.mock('./auth.js', () => ({
 
 import * as admin from './admin.js';
 import { api } from './auth.js';
+import * as cash from './cash.js';
 import * as dashboard from './dashboard.js';
 import * as families from './families.js';
 import * as features from './features.js';
@@ -79,6 +80,17 @@ describe('cableado API real del backoffice', () => {
     expect(post).toHaveBeenCalledWith('/stores', { name: 'Centro', code: '01' });
     await admin.deleteStore('s-1');
     expect(del).toHaveBeenCalledWith('/stores/s-1');
+    await admin.setStoreCentral('s-1', true);
+    expect(patch).toHaveBeenCalledWith('/stores/s-1/central', { isCentral: true });
+  });
+
+  it('cash: aprobaciones de movimientos (#146)', async () => {
+    await cash.listPendingCashMovements();
+    expect(get).toHaveBeenCalledWith('/cash-sessions/movements/pending');
+    await cash.approveCashMovement('cm-1');
+    expect(post).toHaveBeenCalledWith('/cash-sessions/movements/cm-1/approve', {});
+    await cash.denyCashMovement('cm-1');
+    expect(post).toHaveBeenCalledWith('/cash-sessions/movements/cm-1/deny', {});
   });
 
   it('sales: GET /sales con filtros y mapea user/store anidados a planos', async () => {

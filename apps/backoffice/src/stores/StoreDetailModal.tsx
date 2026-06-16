@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useConfirm } from '../components/ConfirmProvider.js';
 import { Modal } from '../components/Modal.js';
 import type { Store } from '../lib/admin.js';
-import { updateStoreOps } from '../lib/admin.js';
+import { setStoreCentral, updateStoreOps } from '../lib/admin.js';
 import { createDevice, listDevices, revokeDevice } from '../lib/devices.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { fmtDayMonth } from '../lib/format.js';
@@ -82,6 +82,14 @@ export function StoreDetailModal({
       void qc.invalidateQueries({ queryKey: ['stores'] });
     },
   });
+  // Tienda central (#146): destino de los traspasos de efectivo. Una sola por
+  // organización; marcar esta desmarca la anterior (el backend lo resuelve en una
+  // transacción). La verdad vuelve por el invalidate de 'stores'.
+  const centralMut = useMutation({
+    mutationFn: (isCentral: boolean) => setStoreCentral(store.id, isCentral),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['stores'] }),
+  });
+
   // Registro de fichajes real de la tienda (GET /time-clock/entries, lo más reciente
   // primero) → resumen de última apertura/cierre + drawer.
   const { data: log = [] } = useQuery({
@@ -193,6 +201,30 @@ export function StoreDetailModal({
                   ? 'Guardado ✓'
                   : 'Guardar estado'}
             </Button>
+          </section>
+
+          <section className="form-section" data-testid="store-central">
+            <span className="form-section-title">Tienda central</span>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={store.isCentral}
+                disabled={centralMut.isPending}
+                onChange={(e) => centralMut.mutate(e.target.checked)}
+                data-testid="store-central-toggle"
+              />
+              <span className="switch-track">
+                <span className="switch-thumb" />
+              </span>
+              <span className="switch-text">
+                Designar como central (destino de los traspasos de efectivo)
+              </span>
+            </label>
+            {centralMut.isError && (
+              <p className="form-error">
+                {formErrorMessage(centralMut.error, 'No se pudo cambiar la central.')}
+              </p>
+            )}
           </section>
 
           <section className="form-section" data-testid="store-device">
