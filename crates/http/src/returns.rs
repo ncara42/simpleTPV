@@ -38,7 +38,10 @@ pub struct ListQuery {
     sale_id: Uuid,
 }
 
-/// `GET /returns?saleId=` — devoluciones de una venta.
+/// `GET /returns?saleId=` — devoluciones de una venta. Org-scoped por RLS (NO acota
+/// por tienda al CLERK): paridad con NestJS `ReturnsService.list`, que tampoco
+/// llama a `assertStoreAccess` (solo lo hacen `create` y `createBlind`). La
+/// escritura (`create`) sí valida acceso por tienda.
 pub async fn list(
     State(state): State<AppState>,
     user: AuthUser,
