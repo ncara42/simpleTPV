@@ -1,8 +1,20 @@
-import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, Min, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
+
+import { MAX_CODE_LENGTH, MAX_NAME_LENGTH } from '../common/limits.js';
 
 export class CreateFamilyDto {
   @IsString()
   @MinLength(1)
+  @MaxLength(MAX_NAME_LENGTH)
   name!: string;
 
   @IsOptional()
@@ -11,10 +23,12 @@ export class CreateFamilyDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_CODE_LENGTH)
   color?: string | null;
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_CODE_LENGTH)
   icon?: string | null;
 
   @IsOptional()
@@ -31,6 +45,7 @@ export class UpdateFamilyDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(MAX_NAME_LENGTH)
   name?: string;
 
   @IsOptional()
@@ -39,10 +54,12 @@ export class UpdateFamilyDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_CODE_LENGTH)
   color?: string | null;
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_CODE_LENGTH)
   icon?: string | null;
 
   @IsOptional()

@@ -78,7 +78,7 @@ export function TimeClockPanel({ storeId }: { storeId: string | null }) {
             type="button"
             className="time-clock-pair"
             disabled={token.trim().length < 6 || pair.isPending}
-            onClick={() => pair.mutate(token.trim())}
+            onClick={() => pair.mutate(token.trim().toUpperCase())}
             data-testid="device-pair"
           >
             Autorizar dispositivo

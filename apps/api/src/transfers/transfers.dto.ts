@@ -9,11 +9,12 @@ import {
   IsString,
   IsUUID,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
 
-import { MAX_QUANTITY } from '../common/limits.js';
+import { MAX_NOTES_LENGTH, MAX_QUANTITY } from '../common/limits.js';
 
 export class CreateTransferLineDto {
   @IsUUID()
@@ -35,6 +36,7 @@ export class CreateTransferDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_NOTES_LENGTH)
   notes?: string;
 
   @IsArray()
@@ -58,6 +60,7 @@ export class ReceiveTransferLineDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_NOTES_LENGTH)
   discrepancyNote?: string;
 }
 

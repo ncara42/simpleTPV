@@ -7,15 +7,23 @@ import {
   IsString,
   IsUUID,
   Max,
+  MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
 
-import { MAX_PRICE } from '../common/limits.js';
+import {
+  MAX_BARCODE_LENGTH,
+  MAX_CODE_LENGTH,
+  MAX_NAME_LENGTH,
+  MAX_NOTES_LENGTH,
+  MAX_PRICE,
+} from '../common/limits.js';
 
 export class CreateProductDto {
   @IsString()
   @MinLength(1)
+  @MaxLength(MAX_NAME_LENGTH)
   name!: string;
 
   @IsNumber({ maxDecimalPlaces: 4 })
@@ -25,14 +33,17 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_NOTES_LENGTH)
   description?: string | null;
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_BARCODE_LENGTH)
   barcode?: string | null;
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_BARCODE_LENGTH)
   sku?: string | null;
 
   @IsOptional()
@@ -53,6 +64,7 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_CODE_LENGTH)
   unitSymbol?: string;
 
   @IsOptional()
@@ -68,6 +80,7 @@ export class UpdateProductDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(MAX_NAME_LENGTH)
   name?: string;
 
   @IsOptional()
@@ -78,14 +91,17 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_NOTES_LENGTH)
   description?: string | null;
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_BARCODE_LENGTH)
   barcode?: string | null;
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_BARCODE_LENGTH)
   sku?: string | null;
 
   @IsOptional()
@@ -106,6 +122,7 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_CODE_LENGTH)
   unitSymbol?: string;
 
   @IsOptional()

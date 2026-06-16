@@ -13,11 +13,12 @@ import {
   IsUUID,
   Matches,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
 
-import { MAX_AMOUNT, MAX_QUANTITY } from '../common/limits.js';
+import { MAX_AMOUNT, MAX_PAGE, MAX_QUANTITY, MAX_SEARCH_LENGTH } from '../common/limits.js';
 
 export class CreateSaleLineDto {
   @IsUUID()
@@ -153,12 +154,15 @@ export class ListSalesQueryDto {
   status?: SaleStatus;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(MAX_SEARCH_LENGTH)
   q?: string;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(MAX_PAGE)
   page?: number;
 
   @IsOptional()

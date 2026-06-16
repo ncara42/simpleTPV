@@ -1,11 +1,14 @@
 import { IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
 
+import { MAX_NAME_LENGTH } from '../common/limits.js';
+
 export class CreateDeviceDto {
   @IsUUID()
   storeId!: string;
 
   @IsString()
   @MinLength(2)
+  @MaxLength(MAX_NAME_LENGTH)
   name!: string;
 }
 

@@ -8,11 +8,12 @@ import {
   IsString,
   IsUUID,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
 
-import { MAX_QUANTITY } from '../common/limits.js';
+import { MAX_NOTES_LENGTH, MAX_QUANTITY } from '../common/limits.js';
 
 // Configuración del stock mínimo de un producto en una tienda (#29).
 export class SetMinStockDto {
@@ -47,6 +48,7 @@ export class AdjustStockDto {
   // Motivo obligatorio del ajuste (recuento, merma, rotura...). Auditoría.
   @IsString()
   @IsNotEmpty()
+  @MaxLength(MAX_NOTES_LENGTH)
   reason!: string;
 }
 
@@ -66,6 +68,7 @@ export class ConfirmInventoryCountDto {
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(MAX_NOTES_LENGTH)
   reason!: string;
 
   @IsArray()
