@@ -63,7 +63,13 @@ pub async fn ticket_block(
     Ok(Json(block))
 }
 
-/// `POST /sales/:id/void` — anula una venta (ADMIN/MANAGER).
+/// `POST /sales/:id/void` — anula una venta (ADMIN/MANAGER), org-scoped por RLS.
+///
+/// NO acota por tienda: paridad con NestJS (`voidSale` no llama a
+/// `assertStoreAccess`; solo lo hacen `create` y `reserveTicketBlock`). El
+/// CLERK no puede anular (la ruta exige ADMIN/MANAGER) y MANAGER es un rol
+/// org-wide por diseño (`ORG_WIDE_ROLES`), así que la comprobación por tienda no
+/// aplica aquí.
 pub async fn void(
     State(state): State<AppState>,
     user: AuthUser,
