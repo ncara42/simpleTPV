@@ -207,6 +207,22 @@ export class CashSessionsService {
     });
   }
 
+  /**
+   * Registro de cierres de caja de una tienda (#145): las sesiones CLOSED con su
+   * cuadre (apertura, cierre, esperado y diferencia), de la más reciente a la más
+   * antigua. Acotado por tienda (SEC-01): un CLERK solo ve los cierres de sus
+   * tiendas. `limit` viene ya saneado del DTO (1..100, por defecto 30).
+   */
+  async listClosed(storeId: string, userId: string, role: string, limit = 30) {
+    const tenant = requireTenant();
+    await assertStoreAccess(this.prisma, { userId, role, storeId });
+    return this.prisma.cashSession.findMany({
+      where: { storeId, organizationId: tenant.organizationId, status: 'CLOSED' },
+      orderBy: { closedAt: 'desc' },
+      take: limit,
+    });
+  }
+
   async movements(id: string, userId: string, role: string) {
     const tenant = requireTenant();
     const session = await this.prisma.cashSession.findFirst({

@@ -15,6 +15,7 @@ import { Roles } from '../auth/roles.decorator.js';
 import {
   CloseCashSessionDto,
   CreateCashMovementDto,
+  ListClosedCashSessionsDto,
   OpenCashSessionDto,
 } from './cash-sessions.dto.js';
 import { CashSessionsService } from './cash-sessions.service.js';
@@ -57,6 +58,19 @@ export class CashSessionsController {
     @Req() req: { user: JwtPayload },
   ) {
     return this.cashSessions.createMovement(id, body, req.user.sub);
+  }
+
+  // Registro de cierres de caja de una tienda (#145): sesiones CLOSED con su
+  // cuadre, de la más reciente a la más antigua. Ruta estática previa a `:id/...`.
+  @Get('closed')
+  @Roles('ADMIN', 'MANAGER', 'CLERK')
+  listClosed(@Query() query: ListClosedCashSessionsDto, @Req() req: { user: JwtPayload }) {
+    return this.cashSessions.listClosed(
+      query.storeId,
+      req.user.sub,
+      req.user.role,
+      query.limit ?? 30,
+    );
   }
 
   // Estado de la caja de una tienda: devuelve la sesión OPEN o null.

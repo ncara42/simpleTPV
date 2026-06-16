@@ -1,5 +1,16 @@
 import { CashMovementType } from '@simpletpv/db';
-import { IsEnum, IsNumber, IsString, IsUUID, Max, Min, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsEnum,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 import { MAX_AMOUNT } from '../common/limits.js';
 
@@ -20,6 +31,20 @@ export class CloseCashSessionDto {
   @Min(0)
   @Max(MAX_AMOUNT)
   countedAmount!: number;
+}
+
+// Listado de cierres de caja de una tienda (registro de arqueos). storeId
+// obligatorio (acotado por tienda, SEC-01); limit opcional (1..100, por defecto 30).
+export class ListClosedCashSessionsDto {
+  @IsUUID()
+  storeId!: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
 }
 
 export class CreateCashMovementDto {

@@ -1,0 +1,135 @@
+/* Página de ayuda del TPV (#144). Mismo lenguaje visual que la del backoffice:
+   paneles-superficie, tarjetas de contacto y un FAQ en acordeón con hairlines. */
+.help-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-8);
+}
+
+.help-section {
+  padding: var(--ui-space-6) var(--ui-space-6);
+  border: 1px solid var(--ui-border);
+  border-radius: 18px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.help-section-head {
+  margin-bottom: var(--ui-space-6);
+}
+.help-title {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  margin: 0;
+  font-size: var(--ui-text-lg);
+  font-weight: 600;
+  letter-spacing: -0.016em;
+  color: var(--ui-text);
+}
+.help-title svg {
+  color: var(--ui-text-soft);
+}
+.help-intro {
+  margin: var(--ui-space-2) 0 0;
+  font-size: var(--ui-text-base);
+  color: var(--ui-text-muted);
+}
+
+/* ── Canales de contacto ──────────────────────────────────────────────────── */
+.help-channels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--ui-space-5);
+}
+.help-channel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-5);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+  color: var(--ui-text);
+  text-decoration: none;
+  transition:
+    border-color 0.18s var(--ui-ease),
+    transform 0.18s var(--ui-ease);
+}
+.help-channel svg {
+  color: var(--ui-text-soft);
+}
+.help-channel:hover {
+  border-color: var(--ui-border-strong);
+  transform: translateY(-1px);
+}
+.help-channel:focus-visible {
+  outline: none;
+  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-focus);
+}
+.help-channel-label {
+  font-weight: 600;
+}
+.help-channel-value {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
+}
+
+/* ── FAQ (acordeón) ───────────────────────────────────────────────────────── */
+.help-faq {
+  display: flex;
+  flex-direction: column;
+}
+.help-faq-item {
+  border-bottom: 1px solid var(--ui-border);
+}
+.help-faq-item:first-child {
+  border-top: 1px solid var(--ui-border);
+}
+.help-faq-item > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  cursor: pointer;
+  padding: var(--ui-space-4) 0;
+  font-weight: 500;
+  color: var(--ui-text);
+  list-style: none;
+}
+.help-faq-item > summary::-webkit-details-marker {
+  display: none;
+}
+.help-faq-item > summary:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+  border-radius: var(--ui-radius-sm);
+}
+.help-faq-item > summary::after {
+  content: '';
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 1.5px solid var(--ui-text-soft);
+  border-bottom: 1.5px solid var(--ui-text-soft);
+  transform: rotate(-45deg);
+  transition: transform 0.18s var(--ui-ease);
+}
+.help-faq-item[open] > summary::after {
+  transform: rotate(45deg);
+}
+.help-faq-item > p {
+  margin: 0 0 var(--ui-space-4);
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-base);
+  line-height: 1.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .help-channel,
+  .help-faq-item > summary::after {
+    transition: none;
+  }
+}
