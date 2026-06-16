@@ -1,9 +1,10 @@
 import { Button, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Plus, Upload, X } from 'lucide-react';
+import { Check, Plus, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { CsvActionButton } from './components/CsvActionButton.js';
 import { CsvDropzone } from './components/CsvDropzone.js';
 import { Modal } from './components/Modal.js';
 import { useTableColumns } from './components/useTableColumns.js';
@@ -18,6 +19,7 @@ import {
   updateUser,
   type User,
 } from './lib/admin.js';
+import { exportRowsToCsv } from './lib/csv.js';
 import { formErrorMessage } from './lib/form-error.js';
 
 type Role = NewUser['role'];
@@ -119,6 +121,21 @@ export function UsersPage() {
   );
 
   usePageHeader('Usuarios', `${allUsers.length} usuarios`, 'users-count');
+
+  // Exporta a CSV las filas actualmente filtradas en memoria.
+  const handleExport = (): void => {
+    const headers = ['Nombre', 'Email', 'Rol', 'Tiendas', 'Estado'];
+    const storesCsv = (role: Role, storeIds: string[]): string =>
+      role === 'ADMIN' ? 'Todas' : storeIds.map(storeName).join('; ');
+    const rows = filtered.map((u) => [
+      u.name,
+      u.email,
+      ROLE_LABEL[u.role],
+      storesCsv(u.role, u.storeIds ?? []),
+      u.active ? 'Activo' : 'Inactivo',
+    ]);
+    exportRowsToCsv('usuarios.csv', headers, rows);
+  };
 
   // ─── Selección ─────────────────────────────────────────────────────────
   const selectedSet = useMemo(() => new Set(selected), [selected]);
@@ -331,16 +348,8 @@ export function UsersPage() {
       {columnsEditor}
 
       <div className="table-actions">
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={() => setImporting(true)}
-          data-testid="users-import"
-          title="Importar CSV"
-          aria-label="Importar CSV"
-        >
-          <Upload size={18} aria-hidden="true" />
-        </button>
+        <CsvActionButton kind="export" onClick={handleExport} testId="users-export" />
+        <CsvActionButton kind="import" onClick={() => setImporting(true)} testId="users-import" />
         <button
           type="button"
           className="ui-dt-cols-trigger"

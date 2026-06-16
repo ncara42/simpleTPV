@@ -1,10 +1,12 @@
 import { Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Check, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { CsvActionButton } from './components/CsvActionButton.js';
 import { Modal } from './components/Modal.js';
+import { exportRowsToCsv } from './lib/csv.js';
 import {
   createPromotion,
   type CreatePromotionInput,
@@ -190,10 +192,27 @@ export function PromotionsPage() {
     });
   };
 
+  const handleExport = (): void => {
+    exportRowsToCsv(
+      'promociones.csv',
+      ['Promoción', 'Condición', 'Descuento', 'Vigencia', 'Estado'],
+      visible.map((p) => [
+        p.name,
+        conditionShort(p),
+        discountShort(p),
+        dateRange(p.startDate, p.endDate),
+        STATUS_LABEL[promoStatus(p)],
+      ]),
+    );
+  };
+
   usePageHeader('Promociones', 'Descuentos y reglas programables');
 
   return (
     <section className="catalog">
+      <div className="table-actions">
+        <CsvActionButton kind="export" onClick={handleExport} testId="promotions-export" />
+      </div>
       <div className="table-panel">
         <DataTable
           className={`promo-table${selected.length ? ' has-selection' : ''}`}
@@ -217,6 +236,7 @@ export function PromotionsPage() {
                       onClick={() => toggleGroup(g.id)}
                       data-testid={`promo-group-${g.id}`}
                     >
+                      <Check size={14} className="promo-chip__check" aria-hidden="true" />
                       {g.label}
                     </button>
                   ))}

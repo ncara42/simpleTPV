@@ -5,12 +5,14 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { useConfirm } from './components/ConfirmProvider.js';
+import { CsvActionButton } from './components/CsvActionButton.js';
 import { Modal } from './components/Modal.js';
 import {
   EMPTY_PRODUCT_FORM,
   ProductFormModal,
   type ProductFormState,
 } from './components/ProductFormModal.js';
+import { exportRowsToCsv } from './lib/csv.js';
 import {
   createFamily,
   deleteFamily,
@@ -333,6 +335,27 @@ export function FamiliesPage({
     return count;
   }, [allProducts]);
 
+  // Exporta el árbol APLANADO en orden DFS: cada fila es un nodo con su tipo
+  // (familia/subfamilia/arquetipo), el contador real de productos de su subárbol
+  // y la ruta de ancestros. La ruta se construye en el recorrido (flattenTree solo
+  // anota la profundidad, no los nombres de ancestros).
+  const handleExport = (): void => {
+    const rows: string[][] = [];
+    const walk = (nodes: FamilyNode[], ancestors: string[]): void => {
+      for (const node of nodes) {
+        const type = node.isArchetype
+          ? 'Arquetipo'
+          : ancestors.length === 0
+            ? 'Familia'
+            : 'Subfamilia';
+        rows.push([node.name, type, String(subtreeCount(node)), ancestors.join(' / ')]);
+        walk(node.children, [...ancestors, node.name]);
+      }
+    };
+    walk(view, []);
+    exportRowsToCsv('familias.csv', ['Nombre', 'Tipo', 'Productos', 'Ruta'], rows);
+  };
+
   // Vista filtrada por la toolbar (no muta el árbol: el reordenado y "Mover a"
   // siguen operando sobre `view`). Una raíz que coincide se muestra entera; si solo
   // coinciden hijas, se muestra la raíz con esas hijas. Búsqueda insensible a
@@ -579,6 +602,9 @@ export function FamiliesPage({
 
   return (
     <section className="catalog">
+      <div className="table-actions">
+        <CsvActionButton kind="export" onClick={handleExport} testId="families-export" />
+      </div>
       <div className="table-panel">
         <div className="table-toolbar">
           <div className="sales-filters">

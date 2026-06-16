@@ -5,9 +5,12 @@ import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { useConfirm } from './components/ConfirmProvider.js';
+import { CsvActionButton } from './components/CsvActionButton.js';
 import { createStore, deleteStore, listStores, type Store, updateStore } from './lib/admin.js';
+import { exportRowsToCsv } from './lib/csv.js';
 import { getSalesToday } from './lib/dashboard.js';
 import { formErrorMessage } from './lib/form-error.js';
+import { fmtEur } from './lib/format.js';
 import { StoreCard } from './stores/StoreCard.js';
 import { StoreDetailModal } from './stores/StoreDetailModal.js';
 import { type StoreForm, StoreFormModal } from './stores/StoreFormModal.js';
@@ -103,10 +106,25 @@ export function StoresPage({
     [stores, salesByStore],
   );
 
+  // Exporta las tiendas visibles (ya ordenadas por ventas de hoy). El importe de
+  // ventas se formatea en euros con el mapa de ventas de hoy; '—' si no hay dato.
+  const handleExport = (): void => {
+    const rows = visibleStores.map((s) => [
+      s.name,
+      s.address ?? '',
+      s.active ? 'Activa' : 'Dormida',
+      fmtEur(salesByStore.get(s.id) ?? 0),
+    ]);
+    exportRowsToCsv('tiendas.csv', ['Nombre', 'Dirección', 'Estado', 'Ventas hoy'], rows);
+  };
+
   usePageHeader('Tiendas', `${stores.length} ubicaciones`);
 
   return (
     <section className="catalog">
+      <div className="table-actions">
+        <CsvActionButton kind="export" onClick={handleExport} testId="stores-export" />
+      </div>
       <div className="users-toolbar">
         <div className="sales-filters" />
         <div className="ui-dt-toolbar-actions">

@@ -1,8 +1,8 @@
 import { Badge, DataTable, type DataTableColumn, Select, usePageHeader } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Download } from 'lucide-react';
 import { useState } from 'react';
 
+import { CsvActionButton } from './components/CsvActionButton.js';
 import { useTableColumns } from './components/useTableColumns.js';
 import {
   listSales,
@@ -11,6 +11,7 @@ import {
   type SalesQueryInput,
   type SalesViewRow,
 } from './lib/admin.js';
+import { exportRowsToCsv } from './lib/csv.js';
 import { type FamilyNode, listFamilies } from './lib/families.js';
 import { useFeatures } from './lib/features.js';
 import { fmtEur, fmtRate } from './lib/format.js';
@@ -63,25 +64,25 @@ function toQuery(filters: Filters): SalesQueryInput {
 }
 
 function downloadCsv(items: SalesViewRow[]): void {
-  const header = 'Nº ticket,Hora,Tienda,Vendedor,Importe (€),Método,Estado';
-  const rows = items.map((s) =>
-    [
-      s.ticketNumber,
-      hour.format(new Date(s.createdAt)),
-      s.storeName,
-      s.sellerName,
-      Number(s.total).toFixed(2),
-      PAYMENT_LABEL[s.paymentMethod] ?? s.paymentMethod,
-      s.status === 'VOIDED' ? 'Anulada' : 'Completada',
-    ].join(','),
-  );
-  const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'ventas.csv';
-  a.click();
-  URL.revokeObjectURL(url);
+  const headers: string[] = [
+    'Nº ticket',
+    'Hora',
+    'Tienda',
+    'Vendedor',
+    'Importe (€)',
+    'Método',
+    'Estado',
+  ];
+  const rows: string[][] = items.map((s) => [
+    String(s.ticketNumber),
+    hour.format(new Date(s.createdAt)),
+    s.storeName,
+    s.sellerName,
+    Number(s.total).toFixed(2),
+    PAYMENT_LABEL[s.paymentMethod] ?? s.paymentMethod,
+    s.status === 'VOIDED' ? 'Anulada' : 'Completada',
+  ]);
+  exportRowsToCsv('ventas.csv', headers, rows);
 }
 
 const columns: DataTableColumn<SalesViewRow>[] = [
@@ -308,16 +309,7 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
 
       <div className="table-actions">
         {features.data_export && (
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={() => void exportCsv()}
-            data-testid="sales-export-csv"
-            title="Exportar CSV"
-            aria-label="Exportar CSV"
-          >
-            <Download size={18} aria-hidden="true" />
-          </button>
+          <CsvActionButton kind="export" onClick={() => void exportCsv()} testId="sales-export" />
         )}
         <button
           type="button"

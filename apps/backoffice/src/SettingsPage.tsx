@@ -1,7 +1,7 @@
 import { Button, evaluateBrandColor, Input } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check } from 'lucide-react';
+import { Check, Palette } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { getBranding, updateBranding } from './lib/branding.js';
@@ -80,17 +80,22 @@ export function SettingsPage() {
   );
 
   return (
-    <section className="catalog" data-testid="settings-page">
-      <div className="table-panel settings-panel">
-        <h3>Marca</h3>
-        <p className="muted">
-          El color corporativo se convierte en el color primario de toda la aplicación (botones,
-          acentos y gráficos) y el logo sustituye a la «S» del menú lateral. Afecta al backoffice y
-          al TPV de todas las tiendas.
-        </p>
+    <section className="catalog settings-page" data-testid="settings-page">
+      <div className="help-section">
+        <div className="help-section-head">
+          <h3 className="help-title">
+            <Palette size={18} aria-hidden="true" /> Marca
+          </h3>
+          <p className="help-intro">
+            El color corporativo se convierte en el color primario de toda la aplicación (botones,
+            acentos y gráficos) y el logo sustituye a la «S» del menú lateral. Afecta al backoffice
+            y al TPV de todas las tiendas.
+          </p>
+        </div>
 
-        <div className="settings-brand-grid">
+        <div className="settings-grid">
           <div className="settings-field">
+            <h4 className="settings-field-title">Color corporativo</h4>
             <label htmlFor="brand-color">Color corporativo</label>
             <div className="settings-color-row">
               <Input
@@ -133,14 +138,19 @@ export function SettingsPage() {
           </div>
 
           <div className="settings-field">
+            <h4 className="settings-field-title">Logotipo</h4>
             <label htmlFor="brand-logo">Logo (PNG, JPEG o SVG · máx. ~64KB)</label>
-            <input
-              id="brand-logo"
-              type="file"
-              accept="image/png,image/jpeg,image/svg+xml"
-              onChange={(e) => onLogoFile(e.target.files?.[0])}
-              data-testid="brand-logo-file"
-            />
+            <label className="settings-file">
+              <input
+                id="brand-logo"
+                className="settings-file-input"
+                type="file"
+                accept="image/png,image/jpeg,image/svg+xml"
+                onChange={(e) => onLogoFile(e.target.files?.[0])}
+                data-testid="brand-logo-file"
+              />
+              <span>Elegir archivo</span>
+            </label>
             <div className="settings-logo-preview" data-testid="brand-logo-preview">
               {logo ? <img src={logo} alt="Logo de la organización" /> : <span>S</span>}
             </div>

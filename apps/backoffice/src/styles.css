@@ -269,54 +269,92 @@
 }
 
 /* ─── U-08: Ajustes — sección Marca ─────────────────────────────────────── */
-.settings-panel {
-  padding: 1.2rem 1.4rem;
-  max-width: 44rem;
-}
-.settings-brand-grid {
+/* El cuerpo vive dentro de una card del sistema (.help-section, de catalog.css);
+   aquí solo el layout interno de la sección Marca. */
+.settings-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
-  margin: 1rem 0;
+  gap: var(--ui-space-5);
+}
+@media (max-width: 640px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* Micro-cabecera de sub-bloque (espejo de .form-section-title). */
+.settings-field-title {
+  margin: 0 0 var(--ui-space-2);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-muted);
 }
 .settings-field label {
   display: block;
-  font-size: 0.82rem;
+  font-size: var(--ui-text-sm);
   font-weight: 600;
   color: var(--ui-text-muted);
-  margin-bottom: 0.4rem;
+  margin-bottom: var(--ui-space-2);
 }
 .settings-color-row {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: var(--ui-space-2);
 }
 .settings-color-row input[type='color'] {
   width: 2.6rem;
   height: 2.2rem;
-  padding: 0.15rem;
+  padding: var(--ui-space-1);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm, 8px);
+  border-radius: var(--ui-radius-sm);
   background: var(--ui-surface);
   cursor: pointer;
 }
 .settings-hex {
   width: 7.5rem;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm, 8px);
-  padding: 0.4rem 0.6rem;
-  font-size: 0.86rem;
+  border-radius: var(--ui-radius-sm);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  font-size: var(--ui-text-base);
   font-variant-numeric: tabular-nums;
 }
+/* Input de fichero: el nativo se oculta y el <label> envolvente toma aspecto
+   de botón secundario. */
+.settings-file {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2) var(--ui-space-4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font-size: var(--ui-text-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--ui-motion-fast) var(--ui-ease);
+}
+.settings-file:hover {
+  background: var(--ui-surface-subtle);
+}
+/* Oculta visualmente el input nativo conservándolo accesible. */
+.settings-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
 .settings-logo-preview {
-  margin-top: 0.6rem;
+  margin-top: var(--ui-space-3);
   width: 3.2rem;
   height: 3.2rem;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1px dashed var(--ui-border-strong);
-  border-radius: 12px;
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface-subtle);
   font-weight: 700;
   color: var(--ui-text-muted);
@@ -329,24 +367,27 @@
 }
 .settings-error {
   color: var(--ui-danger);
-  font-size: 0.84rem;
-  margin: 0.4rem 0 0;
+  font-size: var(--ui-text-sm);
+  margin: var(--ui-space-2) 0 0;
 }
 .settings-warning {
   display: block;
-  margin: 0.5rem 0 0;
-  padding: 0.5rem 0.65rem;
-  font-size: 0.82rem;
+  margin: var(--ui-space-2) 0 0;
+  padding: var(--ui-space-2) var(--ui-space-3);
+  font-size: var(--ui-text-sm);
   line-height: 1.35;
   color: var(--ui-warning);
   background: var(--ui-warning-soft);
   border: 1px solid var(--ui-warning);
-  border-radius: var(--ui-radius-sm, 8px);
+  border-radius: var(--ui-radius-sm);
 }
+/* Pie de acciones con hairline superior (espejo de .modal--form .modal-foot). */
 .settings-actions {
   display: flex;
-  gap: 0.6rem;
-  margin-top: 1rem;
+  gap: var(--ui-space-2);
+  margin-top: var(--ui-space-6);
+  padding-top: var(--ui-space-5);
+  border-top: 1px solid var(--ui-border);
 }
 
 /* ─── U-06: palette central de búsqueda de funciones ────────────────────────

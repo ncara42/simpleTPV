@@ -3,6 +3,8 @@ import { usePageHeader } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
+import { CsvActionButton } from './components/CsvActionButton.js';
+import { exportRowsToCsv } from './lib/csv.js';
 import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
 
 interface Filters {
@@ -90,8 +92,27 @@ export function TimeClockPage() {
     },
   ];
 
+  const handleExport = (): void => {
+    exportRowsToCsv(
+      'control-horario.csv',
+      ['Empleado', 'Tienda', 'Fecha', 'Entrada', 'Salida', 'Pausas', 'Horas'],
+      filtered.map((r) => [
+        r.userName,
+        r.storeName,
+        r.date,
+        hhmm(r.firstIn),
+        hhmm(r.lastOut),
+        fmtMinutes(msToMin(r.breakMs)),
+        fmtMinutes(msToMin(r.workedMs)),
+      ]),
+    );
+  };
+
   return (
     <section className="catalog">
+      <div className="table-actions">
+        <CsvActionButton kind="export" onClick={handleExport} testId="timeclock-export" />
+      </div>
       <div className="table-panel">
         <DataTable
           columns={timeclockColumns}

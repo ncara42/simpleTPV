@@ -4,10 +4,11 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
+import { CsvActionButton } from '../components/CsvActionButton.js';
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
 import { listStores } from '../lib/admin.js';
-import { parseCsvRows } from '../lib/csv.js';
+import { exportRowsToCsv, parseCsvRows } from '../lib/csv.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { listProducts } from '../lib/products.js';
 import { createTransfer, listTransfers, sendTransfer } from '../lib/stock.js';
@@ -72,8 +73,23 @@ export function TransfersSection() {
     },
   ];
 
+  const handleExport = (): void => {
+    exportRowsToCsv(
+      'traspasos.csv',
+      ['Fecha', 'Líneas', 'Estado'],
+      transfers.map((t) => [
+        dt.format(new Date(t.createdAt)),
+        String(t.lines.length),
+        STATUS_LABEL[t.status] ?? t.status,
+      ]),
+    );
+  };
+
   return (
     <>
+      <div className="table-actions">
+        <CsvActionButton kind="export" onClick={handleExport} testId="transfers-export" />
+      </div>
       <div className="table-panel">
         <DataTable
           columns={transferColumns}

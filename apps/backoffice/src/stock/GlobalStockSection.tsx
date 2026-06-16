@@ -10,9 +10,11 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { CsvActionButton } from '../components/CsvActionButton.js';
 import { Modal } from '../components/Modal.js';
 import { useTableColumns } from '../components/useTableColumns.js';
 import { listStores } from '../lib/admin.js';
+import { exportRowsToCsv } from '../lib/csv.js';
 import { listFamilies } from '../lib/families.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { adjustStock, getGlobalStock, listAlerts, setMinStock } from '../lib/stock.js';
@@ -242,6 +244,23 @@ export function GlobalStockSection({
       })
     : filtered;
 
+  // Exporta las filas ACTUALMENTE filtradas/ordenadas. En modo tienda única el total
+  // es el stock de esa tienda (espejo de la columna Total) y se añade la columna con
+  // el stock por tienda agregado.
+  const handleExport = (): void => {
+    const headers: string[] = singleStore
+      ? ['Producto', 'Total', 'Rotación', 'Stock por tienda']
+      : ['Producto', 'Total', 'Rotación'];
+    const rows: string[][] = sortedRows.map((row) => {
+      const total = singleStore ? (visibleStoresOf(row)[0]?.quantity ?? 0) : row.total;
+      const base = [row.productName, String(total), ROTATION_LABEL[row.rotation]];
+      return singleStore
+        ? [...base, String(visibleStoresOf(row).reduce((sum, st) => sum + st.quantity, 0))]
+        : base;
+    });
+    exportRowsToCsv('stock.csv', headers, rows);
+  };
+
   return (
     <>
       {/* U-10: los avisos de roturas viven en su PROPIO panel, encima de la tabla
@@ -278,6 +297,7 @@ export function GlobalStockSection({
       {columnsEditor}
 
       <div className="table-actions">
+        <CsvActionButton kind="export" onClick={handleExport} testId="stock-export" />
         <button
           type="button"
           className="ui-dt-cols-trigger"
