@@ -19,6 +19,7 @@ import { useBranding } from './lib/branding.js';
 import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { formatDuration } from './lib/format.js';
+import { getMe, roleLabel } from './lib/me.js';
 import { switchApp } from './lib/nav.js';
 import { listStores } from './lib/sales.js';
 import { useOfflineSync } from './lib/useOfflineSync.js';
@@ -59,6 +60,8 @@ function Home() {
   const branding = useBranding();
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
   const activeStore = stores[0]?.id ?? null;
+  // Identidad del empleado autenticado para la cabecera (el JWT no lleva el nombre).
+  const { data: me } = useQuery({ queryKey: ['me'], queryFn: getMe });
 
   const queuedCount = useOfflineSync(activeStore);
 
@@ -84,7 +87,7 @@ function Home() {
           ) : undefined
         }
         brand={{ title: 'SimpleTPV', subtitle: 'Punto de venta' }}
-        account={{ name: 'Usuario', subtitle: 'Dependiente' }}
+        account={{ name: me?.name || 'Usuario', subtitle: roleLabel(me?.role) }}
         onLogout={logout}
       />
       <div className="app-content">

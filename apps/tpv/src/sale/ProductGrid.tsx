@@ -1,8 +1,50 @@
-import { useMemo } from 'react';
+import { type KeyboardEvent as ReactKeyboardEvent, useMemo } from 'react';
 
 import type { Product } from '../lib/catalog.js';
 import { eur } from '../lib/format.js';
 import type { StockRow } from '../lib/stock.js';
+
+// Badge de stock de la tienda activa: clicable en CUALQUIER estado (sano, bajo,
+// agotado o sin fila) para consultar el stock del producto en el resto de tiendas
+// (#1, consulta entre tiendas). Detiene la propagación para no añadir al carrito.
+// Accesible por teclado (Enter/Espacio). El color solo destaca el stock bajo; el
+// agotado/neutro quedan neutros porque la tarjeta entera ya se atenúa (.is-out).
+function StockBadge({
+  stock,
+  out,
+  onConsult,
+}: {
+  stock: StockRow | null;
+  out: boolean;
+  onConsult: () => void;
+}) {
+  const variant = stock ? (out ? 'out-of-stock' : `stock-${stock.level}`) : 'neutral';
+
+  function onKeyDown(e: ReactKeyboardEvent<HTMLSpanElement>): void {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      onConsult();
+    }
+  }
+
+  return (
+    <span
+      className={`prod-stock ${variant}`}
+      data-testid="prod-stock"
+      role="button"
+      tabIndex={0}
+      title="Ver stock en otras tiendas"
+      onClick={(e) => {
+        e.stopPropagation();
+        onConsult();
+      }}
+      onKeyDown={onKeyDown}
+    >
+      {stock ? stock.quantity : '—'}
+    </span>
+  );
+}
 
 // Grid de productos de la venta: tarjeta con nombre, precio y stock vivo (#34).
 // Click en la tarjeta añade al carrito; click en el badge de stock abre el detalle
@@ -57,34 +99,7 @@ export function ProductGrid({
             <span className="prod-name">{p.name}</span>
             <span className="prod-meta">
               <span className="prod-price">{eur(Number(p.salePrice))} €</span>
-              {stock ? (
-                out ? (
-                  // Agotado (≤ 0): muestra la cantidad (0 o negativo si hubo sobreventa)
-                  // en gris suave; la tarjeta queda atenuada pero SIGUE siendo clicable
-                  // (la venta nunca se bloquea por falta de stock).
-                  <span className="prod-stock out-of-stock" data-testid="prod-stock">
-                    {stock.quantity}
-                  </span>
-                ) : (
-                  <span
-                    className={`prod-stock stock-${stock.level}`}
-                    data-testid="prod-stock"
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onShowStock(p);
-                    }}
-                    title="Ver stock por tienda"
-                  >
-                    {stock.quantity}
-                  </span>
-                )
-              ) : (
-                <span className="prod-stock neutral" data-testid="prod-stock">
-                  —
-                </span>
-              )}
+              <StockBadge stock={stock} out={out} onConsult={() => onShowStock(p)} />
             </span>
           </button>
         );

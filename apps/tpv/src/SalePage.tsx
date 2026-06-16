@@ -24,6 +24,7 @@ import { useDebounce } from './lib/useDebounce.js';
 import { FamilyChips } from './sale/FamilyChips.js';
 import { ProductGrid } from './sale/ProductGrid.js';
 import { ProductStockModal } from './sale/ProductStockModal.js';
+import { SalesCounterWidget } from './sale/SalesCounterWidget.js';
 
 export function SalePage() {
   usePageHeader('Venta', 'Escanea o añade productos al ticket');
@@ -46,6 +47,9 @@ export function SalePage() {
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
   const [storeId, setStoreId] = useState<string | null>(null);
   const activeStore = storeId ?? stores[0]?.id ?? null;
+  // Nombre de la tienda activa para mostrarlo siempre en la cabecera (#1): con
+  // varias tiendas el selector ya lo muestra; con una sola, un chip de solo lectura.
+  const activeStoreName = stores.find((s) => s.id === activeStore)?.name ?? null;
 
   // Estado de la caja de la tienda activa. Misma queryKey que CashPanel, así
   // react-query deduplica la petición y ambos comparten el resultado. Caja
@@ -145,21 +149,34 @@ export function SalePage() {
   return (
     <div className="sale-layout">
       <div className="sale">
-        {stores.length > 1 && (
-          <div className="sale-store-row">
-            <label>
-              Tienda:{' '}
-              <Select
-                value={activeStore ?? ''}
-                onChange={setStoreId}
-                options={stores.map((s) => ({
-                  value: s.id,
-                  label: `${s.code} · ${s.name}`,
-                }))}
-                ariaLabel="Tienda"
-                data-testid="store-select"
-              />
-            </label>
+        {stores.length > 0 && (
+          <div className="sale-store-row" data-testid="sale-store-row">
+            {stores.length > 1 ? (
+              <label>
+                Tienda:{' '}
+                <Select
+                  value={activeStore ?? ''}
+                  onChange={setStoreId}
+                  options={stores.map((s) => ({
+                    value: s.id,
+                    label: `${s.code} · ${s.name}`,
+                  }))}
+                  ariaLabel="Tienda"
+                  data-testid="store-select"
+                />
+              </label>
+            ) : (
+              activeStoreName && (
+                <span className="sale-store-name" data-testid="active-store-name">
+                  {activeStoreName}
+                </span>
+              )
+            )}
+            {/* Región viva estable: el widget aparece tras resolver la query, así
+                el lector de pantalla anuncia el recuento cuando llega. */}
+            <div aria-live="polite" aria-atomic="true">
+              <SalesCounterWidget storeId={activeStore} />
+            </div>
           </div>
         )}
 
