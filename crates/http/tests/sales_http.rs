@@ -1,0 +1,212 @@
+//! Integración HTTP de ventas (`/sales`, slice 1) vía `tower::oneshot`: crear,
+//! consultar por ticket, listar y rechazo sin sesión. Crea una tienda + caja
+//! abierta propias (vía pool admin) para aislarse.
+
+use std::time::Duration;
+
+use axum::body::Body;
+use axum::http::header::{AUTHORIZATION, CONTENT_TYPE};
+use axum::http::{HeaderMap, Request, StatusCode};
+use axum::Router;
+use http_body_util::BodyExt;
+use secrecy::SecretString;
+use simpletpv_auth::{AuthConfig, AuthService, DbUserStateLookup, UserStateService};
+use simpletpv_http::{build_router, AppState};
+use sqlx::postgres::{PgPool, PgPoolOptions};
+use tower::ServiceExt;
+use uuid::Uuid;
+
+const DEV_APP_URL: &str = "postgres://app:app_dev_password@localhost:5434/simpletpv";
+const DEV_ADMIN_URL: &str = "postgres://app_admin:app_admin_dev_password@localhost:5434/simpletpv";
+const PASSWORD: &str = "password123";
+
+async fn pool(env: &str, default: &str) -> PgPool {
+    let url = std::env::var(env).unwrap_or_else(|_| default.to_owned());
+    PgPoolOptions::new()
+        .max_connections(5)
+        .acquire_timeout(Duration::from_secs(5))
+        .connect(&url)
+        .await
+        .expect("conectar a Postgres")
+}
+
+fn auth_config() -> AuthConfig {
+    AuthConfig {
+        access_secret: SecretString::from("test-access-secret".to_owned()),
+        refresh_secret: SecretString::from("test-refresh-secret".to_owned()),
+        access_ttl: Duration::from_secs(900),
+        refresh_ttl: Duration::from_secs(604_800),
+    }
+}
+
+async fn build() -> (Router, PgPool) {
+    let admin = pool("DATABASE_URL_ADMIN", DEV_ADMIN_URL).await;
+    let db = pool("DATABASE_URL_APP", DEV_APP_URL).await;
+    let user_state = UserStateService::new(DbUserStateLookup::new(admin.clone()));
+    let auth = AuthService::new(admin.clone(), auth_config());
+    let state = AppState::new(auth, user_state, db, false, Vec::new());
+    (build_router(state), admin)
+}
+
+async fn send(app: &Router, req: Request<Body>) -> (StatusCode, HeaderMap, String) {
+    let res = app.clone().oneshot(req).await.unwrap();
+    let status = res.status();
+    let headers = res.headers().clone();
+    let bytes = res.into_body().collect().await.unwrap().to_bytes();
+    (status, headers, String::from_utf8(bytes.to_vec()).unwrap())
+}
+
+fn json(body: &str) -> serde_json::Value {
+    serde_json::from_str(body).expect("body JSON")
+}
+
+async fn login(app: &Router, email: &str) -> String {
+    let req = Request::builder()
+        .method("POST")
+        .uri("/auth/login")
+        .header(CONTENT_TYPE, "application/json")
+        .header("x-forwarded-for", "10.0.0.3")
+        .body(Body::from(format!(
+            r#"{{"email":"{email}","password":"{PASSWORD}"}}"#
+        )))
+        .unwrap();
+    let (st, _, body) = send(app, req).await;
+    assert_eq!(st, StatusCode::OK, "login {email}: {body}");
+    json(&body)["accessToken"].as_str().unwrap().to_owned()
+}
+
+fn get(uri: &str, token: &str) -> Request<Body> {
+    Request::builder()
+        .uri(uri)
+        .header(AUTHORIZATION, format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap()
+}
+
+fn body_req(method: &str, uri: &str, token: Option<&str>, json_body: &str) -> Request<Body> {
+    let mut b = Request::builder()
+        .method(method)
+        .uri(uri)
+        .header(CONTENT_TYPE, "application/json");
+    if let Some(t) = token {
+        b = b.header(AUTHORIZATION, format!("Bearer {t}"));
+    }
+    b.body(Body::from(json_body.to_owned())).unwrap()
+}
+
+async fn create_product(app: &Router, token: &str) -> String {
+    let body = format!(r#"{{"name":"SALEH-{}","salePrice":1.0}}"#, Uuid::new_v4());
+    let (st, _, b) = send(app, body_req("POST", "/products", Some(token), &body)).await;
+    assert_eq!(st, StatusCode::CREATED, "{b}");
+    json(&b)["id"].as_str().unwrap().to_owned()
+}
+
+/// Crea una tienda con caja abierta y devuelve su id (vía pool admin).
+async fn store_with_open_session(admin: &PgPool) -> Uuid {
+    let (org, user): (Uuid, Uuid) = {
+        let org: Uuid =
+            sqlx::query_scalar(r#"SELECT id FROM "Organization" WHERE nif = 'B11111111'"#)
+                .fetch_one(admin)
+                .await
+                .unwrap();
+        let user: Uuid = sqlx::query_scalar(
+            r#"SELECT id FROM "User" WHERE "organizationId" = $1 ORDER BY email LIMIT 1"#,
+        )
+        .bind(org)
+        .fetch_one(admin)
+        .await
+        .unwrap();
+        (org, user)
+    };
+    let store = Uuid::new_v4();
+    let code = format!("H{}", &store.simple().to_string()[..8]);
+    sqlx::query(
+        r#"INSERT INTO "Store" (id, "organizationId", name, code) VALUES ($1, $2, $3, $4)"#,
+    )
+    .bind(store)
+    .bind(org)
+    .bind(format!("Tienda {code}"))
+    .bind(&code)
+    .execute(admin)
+    .await
+    .unwrap();
+    sqlx::query(
+        r#"INSERT INTO "CashSession" (id, "organizationId", "storeId", "userId", "openingAmount", status)
+           VALUES ($1, $2, $3, $4, 0, 'OPEN'::"CashSessionStatus")"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(org)
+    .bind(store)
+    .bind(user)
+    .execute(admin)
+    .await
+    .unwrap();
+    store
+}
+
+async fn cleanup(admin: &PgPool, store: Uuid, product: &str) {
+    let pid = Uuid::parse_str(product).unwrap();
+    for sql in [
+        r#"DELETE FROM "StockMovement" WHERE "storeId" = $1"#,
+        r#"DELETE FROM "StockAlert" WHERE "storeId" = $1"#,
+        r#"DELETE FROM "StockBatch" WHERE "storeId" = $1"#,
+        r#"DELETE FROM "Stock" WHERE "storeId" = $1"#,
+        r#"DELETE FROM "SaleLine" WHERE "saleId" IN (SELECT id FROM "Sale" WHERE "storeId" = $1)"#,
+        r#"DELETE FROM "Sale" WHERE "storeId" = $1"#,
+        r#"DELETE FROM "CashSession" WHERE "storeId" = $1"#,
+        r#"DELETE FROM "Store" WHERE id = $1"#,
+    ] {
+        sqlx::query(sql).bind(store).execute(admin).await.unwrap();
+    }
+    sqlx::query(r#"DELETE FROM "Product" WHERE id = $1"#)
+        .bind(pid)
+        .execute(admin)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn create_and_query_sale() {
+    let (app, admin) = build().await;
+    let token = login(&app, "admin@org1.test").await;
+    let store = store_with_open_session(&admin).await;
+    let product = create_product(&app, &token).await;
+
+    // Crear venta (CARD, 2 uds × 1.00 = 2.00) → 201.
+    let body = format!(
+        r#"{{"storeId":"{store}","paymentMethod":"CARD","lines":[{{"productId":"{product}","qty":2}}]}}"#
+    );
+    let (st, _, b) = send(&app, body_req("POST", "/sales", Some(&token), &body)).await;
+    assert_eq!(st, StatusCode::CREATED, "{b}");
+    let sale = json(&b);
+    assert_eq!(sale["total"], "2");
+    assert_eq!(sale["lines"].as_array().unwrap().len(), 1);
+    let ticket = sale["ticketNumber"].as_str().unwrap().to_owned();
+
+    // Consultar por ticket.
+    let (stt, _, bt) = send(&app, get(&format!("/sales/by-ticket/{ticket}"), &token)).await;
+    assert_eq!(stt, StatusCode::OK, "{bt}");
+    assert_eq!(json(&bt)["id"], sale["id"]);
+
+    // Listar por tienda → contiene la venta.
+    let (stl, _, bl) = send(&app, get(&format!("/sales?storeId={store}"), &token)).await;
+    assert_eq!(stl, StatusCode::OK, "{bl}");
+    let page = json(&bl);
+    assert!(page["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|s| s["id"] == sale["id"]));
+    assert!(page["totalItems"].as_i64().unwrap() >= 1);
+
+    cleanup(&admin, store, &product).await;
+}
+
+#[tokio::test]
+async fn unauthenticated_create_is_rejected() {
+    let (app, _admin) = build().await;
+    let body =
+        r#"{"storeId":"00000000-0000-0000-0000-000000000000","paymentMethod":"CARD","lines":[]}"#;
+    let (st, _, _) = send(&app, body_req("POST", "/sales", None, body)).await;
+    assert_eq!(st, StatusCode::UNAUTHORIZED);
+}

@@ -18,6 +18,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::products;
 use crate::routes;
+use crate::sales;
 use crate::state::AppState;
 use crate::stock;
 
@@ -94,6 +95,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/stock/alerts", get(stock::alerts))
         .route("/stock/global", get(stock::global))
         .route("/stock/product/{product_id}", get(stock::by_product))
+        // Ventas (Fase 2, slice 1): crear, reservar bloque, listar, consultar.
+        .route("/sales", post(sales::create).get(sales::list))
+        .route("/sales/ticket-block", post(sales::ticket_block))
+        .route("/sales/by-ticket/{ticket}", get(sales::by_ticket))
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)

@@ -9,6 +9,7 @@ publish = false
 [dependencies]
 simpletpv-shared = { path = "../shared" }
 simpletpv-db = { path = "../db" }
+simpletpv-auth = { path = "../auth" }
 sqlx.workspace = true
 uuid.workspace = true
 serde.workspace = true
