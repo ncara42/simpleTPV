@@ -39,6 +39,13 @@ RUN pnpm --filter @simpletpv/tpv run build
 
 # Imagen unprivileged: corre como usuario `nginx` (no root) y escucha en 8080.
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runner
+# Hardening de la capa base (#112): la imagen oficial fija paquetes Alpine que
+# arrastran CVEs ya parcheados upstream (openssl/libcrypto3/libssl3, libpng,
+# libxml2, libexpat...). `apk upgrade` trae las versiones corregidas del repo
+# Alpine sin tocar la app. Se ejecuta como root y luego se vuelve a `nginx`.
+USER root
+RUN apk upgrade --no-cache
+USER nginx
 ENV API_URL=http://simpletpv-api:3001
 COPY --from=builder /repo/apps/tpv/dist /usr/share/nginx/html
 COPY apps/tpv/nginx.conf.template /etc/nginx/templates/default.conf.template

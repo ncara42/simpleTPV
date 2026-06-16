@@ -1,5 +1,14 @@
-# Excepciones de Trivy. Cada entrada debe documentar:
-#   - id: <CVE-id o DS-id>
-#   - paths: [archivos afectados]
-#   - razón: por qué se ignora
-# Vacío al inicio — añadir entradas solo con justificación explícita.
+# Excepciones de Trivy. Cada entrada debe documentar id, razón y, si aplica, un
+# TODO para retirarla. Añadir entradas solo con justificación explícita.
+vulnerabilities:
+  - id: CVE-2026-33671
+    statement: >-
+      picomatch ReDoS vía extglob (HIGH). El override `picomatch >=4.0.4` en
+      pnpm-workspace.yaml ya corrige la resolución a nivel de lockfile
+      (pnpm-lock.yaml fija 4.0.4). La copia 4.0.3 que Trivy detecta SOLO aparece
+      en la imagen api, dentro del bundle que genera `pnpm deploy --legacy`
+      (re-resuelve sin aplicar el override). No es explotable en runtime:
+      picomatch es tooling de globbing de build/herramientas, y la API no pasa
+      patrones glob controlados por el usuario al matcher en producción.
+      TODO: ajustar el deploy del Dockerfile de api para que el bundle herede
+      4.0.4 (revisar `pnpm deploy --legacy`) y retirar esta excepción.

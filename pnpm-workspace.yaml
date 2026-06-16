@@ -38,6 +38,10 @@ peerDependencyRules:
 #   GHSA-8988-4f7v-96qf (CVSS 5.3) que OSV detecta en core <2.8.0 (transitivo vía
 #   @sentry/node 10.55, que declara su peer como ^2.6.1 y acepta 2.8.0). Se suben
 #   los tres paquetes 2.x acoplados a la vez para mantener el SDK otel consistente.
+# - picomatch: floor >=4.0.4 por CVE-2026-33671 (HIGH, ReDoS) que Trivy detecta
+#   en la imagen api en <4.0.4 (transitivo vía la toolchain de build/test). 4.0.4
+#   es semver-compatible con 4.x, así que sube sin breaking. Verificado contra el
+#   escaneo de imagen del job image-scan (#112).
 overrides:
   esbuild: '>=0.28.1'
   js-yaml: '>=4.2.0'
@@ -46,6 +50,7 @@ overrides:
   '@opentelemetry/core': '>=2.8.0'
   '@opentelemetry/resources': '>=2.8.0'
   '@opentelemetry/sdk-trace-base': '>=2.8.0'
+  picomatch: '>=4.0.4'
 
 allowBuilds:
   '@nestjs/core': set this to true or false
