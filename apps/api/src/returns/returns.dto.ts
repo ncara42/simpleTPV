@@ -9,10 +9,11 @@ import {
   IsString,
   IsUUID,
   Max,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 
-import { MAX_QUANTITY } from '../common/limits.js';
+import { MAX_NOTES_LENGTH, MAX_QUANTITY } from '../common/limits.js';
 
 export class CreateReturnLineDto {
   @IsUUID()
@@ -33,6 +34,7 @@ export class CreateReturnDto {
   // Motivo obligatorio (auditoría). @IsNotEmpty rechaza la cadena vacía.
   @IsString()
   @IsNotEmpty()
+  @MaxLength(MAX_NOTES_LENGTH)
   reason!: string;
 
   @IsArray()
@@ -64,11 +66,13 @@ export class CreateBlindReturnDto {
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(MAX_NOTES_LENGTH)
   reason!: string;
 
   // PIN (4-8 dígitos) de un MANAGER/ADMIN del tenant que autoriza la devolución.
   @IsString()
   @IsNotEmpty()
+  @MaxLength(8)
   managerPin!: string;
 
   @IsArray()

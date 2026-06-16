@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsPositive,
@@ -11,12 +12,19 @@ import {
   IsUUID,
   Matches,
   Max,
+  MaxLength,
   Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
 
-import { MAX_PRICE, MAX_QUANTITY } from '../common/limits.js';
+import {
+  MAX_BARCODE_LENGTH,
+  MAX_COVERAGE_DAYS,
+  MAX_NOTES_LENGTH,
+  MAX_PRICE,
+  MAX_QUANTITY,
+} from '../common/limits.js';
 
 export class CreatePurchaseOrderLineDto {
   @IsUUID()
@@ -46,6 +54,7 @@ export class CreatePurchaseOrderDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_NOTES_LENGTH)
   notes?: string;
 
   @IsArray()
@@ -71,6 +80,7 @@ export class ReceivePurchaseOrderLineDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(MAX_BARCODE_LENGTH)
   lotCode?: string;
 
   @IsOptional()
@@ -97,8 +107,12 @@ export class SuggestPurchaseOrderDto {
   supplierId?: string;
 
   // Días de cobertura objetivo para la fórmula de sugerencia (default 14).
+  // Entero acotado: sin tope, un valor enorme/Infinity contamina la aritmética
+  // de la sugerencia de compra.
   @IsOptional()
+  @IsInt()
   @IsPositive()
+  @Max(MAX_COVERAGE_DAYS)
   daysCoverage?: number;
 }
 

@@ -1,5 +1,6 @@
 import { UserRole } from '@simpletpv/db';
 import {
+  ArrayMaxSize,
   ArrayUnique,
   IsArray,
   IsBoolean,
@@ -13,6 +14,8 @@ import {
   MinLength,
 } from 'class-validator';
 
+import { MAX_ARRAY_SIZE, MAX_NAME_LENGTH } from '../common/limits.js';
+
 // bcryptjs descarta en silencio los bytes 73+ antes de hashear, así que dos
 // contraseñas que compartan los primeros 72 bytes producirían el mismo hash
 // (CWE-916). Topamos la longitud para rechazar de forma explícita ese caso en
@@ -25,6 +28,7 @@ export class CreateUserDto {
 
   @IsString()
   @MinLength(1)
+  @MaxLength(MAX_NAME_LENGTH)
   name!: string;
 
   @IsString()
@@ -40,6 +44,7 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(MAX_NAME_LENGTH)
   name?: string;
 
   @IsOptional()
@@ -73,6 +78,7 @@ export class SetPinDto {
 
 export class AssignStoresDto {
   @IsArray()
+  @ArrayMaxSize(MAX_ARRAY_SIZE)
   @ArrayUnique()
   @IsUUID('4', { each: true })
   storeIds!: string[];

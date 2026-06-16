@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsBoolean,
   IsInt,
@@ -15,7 +16,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-import { MAX_PRICE, MAX_QUANTITY } from '../common/limits.js';
+import { MAX_ARRAY_SIZE, MAX_PAGE, MAX_PRICE, MAX_QUANTITY } from '../common/limits.js';
 
 // ── Clientes B2B ──────────────────────────────────────────────────────────────
 export class CreateCustomerDto {
@@ -143,6 +144,7 @@ export class CreateWholesaleOrderDto {
 
   @ValidateNested({ each: true })
   @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_ARRAY_SIZE)
   @Type(() => WholesaleOrderLineDto)
   lines!: WholesaleOrderLineDto[];
 }
@@ -165,6 +167,7 @@ export class ListWholesaleOrdersQueryDto {
   @IsOptional()
   @IsInt()
   @Min(1)
+  @Max(MAX_PAGE)
   @Type(() => Number)
   page?: number;
 }
