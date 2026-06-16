@@ -81,11 +81,24 @@ function makePrisma() {
       findMany: vi.fn(async (_a?: unknown): Promise<unknown[]> => []),
       create: vi.fn(async (_a?: unknown): Promise<unknown> => ({ id: 'cm-1' })),
     },
+    // Lock pesimista del fix TOCTOU (RACE-02): withTenantTx fija el tenant con
+    // set_config y createMovement ejecuta SELECT ... FOR UPDATE sobre la sesión.
+    $executeRaw: vi.fn(
+      async (_strings?: TemplateStringsArray, ..._values: unknown[]): Promise<number> => 1,
+    ),
+  };
+}
+
+// Cliente BASE para withTenantTx: $transaction ejecuta el callback con el MISMO
+// mock como tx (así findFirst/create/$executeRaw quedan observables en el test).
+function makeBase(prisma: ReturnType<typeof makePrisma>) {
+  return {
+    $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma)),
   };
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
-  return new CashSessionsService(prisma as never);
+  return new CashSessionsService(prisma as never, makeBase(prisma) as never);
 }
 
 describe('CashSessionsService.open', () => {
@@ -436,5 +449,44 @@ describe('CashSessionsService.createMovement', () => {
     expect(arg.data.amount).toBe(30);
     expect(arg.data.reason).toBe('Fondo');
     expect(result.reason).toBe('Fondo');
+  });
+
+  it('RACE-02: bloquea la fila (FOR UPDATE) ANTES de leer el estado de la sesión', async () => {
+    const prisma = makePrisma();
+    const calls: string[] = [];
+    // withTenantTx emite primero un set_config (fija el tenant) y luego
+    // createMovement emite el SELECT ... FOR UPDATE. Distinguimos por contenido.
+    prisma.$executeRaw = vi.fn(async (strings?: TemplateStringsArray) => {
+      const sql = (strings ?? ([''] as unknown as TemplateStringsArray)).join('');
+      calls.push(sql.includes('FOR UPDATE') ? 'lock' : 'set_config');
+      return 1;
+    });
+    prisma.cashSession.findFirst = vi.fn(async () => {
+      calls.push('read');
+      return { id: 'cs-1', status: 'OPEN', storeId: STORE };
+    });
+    const service = makeService(prisma);
+
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      service.createMovement('cs-1', { type: 'IN', amount: 10, reason: 'fondo' }, 'user-1'),
+    );
+
+    // El lock pesimista debe adquirirse antes de comprobar status (sin él, un
+    // close concurrente podría colarse entre la lectura y el create).
+    expect(calls).toEqual(['set_config', 'lock', 'read']);
+  });
+
+  it('RACE-02: 400 si la sesión pasó a CLOSED (el create no llega a ejecutarse)', async () => {
+    const prisma = makePrisma();
+    // Tras el lock, la relectura ve la sesión ya cerrada por el close concurrente.
+    prisma.cashSession.findFirst = vi.fn(async () => ({ id: 'cs-1', status: 'CLOSED' }));
+    const service = makeService(prisma);
+
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () =>
+        service.createMovement('cs-1', { type: 'OUT', amount: 10, reason: 'retirada' }, 'user-1'),
+      ),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.cashMovement.create).not.toHaveBeenCalled();
   });
 });
