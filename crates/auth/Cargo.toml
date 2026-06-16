@@ -1,0 +1,22 @@
+[package]
+name = "simpletpv-auth"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+simpletpv-shared = { path = "../shared" }
+sqlx.workspace = true
+uuid.workspace = true
+serde.workspace = true
+jsonwebtoken.workspace = true
+bcrypt.workspace = true
+secrecy.workspace = true
+tokio = { workspace = true }
+tracing.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
