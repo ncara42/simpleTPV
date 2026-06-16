@@ -70,6 +70,12 @@ export function updateStoreOps(id: string, input: StoreOpsInput): Promise<Store>
   return api.patch<Store>(`/stores/${id}/ops`, input);
 }
 
+// Designa (o desmarca) la tienda central de la organización (#146). Marcar una
+// nueva desmarca la anterior en el backend (una sola central por organización).
+export function setStoreCentral(id: string, isCentral: boolean): Promise<Store> {
+  return api.patch<Store>(`/stores/${id}/central`, { isCentral });
+}
+
 export function deleteStore(id: string): Promise<void> {
   return api.del(`/stores/${id}`);
 }

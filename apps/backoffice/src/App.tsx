@@ -37,6 +37,7 @@ import { FamiliesPage } from './FamiliesPage.js';
 import { HelpPage } from './HelpPage.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { useBranding } from './lib/branding.js';
+import { listPendingCashMovements } from './lib/cash.js';
 import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { switchApp, type Tab } from './lib/nav.js';
@@ -171,12 +172,18 @@ function Home() {
     setNavSearch(productName);
     setTab('stock');
   };
-  // U-11/D-17: badge de la campana = nº de roturas activas (misma queryKey que
-  // Notificaciones; refresca con el SSE de esa vista).
+  // U-11/D-17: badge de la campana = roturas de stock activas + solicitudes de
+  // caja pendientes (#146). Mismas queryKeys que Notificaciones (refresca con el
+  // SSE de esa vista).
   const { data: alerts = [] } = useQuery({
     queryKey: ['stock-alerts'],
     queryFn: () => listAlerts(),
   });
+  const { data: pendingCash = [] } = useQuery({
+    queryKey: ['pending-cash-movements'],
+    queryFn: () => listPendingCashMovements(),
+  });
+  const notificationCount = alerts.length + pendingCash.length;
 
   return (
     <div className="app-shell">
@@ -210,7 +217,7 @@ function Home() {
               setTab(t);
             }}
             onNotifications={toggleNotifications}
-            notificationCount={alerts.length}
+            notificationCount={notificationCount}
             notificationsActive={tab === 'notifications'}
           />
           <main className="bo-main">

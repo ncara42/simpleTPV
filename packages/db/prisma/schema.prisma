@@ -88,13 +88,19 @@ model Store {
   opsVerified    Boolean   @default(false)
   opsIncident    String?
   opsUpdatedAt   DateTime?
+  // Tienda central de la organización (#146): destino de los traspasos de efectivo.
+  // Una sola por organización, garantizada por el índice único parcial
+  // `one_central_per_org` definido en SQL en la migración.
+  isCentral      Boolean   @default(false)
   createdAt      DateTime @default(now())
 
   organization     Organization     @relation(fields: [organizationId], references: [id])
   users            UserStore[]
   sales            Sale[]
   cashSessions     CashSession[]
-  cashMovements    CashMovement[]
+  cashMovements    CashMovement[]   @relation("CashMovementStore")
+  // Movimientos cuyo destino es esta tienda (traspasos a central, #146).
+  cashMovementsIn  CashMovement[]   @relation("CashMovementTarget")
   returns          Return[]
   stock            Stock[]
   stockBatches     StockBatch[]
@@ -127,7 +133,10 @@ model User {
   stores           UserStore[]
   sales            Sale[]
   cashSessions     CashSession[]
-  cashMovements    CashMovement[]
+  cashMovements    CashMovement[]   @relation("CashMovementUser")
+  // Movimientos de efectivo que este usuario solicitó / revisó (aprobó o denegó) (#146).
+  cashMovementsRequested CashMovement[] @relation("CashMovementRequestedBy")
+  cashMovementsReviewed  CashMovement[] @relation("CashMovementReviewedBy")
   returns          Return[]
   stockMovements   StockMovement[]
   timeClockEntries TimeClockEntry[]
@@ -737,23 +746,37 @@ model CashSession {
 }
 
 model CashMovement {
-  id             String           @id @default(uuid()) @db.Uuid
-  organizationId String           @db.Uuid
-  cashSessionId  String           @db.Uuid
-  storeId        String           @db.Uuid
-  userId         String           @db.Uuid
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @db.Uuid
+  cashSessionId  String             @db.Uuid
+  storeId        String             @db.Uuid
+  // userId = autor del movimiento. Se conserva por compatibilidad de datos y es
+  // igual a requestedById en altas nuevas (#146 D-4).
+  userId         String             @db.Uuid
   type           CashMovementType
-  amount         Decimal          @db.Decimal(12, 2)
+  amount         Decimal            @db.Decimal(12, 2)
   reason         String
-  createdAt      DateTime         @default(now())
+  // Flujo de aprobación (#146): estado, quién solicita y quién revisa.
+  status         CashMovementStatus @default(PENDING)
+  requestedById  String             @db.Uuid
+  reviewedById   String?            @db.Uuid
+  reviewedAt     DateTime?
+  // Destino del traspaso (solo TRANSFER_OUT → tienda central). NULL en IN/OUT.
+  targetStoreId  String?            @db.Uuid
+  createdAt      DateTime           @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id])
   cashSession  CashSession  @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
-  store        Store        @relation(fields: [storeId], references: [id])
-  user         User         @relation(fields: [userId], references: [id])
+  store        Store        @relation("CashMovementStore", fields: [storeId], references: [id])
+  user         User         @relation("CashMovementUser", fields: [userId], references: [id])
+  requestedBy  User         @relation("CashMovementRequestedBy", fields: [requestedById], references: [id])
+  reviewedBy   User?        @relation("CashMovementReviewedBy", fields: [reviewedById], references: [id])
+  targetStore  Store?       @relation("CashMovementTarget", fields: [targetStoreId], references: [id])
 
   @@index([organizationId, cashSessionId, createdAt])
   @@index([organizationId, storeId, createdAt])
+  // Listado de solicitudes pendientes de la organización (campana, #146 D-7).
+  @@index([organizationId, status, createdAt])
 }
 
 model OfficialDevice {
@@ -827,6 +850,16 @@ enum CashSessionStatus {
 enum CashMovementType {
   IN
   OUT
+  TRANSFER_OUT // traspaso de efectivo a la tienda central (#146)
+}
+
+// Máquina de estados del movimiento de efectivo (#146). Nace PENDING (solicitado
+// por el CLERK) y un aprobador (ADMIN/MANAGER) lo pasa a APPROVED o DENIED. La
+// transición es única e irreversible: un DENIED no se reabre, se vuelve a solicitar.
+enum CashMovementStatus {
+  PENDING
+  APPROVED
+  DENIED
 }
 
 enum TimeClockType {

@@ -11,6 +11,7 @@ function makeService() {
     create: vi.fn(async (dto: unknown) => ({ id: 'store-2', ...(dto as object) })),
     update: vi.fn(async (id: string, dto: unknown) => ({ id, ...(dto as object) })),
     remove: vi.fn(async (_id: string) => undefined),
+    setCentral: vi.fn(async (id: string, isCentral: boolean) => ({ id, isCentral })),
   };
 }
 
@@ -54,5 +55,24 @@ describe('StoresController', () => {
     await ctrl.remove('store-1');
 
     expect(svc.remove).toHaveBeenCalledWith('store-1');
+  });
+
+  it('setCentral marca por defecto (isCentral implícito = true)', async () => {
+    const svc = makeService();
+    const ctrl = new StoresController(svc as never);
+
+    const res = await ctrl.setCentral('store-1', {});
+
+    expect(svc.setCentral).toHaveBeenCalledWith('store-1', true);
+    expect(res).toMatchObject({ id: 'store-1', isCentral: true });
+  });
+
+  it('setCentral con isCentral=false desmarca la tienda', async () => {
+    const svc = makeService();
+    const ctrl = new StoresController(svc as never);
+
+    await ctrl.setCentral('store-1', { isCentral: false });
+
+    expect(svc.setCentral).toHaveBeenCalledWith('store-1', false);
   });
 });

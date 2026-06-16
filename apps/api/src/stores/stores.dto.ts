@@ -24,6 +24,15 @@ export class CreateStoreDto {
   active?: boolean;
 }
 
+// Designación de tienda central (#146). Por defecto marca la tienda como central
+// (y desmarca la anterior). Con isCentral=false la desmarca (la org se queda sin
+// central hasta que se designe otra).
+export class MarkCentralDto {
+  @IsOptional()
+  @IsBoolean()
+  isCentral?: boolean;
+}
+
 export class UpdateStoreDto {
   @IsOptional()
   @IsString()

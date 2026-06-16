@@ -88,6 +88,16 @@ describe('cableado API real', () => {
       amount: 25,
       reason: 'Retirada',
     });
+    await cash.requestCashMovement('cs-1', {
+      type: 'TRANSFER_OUT',
+      amount: 40,
+      reason: 'A central',
+    });
+    expect(post).toHaveBeenCalledWith('/cash-sessions/cs-1/movements/request', {
+      type: 'TRANSFER_OUT',
+      amount: 40,
+      reason: 'A central',
+    });
     await cash.listClosedCashSessions('store-1');
     expect(get).toHaveBeenLastCalledWith('/cash-sessions/closed', { storeId: 'store-1' });
     await cash.listClosedCashSessions('store-1', 50);

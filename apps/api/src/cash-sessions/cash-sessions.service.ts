@@ -2,14 +2,17 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 
 import { assertStoreAccess } from '../auth/store-access.js';
 import { round2 } from '../common/money.js';
+import { EVENT_BUS, type EventBus } from '../events/event-bus.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
+import type { TxClient } from '../prisma/with-tenant-tx.js';
 import { withTenantTx } from '../prisma/with-tenant-tx.js';
 import type {
   CloseCashSessionDto,
   CreateCashMovementDto,
   OpenCashSessionDto,
+  RequestCashMovementDto,
 } from './cash-sessions.dto.js';
 
 /**
@@ -39,7 +42,35 @@ export class CashSessionsService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(PRISMA_BASE) private readonly base: PrismaService,
+    @Inject(EVENT_BUS) private readonly events: EventBus,
   ) {}
+
+  /**
+   * Resuelve la tienda central de la organización (destino obligatorio de los
+   * traspasos, #146 D-3). Lanza 400 si no hay central configurada o si el origen
+   * ES la propia central (no tiene sentido traspasarse a sí misma).
+   */
+  private async resolveCentralStoreId(
+    tx: TxClient,
+    organizationId: string,
+    sourceStoreId: string,
+  ): Promise<string> {
+    const central = await tx.store.findFirst({
+      where: { organizationId, isCentral: true },
+      select: { id: true },
+    });
+    if (!central) {
+      throw new BadRequestException(
+        'No hay una tienda central configurada para los traspasos',
+      );
+    }
+    if (central.id === sourceStoreId) {
+      throw new BadRequestException(
+        'La tienda central no puede traspasar efectivo a sí misma',
+      );
+    }
+    return central.id;
+  }
 
   /**
    * Abre una caja para una tienda del tenant. Solo puede haber una sesión OPEN
@@ -112,6 +143,19 @@ export class CashSessionsService {
         throw new BadRequestException('La caja ya está cerrada');
       }
 
+      // Auto-denegación de solicitudes pendientes al cerrar (#146 D-6): un PENDING
+      // no puede aprobarse contra una sesión ya cerrada. Dentro del lock pesimista,
+      // así un request/approve concurrente espera al commit y re-lee la sesión
+      // CLOSED → 400 (no quedan PENDING colgando de una caja cerrada).
+      await tx.cashMovement.updateMany({
+        where: {
+          organizationId: tenant.organizationId,
+          cashSessionId: session.id,
+          status: 'PENDING',
+        },
+        data: { status: 'DENIED', reviewedById: userId, reviewedAt: new Date() },
+      });
+
       // Ventas en efectivo del turno: misma tienda, COMPLETED, CASH, desde la
       // apertura. Las VOIDED no cuentan (status COMPLETED). CARD tampoco.
       const agg = await tx.sale.aggregate({
@@ -130,14 +174,18 @@ export class CashSessionsService {
       // refleja cualquier movimiento que entrara antes de adquirir el lock, y un
       // `createMovement` que llegue después esperará a este commit y re-leerá la
       // sesión ya CLOSED → 400. Es la pieza clave del cierre del TOCTOU.
+      // Solo los movimientos APPROVED afectan al cuadre (#146 D-6): un PENDING no
+      // cuenta hasta aprobarse, y los recién auto-denegados arriba quedan fuera.
       const movementAgg = await tx.cashMovement.groupBy({
         by: ['type'],
         where: {
           organizationId: tenant.organizationId,
           cashSessionId: session.id,
+          status: 'APPROVED',
         },
         _sum: { amount: true },
       });
+      // IN suma; OUT y TRANSFER_OUT (traspaso a central) salen del cajón → restan.
       const movementNet = movementAgg.reduce((acc, row) => {
         const amount = Number(row._sum.amount ?? 0);
         return acc + (row.type === 'IN' ? amount : -amount);
@@ -241,25 +289,22 @@ export class CashSessionsService {
   }
 
   /**
-   * Registra un movimiento manual de efectivo (IN/OUT) en una sesión abierta.
+   * Alta DIRECTA de movimiento (legacy ADMIN/MANAGER, #146 P-1): el aprobador que
+   * actúa en su propia tienda no necesita el doble paso, así que el movimiento
+   * nace ya APPROVED (requestedBy = reviewedBy = el propio actor). Se mantiene por
+   * compatibilidad junto al flujo request→approve.
    *
-   * TOCTOU (RACE-02): la lectura del estado y el create deben compartir UNA
-   * transacción con lock pesimista sobre la fila de la sesión. Sin él, un `close`
-   * concurrente que se cuele entre la comprobación de `status` y el `create`
-   * permitiría insertar un movimiento en una sesión ya CLOSED → el
-   * `expectedAmount` calculado al cerrar no lo reflejaría y se corrompe el
-   * cuadre. Con `SELECT ... FOR UPDATE` la creación espera al commit del cierre
-   * concurrente y, al releer, ve `status = 'CLOSED'` y rechaza con 400. Usa el
-   * cliente BASE (`withTenantTx`) para abrir una sola transacción con RLS fijada.
+   * TOCTOU (RACE-02): la lectura del estado y el create comparten UNA transacción
+   * con lock pesimista sobre la fila de la sesión. Sin él, un `close` concurrente
+   * que se cuele entre la comprobación de `status` y el `create` permitiría
+   * insertar un movimiento (ya APPROVED) en una sesión cuyo `expectedAmount` no lo
+   * reflejaría → cuadre corrupto. Con `SELECT ... FOR UPDATE` la creación espera al
+   * commit del cierre y, al releer, ve `status = 'CLOSED'` → 400.
    */
-  async createMovement(id: string, dto: CreateCashMovementDto, userId: string) {
+  async createMovement(id: string, dto: CreateCashMovementDto, userId: string, role: string) {
     const tenant = requireTenant();
 
     return withTenantTx(this.base, tenant.organizationId, async (tx) => {
-      // Lock pesimista de la fila de la sesión ANTES de leer su estado. Serializa
-      // un `close` concurrente: el segundo actor espera al commit del primero y
-      // entonces lee el `status` actualizado. Si la sesión no existe no bloquea
-      // ninguna fila y el findFirst posterior lanza 404. RLS ya restringe al tenant.
       await tx.$executeRaw`SELECT id FROM "CashSession" WHERE id = ${id}::uuid FOR UPDATE`;
 
       const session = await tx.cashSession.findFirst({
@@ -268,9 +313,15 @@ export class CashSessionsService {
       if (!session) {
         throw new NotFoundException(`Sesión de caja ${id} no encontrada`);
       }
+      // Aislamiento por tienda (SEC-01): acota al CLERK; ADMIN/MANAGER org-wide.
+      await assertStoreAccess(tx, { userId, role, storeId: session.storeId });
       if (session.status !== 'OPEN') {
         throw new BadRequestException('La caja ya está cerrada');
       }
+      const targetStoreId =
+        dto.type === 'TRANSFER_OUT'
+          ? await this.resolveCentralStoreId(tx, tenant.organizationId, session.storeId)
+          : undefined;
       return tx.cashMovement.create({
         data: {
           organizationId: tenant.organizationId,
@@ -280,8 +331,165 @@ export class CashSessionsService {
           type: dto.type,
           amount: dto.amount,
           reason: dto.reason.trim(),
+          status: 'APPROVED',
+          requestedById: userId,
+          reviewedById: userId,
+          reviewedAt: new Date(),
+          ...(targetStoreId ? { targetStoreId } : {}),
         },
       });
+    });
+  }
+
+  /**
+   * SOLICITA un movimiento de efectivo desde el TPV (#146): cualquier rol operativo
+   * (incluido CLERK) lo crea PENDING; un ADMIN/MANAGER lo aprobará o denegará luego.
+   * Para TRANSFER_OUT fija `targetStoreId` = tienda central de la organización.
+   *
+   * Mismo lock pesimista que `createMovement`: si la caja se cierra en paralelo, la
+   * solicitud espera al commit y re-lee CLOSED → 400 (no quedan PENDING colgando de
+   * una caja cerrada). Tras commit emite `cash.movement.requested` para la campana.
+   */
+  async requestMovement(id: string, dto: RequestCashMovementDto, userId: string, role: string) {
+    const tenant = requireTenant();
+
+    return withTenantTx(this.base, tenant.organizationId, async (tx, afterCommit) => {
+      await tx.$executeRaw`SELECT id FROM "CashSession" WHERE id = ${id}::uuid FOR UPDATE`;
+
+      const session = await tx.cashSession.findFirst({
+        where: { id, organizationId: tenant.organizationId },
+      });
+      if (!session) {
+        throw new NotFoundException(`Sesión de caja ${id} no encontrada`);
+      }
+      // Aislamiento por tienda (SEC-01): un CLERK solo solicita en sus tiendas.
+      await assertStoreAccess(tx, { userId, role, storeId: session.storeId });
+      if (session.status !== 'OPEN') {
+        throw new BadRequestException('La caja ya está cerrada');
+      }
+      const targetStoreId =
+        dto.type === 'TRANSFER_OUT'
+          ? await this.resolveCentralStoreId(tx, tenant.organizationId, session.storeId)
+          : undefined;
+      const movement = await tx.cashMovement.create({
+        data: {
+          organizationId: tenant.organizationId,
+          cashSessionId: id,
+          storeId: session.storeId,
+          userId,
+          type: dto.type,
+          amount: dto.amount,
+          reason: dto.reason.trim(),
+          status: 'PENDING',
+          requestedById: userId,
+          ...(targetStoreId ? { targetStoreId } : {}),
+        },
+      });
+      // Refresco en vivo de la campana de aprobaciones (#146 D-7/P-3). Best-effort:
+      // si el bus falla no revierte la solicitud (ya confirmada).
+      afterCommit(async () => {
+        await this.events.publish(tenant.organizationId, {
+          type: 'cash.movement.requested',
+          data: {
+            movementId: movement.id,
+            storeId: movement.storeId,
+            type: movement.type,
+            amount: movement.amount.toString(),
+          },
+        });
+      });
+      return movement;
+    });
+  }
+
+  /**
+   * Solicitudes PENDING de la organización (#146 D-7): fuente de la campana del
+   * backoffice. Org-wide para ADMIN/MANAGER (RLS aísla por tenant). De la más
+   * reciente a la más antigua.
+   */
+  async listPendingMovements() {
+    const tenant = requireTenant();
+    // Enriquecemos con el nombre de la tienda y del solicitante para que la campana
+    // del backoffice los muestre sin un lookup extra (D-7).
+    return this.prisma.cashMovement.findMany({
+      where: { organizationId: tenant.organizationId, status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        store: { select: { name: true } },
+        requestedBy: { select: { name: true } },
+      },
+    });
+  }
+
+  /**
+   * APRUEBA una solicitud (PENDING → APPROVED, #146). Solo ADMIN/MANAGER. Bajo el
+   * lock de la sesión (serializa con el cierre): aprobar tras el cálculo del
+   * `expectedAmount` corrompería el cuadre, así que exige sesión OPEN dentro del
+   * lock. La transición es atómica (updateMany condicional status=PENDING) para
+   * que dos aprobadores concurrentes no la dupliquen.
+   */
+  async approveMovement(movId: string, userId: string, role: string) {
+    const tenant = requireTenant();
+
+    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+      const movement = await tx.cashMovement.findFirst({
+        where: { id: movId, organizationId: tenant.organizationId },
+      });
+      if (!movement) {
+        throw new NotFoundException(`Movimiento ${movId} no encontrado`);
+      }
+      // Aislamiento por tienda (SEC-01): acota al CLERK; ADMIN/MANAGER org-wide.
+      await assertStoreAccess(tx, { userId, role, storeId: movement.storeId });
+
+      // Lock de la sesión: serializa con un cierre concurrente.
+      await tx.$executeRaw`SELECT id FROM "CashSession" WHERE id = ${movement.cashSessionId}::uuid FOR UPDATE`;
+      const session = await tx.cashSession.findFirst({
+        where: { id: movement.cashSessionId, organizationId: tenant.organizationId },
+        select: { status: true },
+      });
+      if (!session || session.status !== 'OPEN') {
+        throw new BadRequestException('La caja ya está cerrada');
+      }
+
+      const updated = await tx.cashMovement.updateMany({
+        where: { id: movId, organizationId: tenant.organizationId, status: 'PENDING' },
+        data: { status: 'APPROVED', reviewedById: userId, reviewedAt: new Date() },
+      });
+      if (updated.count === 0) {
+        throw new BadRequestException('El movimiento ya no está pendiente');
+      }
+      return tx.cashMovement.findFirstOrThrow({
+        where: { id: movId, organizationId: tenant.organizationId },
+      });
+    });
+  }
+
+  /**
+   * DENIEGA una solicitud (PENDING → DENIED, #146). Solo ADMIN/MANAGER. No toca el
+   * cuadre (un DENIED nunca cuenta), así que no requiere sesión OPEN ni lock de
+   * cierre; la transición es atómica vía updateMany condicional.
+   */
+  async denyMovement(movId: string, userId: string, role: string) {
+    const tenant = requireTenant();
+    const movement = await this.prisma.cashMovement.findFirst({
+      where: { id: movId, organizationId: tenant.organizationId },
+      select: { id: true, storeId: true },
+    });
+    if (!movement) {
+      throw new NotFoundException(`Movimiento ${movId} no encontrado`);
+    }
+    // Aislamiento por tienda (SEC-01): acota al CLERK; ADMIN/MANAGER org-wide.
+    await assertStoreAccess(this.prisma, { userId, role, storeId: movement.storeId });
+
+    const updated = await this.prisma.cashMovement.updateMany({
+      where: { id: movId, organizationId: tenant.organizationId, status: 'PENDING' },
+      data: { status: 'DENIED', reviewedById: userId, reviewedAt: new Date() },
+    });
+    if (updated.count === 0) {
+      throw new BadRequestException('El movimiento ya no está pendiente');
+    }
+    return this.prisma.cashMovement.findFirstOrThrow({
+      where: { id: movId, organizationId: tenant.organizationId },
     });
   }
 }

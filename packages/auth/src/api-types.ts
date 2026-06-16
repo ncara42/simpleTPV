@@ -130,6 +130,9 @@ export interface Store {
   opsVerified: boolean;
   opsIncident: string | null;
   opsUpdatedAt: string | null;
+  // Tienda central de la organización (#146): destino de los traspasos de efectivo.
+  // Una sola por organización (índice único parcial en DB).
+  isCentral: boolean;
 }
 
 export interface StoreOpsInput {
@@ -280,7 +283,12 @@ export interface CashSession {
   closedAt: string | null;
 }
 
-export type CashMovementType = 'IN' | 'OUT';
+// IN = ingreso en el cajón, OUT = retirada, TRANSFER_OUT = traspaso a la central (#146).
+export type CashMovementType = 'IN' | 'OUT' | 'TRANSFER_OUT';
+
+// Flujo solicitud → aprobación (#146): nace PENDING (lo solicita el CLERK) y un
+// ADMIN/MANAGER lo APPROVED o DENIED. El cuadre solo cuenta los APPROVED.
+export type CashMovementStatus = 'PENDING' | 'APPROVED' | 'DENIED';
 
 export interface CashMovement {
   id: string;
@@ -290,10 +298,33 @@ export interface CashMovement {
   type: CashMovementType;
   amount: string;
   reason: string;
+  status: CashMovementStatus;
+  // Quién solicitó (sub del JWT) y quién revisó (aprobó/denegó), null mientras PENDING.
+  requestedById: string;
+  reviewedById: string | null;
+  reviewedAt: string | null;
+  // Destino del traspaso (solo TRANSFER_OUT → tienda central); null en IN/OUT.
+  targetStoreId: string | null;
   createdAt: string;
 }
 
+// Solicitud PENDING enriquecida para la campana del backoffice (#146): incluye el
+// nombre de la tienda de origen y del solicitante (GET /cash-sessions/movements/pending).
+export interface PendingCashMovement extends CashMovement {
+  store: { name: string };
+  requestedBy: { name: string };
+}
+
+// Alta directa de movimiento (legacy ADMIN/MANAGER): se crea ya APPROVED.
 export interface CreateCashMovementInput {
+  type: CashMovementType;
+  amount: number;
+  reason: string;
+}
+
+// Solicitud de movimiento desde el TPV (CLERK/MANAGER/ADMIN): se crea PENDING. El
+// destino del traspaso lo resuelve el backend (tienda central de la organización).
+export interface RequestCashMovementInput {
   type: CashMovementType;
   amount: number;
   reason: string;
@@ -619,7 +650,13 @@ export interface TimeClockLogRow {
 }
 
 // Evento del canal SSE GET /events (semana 3). El cliente filtra por `type`.
-export type AppEventType = 'stock.changed' | 'sale.completed' | 'alert.created';
+// cash.movement.requested (#146): un CLERK solicitó un movimiento de efectivo;
+// refresca la campana de aprobaciones del backoffice en vivo.
+export type AppEventType =
+  | 'stock.changed'
+  | 'sale.completed'
+  | 'alert.created'
+  | 'cash.movement.requested';
 export interface AppEvent {
   type: AppEventType;
   data: Record<string, unknown>;

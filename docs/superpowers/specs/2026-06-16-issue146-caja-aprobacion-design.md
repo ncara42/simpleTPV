@@ -1,7 +1,8 @@
 # Diseño — Flujo de aprobación de movimientos de efectivo con tienda central (#146)
 
-> Estado: **propuesta** (pendiente de visto bueno antes de la migración). Fase 3 de las mejoras del TPV.
+> Estado: **implementada**. Fase 3 de las mejoras del TPV.
 > Issues relacionadas: cierra #146. Depende del registro de cierres de caja (#145, Fase 2).
+> Migración: `20260616130000_cash_movement_approval` (enum `CashMovementStatus`, `TRANSFER_OUT`, `Store.isCentral`, columnas de aprobación, back-fill D-8, índice único parcial `one_central_per_org`).
 
 ## 1. Contexto y objetivo
 
@@ -83,9 +84,18 @@ El antiguo `POST /cash-sessions/:id/movements` (alta directa ADMIN/MANAGER) se *
 - **Frontend:** wiring de los nuevos endpoints; `CashPanel` modo solicitud; sección de aprobaciones en `NotificationsPage`; toggle de central en el panel de tiendas.
 - Mantener el **ratchet de cobertura** del API (tests para cada rama nueva del servicio).
 
-## 7. Riesgos y preguntas abiertas
+## 7. Riesgos y preguntas abiertas (resueltas en la implementación)
 
-- **P-1 ·** ¿Deprecar el alta directa de movimientos (ADMIN/MANAGER) y forzar request→approve para todos, o mantener el atajo? (propongo mantener como APPROVED directo).
-- **P-2 ·** ¿El traspaso a central genera también el movimiento espejo de **entrada** en la caja de la central (TRANSFER_IN), o solo se registra la salida en origen? (propongo solo salida en esta iteración; el ingreso en central se concilia aparte — evitar acoplar dos sesiones de caja).
-- **P-3 ·** Notificaciones: ¿basta la fuente derivada (polling + SSE) o se quiere un evento SSE nuevo `cash.movement.requested` para refresco en vivo? (propongo reutilizar el SSE existente con un tipo nuevo).
-- **R-1 ·** Migración con back-fill sobre tabla con datos en producción: el `UPDATE` de D-8 debe correr en la misma migración; revisar bloqueos en tablas grandes (CashMovement no debería serlo).
+- **P-1 · RESUELTA → mantener el atajo.** El alta directa `POST /cash-sessions/:id/movements` (ADMIN/MANAGER) se conserva y crea el movimiento ya `APPROVED` (`requestedBy = reviewedBy = el actor`). Convive con el flujo request→approve. Para `TRANSFER_OUT` directo también se resuelve la central.
+- **P-2 · RESUELTA → solo salida en origen.** El traspaso registra únicamente el `TRANSFER_OUT` en la caja de origen (resta del cuadre). No se crea movimiento espejo de entrada en la central en esta iteración; el ingreso en central se concilia aparte.
+- **P-3 · RESUELTA → SSE reutilizado.** Se añade el tipo de evento `cash.movement.requested` al bus existente (`EVENT_BUS`, `@Global`). `requestMovement` lo publica tras commit (best-effort) y la campana del backoffice invalida `['pending-cash-movements']` al recibirlo.
+- **R-1 · CUBIERTA.** El back-fill (D-8) corre en la misma migración: `requestedById` se añade NULLABLE, se rellena `= userId` y luego se impone `NOT NULL`; las filas existentes pasan a `APPROVED`. CashMovement no es una tabla grande, así que el `UPDATE` no bloquea de forma relevante.
+
+## 8. Resumen de la implementación
+
+- **DB:** migración `20260616130000_cash_movement_approval` (validada con `prisma migrate diff`; aplica limpia + back-fill + índice parcial).
+- **API:** `CashSessionsService` (`requestMovement`, `approveMovement`, `denyMovement`, `listPendingMovements`, `createMovement` directo a APPROVED, `close` solo cuenta APPROVED y auto-deniega PENDING bajo el lock RACE-02); `StoresService.setCentral` (tx atómica). Rutas en `CashSessionsController` y `PATCH /stores/:id/central`.
+- **Tipos compartidos (`@simpletpv/auth`):** `CashMovementStatus`, `TRANSFER_OUT`, `Store.isCentral`, `CashMovement` ampliado, `RequestCashMovementInput`, `PendingCashMovement`, evento `cash.movement.requested`.
+- **TPV:** `CashPanel` en modo solicitud (cualquier rol), opción «Traspaso a central» si hay central, aviso «Solicitud enviada», lista con estado (`CashMovementRow`).
+- **Backoffice:** toggle «Tienda central» en el detalle de tienda + distintivo en la card; sección «Aprobaciones de caja» en la campana con Aprobar/Denegar y el badge sumando las pendientes.
+- **Tests:** unit (servicios/controllers/libs), integración (Postgres efímero: flujo completo, auto-deny, traspaso, `one_central_per_org`), wiring y componentes de los frontends. Cobertura API ≥ suelo del ratchet.

@@ -14,6 +14,7 @@ const STORES: Store[] = [
     opsVerified: false,
     opsIncident: null,
     opsUpdatedAt: null,
+    isCentral: true,
   },
   {
     id: 's2',
@@ -24,6 +25,7 @@ const STORES: Store[] = [
     opsVerified: false,
     opsIncident: null,
     opsUpdatedAt: null,
+    isCentral: false,
   },
 ];
 
@@ -32,6 +34,7 @@ vi.mock('./lib/admin.js', () => ({
   createStore: vi.fn(),
   updateStore: vi.fn(),
   updateStoreOps: vi.fn(),
+  setStoreCentral: vi.fn(),
   deleteStore: vi.fn(),
 }));
 

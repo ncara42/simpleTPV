@@ -2996,3 +2996,31 @@
   border-top: 1px solid var(--ui-border);
   font-size: var(--ui-text-base);
 }
+
+/* Estado de la solicitud de movimiento (#146): chip junto al motivo. */
+.cash-mv-status {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.72em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+}
+
+.cash-mv-pending {
+  background: color-mix(in oklab, var(--ui-warning, #b8860b) 16%, transparent);
+  color: var(--ui-warning, #b8860b);
+}
+
+.cash-mv-approved {
+  background: color-mix(in oklab, var(--ui-success, #2e7d32) 16%, transparent);
+  color: var(--ui-success, #2e7d32);
+}
+
+.cash-mv-denied {
+  background: color-mix(in oklab, var(--ui-danger, #c62828) 16%, transparent);
+  color: var(--ui-danger, #c62828);
+}

@@ -1,4 +1,4 @@
-import { ApiError, type CashSession } from '@simpletpv/auth';
+import { ApiError, type CashMovementType, type CashSession } from '@simpletpv/auth';
 import { Select } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -6,17 +6,18 @@ import { useState } from 'react';
 
 import { CashCloseSummary } from './cash/CashCloseSummary.js';
 import { CashClosuresList } from './cash/CashClosuresList.js';
+import { CashMovementRow } from './cash/CashMovementRow.js';
 import { CashOpenForm } from './cash/CashOpenForm.js';
 import { CashCount } from './CashCount.js';
-import { useAuthStore } from './lib/auth.js';
 import {
   closeCashSession,
-  createCashMovement,
   currentCashSession,
   listCashMovements,
   openCashSession,
+  requestCashMovement,
 } from './lib/cash.js';
 import { eur } from './lib/format.js';
+import { listStores } from './lib/sales.js';
 
 export function CashPanel({ storeId }: { storeId: string | null }) {
   usePageHeader('Caja', 'Apertura, cierre y arqueo de caja');
@@ -24,13 +25,19 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
   // Total contado, alimentado por el contador de denominaciones (CashCount).
   const [counted, setCounted] = useState(0);
   const [closing, setClosing] = useState(false);
-  const [movementType, setMovementType] = useState<'IN' | 'OUT'>('OUT');
+  // El TPV SOLICITA movimientos (#146): el cajero elige tipo, importe y motivo, y
+  // un responsable los aprueba/deniega desde el backoffice.
+  const [movementType, setMovementType] = useState<CashMovementType>('OUT');
   const [movementAmount, setMovementAmount] = useState('');
   const [movementReason, setMovementReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [requestSent, setRequestSent] = useState(false);
   const [closed, setClosed] = useState<CashSession | null>(null);
-  const role = useAuthStore((s) => s.getRole());
-  const canManageMovements = role === 'ADMIN' || role === 'MANAGER';
+
+  // El traspaso a central solo se ofrece si la organización tiene una designada
+  // (Store.isCentral). El backend valida igualmente el destino.
+  const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
+  const hasCentral = stores.some((s) => s.isCentral);
 
   const queryKey = ['cash-session', storeId];
   const { data: session, isLoading } = useQuery({
@@ -63,7 +70,7 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
 
   const movementMutation = useMutation({
     mutationFn: () =>
-      createCashMovement(session!.id, {
+      requestCashMovement(session!.id, {
         type: movementType,
         amount: Number(movementAmount),
         reason: movementReason.trim(),
@@ -72,13 +79,15 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
       setMovementAmount('');
       setMovementReason('');
       setError(null);
+      setRequestSent(true);
       void queryClient.invalidateQueries({ queryKey: ['cash-movements', session?.id] });
     },
     onError: (e: unknown) => {
+      setRequestSent(false);
       setError(
         e instanceof ApiError
-          ? (e.body ?? 'No se pudo registrar el movimiento.')
-          : 'No se pudo registrar el movimiento.',
+          ? (e.body ?? 'No se pudo enviar la solicitud.')
+          : 'No se pudo enviar la solicitud.',
       );
     },
   });
@@ -195,64 +204,67 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
 
           {!closing && (
             <div className="cash-form" data-testid="cash-movements">
-              {canManageMovements ? (
-                <div className="cash-movement-form">
-                  <Select
-                    value={movementType}
-                    onChange={(value) => setMovementType(value as 'IN' | 'OUT')}
-                    options={[
-                      { value: 'OUT', label: 'Retirada' },
-                      { value: 'IN', label: 'Entrada' },
-                    ]}
-                    ariaLabel="Tipo de movimiento"
-                    data-testid="cash-movement-type"
-                  />
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={movementAmount}
-                    onChange={(e) => setMovementAmount(e.target.value)}
-                    placeholder="Importe"
-                    data-testid="cash-movement-amount"
-                  />
-                  <input
-                    value={movementReason}
-                    onChange={(e) => setMovementReason(e.target.value)}
-                    placeholder="Motivo"
-                    data-testid="cash-movement-reason"
-                  />
-                  <button
-                    type="button"
-                    className="cash-btn-open"
-                    disabled={
-                      Number(movementAmount) <= 0 ||
-                      movementReason.trim().length < 2 ||
-                      movementMutation.isPending
-                    }
-                    onClick={() => movementMutation.mutate()}
-                    data-testid="cash-movement-save"
-                  >
-                    Registrar
-                  </button>
-                </div>
-              ) : (
-                <p className="cash-movement-note">
-                  Solo responsables pueden registrar entradas o retiradas.
+              <div className="cash-movement-form">
+                <Select
+                  value={movementType}
+                  onChange={(value) => {
+                    setMovementType(value as CashMovementType);
+                    setRequestSent(false);
+                  }}
+                  options={[
+                    { value: 'OUT', label: 'Retirada' },
+                    { value: 'IN', label: 'Entrada' },
+                    ...(hasCentral
+                      ? [{ value: 'TRANSFER_OUT', label: 'Traspaso a central' }]
+                      : []),
+                  ]}
+                  ariaLabel="Tipo de movimiento"
+                  data-testid="cash-movement-type"
+                />
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={movementAmount}
+                  onChange={(e) => {
+                    setMovementAmount(e.target.value);
+                    setRequestSent(false);
+                  }}
+                  placeholder="Importe"
+                  data-testid="cash-movement-amount"
+                />
+                <input
+                  value={movementReason}
+                  onChange={(e) => {
+                    setMovementReason(e.target.value);
+                    setRequestSent(false);
+                  }}
+                  placeholder="Motivo"
+                  data-testid="cash-movement-reason"
+                />
+                <button
+                  type="button"
+                  className="cash-btn-open"
+                  disabled={
+                    Number(movementAmount) <= 0 ||
+                    movementReason.trim().length < 2 ||
+                    movementMutation.isPending
+                  }
+                  onClick={() => movementMutation.mutate()}
+                  data-testid="cash-movement-save"
+                >
+                  Solicitar
+                </button>
+              </div>
+              {requestSent && (
+                <p className="cash-movement-note" data-testid="cash-request-sent">
+                  Solicitud enviada, pendiente de aprobación.
                 </p>
               )}
               {movementsQuery.data && movementsQuery.data.length > 0 && (
                 <ul className="cash-movement-list" data-testid="cash-movement-list">
                   {movementsQuery.data.map((m) => (
-                    <li key={m.id}>
-                      <span>
-                        {m.type === 'IN' ? 'Entrada' : 'Retirada'} · {m.reason}
-                      </span>
-                      <strong className="tabular-nums">
-                        {m.type === 'IN' ? '+' : '-'}
-                        {eur(Number(m.amount))} €
-                      </strong>
-                    </li>
+                    <CashMovementRow key={m.id} movement={m} />
                   ))}
                 </ul>
               )}

@@ -61,3 +61,20 @@ export class CreateCashMovementDto {
   @MinLength(2)
   reason!: string;
 }
+
+// Solicitud de movimiento desde el TPV (#146): mismo shape que el alta directa,
+// pero el endpoint la crea PENDING. Para TRANSFER_OUT el destino (tienda central)
+// lo resuelve el servicio, no el cliente.
+export class RequestCashMovementDto {
+  @IsEnum(CashMovementType)
+  type!: CashMovementType;
+
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  @Max(MAX_AMOUNT)
+  amount!: number;
+
+  @IsString()
+  @MinLength(2)
+  reason!: string;
+}
