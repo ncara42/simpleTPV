@@ -1,9 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 
 import { assertStoreAccess } from '../auth/store-access.js';
 import { round2 } from '../common/money.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant } from '../prisma/tenant-context.js';
+import { withTenantTx } from '../prisma/with-tenant-tx.js';
 import type {
   CloseCashSessionDto,
   CreateCashMovementDto,
@@ -34,7 +36,10 @@ export function computeDifference(counted: number, expected: number): number {
 
 @Injectable()
 export class CashSessionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(PRISMA_BASE) private readonly base: PrismaService,
+  ) {}
 
   /**
    * Abre una caja para una tienda del tenant. Solo puede haber una sesión OPEN
@@ -69,97 +74,123 @@ export class CashSessionsService {
   /**
    * Cierra una caja del tenant calculando el cuadre. Suma las ventas en efectivo
    * (COMPLETED, CASH) de la misma tienda en la ventana del turno (createdAt >=
-   * openedAt) y compara con lo contado. La transición a CLOSED es atómica:
-   * updateMany condicional (status=OPEN) evita doble cierre concurrente.
+   * openedAt) y compara con lo contado.
+   *
+   * TOCTOU (RACE-02): el cierre y `createMovement` deben SERIALIZARSE sobre la
+   * misma fila de la sesión. Sin ello el lock de `createMovement` es unilateral y
+   * no contiende con nada: un `createMovement` concurrente podría colarse entre el
+   * cálculo del `expectedAmount` (que agrega los CashMovement) y el commit del
+   * cierre → el cierre no incluiría ese movimiento y se corrompería el cuadre. Por
+   * eso el cierre adquiere `SELECT ... FOR UPDATE` sobre la fila ANTES de agregar
+   * movimientos/ventas y hace el update dentro de la MISMA transacción (cliente
+   * BASE vía `withTenantTx`, con RLS fijada). Resultado: o el movimiento entra
+   * antes (y el cierre lo cuenta en `expectedAmount`) o el cierre gana (y
+   * `createMovement`, al re-leer tras el lock, ve `status = 'CLOSED'` → 400). La
+   * transición sigue siendo atómica vía updateMany condicional (status=OPEN), que
+   * además protege contra doble cierre.
    */
   async close(id: string, dto: CloseCashSessionDto, userId: string, role: string) {
     const tenant = requireTenant();
 
-    const session = await this.prisma.cashSession.findFirst({
-      where: { id, organizationId: tenant.organizationId },
-    });
-    if (!session) {
-      throw new NotFoundException(`Sesión de caja ${id} no encontrada`);
-    }
-    // Aislamiento por tienda (SEC-01): un CLERK solo cierra cajas de sus tiendas.
-    await assertStoreAccess(this.prisma, { userId, role, storeId: session.storeId });
-    if (session.status === 'CLOSED') {
-      throw new BadRequestException('La caja ya está cerrada');
-    }
+    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+      // Lock pesimista de la fila de la sesión ANTES de leer su estado y de
+      // agregar los movimientos/ventas. Serializa un `createMovement` concurrente:
+      // el segundo actor espera al commit del primero. Si la sesión no existe no
+      // bloquea ninguna fila y el findFirst posterior lanza 404. RLS ya restringe
+      // al tenant; el filtro por organizationId es defensa en profundidad.
+      await tx.$executeRaw`SELECT id FROM "CashSession" WHERE id = ${id}::uuid FOR UPDATE`;
 
-    // Ventas en efectivo del turno: misma tienda, COMPLETED, CASH, desde la
-    // apertura. Las VOIDED no cuentan (status COMPLETED). CARD tampoco.
-    const agg = await this.prisma.sale.aggregate({
-      _sum: { total: true },
-      where: {
-        organizationId: tenant.organizationId,
-        storeId: session.storeId,
-        status: 'COMPLETED',
-        paymentMethod: 'CASH',
-        createdAt: { gte: session.openedAt },
-      },
-    });
-    const cashSales = Number(agg._sum.total ?? 0);
+      const session = await tx.cashSession.findFirst({
+        where: { id, organizationId: tenant.organizationId },
+      });
+      if (!session) {
+        throw new NotFoundException(`Sesión de caja ${id} no encontrada`);
+      }
+      // Aislamiento por tienda (SEC-01): un CLERK solo cierra cajas de sus tiendas.
+      await assertStoreAccess(tx, { userId, role, storeId: session.storeId });
+      if (session.status === 'CLOSED') {
+        throw new BadRequestException('La caja ya está cerrada');
+      }
 
-    const movementAgg = await this.prisma.cashMovement.groupBy({
-      by: ['type'],
-      where: {
-        organizationId: tenant.organizationId,
-        cashSessionId: session.id,
-      },
-      _sum: { amount: true },
-    });
-    const movementNet = movementAgg.reduce((acc, row) => {
-      const amount = Number(row._sum.amount ?? 0);
-      return acc + (row.type === 'IN' ? amount : -amount);
-    }, 0);
+      // Ventas en efectivo del turno: misma tienda, COMPLETED, CASH, desde la
+      // apertura. Las VOIDED no cuentan (status COMPLETED). CARD tampoco.
+      const agg = await tx.sale.aggregate({
+        _sum: { total: true },
+        where: {
+          organizationId: tenant.organizationId,
+          storeId: session.storeId,
+          status: 'COMPLETED',
+          paymentMethod: 'CASH',
+          createdAt: { gte: session.openedAt },
+        },
+      });
+      const cashSales = Number(agg._sum.total ?? 0);
 
-    // Reembolsos en efectivo del turno (SEC-11): salen del cajón y deben restarse
-    // del esperado. Heurística (sin nuevo campo en el modelo): se considera que un
-    // reembolso es en efectivo si la venta original se pagó en efectivo, y las
-    // devoluciones SIN ticket (saleId null) se asumen en efectivo. Misma tienda y
-    // ventana del turno que las ventas. Si el negocio reembolsa ventas con tarjeta
-    // en efectivo (u otro criterio), conviene modelar el método de pago del Return.
-    const refundAgg = await this.prisma.return.aggregate({
-      _sum: { total: true },
-      where: {
-        organizationId: tenant.organizationId,
-        storeId: session.storeId,
-        createdAt: { gte: session.openedAt },
-        OR: [{ saleId: null }, { sale: { paymentMethod: 'CASH' } }],
-      },
-    });
-    const cashRefunds = Number(refundAgg._sum.total ?? 0);
+      // Agregación de movimientos DENTRO de la tx y DESPUÉS del FOR UPDATE: así
+      // refleja cualquier movimiento que entrara antes de adquirir el lock, y un
+      // `createMovement` que llegue después esperará a este commit y re-leerá la
+      // sesión ya CLOSED → 400. Es la pieza clave del cierre del TOCTOU.
+      const movementAgg = await tx.cashMovement.groupBy({
+        by: ['type'],
+        where: {
+          organizationId: tenant.organizationId,
+          cashSessionId: session.id,
+        },
+        _sum: { amount: true },
+      });
+      const movementNet = movementAgg.reduce((acc, row) => {
+        const amount = Number(row._sum.amount ?? 0);
+        return acc + (row.type === 'IN' ? amount : -amount);
+      }, 0);
 
-    const expected = computeExpected(
-      Number(session.openingAmount),
-      cashSales,
-      movementNet,
-      cashRefunds,
-    );
-    const difference = computeDifference(dto.countedAmount, expected);
+      // Reembolsos en efectivo del turno (SEC-11): salen del cajón y deben restarse
+      // del esperado. Heurística (sin nuevo campo en el modelo): se considera que un
+      // reembolso es en efectivo si la venta original se pagó en efectivo, y las
+      // devoluciones SIN ticket (saleId null) se asumen en efectivo. Misma tienda y
+      // ventana del turno que las ventas. Si el negocio reembolsa ventas con tarjeta
+      // en efectivo (u otro criterio), conviene modelar el método de pago del Return.
+      const refundAgg = await tx.return.aggregate({
+        _sum: { total: true },
+        where: {
+          organizationId: tenant.organizationId,
+          storeId: session.storeId,
+          createdAt: { gte: session.openedAt },
+          OR: [{ saleId: null }, { sale: { paymentMethod: 'CASH' } }],
+        },
+      });
+      const cashRefunds = Number(refundAgg._sum.total ?? 0);
 
-    // Transición atómica: la condición status=OPEN viaja al WHERE, así dos
-    // cierres concurrentes no pueden ambos tener éxito (el segundo afecta 0
-    // filas). organizationId refuerza el aislamiento del write.
-    const updated = await this.prisma.cashSession.updateMany({
-      where: { id, organizationId: tenant.organizationId, status: 'OPEN' },
-      data: {
-        status: 'CLOSED',
-        closingAmount: dto.countedAmount,
-        expectedAmount: expected,
-        difference,
-        closedAt: new Date(),
-      },
-    });
-    if (updated.count === 0) {
-      // Otra request la cerró entre la lectura y el update.
-      throw new BadRequestException('La caja ya está cerrada');
-    }
+      const expected = computeExpected(
+        Number(session.openingAmount),
+        cashSales,
+        movementNet,
+        cashRefunds,
+      );
+      const difference = computeDifference(dto.countedAmount, expected);
 
-    // La sesión existe y la acabamos de cerrar en esta misma request → no es null.
-    return this.prisma.cashSession.findFirstOrThrow({
-      where: { id, organizationId: tenant.organizationId },
+      // Transición atómica: la condición status=OPEN viaja al WHERE, así dos
+      // cierres concurrentes no pueden ambos tener éxito (el segundo afecta 0
+      // filas). organizationId refuerza el aislamiento del write. Dentro de la
+      // misma tx que el FOR UPDATE y los agregados → cuadre consistente.
+      const updated = await tx.cashSession.updateMany({
+        where: { id, organizationId: tenant.organizationId, status: 'OPEN' },
+        data: {
+          status: 'CLOSED',
+          closingAmount: dto.countedAmount,
+          expectedAmount: expected,
+          difference,
+          closedAt: new Date(),
+        },
+      });
+      if (updated.count === 0) {
+        // Otra request la cerró entre la lectura y el update.
+        throw new BadRequestException('La caja ya está cerrada');
+      }
+
+      // La sesión existe y la acabamos de cerrar en esta misma tx → no es null.
+      return tx.cashSession.findFirstOrThrow({
+        where: { id, organizationId: tenant.organizationId },
+      });
     });
   }
 
@@ -193,27 +224,48 @@ export class CashSessionsService {
     });
   }
 
+  /**
+   * Registra un movimiento manual de efectivo (IN/OUT) en una sesión abierta.
+   *
+   * TOCTOU (RACE-02): la lectura del estado y el create deben compartir UNA
+   * transacción con lock pesimista sobre la fila de la sesión. Sin él, un `close`
+   * concurrente que se cuele entre la comprobación de `status` y el `create`
+   * permitiría insertar un movimiento en una sesión ya CLOSED → el
+   * `expectedAmount` calculado al cerrar no lo reflejaría y se corrompe el
+   * cuadre. Con `SELECT ... FOR UPDATE` la creación espera al commit del cierre
+   * concurrente y, al releer, ve `status = 'CLOSED'` y rechaza con 400. Usa el
+   * cliente BASE (`withTenantTx`) para abrir una sola transacción con RLS fijada.
+   */
   async createMovement(id: string, dto: CreateCashMovementDto, userId: string) {
     const tenant = requireTenant();
-    const session = await this.prisma.cashSession.findFirst({
-      where: { id, organizationId: tenant.organizationId },
-    });
-    if (!session) {
-      throw new NotFoundException(`Sesión de caja ${id} no encontrada`);
-    }
-    if (session.status !== 'OPEN') {
-      throw new BadRequestException('La caja ya está cerrada');
-    }
-    return this.prisma.cashMovement.create({
-      data: {
-        organizationId: tenant.organizationId,
-        cashSessionId: id,
-        storeId: session.storeId,
-        userId,
-        type: dto.type,
-        amount: dto.amount,
-        reason: dto.reason.trim(),
-      },
+
+    return withTenantTx(this.base, tenant.organizationId, async (tx) => {
+      // Lock pesimista de la fila de la sesión ANTES de leer su estado. Serializa
+      // un `close` concurrente: el segundo actor espera al commit del primero y
+      // entonces lee el `status` actualizado. Si la sesión no existe no bloquea
+      // ninguna fila y el findFirst posterior lanza 404. RLS ya restringe al tenant.
+      await tx.$executeRaw`SELECT id FROM "CashSession" WHERE id = ${id}::uuid FOR UPDATE`;
+
+      const session = await tx.cashSession.findFirst({
+        where: { id, organizationId: tenant.organizationId },
+      });
+      if (!session) {
+        throw new NotFoundException(`Sesión de caja ${id} no encontrada`);
+      }
+      if (session.status !== 'OPEN') {
+        throw new BadRequestException('La caja ya está cerrada');
+      }
+      return tx.cashMovement.create({
+        data: {
+          organizationId: tenant.organizationId,
+          cashSessionId: id,
+          storeId: session.storeId,
+          userId,
+          type: dto.type,
+          amount: dto.amount,
+          reason: dto.reason.trim(),
+        },
+      });
     });
   }
 }

@@ -40,7 +40,7 @@ describe('Sesiones de caja — integración', () => {
     base = new PrismaService();
     await base.onModuleInit();
     prisma = applyTenantExtension(base);
-    service = new CashSessionsService(prisma as unknown as PrismaService);
+    service = new CashSessionsService(prisma as unknown as PrismaService, base);
     // SalesService crea las ventas del turno (mismo patrón de dos clientes).
     sales = new SalesService(
       prisma as unknown as PrismaService,
@@ -260,5 +260,73 @@ describe('Sesiones de caja — integración', () => {
     await tenantStorage.run({ organizationId: org1Id }, async () => {
       return service.close(session.id, { countedAmount: 100 }, user1Id, 'ADMIN');
     });
+  });
+
+  // RACE-02 (TOCTOU, #109): close y createMovement deben SERIALIZARSE sobre la
+  // misma fila de CashSession. Sin el FOR UPDATE en AMBOS, un movimiento podría
+  // colarse entre el cálculo del expectedAmount y el commit del cierre → caja
+  // CLOSED con un movimiento NO reflejado en el cuadre. Aquí lanzamos cierre y
+  // creación de movimiento CONCURRENTES y verificamos la invariante en cada
+  // iteración: o (a) el movimiento se rechaza con 400 porque el cierre ganó, o
+  // (b) el cierre ganó la carrera incluyendo el movimiento en expectedAmount, o
+  // (c) el movimiento entró antes y el cierre lo cuenta. NUNCA debe quedar la
+  // caja CLOSED con un movimiento creado que no esté en expectedAmount.
+  it('RACE-02: close vs createMovement concurrente no corrompe el cuadre', async () => {
+    const OPENING = 100;
+    const MOVEMENT = 25; // IN: sube el efectivo esperado en 25 si se cuenta.
+    const ITERATIONS = 8;
+
+    for (let i = 0; i < ITERATIONS; i++) {
+      const session = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        service.open({ storeId: store1Id, openingAmount: OPENING }, user1Id, 'ADMIN'),
+      );
+
+      // Lanzamos AMBAS operaciones a la vez sobre la misma sesión. El orden real
+      // lo decide el scheduler + el lock pesimista; allSettled no propaga errores.
+      const [closeRes, moveRes] = await Promise.allSettled([
+        tenantStorage.run({ organizationId: org1Id }, async () =>
+          // countedAmount = OPENING + MOVEMENT: si el cierre cuenta el movimiento,
+          // el cuadre es exacto (difference 0); si no lo cuenta, sobra MOVEMENT.
+          service.close(session.id, { countedAmount: OPENING + MOVEMENT }, user1Id, 'ADMIN'),
+        ),
+        tenantStorage.run({ organizationId: org1Id }, async () =>
+          service.createMovement(
+            session.id,
+            { type: 'IN', amount: MOVEMENT, reason: `fondo-${i}` },
+            user1Id,
+          ),
+        ),
+      ]);
+
+      // El cierre SIEMPRE debe completar (gane la carrera o la pierda el movimiento).
+      expect(closeRes.status).toBe('fulfilled');
+
+      // Estado final de la caja y de sus movimientos (lectura consistente post-commit).
+      const [closed, movements] = await tenantStorage.run({ organizationId: org1Id }, async () =>
+        Promise.all([
+          prisma.cashSession.findUniqueOrThrow({ where: { id: session.id } }),
+          prisma.cashMovement.findMany({ where: { cashSessionId: session.id } }),
+        ]),
+      );
+      expect(closed.status).toBe('CLOSED');
+
+      const movementCreated = moveRes.status === 'fulfilled';
+      const expectedAmount = Number(closed.expectedAmount);
+
+      if (movementCreated) {
+        // Si el movimiento se creó, DEBE estar reflejado en el cuadre: o entró
+        // antes del cierre (lo cuenta) o el cierre serializó y aun así lo incluyó.
+        // Invariante contable: el movimiento persistido está dentro de expectedAmount.
+        expect(movements).toHaveLength(1);
+        expect(expectedAmount).toBeCloseTo(OPENING + MOVEMENT, 2);
+        expect(Number(closed.difference)).toBeCloseTo(0, 2);
+      } else {
+        // El movimiento fue rechazado (400, caja ya CLOSED): no debe haberse
+        // persistido y el cuadre no lo incluye.
+        expect(moveRes.status).toBe('rejected');
+        expect(movements).toHaveLength(0);
+        expect(expectedAmount).toBeCloseTo(OPENING, 2);
+      }
+    }
   });
 });
