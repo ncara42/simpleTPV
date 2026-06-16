@@ -88,6 +88,13 @@ describe('cableado API real', () => {
       amount: 25,
       reason: 'Retirada',
     });
+    await cash.listClosedCashSessions('store-1');
+    expect(get).toHaveBeenLastCalledWith('/cash-sessions/closed', { storeId: 'store-1' });
+    await cash.listClosedCashSessions('store-1', 50);
+    expect(get).toHaveBeenLastCalledWith('/cash-sessions/closed', {
+      storeId: 'store-1',
+      limit: '50',
+    });
   });
 
   it('sales: endpoints correctos', async () => {

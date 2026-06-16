@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { CashCloseSummary } from './cash/CashCloseSummary.js';
+import { CashClosuresList } from './cash/CashClosuresList.js';
 import { CashOpenForm } from './cash/CashOpenForm.js';
 import { CashCount } from './CashCount.js';
 import { useAuthStore } from './lib/auth.js';
@@ -118,160 +119,166 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
     const opening = Number(session.openingAmount);
 
     return (
-      <section className="cash-panel" data-testid="cash-panel">
-        <div className="cash-bar">
-          <div className="cash-status">
-            <span className="cash-dot" />
-            <span className="cash-badge" data-testid="cash-status">
-              Caja abierta
-            </span>
-          </div>
-          <span className="cash-div" />
-          <div className="cash-stat">
-            <span className="cash-stat-label">Apertura</span>
-            <span className="cash-stat-value" data-testid="cash-opening">
-              {eur(opening)} €
-            </span>
-          </div>
-          <span className="cash-div" />
-          <div className="cash-stat">
-            <span className="cash-stat-label">Esperado en caja</span>
-            <span className="cash-stat-value" data-testid="cash-expected-bar">
-              {eur(Number(session.expectedAmount ?? 0))} €
-            </span>
-          </div>
-          <span className="cash-spacer" />
-          {!closing && (
-            <button
-              className="cash-action primary"
-              onClick={() => setClosing(true)}
-              data-testid="cash-close"
-            >
-              Cerrar caja
-            </button>
-          )}
-        </div>
-
-        {closing && (
-          <form
-            className="cash-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              closeMutation.mutate(counted);
-            }}
-          >
-            {/* Conteo por denominaciones (persiste mientras la caja siga abierta). */}
-            <CashCount
-              expected={Number(session.expectedAmount ?? 0)}
-              storageKey={`cash-count:${session.id}`}
-              onTotalChange={setCounted}
-            />
-            <div className="cash-actions">
-              <button
-                type="button"
-                className="cash-btn-cancel"
-                onClick={() => {
-                  // No limpiamos el conteo: queda persistido para retomarlo.
-                  setClosing(false);
-                  setError(null);
-                }}
-                data-testid="cash-close-cancel"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={closeMutation.isPending}
-                data-testid="cash-close-confirm"
-                className="cash-btn-close"
-              >
-                {closeMutation.isPending ? 'Cerrando…' : `Confirmar cierre · ${eur(counted)} €`}
-              </button>
+      <>
+        <section className="cash-panel" data-testid="cash-panel">
+          <div className="cash-bar">
+            <div className="cash-status">
+              <span className="cash-dot" />
+              <span className="cash-badge" data-testid="cash-status">
+                Caja abierta
+              </span>
             </div>
-          </form>
-        )}
+            <span className="cash-div" />
+            <div className="cash-stat">
+              <span className="cash-stat-label">Apertura</span>
+              <span className="cash-stat-value" data-testid="cash-opening">
+                {eur(opening)} €
+              </span>
+            </div>
+            <span className="cash-div" />
+            <div className="cash-stat">
+              <span className="cash-stat-label">Esperado en caja</span>
+              <span className="cash-stat-value" data-testid="cash-expected-bar">
+                {eur(Number(session.expectedAmount ?? 0))} €
+              </span>
+            </div>
+            <span className="cash-spacer" />
+            {!closing && (
+              <button
+                className="cash-action primary"
+                onClick={() => setClosing(true)}
+                data-testid="cash-close"
+              >
+                Cerrar caja
+              </button>
+            )}
+          </div>
 
-        {!closing && (
-          <div className="cash-form" data-testid="cash-movements">
-            {canManageMovements ? (
-              <div className="cash-movement-form">
-                <Select
-                  value={movementType}
-                  onChange={(value) => setMovementType(value as 'IN' | 'OUT')}
-                  options={[
-                    { value: 'OUT', label: 'Retirada' },
-                    { value: 'IN', label: 'Entrada' },
-                  ]}
-                  ariaLabel="Tipo de movimiento"
-                  data-testid="cash-movement-type"
-                />
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={movementAmount}
-                  onChange={(e) => setMovementAmount(e.target.value)}
-                  placeholder="Importe"
-                  data-testid="cash-movement-amount"
-                />
-                <input
-                  value={movementReason}
-                  onChange={(e) => setMovementReason(e.target.value)}
-                  placeholder="Motivo"
-                  data-testid="cash-movement-reason"
-                />
+          {closing && (
+            <form
+              className="cash-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                closeMutation.mutate(counted);
+              }}
+            >
+              {/* Conteo por denominaciones (persiste mientras la caja siga abierta). */}
+              <CashCount
+                expected={Number(session.expectedAmount ?? 0)}
+                storageKey={`cash-count:${session.id}`}
+                onTotalChange={setCounted}
+              />
+              <div className="cash-actions">
                 <button
                   type="button"
-                  className="cash-btn-open"
-                  disabled={
-                    Number(movementAmount) <= 0 ||
-                    movementReason.trim().length < 2 ||
-                    movementMutation.isPending
-                  }
-                  onClick={() => movementMutation.mutate()}
-                  data-testid="cash-movement-save"
+                  className="cash-btn-cancel"
+                  onClick={() => {
+                    // No limpiamos el conteo: queda persistido para retomarlo.
+                    setClosing(false);
+                    setError(null);
+                  }}
+                  data-testid="cash-close-cancel"
                 >
-                  Registrar
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={closeMutation.isPending}
+                  data-testid="cash-close-confirm"
+                  className="cash-btn-close"
+                >
+                  {closeMutation.isPending ? 'Cerrando…' : `Confirmar cierre · ${eur(counted)} €`}
                 </button>
               </div>
-            ) : (
-              <p className="cash-movement-note">
-                Solo responsables pueden registrar entradas o retiradas.
-              </p>
-            )}
-            {movementsQuery.data && movementsQuery.data.length > 0 && (
-              <ul className="cash-movement-list" data-testid="cash-movement-list">
-                {movementsQuery.data.map((m) => (
-                  <li key={m.id}>
-                    <span>
-                      {m.type === 'IN' ? 'Entrada' : 'Retirada'} · {m.reason}
-                    </span>
-                    <strong className="tabular-nums">
-                      {m.type === 'IN' ? '+' : '-'}
-                      {eur(Number(m.amount))} €
-                    </strong>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
+            </form>
+          )}
 
-        {error && (
-          <p className="cash-error" data-testid="cash-error">
-            {error}
-          </p>
-        )}
-      </section>
+          {!closing && (
+            <div className="cash-form" data-testid="cash-movements">
+              {canManageMovements ? (
+                <div className="cash-movement-form">
+                  <Select
+                    value={movementType}
+                    onChange={(value) => setMovementType(value as 'IN' | 'OUT')}
+                    options={[
+                      { value: 'OUT', label: 'Retirada' },
+                      { value: 'IN', label: 'Entrada' },
+                    ]}
+                    ariaLabel="Tipo de movimiento"
+                    data-testid="cash-movement-type"
+                  />
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={movementAmount}
+                    onChange={(e) => setMovementAmount(e.target.value)}
+                    placeholder="Importe"
+                    data-testid="cash-movement-amount"
+                  />
+                  <input
+                    value={movementReason}
+                    onChange={(e) => setMovementReason(e.target.value)}
+                    placeholder="Motivo"
+                    data-testid="cash-movement-reason"
+                  />
+                  <button
+                    type="button"
+                    className="cash-btn-open"
+                    disabled={
+                      Number(movementAmount) <= 0 ||
+                      movementReason.trim().length < 2 ||
+                      movementMutation.isPending
+                    }
+                    onClick={() => movementMutation.mutate()}
+                    data-testid="cash-movement-save"
+                  >
+                    Registrar
+                  </button>
+                </div>
+              ) : (
+                <p className="cash-movement-note">
+                  Solo responsables pueden registrar entradas o retiradas.
+                </p>
+              )}
+              {movementsQuery.data && movementsQuery.data.length > 0 && (
+                <ul className="cash-movement-list" data-testid="cash-movement-list">
+                  {movementsQuery.data.map((m) => (
+                    <li key={m.id}>
+                      <span>
+                        {m.type === 'IN' ? 'Entrada' : 'Retirada'} · {m.reason}
+                      </span>
+                      <strong className="tabular-nums">
+                        {m.type === 'IN' ? '+' : '-'}
+                        {eur(Number(m.amount))} €
+                      </strong>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {error && (
+            <p className="cash-error" data-testid="cash-error">
+              {error}
+            </p>
+          )}
+        </section>
+        <CashClosuresList storeId={storeId} />
+      </>
     );
   }
 
-  // Sin caja abierta — formulario apertura
+  // Sin caja abierta — formulario apertura + registro de cierres
   return (
-    <CashOpenForm
-      onOpen={(amount) => openMutation.mutate(amount)}
-      pending={openMutation.isPending}
-      error={error}
-    />
+    <>
+      <CashOpenForm
+        onOpen={(amount) => openMutation.mutate(amount)}
+        pending={openMutation.isPending}
+        error={error}
+      />
+      <CashClosuresList storeId={storeId} />
+    </>
   );
 }

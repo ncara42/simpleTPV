@@ -33,6 +33,15 @@ export function listCashMovements(cashSessionId: string): Promise<CashMovement[]
   return api.get<CashMovement[]>(`/cash-sessions/${cashSessionId}/movements`);
 }
 
+// Registro de cierres de caja de la tienda (#145): sesiones CLOSED con su cuadre,
+// las más recientes primero. Acotado a la tienda activa en el backend (SEC-01).
+export function listClosedCashSessions(storeId: string, limit?: number): Promise<CashSession[]> {
+  return api.get<CashSession[]>('/cash-sessions/closed', {
+    storeId,
+    ...(limit ? { limit: String(limit) } : {}),
+  });
+}
+
 export function createCashMovement(
   cashSessionId: string,
   input: { type: CashMovementType; amount: number; reason: string },
