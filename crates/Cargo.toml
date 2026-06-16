@@ -1,14 +1,15 @@
 [workspace]
 resolver = "2"
-members = ["shared", "db", "auth", "app"]
+members = ["shared", "db", "auth", "http", "app"]
 
 # Migración del backend a Rust — workspace Cargo.
 # Arquitectura por capas (ver docs/migration-rust/02 §3):
 #   shared  → tipos comunes: config (fail-fast), errores (thiserror)
 #   db      → SQLx: pool + transacción RLS por tenant (set_config $1, true)
-#   auth    → JWT (HS256), bcrypt, rotación de refresh, extractor Axum (Fase 1)
+#   auth    → JWT (HS256), bcrypt, rotación de refresh (dominio, Fase 1)
+#   http    → Axum: router, extractor AuthUser, IntoResponse, cookies, rutas /auth
 #   app     → bootstrap: Axum + Tokio + tracing + graceful shutdown
-# Las capas http/domain se añaden en fases posteriores (02 §4).
+# La capa domain se añade en fases posteriores (02 §4).
 
 [workspace.package]
 version = "0.0.0"
@@ -22,7 +23,19 @@ publish = false
 [workspace.dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net"] }
 axum = "0.8"
-tower-http = { version = "0.6", features = ["trace"] }
+axum-extra = { version = "0.10", features = ["cookie"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = [
+  "trace",
+  "cors",
+  "timeout",
+  "set-header",
+  "sensitive-headers",
+  "limit",
+] }
+# Rate limiting por IP (tower_governor, doc 06 — login 5/min). SmartIpKeyExtractor
+# lee X-Forwarded-For tras el proxy.
+tower_governor = "0.7"
 sqlx = { version = "0.8", default-features = false, features = [
   "runtime-tokio",
   "tls-rustls",

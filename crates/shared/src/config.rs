@@ -14,6 +14,9 @@ use secrecy::SecretString;
 pub struct AppConfig {
     /// Conexión del rol `app` (RLS aplicada). Es el runtime del API.
     pub database_url_app: SecretString,
+    /// Conexión del rol `app_admin` (BYPASSRLS). SOLO para el lookup de login/
+    /// refresh, que ocurre antes de conocer el tenant (doc 06, `DATABASE_URL_AUTH`).
+    pub database_url_admin: SecretString,
     /// Dirección de escucha del servidor HTTP.
     pub bind_addr: String,
 }
@@ -23,10 +26,13 @@ impl AppConfig {
     pub fn from_env() -> anyhow::Result<Self> {
         let database_url_app = std::env::var("DATABASE_URL_APP")
             .map_err(|_| anyhow::anyhow!("DATABASE_URL_APP no definida"))?;
+        let database_url_admin = std::env::var("DATABASE_URL_AUTH")
+            .map_err(|_| anyhow::anyhow!("DATABASE_URL_AUTH no definida (rol app_admin)"))?;
         let bind_addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| "127.0.0.1:3001".to_owned());
 
         Ok(Self {
             database_url_app: SecretString::from(database_url_app),
+            database_url_admin: SecretString::from(database_url_admin),
             bind_addr,
         })
     }
