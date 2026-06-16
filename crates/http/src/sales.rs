@@ -11,7 +11,8 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
-use simpletpv_domain::sales::model::{SaleWithLines, SalesPage, TicketBlock};
+use simpletpv_auth::Role;
+use simpletpv_domain::sales::model::{Sale, SaleWithLines, SalesPage, TicketBlock};
 use simpletpv_domain::sales::service::{self, SalesFilter};
 use simpletpv_domain::sales::{CreateSale, ReserveTicketBlock};
 use simpletpv_shared::AppError;
@@ -60,6 +61,17 @@ pub async fn ticket_block(
     )
     .await?;
     Ok(Json(block))
+}
+
+/// `POST /sales/:id/void` — anula una venta (ADMIN/MANAGER).
+pub async fn void(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Sale>, ApiError> {
+    user.require_role(&[Role::Admin, Role::Manager])?;
+    let sale = service::void(state.db(), user.organization_id, id, user.user_id).await?;
+    Ok(Json(sale))
 }
 
 /// `GET /sales/by-ticket/:ticketNumber`.

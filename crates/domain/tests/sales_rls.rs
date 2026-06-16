@@ -7,8 +7,12 @@ use std::time::Duration;
 
 use rust_decimal::Decimal;
 use simpletpv_auth::Role;
+use simpletpv_db::with_tenant_tx;
 use simpletpv_domain::products::{self, NewProduct};
+use simpletpv_domain::sales::model::SaleStatus;
 use simpletpv_domain::sales::{service, CreateSale, CreateSaleLine, PaymentMethod};
+use simpletpv_domain::stock::model::MovementType;
+use simpletpv_domain::stock::service::{ApplyMovementInput, BatchRef};
 use simpletpv_domain::stock::{service as stock, Adjust};
 use simpletpv_shared::AppError;
 use sqlx::postgres::{PgPool, PgPoolOptions};
@@ -326,5 +330,155 @@ async fn clerk_supera_el_limite_de_descuento() {
     )
     .await;
     assert_eq!(res.err(), Some(AppError::Forbidden));
+    teardown(&c, &[product]).await;
+}
+
+async fn set_tracked(c: &Ctx, product: Uuid) {
+    sqlx::query(r#"UPDATE "Product" SET "tracksBatch" = true WHERE id = $1"#)
+        .bind(product)
+        .execute(&c.admin)
+        .await
+        .unwrap();
+}
+
+async fn receive_lot(c: &Ctx, product: Uuid, lot: &str, qty: i64) {
+    let lot = lot.to_owned();
+    let org = c.org;
+    let store = c.store;
+    with_tenant_tx(&c.app, org, async move |tx, _a| {
+        stock::apply_movement(
+            tx,
+            ApplyMovementInput {
+                organization_id: org,
+                product_id: product,
+                store_id: store,
+                movement_type: MovementType::PurchaseReceipt,
+                quantity: Decimal::from(qty),
+                reference_id: None,
+                reason: None,
+                user_id: None,
+                batch: Some(BatchRef {
+                    lot_code: lot,
+                    expiry_date: None,
+                }),
+            },
+        )
+        .await
+    })
+    .await
+    .unwrap();
+}
+
+async fn batch_qty(c: &Ctx, product: Uuid, lot: &str) -> Decimal {
+    sqlx::query_scalar(
+        r#"SELECT quantity FROM "StockBatch" WHERE "productId" = $1 AND "lotCode" = $2"#,
+    )
+    .bind(product)
+    .bind(lot)
+    .fetch_one(&c.admin)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn void_repone_stock_marca_voided_y_rechaza_doble() {
+    let c = setup().await;
+    open_cash_session(&c).await;
+    let product = make_product(&c, Decimal::new(100, 2)).await;
+    stock::adjust(
+        &c.app,
+        c.org,
+        c.user,
+        Adjust {
+            product_id: product,
+            store_id: c.store,
+            new_quantity: Decimal::from(100),
+            reason: "init".into(),
+        },
+    )
+    .await
+    .unwrap();
+
+    let sale = service::create(
+        &c.app,
+        c.org,
+        c.user,
+        Role::Admin,
+        CreateSale {
+            store_id: c.store,
+            client_id: None,
+            ticket_number: None,
+            lines: vec![line(product, 3, None)],
+            payment_method: PaymentMethod::Card,
+            cash_given: None,
+            ticket_discount_pct: None,
+            ticket_discount_amt: None,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(stock_qty(&c, product).await, Decimal::from(97));
+
+    let voided = service::void(&c.app, c.org, sale.sale.id, c.user)
+        .await
+        .unwrap();
+    assert_eq!(voided.status, SaleStatus::Voided);
+    assert!(voided.voided_at.is_some());
+    assert_eq!(
+        stock_qty(&c, product).await,
+        Decimal::from(100),
+        "el stock vuelve"
+    );
+
+    // Segunda anulación → BadRequest.
+    assert_eq!(
+        service::void(&c.app, c.org, sale.sale.id, c.user)
+            .await
+            .err(),
+        Some(AppError::BadRequest)
+    );
+
+    teardown(&c, &[product]).await;
+}
+
+#[tokio::test]
+async fn void_repone_al_lote_original_en_producto_con_lote() {
+    let c = setup().await;
+    open_cash_session(&c).await;
+    let product = make_product(&c, Decimal::new(100, 2)).await;
+    set_tracked(&c, product).await;
+    receive_lot(&c, product, "L1", 10).await;
+
+    // Vende 4 (FEFO consume del lote L1) → L1 = 6.
+    let sale = service::create(
+        &c.app,
+        c.org,
+        c.user,
+        Role::Admin,
+        CreateSale {
+            store_id: c.store,
+            client_id: None,
+            ticket_number: None,
+            lines: vec![line(product, 4, None)],
+            payment_method: PaymentMethod::Card,
+            cash_given: None,
+            ticket_discount_pct: None,
+            ticket_discount_amt: None,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(batch_qty(&c, product, "L1").await, Decimal::from(6));
+
+    // Anula → reingresa al lote original L1 = 10.
+    service::void(&c.app, c.org, sale.sale.id, c.user)
+        .await
+        .unwrap();
+    assert_eq!(
+        batch_qty(&c, product, "L1").await,
+        Decimal::from(10),
+        "reingreso al lote original"
+    );
+
     teardown(&c, &[product]).await;
 }
