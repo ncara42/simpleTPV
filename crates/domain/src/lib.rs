@@ -3,14 +3,16 @@
 //! ejecutan sus lecturas/escrituras a través de [`simpletpv_db::with_tenant_tx`]
 //! ⇒ RLS por tenant en un único punto auditable.
 //!
-//! Esta fase incluye `products` (catálogo) y `stock` (inventario + lotes/FEFO).
-//! `sales` y `returns` llegan en PRs siguientes.
+//! Incluye `products` (catálogo), `stock` (inventario + lotes/FEFO) y `sales`
+//! (ventas: core de creación). `returns` llega en un PR siguiente.
 
 pub mod csv;
 #[macro_use]
 mod pg_enum;
 pub mod products;
+pub mod sales;
 pub mod serde_helpers;
 pub mod stock;
+pub mod store_access;
 
 pub use csv::{ImportResult, RowError};

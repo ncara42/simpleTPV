@@ -12,6 +12,7 @@ mod json;
 mod products;
 mod router;
 mod routes;
+mod sales;
 mod state;
 mod stock;
 

@@ -1905,6 +1905,7 @@ dependencies = [
  "rust_decimal",
  "serde",
  "serde_json",
+ "simpletpv-auth",
  "simpletpv-db",
  "simpletpv-shared",
  "sqlx",

@@ -1,0 +1,418 @@
+//! Servicio de ventas — port (core) de `sales.service.ts`. Todo bajo
+//! `with_tenant_tx` (RLS). El `create` integra el stock vía las primitivas ya
+//! portadas (`apply_fefo_outflow` / `apply_movement`).
+//!
+//! Patrón de errores: el cierre de `with_tenant_tx` devuelve
+//! `Result<Result<T, AppError>, sqlx::Error>` — el `Ok(Err(..))` lleva el error de
+//! NEGOCIO (validación) y el `Err` (vía `?`) el de BD; ambos se desempaquetan
+//! fuera. Las validaciones de negocio ocurren ANTES de cualquier escritura.
+
+use rust_decimal::Decimal;
+use simpletpv_db::with_tenant_tx;
+use simpletpv_shared::AppError;
+use sqlx::{PgPool, Postgres, QueryBuilder, Transaction};
+use time::PrimitiveDateTime;
+use uuid::Uuid;
+
+use crate::stock::model::MovementType;
+use crate::stock::service::{apply_fefo_outflow, apply_movement, ApplyMovementInput};
+use crate::store_access::has_store_access;
+
+use super::domain::{
+    assert_discount_within_limit, compute_change, compute_totals, format_ticket, PricedLine,
+    TicketDiscount,
+};
+use super::input::CreateSale;
+use super::model::{Sale, SaleLine, SaleWithLines, SalesPage, TicketBlock};
+
+const MAX_SALES_PAGE_SIZE: i64 = 100;
+
+/// Columnas de `Sale` con alias snake_case para `FromRow` (enums como texto).
+const SALE_COLS: &str = r#"id, "organizationId" AS organization_id, "storeId" AS store_id,
+    "userId" AS user_id, "ticketNumber" AS ticket_number, subtotal,
+    "discountTotal" AS discount_total, total, "paymentMethod"::text AS payment_method,
+    "cashGiven" AS cash_given, "cashChange" AS cash_change, status::text AS status,
+    "voidedAt" AS voided_at, "voidedBy" AS voided_by, "clientId" AS client_id,
+    "createdAt" AS created_at"#;
+
+const LINE_COLS: &str = r#"id, "organizationId" AS organization_id, "saleId" AS sale_id,
+    "productId" AS product_id, name, "unitPrice" AS unit_price, qty,
+    "discountPct" AS discount_pct, "discountAmt" AS discount_amt, "taxRate" AS tax_rate,
+    "costPrice" AS cost_price, "discountSource"::text AS discount_source,
+    "lineTotal" AS line_total"#;
+
+#[derive(sqlx::FromRow)]
+struct ProductRow {
+    id: Uuid,
+    name: String,
+    sale_price: Decimal,
+    tax_rate: Decimal,
+    cost_price: Decimal,
+    tracks_batch: bool,
+}
+
+/// Límite de % de descuento efectivo por rol (paridad NestJS): ADMIN sin límite,
+/// MANAGER 50%, CLERK 10%.
+fn discount_limit(role: simpletpv_auth::Role) -> Option<Decimal> {
+    match role {
+        simpletpv_auth::Role::Admin => None,
+        simpletpv_auth::Role::Manager => Some(Decimal::from(50)),
+        simpletpv_auth::Role::Clerk => Some(Decimal::from(10)),
+    }
+}
+
+/// `POST /sales`: crea una venta (idempotente por `clientId`).
+pub async fn create(
+    pool: &PgPool,
+    org: Uuid,
+    user_id: Uuid,
+    role: simpletpv_auth::Role,
+    input: CreateSale,
+) -> Result<SaleWithLines, AppError> {
+    input.validate()?;
+    let limit = discount_limit(role);
+    let is_org_wide = role.is_org_wide();
+
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        // 1. Idempotencia offline: si el clientId ya existe, devolver la venta.
+        if let Some(cid) = input.client_id {
+            if let Some(existing) = load_sale_by_client(tx, cid).await? {
+                let lines = load_lines(tx, existing.id).await?;
+                return Ok(Ok(SaleWithLines { sale: existing, lines }));
+            }
+        }
+        // 2. Acceso a la tienda (SEC-01).
+        if !is_org_wide && !has_store_access(tx, user_id, input.store_id).await? {
+            return Ok(Err(AppError::Forbidden));
+        }
+        // 3. Caja abierta obligatoria.
+        let open: Option<(Uuid,)> = sqlx::query_as(
+            r#"SELECT id FROM "CashSession" WHERE "storeId" = $1 AND status = 'OPEN'::"CashSessionStatus" LIMIT 1"#,
+        )
+        .bind(input.store_id)
+        .fetch_optional(&mut **tx)
+        .await?;
+        if open.is_none() {
+            return Ok(Err(AppError::Conflict));
+        }
+        // 4. Productos + precios por tienda.
+        let product_ids: Vec<Uuid> = input.lines.iter().map(|l| l.product_id).collect();
+        let products: Vec<ProductRow> = sqlx::query_as(
+            r#"SELECT id, name, "salePrice" AS sale_price, "taxRate" AS tax_rate,
+                 "costPrice" AS cost_price, "tracksBatch" AS tracks_batch
+               FROM "Product" WHERE id = ANY($1)"#,
+        )
+        .bind(&product_ids)
+        .fetch_all(&mut **tx)
+        .await?;
+        let pmap: std::collections::HashMap<Uuid, ProductRow> =
+            products.into_iter().map(|p| (p.id, p)).collect();
+
+        let store_prices: Vec<(Uuid, Decimal)> = sqlx::query_as(
+            r#"SELECT "productId", price FROM "StorePrice"
+               WHERE "storeId" = $1 AND "productId" = ANY($2)"#,
+        )
+        .bind(input.store_id)
+        .bind(&product_ids)
+        .fetch_all(&mut **tx)
+        .await?;
+        let spmap: std::collections::HashMap<Uuid, Decimal> = store_prices.into_iter().collect();
+
+        // 5. Líneas preciadas (precio = override por tienda o salePrice).
+        let mut priced = Vec::with_capacity(input.lines.len());
+        for l in &input.lines {
+            let Some(p) = pmap.get(&l.product_id) else {
+                return Ok(Err(AppError::BadRequest)); // producto inexistente
+            };
+            let unit_price = spmap.get(&l.product_id).copied().unwrap_or(p.sale_price);
+            priced.push(PricedLine {
+                product_id: l.product_id,
+                name: p.name.clone(),
+                unit_price,
+                qty: l.qty,
+                discount_pct: l.discount_pct,
+                discount_amt: l.discount_amt,
+                tax_rate: p.tax_rate,
+                cost_price: p.cost_price,
+            });
+        }
+
+        // 6. Totales + límite de descuento por rol + cambio.
+        let totals = compute_totals(
+            priced,
+            TicketDiscount {
+                pct: input.ticket_discount_pct,
+                amt: input.ticket_discount_amt,
+            },
+        );
+        if let Err(e) = assert_discount_within_limit(limit, totals.discount_total, totals.gross_total) {
+            return Ok(Err(e));
+        }
+        let (cash_given, cash_change) =
+            match compute_change(input.payment_method, totals.total, input.cash_given) {
+                Ok(v) => v,
+                Err(e) => return Ok(Err(e)),
+            };
+
+        // 7. Número de ticket: pre-asignado (offline) o contador atómico.
+        let ticket_number = if let Some(tn) = &input.ticket_number {
+            tn.clone()
+        } else {
+            let row: Option<(String, i64)> = sqlx::query_as(
+                r#"UPDATE "Store" SET "ticketCounter" = "ticketCounter" + 1
+                   WHERE id = $1 RETURNING code, "ticketCounter"::bigint"#,
+            )
+            .bind(input.store_id)
+            .fetch_optional(&mut **tx)
+            .await?;
+            let Some((code, counter)) = row else {
+                return Ok(Err(AppError::NotFound)); // tienda inexistente
+            };
+            format_ticket(&code, counter)
+        };
+
+        // 8. INSERT de la venta.
+        let sale_id = Uuid::new_v4();
+        let sale: Sale = sqlx::query_as(&format!(
+            r#"INSERT INTO "Sale" (id, "organizationId", "storeId", "userId", "ticketNumber",
+                 subtotal, "discountTotal", total, "paymentMethod", "cashGiven", "cashChange",
+                 status, "clientId", "createdAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::"PaymentMethod", $10, $11,
+                 'COMPLETED'::"SaleStatus", $12, now())
+               RETURNING {SALE_COLS}"#,
+        ))
+        .bind(sale_id)
+        .bind(org)
+        .bind(input.store_id)
+        .bind(user_id)
+        .bind(&ticket_number)
+        .bind(totals.subtotal)
+        .bind(totals.discount_total)
+        .bind(totals.total)
+        .bind(input.payment_method)
+        .bind(cash_given)
+        .bind(cash_change)
+        .bind(input.client_id)
+        .fetch_one(&mut **tx)
+        .await?;
+
+        // 9. INSERT de las líneas.
+        let mut lines = Vec::with_capacity(totals.lines.len());
+        for cl in &totals.lines {
+            let line: SaleLine = sqlx::query_as(&format!(
+                r#"INSERT INTO "SaleLine" (id, "organizationId", "saleId", "productId", name,
+                     "unitPrice", qty, "discountPct", "discountAmt", "taxRate", "costPrice",
+                     "discountSource", "lineTotal")
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'VOLUNTARY'::"DiscountSource", $12)
+                   RETURNING {LINE_COLS}"#,
+            ))
+            .bind(Uuid::new_v4())
+            .bind(org)
+            .bind(sale_id)
+            .bind(cl.priced.product_id)
+            .bind(&cl.priced.name)
+            .bind(cl.priced.unit_price)
+            .bind(cl.priced.qty)
+            .bind(cl.priced.discount_pct.unwrap_or(Decimal::ZERO))
+            .bind(cl.discount_amt)
+            .bind(cl.priced.tax_rate)
+            .bind(cl.priced.cost_price)
+            .bind(cl.line_total)
+            .fetch_one(&mut **tx)
+            .await?;
+            lines.push(line);
+        }
+
+        // 10. Salida de stock por línea (FEFO si el producto lleva lote).
+        for cl in &totals.lines {
+            let p = &pmap[&cl.priced.product_id];
+            if p.tracks_batch {
+                apply_fefo_outflow(
+                    tx,
+                    org,
+                    p.id,
+                    input.store_id,
+                    MovementType::Sale,
+                    cl.priced.qty,
+                    Some(sale_id),
+                    Some(user_id),
+                )
+                .await?;
+            } else {
+                apply_movement(
+                    tx,
+                    ApplyMovementInput {
+                        organization_id: org,
+                        product_id: p.id,
+                        store_id: input.store_id,
+                        movement_type: MovementType::Sale,
+                        quantity: -cl.priced.qty,
+                        reference_id: Some(sale_id),
+                        reason: None,
+                        user_id: Some(user_id),
+                        batch: None,
+                    },
+                )
+                .await?;
+            }
+        }
+
+        Ok(Ok(SaleWithLines { sale, lines }))
+    })
+    .await?
+}
+
+/// `GET /sales/by-ticket/:ticketNumber` — venta con líneas (404 si no existe).
+pub async fn find_by_ticket(
+    pool: &PgPool,
+    org: Uuid,
+    ticket_number: &str,
+) -> Result<SaleWithLines, AppError> {
+    let ticket_number = ticket_number.to_owned();
+    let found: Option<SaleWithLines> = with_tenant_tx(pool, org, async move |tx, _after| {
+        let Some(sale) = load_sale_by_ticket(tx, &ticket_number).await? else {
+            return Ok(None);
+        };
+        let lines = load_lines(tx, sale.id).await?;
+        Ok(Some(SaleWithLines { sale, lines }))
+    })
+    .await?;
+    found.ok_or(AppError::NotFound)
+}
+
+/// `POST /sales/ticket-block` — reserva `size` números de ticket para uso offline.
+pub async fn reserve_ticket_block(
+    pool: &PgPool,
+    org: Uuid,
+    store_id: Uuid,
+    size: i64,
+) -> Result<TicketBlock, AppError> {
+    let block: Option<TicketBlock> = with_tenant_tx(pool, org, async move |tx, _after| {
+        let row: Option<(String, i64)> = sqlx::query_as(
+            r#"UPDATE "Store" SET "ticketCounter" = "ticketCounter" + $2
+               WHERE id = $1 RETURNING code, "ticketCounter"::bigint"#,
+        )
+        .bind(store_id)
+        .bind(size)
+        .fetch_optional(&mut **tx)
+        .await?;
+        Ok(row.map(|(code, counter)| TicketBlock {
+            code,
+            from: counter - size + 1,
+            to: counter,
+        }))
+    })
+    .await?;
+    block.ok_or(AppError::NotFound)
+}
+
+/// Filtros de `GET /sales`.
+#[derive(Default)]
+pub struct SalesFilter {
+    pub store_id: Option<Uuid>,
+    pub user_id: Option<Uuid>,
+    pub status: Option<String>,
+    pub from: Option<PrimitiveDateTime>,
+    pub to: Option<PrimitiveDateTime>,
+    pub page: i64,
+    pub page_size: i64,
+}
+
+/// `GET /sales` — historial paginado (createdAt desc). Un CLERK (`!org_wide`) solo
+/// ve las ventas de sus tiendas (UserStore).
+pub async fn list(
+    pool: &PgPool,
+    org: Uuid,
+    requester: Uuid,
+    is_org_wide: bool,
+    filter: SalesFilter,
+) -> Result<SalesPage, AppError> {
+    let page = filter.page.max(1);
+    let page_size = filter.page_size.clamp(1, MAX_SALES_PAGE_SIZE);
+
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        let push_where = |qb: &mut QueryBuilder<Postgres>| {
+            qb.push(r#" WHERE "organizationId" = "#).push_bind(org);
+            if let Some(s) = filter.store_id {
+                qb.push(r#" AND "storeId" = "#).push_bind(s);
+            }
+            if let Some(u) = filter.user_id {
+                qb.push(r#" AND "userId" = "#).push_bind(u);
+            }
+            if let Some(st) = &filter.status {
+                qb.push(r#" AND status = "#)
+                    .push_bind(st.clone())
+                    .push(r#"::"SaleStatus""#);
+            }
+            if let Some(f) = filter.from {
+                qb.push(r#" AND "createdAt" >= "#).push_bind(f);
+            }
+            if let Some(t) = filter.to {
+                qb.push(r#" AND "createdAt" < "#).push_bind(t);
+            }
+            // SEC-01: el CLERK solo ve ventas de sus tiendas asignadas.
+            if !is_org_wide {
+                qb.push(
+                    r#" AND "storeId" IN (SELECT "storeId" FROM "UserStore" WHERE "userId" = "#,
+                )
+                .push_bind(requester)
+                .push(")");
+            }
+        };
+
+        let mut count_qb: QueryBuilder<Postgres> =
+            QueryBuilder::new(r#"SELECT count(*) FROM "Sale""#);
+        push_where(&mut count_qb);
+        let total_items: i64 = count_qb.build_query_scalar().fetch_one(&mut **tx).await?;
+
+        let mut qb: QueryBuilder<Postgres> = QueryBuilder::new("SELECT ");
+        qb.push(SALE_COLS).push(r#" FROM "Sale""#);
+        push_where(&mut qb);
+        qb.push(r#" ORDER BY "createdAt" DESC LIMIT "#)
+            .push_bind(page_size)
+            .push(" OFFSET ")
+            .push_bind((page - 1) * page_size);
+        let items: Vec<Sale> = qb.build_query_as::<Sale>().fetch_all(&mut **tx).await?;
+
+        Ok(SalesPage {
+            items,
+            page,
+            page_size,
+            total_items,
+        })
+    })
+    .await
+}
+
+async fn load_sale_by_client(
+    tx: &mut Transaction<'_, Postgres>,
+    client_id: Uuid,
+) -> Result<Option<Sale>, sqlx::Error> {
+    let sql = format!(r#"SELECT {SALE_COLS} FROM "Sale" WHERE "clientId" = $1 LIMIT 1"#);
+    sqlx::query_as(&sql)
+        .bind(client_id)
+        .fetch_optional(&mut **tx)
+        .await
+}
+
+async fn load_sale_by_ticket(
+    tx: &mut Transaction<'_, Postgres>,
+    ticket_number: &str,
+) -> Result<Option<Sale>, sqlx::Error> {
+    let sql = format!(r#"SELECT {SALE_COLS} FROM "Sale" WHERE "ticketNumber" = $1 LIMIT 1"#);
+    sqlx::query_as(&sql)
+        .bind(ticket_number)
+        .fetch_optional(&mut **tx)
+        .await
+}
+
+async fn load_lines(
+    tx: &mut Transaction<'_, Postgres>,
+    sale_id: Uuid,
+) -> Result<Vec<SaleLine>, sqlx::Error> {
+    let sql = format!("SELECT {LINE_COLS} FROM \"SaleLine\" WHERE \"saleId\" = $1 ORDER BY id");
+    sqlx::query_as(&sql)
+        .bind(sale_id)
+        .fetch_all(&mut **tx)
+        .await
+}

@@ -10,6 +10,14 @@ pub fn decimal_str<S: serde::Serializer>(d: &Decimal, s: S) -> Result<S::Ok, S::
     s.serialize_str(&d.normalize().to_string())
 }
 
+/// Variante `Option` de [`decimal_str`]: `null` si es `None`.
+pub fn decimal_opt_str<S: serde::Serializer>(d: &Option<Decimal>, s: S) -> Result<S::Ok, S::Error> {
+    match d {
+        Some(v) => decimal_str(v, s),
+        None => s.serialize_none(),
+    }
+}
+
 /// Serializa un `TIMESTAMP` (sin tz, almacenado en UTC) como ISO-8601 con `Z`.
 pub fn iso_utc<S: serde::Serializer>(dt: &PrimitiveDateTime, s: S) -> Result<S::Ok, S::Error> {
     let formatted = dt
@@ -17,4 +25,15 @@ pub fn iso_utc<S: serde::Serializer>(dt: &PrimitiveDateTime, s: S) -> Result<S::
         .format(&time::format_description::well_known::Rfc3339)
         .map_err(serde::ser::Error::custom)?;
     s.serialize_str(&formatted)
+}
+
+/// Variante `Option` de [`iso_utc`]: `null` si es `None`.
+pub fn iso_opt_utc<S: serde::Serializer>(
+    dt: &Option<PrimitiveDateTime>,
+    s: S,
+) -> Result<S::Ok, S::Error> {
+    match dt {
+        Some(v) => iso_utc(v, s),
+        None => s.serialize_none(),
+    }
 }
