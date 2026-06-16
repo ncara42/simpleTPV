@@ -761,6 +761,8 @@ model OfficialDevice {
   organizationId String    @db.Uuid
   storeId        String    @db.Uuid
   name           String
+  // Hash SHA-256 del token de emparejamiento (nunca el token en claro): el plano
+  // solo se devuelve una vez en la respuesta de creación. KEY-01.
   pairingToken   String    @unique
   authorized     Boolean   @default(false)
   pairedAt       DateTime?
@@ -986,6 +988,8 @@ model ApiKey {
   createdAt      DateTime  @default(now())
   lastUsedAt     DateTime?
   revokedAt      DateTime?
+  // Caducidad opcional (TTL). Null = sin caducidad. KEY-02.
+  expiresAt      DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id])
   priceList    PriceList?   @relation(fields: [priceListId], references: [id])

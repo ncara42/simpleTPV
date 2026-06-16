@@ -339,14 +339,26 @@ describe('ReturnsService.createBlind', () => {
   const PROD = '33333333-3333-3333-3333-333333333333';
 
   // prisma con user (PIN) y product (precio). `pinHash` es el hash del PIN dado.
-  function makeBlindPrisma(opts: { pinHash?: string | null; price?: number | null }) {
+  function makeBlindPrisma(opts: {
+    pinHash?: string | null;
+    price?: number | null;
+    authorizerId?: string;
+  }) {
+    const authorizerId = opts.authorizerId ?? 'mgr-1';
     return {
       user: {
-        findMany: vi.fn(async () =>
-          opts.pinHash === undefined
-            ? [{ id: 'mgr-1', pinHash: null }]
-            : [{ id: 'mgr-1', pinHash: opts.pinHash }],
-        ),
+        // Respeta el filtro `id: { not: userId }` del resolveAuthorizer para que
+        // el test del bypass «cuatro ojos» (iniciador == único autorizador) sea
+        // fiel: si el iniciador queda excluido, findMany devuelve [].
+        findMany: vi.fn(async (args?: { where?: { id?: { not?: string } } }) => {
+          const excluded = args?.where?.id?.not;
+          if (excluded !== undefined && excluded === authorizerId) {
+            return [];
+          }
+          return opts.pinHash === undefined
+            ? [{ id: authorizerId, pinHash: null }]
+            : [{ id: authorizerId, pinHash: opts.pinHash }];
+        }),
       },
       product: {
         findMany: vi.fn(async () =>
@@ -439,6 +451,35 @@ describe('ReturnsService.createBlind', () => {
     };
     expect(createArg.data.saleId).toBeUndefined(); // sin ticket
     expect(createArg.data.userId).toBe('clerk-1'); // operario que la inició
+  });
+
+  it('cuatro ojos: el iniciador NO puede auto-autorizar con su propio PIN', async () => {
+    // El único MANAGER/ADMIN con PIN es el propio iniciador. Al excluirlo del
+    // where (id: { not: userId }), no queda ningún autorizador → 403.
+    const pinHash = await bcrypt.hash('4321', 10);
+    const svc = service(
+      makeBlindPrisma({ pinHash, price: 10, authorizerId: 'self-mgr' }),
+      makeBlindBase(),
+    );
+    await expect(
+      tenantStorage.run({ organizationId: ORG }, () =>
+        // initiator === único autorizador del tenant
+        svc.createBlind(dto, 'self-mgr', 'MANAGER'),
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('cuatro ojos: pasa el userId iniciador como exclusión al resolver', async () => {
+    const pinHash = await bcrypt.hash('4321', 10);
+    const prisma = makeBlindPrisma({ pinHash, price: 10 });
+    const svc = service(prisma, makeBlindBase());
+    await tenantStorage.run({ organizationId: ORG }, () =>
+      svc.createBlind(dto, 'clerk-1', 'ADMIN'),
+    );
+    const whereArg = prisma.user.findMany.mock.calls[0]![0] as {
+      where: { id?: { not?: string } };
+    };
+    expect(whereArg.where.id).toEqual({ not: 'clerk-1' });
   });
 
   it('400 si un producto no pertenece al tenant', async () => {

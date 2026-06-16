@@ -22,11 +22,14 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     const res = host.switchToHttp().getResponse<HttpResponse>();
 
     if (exception.code === 'P2002') {
-      const target = exception.meta?.target;
-      const fields = Array.isArray(target) ? target.join(', ') : String(target ?? 'valor único');
+      // No reflejamos `meta.target` en la respuesta: filtraría nombres de
+      // columnas internas (p.ej. `hashedKey`) — fuga de detalle de
+      // implementación (CWE-209). El nombre de columna real se guarda solo en
+      // el log para diagnóstico.
+      this.logger.warn(`P2002 (unique) en target=${JSON.stringify(exception.meta?.target)}`);
       res.status(HttpStatus.CONFLICT).json({
         statusCode: HttpStatus.CONFLICT,
-        message: `Ya existe un registro con ese ${fields}`,
+        message: 'Ya existe un registro con esos datos',
         error: 'Conflict',
       });
       return;

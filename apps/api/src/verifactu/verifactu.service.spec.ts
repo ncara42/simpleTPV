@@ -1,8 +1,27 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { tenantStorage } from '../prisma/tenant-context.js';
 import { SandboxVerifactuProvider, type VerifactuProvider } from './verifactu.provider.js';
 import { VerifactuService } from './verifactu.service.js';
+
+// Stub de bullmq (no abre Redis real). Capturamos las `connection` y las opciones
+// del job para verificar el endurecimiento TLS y la retención de jobs (#118).
+const queueAdd = vi.fn(async (..._args: unknown[]) => undefined);
+const ctorConnections: unknown[] = [];
+vi.mock('bullmq', () => ({
+  Queue: class {
+    add = queueAdd;
+    close = vi.fn(async () => undefined);
+    constructor(_name: string, opts: { connection: unknown }) {
+      ctorConnections.push(opts.connection);
+    }
+  },
+  Worker: class {
+    close = vi.fn(async () => undefined);
+    on = vi.fn();
+    constructor() {}
+  },
+}));
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 
@@ -141,6 +160,47 @@ describe('VerifactuService.processRecord', () => {
       data: { status?: string };
     };
     expect(upd.data.status).toBe('FAILED');
+  });
+});
+
+// Inicialización con Redis: endurecimiento BullMQ (#118).
+describe('VerifactuService.onModuleInit con Redis', () => {
+  afterEach(() => {
+    ctorConnections.length = 0;
+    queueAdd.mockClear();
+    delete process.env.REDIS_URL;
+  });
+
+  it('con rediss:// fuerza tls en la conexión de la cola', () => {
+    process.env.REDIS_URL = 'rediss://cache:6380';
+    const svc = new VerifactuService(
+      makePrisma() as never,
+      makeBase() as never,
+      new SandboxVerifactuProvider(),
+    );
+    svc.onModuleInit();
+    expect(ctorConnections[0]).toMatchObject({
+      host: 'cache',
+      port: 6380,
+      tls: { rejectUnauthorized: true },
+    });
+  });
+
+  it('enqueueSend encola con removeOnComplete/removeOnFail (retención acotada)', async () => {
+    process.env.REDIS_URL = 'redis://cache:6379';
+    const svc = new VerifactuService(
+      makePrisma() as never,
+      makeBase() as never,
+      new SandboxVerifactuProvider(),
+    );
+    svc.onModuleInit();
+    await svc.enqueueSend('vf1', ORG);
+    const opts = queueAdd.mock.calls[0]![2] as {
+      removeOnComplete: unknown;
+      removeOnFail: unknown;
+    };
+    expect(opts.removeOnComplete).toEqual({ count: 100 });
+    expect(opts.removeOnFail).toEqual({ count: 50 });
   });
 });
 

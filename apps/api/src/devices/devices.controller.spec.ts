@@ -32,14 +32,15 @@ describe('DevicesController', () => {
     expect(res.id).toBe('dev-1');
   });
 
-  it('POST /devices/pair delega en pair con el token', async () => {
+  it('POST /devices/pair delega en pair con el token y el caller del JWT', async () => {
     const { controller, service } = makeController();
+    const req = { user: { sub: 'u-1', organizationId: 'org-1', role: 'CLERK' } };
 
-    const res = (await controller.pair({ pairingToken: 'device-demo-token' })) as {
+    const res = (await controller.pair({ pairingToken: 'ABCDEF012345' }, req)) as {
       authorized: boolean;
     };
 
-    expect(service.pair).toHaveBeenCalledWith('device-demo-token');
+    expect(service.pair).toHaveBeenCalledWith('ABCDEF012345', { userId: 'u-1', role: 'CLERK' });
     expect(res.authorized).toBe(true);
   });
 });

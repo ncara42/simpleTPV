@@ -8,8 +8,10 @@ export class LoginDto {
   @MaxLength(254)
   email!: string;
 
+  // bcryptjs trunca a 72 bytes; topamos aquí para no aceptar como válidas
+  // contraseñas que el hash habría recortado en silencio (issue #107).
   @IsString()
   @IsNotEmpty()
-  @MaxLength(128)
+  @MaxLength(72)
   password!: string;
 }

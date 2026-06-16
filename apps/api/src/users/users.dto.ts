@@ -9,8 +9,15 @@ import {
   IsString,
   IsUUID,
   Matches,
+  MaxLength,
   MinLength,
 } from 'class-validator';
+
+// bcryptjs descarta en silencio los bytes 73+ antes de hashear, así que dos
+// contraseñas que compartan los primeros 72 bytes producirían el mismo hash
+// (CWE-916). Topamos la longitud para rechazar de forma explícita ese caso en
+// lugar de truncar sin avisar. Ver issue #107.
+export const PASSWORD_MAX_LENGTH = 72;
 
 export class CreateUserDto {
   @IsEmail()
@@ -22,6 +29,7 @@ export class CreateUserDto {
 
   @IsString()
   @MinLength(8)
+  @MaxLength(PASSWORD_MAX_LENGTH)
   password!: string;
 
   @IsEnum(UserRole)
@@ -49,6 +57,7 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   @MinLength(8)
+  @MaxLength(PASSWORD_MAX_LENGTH)
   password?: string;
 }
 

@@ -9,6 +9,7 @@ export interface ApiKeyRecord {
   organizationId: string;
   priceListId: string | null;
   revokedAt: Date | null;
+  expiresAt: Date | null;
 }
 
 // Conexión dedicada al flujo de API key (lookup + lastUsedAt). Usa app_admin
@@ -31,7 +32,13 @@ export class ApiKeyLookupService implements OnModuleDestroy {
   async findByHash(hashedKey: string): Promise<ApiKeyRecord | null> {
     return this.client.apiKey.findUnique({
       where: { hashedKey },
-      select: { id: true, organizationId: true, priceListId: true, revokedAt: true },
+      select: {
+        id: true,
+        organizationId: true,
+        priceListId: true,
+        revokedAt: true,
+        expiresAt: true,
+      },
     });
   }
 

@@ -5,8 +5,9 @@ import {
   type OnModuleDestroy,
   type OnModuleInit,
 } from '@nestjs/common';
-import { Queue, type RedisOptions, Worker } from 'bullmq';
+import { Queue, Worker } from 'bullmq';
 
+import { JOB_RETENTION, redisOptionsFromUrl } from '../common/redis-options.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PRISMA_BASE } from '../prisma/prisma.tokens.js';
 import { requireTenant, tenantStorage } from '../prisma/tenant-context.js';
@@ -41,14 +42,9 @@ export class VerifactuService implements OnModuleInit, OnModuleDestroy {
       // (processRecord) al crear el registro. Funciona en una instancia.
       return;
     }
-    // Conexión por opciones (host/port/password) derivadas de REDIS_URL. BullMQ
-    // crea su propia conexión con maxRetriesPerRequest=null internamente.
-    const parsed = new URL(url);
-    const connection: RedisOptions = {
-      host: parsed.hostname,
-      port: Number(parsed.port || 6379),
-      ...(parsed.password ? { password: parsed.password } : {}),
-    };
+    // Conexión por opciones derivadas de REDIS_URL (host/port/password y tls ante
+    // `rediss:`). BullMQ crea su propia conexión con maxRetriesPerRequest=null.
+    const connection = redisOptionsFromUrl(url);
     this.queue = new Queue(QUEUE_NAME, { connection });
     this.worker = new Worker(
       QUEUE_NAME,
@@ -126,7 +122,7 @@ export class VerifactuService implements OnModuleInit, OnModuleDestroy {
       await this.queue.add(
         'send',
         { recordId, organizationId },
-        { attempts: MAX_ATTEMPTS, backoff: { type: 'exponential', delay: 2000 } },
+        { attempts: MAX_ATTEMPTS, backoff: { type: 'exponential', delay: 2000 }, ...JOB_RETENTION },
       );
     } else {
       await this.processRecord(recordId, organizationId);

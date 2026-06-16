@@ -47,7 +47,13 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @simpletpv/db exec prisma generate
 
-      - name: Audit dependencies
+      # Aviso informativo, NO gate. El gate de vulnerabilidades de dependencias
+      # que bloquea el merge vive en `security.yml` (OSV Scanner sobre
+      # pnpm-lock.yaml, sin continue-on-error) + Trivy filesystem. `pnpm audit`
+      # usa la base de avisos de npm (distinta de OSV) y se mantiene como señal
+      # temprana no bloqueante para evitar falsos rojos por divergencia entre
+      # bases; si reporta algo, se revisa contra el resultado de OSV.
+      - name: Audit dependencies (informativo — gate real en security.yml/OSV)
         run: pnpm audit --audit-level=high --prod
         continue-on-error: true
 
@@ -194,7 +200,9 @@ jobs:
         ports:
           - 5432:5432
       redis:
-        image: redis:7-alpine
+        # Pin a 7.4 (>=7.4.3 corrige CVE-2025-49844 / RediShell). Evita que la
+        # etiqueta mutable `7-alpine` resuelva a una build vulnerable en CI.
+        image: redis:7.4-alpine
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 3s
@@ -346,9 +354,14 @@ jobs:
             -d "{\"applicationId\":\"$DOKPLOY_API_APP_ID\"}" \
             "${DOKPLOY_API_URL%/}/api/application.deploy")
           echo "Dokploy application.deploy HTTP $code"
-          # Un fallo del deploy NO debe tumbar el CI de main: el código ya pasó
-          # quality+e2e. Se avisa y se sale OK; revisa los secrets si no se dispara.
+          # Una respuesta no-2xx (p.ej. 401 por token caducado) significa que el
+          # redeploy NO se ha disparado: prod se quedaría en una versión antigua
+          # mientras CI reporta verde. Fail-fast para que el fallo sea visible y
+          # no pase desapercibido (INFRA-05 / CWE-754).
           case "$code" in
             2*) echo "Redeploy disparado." ;;
-            *) echo "::warning::Dokploy application.deploy devolvió $code (esperado 2xx) — deploy no disparado, revisa los secrets DOKPLOY_API_*" ;;
+            *)
+              echo "::error::Dokploy application.deploy devolvió $code (esperado 2xx) — deploy no disparado, revisa los secrets DOKPLOY_API_*"
+              exit 1
+              ;;
           esac

@@ -8,6 +8,8 @@ import { requireTenant } from '../prisma/tenant-context.js';
 import { ApiKeyLookupService } from './api-key-lookup.service.js';
 import type { CreateApiKeyDto } from './api-keys.dto.js';
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 // Genera una key con formato: stpv_<prefix8>_<random43>
 // La key completa se muestra UNA VEZ; en BD solo se almacena sha256(key).
 function generateRawKey(): { raw: string; prefix: string } {
@@ -29,6 +31,7 @@ export class ApiKeysService {
     const { organizationId } = requireTenant();
     const { raw, prefix } = generateRawKey();
     const hashedKey = ApiKeyLookupService.hashKey(raw);
+    const expiresAt = dto.ttlDays != null ? new Date(Date.now() + dto.ttlDays * MS_PER_DAY) : null;
 
     const record = await this.prisma.apiKey.create({
       data: {
@@ -37,6 +40,7 @@ export class ApiKeysService {
         prefix,
         hashedKey,
         priceListId: dto.priceListId ?? null,
+        expiresAt,
       },
       select: { id: true, name: true, prefix: true },
     });
@@ -57,6 +61,7 @@ export class ApiKeysService {
         createdAt: true,
         lastUsedAt: true,
         revokedAt: true,
+        expiresAt: true,
       },
     });
   }

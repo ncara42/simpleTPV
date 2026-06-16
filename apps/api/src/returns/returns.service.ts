@@ -243,12 +243,18 @@ export class ReturnsService {
    * autoriza si el PIN coincide con el de algún MANAGER/ADMIN; si no, lanza 403.
    * Compara contra todos los pinHash (bcrypt) de los autorizadores del tenant —
    * el volumen de MANAGER/ADMIN por tienda es pequeño.
+   *
+   * Control «cuatro ojos» (SEC, IDOR-02): se EXCLUYE al iniciador (`userId`) de la
+   * lista de autorizadores. Sin esta exclusión, un MANAGER/ADMIN con PIN propio
+   * podría auto-autorizar su devolución ciega (`authorizedBy === userId`),
+   * anulando la doble aprobación de un segundo actor.
    */
-  private async resolveAuthorizer(managerPin: string): Promise<string> {
+  private async resolveAuthorizer(managerPin: string, userId: string): Promise<string> {
     const tenant = requireTenant();
     const authorizers = await this.prisma.user.findMany({
       where: {
         organizationId: tenant.organizationId,
+        id: { not: userId },
         role: { in: ['MANAGER', 'ADMIN'] },
         active: true,
         pinHash: { not: null },
@@ -283,7 +289,7 @@ export class ReturnsService {
     this.assertPinNotLocked(pinKey);
     let authorizedBy: string;
     try {
-      authorizedBy = await this.resolveAuthorizer(dto.managerPin);
+      authorizedBy = await this.resolveAuthorizer(dto.managerPin, userId);
     } catch (err) {
       this.registerPinFailure(pinKey);
       throw err;

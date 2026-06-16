@@ -43,8 +43,9 @@ export class UserStateService implements UserStateValidator {
       return hit.state;
     }
     // Puede lanzar si la BD no está disponible: se propaga a propósito para que el
-    // guard haga fail-open (la firma del token ya garantiza autenticidad; esta
-    // revalidación es defensa en profundidad best-effort, no debe tumbar la auth).
+    // guard aplique fail-closed selectivo (deniega roles privilegiados, deja pasar
+    // al resto; la firma del token ya garantiza autenticidad y para roles de bajo
+    // privilegio la revalidación es defensa en profundidad best-effort).
     const user = await this.lookup.getUserState(userId);
     const state: UserState | null = user ? { active: user.active, role: user.role } : null;
     this.cache.set(userId, { state, expiresAt: now + this.ttl });

@@ -42,7 +42,7 @@ describe('UserStateService', () => {
     }
   });
 
-  it('propaga el error del lookup (el guard lo traduce a fail-open)', async () => {
+  it('propaga el error del lookup (el guard aplica fail-closed selectivo)', async () => {
     const lookup = makeLookup(() => Promise.reject(new Error('db down')));
     const svc = new UserStateService(lookup);
     await expect(svc.getState('u1')).rejects.toThrow('db down');

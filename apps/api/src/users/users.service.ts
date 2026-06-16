@@ -2,12 +2,16 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma, UserRole } from '@simpletpv/db';
 import bcrypt from 'bcryptjs';
 
+import { mapWithConcurrency } from '../common/concurrency.js';
 import { type ImportResult, parseCsv, rowNumber } from '../common/csv.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireTenant } from '../prisma/tenant-context.js';
-import type { CreateUserDto, UpdateUserDto } from './users.dto.js';
+import { type CreateUserDto, PASSWORD_MAX_LENGTH, type UpdateUserDto } from './users.dto.js';
 
 const SALT_ROUNDS = 10;
+// Concurrencia máxima de hashes bcrypt en el import en lote: acota la CPU en
+// vuelo para no saturar el event loop con cientos de hashes simultáneos (DOS-03).
+const IMPORT_HASH_CONCURRENCY = 10;
 // Email válido (mismo criterio laxo que class-validator @IsEmail para el alta manual).
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -64,7 +68,7 @@ export class UsersService {
     const rows = parseCsv(csv);
     const errors: ImportResult['errors'] = [];
 
-    // Hash de contraseñas en paralelo solo para las filas válidas.
+    // Hash de contraseñas (con concurrencia acotada) solo para las filas válidas.
     const prepared: Array<{ email: string; name: string; password: string; role: UserRole }> = [];
     rows.forEach((cells, idx) => {
       const row = rowNumber(idx);
@@ -84,6 +88,15 @@ export class UsersService {
         errors.push({ row, message: 'La contraseña debe tener al menos 8 caracteres' });
         return;
       }
+      // bcryptjs trunca a 72 bytes: rechazamos lo más largo en lugar de hashear
+      // un prefijo en silencio (issue #107), igual que el alta manual.
+      if (password.length > PASSWORD_MAX_LENGTH) {
+        errors.push({
+          row,
+          message: `La contraseña no puede superar los ${PASSWORD_MAX_LENGTH} caracteres`,
+        });
+        return;
+      }
       if (!(roleRaw in UserRole)) {
         errors.push({ row, message: 'Rol inválido (ADMIN, MANAGER o CLERK)' });
         return;
@@ -93,15 +106,13 @@ export class UsersService {
 
     let inserted = 0;
     if (prepared.length > 0) {
-      const data = await Promise.all(
-        prepared.map(async (u) => ({
-          organizationId: tenant.organizationId,
-          email: u.email,
-          name: u.name,
-          role: u.role,
-          passwordHash: await bcrypt.hash(u.password, SALT_ROUNDS),
-        })),
-      );
+      const data = await mapWithConcurrency(prepared, IMPORT_HASH_CONCURRENCY, async (u) => ({
+        organizationId: tenant.organizationId,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        passwordHash: await bcrypt.hash(u.password, SALT_ROUNDS),
+      }));
       // skipDuplicates: un email ya existente no rompe el lote (cuenta como no insertado).
       const res = await this.prisma.user.createMany({ data, skipDuplicates: true });
       inserted = res.count;
