@@ -70,6 +70,11 @@ pub fn build_router(state: AppState) -> Router {
         .route("/stock/inventory-count", post(stock::inventory_count))
         .route("/stock/expiring", get(stock::expiring))
         .route("/stock/movements", get(stock::movements))
+        // Stock (slice B): lecturas dashboard (byStore/to-reorder/byProduct/alerts).
+        .route("/stock", get(stock::by_store))
+        .route("/stock/to-reorder", get(stock::to_reorder))
+        .route("/stock/alerts", get(stock::alerts))
+        .route("/stock/product/{product_id}", get(stock::by_product))
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)

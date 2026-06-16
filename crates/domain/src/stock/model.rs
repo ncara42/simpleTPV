@@ -96,3 +96,56 @@ pub struct MovementsPage {
     pub page_size: i64,
     pub total_items: i64,
 }
+
+/// Fila de stock por tienda (vista `GET /stock` y `to-reorder`).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StockByStore {
+    pub product_id: Uuid,
+    pub product_name: String,
+    pub store_id: Uuid,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub quantity: Decimal,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub min_stock: Decimal,
+    pub level: StockLevel,
+}
+
+/// Fila de stock de un producto por tienda (vista `GET /stock/product/:id`).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StockByProduct {
+    pub product_id: Uuid,
+    pub store_id: Uuid,
+    pub store_name: String,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub quantity: Decimal,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub min_stock: Decimal,
+    pub level: StockLevel,
+}
+
+/// Severidad de una alerta tras el anti-rotura por arquetipo (IT-13).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AlertSeverity {
+    Critical,
+    Soft,
+}
+
+/// Alerta de stock enriquecida (vista `GET /stock/alerts`).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AlertView {
+    pub id: Uuid,
+    pub product_id: Uuid,
+    pub product_name: String,
+    pub store_id: Uuid,
+    pub store_name: String,
+    pub alert_type: AlertType,
+    pub has_substitute_stock: bool,
+    pub severity: AlertSeverity,
+    pub resolved: bool,
+    #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
+    pub created_at: PrimitiveDateTime,
+}

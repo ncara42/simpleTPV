@@ -169,6 +169,55 @@ async fn set_min_returns_view_as_manager() {
 }
 
 #[tokio::test]
+async fn dashboard_reads_as_admin() {
+    let (app, admin) = build().await;
+    let token = login(&app, "admin@org1.test").await;
+    let store = a_store(&admin).await;
+    let product = create_product(&app, &token, &format!("RDHTTP-{}", uuid::Uuid::new_v4())).await;
+
+    // Genera stock para que el producto aparezca en las vistas.
+    let body = format!(
+        r#"{{"productId":"{product}","storeId":"{store}","newQuantity":7,"reason":"init"}}"#
+    );
+    assert_eq!(
+        send(&app, body_req("POST", "/stock/adjust", Some(&token), &body))
+            .await
+            .0,
+        StatusCode::OK
+    );
+
+    // GET /stock?storeId= → lista con el producto y su nivel.
+    let (st, _, b) = send(&app, get(&format!("/stock?storeId={store}"), &token)).await;
+    assert_eq!(st, StatusCode::OK, "{b}");
+    let list = json(&b);
+    let mine = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["productId"] == serde_json::json!(product))
+        .expect("producto en byStore");
+    assert_eq!(mine["quantity"], "7");
+    assert_eq!(mine["level"], "green");
+
+    // GET /stock/product/:id → contiene la tienda.
+    let (stp, _, bp) = send(&app, get(&format!("/stock/product/{product}"), &token)).await;
+    assert_eq!(stp, StatusCode::OK, "{bp}");
+    assert!(json(&bp)
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|r| r["storeId"] == serde_json::json!(store)));
+
+    // GET /stock/alerts → 200 (lista, posiblemente vacía para este producto).
+    assert_eq!(
+        send(&app, get("/stock/alerts", &token)).await.0,
+        StatusCode::OK
+    );
+
+    cleanup(&admin, &product).await;
+}
+
+#[tokio::test]
 async fn adjust_requires_admin_or_manager() {
     let (app, _admin) = build().await;
     let clerk = login(&app, "clerk@org1.test").await;

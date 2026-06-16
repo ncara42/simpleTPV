@@ -3,10 +3,11 @@
 //! (cualquier rol). Las vistas byStore/global/alerts (con acceso por tienda,
 //! rotación y arquetipo) llegan en el siguiente sub-PR.
 
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::Json;
 use serde::Deserialize;
 use simpletpv_auth::Role;
+use simpletpv_domain::stock::model::{AlertView, StockByProduct, StockByStore};
 use simpletpv_domain::stock::service::{self, MovementsFilter};
 use simpletpv_domain::stock::{
     Adjust, ExpiringBatch, InventoryCount, InventoryCountResult, MovementsPage, SetMin, StockView,
@@ -112,6 +113,81 @@ pub async fn movements(
     };
     let page = service::movements(state.db(), user.organization_id, filter).await?;
     Ok(Json(page))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoreQuery {
+    store_id: Uuid,
+}
+
+/// `GET /stock?storeId=` (cualquier rol; CLERK acotado a su tienda).
+pub async fn by_store(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<StoreQuery>,
+) -> Result<Json<Vec<StockByStore>>, ApiError> {
+    let rows = service::by_store(
+        state.db(),
+        user.organization_id,
+        q.store_id,
+        user.user_id,
+        user.role.is_org_wide(),
+    )
+    .await?;
+    Ok(Json(rows))
+}
+
+/// `GET /stock/to-reorder?storeId=` (cualquier rol; CLERK acotado a su tienda).
+pub async fn to_reorder(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<StoreQuery>,
+) -> Result<Json<Vec<StockByStore>>, ApiError> {
+    let rows = service::to_reorder(
+        state.db(),
+        user.organization_id,
+        q.store_id,
+        user.user_id,
+        user.role.is_org_wide(),
+    )
+    .await?;
+    Ok(Json(rows))
+}
+
+/// `GET /stock/product/:id` (cualquier rol).
+pub async fn by_product(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(product_id): Path<Uuid>,
+) -> Result<Json<Vec<StockByProduct>>, ApiError> {
+    let rows = service::by_product(state.db(), user.organization_id, product_id).await?;
+    Ok(Json(rows))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AlertsQuery {
+    #[serde(default)]
+    store_id: Option<Uuid>,
+    #[serde(default)]
+    resolved: Option<bool>,
+}
+
+/// `GET /stock/alerts?storeId=&resolved=` (cualquier rol). Por defecto, activas.
+pub async fn alerts(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<AlertsQuery>,
+) -> Result<Json<Vec<AlertView>>, ApiError> {
+    let rows = service::alerts(
+        state.db(),
+        user.organization_id,
+        q.store_id,
+        q.resolved.unwrap_or(false),
+    )
+    .await?;
+    Ok(Json(rows))
 }
 
 /// Parsea un instante ISO-8601 (RFC 3339) a `PrimitiveDateTime` en UTC (la columna

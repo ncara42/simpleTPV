@@ -15,13 +15,13 @@ use time::{Date, OffsetDateTime, PrimitiveDateTime};
 use uuid::Uuid;
 
 use super::domain::{
-    alert_type_for, allocate_fefo, days_until, expiry_cutoff, expiry_status, stock_level,
-    FefoBatch, EXPIRY_THRESHOLD_DAYS,
+    alert_type_for, alert_urgency, allocate_fefo, days_until, expiry_cutoff, expiry_status,
+    stock_level, FefoBatch, EXPIRY_THRESHOLD_DAYS,
 };
 use super::input::{Adjust, InventoryCount, SetMin};
 use super::model::{
-    AlertType, ExpiringBatch, InventoryCountResult, MovementType, MovementsPage, StockMovement,
-    StockView,
+    AlertSeverity, AlertType, AlertView, ExpiringBatch, InventoryCountResult, MovementType,
+    MovementsPage, StockByProduct, StockByStore, StockMovement, StockView,
 };
 
 /// Tope del tamaño de página de `GET /stock/movements` (SEC-09).
@@ -546,4 +546,255 @@ pub async fn movements(
         })
     })
     .await
+}
+
+// --- Lecturas dashboard (slice B) ---
+
+#[derive(sqlx::FromRow)]
+struct ByStoreRow {
+    product_id: Uuid,
+    product_name: String,
+    store_id: Uuid,
+    quantity: Decimal,
+    min_stock: Decimal,
+}
+
+/// `GET /stock`: stock de todos los productos de una tienda con nivel semáforo.
+/// Aislamiento por tienda (SEC-01): un CLERK solo ve sus tiendas (UserStore).
+pub async fn by_store(
+    pool: &PgPool,
+    org: Uuid,
+    store_id: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
+) -> Result<Vec<StockByStore>, AppError> {
+    let rows: Option<Vec<ByStoreRow>> = with_tenant_tx(pool, org, async move |tx, _after| {
+        if !is_org_wide && !has_store_access(tx, user_id, store_id).await? {
+            return Ok(None);
+        }
+        let rows: Vec<ByStoreRow> = sqlx::query_as(
+            r#"SELECT s."productId" AS product_id, p.name AS product_name, s."storeId" AS store_id,
+                 s.quantity, s."minStock" AS min_stock
+               FROM "Stock" s JOIN "Product" p ON p.id = s."productId"
+               WHERE s."storeId" = $1
+               ORDER BY p.name ASC"#,
+        )
+        .bind(store_id)
+        .fetch_all(&mut **tx)
+        .await?;
+        Ok(Some(rows))
+    })
+    .await?;
+
+    let rows = rows.ok_or(AppError::Forbidden)?;
+    Ok(rows
+        .into_iter()
+        .map(|r| StockByStore {
+            product_id: r.product_id,
+            product_name: r.product_name,
+            store_id: r.store_id,
+            quantity: r.quantity,
+            min_stock: r.min_stock,
+            level: stock_level(r.quantity, r.min_stock),
+        })
+        .collect())
+}
+
+/// `GET /stock/to-reorder`: productos por debajo/en el mínimo (nivel != green).
+pub async fn to_reorder(
+    pool: &PgPool,
+    org: Uuid,
+    store_id: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
+) -> Result<Vec<StockByStore>, AppError> {
+    let rows = by_store(pool, org, store_id, user_id, is_org_wide).await?;
+    Ok(rows
+        .into_iter()
+        .filter(|r| r.level != crate::stock::StockLevel::Green)
+        .collect())
+}
+
+#[derive(sqlx::FromRow)]
+struct ByProductRow {
+    store_id: Uuid,
+    store_name: String,
+    quantity: Decimal,
+    min_stock: Decimal,
+}
+
+/// `GET /stock/product/:id`: stock de un producto en todas las tiendas del tenant.
+/// (La caché Redis de cantidad se difiere; se sirve de Postgres.)
+pub async fn by_product(
+    pool: &PgPool,
+    org: Uuid,
+    product_id: Uuid,
+) -> Result<Vec<StockByProduct>, AppError> {
+    let rows: Vec<ByProductRow> = with_tenant_tx(pool, org, async move |tx, _after| {
+        sqlx::query_as(
+            r#"SELECT s."storeId" AS store_id, st.name AS store_name, s.quantity,
+                 s."minStock" AS min_stock
+               FROM "Stock" s JOIN "Store" st ON st.id = s."storeId"
+               WHERE s."productId" = $1
+               ORDER BY st.name ASC"#,
+        )
+        .bind(product_id)
+        .fetch_all(&mut **tx)
+        .await
+    })
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| StockByProduct {
+            product_id,
+            store_id: r.store_id,
+            store_name: r.store_name,
+            quantity: r.quantity,
+            min_stock: r.min_stock,
+            level: stock_level(r.quantity, r.min_stock),
+        })
+        .collect())
+}
+
+#[derive(sqlx::FromRow)]
+struct AlertRow {
+    id: Uuid,
+    product_id: Uuid,
+    product_name: String,
+    store_id: Uuid,
+    store_name: String,
+    alert_type: AlertType,
+    family_id: Option<Uuid>,
+    resolved: bool,
+    created_at: PrimitiveDateTime,
+}
+
+#[derive(sqlx::FromRow)]
+struct SubstituteRow {
+    store_id: Uuid,
+    product_id: Uuid,
+    family_id: Option<Uuid>,
+}
+
+/// `GET /stock/alerts`: alertas (por defecto activas), con anti-rotura por
+/// arquetipo (IT-13): se degradan a `soft` si hay un sustituto (misma familia)
+/// con stock en la tienda; `critical` si no. Orden: críticas, urgencia, antigüedad.
+pub async fn alerts(
+    pool: &PgPool,
+    org: Uuid,
+    store_id: Option<Uuid>,
+    resolved: bool,
+) -> Result<Vec<AlertView>, AppError> {
+    let (rows, substitutes): (Vec<AlertRow>, Vec<SubstituteRow>) =
+        with_tenant_tx(pool, org, async move |tx, _after| {
+            let mut aq: QueryBuilder<Postgres> = QueryBuilder::new(
+                r#"SELECT a.id, a."productId" AS product_id, p.name AS product_name,
+                     a."storeId" AS store_id, st.name AS store_name, a."alertType"::text AS alert_type,
+                     p."familyId" AS family_id, a.resolved, a."createdAt" AS created_at
+                   FROM "StockAlert" a
+                   JOIN "Product" p ON p.id = a."productId"
+                   JOIN "Store" st ON st.id = a."storeId"
+                   WHERE a.resolved = "#,
+            );
+            aq.push_bind(resolved);
+            if let Some(sid) = store_id {
+                aq.push(r#" AND a."storeId" = "#).push_bind(sid);
+            }
+            let rows: Vec<AlertRow> = aq.build_query_as::<AlertRow>().fetch_all(&mut **tx).await?;
+
+            let family_ids: Vec<Uuid> =
+                rows.iter().filter_map(|r| r.family_id).collect::<std::collections::HashSet<_>>().into_iter().collect();
+            let substitutes: Vec<SubstituteRow> = if family_ids.is_empty() {
+                Vec::new()
+            } else {
+                let mut sq: QueryBuilder<Postgres> = QueryBuilder::new(
+                    r#"SELECT s."storeId" AS store_id, s."productId" AS product_id, p."familyId" AS family_id
+                       FROM "Stock" s JOIN "Product" p ON p.id = s."productId"
+                       WHERE s.quantity > 0 AND p.active = true AND p."familyId" = ANY("#,
+                );
+                sq.push_bind(family_ids).push(")");
+                if let Some(sid) = store_id {
+                    sq.push(r#" AND s."storeId" = "#).push_bind(sid);
+                }
+                sq.build_query_as::<SubstituteRow>().fetch_all(&mut **tx).await?
+            };
+            Ok((rows, substitutes))
+        })
+        .await?;
+
+    // (familyId|storeId) → productos de esa familia con stock en esa tienda.
+    let mut stocked: std::collections::HashMap<(Uuid, Uuid), std::collections::HashSet<Uuid>> =
+        std::collections::HashMap::new();
+    for s in substitutes {
+        if let Some(fam) = s.family_id {
+            stocked
+                .entry((fam, s.store_id))
+                .or_default()
+                .insert(s.product_id);
+        }
+    }
+
+    let mut views: Vec<AlertView> = rows
+        .into_iter()
+        .map(|r| {
+            let has_substitute_stock = r
+                .family_id
+                .and_then(|fam| stocked.get(&(fam, r.store_id)))
+                .is_some_and(|set| set.iter().any(|pid| *pid != r.product_id));
+            AlertView {
+                id: r.id,
+                product_id: r.product_id,
+                product_name: r.product_name,
+                store_id: r.store_id,
+                store_name: r.store_name,
+                alert_type: r.alert_type,
+                has_substitute_stock,
+                severity: if has_substitute_stock {
+                    AlertSeverity::Soft
+                } else {
+                    AlertSeverity::Critical
+                },
+                resolved: r.resolved,
+                created_at: r.created_at,
+            }
+        })
+        .collect();
+
+    // Orden: críticas primero; dentro, por urgencia de tipo y antigüedad.
+    views.sort_by(|a, b| {
+        let sev = severity_rank(a.severity).cmp(&severity_rank(b.severity));
+        if sev != std::cmp::Ordering::Equal {
+            return sev;
+        }
+        let urg = alert_urgency(a.alert_type).cmp(&alert_urgency(b.alert_type));
+        if urg != std::cmp::Ordering::Equal {
+            return urg;
+        }
+        a.created_at.cmp(&b.created_at)
+    });
+    Ok(views)
+}
+
+fn severity_rank(s: AlertSeverity) -> u8 {
+    match s {
+        AlertSeverity::Critical => 0,
+        AlertSeverity::Soft => 1,
+    }
+}
+
+/// ¿El usuario tiene una asignación a la tienda (UserStore)? Corre dentro de la
+/// tx de tenant (RLS); un `storeId` ajeno no devuelve fila.
+async fn has_store_access(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+    store_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    let found: Option<(Uuid,)> = sqlx::query_as(
+        r#"SELECT "storeId" FROM "UserStore" WHERE "userId" = $1 AND "storeId" = $2 LIMIT 1"#,
+    )
+    .bind(user_id)
+    .bind(store_id)
+    .fetch_optional(&mut **tx)
+    .await?;
+    Ok(found.is_some())
 }
