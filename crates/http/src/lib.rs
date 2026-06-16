@@ -13,6 +13,7 @@ mod products;
 mod router;
 mod routes;
 mod state;
+mod stock;
 
 pub use error::ApiError;
 pub use extractor::AuthUser;
