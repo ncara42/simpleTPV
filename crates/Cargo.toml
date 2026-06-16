@@ -1,13 +1,14 @@
 [workspace]
 resolver = "2"
-members = ["shared", "db", "app"]
+members = ["shared", "db", "auth", "app"]
 
 # Migración del backend a Rust — workspace Cargo.
 # Arquitectura por capas (ver docs/migration-rust/02 §3):
 #   shared  → tipos comunes: config (fail-fast), errores (thiserror)
 #   db      → SQLx: pool + transacción RLS por tenant (set_config $1, true)
+#   auth    → JWT (HS256), bcrypt, rotación de refresh, extractor Axum (Fase 1)
 #   app     → bootstrap: Axum + Tokio + tracing + graceful shutdown
-# Las capas http/domain/auth se añaden en fases posteriores (02 §4).
+# Las capas http/domain se añaden en fases posteriores (02 §4).
 
 [workspace.package]
 version = "0.0.0"
@@ -27,6 +28,7 @@ sqlx = { version = "0.8", default-features = false, features = [
   "tls-rustls",
   "postgres",
   "uuid",
+  "macros",
 ] }
 uuid = { version = "1", features = ["v4", "serde"] }
 serde = { version = "1", features = ["derive"] }
@@ -35,6 +37,10 @@ anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 secrecy = "0.10"
+# Auth (Fase 1, doc 06). jsonwebtoken HS256 (interop con el backend NestJS
+# durante el corte); bcrypt para verificar los hashes existentes (cost 10).
+jsonwebtoken = "9"
+bcrypt = "0.15"
 
 # Perfil de release: binario pequeño y rápido (corte en producción, doc 02 §4 Fase 6).
 [profile.release]
