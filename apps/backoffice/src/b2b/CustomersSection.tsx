@@ -1,5 +1,6 @@
 import { Button, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { useConfirm } from '../components/ConfirmProvider.js';
@@ -70,6 +71,7 @@ export function CustomersSection() {
   const confirm = useConfirm();
   const toast = useToast();
   const [form, setForm] = useState<Form | null>(null);
+  const [search, setSearch] = useState('');
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ['b2b-customers'],
@@ -105,6 +107,16 @@ export function CustomersSection() {
     { value: '', label: 'Sin tarifa (PVP)' },
     ...priceLists.map((p) => ({ value: p.id, label: p.name })),
   ];
+
+  // Filtrado cliente-side sobre la lista ya cargada en memoria (nombre / NIF / contacto).
+  const query = search.trim().toLowerCase();
+  const filtered = query
+    ? customers.filter((c) =>
+        [c.name, c.nif, c.email, c.phone].some((field) =>
+          (field ?? '').toLowerCase().includes(query),
+        ),
+      )
+    : customers;
 
   type CustomerRow = (typeof customers)[number];
   const customerColumns: DataTableColumn<CustomerRow>[] = [
@@ -160,15 +172,25 @@ export function CustomersSection() {
         actionLabel="Nuevo cliente"
         onAction={() => setForm({ ...EMPTY })}
         actionTestId="b2b-new-customer"
+        actionIcon={<Plus size={16} aria-hidden="true" />}
       >
+        <span className="search-field">
+          <Input
+            className="catalog-search"
+            placeholder="Buscar cliente…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            data-testid="b2b-customers-search"
+          />
+        </span>
         <span className="muted">
-          {customers.length} cliente{customers.length !== 1 ? 's' : ''}
+          {filtered.length} cliente{filtered.length !== 1 ? 's' : ''}
         </span>
       </SectionToolbar>
 
       <DataTable
         columns={customerColumns}
-        rows={customers}
+        rows={filtered}
         rowKey={(c) => c.id}
         loading={isLoading}
         rowTestId="b2b-customer-row"

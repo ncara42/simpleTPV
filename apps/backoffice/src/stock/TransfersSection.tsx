@@ -75,22 +75,26 @@ export function TransfersSection() {
   return (
     <>
       <div className="table-panel">
-        <div className="sales-filters">
-          <Button
-            type="button"
-            className="stock-toolbar-action"
-            onClick={() => setCreating(true)}
-            data-testid="new-transfer"
-            icon={<Plus size={16} aria-hidden="true" />}
-          >
-            Nuevo traspaso
-          </Button>
-        </div>
         <DataTable
           columns={transferColumns}
           rows={transfers}
           rowKey={(t) => t.id}
           loading={isLoading}
+          toolbar={
+            <div className="users-toolbar">
+              <div className="sales-filters" />
+              <div className="ui-dt-toolbar-actions">
+                <Button
+                  type="button"
+                  onClick={() => setCreating(true)}
+                  data-testid="new-transfer"
+                  icon={<Plus size={16} aria-hidden="true" />}
+                >
+                  Nuevo traspaso
+                </Button>
+              </div>
+            </div>
+          }
           rowTestId="transfer-row"
           emptyState={<span data-testid="transfers-empty">Sin traspasos.</span>}
           data-testid="transfers-table"

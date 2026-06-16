@@ -296,8 +296,8 @@ export function GlobalStockSection({
           rowKey={(r) => r.productId}
           loading={isLoading}
           toolbar={
-            <div className="stock-filters">
-              <div className="stock-filter-group">
+            <div className="users-toolbar">
+              <div className="sales-filters">
                 <span className="search-field">
                   <Input
                     className="catalog-search"

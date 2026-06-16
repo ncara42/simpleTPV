@@ -107,15 +107,17 @@ export function StoresPage({
 
   return (
     <section className="catalog">
-      <div className="stores-toolbar">
-        <Button
-          className="stock-tabs-action"
-          onClick={() => setCreating(true)}
-          data-testid="new-store"
-          icon={<Plus size={16} aria-hidden="true" />}
-        >
-          Nueva tienda
-        </Button>
+      <div className="users-toolbar">
+        <div className="sales-filters" />
+        <div className="ui-dt-toolbar-actions">
+          <Button
+            onClick={() => setCreating(true)}
+            data-testid="new-store"
+            icon={<Plus size={16} aria-hidden="true" />}
+          >
+            Nueva tienda
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (

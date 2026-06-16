@@ -1535,6 +1535,11 @@
   gap: 1rem;
   margin-bottom: 1rem;
   flex-wrap: wrap;
+  /* Ocupa todo el ancho del .ui-dt-toolbar para que el CTA quede SIEMPRE fijado a
+     la derecha por space-between, incluso cuando los filtros de la izquierda están
+     vacíos o son pocos (p. ej. Traspasos). Sin esto, como flex-item se encogía al
+     ancho del contenido y el CTA acababa pegado a la izquierda. */
+  width: 100%;
 }
 .users-toolbar .sales-filters {
   margin-bottom: 0;

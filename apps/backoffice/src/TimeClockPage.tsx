@@ -93,59 +93,60 @@ export function TimeClockPage() {
   return (
     <section className="catalog">
       <div className="table-panel">
-        <div className="users-toolbar sales-toolbar">
-          <div className="sales-filters">
-            <Select
-              className="catalog-search"
-              value={filters.storeId}
-              onChange={(value) => setFilter({ storeId: value })}
-              ariaLabel="Filtrar por tienda"
-              data-testid="timeclock-store"
-              options={[
-                { value: '', label: 'Todas las tiendas' },
-                ...storeOptions.map(([id, name]) => ({ value: id, label: name })),
-              ]}
-            />
-            <Select
-              className="catalog-search"
-              value={filters.userId}
-              onChange={(value) => setFilter({ userId: value })}
-              ariaLabel="Filtrar por empleado"
-              data-testid="timeclock-employee"
-              options={[
-                { value: '', label: 'Todos los empleados' },
-                ...employeeOptions.map(([id, name]) => ({ value: id, label: name })),
-              ]}
-            />
-            <Select
-              className="catalog-search"
-              value={filters.date}
-              onChange={(value) => setFilter({ date: value })}
-              ariaLabel="Filtrar por fecha"
-              data-testid="timeclock-date"
-              options={[
-                { value: '', label: 'Todas las fechas' },
-                ...dateOptions.map((d) => ({ value: d, label: d })),
-              ]}
-            />
-            {hasFilters && (
-              <button
-                type="button"
-                className="users-sel-btn"
-                onClick={() => setFilters(NO_FILTERS)}
-                data-testid="timeclock-clear"
-              >
-                Limpiar
-              </button>
-            )}
-          </div>
-        </div>
-
         <DataTable
           columns={timeclockColumns}
           rows={filtered}
           rowKey={(r) => `${r.userId}-${r.storeId}-${r.date}`}
           rowTestId="timeclock-row"
+          toolbar={
+            <div className="users-toolbar">
+              <div className="sales-filters">
+                <Select
+                  className="catalog-search"
+                  value={filters.storeId}
+                  onChange={(value) => setFilter({ storeId: value })}
+                  ariaLabel="Filtrar por tienda"
+                  data-testid="timeclock-store"
+                  options={[
+                    { value: '', label: 'Todas las tiendas' },
+                    ...storeOptions.map(([id, name]) => ({ value: id, label: name })),
+                  ]}
+                />
+                <Select
+                  className="catalog-search"
+                  value={filters.userId}
+                  onChange={(value) => setFilter({ userId: value })}
+                  ariaLabel="Filtrar por empleado"
+                  data-testid="timeclock-employee"
+                  options={[
+                    { value: '', label: 'Todos los empleados' },
+                    ...employeeOptions.map(([id, name]) => ({ value: id, label: name })),
+                  ]}
+                />
+                <Select
+                  className="catalog-search"
+                  value={filters.date}
+                  onChange={(value) => setFilter({ date: value })}
+                  ariaLabel="Filtrar por fecha"
+                  data-testid="timeclock-date"
+                  options={[
+                    { value: '', label: 'Todas las fechas' },
+                    ...dateOptions.map((d) => ({ value: d, label: d })),
+                  ]}
+                />
+                {hasFilters && (
+                  <button
+                    type="button"
+                    className="users-sel-btn"
+                    onClick={() => setFilters(NO_FILTERS)}
+                    data-testid="timeclock-clear"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+            </div>
+          }
           footer={
             <span data-testid="timeclock-totals">
               {totals.count} jornadas · pausas {fmtMinutes(totals.breaks)} · trabajadas{' '}

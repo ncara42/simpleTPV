@@ -1,17 +1,19 @@
 import type { Supplier } from '@simpletpv/auth';
 import { Button, DataTable, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { formErrorMessage } from '../lib/form-error.js';
 import { createSupplier, deleteSupplier, listSuppliers, updateSupplier } from '../lib/purchases.js';
 import { OrdersSection } from './OrdersSection.js';
+import { SupplierFormModal } from './SupplierFormModal.js';
 import { SupplierPricesSection } from './SupplierPricesSection.js';
 
 export function SuppliersSection() {
   const qc = useQueryClient();
-  const [name, setName] = useState('');
-  const [leadTime, setLeadTime] = useState('7');
+  const [search, setSearch] = useState('');
+  const [creating, setCreating] = useState(false);
   // Vista detalle (I-18/D-07): fila clicable → todo lo del proveedor en una vista.
   const [detailId, setDetailId] = useState<string | null>(null);
 
@@ -22,7 +24,7 @@ export function SuppliersSection() {
   const createMut = useMutation({
     mutationFn: createSupplier,
     onSuccess: () => {
-      setName('');
+      setCreating(false);
       void qc.invalidateQueries({ queryKey: ['suppliers'] });
     },
   });
@@ -36,49 +38,45 @@ export function SuppliersSection() {
     return <SupplierDetail supplier={detail} onBack={() => setDetailId(null)} />;
   }
 
+  const term = search.trim().toLowerCase();
+  const filtered = term ? suppliers.filter((s) => s.name.toLowerCase().includes(term)) : suppliers;
+
   return (
     <>
-      <header className="catalog-head">
-        <h2>Proveedores</h2>
-        <div className="catalog-actions">
-          <span className="search-field">
-            <Input
-              className="catalog-search"
-              placeholder="Nombre del proveedor"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              data-testid="supplier-name"
-            />
-          </span>
-          <Input
-            className="catalog-search"
-            type="number"
-            min={0}
-            value={leadTime}
-            onChange={(e) => setLeadTime(e.target.value)}
-            title="Lead time (días)"
-            data-testid="supplier-leadtime"
-            style={{ width: '6rem' }}
-          />
-          <Button
-            type="button"
-            disabled={!name || createMut.isPending}
-            onClick={() => createMut.mutate({ name, leadTimeDays: Number(leadTime) })}
-            data-testid="supplier-create"
-          >
-            Añadir
-          </Button>
-        </div>
-      </header>
       {/* Fila clicable → vista detalle (I-18); las acciones no propagan (stopPropagation). */}
       <DataTable
         data-testid="suppliers-table"
         rowTestId="supplier-row"
-        rows={suppliers}
+        rows={filtered}
         rowKey={(s) => s.id}
         loading={isLoading}
         rowClassName={() => 'row-clickable'}
         onRowClick={(s) => setDetailId(s.id)}
+        toolbar={
+          <div className="users-toolbar">
+            <div className="sales-filters">
+              <span className="search-field">
+                <Input
+                  className="catalog-search"
+                  placeholder="Buscar proveedor…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  data-testid="supplier-search"
+                />
+              </span>
+            </div>
+            <div className="ui-dt-toolbar-actions">
+              <Button
+                type="button"
+                onClick={() => setCreating(true)}
+                data-testid="new-supplier"
+                icon={<Plus size={16} aria-hidden="true" />}
+              >
+                Nuevo proveedor
+              </Button>
+            </div>
+          </div>
+        }
         emptyState={
           <span className="catalog-empty" data-testid="suppliers-empty">
             Sin proveedores.
@@ -124,6 +122,20 @@ export function SuppliersSection() {
           },
         ]}
       />
+      {creating && (
+        <SupplierFormModal
+          onClose={() => setCreating(false)}
+          onSubmit={(form) =>
+            createMut.mutate({ name: form.name, leadTimeDays: Number(form.leadTimeDays) })
+          }
+          pending={createMut.isPending}
+          error={
+            createMut.isError
+              ? formErrorMessage(createMut.error, 'No se pudo crear el proveedor.')
+              : null
+          }
+        />
+      )}
     </>
   );
 }
