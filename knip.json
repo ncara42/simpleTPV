@@ -4,7 +4,11 @@
   "workspaces": {
     ".": {},
     "apps/api": {
-      "ignoreDependencies": ["@prisma/client", "pg"]
+      "ignoreDependencies": ["@prisma/client", "pg"],
+      "vitest": {
+        "config": ["vitest.config.ts", "vitest.integration.config.ts"],
+        "entry": ["test/**/*.integration.spec.ts", "test/global-setup.ts", "test/helpers/**/*.ts"]
+      }
     },
     "packages/db": {
       "ignoreDependencies": ["@prisma/client", "@prisma/client-runtime-utils", "pg", "@types/pg"]
