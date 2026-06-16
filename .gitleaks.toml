@@ -1,0 +1,25 @@
+# Configuración de Gitleaks para simpleTPV.
+#
+# Extiende el set de reglas por defecto (NO lo reemplaza) y añade una allowlist
+# acotada a los ficheros de TEST: sus fixtures contienen credenciales FALSAS
+# (tokens de emparejamiento de dispositivos, passwords de prueba, secretos JWT de
+# CI) que reglas genéricas como `generic-api-key` marcan como falsos positivos.
+# El código de producción se sigue escaneando con todas las reglas por defecto.
+title = "simpleTPV gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fixtures de test: credenciales falsas, no secretos reales"
+# Por ruta: cualquier finding dentro de ficheros/carpetas de test se ignora.
+paths = [
+  '''.*\.spec\.ts$''',
+  '''.*\.test\.ts$''',
+  '''.*\.e2e\.ts$''',
+  '''apps/[^/]+/(test|e2e)/.*''',
+]
+# Por valor: el pairingToken de fixture de devices.controller.spec.ts (hex falso).
+regexes = [
+  '''ABCDEF012345''',
+]
