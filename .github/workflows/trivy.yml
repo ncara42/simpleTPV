@@ -1,8 +1,7 @@
 name: Trivy
 
-# Escaneo del filesystem (dependencias npm + secretos + misconfiguraciones) y
-# escaneo de las imágenes Docker construidas (paquetes del SO + binarios de las
-# capas), que el filesystem-scan NO cubre.
+# Escaneo del filesystem: dependencias npm + secretos + misconfiguraciones.
+# Job de imagen Docker pendiente hasta que existan los Dockerfiles de las apps.
 
 on:
   push:
@@ -28,6 +27,14 @@ concurrency:
 permissions: {}
 
 jobs:
+  # -----------------------------------------------------------------------
+  # TODO (despliegue): Activar image-scan cuando existan los Dockerfiles.
+  # Job image-scan con matrix:
+  #   - app: simpletpv-api,        dockerfile: apps/api/Dockerfile
+  #   - app: simpletpv-tpv,        dockerfile: apps/tpv/Dockerfile
+  #   - app: simpletpv-backoffice, dockerfile: apps/backoffice/Dockerfile
+  # -----------------------------------------------------------------------
+
   filesystem-scan:
     name: Scan filesystem (deps + secrets + misconfig)
     runs-on: ubuntu-latest
@@ -82,85 +89,3 @@ jobs:
         with:
           sarif_file: trivy-fs.sarif
           category: trivy-fs
-
-  # -----------------------------------------------------------------------
-  # Escaneo de capas de imagen: paquetes del SO base (OpenSSL, nginx, glibc) y
-  # binarios que el filesystem-scan NO ve. Se construye cada imagen localmente
-  # (sin push) y se pasa Trivy con gate CRITICAL,HIGH e --ignore-unfixed.
-  # -----------------------------------------------------------------------
-  image-scan:
-    name: Scan image (${{ matrix.app }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - app: simpletpv-api
-            dockerfile: apps/api/Dockerfile
-          - app: simpletpv-tpv
-            dockerfile: apps/tpv/Dockerfile
-          - app: simpletpv-backoffice
-            dockerfile: apps/backoffice/Dockerfile
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
-
-      - name: Build image (local, sin push)
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          push: false
-          load: true
-          tags: ${{ matrix.app }}:ci-scan
-
-      - name: Cache Trivy DB
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v4.3.0
-        with:
-          path: ~/.cache/trivy
-          key: trivy-db-${{ github.run_id }}
-          restore-keys: |
-            trivy-db-
-
-      - name: Run Trivy gate (CRITICAL,HIGH)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          scan-type: image
-          image-ref: ${{ matrix.app }}:ci-scan
-          format: table
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: '1'
-          # vuln,secret: la misconfig de Dockerfiles ya la cubre el filesystem-scan;
-          # sobre la imagen construida solo interesan CVEs de capas y secretos horneados.
-          scanners: vuln,secret
-          trivyignores: .trivyignore.yaml
-
-      - name: Run Trivy SARIF report
-        if: always()
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          scan-type: image
-          image-ref: ${{ matrix.app }}:ci-scan
-          format: sarif
-          output: trivy-image-${{ matrix.app }}.sarif
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          trivyignores: .trivyignore.yaml
-
-      - name: Upload SARIF
-        if: always()
-        continue-on-error: true
-        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
-        with:
-          sarif_file: trivy-image-${{ matrix.app }}.sarif
-          category: trivy-image-${{ matrix.app }}
