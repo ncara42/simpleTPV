@@ -206,7 +206,9 @@ describe('Control horario — integración', () => {
 
     const rows = await tenantStorage.run({ organizationId: org1Id }, () =>
       service.history(
-        { storeId: store1Id, from: '2026-01-01', to: '2026-12-31' },
+        // Rango dentro de la cota de 90 días (DOS-02): to-90d = 2026-04-01, así que
+        // `from` no se recorta y la ventana cubre el dato sembrado en 2026-06-04.
+        { storeId: store1Id, from: '2026-04-01', to: '2026-06-30' },
         'ADMIN',
         user1Id,
       ),
@@ -229,7 +231,8 @@ describe('Control horario — integración', () => {
     await insertAtStore(user1Id, store2Id, 'CLOCK_OUT', new Date('2026-06-04T20:00:00.000Z'));
 
     const rows = await tenantStorage.run({ organizationId: org1Id }, () =>
-      service.historyAll({ from: '2026-01-01', to: '2026-12-31' }),
+      // Rango dentro de la cota de 90 días (DOS-04): to-90d = 2026-04-01, sin recorte.
+      service.historyAll({ from: '2026-04-01', to: '2026-06-30' }),
     );
 
     const mine = rows.filter((r) => r.userId === user1Id);
@@ -240,7 +243,7 @@ describe('Control horario — integración', () => {
 
     // RLS: desde org2 no se ve ninguna jornada de org1.
     const fromOrg2 = await tenantStorage.run({ organizationId: org2Id }, () =>
-      service.historyAll({ from: '2026-01-01', to: '2026-12-31' }),
+      service.historyAll({ from: '2026-04-01', to: '2026-06-30' }),
     );
     expect(fromOrg2).toHaveLength(0);
   });
@@ -257,7 +260,8 @@ describe('Control horario — integración', () => {
     // El endpoint fuerza userId = requestingUser; aquí se ejercita el service igual.
     const rows = await tenantStorage.run({ organizationId: org1Id }, () =>
       service.history(
-        { storeId: store1Id, userId: user1Id, from: '2026-01-01', to: '2026-12-31' },
+        // Rango dentro de la cota de 90 días (DOS-02): to-90d = 2026-04-01, sin recorte.
+        { storeId: store1Id, userId: user1Id, from: '2026-04-01', to: '2026-06-30' },
         'CLERK',
         user1Id,
       ),

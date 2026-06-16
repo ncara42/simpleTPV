@@ -24,6 +24,12 @@ import {
   totalWorkedMs,
 } from './time-clock.compute.js';
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+// Cota máxima del rango consultable en el historial (DOS-02/DOS-04): sin tope, un
+// cliente autenticado puede pedir años de fichajes y degradar la BD. 90 días cubre
+// holgadamente las necesidades de gestión (revisión trimestral) de un SMB.
+const MAX_RANGE_DAYS = 90;
+
 @Injectable()
 export class TimeClockService {
   constructor(
@@ -123,6 +129,29 @@ export class TimeClockService {
   }
 
   /**
+   * Resuelve el rango [from, to] de una consulta de historial aplicando una cota
+   * máxima (DOS-02/DOS-04). `to` por defecto es hoy; `from` por defecto retrocede
+   * `defaultDays`. Si el rango pedido supera MAX_RANGE_DAYS se recorta `from` para
+   * que como mucho abarque esa ventana terminando en `to`, evitando consultas sin
+   * cota que crecen con el tiempo.
+   */
+  private resolveRange(
+    params: { from?: string; to?: string },
+    defaultDays: number,
+    now: Date,
+  ): { from: Date; to: Date } {
+    const to = params.to ? endOfLocalDay(new Date(params.to)) : endOfLocalDay(now);
+    const requestedFrom = params.from
+      ? startOfLocalDay(new Date(params.from))
+      : startOfLocalDay(new Date(now.getTime() - defaultDays * MS_PER_DAY));
+    const minFrom = startOfLocalDay(new Date(to.getTime() - MAX_RANGE_DAYS * MS_PER_DAY));
+    // Recorta solo si el rango pedido excede la ventana máxima (from por debajo del
+    // mínimo permitido). Nunca empuja `from` hacia el futuro respecto a lo pedido.
+    const from = requestedFrom.getTime() < minFrom.getTime() ? minFrom : requestedFrom;
+    return { from, to };
+  }
+
+  /**
    * Historial de control horario por empleado y día para gestión (backoffice).
    * Agrupa los fichajes por usuario+jornada y calcula totales de horas.
    */
@@ -139,10 +168,7 @@ export class TimeClockService {
     });
 
     const now = new Date();
-    const from = params.from
-      ? startOfLocalDay(new Date(params.from))
-      : startOfLocalDay(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
-    const to = params.to ? endOfLocalDay(new Date(params.to)) : endOfLocalDay(now);
+    const { from, to } = this.resolveRange(params, 7, now);
 
     const entries = await this.prisma.timeClockEntry.findMany({
       where: {
@@ -172,10 +198,7 @@ export class TimeClockService {
   async historyAll(params: { storeId?: string; userId?: string; from?: string; to?: string }) {
     const tenant = requireTenant();
     const now = new Date();
-    const from = params.from
-      ? startOfLocalDay(new Date(params.from))
-      : startOfLocalDay(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
-    const to = params.to ? endOfLocalDay(new Date(params.to)) : endOfLocalDay(now);
+    const { from, to } = this.resolveRange(params, 30, now);
 
     const entries = await this.prisma.timeClockEntry.findMany({
       where: {
@@ -275,10 +298,7 @@ export class TimeClockService {
     });
 
     const now = new Date();
-    const from = params.from
-      ? startOfLocalDay(new Date(params.from))
-      : startOfLocalDay(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
-    const to = params.to ? endOfLocalDay(new Date(params.to)) : endOfLocalDay(now);
+    const { from, to } = this.resolveRange(params, 30, now);
 
     const rows = await this.prisma.timeClockEntry.findMany({
       where: {
