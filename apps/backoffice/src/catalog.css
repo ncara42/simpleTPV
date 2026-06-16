@@ -2062,6 +2062,9 @@
   color: var(--ui-text-muted);
   cursor: pointer;
   white-space: nowrap;
+  /* Misma tipografía que el botón "Columnas" (.ui-dt-cols-trigger): 0.8rem / 600. */
+  font-size: 0.8rem;
+  font-weight: 600;
   transition:
     max-width 0.2s var(--ui-ease),
     gap 0.2s var(--ui-ease),
