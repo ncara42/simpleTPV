@@ -7,7 +7,6 @@
   "exports": {
     "./vite": "./vite.base.ts",
     "./tailwind": "./tailwind.preset.ts",
-    "./eslint": "./eslint.react.js",
     "./tsconfig": "./tsconfig.frontend.json"
   },
   "dependencies": {
