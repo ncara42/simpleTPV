@@ -1,21 +1,17 @@
-//! Bootstrap del backend (Fase 0): Axum + Tokio + tracing + graceful shutdown.
+//! Bootstrap del backend: Axum + Tokio + tracing + graceful shutdown.
 //!
-//! Mínimo deliberado: solo prueba que el stack arranca y conecta a la base de
-//! datos. La lógica de dominio y las rutas se añaden en fases posteriores
-//! (doc 02 §4). Las capas siguen el principio de doc 02 §3.
+//! Compone las capas (doc 02 §3): carga config (fail-fast), abre los dos pools
+//! (`app` con RLS y `app_admin` BYPASSRLS para el login), construye `AuthService`
+//! y el router de `simpletpv-http`, y sirve con apagado ordenado.
 
 use std::net::SocketAddr;
 
-use axum::extract::State;
-use axum::http::StatusCode;
-use axum::routing::get;
-use axum::Router;
 use secrecy::ExposeSecret;
+use simpletpv_auth::{AuthConfig, AuthService};
+use simpletpv_http::{build_router, AppState};
 use simpletpv_shared::AppConfig;
-use sqlx::PgPool;
 use tokio::net::TcpListener;
 use tokio::signal;
-use tower_http::trace::TraceLayer;
 use tracing_subscriber::{fmt, EnvFilter};
 
 #[tokio::main]
@@ -26,46 +22,37 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    // Fail-fast: sin configuración válida, no se arranca (doc 07 §5).
+    // Fail-fast: sin config válida (URLs de BD + secretos JWT), no se arranca.
     let config = AppConfig::from_env()?;
-    let pool = simpletpv_db::build_pool(config.database_url_app.expose_secret()).await?;
-    tracing::info!("conectado a la base de datos");
+    let auth_config = AuthConfig::from_env()?;
 
-    // TODO(Fase 1): cabeceras de seguridad (CSP/HSTS/nosniff/Referrer-Policy) y
-    // CORS fail-fast vía tower-http antes de exponer rutas de negocio (doc 06).
-    let app = Router::new()
-        .route("/health", get(health))
-        .route("/ready", get(ready))
-        .with_state(pool)
-        .layer(TraceLayer::new_for_http());
+    let db = simpletpv_db::build_pool(config.database_url_app.expose_secret()).await?;
+    let admin = simpletpv_db::build_pool(config.database_url_admin.expose_secret()).await?;
+    tracing::info!("conectado a la base de datos (roles app + app_admin)");
+
+    let auth = AuthService::new(admin, auth_config);
+    // Cookie `Secure` configurable en runtime (COOKIE_SECURE); por defecto activo
+    // en release. Permite release-tras-proxy-http (off) y dev-sobre-https (on).
+    let cookie_secure = std::env::var("COOKIE_SECURE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(cfg!(not(debug_assertions)));
+    let app = build_router(AppState::new(auth, db, cookie_secure));
 
     let addr: SocketAddr = config.bind_addr.parse()?;
     let listener = TcpListener::bind(addr).await?;
     tracing::info!(%addr, "escuchando");
 
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    // `into_make_service_with_connect_info`: el rate-limit por IP necesita la IP
+    // del peer cuando no llega `X-Forwarded-For` (conexión directa sin proxy).
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
 
     Ok(())
-}
-
-/// Liveness: el proceso está vivo.
-async fn health() -> &'static str {
-    "ok"
-}
-
-/// Readiness: la base de datos responde.
-async fn ready(State(pool): State<PgPool>) -> Result<&'static str, StatusCode> {
-    sqlx::query("SELECT 1")
-        .execute(&pool)
-        .await
-        .map(|_| "ready")
-        .map_err(|e| {
-            // Se registra el detalle en el servidor; al cliente solo el status.
-            tracing::error!(error = %e, "readiness check falló");
-            StatusCode::SERVICE_UNAVAILABLE
-        })
 }
 
 /// Espera SIGINT (Ctrl-C) o SIGTERM para un apagado ordenado.
