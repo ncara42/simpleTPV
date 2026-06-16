@@ -1,5 +1,5 @@
 [package]
-name = "simpletpv-http"
+name = "simpletpv-domain"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,21 +9,13 @@ publish = false
 [dependencies]
 simpletpv-shared = { path = "../shared" }
 simpletpv-db = { path = "../db" }
-simpletpv-auth = { path = "../auth" }
-simpletpv-domain = { path = "../domain" }
-axum.workspace = true
-axum-extra.workspace = true
-tower.workspace = true
-tower-http.workspace = true
-tower_governor.workspace = true
 sqlx.workspace = true
 uuid.workspace = true
 serde.workspace = true
+rust_decimal.workspace = true
+time.workspace = true
 tracing.workspace = true
-time = "0.3"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
-http-body-util = "0.1"
 serde_json = "1"
-secrecy.workspace = true

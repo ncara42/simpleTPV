@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["shared", "db", "auth", "http", "app"]
+members = ["shared", "db", "auth", "domain", "http", "app"]
 
 # Migración del backend a Rust — workspace Cargo.
 # Arquitectura por capas (ver docs/migration-rust/02 §3):
@@ -42,9 +42,16 @@ sqlx = { version = "0.8", default-features = false, features = [
   "postgres",
   "uuid",
   "macros",
+  "rust_decimal",
+  "time",
 ] }
 uuid = { version = "1", features = ["v4", "serde"] }
 serde = { version = "1", features = ["derive"] }
+# Decimal contable (NUMERIC) — nunca float para dinero/cantidades (invariante 02 §2).
+# Salida JSON como string (paridad con Prisma Decimal); entrada desde número JSON.
+rust_decimal = { version = "1", features = ["serde-with-str", "serde-with-float"] }
+# Fechas (TIMESTAMP) para FromRow + serialización ISO-8601.
+time = { version = "0.3", features = ["serde-well-known", "formatting", "macros"] }
 thiserror = "2"
 anyhow = "1"
 tracing = "0.1"

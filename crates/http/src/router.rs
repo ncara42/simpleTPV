@@ -15,6 +15,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
+use crate::products;
 use crate::routes;
 use crate::state::AppState;
 
@@ -51,6 +52,17 @@ pub fn build_router(state: AppState) -> Router {
     Router::new()
         .nest("/auth", auth)
         .route("/me", get(routes::me))
+        // Catálogo (Fase 2). `/import` y `/barcode/{code}` son estáticas y no
+        // colisionan con `/{id}` (axum prioriza el segmento estático).
+        .route("/products", get(products::list).post(products::create))
+        .route("/products/import", post(products::import))
+        .route("/products/barcode/{code}", get(products::get_by_barcode))
+        .route(
+            "/products/{id}",
+            get(products::get_one)
+                .patch(products::update)
+                .delete(products::remove),
+        )
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)
