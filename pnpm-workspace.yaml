@@ -42,6 +42,11 @@ peerDependencyRules:
 #   en la imagen api en <4.0.4 (transitivo vía la toolchain de build/test). 4.0.4
 #   es semver-compatible con 4.x, así que sube sin breaking. Verificado contra el
 #   escaneo de imagen del job image-scan (#112).
+# - hono: floor >=4.12.25 por GHSA-88fw-hqm2-52qc (HIGH 7.1) + 4 avisos más
+#   (j6c9-x7qj-28xf, rv63-4mwf-qqc2, wgpf-jwqj-8h8p, wwfh-h76j-fc44) en 4.12.23,
+#   arrastrado por @prisma/dev 0.24.3 (tooling de prisma 7). 4.12.25 es patch.
+# - multer: floor >=2.2.0 por GHSA-72gw-mp4g-v24j (HIGH 7.5) y GHSA-3p4h-7m6x-2hcm
+#   (5.3) en <2.2.0, arrastrado por @nestjs/platform-express. Bump menor 2.1→2.2.
 overrides:
   esbuild: '>=0.28.1'
   js-yaml: '>=4.2.0'
@@ -51,6 +56,8 @@ overrides:
   '@opentelemetry/resources': '>=2.8.0'
   '@opentelemetry/sdk-trace-base': '>=2.8.0'
   picomatch: '>=4.0.4'
+  hono: '>=4.12.25'
+  multer: '>=2.2.0'
 
 allowBuilds:
   '@nestjs/core': set this to true or false
