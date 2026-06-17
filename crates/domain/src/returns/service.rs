@@ -375,8 +375,17 @@ pub async fn create_blind(
             lines.push(line);
 
             // Devolución ciega: reingreso SIN lote (originSaleId None).
-            apply_batched_return(tx, org, r.product_id, input.store_id, None, r.qty, Some(return_id), Some(user_id))
-                .await?;
+            apply_batched_return(
+                tx,
+                org,
+                r.product_id,
+                input.store_id,
+                None,
+                r.qty,
+                Some(return_id),
+                Some(user_id),
+            )
+            .await?;
         }
 
         Ok(Ok(ReturnWithLines { return_: return_row, lines }))
