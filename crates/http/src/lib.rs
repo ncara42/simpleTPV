@@ -10,6 +10,7 @@ mod cash_sessions;
 mod error;
 mod extractor;
 mod json;
+mod product_families;
 mod products;
 mod purchases;
 mod returns;

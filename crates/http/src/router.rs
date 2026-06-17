@@ -17,6 +17,7 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::cash_sessions;
+use crate::product_families;
 use crate::products;
 use crate::purchases;
 use crate::returns;
@@ -91,6 +92,16 @@ pub fn build_router(state: AppState) -> Router {
             get(products::get_one)
                 .patch(products::update)
                 .delete(products::remove),
+        )
+        // Familias de producto (Fase 4, #154): árbol jerárquico. Lectura abierta a
+        // la sesión; escritura solo ADMIN.
+        .route(
+            "/product-families",
+            get(product_families::find_tree).post(product_families::create),
+        )
+        .route(
+            "/product-families/{id}",
+            patch(product_families::update).delete(product_families::remove),
         )
         // Stock (Fase 2, slice A): ajustes/mínimos/recuento + caducidad/movimientos.
         .route("/stock/min", put(stock::set_min))

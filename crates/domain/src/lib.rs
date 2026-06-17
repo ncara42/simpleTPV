@@ -11,6 +11,7 @@ mod pg_enum;
 pub mod cash_sessions;
 pub mod csv;
 pub mod feature_flags;
+pub mod product_families;
 pub mod products;
 pub mod purchases;
 pub mod receipt;
