@@ -1,0 +1,4 @@
+# Artefactos de compilación locales: el builder reconstruye dentro de la imagen
+# (con cache-mount), así que copiar `target/` solo inflaría el contexto de build.
+target/
+**/*.rs.bk
