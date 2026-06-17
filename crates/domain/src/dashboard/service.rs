@@ -13,6 +13,8 @@ use sqlx::PgPool;
 use time::{OffsetDateTime, PrimitiveDateTime};
 use uuid::Uuid;
 
+use crate::store_access::has_store_access;
+
 use super::model::{
     ArchetypeRotationItem, DiscountByEmployeeItem, MarginKpis, PeriodTotals, ProductRankings,
     ProductRotationItem, RankByMargin, RankBySales, RankByUnits, SalesByEmployeeItem,
@@ -223,6 +225,34 @@ pub async fn sales_today(
         })
     })
     .await
+}
+
+/// Variante TPV de `sales_today` (#STAT-01 para cajeros): accesible a CLERK pero
+/// acotada a SU tienda (SEC-01, cierra el IDOR horizontal). Con `store_id`: un
+/// rol no org-wide debe tener acceso a esa tienda. Sin `store_id`: un rol no
+/// org-wide no puede ver el agregado de la organización → Forbidden.
+pub async fn sales_today_tpv(
+    pool: &PgPool,
+    org: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
+    store_id: Option<Uuid>,
+    compare: CompareMode,
+) -> Result<SalesToday, AppError> {
+    match store_id {
+        Some(sid) if !is_org_wide => {
+            let allowed: bool = with_tenant_tx(pool, org, async move |tx, _after| {
+                has_store_access(tx, user_id, sid).await
+            })
+            .await?;
+            if !allowed {
+                return Err(AppError::Forbidden);
+            }
+        }
+        None if !is_org_wide => return Err(AppError::Forbidden),
+        _ => {}
+    }
+    sales_today(pool, org, store_id, compare).await
 }
 
 /// Granularidad de las series intra-periodo: hora si ≤ ~36h, día si más.

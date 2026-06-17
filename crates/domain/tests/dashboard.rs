@@ -193,7 +193,10 @@ async fn sales_today_y_sales_kpis_del_dia() {
         .await
         .unwrap();
     assert!((margin.revenue - 40.0).abs() < 1e-9); // lineTotal de las 2 líneas
-    assert!(margin.gross_margin >= 0.0);
+                                                   // costPrice por defecto 0 → real_margin = revenue y margin_pct = 1.0 (verifica
+                                                   // las fórmulas, no solo que devuelve algo ≥ 0).
+    assert!((margin.real_margin - 40.0).abs() < 1e-9);
+    assert!((margin.margin_pct - 1.0).abs() < 1e-9);
 
     let disc = service::discount_by_employee(&c.app, c.org, range, Some(c.store))
         .await

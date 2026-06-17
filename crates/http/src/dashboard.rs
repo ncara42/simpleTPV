@@ -91,6 +91,30 @@ pub async fn sales_today(
     ))
 }
 
+/// `GET /tpv/dashboard/sales-today` — recuento diario del TPV. Cualquier rol;
+/// un CLERK queda acotado a su tienda (SEC-01), nunca al agregado de la org.
+pub async fn tpv_sales_today(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<SalesTodayQuery>,
+) -> Result<Json<SalesToday>, ApiError> {
+    let compare = match q.compare.as_deref() {
+        None => CompareMode::Day,
+        Some(s) => CompareMode::parse(s).ok_or(AppError::BadRequest)?,
+    };
+    Ok(Json(
+        service::sales_today_tpv(
+            state.db(),
+            user.organization_id,
+            user.user_id,
+            user.role.is_org_wide(),
+            q.store_id,
+            compare,
+        )
+        .await?,
+    ))
+}
+
 /// `GET /dashboard/sales-kpis?period=&from=&to=&storeId=`.
 pub async fn sales_kpis(
     State(state): State<AppState>,

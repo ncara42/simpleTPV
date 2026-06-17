@@ -223,5 +223,14 @@ async fn arqueo_del_dia_totales_y_validaciones() {
         Some(AppError::BadRequest)
     );
 
+    // Aislamiento por tienda (SEC-01): un rol NO org-wide (is_org_wide=false) sin
+    // acceso a la tienda (no hay fila en UserStore) → Forbidden.
+    assert_eq!(
+        service::get_z_report(&c.app, c.org, c.user, false, c.store, "2026-06-01".into())
+            .await
+            .err(),
+        Some(AppError::Forbidden)
+    );
+
     teardown(&c).await;
 }

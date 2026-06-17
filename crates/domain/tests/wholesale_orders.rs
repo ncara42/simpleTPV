@@ -251,5 +251,39 @@ async fn crea_con_precio_congelado_lista_detalle_y_estados() {
         Some(AppError::NotFound)
     );
 
+    // Killswitch del módulo b2b (#127 B): si el flag b2b está en false a nivel org,
+    // crear un pedido mayorista → Forbidden (gate antes de la tx).
+    sqlx::query(
+        r#"INSERT INTO "FeatureFlag" (id, "organizationId", "storeId", key, enabled, "updatedAt")
+           VALUES ($1, $2, NULL, 'b2b', false, now())"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(c.org)
+    .execute(&c.admin)
+    .await
+    .unwrap();
+    assert_eq!(
+        service::create(
+            &c.app,
+            c.org,
+            CreateWholesaleOrder {
+                customer_id: c.customer,
+                notes: None,
+                lines: vec![WholesaleOrderLineInput {
+                    product_id: c.p_pvp,
+                    qty: dec("1")
+                }],
+            },
+        )
+        .await
+        .err(),
+        Some(AppError::Forbidden)
+    );
+    sqlx::query(r#"DELETE FROM "FeatureFlag" WHERE "organizationId" = $1 AND key = 'b2b'"#)
+        .bind(c.org)
+        .execute(&c.admin)
+        .await
+        .unwrap();
+
     teardown(&c).await;
 }

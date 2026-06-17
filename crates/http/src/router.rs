@@ -369,6 +369,12 @@ pub fn build_router(state: AppState) -> Router {
             "/dashboard/archetype-rotation",
             get(dashboard::archetype_rotation),
         )
+        // Recuento diario del TPV (Fase 4, #154): variante de sales-today accesible
+        // a CLERK pero acotada a SU tienda (SEC-01). Ruta propia `tpv/dashboard`.
+        .route(
+            "/tpv/dashboard/sales-today",
+            get(dashboard::tpv_sales_today),
+        )
         // Eventos en tiempo real (Fase 4, #32): stream SSE filtrado por tenant del
         // JWT. Cualquier rol; tope de conexiones por usuario (SEC-03).
         .route("/events", get(events::stream))

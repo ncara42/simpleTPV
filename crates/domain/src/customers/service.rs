@@ -94,7 +94,10 @@ pub async fn create(pool: &PgPool, org: Uuid, input: CreateCustomer) -> Result<C
         .bind(input.active)
         .fetch_one(&mut **tx)
         .await?;
-        Ok(Ok(load(tx, org, id).await?.expect("recién creado")))
+        match load(tx, org, id).await? {
+            Some(c) => Ok(Ok(c)),
+            None => Ok(Err(AppError::Internal)), // creado pero ilegible (RLS/race)
+        }
     })
     .await?;
     result
@@ -145,7 +148,10 @@ pub async fn update(
         if touched == 0 {
             return Ok(Err(AppError::NotFound));
         }
-        Ok(Ok(load(tx, org, id).await?.expect("actualizado")))
+        match load(tx, org, id).await? {
+            Some(c) => Ok(Ok(c)),
+            None => Ok(Err(AppError::Internal)), // actualizado pero ilegible (RLS/race)
+        }
     })
     .await?;
     result
