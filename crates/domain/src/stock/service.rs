@@ -129,6 +129,17 @@ pub async fn apply_movement(
     )
     .await?;
 
+    // Write-through best-effort de la cantidad resultante (#155, #28): acelera
+    // `by_product`. No-op sin REDIS_URL; Postgres sigue siendo la fuente de verdad.
+    // El TTL de la caché cubre el caso de una tx que luego revierte.
+    crate::cache::cache_quantity(
+        input.organization_id,
+        input.store_id,
+        input.product_id,
+        quantity,
+    )
+    .await;
+
     Ok(quantity)
 }
 
@@ -736,17 +747,27 @@ pub async fn by_product(
         .await
     })
     .await?;
-    Ok(rows
-        .into_iter()
-        .map(|r| StockByProduct {
+    // Cache-aside (#155, #28): la cantidad sale de la caché (hit) o de Postgres
+    // (miss, repuebla). `minStock`/nivel siempre de Postgres. No-op sin REDIS_URL.
+    let mut out = Vec::with_capacity(rows.len());
+    for r in rows {
+        let quantity = match crate::cache::cached_quantity(org, r.store_id, product_id).await {
+            Some(q) => q,
+            None => {
+                crate::cache::cache_quantity(org, r.store_id, product_id, r.quantity).await;
+                r.quantity
+            }
+        };
+        out.push(StockByProduct {
             product_id,
             store_id: r.store_id,
             store_name: r.store_name,
-            quantity: r.quantity,
+            quantity,
             min_stock: r.min_stock,
-            level: stock_level(r.quantity, r.min_stock),
-        })
-        .collect())
+            level: stock_level(quantity, r.min_stock),
+        });
+    }
+    Ok(out)
 }
 
 #[derive(sqlx::FromRow)]

@@ -19,6 +19,12 @@ sha2.workspace = true
 time.workspace = true
 time-tz.workspace = true
 tracing.workspace = true
+# Caché de stock (#155, #28): cliente Redis async degradable + OnceCell/timeout.
+tokio = { workspace = true, features = ["sync", "time"] }
+redis = { version = "0.32", default-features = false, features = [
+  "tokio-comp",
+  "tokio-rustls-comp",
+] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
