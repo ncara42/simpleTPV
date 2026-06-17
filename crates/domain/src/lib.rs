@@ -13,6 +13,7 @@ pub mod branding;
 pub mod cash_sessions;
 pub mod csv;
 pub mod customers;
+pub mod dashboard;
 pub mod devices;
 pub mod feature_flags;
 pub mod me;
