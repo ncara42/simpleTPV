@@ -17,6 +17,7 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::products;
+use crate::returns;
 use crate::routes;
 use crate::sales;
 use crate::state::AppState;
@@ -100,6 +101,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/sales/ticket-block", post(sales::ticket_block))
         .route("/sales/by-ticket/{ticket}", get(sales::by_ticket))
         .route("/sales/{id}/void", post(sales::void))
+        // Devoluciones (Fase 2): con ticket + listado.
+        .route("/returns", post(returns::create).get(returns::list))
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)
