@@ -21,11 +21,14 @@ use crate::stock::service::{
 use crate::store_access::has_store_access;
 
 use super::domain::{
-    assert_discount_within_limit, compute_change, compute_totals, format_ticket, PricedLine,
-    TicketDiscount,
+    assert_discount_within_limit, build_tax_breakdown, compute_change, compute_totals,
+    format_ticket, PricedLine, TaxLine, TicketDiscount,
 };
 use super::input::CreateSale;
-use super::model::{Sale, SaleLine, SaleStatus, SaleWithLines, SalesPage, TicketBlock};
+use super::model::{
+    OrgInfo, Sale, SaleLine, SaleStatus, SaleWithLines, SalesPage, StoreInfo, TicketBlock,
+    TicketData, TicketLine,
+};
 
 const MAX_SALES_PAGE_SIZE: i64 = 100;
 
@@ -280,6 +283,82 @@ pub async fn find_by_ticket(
         };
         let lines = load_lines(tx, sale.id).await?;
         Ok(Some(SaleWithLines { sale, lines }))
+    })
+    .await?;
+    found.ok_or(AppError::NotFound)
+}
+
+/// `GET /sales/:id/ticket` — datos del ticket / factura simplificada (#152).
+/// Org-scoped por RLS y, además, filtro explícito por `organizationId` (defensa
+/// anti-IDOR, paridad NestJS `loadTicketData`). 404 si no existe en el tenant.
+/// El desglose de IVA se calcula con el descuento de ticket (`subtotal − total`).
+pub async fn get_ticket(pool: &PgPool, org: Uuid, sale_id: Uuid) -> Result<TicketData, AppError> {
+    let found: Option<TicketData> = with_tenant_tx(pool, org, async move |tx, _after| {
+        let sql =
+            format!(r#"SELECT {SALE_COLS} FROM "Sale" WHERE id = $1 AND "organizationId" = $2"#);
+        let sale: Option<Sale> = sqlx::query_as(&sql)
+            .bind(sale_id)
+            .bind(org)
+            .fetch_optional(&mut **tx)
+            .await?;
+        let Some(sale) = sale else {
+            return Ok(None);
+        };
+
+        let (org_name, org_nif): (String, Option<String>) =
+            sqlx::query_as(r#"SELECT name, nif FROM "Organization" WHERE id = $1"#)
+                .bind(sale.organization_id)
+                .fetch_one(&mut **tx)
+                .await?;
+        let (store_name, store_code): (String, String) =
+            sqlx::query_as(r#"SELECT name, code FROM "Store" WHERE id = $1"#)
+                .bind(sale.store_id)
+                .fetch_one(&mut **tx)
+                .await?;
+
+        let sale_lines = load_lines(tx, sale.id).await?;
+        let ticket_discount = sale.subtotal - sale.total;
+        let tax_lines: Vec<TaxLine> = sale_lines
+            .iter()
+            .map(|l| TaxLine {
+                tax_rate: l.tax_rate,
+                line_total: l.line_total,
+            })
+            .collect();
+        let tax_breakdown = build_tax_breakdown(&tax_lines, ticket_discount);
+
+        let lines: Vec<TicketLine> = sale_lines
+            .into_iter()
+            .map(|l| TicketLine {
+                name: l.name,
+                qty: l.qty,
+                unit_price: l.unit_price,
+                discount_pct: l.discount_pct,
+                discount_amt: l.discount_amt,
+                line_total: l.line_total,
+            })
+            .collect();
+
+        Ok(Some(TicketData {
+            organization: OrgInfo {
+                name: org_name,
+                nif: org_nif,
+            },
+            store: StoreInfo {
+                name: store_name,
+                code: store_code,
+            },
+            ticket_number: sale.ticket_number,
+            created_at: sale.created_at,
+            lines,
+            subtotal: sale.subtotal,
+            discount_total: sale.discount_total,
+            total: sale.total,
+            payment_method: sale.payment_method,
+            cash_given: sale.cash_given,
+            cash_change: sale.cash_change,
+            tax_breakdown,
+        }))
     })
     .await?;
     found.ok_or(AppError::NotFound)
