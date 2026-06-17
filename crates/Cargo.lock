@@ -1902,6 +1902,7 @@ dependencies = [
 name = "simpletpv-domain"
 version = "0.0.0"
 dependencies = [
+ "bcrypt",
  "rust_decimal",
  "serde",
  "serde_json",

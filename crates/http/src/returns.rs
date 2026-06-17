@@ -7,7 +7,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 use simpletpv_domain::returns::model::ReturnWithLines;
-use simpletpv_domain::returns::{service, CreateReturn};
+use simpletpv_domain::returns::{service, CreateBlindReturn, CreateReturn};
 use uuid::Uuid;
 
 use crate::error::ApiError;
@@ -22,6 +22,23 @@ pub async fn create(
     ValidatedJson(body): ValidatedJson<CreateReturn>,
 ) -> Result<(StatusCode, Json<ReturnWithLines>), ApiError> {
     let r = service::create(
+        state.db(),
+        user.organization_id,
+        user.user_id,
+        user.role.is_org_wide(),
+        body,
+    )
+    .await?;
+    Ok((StatusCode::CREATED, Json(r)))
+}
+
+/// `POST /returns/blind` — devolución SIN ticket (requiere PIN de MANAGER/ADMIN).
+pub async fn create_blind(
+    State(state): State<AppState>,
+    user: AuthUser,
+    ValidatedJson(body): ValidatedJson<CreateBlindReturn>,
+) -> Result<(StatusCode, Json<ReturnWithLines>), ApiError> {
+    let r = service::create_blind(
         state.db(),
         user.organization_id,
         user.user_id,
