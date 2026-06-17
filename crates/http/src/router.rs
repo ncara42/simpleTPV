@@ -23,6 +23,7 @@ use crate::customers;
 use crate::devices;
 use crate::feature_flags;
 use crate::me;
+use crate::price_lists;
 use crate::product_families;
 use crate::products;
 use crate::promotions;
@@ -162,6 +163,22 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/customers/{id}",
             patch(customers::update).delete(customers::remove),
+        )
+        // Tarifas B2B (Fase 4, #154, IT-17): listas de precios + items. ADMIN/MANAGER.
+        .route(
+            "/price-lists",
+            get(price_lists::list).post(price_lists::create),
+        )
+        .route(
+            "/price-lists/{id}",
+            get(price_lists::get)
+                .patch(price_lists::update)
+                .delete(price_lists::remove),
+        )
+        .route("/price-lists/{id}/items", put(price_lists::set_item))
+        .route(
+            "/price-lists/{id}/items/{product_id}",
+            delete(price_lists::remove_item),
         )
         // Promociones (Fase 4, #154): catálogo de central. Lectura abierta a la
         // sesión; escritura ADMIN/MANAGER.

@@ -16,6 +16,7 @@ pub mod customers;
 pub mod devices;
 pub mod feature_flags;
 pub mod me;
+pub mod price_lists;
 pub mod product_families;
 pub mod products;
 pub mod promotions;

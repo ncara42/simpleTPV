@@ -17,6 +17,7 @@ mod extractor;
 mod feature_flags;
 mod json;
 mod me;
+mod price_lists;
 mod product_families;
 mod products;
 mod promotions;
