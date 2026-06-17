@@ -1,19 +1,16 @@
-//! Integración del registro VeriFactu rectificativo (#152) + gate `blind_returns`:
-//! una devolución con ticket crea un `VerifactuRecord` RECTIFICATION (hash no
-//! vacío) en la misma tx; la devolución ciega con el flag APAGADO (override de la
-//! tienda) devuelve Forbidden antes de tocar nada.
+//! Integración del registro VeriFactu de FACTURA (#155): cada venta COMPLETED
+//! crea, en la MISMA tx (atómico, SEC-02), un `VerifactuRecord` tipo INVOICE en
+//! estado PENDING con huella encadenada y QR. Complementa el test de
+//! rectificativos (devoluciones) de `verifactu_rectification.rs`.
 
 use std::time::Duration;
 
 use rust_decimal::Decimal;
 use simpletpv_auth::Role;
 use simpletpv_domain::products::{self, NewProduct};
-use simpletpv_domain::returns::{
-    service as returns_svc, BlindReturnLine, CreateBlindReturn, CreateReturn, CreateReturnLine,
-};
-use simpletpv_domain::sales::{service as sales_svc, CreateSale, CreateSaleLine, PaymentMethod};
+use simpletpv_domain::sales::service::{self};
+use simpletpv_domain::sales::{CreateSale, CreateSaleLine, PaymentMethod, SaleWithLines};
 use simpletpv_domain::stock::{service as stock, Adjust};
-use simpletpv_shared::AppError;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use uuid::Uuid;
 
@@ -53,7 +50,7 @@ async fn setup() -> Ctx {
     .await
     .unwrap();
     let store = Uuid::new_v4();
-    let code = format!("V{}", &store.simple().to_string()[..8]);
+    let code = format!("F{}", &store.simple().to_string()[..8]);
     sqlx::query(
         r#"INSERT INTO "Store" (id, "organizationId", name, code) VALUES ($1, $2, $3, $4)"#,
     )
@@ -89,7 +86,7 @@ async fn make_product(c: &Ctx) -> Uuid {
         &c.app,
         c.org,
         NewProduct {
-            name: format!("VF-{}", Uuid::new_v4()),
+            name: format!("VFI-{}", Uuid::new_v4()),
             sale_price: Decimal::from(100),
             description: None,
             barcode: None,
@@ -121,14 +118,48 @@ async fn make_product(c: &Ctx) -> Uuid {
     id
 }
 
+async fn sell(c: &Ctx, product: Uuid, qty: i64) -> SaleWithLines {
+    service::create(
+        &c.app,
+        c.org,
+        c.user,
+        Role::Admin,
+        CreateSale {
+            store_id: c.store,
+            client_id: None,
+            ticket_number: None,
+            lines: vec![CreateSaleLine {
+                product_id: product,
+                qty: Decimal::from(qty),
+                discount_pct: None,
+                discount_amt: None,
+            }],
+            payment_method: PaymentMethod::Card,
+            cash_given: None,
+            ticket_discount_pct: None,
+            ticket_discount_amt: None,
+        },
+    )
+    .await
+    .unwrap()
+}
+
+/// El único registro INVOICE de una venta: (status, qrData, hash, total del payload).
+async fn invoice_record(c: &Ctx, sale_id: Uuid) -> (String, Option<String>, String, String) {
+    sqlx::query_as(
+        r#"SELECT status::text, "qrData", hash, payload->>'total'
+           FROM "VerifactuRecord"
+           WHERE "saleId" = $1 AND type = 'INVOICE'::"VerifactuType""#,
+    )
+    .bind(sale_id)
+    .fetch_one(&c.admin)
+    .await
+    .expect("un registro INVOICE por venta")
+}
+
 async fn teardown(c: &Ctx, product: Uuid) {
     for sql in [
-        r#"DELETE FROM "VerifactuRecord" WHERE "returnId" IN (SELECT id FROM "Return" WHERE "storeId" = $1)"#,
-        // Las ventas ahora crean su registro INVOICE (#155): limpiarlo también.
         r#"DELETE FROM "VerifactuRecord" WHERE "saleId" IN (SELECT id FROM "Sale" WHERE "storeId" = $1)"#,
-        r#"DELETE FROM "ReturnLine" WHERE "returnId" IN (SELECT id FROM "Return" WHERE "storeId" = $1)"#,
-        r#"DELETE FROM "Return" WHERE "storeId" = $1"#,
-        r#"DELETE FROM "FeatureFlag" WHERE "storeId" = $1"#,
         r#"DELETE FROM "StockMovement" WHERE "storeId" = $1"#,
         r#"DELETE FROM "StockAlert" WHERE "storeId" = $1"#,
         r#"DELETE FROM "StockBatch" WHERE "storeId" = $1"#,
@@ -153,103 +184,35 @@ async fn teardown(c: &Ctx, product: Uuid) {
 }
 
 #[tokio::test]
-async fn devolucion_con_ticket_crea_registro_rectificativo() {
+async fn cada_venta_crea_registro_verifactu_invoice() {
     let c = setup().await;
     let product = make_product(&c).await;
 
-    let sale = sales_svc::create(
-        &c.app,
-        c.org,
-        c.user,
-        Role::Admin,
-        CreateSale {
-            store_id: c.store,
-            client_id: None,
-            ticket_number: None,
-            lines: vec![CreateSaleLine {
-                product_id: product,
-                qty: Decimal::from(2),
-                discount_pct: None,
-                discount_amt: None,
-            }],
-            payment_method: PaymentMethod::Cash,
-            cash_given: Some(Decimal::from(1000)),
-            ticket_discount_pct: None,
-            ticket_discount_amt: None,
-        },
-    )
-    .await
-    .unwrap();
+    // Dos ventas: 200 y 100. Cada una debe dejar su registro INVOICE/PENDING.
+    let s1 = sell(&c, product, 2).await;
+    let s2 = sell(&c, product, 1).await;
 
-    let ret = returns_svc::create(
-        &c.app,
-        c.org,
-        c.user,
-        true,
-        CreateReturn {
-            sale_id: sale.sale.id,
-            reason: "defecto".into(),
-            lines: vec![CreateReturnLine {
-                sale_line_id: sale.lines[0].id,
-                qty: Decimal::from(1),
-            }],
-        },
-    )
-    .await
-    .unwrap();
+    let (st1, qr1, hash1, total1) = invoice_record(&c, s1.sale.id).await;
+    let (st2, qr2, hash2, total2) = invoice_record(&c, s2.sale.id).await;
 
-    // Hay exactamente UN registro RECTIFICATION para esta devolución, con hash.
-    let (count, hash): (i64, Option<String>) = sqlx::query_as(
-        r#"SELECT count(*)::bigint, MAX(hash) FROM "VerifactuRecord"
-           WHERE "returnId" = $1 AND type = 'RECTIFICATION'::"VerifactuType""#,
-    )
-    .bind(ret.return_.id)
-    .fetch_one(&c.admin)
-    .await
-    .unwrap();
-    assert_eq!(count, 1, "un rectificativo por devolución");
-    assert!(hash.is_some_and(|h| h.len() == 64), "hash SHA-256 hex");
+    for (st, qr, hash, total, sale) in [
+        (&st1, &qr1, &hash1, &total1, &s1.sale),
+        (&st2, &qr2, &hash2, &total2, &s2.sale),
+    ] {
+        assert_eq!(st, "PENDING", "el registro nace PENDING (envío diferido)");
+        assert!(qr.is_some(), "qrData de cotejo presente");
+        assert_eq!(hash.len(), 64, "huella SHA-256 en hex");
+        // payload->>'total' = total de la venta con 2 decimales, positivo (factura).
+        let parsed: Decimal = total.parse().expect("total numérico en el payload");
+        assert!(parsed > Decimal::ZERO, "factura: importe positivo");
+        assert_eq!(
+            parsed, sale.total,
+            "el importe del registro = total de la venta"
+        );
+    }
 
-    teardown(&c, product).await;
-}
-
-#[tokio::test]
-async fn devolucion_ciega_con_flag_apagado_da_forbidden() {
-    let c = setup().await;
-    let product = make_product(&c).await;
-    // Apaga blind_returns SOLO en esta tienda (override de tienda) → scoped.
-    sqlx::query(
-        r#"INSERT INTO "FeatureFlag" (id, "organizationId", "storeId", key, enabled, "updatedAt")
-           VALUES ($1, $2, $3, 'blind_returns', false, now())"#,
-    )
-    .bind(Uuid::new_v4())
-    .bind(c.org)
-    .bind(c.store)
-    .execute(&c.admin)
-    .await
-    .unwrap();
-
-    let res = returns_svc::create_blind(
-        &c.app,
-        c.org,
-        c.user,
-        true,
-        CreateBlindReturn {
-            store_id: c.store,
-            reason: "x".into(),
-            manager_pin: "0000".into(),
-            lines: vec![BlindReturnLine {
-                product_id: product,
-                qty: Decimal::from(1),
-            }],
-        },
-    )
-    .await;
-    assert_eq!(
-        res.err(),
-        Some(AppError::Forbidden),
-        "flag apagado → Forbidden"
-    );
+    // Dos facturas distintas → huellas distintas (encadenamiento real).
+    assert_ne!(hash1, hash2, "cada factura encadena con huella propia");
 
     teardown(&c, product).await;
 }

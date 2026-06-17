@@ -262,6 +262,12 @@ pub async fn create(
             }
         }
 
+        // 11. Registro VeriFactu de la venta (INVOICE) DENTRO de la tx (#155,
+        // SEC-02): atómico con la venta. Si la creación del registro fiscal
+        // encadenado falla, toda la venta hace rollback → nunca queda una factura
+        // sin su registro. El ENVÍO a la AEAT es best-effort y lo procesa la cola.
+        crate::verifactu::record_invoice(tx, org, sale_id, &ticket_number, totals.total).await?;
+
         Ok(Ok(SaleWithLines { sale, lines }))
     })
     .await?
