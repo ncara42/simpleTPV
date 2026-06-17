@@ -6,6 +6,7 @@
 //! `domain` no se conoce aquí; los handlers llaman a los servicios (de momento
 //! `AuthService`). La capa http no toca SQL directamente.
 
+mod cash_sessions;
 mod error;
 mod extractor;
 mod json;

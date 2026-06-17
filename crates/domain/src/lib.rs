@@ -6,10 +6,11 @@
 //! Incluye `products` (catálogo), `stock` (inventario + lotes/FEFO), `sales`
 //! (ventas) y `returns` (devoluciones con ticket).
 
-pub mod csv;
-pub mod feature_flags;
 #[macro_use]
 mod pg_enum;
+pub mod cash_sessions;
+pub mod csv;
+pub mod feature_flags;
 pub mod products;
 pub mod purchases;
 pub mod receipt;

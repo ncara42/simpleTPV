@@ -16,6 +16,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
+use crate::cash_sessions;
 use crate::products;
 use crate::purchases;
 use crate::returns;
@@ -176,6 +177,33 @@ pub fn build_router(state: AppState) -> Router {
         .route("/purchase-orders/{id}/export", get(purchases::export))
         .route("/purchase-orders/{id}/confirm", post(purchases::confirm))
         .route("/purchase-orders/{id}/receive", post(purchases::receive))
+        // Caja (Fase 3, #145/#146): apertura/cierre + flujo de aprobación. Rutas
+        // estáticas (open/closed/current/movements/*) y `{id}` conviven (axum
+        // prioriza el segmento estático).
+        .route("/cash-sessions/open", post(cash_sessions::open))
+        .route("/cash-sessions/closed", get(cash_sessions::list_closed))
+        .route("/cash-sessions/current", get(cash_sessions::current))
+        .route(
+            "/cash-sessions/movements/pending",
+            get(cash_sessions::list_pending),
+        )
+        .route(
+            "/cash-sessions/movements/{mov_id}/approve",
+            post(cash_sessions::approve),
+        )
+        .route(
+            "/cash-sessions/movements/{mov_id}/deny",
+            post(cash_sessions::deny),
+        )
+        .route("/cash-sessions/{id}/close", post(cash_sessions::close))
+        .route(
+            "/cash-sessions/{id}/movements",
+            get(cash_sessions::movements).post(cash_sessions::create_movement),
+        )
+        .route(
+            "/cash-sessions/{id}/movements/request",
+            post(cash_sessions::request_movement),
+        )
         // Traspasos (Fase 3): DRAFT→SENT→RECEIVED→CLOSED.
         .route("/transfers", post(transfers::create).get(transfers::list))
         .route("/transfers/{id}", get(transfers::get_one))
