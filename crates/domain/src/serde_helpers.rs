@@ -3,7 +3,19 @@
 
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
+use serde::{Deserialize, Deserializer};
 use time::PrimitiveDateTime;
+
+/// Deserializa un campo en `Option<Option<T>>` para distinguir "ausente" de
+/// `null` en un PATCH (paridad con el `data: input` de Prisma): combinado con
+/// `#[serde(default)]`, ausente→`None`, `null`→`Some(None)`, valor→`Some(Some)`.
+pub fn double_option<'de, T, D>(de: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    Deserialize::deserialize(de).map(Some)
+}
 
 /// Serializa un `Decimal` como string NORMALIZADO (sin ceros finales), igual que
 /// `Decimal.toJSON` de Prisma (`9.9900` → `"9.99"`, `21.00` → `"21"`).

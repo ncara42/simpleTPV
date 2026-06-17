@@ -8,6 +8,7 @@
 
 #[macro_use]
 mod pg_enum;
+pub mod branding;
 pub mod cash_sessions;
 pub mod csv;
 pub mod devices;

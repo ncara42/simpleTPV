@@ -16,6 +16,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
+use crate::branding;
 use crate::cash_sessions;
 use crate::devices;
 use crate::product_families;
@@ -93,6 +94,12 @@ pub fn build_router(state: AppState) -> Router {
             get(products::get_one)
                 .patch(products::update)
                 .delete(products::remove),
+        )
+        // Marca corporativa (Fase 4, #154, U-08): lectura abierta a la sesión,
+        // escritura solo ADMIN.
+        .route(
+            "/organization/branding",
+            get(branding::get).patch(branding::update),
         )
         // Dispositivos TPV (Fase 4, #154): rutas estáticas (current/pair) antes de
         // `{id}`. Estado/emparejado cualquier rol; alta/listado/revocado ADMIN/MANAGER.
