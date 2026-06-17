@@ -58,6 +58,33 @@ pub fn row_number(index: usize) -> usize {
     index + 2
 }
 
+/// Escapa un campo de texto para CSV de EXPORTACIÓN — port de `escapeCsvField`.
+///
+/// 1. Neutraliza la inyección de fórmulas (CWE-1236 / INJ-01): si el primer
+///    carácter dispara la evaluación de la hoja de cálculo (`= + - @ \t \r`),
+///    prefija el campo con comilla simple.
+/// 2. Aplica entrecomillado RFC 4180 (comilla doble duplicada) si el campo
+///    contiene comas, comillas o saltos de línea.
+///
+/// Solo para campos de TEXTO; los importes se serializan aparte (no deben
+/// recibir el prefijo `'` por empezar con `-`).
+pub fn escape_csv_field(value: &str) -> String {
+    let triggers_formula = value
+        .chars()
+        .next()
+        .is_some_and(|c| matches!(c, '=' | '+' | '-' | '@' | '\t' | '\r'));
+    let prefixed = if triggers_formula {
+        format!("'{value}")
+    } else {
+        value.to_owned()
+    };
+    if prefixed.contains(['"', ',', '\n']) {
+        format!("\"{}\"", prefixed.replace('"', "\"\""))
+    } else {
+        prefixed
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,5 +123,29 @@ mod tests {
     fn row_number_humano() {
         assert_eq!(row_number(0), 2);
         assert_eq!(row_number(3), 5);
+    }
+
+    #[test]
+    fn escape_csv_neutraliza_formulas() {
+        assert_eq!(escape_csv_field("=SUM(A1)"), "'=SUM(A1)");
+        assert_eq!(escape_csv_field("+1"), "'+1");
+        assert_eq!(escape_csv_field("-1"), "'-1");
+        assert_eq!(escape_csv_field("@x"), "'@x");
+        assert_eq!(escape_csv_field("\tx"), "'\tx");
+        assert_eq!(escape_csv_field("\rx"), "'\rx");
+    }
+
+    #[test]
+    fn escape_csv_aplica_rfc4180() {
+        assert_eq!(escape_csv_field("normal"), "normal");
+        assert_eq!(escape_csv_field("a,b"), "\"a,b\"");
+        assert_eq!(escape_csv_field("dijo \"hola\""), "\"dijo \"\"hola\"\"\"");
+        assert_eq!(escape_csv_field("línea1\nlínea2"), "\"línea1\nlínea2\"");
+    }
+
+    #[test]
+    fn escape_csv_combina_formula_y_entrecomillado() {
+        // Fórmula que además lleva coma: prefijo `'` Y entrecomillado RFC 4180.
+        assert_eq!(escape_csv_field("=A1,B2"), "\"'=A1,B2\"");
     }
 }

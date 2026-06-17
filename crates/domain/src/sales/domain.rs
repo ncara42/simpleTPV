@@ -3,6 +3,7 @@
 //! (`Decimal::round_dp(2)`), exacto (sin la imprecisión float de NestJS).
 
 use rust_decimal::Decimal;
+use serde::Serialize;
 use simpletpv_shared::AppError;
 
 use super::model::PaymentMethod;
@@ -147,6 +148,93 @@ pub fn format_ticket(code: &str, counter: i64) -> String {
     format!("T{code}-{counter:06}")
 }
 
+/// Línea de entrada para el desglose de IVA: tipo de IVA + neto de línea
+/// (`line_total`, con IVA incluido). Solo entrada (sin `Serialize`).
+#[derive(Debug, Clone, Copy)]
+pub struct TaxLine {
+    pub tax_rate: Decimal,
+    pub line_total: Decimal,
+}
+
+/// Item del desglose de IVA por tipo: base imponible + cuota. SALIDA JSON
+/// (camelCase, importes como string normalizado, paridad Prisma).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaxBreakdownItem {
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub tax_rate: Decimal,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub base: Decimal,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub cuota: Decimal,
+}
+
+/// Desglosa el IVA agrupando líneas por tipo (port de `buildTaxBreakdown`).
+///
+/// Convención retail España: los `line_total` llevan el IVA incluido. El
+/// descuento de TICKET se prorratea entre los grupos proporcional al neto de
+/// cada uno ANTES de calcular base/cuota; el grupo de MAYOR neto absorbe el
+/// residuo de céntimo para que `Σ(base + cuota) == total` exacto. Para cada
+/// grupo, sobre el neto ajustado: `base = round2(neto/(1+t/100))`,
+/// `cuota = round2(neto − base)`. Salida ordenada ascendente por `tax_rate`.
+pub fn build_tax_breakdown(lines: &[TaxLine], ticket_discount: Decimal) -> Vec<TaxBreakdownItem> {
+    let hundred = Decimal::from(100);
+
+    // Agrupa el neto por tipo de IVA preservando exactitud (sin HashMap de Decimal).
+    let mut groups: Vec<(Decimal, Decimal)> = Vec::new();
+    for l in lines {
+        match groups.iter_mut().find(|(rate, _)| *rate == l.tax_rate) {
+            Some(g) => g.1 += l.line_total,
+            None => groups.push((l.tax_rate, l.line_total)),
+        }
+    }
+
+    let subtotal = round2(groups.iter().map(|(_, neto)| *neto).sum());
+    if subtotal <= Decimal::ZERO {
+        return Vec::new();
+    }
+
+    // Orden ascendente por tipo para una salida estable.
+    groups.sort_by_key(|g| g.0);
+
+    // Prorrateo del descuento de ticket; el grupo de MAYOR neto (el primero en
+    // caso de empate, igual que NestJS) absorbe el residuo de céntimo.
+    let discount = round2(ticket_discount);
+    let mut absorber_idx = 0;
+    for i in 1..groups.len() {
+        if groups[i].1 > groups[absorber_idx].1 {
+            absorber_idx = i;
+        }
+    }
+
+    let mut assigned = Decimal::ZERO;
+    let mut prorate = vec![Decimal::ZERO; groups.len()];
+    for (i, (_, neto)) in groups.iter().enumerate() {
+        if i == absorber_idx {
+            continue;
+        }
+        let p = round2(discount * *neto / subtotal);
+        assigned = round2(assigned + p);
+        prorate[i] = p;
+    }
+    prorate[absorber_idx] = round2(discount - assigned);
+
+    groups
+        .iter()
+        .enumerate()
+        .map(|(i, (tax_rate, neto))| {
+            let neto_ajustado = round2(*neto - prorate[i]);
+            let base = round2(neto_ajustado / (Decimal::ONE + *tax_rate / hundred));
+            let cuota = round2(neto_ajustado - base);
+            TaxBreakdownItem {
+                tax_rate: *tax_rate,
+                base,
+                cuota,
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237,5 +325,49 @@ mod tests {
     fn formato_de_ticket() {
         assert_eq!(format_ticket("01", 1), "T01-000001");
         assert_eq!(format_ticket("ABC", 123456), "TABC-123456");
+    }
+
+    fn tax_line(rate: &str, total: &str) -> TaxLine {
+        TaxLine {
+            tax_rate: dec(rate),
+            line_total: dec(total),
+        }
+    }
+
+    #[test]
+    fn iva_sin_descuento_cuadra_con_total() {
+        let items = build_tax_breakdown(&[tax_line("21", "121.00")], dec("0"));
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].tax_rate, dec("21"));
+        assert_eq!(items[0].base, dec("100.00"));
+        assert_eq!(items[0].cuota, dec("21.00"));
+        assert_eq!(items[0].base + items[0].cuota, dec("121.00"));
+    }
+
+    #[test]
+    fn iva_con_descuento_de_ticket_un_grupo_cuadra() {
+        // total = 121.00 − 21.00 = 100.00; Σ(base+cuota) debe ser EXACTO 100.00.
+        let items = build_tax_breakdown(&[tax_line("21", "121.00")], dec("21.00"));
+        assert_eq!(items[0].base + items[0].cuota, dec("100.00"));
+    }
+
+    #[test]
+    fn iva_dos_grupos_residuo_al_mayor_y_orden_ascendente() {
+        let items = build_tax_breakdown(
+            &[tax_line("21", "100.00"), tax_line("10", "50.00")],
+            dec("10.00"),
+        );
+        // Orden ascendente por tipo: 10 antes que 21.
+        assert_eq!(items[0].tax_rate, dec("10"));
+        assert_eq!(items[1].tax_rate, dec("21"));
+        // Σ(base+cuota) == total (150.00 − 10.00 = 140.00) EXACTO, sin descuadre.
+        let suma: Decimal = items.iter().map(|i| i.base + i.cuota).sum();
+        assert_eq!(suma, dec("140.00"));
+    }
+
+    #[test]
+    fn iva_lineas_vacias_o_subtotal_no_positivo_devuelve_vacio() {
+        assert!(build_tax_breakdown(&[], dec("0")).is_empty());
+        assert!(build_tax_breakdown(&[tax_line("21", "0.00")], dec("0")).is_empty());
     }
 }
