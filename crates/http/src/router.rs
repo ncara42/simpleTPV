@@ -341,6 +341,33 @@ pub fn build_router(state: AppState) -> Router {
         // Portados sales-today y sales-kpis; el resto de KPIs llega después.
         .route("/dashboard/sales-today", get(dashboard::sales_today))
         .route("/dashboard/sales-kpis", get(dashboard::sales_kpis))
+        .route(
+            "/dashboard/sales-by-family",
+            get(dashboard::sales_by_family),
+        )
+        .route("/dashboard/sales-by-hour", get(dashboard::sales_by_hour))
+        .route(
+            "/dashboard/discount-by-employee",
+            get(dashboard::discount_by_employee),
+        )
+        .route(
+            "/dashboard/sales-by-employee",
+            get(dashboard::sales_by_employee),
+        )
+        .route("/dashboard/margin-kpis", get(dashboard::margin_kpis))
+        .route("/dashboard/stockout-kpis", get(dashboard::stockout_kpis))
+        .route(
+            "/dashboard/product-rankings",
+            get(dashboard::product_rankings),
+        )
+        .route(
+            "/dashboard/product-rotation",
+            get(dashboard::product_rotation),
+        )
+        .route(
+            "/dashboard/archetype-rotation",
+            get(dashboard::archetype_rotation),
+        )
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)

@@ -5,8 +5,14 @@ use axum::extract::{Query, State};
 use axum::Json;
 use serde::Deserialize;
 use simpletpv_auth::Role;
-use simpletpv_domain::dashboard::period::{resolve_period, CompareMode, DashboardPeriod};
-use simpletpv_domain::dashboard::{service, SalesKpis, SalesToday};
+use simpletpv_domain::dashboard::period::{
+    resolve_period, CompareMode, DashboardPeriod, DateRange,
+};
+use simpletpv_domain::dashboard::{
+    service, ArchetypeRotationItem, DiscountByEmployeeItem, MarginKpis, ProductRankings,
+    ProductRotationItem, SalesByEmployeeItem, SalesByFamilyItem, SalesByHourItem, SalesKpis,
+    SalesToday, StockoutKpis,
+};
 use simpletpv_shared::AppError;
 use uuid::Uuid;
 
@@ -38,6 +44,37 @@ pub struct PeriodQuery {
     store_id: Option<Uuid>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RankingsQuery {
+    #[serde(default)]
+    period: Option<String>,
+    #[serde(default)]
+    from: Option<String>,
+    #[serde(default)]
+    to: Option<String>,
+    #[serde(default)]
+    store_id: Option<Uuid>,
+    #[serde(default)]
+    limit: Option<i64>,
+}
+
+/// Resuelve el `DateRange` del periodo desde una `PeriodQuery` (valida `custom`).
+impl PeriodQuery {
+    fn range(&self) -> Result<DateRange, ApiError> {
+        let period = match self.period.as_deref() {
+            None => DashboardPeriod::Today,
+            Some(s) => DashboardPeriod::parse(s).ok_or(AppError::BadRequest)?,
+        };
+        Ok(resolve_period(
+            period,
+            now_utc(),
+            self.from.as_deref(),
+            self.to.as_deref(),
+        )?)
+    }
+}
+
 /// `GET /dashboard/sales-today?compare=&storeId=`.
 pub async fn sales_today(
     State(state): State<AppState>,
@@ -61,13 +98,139 @@ pub async fn sales_kpis(
     Query(q): Query<PeriodQuery>,
 ) -> Result<Json<SalesKpis>, ApiError> {
     user.require_role(&MGMT_ROLES)?;
-    let period = match q.period.as_deref() {
-        None => DashboardPeriod::Today,
-        Some(s) => DashboardPeriod::parse(s).ok_or(AppError::BadRequest)?,
-    };
-    let range = resolve_period(period, now_utc(), q.from.as_deref(), q.to.as_deref())?;
+    let range = q.range()?;
     Ok(Json(
         service::sales_kpis(state.db(), user.organization_id, range, q.store_id).await?,
+    ))
+}
+
+/// `GET /dashboard/sales-by-family`.
+pub async fn sales_by_family(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<PeriodQuery>,
+) -> Result<Json<Vec<SalesByFamilyItem>>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    let range = q.range()?;
+    Ok(Json(
+        service::sales_by_family(state.db(), user.organization_id, range, q.store_id).await?,
+    ))
+}
+
+/// `GET /dashboard/sales-by-hour`.
+pub async fn sales_by_hour(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<PeriodQuery>,
+) -> Result<Json<Vec<SalesByHourItem>>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    let range = q.range()?;
+    Ok(Json(
+        service::sales_by_hour(state.db(), user.organization_id, range, q.store_id).await?,
+    ))
+}
+
+/// `GET /dashboard/discount-by-employee`.
+pub async fn discount_by_employee(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<PeriodQuery>,
+) -> Result<Json<Vec<DiscountByEmployeeItem>>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    let range = q.range()?;
+    Ok(Json(
+        service::discount_by_employee(state.db(), user.organization_id, range, q.store_id).await?,
+    ))
+}
+
+/// `GET /dashboard/sales-by-employee`.
+pub async fn sales_by_employee(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<PeriodQuery>,
+) -> Result<Json<Vec<SalesByEmployeeItem>>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    let range = q.range()?;
+    Ok(Json(
+        service::sales_by_employee(state.db(), user.organization_id, range, q.store_id).await?,
+    ))
+}
+
+/// `GET /dashboard/margin-kpis`.
+pub async fn margin_kpis(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<PeriodQuery>,
+) -> Result<Json<MarginKpis>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    let range = q.range()?;
+    Ok(Json(
+        service::margin_kpis(state.db(), user.organization_id, range, q.store_id).await?,
+    ))
+}
+
+/// `GET /dashboard/stockout-kpis`.
+pub async fn stockout_kpis(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<PeriodQuery>,
+) -> Result<Json<StockoutKpis>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    let range = q.range()?;
+    Ok(Json(
+        service::stockout_kpis(state.db(), user.organization_id, range, q.store_id).await?,
+    ))
+}
+
+/// `GET /dashboard/product-rankings?limit=`.
+pub async fn product_rankings(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<RankingsQuery>,
+) -> Result<Json<ProductRankings>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    let pq = PeriodQuery {
+        period: q.period,
+        from: q.from,
+        to: q.to,
+        store_id: q.store_id,
+    };
+    let range = pq.range()?;
+    Ok(Json(
+        service::product_rankings(
+            state.db(),
+            user.organization_id,
+            range,
+            pq.store_id,
+            q.limit.unwrap_or(10),
+        )
+        .await?,
+    ))
+}
+
+/// `GET /dashboard/product-rotation`.
+pub async fn product_rotation(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<PeriodQuery>,
+) -> Result<Json<Vec<ProductRotationItem>>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    let range = q.range()?;
+    Ok(Json(
+        service::product_rotation(state.db(), user.organization_id, range, q.store_id).await?,
+    ))
+}
+
+/// `GET /dashboard/archetype-rotation`.
+pub async fn archetype_rotation(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<PeriodQuery>,
+) -> Result<Json<Vec<ArchetypeRotationItem>>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    let range = q.range()?;
+    Ok(Json(
+        service::archetype_rotation(state.db(), user.organization_id, range, q.store_id).await?,
     ))
 }
 

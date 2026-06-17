@@ -141,10 +141,12 @@ async fn sales_today_y_sales_kpis_del_dia() {
     // Dos ventas de HOY (10 + 30), ancladas unos minutos ANTES de ahora para que
     // sean < now y caigan en el día en curso (salvo en los primeros minutos tras
     // medianoche UTC, ventana despreciable en dev/CI).
+    // ticketNumber es único por org → lo derivamos del UUID de la tienda (único por run).
+    let pfx = &c.store.simple().to_string()[..8];
     let t1 = now_utc() - time::Duration::minutes(10);
     let t2 = now_utc() - time::Duration::minutes(5);
-    insert_sale(&c, "TD-1", "10.00", t1).await;
-    insert_sale(&c, "TD-2", "30.00", t2).await;
+    insert_sale(&c, &format!("T{pfx}-1"), "10.00", t1).await;
+    insert_sale(&c, &format!("T{pfx}-2"), "30.00", t2).await;
 
     // sales_today (compare=day): total de hoy = 40, 2 tickets; la tienda aparece.
     let st = service::sales_today(&c.app, c.org, Some(c.store), CompareMode::Day)
@@ -166,6 +168,58 @@ async fn sales_today_y_sales_kpis_del_dia() {
     assert!((k.avg_ticket - 20.0).abs() < 1e-9);
     assert!((k.upt - 2.0).abs() < 1e-9); // 4 uds / 2 ventas
     assert!(k.return_rate.abs() < 1e-9); // sin devoluciones
+
+    // El resto de endpoints del dashboard responden coherentemente con las 2 ventas.
+    let by_hour = service::sales_by_hour(&c.app, c.org, range, Some(c.store))
+        .await
+        .unwrap();
+    assert_eq!(by_hour.iter().map(|h| h.count).sum::<i64>(), 2);
+    assert!((by_hour.iter().map(|h| h.revenue).sum::<f64>() - 40.0).abs() < 1e-9);
+
+    let by_emp = service::sales_by_employee(&c.app, c.org, range, Some(c.store))
+        .await
+        .unwrap();
+    let me = by_emp.iter().find(|e| e.user_id == c.user).unwrap();
+    assert_eq!(me.sales_count, 2);
+    assert!((me.total - 40.0).abs() < 1e-9);
+
+    let by_fam = service::sales_by_family(&c.app, c.org, range, Some(c.store))
+        .await
+        .unwrap();
+    // El producto no tiene familia → fila "Sin familia" con el total.
+    assert!(by_fam.iter().any(|fmly| (fmly.total - 40.0).abs() < 1e-9));
+
+    let margin = service::margin_kpis(&c.app, c.org, range, Some(c.store))
+        .await
+        .unwrap();
+    assert!((margin.revenue - 40.0).abs() < 1e-9); // lineTotal de las 2 líneas
+    assert!(margin.gross_margin >= 0.0);
+
+    let disc = service::discount_by_employee(&c.app, c.org, range, Some(c.store))
+        .await
+        .unwrap();
+    assert!(disc.iter().any(|d| d.user_id == c.user)); // sin descuento → 0%
+
+    let stockout = service::stockout_kpis(&c.app, c.org, range, Some(c.store))
+        .await
+        .unwrap();
+    assert_eq!(stockout.events, 0); // sin alertas de rotura en el periodo
+
+    let rankings = service::product_rankings(&c.app, c.org, range, Some(c.store), 10)
+        .await
+        .unwrap();
+    assert!(rankings.top_sales.iter().any(|r| r.product_id == c.product));
+
+    let rotation = service::product_rotation(&c.app, c.org, range, Some(c.store))
+        .await
+        .unwrap();
+    assert!(rotation.iter().any(|r| r.product_id == c.product));
+
+    // No falla y devuelve filas (incluye el grupo "Sin arquetipo" del producto sin familia).
+    let arch = service::archetype_rotation(&c.app, c.org, range, Some(c.store))
+        .await
+        .unwrap();
+    assert!(!arch.is_empty());
 
     teardown(&c).await;
 }
