@@ -5,7 +5,10 @@
 //! restaurar el valor por defecto, valor = fijar. El logo viaja como data-URL
 //! base64 (PNG/JPEG/SVG, ≤ ~64KB). Para SVG se decodifica y se rechaza cualquier
 //! vector de XSS (script/handlers/javascript:/foreignObject) — defensa en
-//! profundidad, aunque el logo se pinta con `<img src=dataURL>`.
+//! profundidad, aunque el logo se pinta con `<img src=dataURL>`. `xlink:href`
+//! no se prohíbe por sí solo (paridad con NestJS: un `<use xlink:href="#id">`
+//! interno es legítimo); el riesgo real, `xlink:href="javascript:…"`, lo cubre
+//! la rama `javascript:`.
 
 use serde::Deserialize;
 use simpletpv_shared::AppError;
@@ -173,24 +176,46 @@ mod tests {
         assert!(!logo_data_url_ok("data:image/png;base64,")); // vacío
     }
 
-    #[test]
-    fn svg_seguro_vs_malicioso() {
-        let safe = UpdateBranding {
+    /// `UpdateBranding` con un único logo SVG (como data-URL base64).
+    fn svg_logo(svg: &str) -> UpdateBranding {
+        UpdateBranding {
             brand_color: None,
-            logo_url: Some(Some(format!("{SVG_PREFIX}{}", b64("<svg><rect/></svg>")))),
-        };
-        assert!(safe.validate().is_ok());
+            logo_url: Some(Some(format!("{SVG_PREFIX}{}", b64(svg)))),
+        }
+    }
 
+    #[test]
+    fn svg_limpio_se_acepta() {
+        assert!(
+            svg_logo(r#"<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>"#)
+                .validate()
+                .is_ok()
+        );
+        // `xlink:href` interno (referencia a un símbolo del propio documento) es
+        // legítimo y NO se prohíbe per se — paridad con `SVG_FORBIDDEN` de
+        // NestJS, que no lo lista. El vector real (una URI `javascript:` dentro
+        // del atributo) lo caza la rama `javascript:`; ver el test siguiente.
+        assert!(svg_logo(r##"<svg><use xlink:href="#icon"/></svg>"##)
+            .validate()
+            .is_ok());
+    }
+
+    #[test]
+    fn svg_vectores_xss_se_rechazan() {
+        // Las cuatro primeras son los fixtures de paridad de
+        // `apps/api/src/organization/branding.service.spec.ts`; las dos últimas
+        // cubren ramas antes sin ejercitar: `on*=` con espacios y un
+        // `javascript:` embebido en `xlink:href`.
         for bad in [
-            "<svg><script>x</script></svg>",
-            "<svg onload=alert(1)></svg>",
+            "<svg><script>alert(1)</script></svg>",              // <script
+            r#"<svg onload="alert(1)"/>"#,                       // on*=
+            r#"<svg><a href="javascript:alert(1)">x</a></svg>"#, // javascript:
+            "<svg><foreignObject/></svg>",                       // <foreignObject
+            r#"<svg onerror = "alert(1)"/>"#,                    // on*= con espacios
+            r##"<svg><image xlink:href="javascript:alert(1)"/></svg>"##, // xlink:href → js:
         ] {
-            let u = UpdateBranding {
-                brand_color: None,
-                logo_url: Some(Some(format!("{SVG_PREFIX}{}", b64(bad)))),
-            };
             assert_eq!(
-                u.validate().err(),
+                svg_logo(bad).validate().err(),
                 Some(AppError::BadRequest),
                 "debía rechazar: {bad}"
             );

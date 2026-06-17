@@ -47,6 +47,19 @@ cargo fmt --check
 - Tests de integración Rust: **un usuario del seed distinto por test** (parallel-safe).
 - El esquema lo sigue gestionando **Prisma Migrate**; SQLx solo consume (doc 04 §5).
 
+## Divergencias conscientes de paridad
+
+Casos donde el backend Rust se aparta **a propósito** de NestJS (no son bugs):
+
+- **`PATCH /price-lists/:id` inexistente → 404** (NestJS devolvía `200` con cuerpo
+  `null`: hacía `updateMany`+`findFirst`). El `RETURNING` vacío se mapea a
+  `NotFound`, que es la semántica REST correcta para un PATCH a un recurso que no
+  existe. Decidido en #165; fijado por test en `domain/tests/price_lists.rs`.
+- **`GET /public/stock` → `sku: null`** cuando el producto no tiene referencia
+  (`Product.sku` es opcional). Esto **sí** era un defecto: el port tipaba `sku`
+  como `String` y reventaba con `500` (decode de NULL). Corregido en #165 a
+  `Option<String>` → paridad real con NestJS (`sku: s.product.sku`).
+
 ## Próximo trabajo (en orden)
 
 1. **Cerrar la capa http de auth** (TODO en `crates/http`):

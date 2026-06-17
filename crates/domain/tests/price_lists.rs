@@ -170,6 +170,25 @@ async fn crud_tarifas_items_y_pertenencia() {
     assert_eq!(updated.name, "TT-Mayorista 2");
     assert!(!updated.active);
 
+    // update sobre id inexistente → NotFound (404). Divergencia CONSCIENTE de
+    // paridad: NestJS hace updateMany+findFirst y devuelve `null` con 200; aquí
+    // el `RETURNING` vacío se mapea a NotFound, que es la semántica REST correcta
+    // para un PATCH a un recurso que no existe. Ver docs/migration-rust/HANDOFF.md.
+    assert_eq!(
+        service::update(
+            &c.app,
+            c.org,
+            Uuid::new_v4(),
+            UpdatePriceList {
+                name: Some("fantasma".into()),
+                active: None,
+            },
+        )
+        .await
+        .err(),
+        Some(AppError::NotFound)
+    );
+
     // get de tarifa inexistente → NotFound.
     assert_eq!(
         service::get(&c.app, c.org, Uuid::new_v4()).await.err(),

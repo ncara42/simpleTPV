@@ -129,6 +129,51 @@ async fn insert_sale(c: &Ctx, ticket: &str, total: &str, created: PrimitiveDateT
     .unwrap();
 }
 
+/// Venta COMPLETED con descuento: `net` = subtotal neto (post-descuento) y total;
+/// `discount` = `discountTotal`. La tarifa bruta es `net + discount`. Una línea
+/// de 2 uds con `discountSource` por defecto (VOLUNTARY) → cuenta como descuento
+/// voluntario del vendedor (no promoción).
+async fn insert_discounted_sale(
+    c: &Ctx,
+    ticket: &str,
+    net: &str,
+    discount: &str,
+    created: PrimitiveDateTime,
+) {
+    let sale_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO "Sale"
+             (id, "organizationId", "storeId", "userId", "ticketNumber", status, "paymentMethod",
+              subtotal, total, "discountTotal", "createdAt")
+           VALUES ($1, $2, $3, $4, $5, 'COMPLETED'::"SaleStatus", 'CASH'::"PaymentMethod",
+              $6::numeric, $6::numeric, $7::numeric, $8)"#,
+    )
+    .bind(sale_id)
+    .bind(c.org)
+    .bind(c.store)
+    .bind(c.user)
+    .bind(ticket)
+    .bind(net)
+    .bind(discount)
+    .bind(created)
+    .execute(&c.admin)
+    .await
+    .unwrap();
+    sqlx::query(
+        r#"INSERT INTO "SaleLine"
+             (id, "organizationId", "saleId", "productId", name, "unitPrice", qty, "taxRate", "lineTotal")
+           VALUES ($1, $2, $3, $4, 'L', $5::numeric, 2, 21, $5::numeric)"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(c.org)
+    .bind(sale_id)
+    .bind(c.product)
+    .bind(net)
+    .execute(&c.admin)
+    .await
+    .unwrap();
+}
+
 fn now_utc() -> PrimitiveDateTime {
     let n = OffsetDateTime::now_utc();
     PrimitiveDateTime::new(n.date(), n.time())
@@ -223,6 +268,71 @@ async fn sales_today_y_sales_kpis_del_dia() {
         .await
         .unwrap();
     assert!(!arch.is_empty());
+
+    teardown(&c).await;
+}
+
+/// Con descuento REAL (los fixtures base van a 0): asegura que `discount_rate`
+/// (escalar y serie) y `discount_by_employee` calculan el porcentaje correcto, no
+/// solo que devuelven algo. Cierra el hueco de #165 (KPIs de descuento sin aserción).
+#[tokio::test]
+async fn discount_rate_y_serie_con_descuento_real() {
+    let c = setup().await;
+
+    let pfx = &c.store.simple().to_string()[..8];
+    let t1 = now_utc() - time::Duration::minutes(10);
+    let t2 = now_utc() - time::Duration::minutes(5);
+    // 2 ventas: subtotal neto 80 + descuento 20 ⇒ tarifa bruta 100, 20% de dto.
+    insert_discounted_sale(&c, &format!("D{pfx}-1"), "80.00", "20.00", t1).await;
+    insert_discounted_sale(&c, &format!("D{pfx}-2"), "80.00", "20.00", t2).await;
+
+    let range = resolve_period(DashboardPeriod::Today, now_utc(), None, None).unwrap();
+    let k = service::sales_kpis(&c.app, c.org, range, Some(c.store))
+        .await
+        .unwrap();
+
+    // discount_rate = discount / (subtotal + discount) = 40 / (160 + 40) = 0.20.
+    assert!(
+        (k.discount_rate - 0.20).abs() < 1e-9,
+        "discount_rate esperado 0.20, fue {}",
+        k.discount_rate
+    );
+
+    // Serie intradía: solo aparecen buckets con venta, cada uno al 20% (round3).
+    assert!(
+        !k.series.discount_rate.is_empty(),
+        "la serie de descuento no debe estar vacía"
+    );
+    assert!(
+        k.series
+            .discount_rate
+            .iter()
+            .any(|&r| (r - 0.20).abs() < 1e-9),
+        "algún bucket debe reflejar el 20%: {:?}",
+        k.series.discount_rate
+    );
+    assert!(
+        k.series
+            .discount_rate
+            .iter()
+            .all(|&r| r == 0.0 || (r - 0.20).abs() < 1e-9),
+        "cada bucket con venta debe ir al 20%: {:?}",
+        k.series.discount_rate
+    );
+
+    // discount_by_employee: descuento voluntario 40 / tarifa 200 = 0.20 (sin promos).
+    let disc = service::discount_by_employee(&c.app, c.org, range, Some(c.store))
+        .await
+        .unwrap();
+    let me = disc
+        .iter()
+        .find(|d| d.user_id == c.user)
+        .expect("el vendedor debe aparecer");
+    assert!(
+        (me.avg_discount_pct - 0.20).abs() < 1e-9,
+        "avg_discount_pct esperado 0.20, fue {}",
+        me.avg_discount_pct
+    );
 
     teardown(&c).await;
 }
