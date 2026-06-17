@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::http::{header, HeaderValue, Method, StatusCode};
-use axum::routing::{get, post, put};
+use axum::routing::{get, patch, post, put};
 use axum::Router;
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::SmartIpKeyExtractor;
@@ -23,6 +23,7 @@ use crate::sales;
 use crate::sales_export;
 use crate::state::AppState;
 use crate::stock;
+use crate::users;
 
 const REQUEST_TIMEOUT_SECS: u64 = 30;
 // Límite de body (DoS backstop; NestJS usaba 512kb). 64kb sobra para JSON de API.
@@ -115,6 +116,12 @@ pub fn build_router(state: AppState) -> Router {
         // Devoluciones (Fase 2): con ticket + ciega (PIN) + listado.
         .route("/returns", post(returns::create).get(returns::list))
         .route("/returns/blind", post(returns::create_blind))
+        // Usuarios (Fase 3): gestión solo ADMIN. `/import` estática antes de `/{id}`.
+        .route("/users", get(users::list).post(users::create))
+        .route("/users/import", post(users::import_csv))
+        .route("/users/{id}", patch(users::update).delete(users::remove))
+        .route("/users/{id}/pin", put(users::set_pin))
+        .route("/users/{id}/stores", put(users::assign_stores))
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)

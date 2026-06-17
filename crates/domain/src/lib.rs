@@ -17,6 +17,7 @@ pub mod sales;
 pub mod serde_helpers;
 pub mod stock;
 pub mod store_access;
+pub mod users;
 pub mod verifactu;
 
 pub use csv::{ImportResult, RowError};

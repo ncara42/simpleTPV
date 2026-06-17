@@ -35,6 +35,17 @@ pub async fn verify_password(password: String, hash: Option<String>) -> bool {
         .unwrap_or(false)
 }
 
+/// Hash bcrypt (cost 10, igual que el resto del sistema) de una credencial
+/// (contraseña o PIN). CPU-bound ⇒ `spawn_blocking`. El cost es constante y
+/// válido, así que `bcrypt::hash` no falla en la práctica.
+pub async fn hash_password(password: String) -> String {
+    tokio::task::spawn_blocking(move || {
+        bcrypt::hash(&password, BCRYPT_COST).expect("bcrypt hash con cost fijo válido")
+    })
+    .await
+    .expect("spawn_blocking de hash bcrypt")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
