@@ -1,4 +1,4 @@
-//! Bootstrap del backend: Axum + Tokio + tracing + graceful shutdown.
+//! Bootstrap del backend: Axum + Tokio + tracing + Sentry + graceful shutdown.
 //!
 //! Compone las capas (doc 02 §3): carga config (fail-fast), abre los dos pools
 //! (`app` con RLS y `app_admin` BYPASSRLS para el login), construye `AuthService`
@@ -13,6 +13,8 @@ use simpletpv_http::{build_router, AppState};
 use simpletpv_shared::AppConfig;
 use tokio::net::TcpListener;
 use tokio::signal;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 /// Cada cuánto el worker VeriFactu sondea la cola de registros PENDING.
@@ -20,14 +22,54 @@ const VERIFACTU_POLL_SECS: u64 = 5;
 /// Registros por ciclo del worker (cota del lote `SKIP LOCKED`).
 const VERIFACTU_BATCH: i64 = 50;
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
-        )
+fn main() -> anyhow::Result<()> {
+    // Sentry se inicializa ANTES del runtime async (doc oficial): su transporte
+    // arranca un hilo de fondo. El guard vive todo el proceso y hace flush de los
+    // eventos pendientes al caer. Inicializa `tracing` con la capa de Sentry.
+    let _sentry = init_observability();
+
+    // Runtime construido a mano (en vez de #[tokio::main]) para poder inicializar
+    // Sentry antes. `enable_all` activa los drivers de IO y tiempo (worker + net).
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(run())
+}
+
+/// Inicializa Sentry (errores/panics + trazas) y el subscriber de `tracing` con
+/// la capa de Sentry. No-op de envío si falta `SENTRY_DSN` (cliente deshabilitado);
+/// `tracing` queda igualmente montado para los logs de consola.
+fn init_observability() -> sentry::ClientInitGuard {
+    let dsn = std::env::var("SENTRY_DSN").ok().filter(|d| !d.is_empty());
+    let enabled = dsn.is_some();
+    // Muestreo de trazas de rendimiento (transacciones): 0.0 por defecto (solo
+    // errores + breadcrumbs). Subir en prod con SENTRY_TRACES_SAMPLE_RATE.
+    let traces_sample_rate = std::env::var("SENTRY_TRACES_SAMPLE_RATE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0.0);
+    let guard = sentry::init(sentry::ClientOptions {
+        dsn: dsn.and_then(|d| d.parse().ok()),
+        release: sentry::release_name!(),
+        traces_sample_rate,
+        send_default_pii: false, // nada de PII/secretos a Sentry (#155)
+        environment: std::env::var("SENTRY_ENVIRONMENT").ok().map(Into::into),
+        ..Default::default()
+    });
+
+    tracing_subscriber::registry()
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with(fmt::layer())
+        .with(sentry::integrations::tracing::layer())
         .init();
 
+    if enabled {
+        tracing::info!("Sentry activado (envío de errores/trazas)");
+    }
+    guard
+}
+
+async fn run() -> anyhow::Result<()> {
     // Fail-fast: sin config válida (URLs de BD + secretos JWT), no se arranca.
     let config = AppConfig::from_env()?;
     let auth_config = AuthConfig::from_env()?;
