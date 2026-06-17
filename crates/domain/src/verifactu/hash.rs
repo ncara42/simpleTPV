@@ -4,7 +4,23 @@
 //! de campos en orden, separados por `|`). El subsistema completo (colas, envío
 //! AEAT, reintentos) llega en Fase 5 (#155).
 
+use std::sync::LazyLock;
+
 use rust_decimal::Decimal;
+
+/// URL base del servicio de cotejo de la AEAT (impreso en el QR del ticket). Por
+/// defecto **producción**; apuntar al sandbox de preproducción con la env
+/// `AEAT_COTEJO_URL` (#156, H-03: antes estaba cableado a `prewww2`, lo que dejaba
+/// los QR de producción inservibles).
+static COTEJO_BASE_URL: LazyLock<String> = LazyLock::new(|| {
+    std::env::var("AEAT_COTEJO_URL")
+        .unwrap_or_else(|_| "https://www2.aeat.es/wlpl/TIKE-CONT/ValidarQR".to_owned())
+});
+
+/// URL base del cotejo AEAT (configurable por env, default producción).
+pub fn cotejo_base_url() -> &'static str {
+    &COTEJO_BASE_URL
+}
 
 /// Datos mínimos que entran en la huella de un registro VeriFactu.
 pub struct VerifactuPayload<'a> {
@@ -41,7 +57,8 @@ pub fn compute_hash(payload: &VerifactuPayload, previous_hash: Option<&str>) -> 
 /// query del servicio de cotejo VeriFactu (`nif`, `numserie`, `importe`).
 pub fn build_qr_data(nif: Option<&str>, invoice_number: &str, total: Decimal) -> String {
     format!(
-        "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif={}&numserie={}&importe={total:.2}",
+        "{}?nif={}&numserie={}&importe={total:.2}",
+        cotejo_base_url(),
         form_encode(nif.unwrap_or("")),
         form_encode(invoice_number),
     )

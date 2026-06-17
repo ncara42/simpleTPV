@@ -43,7 +43,9 @@ async fn create_record_in_tx(
     invoice_number: &str,
     total: Decimal,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1::text))")
+    // `hashtextextended(...,0)` da 64 bits (como en time_clock): evita colisiones
+    // de lock entre tenants distintos que sí tendría `hashtext` (32 bits) — M-02.
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))")
         .bind(org.to_string())
         .execute(&mut **tx)
         .await?;

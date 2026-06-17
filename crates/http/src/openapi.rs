@@ -12,9 +12,9 @@ use utoipa::{Modify, OpenApi, ToSchema};
 #[derive(ToSchema, Serialize)]
 #[schema(rename_all = "camelCase")]
 pub struct LoginRequest {
-    #[schema(example = "admin@org1.test")]
+    #[schema(example = "user@example.com")]
     pub email: String,
-    #[schema(example = "password123")]
+    #[schema(example = "<password>")]
     pub password: String,
 }
 

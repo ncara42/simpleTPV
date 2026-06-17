@@ -113,9 +113,6 @@ pub async fn cache_quantity(org: Uuid, store: Uuid, product: Uuid, qty: Decimal)
 mod tests {
     use super::*;
 
-    /// URL del Redis de desarrollo (docker compose: :6381, requirepass).
-    const DEV_REDIS_URL: &str = "redis://:redis_dev_password@localhost:6381";
-
     #[tokio::test]
     async fn deshabilitada_es_noop() {
         let cache = StockCache::connect(None);
@@ -130,9 +127,13 @@ mod tests {
 
     #[tokio::test]
     async fn roundtrip_set_get() {
-        let url = std::env::var("REDIS_URL").unwrap_or_else(|_| DEV_REDIS_URL.to_owned());
+        // Sin credencial hardcodeada (M-01): exige REDIS_URL en el entorno; si no
+        // está (p. ej. CI sin servicio Redis), se omite el test.
+        let Ok(url) = std::env::var("REDIS_URL") else {
+            eprintln!("REDIS_URL no definida — roundtrip omitido");
+            return;
+        };
         let cache = StockCache::connect(Some(&url));
-        // Si no hay Redis accesible (p. ej. CI sin servicio), se omite el test.
         if cache.connection().await.is_none() {
             eprintln!("Redis no accesible — roundtrip omitido");
             return;

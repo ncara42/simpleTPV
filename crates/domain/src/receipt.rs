@@ -14,9 +14,8 @@ use time_tz::{timezones, OffsetDateTimeExt};
 use crate::sales::domain::TaxBreakdownItem;
 use crate::sales::model::{PaymentMethod, TicketData, TicketLine};
 
-// URL pública de cotejo de la AEAT para el enlace/QR VeriFactu. Misma fórmula que
-// el cliente; cuando VeriFactu (#155) esté activo se sustituye por el QR real.
-const AEAT_COTEJO_URL: &str = "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR";
+// La URL base de cotejo AEAT vive en verifactu::hash (configurable por env,
+// default producción; #156 H-03). Aquí se reutiliza para el enlace del recibo.
 
 /// Importe en euros con formato español: coma decimal y 2 decimales ("24,90 €").
 /// Determinista (sin `Intl`): los importes ya son `Decimal(12,2)` exactos.
@@ -82,7 +81,8 @@ fn form_encode(s: &str) -> String {
 
 fn build_cotejo_url(nif: Option<&str>, ticket_number: &str, total: Decimal) -> String {
     format!(
-        "{AEAT_COTEJO_URL}?nif={}&numserie={}&importe={total:.2}",
+        "{}?nif={}&numserie={}&importe={total:.2}",
+        crate::verifactu::hash::cotejo_base_url(),
         form_encode(nif.unwrap_or("")),
         form_encode(ticket_number),
     )
@@ -507,7 +507,8 @@ mod tests {
     fn render_enlace_cotejo_verifactu() {
         let html = render_receipt_html(&make_data());
         assert!(html.contains("VeriFactu"));
-        assert!(html.contains("prewww2.aeat.es"));
+        // Ruta del cotejo AEAT (robusta al host pre/producción, configurable por env).
+        assert!(html.contains("/wlpl/TIKE-CONT/ValidarQR"));
         assert!(html.contains("nif=B12345678"));
         assert!(html.contains("numserie=T01-000042"));
         assert!(html.contains("importe=53.90"));

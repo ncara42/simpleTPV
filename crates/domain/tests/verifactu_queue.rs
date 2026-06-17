@@ -148,8 +148,12 @@ async fn fallos_reintentan_hasta_failed() {
 
     // …hasta que retry lo devuelve a PENDING (lastError limpio) y se reenvía OK.
     queue::retry(&admin, org, id).await.unwrap();
-    let (status, _, err) = state_of(&admin, id).await;
+    let (status, attempts, err) = state_of(&admin, id).await;
     assert_eq!(status, "PENDING", "retry resetea a PENDING");
+    assert_eq!(
+        attempts, 0,
+        "retry resetea attempts (H-02): vuelve a tener todos los intentos"
+    );
     assert!(err.is_none(), "retry limpia el lastError");
 
     process_pending_batch(&admin, &queue::SandboxProvider, 50, Some(org))

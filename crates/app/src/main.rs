@@ -104,29 +104,45 @@ async fn run() -> anyhow::Result<()> {
         config.cors_origins,
     ));
 
-    // Worker de envío VeriFactu (#155): cada VERIFACTU_POLL_SECS drena la cola de
-    // registros PENDING con `FOR UPDATE SKIP LOCKED` (sin BullMQ/Redis) y los
-    // envía vía el proveedor sandbox, con reintentos. Tarea de fondo desligada del
-    // ciclo de petición: una venta solo crea el registro; el envío es posterior.
-    tokio::spawn(async move {
-        let provider = simpletpv_domain::verifactu::SandboxProvider;
-        let mut tick = tokio::time::interval(Duration::from_secs(VERIFACTU_POLL_SECS));
-        loop {
-            tick.tick().await;
-            match simpletpv_domain::verifactu::process_pending_batch(
-                &verifactu_db,
-                &provider,
-                VERIFACTU_BATCH,
-                None,
-            )
-            .await
-            {
-                Ok(n) if n > 0 => tracing::info!(procesados = n, "ciclo de envío VeriFactu"),
-                Ok(_) => {}
-                Err(e) => tracing::warn!(error = %e, "ciclo del worker VeriFactu falló"),
+    // Worker de envío VeriFactu (#155): drena la cola de registros PENDING con
+    // `FOR UPDATE SKIP LOCKED` y los envía. SOLO se arranca con el flag explícito
+    // `VERIFACTU_SANDBOX_SEND=true` (H-01): el único proveedor disponible es el
+    // SANDBOX, que marca SENT sin declarar a la AEAT. En PRODUCCIÓN, sin proveedor
+    // certificado, debe quedar APAGADO → los registros se quedan PENDING (no se
+    // marcan SENT falsamente, lo que incumpliría la obligación fiscal). Cuando
+    // exista proveedor real, se inyecta aquí y el flag deja de ser necesario.
+    let sandbox_send = std::env::var("VERIFACTU_SANDBOX_SEND")
+        .ok()
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or(false);
+    if sandbox_send {
+        tracing::warn!(
+            "VeriFactu: worker de envío SANDBOX ACTIVO — marca SENT sin declarar a la AEAT (solo dev/piloto)"
+        );
+        tokio::spawn(async move {
+            let provider = simpletpv_domain::verifactu::SandboxProvider;
+            let mut tick = tokio::time::interval(Duration::from_secs(VERIFACTU_POLL_SECS));
+            loop {
+                tick.tick().await;
+                match simpletpv_domain::verifactu::process_pending_batch(
+                    &verifactu_db,
+                    &provider,
+                    VERIFACTU_BATCH,
+                    None,
+                )
+                .await
+                {
+                    Ok(n) if n > 0 => tracing::info!(procesados = n, "ciclo de envío VeriFactu"),
+                    Ok(_) => {}
+                    Err(e) => tracing::warn!(error = %e, "ciclo del worker VeriFactu falló"),
+                }
             }
-        }
-    });
+        });
+    } else {
+        tracing::info!(
+            "VeriFactu: envío deshabilitado (sin proveedor AEAT certificado); los registros quedan PENDING"
+        );
+    }
 
     let addr: SocketAddr = config.bind_addr.parse()?;
     let listener = TcpListener::bind(addr).await?;

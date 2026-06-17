@@ -61,8 +61,10 @@ pub async fn process_pending_batch<P: VerifactuProvider>(
     org: Option<Uuid>,
 ) -> Result<usize, AppError> {
     let mut tx = admin.begin().await.map_err(|e| classify(&e))?;
-    let rows: Vec<(Uuid, String, i32, String)> = sqlx::query_as(
-        r#"SELECT id, hash, attempts, payload::text
+    // `attempts` lo incrementa el propio UPDATE (en SQL): evita valores stale y
+    // unifica el cálculo en éxito y fallo (M-05).
+    let rows: Vec<(Uuid, String, String)> = sqlx::query_as(
+        r#"SELECT id, hash, payload::text
            FROM "VerifactuRecord"
            WHERE status = 'PENDING'::"VerifactuStatus"
              AND ($2::uuid IS NULL OR "organizationId" = $2)
@@ -77,7 +79,7 @@ pub async fn process_pending_batch<P: VerifactuProvider>(
     .map_err(|e| classify(&e))?;
 
     let processed = rows.len();
-    for (id, hash, attempts, payload) in rows {
+    for (id, hash, payload) in rows {
         let res = provider.send(&payload, &hash).await;
         if res.ok {
             sqlx::query(
@@ -91,16 +93,15 @@ pub async fn process_pending_batch<P: VerifactuProvider>(
             .await
             .map_err(|e| classify(&e))?;
         } else {
-            let next = attempts + 1;
+            // Fallo: incrementa intentos; al alcanzar MAX_ATTEMPTS marca FAILED.
             sqlx::query(
                 r#"UPDATE "VerifactuRecord"
-                   SET attempts = $2, "lastError" = $3,
-                       status = CASE WHEN $2 >= $4 THEN 'FAILED'::"VerifactuStatus"
+                   SET attempts = attempts + 1, "lastError" = $2,
+                       status = CASE WHEN attempts + 1 >= $3 THEN 'FAILED'::"VerifactuStatus"
                                      ELSE status END
                    WHERE id = $1"#,
             )
             .bind(id)
-            .bind(next)
             .bind(res.error.unwrap_or_else(|| "envío rechazado".to_owned()))
             .bind(MAX_ATTEMPTS)
             .execute(&mut *tx)
@@ -162,9 +163,11 @@ pub async fn list(
 /// paridad NestJS `retry`); el worker lo recoge en el siguiente ciclo.
 pub async fn retry(pool: &PgPool, org: Uuid, id: Uuid) -> Result<(), AppError> {
     with_tenant_tx(pool, org, async move |tx, _| {
+        // Resetea `attempts` (H-02): si no, un FAILED (attempts=MAX) re-encolado
+        // se marcaría FAILED tras un único intento, haciendo el retry inefectivo.
         sqlx::query(
             r#"UPDATE "VerifactuRecord"
-               SET status = 'PENDING'::"VerifactuStatus", "lastError" = NULL
+               SET status = 'PENDING'::"VerifactuStatus", "lastError" = NULL, attempts = 0
                WHERE id = $1 AND "organizationId" = $2"#,
         )
         .bind(id)
