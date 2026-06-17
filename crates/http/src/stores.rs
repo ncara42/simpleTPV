@@ -119,9 +119,9 @@ pub async fn set_price(
     user: AuthUser,
     Path(id): Path<Uuid>,
     Json(body): Json<SetStorePrice>,
-) -> Result<StatusCode, ApiError> {
+) -> Result<Json<StorePriceItem>, ApiError> {
     user.require_role(&OPS_ROLES)?;
-    service::set_price(
+    let item = service::set_price(
         state.db(),
         user.organization_id,
         id,
@@ -130,7 +130,7 @@ pub async fn set_price(
         body,
     )
     .await?;
-    Ok(StatusCode::NO_CONTENT)
+    Ok(Json(item))
 }
 
 pub async fn import_prices(

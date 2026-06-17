@@ -235,40 +235,60 @@ pub async fn set_price(
     user_id: Uuid,
     is_org_wide: bool,
     input: SetStorePrice,
-) -> Result<(), AppError> {
+) -> Result<StorePriceItem, AppError> {
     input.validate()?;
-    let result: Result<(), AppError> = with_tenant_tx(pool, org, async move |tx, _after| {
-        if !is_org_wide && !has_store_access(tx, user_id, store_id).await? {
-            return Ok(Err(AppError::Forbidden));
-        }
-        // La tienda y el producto deben ser del tenant (FK no es tenant-scoped en BD).
-        let store: Option<(Uuid,)> = sqlx::query_as(r#"SELECT id FROM "Store" WHERE id = $1"#)
+    let result: Result<StorePriceItem, AppError> =
+        with_tenant_tx(pool, org, async move |tx, _after| {
+            if !is_org_wide && !has_store_access(tx, user_id, store_id).await? {
+                return Ok(Err(AppError::Forbidden));
+            }
+            // La tienda y el producto deben ser del tenant (RLS + organizationId
+            // explícito, defensa en profundidad como el original NestJS).
+            let store: Option<(Uuid,)> = sqlx::query_as(
+                r#"SELECT id FROM "Store" WHERE id = $1 AND "organizationId" = $2"#,
+            )
             .bind(store_id)
+            .bind(org)
             .fetch_optional(&mut **tx)
             .await?;
-        let product: Option<(Uuid,)> = sqlx::query_as(r#"SELECT id FROM "Product" WHERE id = $1"#)
+            let product: Option<(Uuid,)> = sqlx::query_as(
+                r#"SELECT id FROM "Product" WHERE id = $1 AND "organizationId" = $2"#,
+            )
             .bind(input.product_id)
+            .bind(org)
             .fetch_optional(&mut **tx)
             .await?;
-        if store.is_none() || product.is_none() {
-            return Ok(Err(AppError::NotFound));
-        }
-        sqlx::query(
-            r#"INSERT INTO "StorePrice" (id, "organizationId", "storeId", "productId", price, "updatedAt")
-               VALUES ($1, $2, $3, $4, $5, now())
-               ON CONFLICT ("productId", "storeId")
-               DO UPDATE SET price = EXCLUDED.price, "updatedAt" = now()"#,
-        )
-        .bind(Uuid::new_v4())
-        .bind(org)
-        .bind(store_id)
-        .bind(input.product_id)
-        .bind(input.price)
-        .execute(&mut **tx)
+            if store.is_none() || product.is_none() {
+                // Paridad NestJS: requireOwned lanza 400 (no 404).
+                return Ok(Err(AppError::BadRequest));
+            }
+            sqlx::query(
+                r#"INSERT INTO "StorePrice" (id, "organizationId", "storeId", "productId", price, "updatedAt")
+                   VALUES ($1, $2, $3, $4, $5, now())
+                   ON CONFLICT ("productId", "storeId")
+                   DO UPDATE SET price = EXCLUDED.price, "updatedAt" = now()"#,
+            )
+            .bind(Uuid::new_v4())
+            .bind(org)
+            .bind(store_id)
+            .bind(input.product_id)
+            .bind(input.price)
+            .execute(&mut **tx)
+            .await?;
+            // Devuelve la tarifa resultante (200 con cuerpo, paridad NestJS).
+            let row: StorePriceFlat = sqlx::query_as(
+                r#"SELECT sp.id, sp."productId" AS product_id, sp.price,
+                     p.name AS product_name, p."salePrice" AS product_sale_price
+                   FROM "StorePrice" sp JOIN "Product" p ON p.id = sp."productId"
+                   WHERE sp."storeId" = $1 AND sp."productId" = $2"#,
+            )
+            .bind(store_id)
+            .bind(input.product_id)
+            .fetch_one(&mut **tx)
+            .await?;
+            Ok(Ok(StorePriceItem::from(row)))
+        })
         .await?;
-        Ok(Ok(()))
-    })
-    .await?;
     result
 }
 
@@ -313,12 +333,15 @@ pub async fn import_prices_csv(
             if !is_org_wide && !has_store_access(tx, user_id, store_id).await? {
                 return Ok(Err(AppError::Forbidden));
             }
-            let store: Option<(Uuid,)> = sqlx::query_as(r#"SELECT id FROM "Store" WHERE id = $1"#)
-                .bind(store_id)
-                .fetch_optional(&mut **tx)
-                .await?;
+            let store: Option<(Uuid,)> = sqlx::query_as(
+                r#"SELECT id FROM "Store" WHERE id = $1 AND "organizationId" = $2"#,
+            )
+            .bind(store_id)
+            .bind(org)
+            .fetch_optional(&mut **tx)
+            .await?;
             if store.is_none() {
-                return Ok(Err(AppError::NotFound));
+                return Ok(Err(AppError::BadRequest)); // paridad: requireOwned 400
             }
             let mut errors: Vec<RowError> = Vec::new();
             let mut inserted: u64 = 0;
