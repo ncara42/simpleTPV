@@ -32,6 +32,16 @@ pg_text_enum! {
     }
 }
 
+pg_text_enum! {
+    /// Estado de un export de ventas (`SalesExportStatus`).
+    pub enum SalesExportStatus {
+        Pending = "PENDING",
+        Processing = "PROCESSING",
+        Completed = "COMPLETED",
+        Failed = "FAILED",
+    }
+}
+
 /// Fila de `Sale`. Solo SALIDA: `FromRow` + `Serialize`.
 #[derive(Debug, Clone, sqlx::FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -113,6 +123,20 @@ pub struct SalesPage {
     pub page: i64,
     pub page_size: i64,
     pub total_items: i64,
+}
+
+/// Metadatos de un export de ventas (sin el CSV, que puede ser grande).
+#[derive(Debug, Clone, sqlx::FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SalesExportMeta {
+    pub id: Uuid,
+    pub status: SalesExportStatus,
+    pub row_count: Option<i32>,
+    pub error: Option<String>,
+    #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
+    pub created_at: PrimitiveDateTime,
+    #[serde(serialize_with = "crate::serde_helpers::iso_opt_utc")]
+    pub completed_at: Option<PrimitiveDateTime>,
 }
 
 /// Datos fiscales de la organización para el ticket (#152).

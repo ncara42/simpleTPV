@@ -4,14 +4,16 @@
 
 pub mod domain;
 pub mod export;
+pub mod export_service;
 pub mod input;
 pub mod model;
 pub mod service;
 
 pub use domain::{build_tax_breakdown, TaxBreakdownItem, TaxLine};
 pub use export::{build_accounting_csv, build_sales_csv, AccountingSaleRow, SalesExportRow};
+pub use export_service::{ExportFormat, SalesExportFilter};
 pub use input::{CreateSale, CreateSaleLine, ReserveTicketBlock};
 pub use model::{
-    DiscountSource, OrgInfo, PaymentMethod, Sale, SaleLine, SaleStatus, SaleWithLines, SalesPage,
-    StoreInfo, TicketBlock, TicketData, TicketLine,
+    DiscountSource, OrgInfo, PaymentMethod, Sale, SaleLine, SaleStatus, SaleWithLines,
+    SalesExportMeta, SalesExportStatus, SalesPage, StoreInfo, TicketBlock, TicketData, TicketLine,
 };

@@ -20,6 +20,7 @@ use crate::products;
 use crate::returns;
 use crate::routes;
 use crate::sales;
+use crate::sales_export;
 use crate::state::AppState;
 use crate::stock;
 
@@ -99,6 +100,14 @@ pub fn build_router(state: AppState) -> Router {
         // Ventas (Fase 2, slice 1): crear, reservar bloque, listar, consultar.
         .route("/sales", post(sales::create).get(sales::list))
         .route("/sales/ticket-block", post(sales::ticket_block))
+        // Export (#152): rutas estáticas `/sales/export*` antes que `/sales/{id}`.
+        .route("/sales/export", post(sales_export::request_export))
+        .route(
+            "/sales/export/accounting",
+            post(sales_export::request_accounting_export),
+        )
+        .route("/sales/export/{id}", get(sales_export::get_export))
+        .route("/sales/export/{id}/download", get(sales_export::download))
         .route("/sales/by-ticket/{ticket}", get(sales::by_ticket))
         .route("/sales/{id}/ticket", get(sales::ticket))
         .route("/sales/{id}/receipt", get(sales::receipt))
