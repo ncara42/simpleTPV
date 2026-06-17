@@ -257,6 +257,20 @@ async fn ticket_and_receipt_endpoints() {
 }
 
 #[tokio::test]
+async fn export_endpoints_requieren_admin_o_manager() {
+    let (app, _admin) = build().await;
+    let clerk = login(&app, "clerk@org1.test").await;
+    let id = Uuid::new_v4();
+    // POST export, GET estado y GET descarga → 403 para CLERK (datos de central).
+    let (s1, _, _) = send(&app, body_req("POST", "/sales/export", Some(&clerk), "{}")).await;
+    assert_eq!(s1, StatusCode::FORBIDDEN);
+    let (s2, _, _) = send(&app, get(&format!("/sales/export/{id}"), &clerk)).await;
+    assert_eq!(s2, StatusCode::FORBIDDEN);
+    let (s3, _, _) = send(&app, get(&format!("/sales/export/{id}/download"), &clerk)).await;
+    assert_eq!(s3, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
 async fn ticket_requires_auth() {
     let (app, _admin) = build().await;
     let req = Request::builder()

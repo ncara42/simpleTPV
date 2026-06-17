@@ -115,22 +115,25 @@ pub async fn request_accounting_export(
     request(state, user, q, ExportFormat::Accounting).await
 }
 
-/// `GET /sales/export/:id` — estado/metadatos del export.
+/// `GET /sales/export/:id` — estado/metadatos del export (ADMIN/MANAGER: central).
 pub async fn get_export(
     State(state): State<AppState>,
     user: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<SalesExportMeta>, ApiError> {
+    user.require_role(&[Role::Admin, Role::Manager])?;
     let meta = export_service::get_sales_export(state.db(), user.organization_id, id).await?;
     Ok(Json(meta))
 }
 
 /// `GET /sales/export/:id/download` — descarga el CSV (409 si no está listo).
+/// ADMIN/MANAGER: el CSV lleva datos financieros de toda la organización.
 pub async fn download(
     State(state): State<AppState>,
     user: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
+    user.require_role(&[Role::Admin, Role::Manager])?;
     let (csv, filename) =
         export_service::download_sales_export(state.db(), user.organization_id, id).await?;
     let headers = [

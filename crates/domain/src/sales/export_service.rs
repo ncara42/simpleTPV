@@ -14,6 +14,8 @@ use sqlx::{Postgres, QueryBuilder, Transaction};
 use time::PrimitiveDateTime;
 use uuid::Uuid;
 
+use crate::feature_flags::assert_flag_enabled;
+
 use super::domain::TaxLine;
 use super::export::{build_accounting_csv, build_sales_csv, AccountingSaleRow, SalesExportRow};
 use super::model::{PaymentMethod, SaleStatus, SalesExportMeta};
@@ -214,6 +216,10 @@ pub async fn create_sales_export(
     filter: SalesExportFilter,
     format: ExportFormat,
 ) -> Result<SalesExportMeta, AppError> {
+    // Feature flag `data_export` (#127 B): la exportación es de central; gate a
+    // nivel org (Forbidden si está apagada), FUERA de la tx de escritura.
+    assert_flag_enabled(pool, org, "data_export", None).await?;
+
     let meta: SalesExportMeta = with_tenant_tx(pool, org, async move |tx, _after| {
         let (csv, row_count) = match format {
             ExportFormat::Sales => {

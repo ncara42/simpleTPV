@@ -123,9 +123,11 @@ pub struct SalesTotals {
     pub count: i64,
     #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
     pub total_amount: Decimal,
-    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    // Ratios (0..1): el frontend los consume como NÚMERO (paridad NestJS, que los
+    // emite como float). Serializarlos como string los rompería (`fmtRate` → '—').
+    #[serde(serialize_with = "rust_decimal::serde::float::serialize")]
     pub avg_discount_pct: Decimal,
-    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    #[serde(serialize_with = "rust_decimal::serde::float::serialize")]
     pub avg_margin_pct: Decimal,
 }
 
