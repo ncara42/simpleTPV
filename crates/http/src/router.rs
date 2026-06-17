@@ -20,6 +20,7 @@ use crate::api_keys;
 use crate::branding;
 use crate::cash_sessions;
 use crate::customers;
+use crate::dashboard;
 use crate::devices;
 use crate::feature_flags;
 use crate::me;
@@ -336,6 +337,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/store-orders/{id}/close", post(transfers::close))
         // Cierre Z (Fase 4, #124): arqueo fiscal diario por tienda. ADMIN/MANAGER.
         .route("/z-report", get(z_report::get))
+        // Dashboard de KPIs (Fase 4, #154): solo central (ADMIN/MANAGER), lectura.
+        // Portados sales-today y sales-kpis; el resto de KPIs llega después.
+        .route("/dashboard/sales-today", get(dashboard::sales_today))
+        .route("/dashboard/sales-kpis", get(dashboard::sales_kpis))
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)
