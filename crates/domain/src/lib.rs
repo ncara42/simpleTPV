@@ -19,6 +19,7 @@ pub mod stock;
 pub mod store_access;
 pub mod stores;
 pub mod suppliers;
+pub mod time_clock;
 pub mod users;
 pub mod verifactu;
 

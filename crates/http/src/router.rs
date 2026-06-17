@@ -25,6 +25,7 @@ use crate::state::AppState;
 use crate::stock;
 use crate::stores;
 use crate::suppliers;
+use crate::time_clock;
 use crate::users;
 
 const REQUEST_TIMEOUT_SECS: u64 = 30;
@@ -155,6 +156,14 @@ pub fn build_router(state: AppState) -> Router {
             "/stores/{id}/prices/{product_id}",
             delete(stores::remove_price),
         )
+        // Control horario (Fase 3): fichaje + estado + historial agregado.
+        .route("/time-clock", post(time_clock::create))
+        .route("/time-clock/current", get(time_clock::current))
+        .route("/time-clock/today", get(time_clock::today))
+        .route("/time-clock/history", get(time_clock::history))
+        .route("/time-clock/history/me", get(time_clock::history_me))
+        .route("/time-clock/history-all", get(time_clock::history_all))
+        .route("/time-clock/entries", get(time_clock::entries))
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)
