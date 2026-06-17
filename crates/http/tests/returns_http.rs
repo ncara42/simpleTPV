@@ -44,7 +44,14 @@ async fn build() -> (Router, PgPool) {
     let user_state = UserStateService::new(DbUserStateLookup::new(admin.clone()));
     let auth = AuthService::new(admin.clone(), auth_config());
     (
-        build_router(AppState::new(auth, user_state, db, false, Vec::new())),
+        build_router(AppState::new(
+            auth,
+            user_state,
+            db,
+            admin.clone(),
+            false,
+            Vec::new(),
+        )),
         admin,
     )
 }

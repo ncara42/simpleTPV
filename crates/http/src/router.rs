@@ -16,6 +16,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
+use crate::api_keys;
 use crate::branding;
 use crate::cash_sessions;
 use crate::devices;
@@ -24,6 +25,7 @@ use crate::me;
 use crate::product_families;
 use crate::products;
 use crate::promotions;
+use crate::public;
 use crate::purchases;
 use crate::returns;
 use crate::routes;
@@ -46,6 +48,10 @@ const LOGIN_BURST: u32 = 5;
 // Refresh: 10/min/IP (paridad con NestJS). Token bucket: burst 10 + repone 1 cada 6s.
 const REFRESH_REFILL_SECS: u64 = 6;
 const REFRESH_BURST: u32 = 10;
+// API pública: 30/min/IP (paridad con el Throttle del PublicController, estricto
+// frente a los 120 del API privado). Token bucket: burst 30 + repone 1 cada 2s.
+const PUBLIC_REFILL_SECS: u64 = 2;
+const PUBLIC_BURST: u32 = 30;
 // Cacheo de preflight CORS en el navegador (1h): reduce OPTIONS repetidos.
 const CORS_MAX_AGE_SECS: u64 = 3600;
 
@@ -62,6 +68,12 @@ pub fn build_router(state: AppState) -> Router {
         .key_extractor(SmartIpKeyExtractor)
         .finish()
         .expect("config de rate-limit de refresh válida");
+    let public_rl = GovernorConfigBuilder::default()
+        .period(Duration::from_secs(PUBLIC_REFILL_SECS))
+        .burst_size(PUBLIC_BURST)
+        .key_extractor(SmartIpKeyExtractor)
+        .finish()
+        .expect("config de rate-limit de la API pública válida");
 
     // CORS desde la config (orígenes resueltos con fail-fast en prod, SEC-18).
     // Con `allow_credentials` los orígenes deben ser explícitos (nunca `Any`).
@@ -100,6 +112,17 @@ pub fn build_router(state: AppState) -> Router {
             get(feature_flags::list).put(feature_flags::set_flag),
         )
         .route("/feature-flags/{key}", delete(feature_flags::clear_flag))
+        // API keys (Fase 4, #154, IT-18): gestión solo ADMIN.
+        .route("/api-keys", get(api_keys::list).post(api_keys::generate))
+        .route("/api-keys/{id}", delete(api_keys::revoke))
+        // API pública (Fase 4, #154, IT-18): autenticada con X-API-Key (sin JWT) y
+        // con rate limit estricto (30/min/IP) propio.
+        .route(
+            "/public/stock",
+            get(public::stock).route_layer(GovernorLayer {
+                config: Arc::new(public_rl),
+            }),
+        )
         // Catálogo (Fase 2). `/import` y `/barcode/{code}` son estáticas y no
         // colisionan con `/{id}` (axum prioriza el segmento estático).
         .route("/products", get(products::list).post(products::create))

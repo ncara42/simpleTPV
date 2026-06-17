@@ -8,6 +8,7 @@
 
 #[macro_use]
 mod pg_enum;
+pub mod api_keys;
 pub mod branding;
 pub mod cash_sessions;
 pub mod csv;
@@ -17,6 +18,7 @@ pub mod me;
 pub mod product_families;
 pub mod products;
 pub mod promotions;
+pub mod public;
 pub mod purchases;
 pub mod receipt;
 pub mod returns;

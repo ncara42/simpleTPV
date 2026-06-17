@@ -20,6 +20,10 @@ struct Inner {
     user_state: UserStateService<DbUserStateLookup>,
     /// Pool del rol `app` (RLS). Para readiness y futuras rutas de dominio.
     db: PgPool,
+    /// Pool del rol `app_admin` (BYPASSRLS). Para lookups pre-tenant (API key de
+    /// la API pública): la key se busca por hash ANTES de conocer la organización,
+    /// donde la RLS devolvería 0 filas. NUNCA para rutas autenticadas con JWT.
+    admin_db: PgPool,
     /// Si la cookie del refresh lleva el flag `Secure` (solo HTTPS). En runtime
     /// (no compile-time): un binario release tras un proxy http debe poder
     /// desactivarlo, y dev sobre https activarlo.
@@ -33,6 +37,7 @@ impl AppState {
         auth: AuthService,
         user_state: UserStateService<DbUserStateLookup>,
         db: PgPool,
+        admin_db: PgPool,
         cookie_secure: bool,
         cors_origins: Vec<String>,
     ) -> Self {
@@ -41,6 +46,7 @@ impl AppState {
                 auth,
                 user_state,
                 db,
+                admin_db,
                 cookie_secure,
                 cors_origins,
             }),
@@ -57,6 +63,11 @@ impl AppState {
 
     pub fn db(&self) -> &PgPool {
         &self.inner.db
+    }
+
+    /// Pool `app_admin` (BYPASSRLS) — solo para lookups pre-tenant (API key).
+    pub fn admin_db(&self) -> &PgPool {
+        &self.inner.admin_db
     }
 
     pub fn cookie_secure(&self) -> bool {

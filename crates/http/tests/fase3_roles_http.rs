@@ -43,7 +43,7 @@ async fn build() -> Router {
             refresh_ttl: Duration::from_secs(604_800),
         },
     );
-    let state = AppState::new(auth, user_state, db, false, Vec::new());
+    let state = AppState::new(auth, user_state, db, admin.clone(), false, Vec::new());
     build_router(state)
 }
 

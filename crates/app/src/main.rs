@@ -34,6 +34,9 @@ async fn main() -> anyhow::Result<()> {
     // PgPool es Arc por dentro) + caché TTL corto. Se construye antes de mover
     // `admin` a `AuthService`.
     let user_state = UserStateService::new(DbUserStateLookup::new(admin.clone()));
+    // El pool admin también alimenta el lookup pre-tenant de API keys en AppState
+    // (clon barato: PgPool es Arc). Se clona antes de mover `admin` a AuthService.
+    let admin_db = admin.clone();
     let auth = AuthService::new(admin, auth_config);
     // Cookie `Secure` configurable en runtime (COOKIE_SECURE); por defecto activo
     // en release. Permite release-tras-proxy-http (off) y dev-sobre-https (on).
@@ -45,6 +48,7 @@ async fn main() -> anyhow::Result<()> {
         auth,
         user_state,
         db,
+        admin_db,
         cookie_secure,
         config.cors_origins,
     ));
