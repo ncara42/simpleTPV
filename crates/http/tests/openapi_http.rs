@@ -51,6 +51,25 @@ async fn build() -> Router {
 }
 
 #[tokio::test]
+async fn health_es_publico_sin_token() {
+    // app-bootstrap (paridad NestJS): /health responde 200 sin autenticación.
+    // El rechazo 401 sin token de las rutas protegidas lo cubre fase3_roles_http.
+    let app = build().await;
+    let res = app
+        .oneshot(
+            Request::builder()
+                .uri("/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK, "/health es público");
+    let bytes = res.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(&bytes[..], b"ok");
+}
+
+#[tokio::test]
 async fn openapi_json_documenta_rutas_y_seguridad() {
     let app = build().await;
     let res = app

@@ -133,7 +133,7 @@ async fn mutacion_post_se_audita_get_no() {
     // La auditoría se escribe inline en el middleware (antes de responder).
     let after = audit_count(&admin, org, user, "POST", "products").await;
     assert!(
-        after >= before + 1,
+        after > before,
         "el POST debe haber añadido ≥1 fila de auditoría (before={before}, after={after})"
     );
 

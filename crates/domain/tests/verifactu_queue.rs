@@ -5,9 +5,12 @@
 
 use std::time::Duration;
 
+use rust_decimal::Decimal;
+use simpletpv_db::with_tenant_tx;
 use simpletpv_domain::verifactu::queue::{
     self, process_pending_batch, SendResult, VerifactuProvider, MAX_ATTEMPTS,
 };
+use simpletpv_domain::verifactu::record_invoice;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use uuid::Uuid;
 
@@ -87,6 +90,48 @@ impl VerifactuProvider for FailingProvider {
             error: Some("AEAT rechazó".to_owned()),
         }
     }
+}
+
+#[tokio::test]
+async fn encadena_huellas_previous_hash() {
+    let admin = admin_pool().await;
+    let org = temp_org(&admin).await; // org desechable → encadenamiento aislado
+    let (sale1, sale2) = (Uuid::new_v4(), Uuid::new_v4());
+
+    // Dos facturas encadenadas en la misma tx (el advisory lock serializa).
+    with_tenant_tx(&admin, org, async move |tx, _| {
+        record_invoice(tx, org, sale1, "INV-1", Decimal::from(100)).await?;
+        record_invoice(tx, org, sale2, "INV-2", Decimal::from(50)).await?;
+        Ok(())
+    })
+    .await
+    .unwrap();
+
+    let sql = r#"SELECT hash, "previousHash" FROM "VerifactuRecord" WHERE "saleId" = $1"#;
+    let (hash1, prev1): (String, Option<String>) = sqlx::query_as(sql)
+        .bind(sale1)
+        .fetch_one(&admin)
+        .await
+        .unwrap();
+    let (hash2, prev2): (String, Option<String>) = sqlx::query_as(sql)
+        .bind(sale2)
+        .fetch_one(&admin)
+        .await
+        .unwrap();
+
+    assert_eq!(hash1.len(), 64, "huella SHA-256 hex");
+    assert!(
+        prev1.is_none(),
+        "el 1er registro de la org no tiene previousHash"
+    );
+    assert_eq!(
+        prev2.as_deref(),
+        Some(hash1.as_str()),
+        "el 2º registro encadena con la huella del 1º (previousHash == hash(r1))"
+    );
+    assert_ne!(hash1, hash2, "huellas distintas");
+
+    cleanup(&admin, org).await;
 }
 
 #[tokio::test]
