@@ -17,6 +17,7 @@ mod sales;
 mod sales_export;
 mod state;
 mod stock;
+mod suppliers;
 mod users;
 
 pub use error::ApiError;

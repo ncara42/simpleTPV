@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::http::{header, HeaderValue, Method, StatusCode};
-use axum::routing::{get, patch, post, put};
+use axum::routing::{delete, get, patch, post, put};
 use axum::Router;
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::SmartIpKeyExtractor;
@@ -23,6 +23,7 @@ use crate::sales;
 use crate::sales_export;
 use crate::state::AppState;
 use crate::stock;
+use crate::suppliers;
 use crate::users;
 
 const REQUEST_TIMEOUT_SECS: u64 = 30;
@@ -122,6 +123,22 @@ pub fn build_router(state: AppState) -> Router {
         .route("/users/{id}", patch(users::update).delete(users::remove))
         .route("/users/{id}/pin", put(users::set_pin))
         .route("/users/{id}/stores", put(users::assign_stores))
+        // Proveedores + tarifas (Fase 3). `/comparison` e `/import` estáticas
+        // antes de `/{id}`.
+        .route("/suppliers", get(suppliers::list).post(suppliers::create))
+        .route(
+            "/suppliers/{id}",
+            patch(suppliers::update)
+                .delete(suppliers::remove)
+                .get(suppliers::get_one),
+        )
+        .route(
+            "/supplier-prices",
+            get(suppliers::list_prices).put(suppliers::upsert_price),
+        )
+        .route("/supplier-prices/comparison", get(suppliers::comparison))
+        .route("/supplier-prices/import", post(suppliers::import_prices))
+        .route("/supplier-prices/{id}", delete(suppliers::remove_price))
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)
