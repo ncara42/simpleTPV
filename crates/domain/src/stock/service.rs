@@ -282,6 +282,98 @@ pub async fn apply_fefo_outflow(
     Ok(resulting)
 }
 
+/// Recepción de un traspaso para producto con lote (#138): recrea en DESTINO los
+/// MISMOS lotes que salieron del ORIGEN (lotCode + caducidad), repartiendo lo
+/// recibido por lote en orden de envío (FEFO del origen); el exceso entra sin
+/// lote. Lee los `TRANSFER_OUT` del traspaso (con `batchId`) y los une a
+/// `StockBatch` para recuperar el lote viajero. Devuelve el stock resultante.
+#[allow(clippy::too_many_arguments)]
+pub async fn apply_transfer_receipt(
+    tx: &mut Transaction<'_, Postgres>,
+    org: Uuid,
+    product_id: Uuid,
+    dest_store_id: Uuid,
+    transfer_id: Uuid,
+    quantity_received: Decimal,
+    reference_id: Option<Uuid>,
+    user_id: Option<Uuid>,
+) -> Result<Decimal, sqlx::Error> {
+    // Lotes enviados del origen (movimientos TRANSFER_OUT del traspaso con batchId),
+    // en orden de envío; cada uno con su lotCode y caducidad de origen.
+    let sent: Vec<(String, Option<time::Date>, Decimal)> = sqlx::query_as(
+        r#"SELECT b."lotCode", b."expiryDate", abs(m.quantity)
+           FROM "StockMovement" m JOIN "StockBatch" b ON b.id = m."batchId"
+           WHERE m."organizationId" = $1 AND m."productId" = $2
+             AND m.type = 'TRANSFER_OUT'::"MovementType" AND m."referenceId" = $3
+             AND m."batchId" IS NOT NULL
+           ORDER BY m."createdAt" ASC"#,
+    )
+    .bind(org)
+    .bind(product_id)
+    .bind(transfer_id)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    // Stock de partida del destino (por si quantity_received fuese 0).
+    let mut resulting: Decimal = sqlx::query_scalar(
+        r#"SELECT quantity FROM "Stock" WHERE "productId" = $1 AND "storeId" = $2"#,
+    )
+    .bind(product_id)
+    .bind(dest_store_id)
+    .fetch_optional(&mut **tx)
+    .await?
+    .unwrap_or(Decimal::ZERO);
+
+    // Reparte lo recibido sobre los lotes (orden de envío, capado por lo enviado);
+    // el exceso cae sin lote (D4).
+    let mut remaining = quantity_received;
+    for (lot_code, expiry_date, sent_qty) in sent {
+        if remaining <= Decimal::ZERO {
+            break;
+        }
+        let take = remaining.min(sent_qty);
+        if take > Decimal::ZERO {
+            resulting = apply_movement(
+                tx,
+                ApplyMovementInput {
+                    organization_id: org,
+                    product_id,
+                    store_id: dest_store_id,
+                    movement_type: MovementType::TransferIn,
+                    quantity: take,
+                    reference_id,
+                    reason: None,
+                    user_id,
+                    batch: Some(BatchRef {
+                        lot_code,
+                        expiry_date,
+                    }),
+                },
+            )
+            .await?;
+            remaining -= take;
+        }
+    }
+    if remaining > Decimal::ZERO {
+        resulting = apply_movement(
+            tx,
+            ApplyMovementInput {
+                organization_id: org,
+                product_id,
+                store_id: dest_store_id,
+                movement_type: MovementType::TransferIn,
+                quantity: remaining,
+                reference_id,
+                reason: None,
+                user_id,
+                batch: None,
+            },
+        )
+        .await?;
+    }
+    Ok(resulting)
+}
+
 /// `PUT /stock/min`: configura el stock mínimo (upsert) y reevalúa la alerta.
 pub async fn set_min(pool: &PgPool, org: Uuid, input: SetMin) -> Result<StockView, AppError> {
     input.validate()?;

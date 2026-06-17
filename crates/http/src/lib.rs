@@ -20,6 +20,7 @@ mod stock;
 mod stores;
 mod suppliers;
 mod time_clock;
+mod transfers;
 mod users;
 
 pub use error::ApiError;

@@ -26,6 +26,7 @@ use crate::stock;
 use crate::stores;
 use crate::suppliers;
 use crate::time_clock;
+use crate::transfers;
 use crate::users;
 
 const REQUEST_TIMEOUT_SECS: u64 = 30;
@@ -164,6 +165,12 @@ pub fn build_router(state: AppState) -> Router {
         .route("/time-clock/history/me", get(time_clock::history_me))
         .route("/time-clock/history-all", get(time_clock::history_all))
         .route("/time-clock/entries", get(time_clock::entries))
+        // Traspasos (Fase 3): DRAFT→SENT→RECEIVED→CLOSED.
+        .route("/transfers", post(transfers::create).get(transfers::list))
+        .route("/transfers/{id}", get(transfers::get_one))
+        .route("/transfers/{id}/send", post(transfers::send))
+        .route("/transfers/{id}/receive", post(transfers::receive))
+        .route("/transfers/{id}/close", post(transfers::close))
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)
