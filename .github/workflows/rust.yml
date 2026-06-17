@@ -1,0 +1,138 @@
+name: Rust
+
+# Gate de calidad del workspace Rust (`crates/`). Corre fmt + clippy + test en
+# cada PR y push a `main` que toque `crates/**`. Cierra el hueco de #160: hasta
+# ahora ningún workflow ejecutaba `cargo`, así que un fallo de fmt/clippy/test
+# pasaba el "CI verde".
+#
+# IMPORTANTE: este gate es de CALIDAD DE CÓDIGO, no protege producción. Un push
+# a `main` despliega en Dokploy aunque este job falle (deploy gateado solo por
+# `ci.yml`). Su valor es cazar regresiones de formato/lint/tests antes de
+# mergear, no bloquear el deploy. Ver issue #160.
+#
+# Actions pinneadas por SHA con comentario de versión (igual que ci.yml): una
+# credencial de maintainer robada no puede reetiquetar. Dependabot propone bumps.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/**'
+      - '.github/workflows/rust.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/**'
+      - '.github/workflows/rust.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  rust:
+    name: cargo fmt + clippy + test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+
+    # Postgres efímero para los tests de integración (db/http/domain conectan
+    # con los roles `app` (RLS) y `app_admin` (BYPASSRLS) del bootstrap dev).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: simpletpv
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 3s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+
+    env:
+      # El CLI de Prisma (migrate deploy / db seed) entra como superuser.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/simpletpv?schema=public
+      # Los tests Rust leen estas dos (con fallback a :5434 local). En CI el
+      # service expone Postgres en :5432.
+      DATABASE_URL_APP: postgres://app:app_dev_password@localhost:5432/simpletpv
+      DATABASE_URL_ADMIN: postgres://app_admin:app_admin_dev_password@localhost:5432/simpletpv
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # --- Toolchain fijada por crates/rust-toolchain.toml (stable + rustfmt +
+      #     clippy). `rustup show` materializa el canal declarado en el toml. ---
+      - name: Rust toolchain
+        working-directory: crates
+        run: |
+          rustup show active-toolchain || rustup toolchain install stable
+          rustup component add rustfmt clippy
+
+      - name: Cache cargo + target
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: crates
+
+      # --- fmt + clippy NO necesitan BD (queries SQLx en runtime, sin macros
+      #     compile-time): fallan rápido antes de levantar Postgres/seed. ---
+      - name: cargo fmt --check
+        working-directory: crates
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy -D warnings
+        working-directory: crates
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      # --- Preparar el Postgres efímero (mismo flujo que el job e2e de ci.yml y
+      #     que docs/migration-rust/HANDOFF.md). ---
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+        with:
+          version: 11.1.3
+
+      - name: Setup Node 22
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @simpletpv/db exec prisma generate
+
+      - name: Apply Prisma migrations
+        run: pnpm --filter @simpletpv/db exec prisma migrate deploy
+
+      # Bootstrap dev: da login a los roles `app`/`app_admin` con passwords de
+      # desarrollo. NO es migración Prisma (en prod los pone Dokploy via ALTER
+      # ROLE manual). El script de package.json usa `docker compose exec`, que
+      # aquí no aplica: lo corremos con psql directo contra el service, igual
+      # que el job e2e. Ver packages/db/scripts/README.md.
+      - name: Bootstrap dev roles (app / app_admin)
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5432 -U postgres -d simpletpv \
+            -f packages/db/scripts/dev-bootstrap.sql
+
+      # Seed contractual (prisma db seed → tsx prisma/seed.ts): orgs
+      # B11111111/B22222222, usuarios *@org1.test / *@org2.test (pwd
+      # password123). Es el que esperan los tests de integración Rust (NO el
+      # seed:demo del e2e).
+      - name: Seed contractual
+        run: pnpm --filter @simpletpv/db db:seed
+
+      - name: cargo test --workspace
+        working-directory: crates
+        run: cargo test --workspace
