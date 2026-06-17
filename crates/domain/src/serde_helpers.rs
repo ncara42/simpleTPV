@@ -1,6 +1,7 @@
 //! Helpers de serialización compartidos por los modelos de salida (DTOs de
 //! respuesta), para emitir el MISMO formato JSON que el backend NestJS/Prisma.
 
+use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use time::PrimitiveDateTime;
 
@@ -14,6 +15,23 @@ pub fn decimal_str<S: serde::Serializer>(d: &Decimal, s: S) -> Result<S::Ok, S::
 pub fn decimal_opt_str<S: serde::Serializer>(d: &Option<Decimal>, s: S) -> Result<S::Ok, S::Error> {
     match d {
         Some(v) => decimal_str(v, s),
+        None => s.serialize_none(),
+    }
+}
+
+/// Serializa un `Decimal` como NÚMERO JSON (paridad con los campos que NestJS
+/// emite vía `Number(...)`: ratios, KPIs, métricas de sugerencia).
+pub fn decimal_float<S: serde::Serializer>(d: &Decimal, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_f64(d.to_f64().unwrap_or(0.0))
+}
+
+/// Variante `Option` de [`decimal_float`]: `null` si es `None`.
+pub fn decimal_opt_float<S: serde::Serializer>(
+    d: &Option<Decimal>,
+    s: S,
+) -> Result<S::Ok, S::Error> {
+    match d {
+        Some(v) => decimal_float(v, s),
         None => s.serialize_none(),
     }
 }

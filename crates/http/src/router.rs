@@ -17,6 +17,7 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::products;
+use crate::purchases;
 use crate::returns;
 use crate::routes;
 use crate::sales;
@@ -165,6 +166,16 @@ pub fn build_router(state: AppState) -> Router {
         .route("/time-clock/history/me", get(time_clock::history_me))
         .route("/time-clock/history-all", get(time_clock::history_all))
         .route("/time-clock/entries", get(time_clock::entries))
+        // Compras (Fase 3): pedidos a proveedor. `/suggest` estática antes de `/{id}`.
+        .route(
+            "/purchase-orders",
+            post(purchases::create).get(purchases::list),
+        )
+        .route("/purchase-orders/suggest", post(purchases::suggest))
+        .route("/purchase-orders/{id}", get(purchases::get_one))
+        .route("/purchase-orders/{id}/export", get(purchases::export))
+        .route("/purchase-orders/{id}/confirm", post(purchases::confirm))
+        .route("/purchase-orders/{id}/receive", post(purchases::receive))
         // Traspasos (Fase 3): DRAFT→SENT→RECEIVED→CLOSED.
         .route("/transfers", post(transfers::create).get(transfers::list))
         .route("/transfers/{id}", get(transfers::get_one))

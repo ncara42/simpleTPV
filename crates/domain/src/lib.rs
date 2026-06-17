@@ -11,6 +11,7 @@ pub mod feature_flags;
 #[macro_use]
 mod pg_enum;
 pub mod products;
+pub mod purchases;
 pub mod receipt;
 pub mod returns;
 pub mod sales;
