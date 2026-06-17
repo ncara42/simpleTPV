@@ -23,6 +23,7 @@ use crate::sales;
 use crate::sales_export;
 use crate::state::AppState;
 use crate::stock;
+use crate::stores;
 use crate::suppliers;
 use crate::users;
 
@@ -139,6 +140,21 @@ pub fn build_router(state: AppState) -> Router {
         .route("/supplier-prices/comparison", get(suppliers::comparison))
         .route("/supplier-prices/import", post(suppliers::import_prices))
         .route("/supplier-prices/{id}", delete(suppliers::remove_price))
+        // Tiendas (Fase 3): CRUD ADMIN + ops/central + precios por tienda. Param
+        // `{id}` consistente para no chocar en el árbol de rutas.
+        .route("/stores", get(stores::list).post(stores::create))
+        .route("/stores/{id}", patch(stores::update).delete(stores::remove))
+        .route("/stores/{id}/central", patch(stores::set_central))
+        .route("/stores/{id}/ops", patch(stores::update_ops))
+        .route(
+            "/stores/{id}/prices",
+            get(stores::list_prices).put(stores::set_price),
+        )
+        .route("/stores/{id}/prices/import", post(stores::import_prices))
+        .route(
+            "/stores/{id}/prices/{product_id}",
+            delete(stores::remove_price),
+        )
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)
