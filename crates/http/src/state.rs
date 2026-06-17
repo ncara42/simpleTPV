@@ -5,6 +5,8 @@ use std::sync::Arc;
 use simpletpv_auth::{AuthService, DbUserStateLookup, UserStateService};
 use sqlx::PgPool;
 
+use crate::events::EventHub;
+
 #[derive(Clone)]
 pub struct AppState {
     inner: Arc<Inner>,
@@ -30,6 +32,9 @@ struct Inner {
     cookie_secure: bool,
     /// Orígenes CORS permitidos (resueltos al arranque; fail-fast en prod).
     cors_origins: Vec<String>,
+    /// Bus de eventos in-process para SSE (#32). Se construye aquí (no se inyecta):
+    /// no hay publishers cableados todavía, así que no necesita compartirse fuera.
+    events: EventHub,
 }
 
 impl AppState {
@@ -49,6 +54,7 @@ impl AppState {
                 admin_db,
                 cookie_secure,
                 cors_origins,
+                events: EventHub::new(),
             }),
         }
     }
@@ -76,5 +82,10 @@ impl AppState {
 
     pub fn cors_origins(&self) -> &[String] {
         &self.inner.cors_origins
+    }
+
+    /// Bus de eventos in-process (SSE, #32).
+    pub fn events(&self) -> &EventHub {
+        &self.inner.events
     }
 }

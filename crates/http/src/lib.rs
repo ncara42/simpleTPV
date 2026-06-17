@@ -14,6 +14,7 @@ mod customers;
 mod dashboard;
 mod devices;
 mod error;
+mod events;
 mod extractor;
 mod feature_flags;
 mod json;

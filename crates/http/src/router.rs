@@ -22,6 +22,7 @@ use crate::cash_sessions;
 use crate::customers;
 use crate::dashboard;
 use crate::devices;
+use crate::events;
 use crate::feature_flags;
 use crate::me;
 use crate::price_lists;
@@ -368,6 +369,9 @@ pub fn build_router(state: AppState) -> Router {
             "/dashboard/archetype-rotation",
             get(dashboard::archetype_rotation),
         )
+        // Eventos en tiempo real (Fase 4, #32): stream SSE filtrado por tenant del
+        // JWT. Cualquier rol; tope de conexiones por usuario (SEC-03).
+        .route("/events", get(events::stream))
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)
