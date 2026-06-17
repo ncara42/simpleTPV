@@ -19,6 +19,7 @@ use tower_http::trace::TraceLayer;
 use crate::api_keys;
 use crate::branding;
 use crate::cash_sessions;
+use crate::customers;
 use crate::devices;
 use crate::feature_flags;
 use crate::me;
@@ -155,6 +156,12 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/product-families/{id}",
             patch(product_families::update).delete(product_families::remove),
+        )
+        // Clientes B2B (Fase 4, #154, IT-17): función de central → ADMIN/MANAGER.
+        .route("/customers", get(customers::list).post(customers::create))
+        .route(
+            "/customers/{id}",
+            patch(customers::update).delete(customers::remove),
         )
         // Promociones (Fase 4, #154): catálogo de central. Lectura abierta a la
         // sesión; escritura ADMIN/MANAGER.
