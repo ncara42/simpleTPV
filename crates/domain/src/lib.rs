@@ -10,6 +10,7 @@
 mod pg_enum;
 pub mod cash_sessions;
 pub mod csv;
+pub mod devices;
 pub mod feature_flags;
 pub mod product_families;
 pub mod products;

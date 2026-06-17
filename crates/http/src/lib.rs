@@ -7,6 +7,7 @@
 //! `AuthService`). La capa http no toca SQL directamente.
 
 mod cash_sessions;
+mod devices;
 mod error;
 mod extractor;
 mod json;

@@ -17,6 +17,7 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::cash_sessions;
+use crate::devices;
 use crate::product_families;
 use crate::products;
 use crate::purchases;
@@ -93,6 +94,12 @@ pub fn build_router(state: AppState) -> Router {
                 .patch(products::update)
                 .delete(products::remove),
         )
+        // Dispositivos TPV (Fase 4, #154): rutas estáticas (current/pair) antes de
+        // `{id}`. Estado/emparejado cualquier rol; alta/listado/revocado ADMIN/MANAGER.
+        .route("/devices/current", get(devices::current))
+        .route("/devices/pair", post(devices::pair))
+        .route("/devices", get(devices::find_all).post(devices::create))
+        .route("/devices/{id}", delete(devices::revoke))
         // Familias de producto (Fase 4, #154): árbol jerárquico. Lectura abierta a
         // la sesión; escritura solo ADMIN.
         .route(
