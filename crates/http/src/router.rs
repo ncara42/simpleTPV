@@ -41,6 +41,7 @@ use crate::time_clock;
 use crate::transfers;
 use crate::users;
 use crate::wholesale_orders;
+use crate::z_report;
 
 const REQUEST_TIMEOUT_SECS: u64 = 30;
 // Límite de body (DoS backstop; NestJS usaba 512kb). 64kb sobra para JSON de API.
@@ -322,6 +323,19 @@ pub fn build_router(state: AppState) -> Router {
         .route("/transfers/{id}/send", post(transfers::send))
         .route("/transfers/{id}/receive", post(transfers::receive))
         .route("/transfers/{id}/close", post(transfers::close))
+        // Pedidos de tienda (Fase 4, #154): ALIAS de traspasos en otra ruta — el
+        // StoreOrdersController de NestJS delega entero en TransfersService con los
+        // mismos DTOs. Mismos handlers, mismas reglas de rol.
+        .route(
+            "/store-orders",
+            post(transfers::create).get(transfers::list),
+        )
+        .route("/store-orders/{id}", get(transfers::get_one))
+        .route("/store-orders/{id}/send", post(transfers::send))
+        .route("/store-orders/{id}/receive", post(transfers::receive))
+        .route("/store-orders/{id}/close", post(transfers::close))
+        // Cierre Z (Fase 4, #124): arqueo fiscal diario por tienda. ADMIN/MANAGER.
+        .route("/z-report", get(z_report::get))
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
         .with_state(state)

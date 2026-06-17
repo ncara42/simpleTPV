@@ -35,5 +35,6 @@ pub mod transfers;
 pub mod users;
 pub mod verifactu;
 pub mod wholesale_orders;
+pub mod z_report;
 
 pub use csv::{ImportResult, RowError};
