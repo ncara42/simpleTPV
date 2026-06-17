@@ -115,6 +115,20 @@ pub struct TicketBlock {
     pub to: i64,
 }
 
+/// Agregados del listado de ventas (SOLO sobre ventas COMPLETED del filtro; las
+/// VOIDED se listan pero no suman). `avg_*_pct` son ratios (0..1).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SalesTotals {
+    pub count: i64,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub total_amount: Decimal,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub avg_discount_pct: Decimal,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub avg_margin_pct: Decimal,
+}
+
 /// Página del historial de ventas.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -123,6 +137,7 @@ pub struct SalesPage {
     pub page: i64,
     pub page_size: i64,
     pub total_items: i64,
+    pub totals: SalesTotals,
 }
 
 /// Metadatos de un export de ventas (sin el CSV, que puede ser grande).

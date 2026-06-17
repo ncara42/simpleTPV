@@ -26,8 +26,8 @@ use super::domain::{
 };
 use super::input::CreateSale;
 use super::model::{
-    OrgInfo, Sale, SaleLine, SaleStatus, SaleWithLines, SalesPage, StoreInfo, TicketBlock,
-    TicketData, TicketLine,
+    OrgInfo, Sale, SaleLine, SaleStatus, SaleWithLines, SalesPage, SalesTotals, StoreInfo,
+    TicketBlock, TicketData, TicketLine,
 };
 
 const MAX_SALES_PAGE_SIZE: i64 = 100;
@@ -467,14 +467,93 @@ pub async fn list(
             .push_bind((page - 1) * page_size);
         let items: Vec<Sale> = qb.build_query_as::<Sale>().fetch_all(&mut **tx).await?;
 
+        // Totales: SOLO ventas COMPLETED del filtro (las VOIDED se listan pero no
+        // suman). count + importe + ratios de descuento y margen.
+        let mut agg_qb: QueryBuilder<Postgres> = QueryBuilder::new(
+            r#"SELECT count(*)::bigint, COALESCE(SUM(total), 0), COALESCE(SUM(subtotal), 0),
+                 COALESCE(SUM("discountTotal"), 0) FROM "Sale""#,
+        );
+        push_completed_where(&mut agg_qb, org, requester, is_org_wide, &filter, "");
+        let (count, total_amount, sum_subtotal, sum_discount): (i64, Decimal, Decimal, Decimal) =
+            agg_qb.build_query_as().fetch_one(&mut **tx).await?;
+
+        // Margen real sobre el coste CONGELADO en la línea (IT-03): producto de
+        // columnas que el agregado no expresa → SQL sobre SaleLine JOIN Sale.
+        let mut margin_qb: QueryBuilder<Postgres> = QueryBuilder::new(
+            r#"SELECT COALESCE(SUM(sl."lineTotal" - sl."costPrice" * sl.qty), 0),
+                 COALESCE(SUM(sl."lineTotal"), 0)
+               FROM "SaleLine" sl JOIN "Sale" sa ON sa.id = sl."saleId""#,
+        );
+        push_completed_where(&mut margin_qb, org, requester, is_org_wide, &filter, "sa.");
+        let (margin, revenue): (Decimal, Decimal) =
+            margin_qb.build_query_as().fetch_one(&mut **tx).await?;
+
+        let discount_base = sum_subtotal + sum_discount;
+        let avg_discount_pct = if discount_base > Decimal::ZERO {
+            (sum_discount / discount_base).round_dp(6)
+        } else {
+            Decimal::ZERO
+        };
+        let avg_margin_pct = if revenue > Decimal::ZERO {
+            (margin / revenue).round_dp(6)
+        } else {
+            Decimal::ZERO
+        };
+
         Ok(SalesPage {
             items,
             page,
             page_size,
             total_items,
+            totals: SalesTotals {
+                count,
+                total_amount,
+                avg_discount_pct,
+                avg_margin_pct,
+            },
         })
     })
     .await
+}
+
+/// Empuja el WHERE de los agregados (SIEMPRE `status = COMPLETED`, ignora el
+/// filtro de estado del listado) con el prefijo de tabla dado (`""` para `Sale`,
+/// `"sa."` para el JOIN del margen). Mismo filtro estructural que el listado.
+fn push_completed_where(
+    qb: &mut QueryBuilder<Postgres>,
+    org: Uuid,
+    requester: Uuid,
+    is_org_wide: bool,
+    f: &SalesFilter,
+    prefix: &str,
+) {
+    qb.push(format!(r#" WHERE {prefix}"organizationId" = "#))
+        .push_bind(org);
+    qb.push(format!(
+        r#" AND {prefix}status = 'COMPLETED'::"SaleStatus""#
+    ));
+    if let Some(s) = f.store_id {
+        qb.push(format!(r#" AND {prefix}"storeId" = "#))
+            .push_bind(s);
+    }
+    if let Some(u) = f.user_id {
+        qb.push(format!(r#" AND {prefix}"userId" = "#)).push_bind(u);
+    }
+    if let Some(from) = f.from {
+        qb.push(format!(r#" AND {prefix}"createdAt" >= "#))
+            .push_bind(from);
+    }
+    if let Some(to) = f.to {
+        qb.push(format!(r#" AND {prefix}"createdAt" < "#))
+            .push_bind(to);
+    }
+    if !is_org_wide {
+        qb.push(format!(
+            r#" AND {prefix}"storeId" IN (SELECT "storeId" FROM "UserStore" WHERE "userId" = "#
+        ))
+        .push_bind(requester)
+        .push(")");
+    }
 }
 
 /// `POST /sales/:id/void` — anula una venta (ADMIN/MANAGER) y repone el stock al
