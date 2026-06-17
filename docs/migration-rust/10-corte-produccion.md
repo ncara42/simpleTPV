@@ -157,8 +157,13 @@ Pendiente (no bloqueante para preparar; sí antes/durante el corte):
 - **H-01 (operativo)**: para declarar de verdad hace falta **proveedor AEAT
   certificado**; hasta entonces, VeriFactu en modo piloto (sandbox) debe
   acordarse formalmente, o el envío queda apagado.
-- **M-03** `Permissions-Policy` + `preload` en HSTS · **M-04** backoff del worker
-  ante fallos persistentes · **L-02** allowlist de `status` y cota de `within_days`.
+- **M-04** backoff exponencial del worker: **diferido**. Los reintentos YA están
+  acotados (≤5 intentos y luego FAILED — no hay flood infinito); un backoff real
+  necesita una columna `lastAttemptAt` (migración Prisma) y solo importa con el
+  proveedor AEAT real → se hará junto a él.
+
+Ya corregidos: **M-03** (`Permissions-Policy` + `preload` en HSTS) y **L-02**
+(allowlist de `status` en `/verifactu/records` + cota de `within_days` a 3650).
 
 - **Lockout de PIN en Redis** (S-09): solo si se escala a varias réplicas del
   servicio Rust (con una sola, el in-memory es correcto).

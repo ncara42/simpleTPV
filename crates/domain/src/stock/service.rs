@@ -530,8 +530,12 @@ pub async fn expiring_batches(
     store_id: Option<Uuid>,
     within_days: Option<i64>,
 ) -> Result<Vec<ExpiringBatch>, AppError> {
+    // `within_days` acotado a [0, 3650] (L-02): descarta negativos y pone un techo
+    // razonable (~10 años) para no aceptar ventanas absurdas.
+    const MAX_WITHIN_DAYS: i64 = 3650;
     let days = within_days
         .filter(|d| *d >= 0)
+        .map(|d| d.min(MAX_WITHIN_DAYS))
         .unwrap_or(EXPIRY_THRESHOLD_DAYS);
     let today = OffsetDateTime::now_utc().date();
     let cutoff = expiry_cutoff(today, days);

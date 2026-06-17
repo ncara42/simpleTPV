@@ -15,6 +15,8 @@ use crate::extractor::AuthUser;
 use crate::state::AppState;
 
 const MGMT_ROLES: [Role; 2] = [Role::Admin, Role::Manager];
+/// Estados válidos del filtro (allowlist, L-02): rechaza valores arbitrarios.
+const VALID_STATUS: [&str; 3] = ["PENDING", "SENT", "FAILED"];
 
 #[derive(Deserialize)]
 pub struct ListQuery {
@@ -29,6 +31,11 @@ pub async fn list(
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<VerifactuRecordView>>, ApiError> {
     user.require_role(&MGMT_ROLES)?;
+    if let Some(s) = &q.status {
+        if !VALID_STATUS.contains(&s.as_str()) {
+            return Err(simpletpv_shared::AppError::BadRequest.into());
+        }
+    }
     Ok(Json(
         queue::list(state.db(), user.organization_id, q.status).await?,
     ))
