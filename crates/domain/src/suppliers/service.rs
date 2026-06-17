@@ -207,13 +207,15 @@ pub async fn upsert_price(
         with_tenant_tx(pool, org, async move |tx, _after| {
             // Pertenencia al tenant (RLS + comprobación explícita).
             let supplier: Option<(Uuid,)> =
-                sqlx::query_as(r#"SELECT id FROM "Supplier" WHERE id = $1"#)
+                sqlx::query_as(r#"SELECT id FROM "Supplier" WHERE id = $1 AND "organizationId" = $2"#)
                     .bind(input.supplier_id)
+                    .bind(org)
                     .fetch_optional(&mut **tx)
                     .await?;
             let product: Option<(Uuid,)> =
-                sqlx::query_as(r#"SELECT id FROM "Product" WHERE id = $1"#)
+                sqlx::query_as(r#"SELECT id FROM "Product" WHERE id = $1 AND "organizationId" = $2"#)
                     .bind(input.product_id)
+                    .bind(org)
                     .fetch_optional(&mut **tx)
                     .await?;
             if supplier.is_none() || product.is_none() {
@@ -272,10 +274,11 @@ pub async fn import_prices_csv(
     let max = max_price();
     let result: Result<ImportResult, AppError> =
         with_tenant_tx(pool, org, async move |tx, _after| {
-            // El proveedor debe pertenecer al tenant.
+            // El proveedor debe pertenecer al tenant (RLS + comprobación explícita).
             let supplier: Option<(Uuid,)> =
-                sqlx::query_as(r#"SELECT id FROM "Supplier" WHERE id = $1"#)
+                sqlx::query_as(r#"SELECT id FROM "Supplier" WHERE id = $1 AND "organizationId" = $2"#)
                     .bind(supplier_id)
+                    .bind(org)
                     .fetch_optional(&mut **tx)
                     .await?;
             if supplier.is_none() {

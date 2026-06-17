@@ -260,3 +260,63 @@ async fn denegar_solicitud_no_afecta_cuadre() {
 
     teardown(&c).await;
 }
+
+/// #146 D-6: al cerrar caja, las solicitudes que siguen PENDING se auto-deniegan
+/// y NO entran en el cuadre (solo cuentan las APPROVED).
+#[tokio::test]
+async fn cierre_autodeniega_pendientes_y_no_afectan_cuadre() {
+    let c = setup().await;
+    let session = service::open(
+        &c.app,
+        c.org,
+        c.user,
+        true,
+        OpenCashSession {
+            store_id: c.store,
+            opening_amount: Decimal::from(100),
+        },
+    )
+    .await
+    .unwrap();
+
+    // Una solicitud que queda PENDING (nunca se aprueba ni deniega).
+    let req = service::request_movement(
+        &c.app,
+        c.org,
+        c.user,
+        true,
+        session.id,
+        mov("OUT", 40, "pendiente al cierre"),
+    )
+    .await
+    .unwrap();
+    assert_eq!(req.status, CashMovementStatus::Pending);
+
+    // Cierre con el PENDING vivo: esperado = 100 (el OUT no cuenta), contado 100 → diff 0.
+    let closed = service::close(
+        &c.app,
+        c.org,
+        c.user,
+        true,
+        session.id,
+        CloseCashSession {
+            counted_amount: Decimal::from(100),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(closed.expected_amount, Some(Decimal::from(100)));
+    assert_eq!(closed.difference, Some(Decimal::ZERO));
+
+    // El movimiento que estaba PENDING ha quedado auto-denegado.
+    let movs = service::movements(&c.app, c.org, c.user, true, session.id)
+        .await
+        .unwrap();
+    let m = movs
+        .iter()
+        .find(|m| m.id == req.id)
+        .expect("movimiento presente");
+    assert_eq!(m.status, CashMovementStatus::Denied);
+
+    teardown(&c).await;
+}

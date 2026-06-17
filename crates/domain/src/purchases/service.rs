@@ -386,13 +386,19 @@ pub async fn receive(
                 if r.quantity_received <= Decimal::ZERO {
                     continue;
                 }
-                sqlx::query(
-                    r#"UPDATE "PurchaseOrderLine" SET "quantityReceived" = "quantityReceived" + $2 WHERE id = $1"#,
+                let touched = sqlx::query(
+                    r#"UPDATE "PurchaseOrderLine" SET "quantityReceived" = "quantityReceived" + $2
+                       WHERE id = $1 AND "organizationId" = $3"#,
                 )
                 .bind(line.id)
                 .bind(r.quantity_received)
+                .bind(org)
                 .execute(&mut **tx)
-                .await?;
+                .await?
+                .rows_affected();
+                if touched == 0 {
+                    return Ok(Err(AppError::Conflict)); // recepción concurrente o fuera de tenant
+                }
 
                 let lot = r.lot_code.as_ref().map(|s| s.trim()).filter(|s| !s.is_empty());
                 let batch = if tracks_of(line.product_id) {
@@ -436,16 +442,20 @@ pub async fn receive(
             let complete = fresh.iter().all(|l| l.quantity_received >= l.quantity_ordered);
             if complete {
                 sqlx::query(
-                    r#"UPDATE "PurchaseOrder" SET status = 'RECEIVED'::"PurchaseOrderStatus", "receivedAt" = now() WHERE id = $1"#,
+                    r#"UPDATE "PurchaseOrder" SET status = 'RECEIVED'::"PurchaseOrderStatus", "receivedAt" = now()
+                       WHERE id = $1 AND "organizationId" = $2"#,
                 )
                 .bind(id)
+                .bind(org)
                 .execute(&mut **tx)
                 .await?;
             } else {
                 sqlx::query(
-                    r#"UPDATE "PurchaseOrder" SET status = 'PARTIALLY_RECEIVED'::"PurchaseOrderStatus" WHERE id = $1"#,
+                    r#"UPDATE "PurchaseOrder" SET status = 'PARTIALLY_RECEIVED'::"PurchaseOrderStatus"
+                       WHERE id = $1 AND "organizationId" = $2"#,
                 )
                 .bind(id)
+                .bind(org)
                 .execute(&mut **tx)
                 .await?;
             }
