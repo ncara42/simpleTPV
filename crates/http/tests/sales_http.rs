@@ -210,3 +210,59 @@ async fn unauthenticated_create_is_rejected() {
     let (st, _, _) = send(&app, body_req("POST", "/sales", None, body)).await;
     assert_eq!(st, StatusCode::UNAUTHORIZED);
 }
+
+#[tokio::test]
+async fn ticket_and_receipt_endpoints() {
+    let (app, admin) = build().await;
+    let token = login(&app, "admin@org1.test").await;
+    let store = store_with_open_session(&admin).await;
+    let product = create_product(&app, &token).await;
+
+    let body = format!(
+        r#"{{"storeId":"{store}","paymentMethod":"CASH","cashGiven":10,"lines":[{{"productId":"{product}","qty":2}}]}}"#
+    );
+    let (st, _, b) = send(&app, body_req("POST", "/sales", Some(&token), &body)).await;
+    assert_eq!(st, StatusCode::CREATED, "{b}");
+    let sale = json(&b);
+    let id = sale["id"].as_str().unwrap().to_owned();
+
+    // GET /sales/{id}/ticket → 200 JSON con desglose de IVA.
+    let (stt, _, bt) = send(&app, get(&format!("/sales/{id}/ticket"), &token)).await;
+    assert_eq!(stt, StatusCode::OK, "{bt}");
+    let t = json(&bt);
+    assert_eq!(t["ticketNumber"], sale["ticketNumber"]);
+    assert!(!t["taxBreakdown"].as_array().unwrap().is_empty());
+
+    // GET /sales/{id}/receipt → 200 text/html con CSP.
+    let (str_, hr, br) = send(&app, get(&format!("/sales/{id}/receipt"), &token)).await;
+    assert_eq!(str_, StatusCode::OK);
+    assert!(hr
+        .get(CONTENT_TYPE)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .starts_with("text/html"));
+    assert!(hr.contains_key("content-security-policy"));
+    assert!(br.contains("<!DOCTYPE html>"));
+
+    // 404 para una venta inexistente.
+    let (s404, _, _) = send(
+        &app,
+        get(&format!("/sales/{}/ticket", Uuid::new_v4()), &token),
+    )
+    .await;
+    assert_eq!(s404, StatusCode::NOT_FOUND);
+
+    cleanup(&admin, store, &product).await;
+}
+
+#[tokio::test]
+async fn ticket_requires_auth() {
+    let (app, _admin) = build().await;
+    let req = Request::builder()
+        .uri(format!("/sales/{}/ticket", Uuid::new_v4()))
+        .body(Body::empty())
+        .unwrap();
+    let (st, _, _) = send(&app, req).await;
+    assert_eq!(st, StatusCode::UNAUTHORIZED);
+}

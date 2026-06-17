@@ -8,11 +8,13 @@
 //! `findByTicket` de NestJS, que no llama a `assertStoreAccess`).
 
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{header, StatusCode};
+use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
 use simpletpv_auth::Role;
-use simpletpv_domain::sales::model::{Sale, SaleWithLines, SalesPage, TicketBlock};
+use simpletpv_domain::receipt::render_receipt_html;
+use simpletpv_domain::sales::model::{Sale, SaleWithLines, SalesPage, TicketBlock, TicketData};
 use simpletpv_domain::sales::service::{self, SalesFilter};
 use simpletpv_domain::sales::{CreateSale, ReserveTicketBlock};
 use simpletpv_shared::AppError;
@@ -88,6 +90,37 @@ pub async fn by_ticket(
 ) -> Result<Json<SaleWithLines>, ApiError> {
     let sale = service::find_by_ticket(state.db(), user.organization_id, &ticket).await?;
     Ok(Json(sale))
+}
+
+/// `GET /sales/:id/ticket` — datos del ticket/factura (JSON). Accesible a todos
+/// los roles con sesión (paridad NestJS), org-scoped por RLS.
+pub async fn ticket(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<TicketData>, ApiError> {
+    let ticket = service::get_ticket(state.db(), user.organization_id, id).await?;
+    Ok(Json(ticket))
+}
+
+/// `GET /sales/:id/receipt` — documento HTML imprimible. CSP estricta y `nosniff`
+/// (el documento es autocontenido: solo permite estilos inline propios).
+pub async fn receipt(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Response, ApiError> {
+    let ticket = service::get_ticket(state.db(), user.organization_id, id).await?;
+    let html = render_receipt_html(&ticket);
+    let headers = [
+        (header::CONTENT_TYPE, "text/html; charset=utf-8"),
+        (
+            header::CONTENT_SECURITY_POLICY,
+            "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+        ),
+        (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+    ];
+    Ok((headers, html).into_response())
 }
 
 #[derive(Deserialize)]

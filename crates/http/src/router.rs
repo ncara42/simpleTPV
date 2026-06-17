@@ -100,6 +100,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/sales", post(sales::create).get(sales::list))
         .route("/sales/ticket-block", post(sales::ticket_block))
         .route("/sales/by-ticket/{ticket}", get(sales::by_ticket))
+        .route("/sales/{id}/ticket", get(sales::ticket))
+        .route("/sales/{id}/receipt", get(sales::receipt))
         .route("/sales/{id}/void", post(sales::void))
         // Devoluciones (Fase 2): con ticket + ciega (PIN) + listado.
         .route("/returns", post(returns::create).get(returns::list))
