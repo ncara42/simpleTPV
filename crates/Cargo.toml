@@ -52,6 +52,9 @@ serde = { version = "1", features = ["derive"] }
 rust_decimal = { version = "1", features = ["serde-with-str", "serde-with-float"] }
 # Fechas (TIMESTAMP) para FromRow + serialización ISO-8601.
 time = { version = "0.3", features = ["serde-well-known", "formatting", "macros"] }
+# Zona horaria IANA (Europe/Madrid con DST) para el documento fiscal (#152) —
+# evita hardcodear el offset CET/CEST, frágil ante cambios de horario de verano.
+time-tz = { version = "2", features = ["db"] }
 thiserror = "2"
 anyhow = "1"
 tracing = "0.1"

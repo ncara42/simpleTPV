@@ -10,6 +10,6 @@ pub mod service;
 pub use domain::{build_tax_breakdown, TaxBreakdownItem, TaxLine};
 pub use input::{CreateSale, CreateSaleLine, ReserveTicketBlock};
 pub use model::{
-    DiscountSource, PaymentMethod, Sale, SaleLine, SaleStatus, SaleWithLines, SalesPage,
-    TicketBlock,
+    DiscountSource, OrgInfo, PaymentMethod, Sale, SaleLine, SaleStatus, SaleWithLines, SalesPage,
+    StoreInfo, TicketBlock, TicketData, TicketLine,
 };

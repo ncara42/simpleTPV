@@ -6,6 +6,8 @@ use serde::Serialize;
 use time::PrimitiveDateTime;
 use uuid::Uuid;
 
+use super::domain::TaxBreakdownItem;
+
 pg_text_enum! {
     /// Método de pago (enum `PaymentMethod` de Prisma/Postgres).
     pub enum PaymentMethod {
@@ -111,4 +113,62 @@ pub struct SalesPage {
     pub page: i64,
     pub page_size: i64,
     pub total_items: i64,
+}
+
+/// Datos fiscales de la organización para el ticket (#152).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrgInfo {
+    pub name: String,
+    pub nif: Option<String>,
+}
+
+/// Datos de la tienda para el ticket.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoreInfo {
+    pub name: String,
+    pub code: String,
+}
+
+/// Línea del ticket fiscal (importes como string normalizado).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TicketLine {
+    pub name: String,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub qty: Decimal,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub unit_price: Decimal,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub discount_pct: Decimal,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub discount_amt: Decimal,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub line_total: Decimal,
+}
+
+/// Datos completos del ticket/factura simplificada (#152). Salida JSON de
+/// `GET /sales/:id/ticket` y entrada de `render_receipt_html`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TicketData {
+    pub organization: OrgInfo,
+    pub store: StoreInfo,
+    pub ticket_number: String,
+    #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
+    pub created_at: PrimitiveDateTime,
+    pub lines: Vec<TicketLine>,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub subtotal: Decimal,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub discount_total: Decimal,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub total: Decimal,
+    pub payment_method: PaymentMethod,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_opt_str")]
+    pub cash_given: Option<Decimal>,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_opt_str")]
+    pub cash_change: Option<Decimal>,
+    pub tax_breakdown: Vec<TaxBreakdownItem>,
 }
