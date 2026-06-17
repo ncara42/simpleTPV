@@ -25,6 +25,8 @@ time = "0.3"
 # SSE (#32): bus de eventos in-process (broadcast por tenant) + stream del endpoint.
 tokio = { workspace = true, features = ["sync"] }
 async-stream = "0.3"
+# OpenAPI (#155): documento servido en /openapi.json (esquema code-first).
+utoipa = "5"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

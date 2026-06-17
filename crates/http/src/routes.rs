@@ -66,6 +66,18 @@ impl<S: Send + Sync> FromRequest<S> for LoginJson {
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/auth/login",
+    tag = "auth",
+    request_body = crate::openapi::LoginRequest,
+    responses(
+        (status = 200, description = "Sesión iniciada (access token + cookie de refresh)",
+            body = crate::openapi::TokenResponseDoc),
+        (status = 401, description = "Credenciales inválidas"),
+        (status = 429, description = "Demasiados intentos (rate-limit por IP)")
+    )
+)]
 pub async fn login(
     State(state): State<AppState>,
     jar: CookieJar,
@@ -108,11 +120,26 @@ pub async fn logout(State(state): State<AppState>, jar: CookieJar) -> Result<Coo
 }
 
 /// Liveness.
+#[utoipa::path(
+    get,
+    path = "/health",
+    tag = "health",
+    responses((status = 200, description = "El servicio está vivo", body = String))
+)]
 pub async fn health() -> &'static str {
     "ok"
 }
 
 /// Readiness: la base de datos responde.
+#[utoipa::path(
+    get,
+    path = "/ready",
+    tag = "health",
+    responses(
+        (status = 200, description = "Listo: la base de datos responde", body = String),
+        (status = 503, description = "No listo: la base de datos no responde")
+    )
+)]
 pub async fn ready(State(state): State<AppState>) -> Result<&'static str, StatusCode> {
     sqlx::query("SELECT 1")
         .execute(state.db())

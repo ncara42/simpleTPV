@@ -25,6 +25,7 @@ use crate::devices;
 use crate::events;
 use crate::feature_flags;
 use crate::me;
+use crate::openapi;
 use crate::price_lists;
 use crate::product_families;
 use crate::products;
@@ -385,6 +386,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/events", get(events::stream))
         .route("/health", get(routes::health))
         .route("/ready", get(routes::ready))
+        // Documento OpenAPI (#155): público, sin auth.
+        .route("/openapi.json", get(openapi::openapi_json))
         .with_state(state)
         // CORS para los SPA (TPV y backoffice). Antes que las cabeceras de
         // seguridad para que la respuesta de preflight las arrastre también.
