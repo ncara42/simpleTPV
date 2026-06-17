@@ -19,6 +19,7 @@ tower_governor.workspace = true
 sqlx.workspace = true
 uuid.workspace = true
 serde.workspace = true
+serde_json = "1"
 tracing.workspace = true
 time = "0.3"
 

@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use simpletpv_shared::AppError;
 
 use crate::error::ApiError;
-use crate::extractor::AuthUser;
 use crate::state::AppState;
 
 const REFRESH_COOKIE: &str = "refreshToken";
@@ -27,14 +26,6 @@ pub struct LoginRequest {
 #[serde(rename_all = "camelCase")]
 pub struct TokenResponse {
     access_token: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MeResponse {
-    user_id: String,
-    organization_id: String,
-    role: &'static str,
 }
 
 /// Cookie del refresh token: httpOnly (no accesible por JS), SameSite=Strict
@@ -114,15 +105,6 @@ pub async fn logout(State(state): State<AppState>, jar: CookieJar) -> Result<Coo
     }
     // Emite un Set-Cookie de borrado (Max-Age=0) con los mismos atributos.
     Ok(jar.remove(removal_cookie(state.cookie_secure())))
-}
-
-/// Ejemplo de ruta protegida (mínimo del módulo `me`): devuelve los claims.
-pub async fn me(user: AuthUser) -> Json<MeResponse> {
-    Json(MeResponse {
-        user_id: user.user_id.to_string(),
-        organization_id: user.organization_id.to_string(),
-        role: user.role.as_str(),
-    })
 }
 
 /// Liveness.

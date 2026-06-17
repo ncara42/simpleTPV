@@ -13,6 +13,7 @@ pub mod cash_sessions;
 pub mod csv;
 pub mod devices;
 pub mod feature_flags;
+pub mod me;
 pub mod product_families;
 pub mod products;
 pub mod purchases;

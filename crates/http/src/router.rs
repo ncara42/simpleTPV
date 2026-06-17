@@ -19,6 +19,8 @@ use tower_http::trace::TraceLayer;
 use crate::branding;
 use crate::cash_sessions;
 use crate::devices;
+use crate::feature_flags;
+use crate::me;
 use crate::product_families;
 use crate::products;
 use crate::purchases;
@@ -83,7 +85,20 @@ pub fn build_router(state: AppState) -> Router {
 
     Router::new()
         .nest("/auth", auth)
-        .route("/me", get(routes::me))
+        // Recursos del usuario autenticado (Fase 4, #154): perfil, tiendas (selector
+        // TPV), feature flags efectivos y preferencias. Rutas estáticas antes de
+        // `/me/preferences/{key}`.
+        .route("/me", get(me::profile))
+        .route("/me/stores", get(me::stores))
+        .route("/me/features", get(me::features))
+        .route("/me/preferences", get(me::preferences_get))
+        .route("/me/preferences/{key}", put(me::preferences_set))
+        // Gestión de feature flags (Fase 4, #154 / #127 B): ADMIN/MANAGER.
+        .route(
+            "/feature-flags",
+            get(feature_flags::list).put(feature_flags::set_flag),
+        )
+        .route("/feature-flags/{key}", delete(feature_flags::clear_flag))
         // Catálogo (Fase 2). `/import` y `/barcode/{code}` son estáticas y no
         // colisionan con `/{id}` (axum prioriza el segmento estático).
         .route("/products", get(products::list).post(products::create))
