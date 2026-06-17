@@ -20,7 +20,9 @@ pub async fn stock(
     store_id: Option<Uuid>,
 ) -> Result<Vec<PublicStockItem>, AppError> {
     with_tenant_tx(pool, org, async move |tx, _after| {
-        let rows: Vec<(Uuid, String, String, Uuid, Decimal)> = sqlx::query_as(
+        // `p.sku` es nullable: se decodifica como `Option` para no romper con
+        // productos sin referencia (devolverían 500 por fallo de decode).
+        let rows: Vec<(Uuid, Option<String>, String, Uuid, Decimal)> = sqlx::query_as(
             r#"SELECT p.id, p.sku, p.name, s."storeId", s.quantity
                FROM "Stock" s
                JOIN "Product" p ON p.id = s."productId"

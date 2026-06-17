@@ -10,7 +10,9 @@ use uuid::Uuid;
 #[serde(rename_all = "camelCase")]
 pub struct PublicStockItem {
     pub product_id: Uuid,
-    pub sku: String,
+    /// `Product.sku` es opcional en BD; NestJS devuelve `sku: null` cuando falta
+    /// (no todos los productos tienen referencia). Paridad: `Option` → `null`.
+    pub sku: Option<String>,
     pub name: String,
     pub store_id: Uuid,
     #[serde(serialize_with = "crate::serde_helpers::decimal_float")]
