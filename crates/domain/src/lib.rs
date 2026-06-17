@@ -16,6 +16,7 @@ pub mod feature_flags;
 pub mod me;
 pub mod product_families;
 pub mod products;
+pub mod promotions;
 pub mod purchases;
 pub mod receipt;
 pub mod returns;

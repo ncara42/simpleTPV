@@ -23,6 +23,7 @@ use crate::feature_flags;
 use crate::me;
 use crate::product_families;
 use crate::products;
+use crate::promotions;
 use crate::purchases;
 use crate::returns;
 use crate::routes;
@@ -131,6 +132,18 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/product-families/{id}",
             patch(product_families::update).delete(product_families::remove),
+        )
+        // Promociones (Fase 4, #154): catálogo de central. Lectura abierta a la
+        // sesión; escritura ADMIN/MANAGER.
+        .route(
+            "/promotions",
+            get(promotions::find_all).post(promotions::create),
+        )
+        .route(
+            "/promotions/{id}",
+            get(promotions::find_one)
+                .patch(promotions::update)
+                .delete(promotions::remove),
         )
         // Stock (Fase 2, slice A): ajustes/mínimos/recuento + caducidad/movimientos.
         .route("/stock/min", put(stock::set_min))

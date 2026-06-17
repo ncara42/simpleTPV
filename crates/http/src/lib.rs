@@ -16,6 +16,7 @@ mod json;
 mod me;
 mod product_families;
 mod products;
+mod promotions;
 mod purchases;
 mod returns;
 mod router;
