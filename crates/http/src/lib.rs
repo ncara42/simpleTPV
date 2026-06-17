@@ -35,6 +35,7 @@ mod suppliers;
 mod time_clock;
 mod transfers;
 mod users;
+mod wholesale_orders;
 
 pub use error::ApiError;
 pub use extractor::AuthUser;

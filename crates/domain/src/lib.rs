@@ -34,5 +34,6 @@ pub mod time_clock;
 pub mod transfers;
 pub mod users;
 pub mod verifactu;
+pub mod wholesale_orders;
 
 pub use csv::{ImportResult, RowError};

@@ -40,6 +40,7 @@ use crate::suppliers;
 use crate::time_clock;
 use crate::transfers;
 use crate::users;
+use crate::wholesale_orders;
 
 const REQUEST_TIMEOUT_SECS: u64 = 30;
 // Límite de body (DoS backstop; NestJS usaba 512kb). 64kb sobra para JSON de API.
@@ -180,6 +181,17 @@ pub fn build_router(state: AppState) -> Router {
             "/price-lists/{id}/items/{product_id}",
             delete(price_lists::remove_item),
         )
+        // Pedidos mayoristas B2B (Fase 4, #154, IT-17c): salientes con precio
+        // congelado por línea. ADMIN/MANAGER. `/{id}/status` antes de `/{id}`.
+        .route(
+            "/wholesale-orders",
+            get(wholesale_orders::list).post(wholesale_orders::create),
+        )
+        .route(
+            "/wholesale-orders/{id}/status",
+            patch(wholesale_orders::update_status),
+        )
+        .route("/wholesale-orders/{id}", get(wholesale_orders::get))
         // Promociones (Fase 4, #154): catálogo de central. Lectura abierta a la
         // sesión; escritura ADMIN/MANAGER.
         .route(
