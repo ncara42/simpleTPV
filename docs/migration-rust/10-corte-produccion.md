@@ -106,18 +106,14 @@ El binario hace **fail-fast**: sin las obligatorias, no arranca.
 
 ## Pendiente antes del flip definitivo
 
-### Bloqueante de FEATURE (no solo de test)
+### Bloqueante de FEATURE — RESUELTO
 
-- **Audit log — NO portado a Rust.** NestJS tiene un interceptor global
-  (`apps/api/src/audit/audit.interceptor.ts`) que, tras CADA mutación exitosa
-  (POST/PUT/PATCH/DELETE de un usuario autenticado), inserta en `AuditLog`
-  (`action`=método, `entity`=1er segmento de ruta, `entityId`=2º, `userId`,
-  `organizationId`) bajo el contexto de tenant (RLS). El backend Rust **no
-  escribe `AuditLog` en absoluto** (`grep AuditLog crates/` = 0). Es requisito de
-  trazabilidad/compliance (SEC-22): **una ruta de mutación servida por Rust no se
-  audita**. → Portar como middleware Axum (capa que, en respuesta 2xx de método
-  mutante con `AuthUser`, inserta `AuditLog` vía `with_tenant_tx`) ANTES de
-  enrutar mutaciones a Rust. Prioridad ALTA.
+- **Audit log — PORTADO** (`crates/http/src/audit.rs`). Middleware Axum global
+  (capa más interna del stack) que, tras CADA mutación exitosa (POST/PUT/PATCH/
+  DELETE con respuesta 2xx de un usuario autenticado), inserta en `AuditLog`
+  (`action`/`entity`/`entityId`/`userId`/`organizationId`) bajo `with_tenant_tx`
+  (RLS). Best-effort, no silencioso (SEC-22). Paridad con el `AuditInterceptor`
+  de NestJS. Test: `crates/http/tests/audit_http.rs`.
 
 ### Paridad de rutas
 

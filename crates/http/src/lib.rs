@@ -8,6 +8,7 @@
 
 mod api_key_extractor;
 mod api_keys;
+mod audit;
 mod branding;
 mod cash_sessions;
 mod customers;

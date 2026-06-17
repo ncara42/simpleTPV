@@ -17,6 +17,7 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::api_keys;
+use crate::audit;
 use crate::branding;
 use crate::cash_sessions;
 use crate::customers;
@@ -86,6 +87,9 @@ pub fn build_router(state: AppState) -> Router {
     // CORS desde la config (orígenes resueltos con fail-fast en prod, SEC-18).
     // Con `allow_credentials` los orígenes deben ser explícitos (nunca `Any`).
     let cors = build_cors(state.cors_origins());
+    // Estado para el middleware de auditoría (#156): clon barato (Arc) antes de
+    // que `with_state` consuma el original.
+    let audit_state = state.clone();
 
     let auth = Router::new()
         .route(
@@ -389,6 +393,13 @@ pub fn build_router(state: AppState) -> Router {
         // Documento OpenAPI (#155): público, sin auth.
         .route("/openapi.json", get(openapi::openapi_json))
         .with_state(state)
+        // Auditoría (#156, SEC-22): capa MÁS INTERNA, ve el estado real del
+        // handler (2xx) y registra cada mutación en AuditLog. Va dentro del
+        // timeout para no auditar 408 sintéticos.
+        .layer(axum::middleware::from_fn_with_state(
+            audit_state,
+            audit::record,
+        ))
         // CORS para los SPA (TPV y backoffice). Antes que las cabeceras de
         // seguridad para que la respuesta de preflight las arrastre también.
         .layer(cors)
@@ -406,10 +417,16 @@ pub fn build_router(state: AppState) -> Router {
             header::REFERRER_POLICY,
             HeaderValue::from_static("strict-origin-when-cross-origin"),
         ))
-        // HSTS: solo lo honra el navegador sobre HTTPS; inocuo sobre http.
+        // HSTS: solo lo honra el navegador sobre HTTPS; inocuo sobre http. Con
+        // `preload` para entrar en la lista HSTS preload de los navegadores (M-03).
         .layer(SetResponseHeaderLayer::if_not_present(
             header::STRICT_TRANSPORT_SECURITY,
-            HeaderValue::from_static("max-age=31536000; includeSubDomains"),
+            HeaderValue::from_static("max-age=31536000; includeSubDomains; preload"),
+        ))
+        // Permissions-Policy (M-03): desactiva APIs del navegador que el API no usa.
+        .layer(SetResponseHeaderLayer::if_not_present(
+            axum::http::HeaderName::from_static("permissions-policy"),
+            HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
         ))
         // Límite de tamaño del body (backstop DoS).
         .layer(RequestBodyLimitLayer::new(MAX_BODY_BYTES))
