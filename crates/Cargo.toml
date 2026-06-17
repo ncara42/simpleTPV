@@ -64,6 +64,8 @@ secrecy = "0.10"
 # durante el corte); bcrypt para verificar los hashes existentes (cost 10).
 jsonwebtoken = "9"
 bcrypt = "0.15"
+# Hash encadenado de los registros VeriFactu (#152/#155): SHA-256.
+sha2 = "0.10"
 
 # Perfil de release: binario pequeño y rápido (corte en producción, doc 02 §4 Fase 6).
 [profile.release]

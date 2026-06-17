@@ -7,6 +7,7 @@
 //! (ventas) y `returns` (devoluciones con ticket).
 
 pub mod csv;
+pub mod feature_flags;
 #[macro_use]
 mod pg_enum;
 pub mod products;
@@ -16,5 +17,6 @@ pub mod sales;
 pub mod serde_helpers;
 pub mod stock;
 pub mod store_access;
+pub mod verifactu;
 
 pub use csv::{ImportResult, RowError};

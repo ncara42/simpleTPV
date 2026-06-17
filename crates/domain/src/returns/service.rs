@@ -14,8 +14,10 @@ use simpletpv_shared::AppError;
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
+use crate::feature_flags::assert_flag_enabled;
 use crate::stock::service::apply_batched_return;
 use crate::store_access::has_store_access;
+use crate::verifactu::record_rectification;
 
 use super::domain::{compute_return_line_total, compute_returnable};
 use super::input::{CreateBlindReturn, CreateReturn};
@@ -52,14 +54,15 @@ pub async fn create(
             .execute(&mut **tx)
             .await?;
 
-        // Venta + estado + tienda (para el acceso por tienda y el storeId del Return).
-        let sale: Option<(Uuid, String)> = sqlx::query_as(
-            r#"SELECT "storeId", status::text FROM "Sale" WHERE id = $1"#,
+        // Venta + estado + tienda + nº ticket (acceso por tienda, storeId del
+        // Return y referencia del rectificativo VeriFactu).
+        let sale: Option<(Uuid, String, String)> = sqlx::query_as(
+            r#"SELECT "storeId", status::text, "ticketNumber" FROM "Sale" WHERE id = $1"#,
         )
         .bind(input.sale_id)
         .fetch_optional(&mut **tx)
         .await?;
-        let Some((store_id, status)) = sale else {
+        let Some((store_id, status, ticket_number)) = sale else {
             return Ok(Err(AppError::NotFound));
         };
         if status == "VOIDED" {
@@ -175,6 +178,10 @@ pub async fn create(
             .await?;
         }
 
+        // Registro VeriFactu rectificativo (SEC-07): referencia el ticket de la
+        // venta original. En la misma tx → atómico con la devolución.
+        record_rectification(tx, org, return_id, &ticket_number, total).await?;
+
         Ok(Ok(ReturnWithLines { return_: return_row, lines }))
     })
     .await?
@@ -269,6 +276,10 @@ pub async fn create_blind(
     input: CreateBlindReturn,
 ) -> Result<ReturnWithLines, AppError> {
     input.validate()?;
+
+    // Feature flag `blind_returns` (#152): gatea la devolución ciega por org/tienda
+    // (FUERA de la tx de escritura, paridad NestJS). Apagada → Forbidden.
+    assert_flag_enabled(pool, org, "blind_returns", Some(input.store_id)).await?;
 
     // Acceso a la tienda (SEC-01) + autorizadores candidatos, en una lectura.
     // Autorizadores = MANAGER/ADMIN del tenant, activos, con PIN, EXCLUIDO el
@@ -387,6 +398,11 @@ pub async fn create_blind(
             )
             .await?;
         }
+
+        // Registro VeriFactu rectificativo (SEC-07): sin factura original (ciega),
+        // referencia el id de la devolución. Atómico con la devolución.
+        let invoice = format!("BLIND-{return_id}");
+        record_rectification(tx, org, return_id, &invoice, total).await?;
 
         Ok(Ok(ReturnWithLines { return_: return_row, lines }))
     })
