@@ -14,6 +14,7 @@ path = "src/main.rs"
 simpletpv-shared = { path = "../shared" }
 simpletpv-db = { path = "../db" }
 simpletpv-auth = { path = "../auth" }
+simpletpv-domain = { path = "../domain" }
 simpletpv-http = { path = "../http" }
 axum.workspace = true
 tokio.workspace = true

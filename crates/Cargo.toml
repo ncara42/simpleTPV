@@ -21,7 +21,13 @@ publish = false
 # Versiones centralizadas (DRY). Cada crate las consume con `dep.workspace = true`.
 # Todas las crates y su justificación documentadas en docs/migration-rust/02-08.
 [workspace.dependencies]
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net"] }
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "macros",
+  "signal",
+  "net",
+  "time",
+] }
 axum = "0.8"
 axum-extra = { version = "0.10", features = ["cookie"] }
 tower = "0.5"

@@ -42,6 +42,7 @@ use crate::suppliers;
 use crate::time_clock;
 use crate::transfers;
 use crate::users;
+use crate::verifactu;
 use crate::wholesale_orders;
 use crate::z_report;
 
@@ -129,6 +130,10 @@ pub fn build_router(state: AppState) -> Router {
                 config: Arc::new(public_rl),
             }),
         )
+        // VeriFactu (Fase 5, #155): estado y reintento de registros (ADMIN/MANAGER).
+        // El envío real lo procesa el worker de fondo (cola Postgres SKIP LOCKED).
+        .route("/verifactu/records", get(verifactu::list))
+        .route("/verifactu/records/{id}/retry", post(verifactu::retry))
         // Catálogo (Fase 2). `/import` y `/barcode/{code}` son estáticas y no
         // colisionan con `/{id}` (axum prioriza el segmento estático).
         .route("/products", get(products::list).post(products::create))

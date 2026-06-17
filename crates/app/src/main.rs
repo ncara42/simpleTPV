@@ -5,6 +5,7 @@
 //! y el router de `simpletpv-http`, y sirve con apagado ordenado.
 
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use secrecy::ExposeSecret;
 use simpletpv_auth::{AuthConfig, AuthService, DbUserStateLookup, UserStateService};
@@ -13,6 +14,11 @@ use simpletpv_shared::AppConfig;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tracing_subscriber::{fmt, EnvFilter};
+
+/// Cada cuánto el worker VeriFactu sondea la cola de registros PENDING.
+const VERIFACTU_POLL_SECS: u64 = 5;
+/// Registros por ciclo del worker (cota del lote `SKIP LOCKED`).
+const VERIFACTU_BATCH: i64 = 50;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -37,6 +43,9 @@ async fn main() -> anyhow::Result<()> {
     // El pool admin también alimenta el lookup pre-tenant de API keys en AppState
     // (clon barato: PgPool es Arc). Se clona antes de mover `admin` a AuthService.
     let admin_db = admin.clone();
+    // Mismo pool admin (BYPASSRLS) para el worker de envío VeriFactu (#155), que
+    // drena la cola PENDING de todos los tenants. Se clona antes de mover `admin`.
+    let verifactu_db = admin.clone();
     let auth = AuthService::new(admin, auth_config);
     // Cookie `Secure` configurable en runtime (COOKIE_SECURE); por defecto activo
     // en release. Permite release-tras-proxy-http (off) y dev-sobre-https (on).
@@ -52,6 +61,30 @@ async fn main() -> anyhow::Result<()> {
         cookie_secure,
         config.cors_origins,
     ));
+
+    // Worker de envío VeriFactu (#155): cada VERIFACTU_POLL_SECS drena la cola de
+    // registros PENDING con `FOR UPDATE SKIP LOCKED` (sin BullMQ/Redis) y los
+    // envía vía el proveedor sandbox, con reintentos. Tarea de fondo desligada del
+    // ciclo de petición: una venta solo crea el registro; el envío es posterior.
+    tokio::spawn(async move {
+        let provider = simpletpv_domain::verifactu::SandboxProvider;
+        let mut tick = tokio::time::interval(Duration::from_secs(VERIFACTU_POLL_SECS));
+        loop {
+            tick.tick().await;
+            match simpletpv_domain::verifactu::process_pending_batch(
+                &verifactu_db,
+                &provider,
+                VERIFACTU_BATCH,
+                None,
+            )
+            .await
+            {
+                Ok(n) if n > 0 => tracing::info!(procesados = n, "ciclo de envío VeriFactu"),
+                Ok(_) => {}
+                Err(e) => tracing::warn!(error = %e, "ciclo del worker VeriFactu falló"),
+            }
+        }
+    });
 
     let addr: SocketAddr = config.bind_addr.parse()?;
     let listener = TcpListener::bind(addr).await?;

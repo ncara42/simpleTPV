@@ -1956,6 +1956,7 @@ dependencies = [
  "secrecy",
  "simpletpv-auth",
  "simpletpv-db",
+ "simpletpv-domain",
  "simpletpv-http",
  "simpletpv-shared",
  "tokio",

@@ -37,6 +37,7 @@ mod suppliers;
 mod time_clock;
 mod transfers;
 mod users;
+mod verifactu;
 mod wholesale_orders;
 mod z_report;
 
