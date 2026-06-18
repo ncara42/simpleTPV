@@ -234,17 +234,27 @@ static PIN_ATTEMPTS: LazyLock<Mutex<HashMap<String, (u32, Instant)>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 fn pin_locked(key: &str) -> bool {
-    let map = PIN_ATTEMPTS.lock().unwrap_or_else(|e| e.into_inner());
-    map.get(key)
-        .is_some_and(|(_, locked_until)| *locked_until > Instant::now())
+    pin_locked_at(key, Instant::now())
 }
 
 fn register_pin_failure(key: &str) {
+    register_pin_failure_at(key, Instant::now());
+}
+
+// Variantes con `now` inyectable (seam de tiempo): permiten testear el umbral, la
+// ventana de lockout, su expiración y el reset sin dormir 5 minutos (#161).
+fn pin_locked_at(key: &str, now: Instant) -> bool {
+    let map = PIN_ATTEMPTS.lock().unwrap_or_else(|e| e.into_inner());
+    map.get(key)
+        .is_some_and(|(_, locked_until)| *locked_until > now)
+}
+
+fn register_pin_failure_at(key: &str, now: Instant) {
     let mut map = PIN_ATTEMPTS.lock().unwrap_or_else(|e| e.into_inner());
-    let entry = map.entry(key.to_owned()).or_insert((0, Instant::now()));
+    let entry = map.entry(key.to_owned()).or_insert((0, now));
     entry.0 += 1;
     if entry.0 >= PIN_MAX_ATTEMPTS {
-        *entry = (0, Instant::now() + PIN_LOCKOUT);
+        *entry = (0, now + PIN_LOCKOUT);
     }
 }
 
@@ -407,4 +417,79 @@ pub async fn create_blind(
         Ok(Ok(ReturnWithLines { return_: return_row, lines }))
     })
     .await?
+}
+
+#[cfg(test)]
+mod tests {
+    //! Lockout de PIN de devolución ciega (#161, criterio 3 / SEC-19). Usa el
+    //! seam de tiempo (`*_at`) para verificar umbral, ventana, expiración y reset
+    //! de forma determinista, sin dormir. Cada test usa una clave única → no
+    //! colisiona con otros tests en paralelo sobre el global `PIN_ATTEMPTS`.
+    use super::*;
+
+    fn unique_key() -> String {
+        format!("pin-test:{}", Uuid::new_v4())
+    }
+
+    #[test]
+    fn bloquea_al_quinto_intento_y_expira_tras_la_ventana() {
+        let key = unique_key();
+        let t0 = Instant::now();
+
+        // 4 fallos: aún NO bloqueado.
+        for _ in 0..PIN_MAX_ATTEMPTS - 1 {
+            register_pin_failure_at(&key, t0);
+        }
+        assert!(!pin_locked_at(&key, t0), "4 fallos no deben bloquear");
+
+        // 5º fallo → bloqueado durante PIN_LOCKOUT.
+        register_pin_failure_at(&key, t0);
+        assert!(pin_locked_at(&key, t0), "el 5º fallo bloquea");
+        assert!(
+            pin_locked_at(&key, t0 + PIN_LOCKOUT - Duration::from_secs(1)),
+            "sigue bloqueado dentro de la ventana"
+        );
+
+        // Pasada la ventana → desbloqueado.
+        assert!(
+            !pin_locked_at(&key, t0 + PIN_LOCKOUT + Duration::from_secs(1)),
+            "expira pasada la ventana de lockout"
+        );
+
+        clear_pin_failures(&key);
+    }
+
+    #[test]
+    fn el_exito_resetea_el_contador() {
+        let key = unique_key();
+        let t0 = Instant::now();
+
+        // 3 fallos y luego un PIN correcto (clear) → contador a cero.
+        for _ in 0..3 {
+            register_pin_failure_at(&key, t0);
+        }
+        clear_pin_failures(&key);
+        assert!(!pin_locked_at(&key, t0), "tras el éxito no hay lockout");
+
+        // Tras el reset hacen falta de nuevo 5 fallos para bloquear (no quedan 2).
+        for _ in 0..PIN_MAX_ATTEMPTS - 1 {
+            register_pin_failure_at(&key, t0);
+        }
+        assert!(
+            !pin_locked_at(&key, t0),
+            "tras el reset, 4 fallos no bloquean"
+        );
+        register_pin_failure_at(&key, t0);
+        assert!(
+            pin_locked_at(&key, t0),
+            "el 5º tras el reset vuelve a bloquear"
+        );
+
+        clear_pin_failures(&key);
+    }
+
+    #[test]
+    fn clave_desconocida_no_esta_bloqueada() {
+        assert!(!pin_locked_at(&unique_key(), Instant::now()));
+    }
 }
