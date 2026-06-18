@@ -3,7 +3,7 @@
 //! export se crea ya COMPLETED). Los POST exigen ADMIN/MANAGER (control de
 //! central); el CLERK queda acotado a sus tiendas en el servicio (SEC-01).
 
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -97,20 +97,22 @@ async fn request(
     Ok((StatusCode::ACCEPTED, Json(meta)))
 }
 
-/// `POST /sales/export` — export del historial de ventas (CSV).
+/// `POST /sales/export` — export del historial de ventas (CSV). Los filtros van en
+/// el CUERPO JSON (paridad NestJS `@Body() ListSalesQueryDto`), no en la query.
 pub async fn request_export(
     State(state): State<AppState>,
     user: AuthUser,
-    Query(q): Query<ExportQuery>,
+    Json(q): Json<ExportQuery>,
 ) -> Result<(StatusCode, Json<SalesExportMeta>), ApiError> {
     request(state, user, q, ExportFormat::Sales).await
 }
 
-/// `POST /sales/export/accounting` — export contable (libro de IVA).
+/// `POST /sales/export/accounting` — export contable (libro de IVA). Filtros en el
+/// cuerpo JSON (paridad NestJS).
 pub async fn request_accounting_export(
     State(state): State<AppState>,
     user: AuthUser,
-    Query(q): Query<ExportQuery>,
+    Json(q): Json<ExportQuery>,
 ) -> Result<(StatusCode, Json<SalesExportMeta>), ApiError> {
     request(state, user, q, ExportFormat::Accounting).await
 }
