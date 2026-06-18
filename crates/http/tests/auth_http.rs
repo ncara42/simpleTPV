@@ -267,6 +267,78 @@ async fn refresh_is_rate_limited_per_ip() {
     );
 }
 
+fn health_req(ip: &str) -> Request<Body> {
+    Request::builder()
+        .method("GET")
+        .uri("/health")
+        // El rate-limit global usa SmartIpKeyExtractor (X-Forwarded-For tras proxy).
+        .header("x-forwarded-for", ip)
+        .body(Body::empty())
+        .unwrap()
+}
+
+/// El API privado tiene rate-limit GLOBAL (paridad ThrottlerGuard de NestJS): toda
+/// ruta —no solo auth— está acotada (def 120/min/IP). Antes de #156, rutas como
+/// `/me`/`/sales`/`/stock`/`/health` quedaban sin límite. burst 120 ⇒ las 120
+/// primeras pasan; a partir de ahí el limiter corta con 429.
+#[tokio::test]
+async fn private_api_has_global_rate_limit() {
+    let (app, _admin) = build().await;
+    let ip = "203.0.113.77"; // IP propia: no interfiere con otros tests
+    let mut statuses = Vec::with_capacity(140);
+    for _ in 0..140 {
+        let (st, _, _) = send(&app, health_req(ip)).await;
+        statuses.push(st);
+    }
+    // El burst inicial (120 tokens) pasa entero; la reposición es lenta (1/500ms),
+    // así que en la ventana del test apenas se reponen tokens.
+    assert!(
+        statuses.iter().take(120).all(|s| *s == StatusCode::OK),
+        "las 120 del burst pasan (200 en /health): {:?}",
+        &statuses[..120.min(statuses.len())]
+    );
+    assert!(
+        statuses
+            .iter()
+            .skip(120)
+            .any(|s| *s == StatusCode::TOO_MANY_REQUESTS),
+        "tras agotar el burst, el rate-limit global corta con 429: {statuses:?}"
+    );
+}
+
+/// `/users/import` hashea hasta 500 bcrypt por petición → límite estricto 2/min/IP
+/// (DOS-03, paridad NestJS `@Throttle`). El limiter actúa ANTES del handler: sin
+/// token, las 2 primeras llegan al 401 y la 3ª la corta el rate-limit (429).
+#[tokio::test]
+async fn users_import_is_rate_limited_2_per_min() {
+    let (app, _admin) = build().await;
+    let ip = "203.0.113.99";
+    let mut statuses = Vec::new();
+    for _ in 0..3 {
+        let req = Request::builder()
+            .method("POST")
+            .uri("/users/import")
+            .header("x-forwarded-for", ip)
+            .header(CONTENT_TYPE, "application/json")
+            .body(Body::from("{}"))
+            .unwrap();
+        let (st, _, _) = send(&app, req).await;
+        statuses.push(st);
+    }
+    assert!(
+        statuses
+            .iter()
+            .take(2)
+            .all(|s| *s != StatusCode::TOO_MANY_REQUESTS),
+        "las 2 primeras pasan el limiter: {statuses:?}"
+    );
+    assert_eq!(
+        statuses[2],
+        StatusCode::TOO_MANY_REQUESTS,
+        "la 3ª petición la corta el rate-limit estricto de import: {statuses:?}"
+    );
+}
+
 #[tokio::test]
 async fn login_malformed_body_is_400_without_serde_leak() {
     let (app, _admin) = build().await;

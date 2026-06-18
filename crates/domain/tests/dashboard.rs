@@ -77,6 +77,11 @@ async fn setup() -> Ctx {
 }
 
 async fn teardown(c: &Ctx) {
+    sqlx::query(r#"DELETE FROM "StockAlert" WHERE "storeId" = $1"#)
+        .bind(c.store)
+        .execute(&c.admin)
+        .await
+        .unwrap();
     sqlx::query(r#"DELETE FROM "Sale" WHERE "storeId" = $1"#)
         .bind(c.store)
         .execute(&c.admin)
@@ -201,7 +206,33 @@ async fn sales_today_y_sales_kpis_del_dia() {
     assert!((st.today.total - 40.0).abs() < 1e-9);
     let row = st.by_store.iter().find(|s| s.store_id == c.store).unwrap();
     assert!((row.today - 40.0).abs() < 1e-9);
-    assert!(!st.intraday.is_empty()); // hay sparkline intradía en compare=day
+    assert!(row.yesterday.abs() < 1e-9, "la tienda no vendió ayer");
+    assert!(
+        row.delta_pct.is_none(),
+        "deltaPct de la tienda null si ayer = 0"
+    );
+    // Sin ventas ayer → deltaPct agregado null y total de ayer 0.
+    assert!(st.delta_pct.is_none(), "deltaPct agregado null si ayer = 0");
+    assert!(
+        st.yesterday.total.abs() < 1e-9,
+        "agregado de ayer sin ventas"
+    );
+    // Intradía acumulado (compare=day): monótono no decreciente y su último valor =
+    // total del día (40). Verifica la acumulación, no solo que exista sparkline.
+    assert!(
+        !st.intraday.is_empty(),
+        "hay sparkline intradía en compare=day"
+    );
+    assert!(
+        st.intraday.windows(2).all(|w| w[1] >= w[0] - 1e-9),
+        "el intradía es acumulado (no decreciente): {:?}",
+        st.intraday
+    );
+    assert!(
+        (st.intraday.last().copied().unwrap() - 40.0).abs() < 1e-9,
+        "el último acumulado del intradía = total del día (40): {:?}",
+        st.intraday
+    );
 
     // sales_kpis del periodo "today": revenue 40, 2 ventas, avgTicket 20, UPT 2.
     let range = resolve_period(DashboardPeriod::Today, now_utc(), None, None).unwrap();
@@ -251,23 +282,66 @@ async fn sales_today_y_sales_kpis_del_dia() {
     let stockout = service::stockout_kpis(&c.app, c.org, range, Some(c.store))
         .await
         .unwrap();
-    assert_eq!(stockout.events, 0); // sin alertas de rotura en el periodo
+    // Sin alertas de rotura en la tienda nueva → estado cero COMPLETO (no solo events).
+    assert_eq!(stockout.events, 0);
+    assert_eq!(stockout.open, 0);
+    assert_eq!(stockout.resolved, 0);
+    assert!(stockout.avg_duration_hours.is_none());
+    assert!(stockout.estimated_lost_sales.abs() < 1e-9);
 
+    // Acotado a la tienda nueva, solo nuestro producto tiene ventas → encabeza el
+    // ranking, con total = ΣlineTotal (40) y units = Σqty (4). Asevera valor+orden.
     let rankings = service::product_rankings(&c.app, c.org, range, Some(c.store), 10)
         .await
         .unwrap();
-    assert!(rankings.top_sales.iter().any(|r| r.product_id == c.product));
+    let top = rankings
+        .top_sales
+        .first()
+        .expect("hay al menos un producto en el ranking");
+    assert_eq!(
+        top.product_id, c.product,
+        "nuestro producto encabeza el ranking"
+    );
+    assert!(
+        (top.total - 40.0).abs() < 1e-9,
+        "total del ranking = ΣlineTotal (40)"
+    );
+    assert!(
+        (top.units - 4.0).abs() < 1e-9,
+        "units del ranking = Σqty (4)"
+    );
 
     let rotation = service::product_rotation(&c.app, c.org, range, Some(c.store))
         .await
         .unwrap();
-    assert!(rotation.iter().any(|r| r.product_id == c.product));
+    let rot = rotation
+        .iter()
+        .find(|r| r.product_id == c.product)
+        .expect("nuestro producto aparece en rotación");
+    assert!(
+        (rot.units - 4.0).abs() < 1e-9,
+        "rotación: units vendidas = 4"
+    );
+    assert_eq!(rot.days_since_last_sale, Some(0), "última venta = hoy");
 
-    // No falla y devuelve filas (incluye el grupo "Sin arquetipo" del producto sin familia).
+    // El producto no tiene familia → grupo "Sin arquetipo" (family_id = None). Acotado
+    // a la tienda nueva, sus units vendidas = 4. (product_count NO se filtra por venta
+    // —cuenta todos los productos sin familia de la org— así que no se asevera aquí.)
     let arch = service::archetype_rotation(&c.app, c.org, range, Some(c.store))
         .await
         .unwrap();
-    assert!(!arch.is_empty());
+    let sin_arq = arch
+        .iter()
+        .find(|a| a.family_id.is_none())
+        .expect("existe el grupo Sin arquetipo");
+    assert!(
+        (sin_arq.units - 4.0).abs() < 1e-9,
+        "Sin arquetipo: units vendidas = 4"
+    );
+    assert!(
+        sin_arq.product_count >= 1,
+        "incluye al menos nuestro producto"
+    );
 
     teardown(&c).await;
 }
@@ -332,6 +406,63 @@ async fn discount_rate_y_serie_con_descuento_real() {
         (me.avg_discount_pct - 0.20).abs() < 1e-9,
         "avg_discount_pct esperado 0.20, fue {}",
         me.avg_discount_pct
+    );
+
+    teardown(&c).await;
+}
+
+/// Inserta una alerta StockAlert OUT_OF_STOCK para el producto/tienda del Ctx.
+async fn insert_stockout_alert(
+    c: &Ctx,
+    resolved: bool,
+    created: PrimitiveDateTime,
+    resolved_at: Option<PrimitiveDateTime>,
+) {
+    sqlx::query(
+        r#"INSERT INTO "StockAlert"
+             (id, "organizationId", "productId", "storeId", "alertType", resolved, "resolvedAt", "createdAt")
+           VALUES ($1, $2, $3, $4, 'OUT_OF_STOCK'::"AlertType", $5, $6, $7)"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(c.org)
+    .bind(c.product)
+    .bind(c.store)
+    .bind(resolved)
+    .bind(resolved_at)
+    .bind(created)
+    .execute(&c.admin)
+    .await
+    .unwrap();
+}
+
+/// stockout-kpis con alertas REALES (caso poblado, no solo estado cero): cuenta
+/// eventos OUT_OF_STOCK del periodo, separa abiertas/resueltas, calcula la duración
+/// media de las resueltas y las ventas perdidas estimadas (ΣsalePrice de las abiertas).
+#[tokio::test]
+async fn stockout_kpis_cuenta_abiertas_y_resueltas() {
+    let c = setup().await;
+
+    // Dos alertas de rotura HOY: una resuelta (duró 1h exacta) y una abierta.
+    let resolved_created = now_utc() - time::Duration::hours(2);
+    let resolved_at = now_utc() - time::Duration::hours(1);
+    let open_created = now_utc() - time::Duration::minutes(30);
+    insert_stockout_alert(&c, true, resolved_created, Some(resolved_at)).await;
+    insert_stockout_alert(&c, false, open_created, None).await;
+
+    let range = resolve_period(DashboardPeriod::Today, now_utc(), None, None).unwrap();
+    let k = service::stockout_kpis(&c.app, c.org, range, Some(c.store))
+        .await
+        .unwrap();
+    assert_eq!(k.events, 2, "dos eventos de rotura en el periodo");
+    assert_eq!(k.resolved, 1, "una resuelta");
+    assert_eq!(k.open, 1, "una abierta");
+    let dur = k.avg_duration_hours.expect("hay duración de las resueltas");
+    assert!((dur - 1.0).abs() < 1e-6, "duración media 1h, fue {dur}");
+    // Ventas perdidas estimadas = salePrice del producto de la alerta abierta (10.00).
+    assert!(
+        (k.estimated_lost_sales - 10.0).abs() < 1e-9,
+        "ventas perdidas = salePrice de la abierta (10), fue {}",
+        k.estimated_lost_sales
     );
 
     teardown(&c).await;

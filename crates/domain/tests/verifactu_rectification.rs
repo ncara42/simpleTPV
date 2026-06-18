@@ -198,10 +198,20 @@ async fn devolucion_con_ticket_crea_registro_rectificativo() {
     .await
     .unwrap();
 
-    // Hay exactamente UN registro RECTIFICATION para esta devolución, con hash.
-    let (count, hash): (i64, Option<String>) = sqlx::query_as(
-        r#"SELECT count(*)::bigint, MAX(hash) FROM "VerifactuRecord"
-           WHERE "returnId" = $1 AND type = 'RECTIFICATION'::"VerifactuType""#,
+    // Hay exactamente UN registro RECTIFICATION para esta devolución, con hash y
+    // payload coherente con el abono (paridad spec NestJS SEC-07): importe NEGATIVO
+    // igual a -total de la devolución, e invoiceNumber referenciando el ticket de la
+    // venta original. Replica el rigor de verifactu_invoice.rs (que sí asevera signo).
+    let (count, hash, total_str, invoice_number): (
+        i64,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    ) = sqlx::query_as(
+        r#"SELECT count(*)::bigint, MAX(hash),
+                      MAX(payload->>'total'), MAX(payload->>'invoiceNumber')
+               FROM "VerifactuRecord"
+               WHERE "returnId" = $1 AND type = 'RECTIFICATION'::"VerifactuType""#,
     )
     .bind(ret.return_.id)
     .fetch_one(&c.admin)
@@ -209,6 +219,30 @@ async fn devolucion_con_ticket_crea_registro_rectificativo() {
     .unwrap();
     assert_eq!(count, 1, "un rectificativo por devolución");
     assert!(hash.is_some_and(|h| h.len() == 64), "hash SHA-256 hex");
+
+    // El importe del rectificativo es un abono: negativo y exactamente -total devuelto.
+    let payload_total: Decimal = total_str
+        .expect("payload->>'total' presente")
+        .parse()
+        .expect("total numérico en el payload");
+    assert!(payload_total < Decimal::ZERO, "abono: importe negativo");
+    assert_eq!(
+        payload_total, -ret.return_.total,
+        "el abono = -total de la devolución"
+    );
+
+    // El rectificativo referencia la factura original (nº de ticket de la venta).
+    let original_ticket: String =
+        sqlx::query_scalar(r#"SELECT "ticketNumber" FROM "Sale" WHERE id = $1"#)
+            .bind(sale.sale.id)
+            .fetch_one(&c.admin)
+            .await
+            .unwrap();
+    assert_eq!(
+        invoice_number.as_deref(),
+        Some(original_ticket.as_str()),
+        "invoiceNumber referencia el ticket de la venta original"
+    );
 
     teardown(&c, product).await;
 }

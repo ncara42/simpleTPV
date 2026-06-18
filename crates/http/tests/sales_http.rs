@@ -270,6 +270,31 @@ async fn export_endpoints_requieren_admin_o_manager() {
     assert_eq!(s3, StatusCode::FORBIDDEN);
 }
 
+/// `POST /sales/export` lee los filtros del CUERPO JSON (paridad NestJS `@Body`),
+/// no de la query: un `status` inválido en el body se valida → 400. Si el endpoint
+/// leyera de la query (ignorando el body), esto sería 202. Fija la regresión que
+/// detectó la auditoría de paridad.
+#[tokio::test]
+async fn export_valida_filtros_del_cuerpo() {
+    let (app, _admin) = build().await;
+    let token = login(&app, "admin@org1.test").await;
+    let (st, _, _) = send(
+        &app,
+        body_req(
+            "POST",
+            "/sales/export",
+            Some(&token),
+            r#"{"status":"INVALID"}"#,
+        ),
+    )
+    .await;
+    assert_eq!(
+        st,
+        StatusCode::BAD_REQUEST,
+        "el status inválido del cuerpo se valida (filtro leído del body, no de la query)"
+    );
+}
+
 #[tokio::test]
 async fn ticket_requires_auth() {
     let (app, _admin) = build().await;

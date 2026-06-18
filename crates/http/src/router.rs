@@ -6,9 +6,11 @@ use std::time::Duration;
 use axum::http::{header, HeaderValue, Method, StatusCode};
 use axum::routing::{delete, get, patch, post, put};
 use axum::Router;
+use std::net::{IpAddr, Ipv4Addr};
+
 use tower_governor::governor::GovernorConfigBuilder;
-use tower_governor::key_extractor::SmartIpKeyExtractor;
-use tower_governor::GovernorLayer;
+use tower_governor::key_extractor::{KeyExtractor, SmartIpKeyExtractor};
+use tower_governor::{GovernorError, GovernorLayer};
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::sensitive_headers::SetSensitiveRequestHeadersLayer;
@@ -61,8 +63,36 @@ const REFRESH_BURST: u32 = 10;
 // frente a los 120 del API privado). Token bucket: burst 30 + repone 1 cada 2s.
 const PUBLIC_REFILL_SECS: u64 = 2;
 const PUBLIC_BURST: u32 = 30;
+// Import CSV de usuarios: 2/min/IP (paridad NestJS @Throttle, DOS-03). Hashea hasta
+// 500 bcrypt por petición (CPU-bound) → límite mucho más estricto que el global.
+// Token bucket: burst 2 + repone 1 cada 30s.
+const USERS_IMPORT_REFILL_SECS: u64 = 30;
+const USERS_IMPORT_BURST: u32 = 2;
+// Rate-limit GLOBAL del API privado (paridad con el ThrottlerGuard global de NestJS,
+// que limitaba TODA ruta autenticada). Configurable por env `THROTTLE_LIMIT`
+// (peticiones/min/IP); default 120. Los route_layer más estrictos (login/refresh/
+// public) siguen mandando sobre sus rutas. Backstop anti-scraping/enumeración/DoS.
+const DEFAULT_THROTTLE_PER_MIN: u32 = 120;
 // Cacheo de preflight CORS en el navegador (1h): reduce OPTIONS repetidos.
 const CORS_MAX_AGE_SECS: u64 = 3600;
+
+/// Extractor de clave del rate-limit GLOBAL. Reusa la lógica de `SmartIpKeyExtractor`
+/// (X-Forwarded-For / X-Real-Ip / IP del peer) pero, si no hay ninguna fuente —p.ej.
+/// el healthcheck local del contenedor (curl directo, sin proxy) o un test con
+/// `oneshot`—, cae a una clave fija en vez de devolver `500 Unable To Extract Key`.
+/// Solo lo usa el limitador global; los de auth/public siguen con `SmartIp` estricto.
+#[derive(Clone)]
+struct FallbackIpKeyExtractor;
+
+impl KeyExtractor for FallbackIpKeyExtractor {
+    type Key = IpAddr;
+
+    fn extract<T>(&self, req: &axum::http::Request<T>) -> Result<Self::Key, GovernorError> {
+        Ok(SmartIpKeyExtractor
+            .extract(req)
+            .unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED)))
+    }
+}
 
 pub fn build_router(state: AppState) -> Router {
     let login_rl = GovernorConfigBuilder::default()
@@ -83,6 +113,27 @@ pub fn build_router(state: AppState) -> Router {
         .key_extractor(SmartIpKeyExtractor)
         .finish()
         .expect("config de rate-limit de la API pública válida");
+    // Rate-limit global: N/min/IP (env `THROTTLE_LIMIT`, default 120). Token bucket:
+    // burst N + repone 1 token cada (60/N) segundos.
+    let throttle_per_min = std::env::var("THROTTLE_LIMIT")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+        .filter(|&n| n > 0)
+        .unwrap_or(DEFAULT_THROTTLE_PER_MIN);
+    let global_rl = GovernorConfigBuilder::default()
+        .period(Duration::from_nanos(
+            60_000_000_000 / throttle_per_min as u64,
+        ))
+        .burst_size(throttle_per_min)
+        .key_extractor(FallbackIpKeyExtractor)
+        .finish()
+        .expect("config de rate-limit global válida");
+    let users_import_rl = GovernorConfigBuilder::default()
+        .period(Duration::from_secs(USERS_IMPORT_REFILL_SECS))
+        .burst_size(USERS_IMPORT_BURST)
+        .key_extractor(SmartIpKeyExtractor)
+        .finish()
+        .expect("config de rate-limit de import de usuarios válida");
 
     // CORS desde la config (orígenes resueltos con fail-fast en prod, SEC-18).
     // Con `allow_credentials` los orígenes deben ser explícitos (nunca `Any`).
@@ -249,7 +300,12 @@ pub fn build_router(state: AppState) -> Router {
         .route("/returns/blind", post(returns::create_blind))
         // Usuarios (Fase 3): gestión solo ADMIN. `/import` estática antes de `/{id}`.
         .route("/users", get(users::list).post(users::create))
-        .route("/users/import", post(users::import_csv))
+        .route(
+            "/users/import",
+            post(users::import_csv).route_layer(GovernorLayer {
+                config: Arc::new(users_import_rl),
+            }),
+        )
         .route("/users/{id}", patch(users::update).delete(users::remove))
         .route("/users/{id}/pin", put(users::set_pin))
         .route("/users/{id}/stores", put(users::assign_stores))
@@ -434,6 +490,12 @@ pub fn build_router(state: AppState) -> Router {
             StatusCode::REQUEST_TIMEOUT,
             Duration::from_secs(REQUEST_TIMEOUT_SECS),
         ))
+        // Rate-limit global del API privado (paridad ThrottlerGuard de NestJS).
+        // Outer respecto al timeout/handler: rechaza con 429 antes de hacer trabajo;
+        // inner respecto al TraceLayer: las peticiones limitadas se siguen trazando.
+        .layer(GovernorLayer {
+            config: Arc::new(global_rl),
+        })
         .layer(TraceLayer::new_for_http())
         // Outermost: marca Authorization/Cookie como sensibles ANTES de que el
         // TraceLayer registre, para que no aparezcan en logs.

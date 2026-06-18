@@ -147,6 +147,10 @@ pub struct ListQuery {
     #[serde(default)]
     status: Option<String>,
     #[serde(default)]
+    family_id: Option<Uuid>,
+    #[serde(default)]
+    q: Option<String>,
+    #[serde(default)]
     date: Option<String>,
     #[serde(default)]
     from: Option<String>,
@@ -187,6 +191,8 @@ pub async fn list(
         store_id: q.store_id,
         user_id: q.user_id,
         status: q.status,
+        family_id: q.family_id,
+        q: q.q,
         from,
         to,
         page: q.page.unwrap_or(1),
