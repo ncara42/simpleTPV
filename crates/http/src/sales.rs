@@ -43,6 +43,20 @@ pub async fn create(
         body,
     )
     .await?;
+    // Evento SSE sale.completed (#32, #154): al volver del servicio la tx ya
+    // commiteó → semántica after-commit. Best-effort, no afecta la respuesta.
+    state.events().publish(
+        user.organization_id,
+        crate::events::AppEvent {
+            event_type: "sale.completed".to_owned(),
+            data: serde_json::json!({
+                "saleId": sale.sale.id,
+                "storeId": sale.sale.store_id,
+                "ticketNumber": sale.sale.ticket_number,
+                "total": sale.sale.total.to_string(),
+            }),
+        },
+    );
     Ok((StatusCode::CREATED, Json(sale)))
 }
 

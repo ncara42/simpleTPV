@@ -156,6 +156,20 @@ pub async fn request_movement(
         body,
     )
     .await?;
+    // Evento SSE cash.movement.requested (#146, #154) para la campana de
+    // aprobaciones: after-commit (la solicitud ya está confirmada). Best-effort.
+    state.events().publish(
+        user.organization_id,
+        crate::events::AppEvent {
+            event_type: "cash.movement.requested".to_owned(),
+            data: serde_json::json!({
+                "movementId": m.id,
+                "storeId": m.store_id,
+                "type": m.movement_type,
+                "amount": m.amount.to_string(),
+            }),
+        },
+    );
     Ok(Json(m))
 }
 

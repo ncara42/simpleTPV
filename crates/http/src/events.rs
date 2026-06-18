@@ -1,10 +1,15 @@
 //! Eventos en tiempo real vía SSE (`GET /events`, #32) — port de `events`
 //! (interface + in-memory-event-bus + controller). Bus **in-process** por tenant
 //! (`tokio::broadcast`): es la elección para despliegue de instancia única; un
-//! bus Redis solo haría falta con múltiples réplicas. Hoy, igual que en NestJS,
-//! ningún `after_commit` publica todavía: el stream emite solo el heartbeat hasta
-//! que se cableen los publishers (stock.changed/sale.completed/alert.created/
-//! cash.movement.requested).
+//! bus Redis solo haría falta con múltiples réplicas.
+//!
+//! Publishers cableados (en la capa http, al volver del servicio = after-commit):
+//! `sale.completed` (handler de `POST /sales`) y `cash.movement.requested`
+//! (handler de `POST /cash-sessions/:id/movements/request`).
+//! Pendientes: `stock.changed` y `alert.created` se emiten POR MOVIMIENTO dentro
+//! de `stock::apply_movement`/`reevaluate_alert` (profundo; lo invocan ventas/
+//! devoluciones/traspasos/compras/ajustes); cablearlos exige propagar un publisher
+//! a través de la primitiva de stock (deuda acotada, varios ficheros).
 //!
 //! Filtrado por tenant SIEMPRE en el servidor (org del JWT); el cliente nunca
 //! elige el tenant. Tope de conexiones por usuario (SEC-03) liberado al cerrar.
