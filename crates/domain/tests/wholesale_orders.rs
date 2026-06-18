@@ -6,9 +6,7 @@ use std::time::Duration;
 
 use rust_decimal::Decimal;
 use simpletpv_domain::wholesale_orders::model::WholesaleOrderStatus;
-use simpletpv_domain::wholesale_orders::{
-    service, CreateWholesaleOrder, WholesaleOrderLineInput,
-};
+use simpletpv_domain::wholesale_orders::{service, CreateWholesaleOrder, WholesaleOrderLineInput};
 use simpletpv_shared::AppError;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use uuid::Uuid;
@@ -313,11 +311,10 @@ async fn pedido_no_cruza_tenants_rls() {
     .unwrap();
 
     // org2 no puede ver el pedido creado por org1.
-    let org2: Uuid =
-        sqlx::query_scalar(r#"SELECT id FROM "Organization" WHERE nif = 'B22222222'"#)
-            .fetch_one(&c.admin)
-            .await
-            .unwrap();
+    let org2: Uuid = sqlx::query_scalar(r#"SELECT id FROM "Organization" WHERE nif = 'B22222222'"#)
+        .fetch_one(&c.admin)
+        .await
+        .unwrap();
     assert_eq!(
         service::get(&c.app, org2, created.id).await.err(),
         Some(AppError::NotFound),
