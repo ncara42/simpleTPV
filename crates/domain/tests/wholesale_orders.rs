@@ -6,7 +6,9 @@ use std::time::Duration;
 
 use rust_decimal::Decimal;
 use simpletpv_domain::wholesale_orders::model::WholesaleOrderStatus;
-use simpletpv_domain::wholesale_orders::{service, CreateWholesaleOrder, WholesaleOrderLineInput};
+use simpletpv_domain::wholesale_orders::{
+    service, CreateWholesaleOrder, WholesaleOrderLineInput,
+};
 use simpletpv_shared::AppError;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use uuid::Uuid;
@@ -284,6 +286,50 @@ async fn crea_con_precio_congelado_lista_detalle_y_estados() {
         .execute(&c.admin)
         .await
         .unwrap();
+
+    teardown(&c).await;
+}
+
+/// Un pedido de org1 es invisible desde el contexto RLS de org2 (y viceversa).
+/// Cubre el aislamiento de comportamiento que `fase4_rls.rs` solo cubre
+/// estructuralmente para `WholesaleOrder`.
+#[tokio::test]
+async fn pedido_no_cruza_tenants_rls() {
+    let c = setup().await;
+
+    let created = service::create(
+        &c.app,
+        c.org,
+        CreateWholesaleOrder {
+            customer_id: c.customer,
+            notes: None,
+            lines: vec![WholesaleOrderLineInput {
+                product_id: c.p_pvp,
+                qty: dec("1"),
+            }],
+        },
+    )
+    .await
+    .unwrap();
+
+    // org2 no puede ver el pedido creado por org1.
+    let org2: Uuid =
+        sqlx::query_scalar(r#"SELECT id FROM "Organization" WHERE nif = 'B22222222'"#)
+            .fetch_one(&c.admin)
+            .await
+            .unwrap();
+    assert_eq!(
+        service::get(&c.app, org2, created.id).await.err(),
+        Some(AppError::NotFound),
+        "org2 no debe ver pedidos de org1"
+    );
+
+    // El listado de org2 tampoco incluye el pedido de org1.
+    let page = service::list(&c.app, org2, None, None, 1).await.unwrap();
+    assert!(
+        page.items.iter().all(|i| i.id != created.id),
+        "listado de org2 no debe incluir pedidos de org1"
+    );
 
     teardown(&c).await;
 }
