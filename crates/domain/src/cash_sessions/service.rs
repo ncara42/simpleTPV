@@ -407,7 +407,7 @@ pub async fn list_pending(pool: &PgPool, org: Uuid) -> Result<Vec<PendingMovemen
     with_tenant_tx(pool, org, async move |tx, _after| {
         let rows: Vec<PendingRow> = sqlx::query_as(
             r#"SELECT m.id, m."cashSessionId" AS cash_session_id, m."storeId" AS store_id,
-                 st.name AS store_name, m.type AS movement_type, m.amount, m.reason,
+                 st.name AS store_name, m.type::text AS movement_type, m.amount, m.reason,
                  m."requestedById" AS requested_by_id, u.name AS requested_by_name,
                  m."createdAt" AS created_at
                FROM "CashMovement" m
