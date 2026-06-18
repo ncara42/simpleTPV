@@ -14,8 +14,25 @@ use crate::store_access::has_store_access;
 use super::domain::{compute_difference, compute_expected};
 use super::input::{CashMovementInput, CloseCashSession, OpenCashSession};
 use super::model::{
-    CashMovement, CashMovementType, CashSession, CashSessionStatus, PendingMovement,
+    CashMovement, CashMovementType, CashSession, CashSessionStatus, PendingMovement, StoreRef,
+    UserRef,
 };
+
+/// Struct interno de mapeo SQLx para `list_pending`. Los campos anidados
+/// (`store`, `requested_by`) se construyen manualmente a partir de este plano.
+#[derive(sqlx::FromRow)]
+struct PendingRow {
+    id: Uuid,
+    cash_session_id: Uuid,
+    store_id: Uuid,
+    store_name: String,
+    movement_type: CashMovementType,
+    amount: Decimal,
+    reason: String,
+    requested_by_id: Uuid,
+    requested_by_name: String,
+    created_at: time::PrimitiveDateTime,
+}
 
 const SESSION_COLS: &str = r#"id, "organizationId" AS organization_id, "storeId" AS store_id,
     "userId" AS user_id, "openingAmount" AS opening_amount, "closingAmount" AS closing_amount,
@@ -388,9 +405,9 @@ pub async fn request_movement(
 /// `GET /cash-sessions/movements/pending` — solicitudes PENDING del tenant (#146).
 pub async fn list_pending(pool: &PgPool, org: Uuid) -> Result<Vec<PendingMovement>, AppError> {
     with_tenant_tx(pool, org, async move |tx, _after| {
-        let rows: Vec<PendingMovement> = sqlx::query_as(
+        let rows: Vec<PendingRow> = sqlx::query_as(
             r#"SELECT m.id, m."cashSessionId" AS cash_session_id, m."storeId" AS store_id,
-                 st.name AS store_name, m.type::text AS movement_type, m.amount, m.reason,
+                 st.name AS store_name, m.type AS movement_type, m.amount, m.reason,
                  m."requestedById" AS requested_by_id, u.name AS requested_by_name,
                  m."createdAt" AS created_at
                FROM "CashMovement" m
@@ -402,7 +419,22 @@ pub async fn list_pending(pool: &PgPool, org: Uuid) -> Result<Vec<PendingMovemen
         .bind(org)
         .fetch_all(&mut **tx)
         .await?;
-        Ok(rows)
+        let result = rows
+            .into_iter()
+            .map(|r| PendingMovement {
+                id: r.id,
+                cash_session_id: r.cash_session_id,
+                store_id: r.store_id,
+                store: StoreRef { name: r.store_name },
+                movement_type: r.movement_type,
+                amount: r.amount,
+                reason: r.reason,
+                requested_by_id: r.requested_by_id,
+                requested_by: UserRef { name: r.requested_by_name },
+                created_at: r.created_at,
+            })
+            .collect();
+        Ok(result)
     })
     .await
 }

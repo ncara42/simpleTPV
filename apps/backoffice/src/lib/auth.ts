@@ -1,6 +1,6 @@
 import { setupAuth } from '@simpletpv/auth';
 
-const setup = setupAuth('backoffice');
+const setup = setupAuth('backoffice', import.meta.env.VITE_API_URL);
 
 export const useAuthStore = setup.useAuthStore;
 
