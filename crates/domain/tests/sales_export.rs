@@ -142,9 +142,11 @@ async fn make_sale(c: &Ctx) -> Uuid {
     product
 }
 
-async fn teardown(c: &Ctx, product: Uuid) {
-    sqlx::query(r#"DELETE FROM "SalesExport" WHERE "requestedById" = $1"#)
-        .bind(c.user)
+async fn teardown(c: &Ctx, product: Uuid, export_id: Uuid) {
+    // Borra solo el export de ESTE test (por id) para evitar la carrera con
+    // tests concurrentes que comparten el mismo usuario.
+    sqlx::query(r#"DELETE FROM "SalesExport" WHERE id = $1"#)
+        .bind(export_id)
         .execute(&c.admin)
         .await
         .unwrap();
@@ -200,7 +202,7 @@ async fn export_ventas_completed_y_descarga() {
     assert!(csv.starts_with("ticket,fecha,tienda,vendedor,estado,metodo_pago"));
     assert_eq!(csv.lines().count(), 2, "cabecera + 1 venta");
 
-    teardown(&c, product).await;
+    teardown(&c, product, meta.id).await;
 }
 
 #[tokio::test]
@@ -230,7 +232,7 @@ async fn export_contable_libro_de_iva() {
     assert!(csv.starts_with("fecha,numero,tienda,metodo_pago,tipo_iva,base,cuota,total"));
     assert!(csv.contains(",21,"), "desglose con tipo 21%");
 
-    teardown(&c, product).await;
+    teardown(&c, product, meta.id).await;
 }
 
 #[tokio::test]
@@ -265,7 +267,7 @@ async fn export_no_cruza_tenants_rls() {
         Some(AppError::NotFound)
     );
 
-    teardown(&c, product).await;
+    teardown(&c, product, meta.id).await;
 }
 
 #[tokio::test]
