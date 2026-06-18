@@ -411,10 +411,57 @@ pub struct SalesFilter {
     pub store_id: Option<Uuid>,
     pub user_id: Option<Uuid>,
     pub status: Option<String>,
+    /// Familia de producto: la venta tiene alguna línea de un producto de esa familia.
+    pub family_id: Option<Uuid>,
+    /// Búsqueda libre (paridad NestJS): ILIKE sobre nº de ticket, nombre del
+    /// vendedor y nombre de línea; y, si es numérico, `total` exacto.
+    pub q: Option<String>,
     pub from: Option<PrimitiveDateTime>,
     pub to: Option<PrimitiveDateTime>,
     pub page: i64,
     pub page_size: i64,
+}
+
+/// Empuja los filtros de búsqueda libre (`q`) y de familia (`familyId`) — paridad
+/// con `buildSalesFilter` de NestJS. `col_prefix` cualifica las columnas de `Sale`
+/// (`""` o `"sa."`); `outer` es el cualificador de la fila externa para las
+/// subconsultas correlacionadas (`"Sale"` o `sa`). Todo va por `push_bind` (sin
+/// inyección); los `format!` solo expanden constantes de prefijo/alias.
+fn push_sales_search(
+    qb: &mut QueryBuilder<Postgres>,
+    f: &SalesFilter,
+    col_prefix: &str,
+    outer: &str,
+) {
+    if let Some(fam) = f.family_id {
+        qb.push(format!(
+            r#" AND EXISTS (SELECT 1 FROM "SaleLine" slf JOIN "Product" pf ON pf.id = slf."productId"
+                 WHERE slf."saleId" = {outer}.id AND pf."familyId" = "#
+        ))
+        .push_bind(fam)
+        .push(")");
+    }
+    if let Some(term) = f.q.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+        let like = format!("%{term}%");
+        qb.push(" AND (")
+            .push(format!(r#"{col_prefix}"ticketNumber" ILIKE "#))
+            .push_bind(like.clone())
+            .push(format!(
+                r#" OR EXISTS (SELECT 1 FROM "User" uq WHERE uq.id = {outer}."userId" AND uq.name ILIKE "#
+            ))
+            .push_bind(like.clone())
+            .push(")")
+            .push(format!(
+                r#" OR EXISTS (SELECT 1 FROM "SaleLine" slq WHERE slq."saleId" = {outer}.id AND slq.name ILIKE "#
+            ))
+            .push_bind(like)
+            .push(")");
+        // Término numérico → además casa el total exacto (paridad `{ total: Number(term) }`).
+        if let Ok(n) = term.parse::<Decimal>() {
+            qb.push(format!(r#" OR {col_prefix}total = "#)).push_bind(n);
+        }
+        qb.push(")");
+    }
 }
 
 /// `GET /sales` — historial paginado (createdAt desc). Un CLERK (`!org_wide`) solo
@@ -449,6 +496,7 @@ pub async fn list(
             if let Some(t) = filter.to {
                 qb.push(r#" AND "createdAt" < "#).push_bind(t);
             }
+            push_sales_search(qb, &filter, "", r#""Sale""#);
             // SEC-01: el CLERK solo ve ventas de sus tiendas asignadas.
             if !is_org_wide {
                 qb.push(
@@ -553,6 +601,14 @@ fn push_completed_where(
         qb.push(format!(r#" AND {prefix}"createdAt" < "#))
             .push_bind(to);
     }
+    // Cualificador de la fila externa para subconsultas correlacionadas: `"Sale"`
+    // cuando no hay prefijo, o el alias `sa` del JOIN del margen.
+    let outer = if prefix.is_empty() {
+        r#""Sale""#
+    } else {
+        prefix.trim_end_matches('.')
+    };
+    push_sales_search(qb, f, prefix, outer);
     if !is_org_wide {
         qb.push(format!(
             r#" AND {prefix}"storeId" IN (SELECT "storeId" FROM "UserStore" WHERE "userId" = "#

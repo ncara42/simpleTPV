@@ -215,3 +215,227 @@ async fn totales_sin_ventas_no_dividen_por_cero() {
     assert_eq!(page.totals.avg_margin_pct, Decimal::ZERO);
     teardown(&c, product).await;
 }
+
+async fn make_family(c: &Ctx, name: &str) -> Uuid {
+    let id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO "ProductFamily" (id, "organizationId", name, "updatedAt")
+           VALUES ($1, $2, $3, now())"#,
+    )
+    .bind(id)
+    .bind(c.org)
+    .bind(name)
+    .execute(&c.admin)
+    .await
+    .unwrap();
+    id
+}
+
+async fn make_product_named(c: &Ctx, name: String, family: Option<Uuid>) -> Uuid {
+    let id = products::service::create(
+        &c.app,
+        c.org,
+        NewProduct {
+            name,
+            sale_price: Decimal::from(100),
+            description: None,
+            barcode: None,
+            sku: None,
+            cost_price: Some(Decimal::from(60)),
+            tax_rate: Some(Decimal::from(21)),
+            sale_unit: None,
+            unit_symbol: None,
+            family_id: family,
+            active: None,
+        },
+    )
+    .await
+    .unwrap()
+    .id;
+    stock::adjust(
+        &c.app,
+        c.org,
+        c.user,
+        Adjust {
+            product_id: id,
+            store_id: c.store,
+            new_quantity: Decimal::from(100),
+            reason: "init".into(),
+        },
+    )
+    .await
+    .unwrap();
+    id
+}
+
+/// Vende `qty` uds de `product` y devuelve (id de venta, total).
+async fn sell_qty(c: &Ctx, product: Uuid, qty: i64) -> (Uuid, Decimal) {
+    let s = service::create(
+        &c.app,
+        c.org,
+        c.user,
+        Role::Admin,
+        CreateSale {
+            store_id: c.store,
+            client_id: None,
+            ticket_number: None,
+            lines: vec![CreateSaleLine {
+                product_id: product,
+                qty: Decimal::from(qty),
+                discount_pct: None,
+                discount_amt: None,
+            }],
+            payment_method: PaymentMethod::Card,
+            cash_given: None,
+            ticket_discount_pct: None,
+            ticket_discount_amt: None,
+        },
+    )
+    .await
+    .unwrap()
+    .sale;
+    (s.id, s.total)
+}
+
+async fn cleanup_qfam(c: &Ctx, products: &[Uuid], family: Uuid) {
+    for sql in [
+        r#"DELETE FROM "StockMovement" WHERE "storeId" = $1"#,
+        r#"DELETE FROM "StockAlert" WHERE "storeId" = $1"#,
+        r#"DELETE FROM "StockBatch" WHERE "storeId" = $1"#,
+        r#"DELETE FROM "Stock" WHERE "storeId" = $1"#,
+        r#"DELETE FROM "SaleLine" WHERE "saleId" IN (SELECT id FROM "Sale" WHERE "storeId" = $1)"#,
+        r#"DELETE FROM "Sale" WHERE "storeId" = $1"#,
+        r#"DELETE FROM "CashSession" WHERE "storeId" = $1"#,
+        r#"DELETE FROM "UserStore" WHERE "storeId" = $1"#,
+        r#"DELETE FROM "Store" WHERE id = $1"#,
+    ] {
+        sqlx::query(sql)
+            .bind(c.store)
+            .execute(&c.admin)
+            .await
+            .unwrap();
+    }
+    for p in products {
+        sqlx::query(r#"DELETE FROM "Product" WHERE id = $1"#)
+            .bind(p)
+            .execute(&c.admin)
+            .await
+            .unwrap();
+    }
+    sqlx::query(r#"DELETE FROM "ProductFamily" WHERE id = $1"#)
+        .bind(family)
+        .execute(&c.admin)
+        .await
+        .unwrap();
+}
+
+/// `GET /sales` aplica los filtros `q` (búsqueda libre) y `familyId` — paridad con
+/// `buildSalesFilter` de NestJS. Antes el `ListQuery` de Rust los descartaba en
+/// silencio y devolvía TODAS las ventas del tenant (regresión HIGH de la auditoría
+/// de paridad). El filtro afecta tanto al listado como a los totales agregados.
+#[tokio::test]
+async fn filtro_q_y_family_id_acotan_listado_y_totales() {
+    let c = setup().await;
+
+    // Producto A sin familia, producto B en la familia F. Nombres únicos → la barra
+    // de búsqueda casa por nombre de línea (SaleLine.name = nombre del producto).
+    let family = make_family(&c, &format!("Fam-{}", Uuid::new_v4())).await;
+    let name_a = format!("AAA-{}", Uuid::new_v4());
+    let prod_a = make_product_named(&c, name_a.clone(), None).await;
+    let prod_b = make_product_named(&c, format!("BBB-{}", Uuid::new_v4()), Some(family)).await;
+    // A: 1 ud (total 100); B: 2 uds (total 200) → totales distintos para el `q` numérico.
+    let (sale_a, _) = sell_qty(&c, prod_a, 1).await;
+    let (sale_b, total_b) = sell_qty(&c, prod_b, 2).await;
+
+    // q por nombre de línea de A → solo la venta A, en listado y en totales.
+    let page = service::list(
+        &c.app,
+        c.org,
+        c.user,
+        true,
+        SalesFilter {
+            q: Some(name_a.clone()),
+            ..filter(c.store)
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(page.total_items, 1, "q por nombre casa solo la venta A");
+    assert_eq!(page.items[0].id, sale_a);
+    assert_eq!(page.totals.count, 1, "los totales también se acotan por q");
+
+    // q que no casa nada → 0 items y totales a cero.
+    let page = service::list(
+        &c.app,
+        c.org,
+        c.user,
+        true,
+        SalesFilter {
+            q: Some("ZZZ-no-existe".into()),
+            ..filter(c.store)
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(page.total_items, 0);
+    assert_eq!(page.totals.count, 0);
+    assert_eq!(page.totals.total_amount, Decimal::ZERO);
+
+    // q numérico = total de B (200) → casa B por total exacto, no A (100).
+    let page = service::list(
+        &c.app,
+        c.org,
+        c.user,
+        true,
+        SalesFilter {
+            q: Some(total_b.to_string()),
+            ..filter(c.store)
+        },
+    )
+    .await
+    .unwrap();
+    assert!(
+        page.items.iter().any(|s| s.id == sale_b),
+        "q numérico casa el total de B"
+    );
+    assert!(
+        !page.items.iter().any(|s| s.id == sale_a),
+        "no casa A (total distinto)"
+    );
+
+    // familyId = F → solo la venta B (su línea es de un producto de F).
+    let page = service::list(
+        &c.app,
+        c.org,
+        c.user,
+        true,
+        SalesFilter {
+            family_id: Some(family),
+            ..filter(c.store)
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        page.total_items, 1,
+        "familyId acota a la venta del producto en F"
+    );
+    assert_eq!(page.items[0].id, sale_b);
+
+    // familyId desconocida → 0.
+    let page = service::list(
+        &c.app,
+        c.org,
+        c.user,
+        true,
+        SalesFilter {
+            family_id: Some(Uuid::new_v4()),
+            ..filter(c.store)
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(page.total_items, 0);
+
+    cleanup_qfam(&c, &[prod_a, prod_b], family).await;
+}
