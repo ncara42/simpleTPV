@@ -430,7 +430,9 @@ pub async fn list_pending(pool: &PgPool, org: Uuid) -> Result<Vec<PendingMovemen
                 amount: r.amount,
                 reason: r.reason,
                 requested_by_id: r.requested_by_id,
-                requested_by: UserRef { name: r.requested_by_name },
+                requested_by: UserRef {
+                    name: r.requested_by_name,
+                },
                 created_at: r.created_at,
             })
             .collect();
