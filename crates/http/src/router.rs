@@ -63,6 +63,11 @@ const REFRESH_BURST: u32 = 10;
 // frente a los 120 del API privado). Token bucket: burst 30 + repone 1 cada 2s.
 const PUBLIC_REFILL_SECS: u64 = 2;
 const PUBLIC_BURST: u32 = 30;
+// Import CSV de usuarios: 2/min/IP (paridad NestJS @Throttle, DOS-03). Hashea hasta
+// 500 bcrypt por petición (CPU-bound) → límite mucho más estricto que el global.
+// Token bucket: burst 2 + repone 1 cada 30s.
+const USERS_IMPORT_REFILL_SECS: u64 = 30;
+const USERS_IMPORT_BURST: u32 = 2;
 // Rate-limit GLOBAL del API privado (paridad con el ThrottlerGuard global de NestJS,
 // que limitaba TODA ruta autenticada). Configurable por env `THROTTLE_LIMIT`
 // (peticiones/min/IP); default 120. Los route_layer más estrictos (login/refresh/
@@ -123,6 +128,12 @@ pub fn build_router(state: AppState) -> Router {
         .key_extractor(FallbackIpKeyExtractor)
         .finish()
         .expect("config de rate-limit global válida");
+    let users_import_rl = GovernorConfigBuilder::default()
+        .period(Duration::from_secs(USERS_IMPORT_REFILL_SECS))
+        .burst_size(USERS_IMPORT_BURST)
+        .key_extractor(SmartIpKeyExtractor)
+        .finish()
+        .expect("config de rate-limit de import de usuarios válida");
 
     // CORS desde la config (orígenes resueltos con fail-fast en prod, SEC-18).
     // Con `allow_credentials` los orígenes deben ser explícitos (nunca `Any`).
@@ -289,7 +300,12 @@ pub fn build_router(state: AppState) -> Router {
         .route("/returns/blind", post(returns::create_blind))
         // Usuarios (Fase 3): gestión solo ADMIN. `/import` estática antes de `/{id}`.
         .route("/users", get(users::list).post(users::create))
-        .route("/users/import", post(users::import_csv))
+        .route(
+            "/users/import",
+            post(users::import_csv).route_layer(GovernorLayer {
+                config: Arc::new(users_import_rl),
+            }),
+        )
         .route("/users/{id}", patch(users::update).delete(users::remove))
         .route("/users/{id}/pin", put(users::set_pin))
         .route("/users/{id}/stores", put(users::assign_stores))

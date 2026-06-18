@@ -306,6 +306,39 @@ async fn private_api_has_global_rate_limit() {
     );
 }
 
+/// `/users/import` hashea hasta 500 bcrypt por petición → límite estricto 2/min/IP
+/// (DOS-03, paridad NestJS `@Throttle`). El limiter actúa ANTES del handler: sin
+/// token, las 2 primeras llegan al 401 y la 3ª la corta el rate-limit (429).
+#[tokio::test]
+async fn users_import_is_rate_limited_2_per_min() {
+    let (app, _admin) = build().await;
+    let ip = "203.0.113.99";
+    let mut statuses = Vec::new();
+    for _ in 0..3 {
+        let req = Request::builder()
+            .method("POST")
+            .uri("/users/import")
+            .header("x-forwarded-for", ip)
+            .header(CONTENT_TYPE, "application/json")
+            .body(Body::from("{}"))
+            .unwrap();
+        let (st, _, _) = send(&app, req).await;
+        statuses.push(st);
+    }
+    assert!(
+        statuses
+            .iter()
+            .take(2)
+            .all(|s| *s != StatusCode::TOO_MANY_REQUESTS),
+        "las 2 primeras pasan el limiter: {statuses:?}"
+    );
+    assert_eq!(
+        statuses[2],
+        StatusCode::TOO_MANY_REQUESTS,
+        "la 3ª petición la corta el rate-limit estricto de import: {statuses:?}"
+    );
+}
+
 #[tokio::test]
 async fn login_malformed_body_is_400_without_serde_leak() {
     let (app, _admin) = build().await;
