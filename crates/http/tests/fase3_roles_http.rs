@@ -127,6 +127,9 @@ async fn sin_sesion_es_401() {
         "/stores",
         "/suppliers",
         "/time-clock/current?storeId=x",
+        "/products",
+        "/sales",
+        "/stock",
     ] {
         let (st, _, _) = send(&app, get(uri, None)).await;
         assert_eq!(
