@@ -8,8 +8,8 @@ export interface AuthSetup {
 
 // Crea el store + cliente para una app concreta. `appKey` aísla la sesión en
 // localStorage (TPV y backoffice no comparten sesión en el mismo navegador).
-export function setupAuth(appKey: string): AuthSetup {
+export function setupAuth(appKey: string, apiBaseUrl?: string): AuthSetup {
   const useAuthStore = createAuthStore(`simpletpv.auth.${appKey}`);
-  const api = createApiClient(useAuthStore);
+  const api = createApiClient(useAuthStore, apiBaseUrl ?? '/api');
   return { useAuthStore, api };
 }

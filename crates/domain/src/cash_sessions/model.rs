@@ -75,23 +75,35 @@ pub struct CashMovement {
     pub created_at: PrimitiveDateTime,
 }
 
+/// Objeto anidado con el nombre de la tienda (paridad NestJS `store: { name }`).
+#[derive(Debug, Clone, Serialize)]
+pub struct StoreRef {
+    pub name: String,
+}
+
+/// Objeto anidado con el nombre del solicitante (paridad NestJS `requestedBy: { name }`).
+#[derive(Debug, Clone, Serialize)]
+pub struct UserRef {
+    pub name: String,
+}
+
 /// Solicitud PENDING enriquecida con nombre de tienda y de solicitante (campana,
-/// #146 D-7). `storeName`/`requestedByName` son campos planos (el frontend los
-/// lee directamente); divergencia de forma menor frente al `store:{name}` anidado.
-#[derive(Debug, Clone, sqlx::FromRow, Serialize)]
+/// #146 D-7). Serializa `store: { name }` y `requestedBy: { name }` para paridad
+/// con el contrato NestJS que la UI consume en `NotificationsPage`.
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PendingMovement {
     pub id: Uuid,
     pub cash_session_id: Uuid,
     pub store_id: Uuid,
-    pub store_name: String,
+    pub store: StoreRef,
     #[serde(rename = "type")]
     pub movement_type: CashMovementType,
     #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
     pub amount: Decimal,
     pub reason: String,
     pub requested_by_id: Uuid,
-    pub requested_by_name: String,
+    pub requested_by: UserRef,
     #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
     pub created_at: PrimitiveDateTime,
 }
