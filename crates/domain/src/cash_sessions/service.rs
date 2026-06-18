@@ -382,8 +382,6 @@ pub async fn request_movement(
     input: CashMovementInput,
 ) -> Result<CashMovement, AppError> {
     let mov = insert_movement(pool, org, user_id, is_org_wide, id, input, false).await?;
-    // TODO #154 (SSE): emitir `cash.movement.requested` tras commit para la campana.
-    tracing::debug!(movement_id = %mov.id, "solicitud de movimiento de caja (evento SSE diferido, #154)");
     Ok(mov)
 }
 
