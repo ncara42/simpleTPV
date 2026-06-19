@@ -563,3 +563,102 @@ button.ui-chart-group:focus-visible {
 .ui-chart-no-anim .ui-chart-seg {
   transition: none;
 }
+
+/* ── Tarta / donut (PieChart, #188) ─────────────────────────────────────────── */
+.ui-pie {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.ui-pie-canvas {
+  position: relative;
+  flex: 0 0 auto;
+  height: 100%;
+  aspect-ratio: 1;
+}
+.ui-pie-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.ui-pie-slice {
+  cursor: default;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+  transform-origin: 50% 50%;
+}
+.ui-pie-slice.is-active {
+  opacity: 0.85;
+  transform: scale(1.03);
+}
+.ui-pie-hole {
+  fill: var(--ui-surface, #fff);
+}
+.ui-pie-empty {
+  fill: var(--ui-border, #e5e7eb);
+}
+.ui-pie-tip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--ui-text, #18181b);
+  color: var(--ui-surface, #fff);
+  font-size: 0.72rem;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 18%);
+}
+.ui-pie-tip-title {
+  font-weight: 600;
+}
+.ui-pie-tip-value {
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+.ui-pie-legend {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ui-pie-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+.ui-pie-legend-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.ui-pie-legend-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-pie-legend-value {
+  flex: 0 0 auto;
+  color: var(--ui-text-muted, #6b7280);
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-pie-slice {
+    transition: none;
+  }
+}

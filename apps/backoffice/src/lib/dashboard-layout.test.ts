@@ -6,6 +6,7 @@ import {
   addShape,
   addText,
   addWidget,
+  addWidgetToGrid,
   autoArrangeFree,
   availableWidgets,
   BOARD_COLS,
@@ -21,6 +22,8 @@ import {
   type FreeShape,
   type FreeText,
   type FreeWidget,
+  GENERIC_DEFAULT_SIZE,
+  GRID_BREAKPOINT_COLS,
   ITEM_SPECS,
   migrateFreeLayout,
   NOTE_DEFAULT,
@@ -456,5 +459,67 @@ describe('herramientas de dibujo (formas, trazos, texto)', () => {
         .map((e) => e.id)
         .sort(),
     ).toEqual(['d', 's', 't']);
+  });
+});
+
+describe('GENERIC_DEFAULT_SIZE', () => {
+  it('define un tamaño por cada tipo de widget genérico', () => {
+    const types = ['table', 'bar', 'line', 'area', 'stacked', 'pie', 'donut', 'kpi', 'insight'];
+    for (const t of types) {
+      const size = GENERIC_DEFAULT_SIZE[t as keyof typeof GENERIC_DEFAULT_SIZE];
+      expect(size, `falta tamaño para ${t}`).toBeDefined();
+      expect(size.w).toBeGreaterThan(0);
+      expect(size.h).toBeGreaterThan(0);
+    }
+    // Valores clave del plan.
+    expect(GENERIC_DEFAULT_SIZE.table).toEqual({ w: 6, h: 3 });
+    expect(GENERIC_DEFAULT_SIZE.pie).toEqual({ w: 4, h: 3 });
+    expect(GENERIC_DEFAULT_SIZE.kpi).toEqual({ w: 2, h: 1 });
+  });
+});
+
+describe('addWidgetToGrid', () => {
+  it('inserta en lg en top-left con el tamaño dado', () => {
+    const result = addWidgetToGrid({}, 'gen:abc', { w: 6, h: 2 }, 'top-left');
+    expect(result.lg).toEqual([{ i: 'gen:abc', x: 0, y: 0, w: 6, h: 2 }]);
+  });
+
+  it('top-right ancla el widget al borde derecho de las 12 columnas', () => {
+    const result = addWidgetToGrid({}, 'kpi-today', { w: 2, h: 1 }, 'top-right');
+    expect(result.lg).toEqual([{ i: 'kpi-today', x: 10, y: 0, w: 2, h: 1 }]);
+  });
+
+  it('top-center centra el widget', () => {
+    const result = addWidgetToGrid({}, 'w', { w: 4, h: 2 }, 'top-center');
+    expect(result.lg![0]).toMatchObject({ x: 4, w: 4 });
+  });
+
+  it('bottom-left lo coloca bajo lo existente', () => {
+    const base = { lg: [{ i: 'a', x: 0, y: 0, w: 12, h: 3 }] };
+    const result = addWidgetToGrid(base, 'b', { w: 6, h: 2 }, 'bottom-left');
+    const added = result.lg!.find((it) => it.i === 'b')!;
+    expect(added).toEqual({ i: 'b', x: 0, y: 3, w: 6, h: 2 });
+  });
+
+  it('clampa el ancho a las columnas de cada breakpoint presente', () => {
+    // sm tiene 6 columnas: un widget de w:8 se clampa a 6.
+    const base = { lg: [], sm: [] };
+    const result = addWidgetToGrid(base, 'wide', { w: 8, h: 2 }, 'top-left');
+    expect(result.lg![0]!.w).toBe(8); // lg = 12 cols → cabe
+    expect(result.sm![0]!.w).toBe(GRID_BREAKPOINT_COLS.sm); // 6 → clampado
+  });
+
+  it('reemplaza el widget si ya estaba (no lo duplica)', () => {
+    const base = { lg: [{ i: 'x', x: 0, y: 0, w: 2, h: 1 }] };
+    const result = addWidgetToGrid(base, 'x', { w: 4, h: 2 }, 'top-left');
+    expect(result.lg!.filter((it) => it.i === 'x')).toHaveLength(1);
+    expect(result.lg![0]).toMatchObject({ w: 4, h: 2 });
+  });
+
+  it('no muta el layout de entrada', () => {
+    const base = { lg: [{ i: 'a', x: 0, y: 0, w: 2, h: 1 }] };
+    const snapshot = JSON.stringify(base);
+    addWidgetToGrid(base, 'b', { w: 2, h: 1 }, 'top-left');
+    expect(JSON.stringify(base)).toBe(snapshot);
   });
 });

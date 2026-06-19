@@ -2366,3 +2366,70 @@
     transition: none;
   }
 }
+
+/* ── Widgets genéricos (#188) ───────────────────────────────────────────────── */
+/* Contenedores de los widgets parametrizables que crea el agente. Llenan el tile
+   (grid o lienzo libre) y comparten cabecera con el resto del dashboard. */
+.dash-generic {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+  padding: 12px 14px;
+}
+.dash-generic-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text, #18181b);
+}
+.dash-generic-msg {
+  margin: auto;
+  color: var(--text-muted, #6b7280);
+  font-size: 0.85rem;
+}
+.dash-generic--chart {
+  gap: 6px;
+}
+.dash-generic--chart figcaption {
+  margin: 0;
+}
+.dash-generic--kpi {
+  justify-content: center;
+  gap: 4px;
+}
+.dash-generic-kpi-label {
+  font-size: 0.78rem;
+  color: var(--text-muted, #6b7280);
+}
+.dash-generic-kpi-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text, #18181b);
+}
+.dash-generic--insight {
+  overflow: auto;
+}
+.dash-generic-md {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text, #18181b);
+}
+.dash-generic-md > :first-child {
+  margin-top: 0;
+}
+.dash-generic-md > :last-child {
+  margin-bottom: 0;
+}
+.dash-generic-md table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.dash-generic-md th,
+.dash-generic-md td {
+  padding: 4px 8px;
+  border: 1px solid var(--border, #e5e7eb);
+  text-align: left;
+}

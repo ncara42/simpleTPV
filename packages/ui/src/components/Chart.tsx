@@ -48,9 +48,10 @@ export interface ChartProps {
    * la barra más alta no se corte. Solo aplica a `kind="bars"`. Por defecto, false.
    */
   barValues?: boolean;
-  /** Representación: barras (default) o línea con área (U-02). Misma escala,
-   *  mismos labels y mismo tooltip lateral en ambas. */
-  kind?: 'bars' | 'line';
+  /** Representación: barras (default), línea con área (U-02) o área (alias de línea:
+   *  la variante línea ya rellena el área con gradiente). Misma escala, mismos labels
+   *  y mismo tooltip lateral en todas. */
+  kind?: 'bars' | 'line' | 'area';
   /**
    * Solo modo línea: px que el trazo sangra a cada lado (para cancelar el padding
    * del panel y que la línea toque el filo de la card). Los puntos y las etiquetas
@@ -184,9 +185,10 @@ export function Chart({
   const base = showGrid ? niceTicks(rawMax, GRID_TICKS) : { top: rawMax, ticks: [] as number[] };
   // Holgura superior: con barras rotuladas (etiqueta encima) o en línea sin rejilla
   // (el pico no debe tocar el filo superior). La rejilla ya redondea hacia arriba.
+  const isLine = kind === 'line' || kind === 'area';
   let max = base.top;
   if (barValues) max = Math.max(max, rawMax * BAR_VALUE_HEADROOM);
-  if (kind === 'line' && !showGrid) max = Math.max(max, rawMax * LINE_HEADROOM);
+  if (isLine && !showGrid) max = Math.max(max, rawMax * LINE_HEADROOM);
   const axisTicks = base.ticks;
   // Sin eje (showGrid=false) colapsamos el canal izquierdo reservado a los números.
   const noAxisClass = showGrid ? '' : 'ui-chart-no-axis';
@@ -219,7 +221,7 @@ export function Chart({
     </div>
   );
 
-  if (kind === 'line') {
+  if (isLine) {
     return (
       <ChartLine
         data={data}

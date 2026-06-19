@@ -4,6 +4,8 @@
 // preset, vía "Personalizar" (tablero arrastrable con snap a la rejilla), persistida por
 // preset en la preferencia `dashboard.layout`.
 
+import type { DashboardPeriod } from './dashboard.js';
+
 export type PresetId = 'personalizado' | 'ventas' | 'beneficio' | 'inventario' | 'equipo';
 
 // Cards con toggle barras↔línea independiente. El tipo de gráfico es LOCAL a cada card.
@@ -169,6 +171,51 @@ export const DRAW_COLORS = ['#1f2933', '#2563eb', '#16a34a', '#dc2626', '#d97706
 export const DRAW_STROKE_WIDTH = 3;
 export const TEXT_DEFAULT = { w: 220, h: 40, fontSize: 18 };
 
+// ── Widgets genéricos (D-22, chatbot #188) ──
+// El agente puede crear widgets parametrizables (no del catálogo fijo) apuntando a un
+// endpoint de lectura. Su configuración vive en `LayoutPref.genericWidgets[id]` (id =
+// `gen:<uuid>`) para reconstruirlos al recargar. El `type` decide el componente que los
+// renderiza (ver `apps/backoffice/src/widgets/generic/`).
+export type GenericWidgetType =
+  | 'table'
+  | 'bar'
+  | 'line'
+  | 'area'
+  | 'stacked'
+  | 'pie'
+  | 'donut'
+  | 'kpi'
+  | 'insight';
+
+// Configuración persistida de un widget genérico. `endpoint` es relativo a `/api` y debe
+// estar en la allowlist (validada en frontend, ver Fase 5). `params` son query params;
+// `fields` nombra las columnas/series relevantes. `defaultSize` (unidades de grid) lo usa
+// `addWidgetToGrid`/`addWidget` cuando el id no está en `ITEM_SPECS`.
+export interface GenericSpec {
+  type: GenericWidgetType;
+  endpoint: string;
+  params?: Record<string, string | number | boolean>;
+  fields?: string[];
+  period?: DashboardPeriod;
+  storeId?: string | null;
+  title: string;
+  defaultSize: { w: number; h: number };
+}
+
+// Tamaño por defecto (unidades de grid) por tipo de widget genérico. El agente puede
+// sobreescribirlo en `GenericSpec.defaultSize`.
+export const GENERIC_DEFAULT_SIZE: Record<GenericWidgetType, { w: number; h: number }> = {
+  table: { w: 6, h: 3 },
+  bar: { w: 6, h: 2 },
+  line: { w: 6, h: 2 },
+  area: { w: 6, h: 2 },
+  stacked: { w: 6, h: 2 },
+  pie: { w: 4, h: 3 },
+  donut: { w: 4, h: 3 },
+  kpi: { w: 2, h: 1 },
+  insight: { w: 4, h: 2 },
+};
+
 // Preferencia de layout: preset activo, modo, tipo de gráfico por card, colocación 2D del
 // tablero (grid, por breakpoint) y colocación libre (free, a píxel) — ambas por preset.
 // Las claves antiguas (cardOrder/panelOrder, hiddenByPreset, chartKind global) se ignoran.
@@ -186,6 +233,8 @@ export interface LayoutPref {
   freeViews?: Partial<Record<PresetId, { panX: number; panY: number; zoom: number }>>;
   /** D-21: cards/paneles quitados del tablero (Cuadrícula) por preset, vía «Personalizar». */
   hiddenByPreset?: Partial<Record<PresetId, string[]>>;
+  /** D-22 (#188): widgets genéricos creados por el agente, indexados por `gen:<uuid>`. */
+  genericWidgets?: Record<string, GenericSpec>;
 }
 
 // Layout por defecto (breakpoint lg, 12 columnas): coloca primero las tarjetas KPI en una
@@ -245,6 +294,72 @@ export function reconcileLayout(saved: LayoutCoords[], itemIds: string[]): Layou
     rowH = Math.max(rowH, spec.h);
   }
   return [...kept, ...extra];
+}
+
+// ── Inserción en la rejilla (D-22, chatbot #188) ──
+// Columnas por breakpoint del tablero RGL (espejo de `BOARD_COLS_BY_BP` en DashboardPage).
+export const GRID_BREAKPOINT_COLS: Record<string, number> = {
+  lg: 12,
+  md: 12,
+  sm: 6,
+  xs: 4,
+  xxs: 2,
+};
+
+// Posición semántica donde el agente quiere colocar un widget en la rejilla.
+export type SemanticPosition =
+  | 'top-left'
+  | 'top-center'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-center'
+  | 'bottom-right'
+  | 'center';
+
+// x (en columnas) según el ancla horizontal de la posición y el ancho ya clampeado.
+function anchorX(position: SemanticPosition, cols: number, w: number): number {
+  if (position.endsWith('right')) return Math.max(0, cols - w);
+  if (position.endsWith('center') || position === 'center')
+    return Math.max(0, Math.floor((cols - w) / 2));
+  return 0; // left
+}
+
+// y (en filas) según el ancla vertical: arriba = 0; abajo = bajo todo lo existente.
+function anchorY(position: SemanticPosition, items: readonly LayoutCoords[]): number {
+  if (position.startsWith('bottom')) {
+    return items.reduce((m, it) => Math.max(m, it.y + it.h), 0);
+  }
+  return 0; // top / center → arriba (la rejilla fluye hacia abajo)
+}
+
+// Inserta un widget (catálogo o `gen:<uuid>`) en la rejilla, devolviendo unos `StoredLayouts`
+// nuevos (inmutable). El llamador resuelve `size` antes (ITEM_SPECS para catálogo,
+// GenericSpec.defaultSize para genéricos). Inserta en `lg` SIEMPRE y en cada breakpoint ya
+// presente en `layouts`, clampando el ancho a las columnas de cada uno. NO fabrica breakpoints
+// estrechos a partir de `lg` (reproducir el reflow 12→N columnas es trabajo de RGL, que deriva
+// los breakpoints ausentes de `lg` al renderizar). Si el widget ya estaba, se reemplaza.
+export function addWidgetToGrid(
+  layouts: StoredLayouts,
+  widgetId: string,
+  size: { w: number; h: number },
+  position: SemanticPosition = 'top-left',
+): StoredLayouts {
+  const result: StoredLayouts = { ...layouts };
+  const targets = new Set<string>(['lg', ...Object.keys(layouts)]);
+  for (const bp of targets) {
+    const cols = GRID_BREAKPOINT_COLS[bp] ?? BOARD_COLS;
+    const w = Math.min(size.w, cols);
+    const existing = (layouts[bp] ?? []).filter((it) => it.i !== widgetId);
+    const item: LayoutCoords = {
+      i: widgetId,
+      x: anchorX(position, cols, w),
+      y: anchorY(position, existing),
+      w,
+      h: size.h,
+    };
+    result[bp] = [...existing, item];
+  }
+  return result;
 }
 
 // ── Lienzo libre (D-20) ──

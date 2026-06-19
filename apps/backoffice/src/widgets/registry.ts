@@ -1,7 +1,17 @@
 // Catálogo centralizado de widgets del dashboard.
 // Las etiquetas legibles se usan en la paleta de adición, los aria-labels y el chatbot.
+// El registry mantiene los metadatos (etiqueta, tipo, tamaño) de los 22 widgets fijos y
+// permite registrar widgets genéricos (gen:<uuid>) creados por el agente (#188).
 
-import { addWidget, type FreeLayout, ITEM_SPECS } from '../lib/dashboard-layout.js';
+import { createElement, type ReactElement } from 'react';
+
+import {
+  addWidget,
+  type FreeLayout,
+  type GenericSpec,
+  ITEM_SPECS,
+} from '../lib/dashboard-layout.js';
+import { GenericWidget } from './generic/GenericWidget.js';
 
 // Etiquetas legibles de los 22 widgets del catálogo.
 export const WIDGET_LABELS: Record<string, string> = {
@@ -31,12 +41,71 @@ export const WIDGET_LABELS: Record<string, string> = {
   'dash-timeclock': 'Fichajes de hoy',
 };
 
-// Todos los ids de widget disponibles en el catálogo (22).
+// Tipo de widget en el registry. Los del catálogo son 'kpi' o 'panel' (su render lo posee
+// DashboardPage durante la transición); los 'generic' se renderizan vía GenericWidget.
+export type WidgetKind = 'kpi' | 'panel' | 'generic';
+
+export interface WidgetSpec {
+  id: string;
+  label: string;
+  kind: WidgetKind;
+  /** Tamaño por defecto en unidades de rejilla (de ITEM_SPECS o GenericSpec.defaultSize). */
+  defaultSize: { w: number; h: number };
+  /** Render del widget. Opcional para los del catálogo (los pinta DashboardPage por ahora). */
+  render?: () => ReactElement;
+  /** Solo 'generic': configuración con la que el agente parametrizó el widget. */
+  genericSpec?: GenericSpec;
+}
+
+// Todos los ids de widget del catálogo fijo (22).
 export const ALL_WIDGET_IDS: readonly string[] = Object.keys(ITEM_SPECS);
 
-// Devuelve la etiqueta legible de un widget, o su id si no está registrado.
+// Registro vivo. Se siembra con los 22 widgets del catálogo (metadatos); los genéricos se
+// añaden en runtime con `registerGenericWidget`.
+export const WIDGET_REGISTRY = new Map<string, WidgetSpec>(
+  ALL_WIDGET_IDS.map((id) => [
+    id,
+    {
+      id,
+      label: WIDGET_LABELS[id] ?? id,
+      kind: id.startsWith('kpi-') ? 'kpi' : 'panel',
+      defaultSize: ITEM_SPECS[id] ?? { w: 4, h: 2 },
+    } satisfies WidgetSpec,
+  ]),
+);
+
+// Devuelve la etiqueta legible de un widget (catálogo, genérico registrado, o el id).
 export function getWidgetLabel(id: string): string {
-  return WIDGET_LABELS[id] ?? id;
+  return WIDGET_REGISTRY.get(id)?.label ?? WIDGET_LABELS[id] ?? id;
+}
+
+// Devuelve la WidgetSpec registrada (catálogo o genérico), si existe.
+export function getWidgetSpec(id: string): WidgetSpec | undefined {
+  return WIDGET_REGISTRY.get(id);
+}
+
+// Construye la WidgetSpec de un widget genérico a partir de su GenericSpec.
+export function buildGenericWidgetSpec(id: string, spec: GenericSpec): WidgetSpec {
+  return {
+    id,
+    label: spec.title,
+    kind: 'generic',
+    defaultSize: spec.defaultSize,
+    genericSpec: spec,
+    render: () => createElement(GenericWidget, { spec }),
+  };
+}
+
+// Registra (o reemplaza) un widget genérico `gen:<uuid>` en el registry y lo devuelve.
+export function registerGenericWidget(id: string, spec: GenericSpec): WidgetSpec {
+  const widget = buildGenericWidgetSpec(id, spec);
+  WIDGET_REGISTRY.set(id, widget);
+  return widget;
+}
+
+// Elimina un widget genérico del registry (al quitarlo del lienzo o limpiar huérfanos).
+export function unregisterGenericWidget(id: string): void {
+  WIDGET_REGISTRY.delete(id);
 }
 
 // Añade un widget al lienzo libre centrado en `at`.

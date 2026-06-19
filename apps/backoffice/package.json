@@ -23,7 +23,9 @@
     "perfect-freehand": "^1.2.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-grid-layout": "^2.2.3"
+    "react-grid-layout": "^2.2.3",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0",
