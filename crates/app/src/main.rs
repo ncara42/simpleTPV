@@ -82,11 +82,22 @@ async fn run() -> anyhow::Result<()> {
     // sqlx::migrate!() embebe los SQL del directorio migrations/ en el binario:
     // no se necesita Prisma Migrate ni Node.js al desplegar. Las migraciones ya
     // aplicadas son no-op gracias a la tabla _sqlx_migrations que sqlx gestiona.
-    sqlx::migrate!("./migrations")
-        .run(&admin)
-        .await
-        .map_err(|e| anyhow::anyhow!("migraciones fallidas: {e}"))?;
-    tracing::info!("migraciones OK");
+    //
+    // SKIP_MIGRATE=true omite este paso (corte entre Prisma y sqlx: ejecutar el
+    // script de cutover, luego desplegar SIN el flag, y re-desplegar ya limpio).
+    let skip_migrate = std::env::var("SKIP_MIGRATE")
+        .ok()
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or(false);
+    if skip_migrate {
+        tracing::warn!("SKIP_MIGRATE=true: migraciones sqlx omitidas (corte temporal)");
+    } else {
+        sqlx::migrate!("./migrations")
+            .run(&admin)
+            .await
+            .map_err(|e| anyhow::anyhow!("migraciones fallidas: {e}"))?;
+        tracing::info!("migraciones OK");
+    }
 
     // Revalidación A-04: lookup BYPASSRLS sobre el MISMO pool admin (clon barato:
     // PgPool es Arc por dentro) + caché TTL corto. Se construye antes de mover
