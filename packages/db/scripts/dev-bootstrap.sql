@@ -37,5 +37,9 @@ BEGIN
   END IF;
 END $$;
 
+-- app_admin necesita ADMIN sobre app para que la migración `app_login`
+-- pueda hacer ALTER ROLE (PG 16+: CREATEROLE solo no basta; requiere ADMIN OPTION).
+GRANT app TO app_admin WITH ADMIN OPTION;
+
 -- El auto-migrate (runner propio) necesita CREATE en public para crear _sqlx_migrations.
 GRANT USAGE, CREATE ON SCHEMA public TO app_admin;
