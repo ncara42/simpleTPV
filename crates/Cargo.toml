@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["shared", "db", "auth", "domain", "http", "app"]
+members = ["shared", "db", "auth", "domain", "http", "app", "ai"]
 
 # Migración del backend a Rust — workspace Cargo.
 # Arquitectura por capas (ver docs/migration-rust/02 §3):
@@ -73,6 +73,16 @@ jsonwebtoken = "9"
 bcrypt = "0.15"
 # Hash encadenado de los registros VeriFactu (#152/#155): SHA-256.
 sha2 = "0.10"
+# HTTP cliente para las llamadas a los providers LLM (OpenAI, Anthropic) — streaming SSE.
+reqwest = { version = "0.12", features = ["json", "stream"] }
+# SSE generado en Rust (elevado desde http crate que lo tenía como dep local).
+async-stream = "0.3"
+# Stream combinators para los events SSE.
+futures = "0.3"
+# Mapa concurrente para rate-limit por userId en el handler de chat.
+dashmap = "6"
+# CancellationToken para abortar tasks de LLM en el handler.
+tokio-util = { version = "0.7", features = ["sync"] }
 
 # Perfil de release: binario pequeño y rápido (corte en producción, doc 02 §4 Fase 6).
 [profile.release]

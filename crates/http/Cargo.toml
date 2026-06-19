@@ -24,7 +24,7 @@ tracing.workspace = true
 time = "0.3"
 # SSE (#32): bus de eventos in-process (broadcast por tenant) + stream del endpoint.
 tokio = { workspace = true, features = ["sync"] }
-async-stream = "0.3"
+async-stream = { workspace = true }
 # OpenAPI (#155): documento servido en /openapi.json (esquema code-first).
 utoipa = "5"
 
