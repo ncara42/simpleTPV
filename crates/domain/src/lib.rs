@@ -11,6 +11,7 @@ mod pg_enum;
 pub mod api_keys;
 pub mod branding;
 pub mod cache;
+pub mod chat;
 pub mod cash_sessions;
 pub mod csv;
 pub mod customers;
