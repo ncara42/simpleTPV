@@ -6,7 +6,8 @@
 --   o vía el script de package.json:
 --     pnpm --filter @simpletpv/db db:bootstrap-dev
 --
---   En CI (job E2E): se invoca tras `prisma migrate deploy` y antes del seed.
+--   En CI (job E2E): se invoca ANTES del arranque del backend (que auto-migra).
+--   Las migraciones crean los roles con NOLOGIN; aquí les damos LOGIN + password.
 --
 -- NUNCA EJECUTAR EN PRODUCCIÓN:
 --   En prod, el operador ejecuta UNA VEZ manualmente (o desde script de despliegue
@@ -21,5 +22,17 @@
 --   - `app_admin` : BYPASSRLS. Lo usa SOLO el lookup de login del AuthService
 --                   (buscar usuario por email antes de conocer su tenant) y el seed.
 
-ALTER ROLE app       LOGIN PASSWORD 'app_dev_password';
-ALTER ROLE app_admin LOGIN PASSWORD 'app_admin_dev_password';
+-- Crea los roles si no existen (entornos frescos sin migraciones previas, como CI).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app') THEN
+    CREATE ROLE app LOGIN PASSWORD 'app_dev_password';
+  ELSE
+    ALTER ROLE app LOGIN PASSWORD 'app_dev_password';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_admin') THEN
+    CREATE ROLE app_admin LOGIN PASSWORD 'app_admin_dev_password' BYPASSRLS;
+  ELSE
+    ALTER ROLE app_admin LOGIN PASSWORD 'app_admin_dev_password';
+  END IF;
+END $$;

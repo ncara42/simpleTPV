@@ -145,13 +145,20 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @simpletpv/db exec prisma generate
 
+      # El bootstrap CREA o ALTERA los roles `app`/`app_admin` antes del auto-migrate.
+      # El backend necesita estos roles para conectar a la BD. Las migraciones los
+      # crearían con NOLOGIN; aquí les damos LOGIN + password directamente.
+      - name: Bootstrap dev roles (app / app_admin)
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5432 -U postgres -d simpletpv \
+            -f packages/db/scripts/dev-bootstrap.sql
+
       - name: Build apps
         run: pnpm build
 
       # --- Backend Rust ---
-      # El binario aplica las migraciones al arrancar (runner propio, solo versiones).
-      # Las migraciones crean los roles `app` y `app_admin`; el bootstrap de después
-      # les pone contraseña con ALTER ROLE.
       - name: Rust toolchain
         working-directory: crates
         run: |
@@ -181,15 +188,6 @@ jobs:
           echo "API no respondió en 30s — log:"
           cat /tmp/api.log
           exit 1
-
-      # El bootstrap DEBE ir después del auto-migrate: las migraciones crean los
-      # roles `app`/`app_admin`, y aquí les ponemos contraseña con ALTER ROLE.
-      - name: Bootstrap dev roles (app / app_admin)
-        env:
-          PGPASSWORD: postgres
-        run: |
-          psql -h localhost -p 5432 -U postgres -d simpletpv \
-            -f packages/db/scripts/dev-bootstrap.sql
 
       - name: Seed datos demo (e2e)
         run: pnpm --filter @simpletpv/db db:seed:demo
