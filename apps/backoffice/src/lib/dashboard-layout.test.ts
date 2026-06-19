@@ -25,6 +25,7 @@ import {
   migrateFreeLayout,
   NOTE_DEFAULT,
   PANEL_CANON,
+  type PresetDef,
   presetItemIds,
   PRESETS,
   reconcileFreeLayout,
@@ -33,7 +34,30 @@ import {
   TEXT_DEFAULT,
 } from './dashboard-layout.js';
 
-const ventas = PRESETS.find((p) => p.id === 'ventas')!;
+// F0 (#174) dejó «personalizado» como único preset real (lienzo vacío). Las
+// funciones de layout (buildDefaultLayout/defaultPanelOrder/…) siguen aceptando
+// cualquier PresetDef, así que estos fixtures reproducen los presets retirados
+// (Ventas/Inventario) para no perder la cobertura de la lógica de maquetación.
+const ventas: PresetDef = {
+  id: 'ventas',
+  label: 'Ventas',
+  cards: ['kpi-today', 'kpi-avg-ticket', 'kpi-upt'],
+  panels: ['dash-bars', 'dash-family', 'rank-sales', 'dash-hour'],
+};
+const inventario: PresetDef = {
+  id: 'inventario',
+  label: 'Inventario',
+  cards: [],
+  panels: [
+    'dash-stockout',
+    'rank-rotation',
+    'dash-expiring',
+    'dash-purchase-orders',
+    'dash-rotation',
+  ],
+};
+// Presets a validar en las invariantes «para todos los presets»: los reales + los fixtures.
+const ALL_PRESETS: PresetDef[] = [...PRESETS, ventas, inventario];
 
 describe('defaultPanelOrder', () => {
   it('preset Ventas: paneles en orden canónico (maquetación), no en el orden del array', () => {
@@ -46,7 +70,6 @@ describe('defaultPanelOrder', () => {
   });
 
   it('preset Inventario: orden canónico', () => {
-    const inventario = PRESETS.find((p) => p.id === 'inventario')!;
     expect(defaultPanelOrder(inventario)).toEqual([
       'dash-stockout',
       'rank-rotation',
@@ -75,7 +98,7 @@ describe('presetItemIds + ITEM_SPECS', () => {
   });
 
   it('cada elemento de cada preset tiene un tamaño en ITEM_SPECS', () => {
-    for (const preset of PRESETS) {
+    for (const preset of ALL_PRESETS) {
       for (const id of presetItemIds(preset)) {
         expect(ITEM_SPECS[id], `falta ITEM_SPECS para ${id}`).toBeDefined();
       }
@@ -100,7 +123,7 @@ describe('buildDefaultLayout', () => {
   });
 
   it('ningún elemento se sale de las 12 columnas', () => {
-    for (const preset of PRESETS) {
+    for (const preset of ALL_PRESETS) {
       for (const it of buildDefaultLayout(preset)) {
         expect(it.x + it.w).toBeLessThanOrEqual(12);
       }
@@ -108,7 +131,7 @@ describe('buildDefaultLayout', () => {
   });
 
   it('incluye exactamente los elementos del preset', () => {
-    for (const preset of PRESETS) {
+    for (const preset of ALL_PRESETS) {
       const ids = buildDefaultLayout(preset)
         .map((it) => it.i)
         .sort();

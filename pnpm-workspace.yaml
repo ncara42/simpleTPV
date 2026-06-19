@@ -46,8 +46,13 @@ peerDependencyRules:
 #   arrastrado por @prisma/dev 0.24.3 (tooling de prisma 7). 4.12.25 es patch.
 # - multer: floor >=2.2.0 por GHSA-72gw-mp4g-v24j (HIGH 7.5) y GHSA-3p4h-7m6x-2hcm
 #   (5.3) en <2.2.0, arrastrado por @nestjs/platform-express (NestJS eliminado, backend ahora Rust).
-# - undici: floor >=7.28.0 por GHSA-vmh5-mc38-953g (HIGH 7.4) y GHSA-pr7r-676h-xcf6
-#   (MEDIUM 5.9) en 7.26.0, arrastrado transitivamente por jsdom (vía vitest).
+# - undici: rango >=7.28.0 <8.0.0 por GHSA-vmh5-mc38-953g (HIGH 7.4) y
+#   GHSA-pr7r-676h-xcf6 (MEDIUM 5.9) en 7.26.0, arrastrado transitivamente por
+#   jsdom (vía vitest). El tope <8 es CRÍTICO: jsdom 29.1.1 declara `undici
+#   ^7.25.0` y undici 8.x movió `lib/handler/wrap-handler.js`, así que un floor
+#   abierto `>=7.28.0` resolvía a 8.5.0 y rompía TODO el entorno de tests jsdom
+#   (MODULE_NOT_FOUND en jsdom-dispatcher.js). 7.28.x satisface el suelo de
+#   seguridad y mantiene la compatibilidad con jsdom.
 overrides:
   esbuild: '>=0.28.1'
   js-yaml: '>=4.2.0'
@@ -58,7 +63,7 @@ overrides:
   '@opentelemetry/sdk-trace-base': '>=2.8.0'
   picomatch: '>=4.0.4'
   hono: '>=4.12.25'
-  undici: '>=7.28.0'
+  undici: '>=7.28.0 <8.0.0'
 
 allowBuilds:
   '@prisma/engines': set this to true or false
