@@ -82,6 +82,7 @@ import { compareSupplierPrices } from './lib/supplier-prices.js';
 import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
 import { STATUS_LABEL } from './purchases/labels.js';
 import { ALERT_LABEL, df, EXPIRY_LABEL, expiryDaysText } from './stock/labels.js';
+import { getWidgetLabel } from './widgets/registry.js';
 
 // Subtítulo de panel según el periodo seleccionado (más claro que "Periodo actual").
 const PERIOD_SUBTITLE: Record<DashboardPeriod, string> = {
@@ -739,7 +740,7 @@ export function DashboardPage({
   };
   // Etiqueta legible de un elemento del tablero (tarjeta KPI o panel) para el aria-label.
   const boardItemLabel = (id: string): string =>
-    cardDefs.find((c) => c.id === id)?.label ?? PANEL_LABELS[id] ?? id;
+    cardDefs.find((c) => c.id === id)?.label ?? getWidgetLabel(id);
 
   // El bloque de rankings se monta para la pestaña inicial que fije el preset (D-08);
   // su data-testid histórico (dash-rankings) y el selector interno se conservan.
