@@ -175,6 +175,8 @@ jobs:
         run: cargo build --bin simpletpv-api
 
       - name: Start API (auto-migrate + serve)
+        env:
+          THROTTLE_LIMIT: '600'
         run: |
           ./crates/target/debug/simpletpv-api > /tmp/api.log 2>&1 &
           echo $! > /tmp/api.pid
