@@ -441,7 +441,7 @@ async fn run_migrations(pool: &sqlx::PgPool) -> anyhow::Result<()> {
             continue;
         }
         tracing::info!(version = m.version, desc = m.desc, "aplicando migración");
-        sqlx::query(m.sql)
+        sqlx::raw_sql(m.sql)
             .execute(pool)
             .await
             .map_err(|e| anyhow::anyhow!("migración {} ({}): {}", m.version, m.desc, e))?;
