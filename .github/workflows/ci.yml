@@ -145,19 +145,13 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @simpletpv/db exec prisma generate
 
-      - name: Bootstrap dev roles (app / app_admin)
-        env:
-          PGPASSWORD: postgres
-        run: |
-          psql -h localhost -p 5432 -U postgres -d simpletpv \
-            -f packages/db/scripts/dev-bootstrap.sql
-
       - name: Build apps
         run: pnpm build
 
       # --- Backend Rust ---
-      # El binario aplica las migraciones sqlx al arrancar (sqlx::migrate!()),
-      # eliminando la dependencia de Prisma Migrate / Node.js en el despliegue.
+      # El binario aplica las migraciones al arrancar (runner propio, solo versiones).
+      # Las migraciones crean los roles `app` y `app_admin`; el bootstrap de después
+      # les pone contraseña con ALTER ROLE.
       - name: Rust toolchain
         working-directory: crates
         run: |
@@ -188,9 +182,15 @@ jobs:
           cat /tmp/api.log
           exit 1
 
-      # El seed corre DESPUÉS de que el binario Rust haya aplicado las migraciones
-      # (sqlx::migrate!() al arrancar). Prisma Client se usa solo para poblar datos
-      # de test; el esquema ya existe gracias a las migraciones sqlx embebidas.
+      # El bootstrap DEBE ir después del auto-migrate: las migraciones crean los
+      # roles `app`/`app_admin`, y aquí les ponemos contraseña con ALTER ROLE.
+      - name: Bootstrap dev roles (app / app_admin)
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5432 -U postgres -d simpletpv \
+            -f packages/db/scripts/dev-bootstrap.sql
+
       - name: Seed datos demo (e2e)
         run: pnpm --filter @simpletpv/db db:seed:demo
 
