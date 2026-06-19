@@ -36,3 +36,6 @@ BEGIN
     ALTER ROLE app_admin LOGIN PASSWORD 'app_admin_dev_password';
   END IF;
 END $$;
+
+-- El auto-migrate (runner propio) necesita CREATE en public para crear _sqlx_migrations.
+GRANT USAGE, CREATE ON SCHEMA public TO app_admin;
