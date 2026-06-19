@@ -3,9 +3,6 @@
   "ignore": ["**/postcss.config.js"],
   "workspaces": {
     ".": {},
-    "apps/api": {
-      "ignoreDependencies": ["@prisma/client", "pg"]
-    },
     "packages/db": {
       "ignoreDependencies": ["@prisma/client", "@prisma/client-runtime-utils", "pg", "@types/pg"]
     },

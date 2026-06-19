@@ -5,9 +5,8 @@
 # CI/CD y workflows
 /.github/                          @ncara42 @marcogmurciano
 
-# Auth y RLS del API
-/apps/api/src/tenant/              @ncara42 @marcogmurciano
-/apps/api/src/prisma/              @ncara42 @marcogmurciano
+# Backend Rust (auth, RLS, handlers)
+/crates/                            @ncara42 @marcogmurciano
 
 # Infraestructura
 /docker-compose.yml                @ncara42 @marcogmurciano

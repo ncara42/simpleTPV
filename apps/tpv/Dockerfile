@@ -13,7 +13,6 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/db/package.json packages/db/
 COPY packages/ui/package.json packages/ui/
 COPY packages/web-config/package.json packages/web-config/
-COPY apps/api/package.json apps/api/
 COPY apps/tpv/package.json apps/tpv/
 COPY apps/backoffice/package.json apps/backoffice/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \

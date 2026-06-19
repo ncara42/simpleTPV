@@ -99,8 +99,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - app: simpletpv-api
-            dockerfile: apps/api/Dockerfile
+          - app: simpletpv-api-rust
+            dockerfile: crates/Dockerfile
           - app: simpletpv-tpv
             dockerfile: apps/tpv/Dockerfile
           - app: simpletpv-backoffice

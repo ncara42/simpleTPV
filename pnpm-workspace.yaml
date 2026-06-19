@@ -7,7 +7,6 @@ packages:
 strictDepBuilds: false
 
 onlyBuiltDependencies:
-  - '@nestjs/core'
   - '@prisma/client'
   - '@prisma/engines'
   - '@swc/core'
@@ -46,7 +45,7 @@ peerDependencyRules:
 #   (j6c9-x7qj-28xf, rv63-4mwf-qqc2, wgpf-jwqj-8h8p, wwfh-h76j-fc44) en 4.12.23,
 #   arrastrado por @prisma/dev 0.24.3 (tooling de prisma 7). 4.12.25 es patch.
 # - multer: floor >=2.2.0 por GHSA-72gw-mp4g-v24j (HIGH 7.5) y GHSA-3p4h-7m6x-2hcm
-#   (5.3) en <2.2.0, arrastrado por @nestjs/platform-express. Bump menor 2.1→2.2.
+#   (5.3) en <2.2.0, arrastrado por @nestjs/platform-express (NestJS eliminado, backend ahora Rust).
 # - undici: floor >=7.28.0 por GHSA-vmh5-mc38-953g (HIGH 7.4) y GHSA-pr7r-676h-xcf6
 #   (MEDIUM 5.9) en 7.26.0, arrastrado transitivamente por jsdom (vía vitest).
 overrides:
@@ -59,11 +58,9 @@ overrides:
   '@opentelemetry/sdk-trace-base': '>=2.8.0'
   picomatch: '>=4.0.4'
   hono: '>=4.12.25'
-  multer: '>=2.2.0'
   undici: '>=7.28.0'
 
 allowBuilds:
-  '@nestjs/core': set this to true or false
   '@prisma/engines': set this to true or false
   '@scarf/scarf': set this to true or false
   '@swc/core': set this to true or false
