@@ -1029,3 +1029,56 @@ model ApiKey {
 
   @@index([organizationId])
 }
+
+// Chat agente lateral (Dashboard-Chat EPIC #188). El Prisma client no se usa en producción
+// (el backend es Rust/SQLx); estos modelos son documentales para mantener el esquema legible.
+
+model ChatConversation {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  userId         String   @db.Uuid
+  title          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now())
+
+  messages ChatMessage[]
+  usage    AiUsage[]
+
+  @@index([organizationId, userId])
+  @@map("chat_conversation")
+}
+
+model ChatMessage {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @db.Uuid
+  organizationId String   @db.Uuid
+  role           String
+  content        Json
+  toolCalls      Json?
+  toolResults    Json?
+  createdAt      DateTime @default(now())
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId])
+  @@map("chat_message")
+}
+
+model AiUsage {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  userId         String   @db.Uuid
+  conversationId String?  @db.Uuid
+  provider       String
+  model          String
+  inputTokens    Int
+  outputTokens   Int
+  costEur        Decimal  @db.Decimal(10, 4)
+  aborted        Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  conversation ChatConversation? @relation(fields: [conversationId], references: [id])
+
+  @@index([organizationId, createdAt])
+  @@map("ai_usage")
+}
