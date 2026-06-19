@@ -79,12 +79,13 @@ async fn run() -> anyhow::Result<()> {
     tracing::info!("conectado a la base de datos (roles app + app_admin)");
 
     // Aplica migraciones pendientes al arrancar, antes de que el router escuche.
-    // sqlx::migrate!() embebe los SQL del directorio migrations/ en el binario:
-    // no se necesita Prisma Migrate ni Node.js al desplegar. Las migraciones ya
-    // aplicadas son no-op gracias a la tabla _sqlx_migrations que sqlx gestiona.
+    // Las migraciones van embebidas en el binario (include_str!). El runner propio
+    // comprueba solo versiones en _sqlx_migrations, sin validar checksums: así el
+    // corte Prisma → sqlx es indoloro (el script de cutover marca versiones, no
+    // checksums). Las migraciones ya aplicadas se saltan; las nuevas se ejecutan
+    // en orden dentro de una transacción.
     //
-    // SKIP_MIGRATE=true omite este paso (corte entre Prisma y sqlx: ejecutar el
-    // script de cutover, luego desplegar SIN el flag, y re-desplegar ya limpio).
+    // SKIP_MIGRATE=true omite este paso (solo para emergencias o cortes manuales).
     let skip_migrate = std::env::var("SKIP_MIGRATE")
         .ok()
         .and_then(|v| v.parse::<bool>().ok())
@@ -92,11 +93,7 @@ async fn run() -> anyhow::Result<()> {
     if skip_migrate {
         tracing::warn!("SKIP_MIGRATE=true: migraciones sqlx omitidas (corte temporal)");
     } else {
-        sqlx::migrate!("./migrations")
-            .run(&admin)
-            .await
-            .map_err(|e| anyhow::anyhow!("migraciones fallidas: {e}"))?;
-        tracing::info!("migraciones OK");
+        run_migrations(&admin).await?;
     }
 
     // Revalidación A-04: lookup BYPASSRLS sobre el MISMO pool admin (clon barato:
@@ -178,6 +175,286 @@ async fn run() -> anyhow::Result<()> {
     .with_graceful_shutdown(shutdown_signal())
     .await?;
 
+    Ok(())
+}
+
+struct Migration {
+    version: i64,
+    desc: &'static str,
+    sql: &'static str,
+}
+
+macro_rules! m {
+    ($file:literal, $ver:expr, $desc:expr) => {
+        Migration {
+            version: $ver,
+            desc: $desc,
+            sql: include_str!($file),
+        }
+    };
+}
+
+async fn run_migrations(pool: &sqlx::PgPool) -> anyhow::Result<()> {
+    sqlx::query(
+        r#"CREATE TABLE IF NOT EXISTS _sqlx_migrations (
+            version BIGINT PRIMARY KEY,
+            description TEXT NOT NULL,
+            installed_on TIMESTAMPTZ NOT NULL DEFAULT now(),
+            success BOOLEAN NOT NULL,
+            checksum BYTEA NOT NULL DEFAULT ''::bytea,
+            execution_time BIGINT NOT NULL DEFAULT 0
+        )"#,
+    )
+    .execute(pool)
+    .await?;
+
+    let migrations: &[Migration] = &[
+        m!(
+            "../migrations/20260527233848_initial.sql",
+            20260527233848,
+            "initial"
+        ),
+        m!(
+            "../migrations/20260527233947_add_rls.sql",
+            20260527233947,
+            "add_rls"
+        ),
+        m!(
+            "../migrations/20260527234721_app_login.sql",
+            20260527234721,
+            "app_login"
+        ),
+        m!(
+            "../migrations/20260527235720_rls_nullif_fix.sql",
+            20260527235720,
+            "rls_nullif_fix"
+        ),
+        m!(
+            "../migrations/20260528001929_remove_app_password.sql",
+            20260528001929,
+            "remove_app_password"
+        ),
+        m!(
+            "../migrations/20260528062610_product_catalog_fields.sql",
+            20260528062610,
+            "product_catalog_fields"
+        ),
+        m!(
+            "../migrations/20260528065732_product_families.sql",
+            20260528065732,
+            "product_families"
+        ),
+        m!(
+            "../migrations/20260528071759_users_pin_audit.sql",
+            20260528071759,
+            "users_pin_audit"
+        ),
+        m!(
+            "../migrations/20260528095500_sales.sql",
+            20260528095500,
+            "sales"
+        ),
+        m!(
+            "../migrations/20260528100000_sale_payment.sql",
+            20260528100000,
+            "sale_payment"
+        ),
+        m!(
+            "../migrations/20260528122034_sale_discounts.sql",
+            20260528122034,
+            "sale_discounts"
+        ),
+        m!(
+            "../migrations/20260528130000_saleline_tax_rate.sql",
+            20260528130000,
+            "saleline_tax_rate"
+        ),
+        m!(
+            "../migrations/20260528140000_sale_void.sql",
+            20260528140000,
+            "sale_void"
+        ),
+        m!(
+            "../migrations/20260528150000_cash_sessions.sql",
+            20260528150000,
+            "cash_sessions"
+        ),
+        m!(
+            "../migrations/20260528160000_returns.sql",
+            20260528160000,
+            "returns"
+        ),
+        m!(
+            "../migrations/20260528162206_stock_base.sql",
+            20260528162206,
+            "stock_base"
+        ),
+        m!(
+            "../migrations/20260528164730_stock_alerts.sql",
+            20260528164730,
+            "stock_alerts"
+        ),
+        m!(
+            "../migrations/20260528170337_transfers.sql",
+            20260528170337,
+            "transfers"
+        ),
+        m!(
+            "../migrations/20260528201442_suppliers_purchases.sql",
+            20260528201442,
+            "suppliers_purchases"
+        ),
+        m!(
+            "../migrations/20260528204427_verifactu.sql",
+            20260528204427,
+            "verifactu"
+        ),
+        m!(
+            "../migrations/20260529111906_blind_returns.sql",
+            20260529111906,
+            "blind_returns"
+        ),
+        m!(
+            "../migrations/20260530133225_week7_perf_indexes.sql",
+            20260530133225,
+            "week7_perf_indexes"
+        ),
+        m!(
+            "../migrations/20260603110000_tpv_operational_flows.sql",
+            20260603110000,
+            "tpv_operational_flows"
+        ),
+        m!(
+            "../migrations/20260603120000_refresh_tokens.sql",
+            20260603120000,
+            "refresh_tokens"
+        ),
+        m!(
+            "../migrations/20260605120000_time_clock_breaks.sql",
+            20260605120000,
+            "time_clock_breaks"
+        ),
+        m!(
+            "../migrations/20260605163332_saleline_cost_source.sql",
+            20260605163332,
+            "saleline_cost_source"
+        ),
+        m!(
+            "../migrations/20260605192939_sales_export.sql",
+            20260605192939,
+            "sales_export"
+        ),
+        m!(
+            "../migrations/20260606080543_user_preference.sql",
+            20260606080543,
+            "user_preference"
+        ),
+        m!(
+            "../migrations/20260606090657_b2b_wholesale.sql",
+            20260606090657,
+            "b2b_wholesale"
+        ),
+        m!(
+            "../migrations/20260606092916_api_key.sql",
+            20260606092916,
+            "api_key"
+        ),
+        m!(
+            "../migrations/20260607150000_sale_client_id.sql",
+            20260607150000,
+            "sale_client_id"
+        ),
+        m!(
+            "../migrations/20260607220000_stock_batch_fefo.sql",
+            20260607220000,
+            "stock_batch_fefo"
+        ),
+        m!(
+            "../migrations/20260608120000_store_price.sql",
+            20260608120000,
+            "store_price"
+        ),
+        m!(
+            "../migrations/20260608140000_feature_flag.sql",
+            20260608140000,
+            "feature_flag"
+        ),
+        m!(
+            "../migrations/20260608150000_promotion.sql",
+            20260608150000,
+            "promotion"
+        ),
+        m!(
+            "../migrations/20260609100000_family_archetype.sql",
+            20260609100000,
+            "family_archetype"
+        ),
+        m!(
+            "../migrations/20260609160000_supplier_price.sql",
+            20260609160000,
+            "supplier_price"
+        ),
+        m!(
+            "../migrations/20260610200000_store_ops.sql",
+            20260610200000,
+            "store_ops"
+        ),
+        m!(
+            "../migrations/20260611200000_org_branding.sql",
+            20260611200000,
+            "org_branding"
+        ),
+        m!(
+            "../migrations/20260616120000_api_key_ttl.sql",
+            20260616120000,
+            "api_key_ttl"
+        ),
+        m!(
+            "../migrations/20260616120001_rls_with_check.sql",
+            20260616120001,
+            "rls_with_check"
+        ),
+        m!(
+            "../migrations/20260616120002_userstore_rls.sql",
+            20260616120002,
+            "userstore_rls"
+        ),
+        m!(
+            "../migrations/20260616130000_cash_movement_approval.sql",
+            20260616130000,
+            "cash_movement_approval"
+        ),
+    ];
+
+    for m in migrations {
+        let applied: Option<(i64,)> =
+            sqlx::query_as("SELECT version FROM _sqlx_migrations WHERE version = $1")
+                .bind(m.version)
+                .fetch_optional(pool)
+                .await?;
+        if applied.is_some() {
+            tracing::debug!(
+                version = m.version,
+                desc = m.desc,
+                "migración ya aplicada, saltando"
+            );
+            continue;
+        }
+        tracing::info!(version = m.version, desc = m.desc, "aplicando migración");
+        sqlx::query(m.sql)
+            .execute(pool)
+            .await
+            .map_err(|e| anyhow::anyhow!("migración {} ({}): {}", m.version, m.desc, e))?;
+        sqlx::query(
+            "INSERT INTO _sqlx_migrations (version, description, success) VALUES ($1, $2, true)",
+        )
+        .bind(m.version)
+        .bind(m.desc)
+        .execute(pool)
+        .await?;
+    }
+
+    tracing::info!("migraciones OK ({} archivos)", migrations.len());
     Ok(())
 }
 
