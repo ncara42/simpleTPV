@@ -16,6 +16,7 @@ simpletpv-db = { path = "../db" }
 simpletpv-auth = { path = "../auth" }
 simpletpv-domain = { path = "../domain" }
 simpletpv-http = { path = "../http" }
+simpletpv-ai = { path = "../ai" }
 axum.workspace = true
 tokio.workspace = true
 tracing.workspace = true

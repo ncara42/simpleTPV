@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use simpletpv_ai::AiConfig;
 use simpletpv_auth::{AuthService, DbUserStateLookup, UserStateService};
 use sqlx::PgPool;
 
@@ -35,6 +36,8 @@ struct Inner {
     /// Bus de eventos in-process para SSE (#32). Se construye aquí (no se inyecta):
     /// no hay publishers cableados todavía, así que no necesita compartirse fuera.
     events: EventHub,
+    /// Configuración de proveedores LLM (claves de API). None si no se configuró.
+    ai: Option<AiConfig>,
 }
 
 impl AppState {
@@ -45,6 +48,7 @@ impl AppState {
         admin_db: PgPool,
         cookie_secure: bool,
         cors_origins: Vec<String>,
+        ai: Option<AiConfig>,
     ) -> Self {
         Self {
             inner: Arc::new(Inner {
@@ -55,6 +59,7 @@ impl AppState {
                 cookie_secure,
                 cors_origins,
                 events: EventHub::new(),
+                ai,
             }),
         }
     }
@@ -87,5 +92,10 @@ impl AppState {
     /// Bus de eventos in-process (SSE, #32).
     pub fn events(&self) -> &EventHub {
         &self.inner.events
+    }
+
+    /// Configuración de proveedores LLM. None si no hay claves configuradas.
+    pub fn ai(&self) -> Option<&AiConfig> {
+        self.inner.ai.as_ref()
     }
 }

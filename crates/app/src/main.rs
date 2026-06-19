@@ -8,6 +8,7 @@ use std::net::SocketAddr;
 use std::time::Duration;
 
 use secrecy::ExposeSecret;
+use simpletpv_ai::AiConfig;
 use simpletpv_auth::{AuthConfig, AuthService, DbUserStateLookup, UserStateService};
 use simpletpv_http::{build_router, AppState};
 use simpletpv_shared::AppConfig;
@@ -113,6 +114,10 @@ async fn run() -> anyhow::Result<()> {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(cfg!(not(debug_assertions)));
+    let ai = AiConfig::from_env().ok();
+    if ai.is_none() {
+        tracing::info!("chatbot IA deshabilitado (sin OPENAI_API_KEY ni ANTHROPIC_API_KEY)");
+    }
     let app = build_router(AppState::new(
         auth,
         user_state,
@@ -120,6 +125,7 @@ async fn run() -> anyhow::Result<()> {
         admin_db,
         cookie_secure,
         config.cors_origins,
+        ai,
     ));
 
     // Worker de envío VeriFactu (#155): drena la cola de registros PENDING con
@@ -423,6 +429,11 @@ async fn run_migrations(pool: &sqlx::PgPool) -> anyhow::Result<()> {
             "../migrations/20260616130000_cash_movement_approval.sql",
             20260616130000,
             "cash_movement_approval"
+        ),
+        m!(
+            "../migrations/20260620120000_chat.sql",
+            20260620120000,
+            "chat"
         ),
     ];
 

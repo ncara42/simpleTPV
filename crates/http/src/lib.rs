@@ -11,6 +11,7 @@ mod api_keys;
 mod audit;
 mod branding;
 mod cash_sessions;
+mod chat;
 mod customers;
 mod dashboard;
 mod devices;

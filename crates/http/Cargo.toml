@@ -11,6 +11,7 @@ simpletpv-shared = { path = "../shared" }
 simpletpv-db = { path = "../db" }
 simpletpv-auth = { path = "../auth" }
 simpletpv-domain = { path = "../domain" }
+simpletpv-ai = { path = "../ai" }
 axum.workspace = true
 axum-extra.workspace = true
 tower.workspace = true
@@ -25,6 +26,7 @@ time = "0.3"
 # SSE (#32): bus de eventos in-process (broadcast por tenant) + stream del endpoint.
 tokio = { workspace = true, features = ["sync"] }
 async-stream = { workspace = true }
+futures = { workspace = true }
 # OpenAPI (#155): documento servido en /openapi.json (esquema code-first).
 utoipa = "5"
 

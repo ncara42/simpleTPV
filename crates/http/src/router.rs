@@ -22,6 +22,7 @@ use crate::api_keys;
 use crate::audit;
 use crate::branding;
 use crate::cash_sessions;
+use crate::chat;
 use crate::customers;
 use crate::dashboard;
 use crate::devices;
@@ -441,6 +442,36 @@ pub fn build_router(state: AppState) -> Router {
             "/tpv/dashboard/sales-today",
             get(dashboard::tpv_sales_today),
         )
+        // Chat agente (#188): ADMIN/MANAGER. SSE para el turno de streaming;
+        // rutas REST para historial, uso y gestión de conversaciones.
+        .route("/chat/stream", post(chat::stream))
+        .route("/chat/conversations", get(chat::list_conversations))
+        .route(
+            "/chat/conversations/{id}/finalize",
+            post(chat::finalize),
+        )
+        .route(
+            "/chat/conversations/{id}/canvas-result",
+            post(chat::canvas_result),
+        )
+        .route(
+            "/chat/conversations/{id}/after/{message_id}",
+            delete(chat::prune_after),
+        )
+        .route(
+            "/chat/conversations/{id}/messages",
+            get(chat::get_messages),
+        )
+        .route(
+            "/chat/conversations/{id}/usage",
+            get(chat::get_conversation_usage),
+        )
+        .route(
+            "/chat/conversations/{id}",
+            delete(chat::delete_conversation),
+        )
+        .route("/chat/models", get(chat::list_models))
+        .route("/chat/usage", get(chat::get_org_usage))
         // Eventos en tiempo real (Fase 4, #32): stream SSE filtrado por tenant del
         // JWT. Cualquier rol; tope de conexiones por usuario (SEC-03).
         .route("/events", get(events::stream))
