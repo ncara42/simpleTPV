@@ -102,6 +102,7 @@ export interface CanvasOpEvent {
 
 export interface DoneEvent {
   messageId: string;
+  conversationId: string;
   usage: UsageSummary;
 }
 
@@ -306,4 +307,37 @@ export function autoTitle(firstUserMessage: string, now = new Date()): string {
     });
   }
   return snippet.charAt(0).toUpperCase() + snippet.slice(1);
+}
+
+// ── Canvas ops deshacibles ──────────────────────────────────────────────────────
+// Solo las ops `add_*` son inversibles (espejo de `extract_canvas_ops_to_undo` del
+// backend). Se usa en el caso borde de editar/regenerar el primer turno, donde no
+// hay predecesor sobre el que llamar a `pruneAfter` y se borra la conversación
+// entera: necesitamos extraer las ops del historial en cliente antes de borrar.
+
+const ADD_OPS: ReadonlySet<CanvasOpType> = new Set<CanvasOpType>([
+  'add_widget',
+  'add_shape',
+  'add_text',
+  'add_note',
+  'add_insight',
+]);
+
+export function extractUndoableCanvasOps(messages: ChatMessage[]): CanvasOp[] {
+  const ops: CanvasOp[] = [];
+  for (const msg of messages) {
+    if (msg.role !== 'assistant' || !msg.toolCalls) continue;
+    for (const call of msg.toolCalls) {
+      const args = call.args;
+      if (
+        args !== null &&
+        typeof args === 'object' &&
+        'op' in args &&
+        ADD_OPS.has((args as CanvasOp).op)
+      ) {
+        ops.push(args as CanvasOp);
+      }
+    }
+  }
+  return ops;
 }
