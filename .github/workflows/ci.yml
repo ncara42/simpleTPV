@@ -189,6 +189,15 @@ jobs:
           cat /tmp/api.log
           exit 1
 
+      # La migración `remove_app_password` hace ALTER ROLE app NOLOGIN por
+      # seguridad. Para CI necesitamos restaurar LOGIN para el seed y E2E.
+      - name: Re-bootstrap roles (restaura password tras migraciones)
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5432 -U postgres -d simpletpv \
+            -f packages/db/scripts/dev-bootstrap.sql
+
       - name: Seed datos demo (e2e)
         run: pnpm --filter @simpletpv/db db:seed:demo
 
