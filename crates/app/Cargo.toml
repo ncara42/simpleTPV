@@ -25,11 +25,12 @@ secrecy.workspace = true
 # Observabilidad (#155): errores/panics + integración con `tracing`. Transporte
 # sobre rustls (coherente con sqlx); no-op sin SENTRY_DSN. `send_default_pii`
 # desactivado: nada de secretos/PII a Sentry.
-sentry = { version = "0.38", default-features = false, features = [
-  "backtrace",
-  "contexts",
-  "panic",
-  "tracing",
-  "reqwest",
-  "rustls",
-] }
+  sentry = { version = "0.38", default-features = false, features = [
+    "backtrace",
+    "contexts",
+    "panic",
+    "tracing",
+    "reqwest",
+    "rustls",
+  ] }
+  sqlx = { workspace = true }

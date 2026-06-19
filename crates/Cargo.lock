@@ -2604,6 +2604,7 @@ dependencies = [
  "simpletpv-domain",
  "simpletpv-http",
  "simpletpv-shared",
+ "sqlx",
  "tokio",
  "tracing",
  "tracing-subscriber",

@@ -78,6 +78,16 @@ async fn run() -> anyhow::Result<()> {
     let admin = simpletpv_db::build_pool(config.database_url_admin.expose_secret()).await?;
     tracing::info!("conectado a la base de datos (roles app + app_admin)");
 
+    // Aplica migraciones pendientes al arrancar, antes de que el router escuche.
+    // sqlx::migrate!() embebe los SQL del directorio migrations/ en el binario:
+    // no se necesita Prisma Migrate ni Node.js al desplegar. Las migraciones ya
+    // aplicadas son no-op gracias a la tabla _sqlx_migrations que sqlx gestiona.
+    sqlx::migrate!("./migrations")
+        .run(&admin)
+        .await
+        .map_err(|e| anyhow::anyhow!("migraciones fallidas: {e}"))?;
+    tracing::info!("migraciones OK");
+
     // Revalidación A-04: lookup BYPASSRLS sobre el MISMO pool admin (clon barato:
     // PgPool es Arc por dentro) + caché TTL corto. Se construye antes de mover
     // `admin` a `AuthService`.
