@@ -31,7 +31,7 @@ BEGIN
     ALTER ROLE app LOGIN PASSWORD 'app_dev_password';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_admin') THEN
-    CREATE ROLE app_admin LOGIN PASSWORD 'app_admin_dev_password' BYPASSRLS;
+    CREATE ROLE app_admin LOGIN PASSWORD 'app_admin_dev_password' BYPASSRLS CREATEROLE;
   ELSE
     ALTER ROLE app_admin LOGIN PASSWORD 'app_admin_dev_password';
   END IF;
