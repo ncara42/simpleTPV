@@ -5,26 +5,14 @@
    números tabulares con tracking tight.
    ════════════════════════════════════════════════════════════════════ */
 
-/* ─── Cabecera: selector de periodo + selector de tienda ─── */
-/* Periodo: desplegable que se ciñe a su etiqueta (Hoy/Ayer/Semana/Mes) y alinea
-   su alto exterior con el selector de tienda contiguo. */
-.dash-period-select {
-  width: fit-content;
-}
-.dash-period-select .ui-select-trigger {
-  height: calc(30px + 0.36rem + 2px);
-}
-
-.dash-store {
-  /* Se ciñe a la tienda seleccionada (acotado por max-width). */
-  width: fit-content;
-  max-width: 13rem;
-}
-
-/* Iguala el alto exterior de las pills de periodo (.bo-tabs): alto del tab
-   (30px) + padding vertical del contenedor (0.36rem) + hairlines (2px). */
-.dash-store .ui-select-trigger {
-  height: calc(30px + 0.36rem + 2px);
+/* ─── Cabecera: chip de modo activo ─── */
+.dash-preset-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+  letter-spacing: 0.01em;
+  padding: 0 0.25rem;
+  user-select: none;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -209,9 +197,8 @@
 .dash-compare-select {
   width: fit-content;
 }
-/* Misma altura exterior que las pills del header (.dash-period-select/.dash-store)
-   para que TODAS las pills de la vista sean coherentes; el default del Select es
-   2.5rem (más alto). */
+/* Misma altura exterior que las pills del header para que todas las pills de la vista
+   sean coherentes; el default del Select es 2.5rem (más alto). */
 .dash-compare-select .ui-select-trigger {
   height: calc(30px + 0.36rem + 2px);
   border-radius: 9999px;
@@ -920,45 +907,6 @@
   border-radius: 0.5rem;
   padding: 0.02rem 0.4rem;
   vertical-align: middle;
-}
-
-/* ── Selector de preset del dashboard (I-15 / D-08c): control segmentado en la
-   cabecera, junto a periodo y tienda. Mismo lenguaje que .dash-toggle pero en
-   flujo (no flota sobre un panel). ── */
-.dash-preset-switch {
-  display: inline-flex;
-  gap: 0.15rem;
-  padding: 0.18rem;
-  border: 1px solid var(--ui-border);
-  border-radius: 9999px;
-  background: var(--ui-surface-subtle);
-}
-.dash-preset-switch button {
-  /* inline-flex + min-height: los botones solo-icono (toggle de gráfico) igualan
-     la altura de los botones con texto (preset), que viene dada por la caja de
-     línea de la tipografía. Con box-sizing border-box, min-height incluye el
-     padding, así que ambos miden lo mismo. */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 1.8rem;
-  border: none;
-  background: none;
-  padding: 0.28rem 0.85rem;
-  border-radius: 9999px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--ui-text-muted);
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
-}
-.dash-preset-switch button.is-active {
-  background: var(--ui-surface);
-  color: var(--ui-text);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
 }
 
 /* ── Fichajes de hoy (preset Equipo, I-15) ── */

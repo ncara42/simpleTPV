@@ -31,7 +31,6 @@ import {
 import { DaySelector } from './components/DaySelector.js';
 import { FreeBoard } from './components/FreeBoard.js';
 import { WidgetPalette } from './components/WidgetPalette.js';
-import { listStores } from './lib/admin.js';
 import {
   type DashboardPeriod,
   type FamilySales,
@@ -83,14 +82,6 @@ import { compareSupplierPrices } from './lib/supplier-prices.js';
 import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
 import { STATUS_LABEL } from './purchases/labels.js';
 import { ALERT_LABEL, df, EXPIRY_LABEL, expiryDaysText } from './stock/labels.js';
-
-const PERIODS: Array<{ id: DashboardPeriod; label: string }> = [
-  { id: 'yesterday', label: 'Ayer' },
-  { id: 'today', label: 'Hoy' },
-  { id: 'week', label: 'Semana' },
-  { id: 'month', label: 'Mes' },
-  { id: 'year', label: 'Año' },
-];
 
 // Subtítulo de panel según el periodo seleccionado (más claro que "Periodo actual").
 const PERIOD_SUBTITLE: Record<DashboardPeriod, string> = {
@@ -231,17 +222,14 @@ export function DashboardPage({
   const [customGridPaletteOpen, setCustomGridPaletteOpen] = useState(false);
   const store = storeId || undefined;
 
-  const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
-
   // Preferencias ANTES de las queries: el preset activo decide qué se pinta Y
   // qué endpoints se consultan (enabled por visibilidad). D-18: la composición
   // (tarjetas y paneles) la dictan exclusivamente los presets; D-19 añade el orden
   // personalizable DENTRO de cada preset (no cambia qué aparece, solo en qué orden).
   const { prefs, setPref, loaded: prefsLoaded } = usePreferences();
   const layout = readPref<LayoutPref>(prefs, 'dashboard.layout', {});
-  // Default = 'ventas' (no PRESETS[0], que ahora es 'personalizado' y va vacío).
-  const preset =
-    PRESETS.find((p) => p.id === layout.preset) ?? PRESETS.find((p) => p.id === 'ventas')!;
+  // Único preset activo: «personalizado». Los presets anteriores se migraron en F0.
+  const preset = PRESETS[0]!;
   const vis = new Set([...preset.cards, ...preset.panels]);
   // Estable por preset: evita recalcular y, en modo libre, invalidar la memo de nodos del
   // lienzo en cada re-render por datos. (renderItem sí cambia con los datos, por diseño.)
@@ -420,20 +408,36 @@ export function DashboardPage({
 
   usePageHeader('Resumen', 'Actualizado hace 2 min');
 
-  // Periodo y tienda por defecto (IT-16): el dashboard recuerda el último elegido. Se
-  // aplica UNA vez tras cargar las preferencias; los cambios del usuario lo reescriben.
-  const defaultsApplied = useRef(false);
+  // Migración única: si el usuario tenía un preset antiguo (ventas/beneficio/inventario/equipo),
+  // copia su composición a 'personalizado' y fija el preset. Idempotente.
+  const migrationDone = useRef(false);
   useEffect(() => {
-    if (!prefsLoaded || defaultsApplied.current) return;
-    defaultsApplied.current = true;
-    const d = readPref<{ period?: DashboardPeriod; storeId?: string }>(
-      prefs,
-      'dashboard.defaults',
-      {},
-    );
-    if (d.period && PERIODS.some((p) => p.id === d.period)) setPeriod(d.period);
-    if (typeof d.storeId === 'string') setStoreId(d.storeId);
-  }, [prefsLoaded, prefs]);
+    if (!prefsLoaded || migrationDone.current) return;
+    migrationDone.current = true;
+    const oldPreset = (layout as { preset?: string }).preset;
+    if (!oldPreset || oldPreset === 'personalizado') return;
+    const pid = oldPreset as PresetId;
+    const migratedLayouts = layout.layouts?.[pid] ?? layout.layouts?.personalizado;
+    const migratedFreeLayouts = layout.freeLayouts?.[pid] ?? layout.freeLayouts?.personalizado;
+    const migratedFreeViews = layout.freeViews?.[pid] ?? layout.freeViews?.personalizado;
+    const migrated: LayoutPref = {
+      ...layout,
+      preset: 'personalizado',
+      layouts: {
+        ...layout.layouts,
+        ...(migratedLayouts !== undefined ? { personalizado: migratedLayouts } : {}),
+      },
+      freeLayouts: {
+        ...layout.freeLayouts,
+        ...(migratedFreeLayouts !== undefined ? { personalizado: migratedFreeLayouts } : {}),
+      },
+      freeViews: {
+        ...layout.freeViews,
+        ...(migratedFreeViews !== undefined ? { personalizado: migratedFreeViews } : {}),
+      },
+    };
+    setPref('dashboard.layout', migrated);
+  }, [prefsLoaded, layout, setPref]);
   // Reubica el foco al conmutar de modo: al entrar, al primer tile (es enfocable en
   // edición y su aria-label explica cómo moverlo con las flechas); al salir, al botón
   // "Personalizar". No roba el foco en el montaje inicial (solo en transiciones reales).
@@ -455,14 +459,6 @@ export function DashboardPage({
     const t = setTimeout(() => setDotsLeaving(false), 500);
     return () => clearTimeout(t);
   }, [dotsLeaving]);
-  const saveDashboardDefault = (patch: { period?: DashboardPeriod; storeId?: string }): void => {
-    const cur = readPref<{ period?: DashboardPeriod; storeId?: string }>(
-      prefs,
-      'dashboard.defaults',
-      {},
-    );
-    setPref('dashboard.defaults', { ...cur, ...patch });
-  };
   const cardDefs: Array<{ id: string; label: string; node: React.ReactNode }> = [
     {
       id: 'kpi-today',
@@ -579,9 +575,6 @@ export function DashboardPage({
     },
   ];
 
-  // Ocultar/mostrar SOLO afecta al preset activo (D-03): se escribe entera la
-  // lista efectiva de ocultos del preset en dashboard.layout.
-  const setPreset = (id: PresetId): void => setPref('dashboard.layout', { ...layout, preset: id });
   // D-20: cambio de modo (grid/libre). Al cambiar de modo salimos de la edición del grid
   // (editing/draft son conceptos del tablero RGL, no del lienzo libre).
   const setMode = (m: DashboardMode): void => {
@@ -1450,52 +1443,9 @@ export function DashboardPage({
             </div>
           ) : (
             <>
-              {/* Selector de preset en la cabecera (D-08c): cambiar de foco = 1 clic. */}
-              <div
-                className="dash-preset-switch"
-                role="tablist"
-                aria-label="Preset del dashboard"
-                data-testid="dash-preset"
-              >
-                {PRESETS.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={preset.id === p.id}
-                    className={preset.id === p.id ? 'is-active' : ''}
-                    onClick={() => setPreset(p.id)}
-                    data-testid={`dash-preset-${p.id}`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-              <Select
-                className="dash-period-select"
-                value={period}
-                onChange={(value) => {
-                  setPeriod(value as DashboardPeriod);
-                  saveDashboardDefault({ period: value as DashboardPeriod });
-                }}
-                ariaLabel="Periodo"
-                data-testid="dash-period"
-                options={PERIODS.map((p) => ({ value: p.id, label: p.label }))}
-              />
-              <Select
-                className="dash-store"
-                value={storeId}
-                onChange={(value) => {
-                  setStoreId(value);
-                  saveDashboardDefault({ storeId: value });
-                }}
-                ariaLabel="Tienda"
-                data-testid="dash-store"
-                options={[
-                  { value: '', label: 'Todas las tiendas' },
-                  ...stores.map((s) => ({ value: s.id, label: s.name })),
-                ]}
-              />
+              <span className="dash-preset-label" data-testid="dash-preset-personalizado">
+                Personalizado
+              </span>
               {/* En modo Libre el toggle vive en la cabecera flotante centrada (en Cuadrícula
                   va en el cluster sticky de abajo). */}
               {mode === 'free' && <div className="dash-head-right">{modeActions}</div>}

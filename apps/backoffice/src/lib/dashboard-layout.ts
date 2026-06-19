@@ -16,47 +16,15 @@ export interface PresetDef {
   panels: string[];
 }
 
-// Cada preset define sus tarjetas KPI Y sus paneles (D-08d), con el reparto EXACTO
-// cerrado en informe_decisiones. 'ventas' es el default. El preset activo persiste en
-// la preferencia `dashboard.layout` (D-03).
+// Único preset activo: «personalizado». El usuario compone el dashboard con el agente
+// o manualmente. Los presets anteriores (ventas/beneficio/inventario/equipo) se migraron
+// en F0 y sus datos se mantienen en LayoutPref.layouts/freeLayouts por legacy.
 export const PRESETS: PresetDef[] = [
   {
-    // Lienzo en blanco: el usuario compone su dashboard desde cero (modo libre). Empieza
-    // VACÍO; en el lienzo aparece un "+" central para buscar y añadir widgets.
     id: 'personalizado',
     label: 'Personalizado',
     cards: [],
     panels: [],
-  },
-  {
-    id: 'ventas',
-    label: 'Ventas',
-    cards: ['kpi-today', 'kpi-avg-ticket', 'kpi-upt'],
-    panels: ['dash-bars', 'dash-hour', 'dash-family', 'rank-sales'],
-  },
-  {
-    id: 'beneficio',
-    label: 'Beneficio',
-    cards: ['kpi-margin', 'kpi-profit', 'kpi-discount', 'kpi-return'],
-    panels: ['rank-margin', 'dash-discount-emp', 'dash-suppliers'],
-  },
-  {
-    id: 'inventario',
-    label: 'Inventario',
-    cards: ['kpi-lost-sales'],
-    panels: [
-      'dash-stockout',
-      'dash-rotation',
-      'rank-rotation',
-      'dash-expiring',
-      'dash-purchase-orders',
-    ],
-  },
-  {
-    id: 'equipo',
-    label: 'Equipo',
-    cards: [],
-    panels: ['dash-sales-emp', 'dash-discount-emp', 'dash-timeclock'],
   },
 ];
 
