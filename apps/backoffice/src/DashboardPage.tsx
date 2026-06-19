@@ -65,6 +65,7 @@ import {
   reconcileLayout,
   type StoredLayouts,
 } from './lib/dashboard-layout.js';
+import { useDashboardStore } from './lib/dashboard-store.js';
 import {
   deltaTone,
   fmtDelta,
@@ -201,7 +202,10 @@ export function DashboardPage({
   );
   // Modo "Personalizar" (D-19): reordenar cards y paneles por arrastre. El borrador
   // (draft) mantiene el orden mientras se edita; se confirma con Guardar o se descarta.
-  const [editing, setEditing] = useState(false);
+  // F4.1 (#188): `editing` vive en el store del dashboard (compartido con el ChatPanel del
+  // agente, que puede desactivarlo al cambiar a modo Libre).
+  const editing = useDashboardStore((s) => s.editing);
+  const setEditing = useDashboardStore((s) => s.setEditing);
   // Borrador del layout del tablero mientras se edita; se confirma con Guardar o se descarta.
   const [draftLayouts, setDraftLayouts] = useState<StoredLayouts | null>(null);
   // D-21: cards/paneles quitados durante la edición (orden = pila de deshacer). Se inicializa
@@ -228,7 +232,29 @@ export function DashboardPage({
   // (tarjetas y paneles) la dictan exclusivamente los presets; D-19 añade el orden
   // personalizable DENTRO de cada preset (no cambia qué aparece, solo en qué orden).
   const { prefs, setPref, loaded: prefsLoaded } = usePreferences();
-  const layout = readPref<LayoutPref>(prefs, 'dashboard.layout', {});
+  // F4.1 (#188): el store es la fuente de verdad del layout; `usePreferences` queda como capa
+  // de persistencia debajo. Se hidrata una vez desde el servidor y luego el store sincroniza
+  // con `setPref` (debounce 500ms) mediante un persister inyectado.
+  const layout = useDashboardStore((s) => s.layout);
+  const hydrated = useDashboardStore((s) => s.hydrated);
+  const setStoreLayout = useDashboardStore((s) => s.setLayout);
+  // `setPref` se recrea en cada render (arrow inline en usePreferences); lo leemos vía ref para
+  // registrar el persister una sola vez sin re-suscribir.
+  const setPrefRef = useRef(setPref);
+  setPrefRef.current = setPref;
+  useEffect(() => {
+    useDashboardStore.getState().setPersister((l) => setPrefRef.current('dashboard.layout', l));
+    return () => {
+      // Vuelca una escritura pendiente del debounce antes de soltar el persister (evita perder
+      // un cambio al navegar fuera dentro de la ventana de 500ms).
+      useDashboardStore.getState().flushPersist();
+      useDashboardStore.getState().setPersister(null);
+    };
+  }, []);
+  useEffect(() => {
+    if (!prefsLoaded || hydrated) return;
+    useDashboardStore.getState().hydrate(readPref<LayoutPref>(prefs, 'dashboard.layout', {}));
+  }, [prefsLoaded, hydrated, prefs]);
   // Único preset activo: «personalizado». Los presets anteriores se migraron en F0.
   const preset = PRESETS[0]!;
   const vis = new Set([...preset.cards, ...preset.panels]);
@@ -413,7 +439,8 @@ export function DashboardPage({
   // copia su composición a 'personalizado' y fija el preset. Idempotente.
   const migrationDone = useRef(false);
   useEffect(() => {
-    if (!prefsLoaded || migrationDone.current) return;
+    // Espera a la hidratación: el layout del store es `{}` hasta sembrarse desde el servidor.
+    if (!hydrated || migrationDone.current) return;
     migrationDone.current = true;
     const oldPreset = (layout as { preset?: string }).preset;
     if (!oldPreset || oldPreset === 'personalizado') return;
@@ -437,8 +464,8 @@ export function DashboardPage({
         ...(migratedFreeViews !== undefined ? { personalizado: migratedFreeViews } : {}),
       },
     };
-    setPref('dashboard.layout', migrated);
-  }, [prefsLoaded, layout, setPref]);
+    setStoreLayout(migrated);
+  }, [hydrated, layout, setStoreLayout]);
   // Reubica el foco al conmutar de modo: al entrar, al primer tile (es enfocable en
   // edición y su aria-label explica cómo moverlo con las flechas); al salir, al botón
   // "Personalizar". No roba el foco en el montaje inicial (solo en transiciones reales).
@@ -584,24 +611,24 @@ export function DashboardPage({
       setDotsLeaving(true);
       setDraftLayouts(null);
     }
-    setPref('dashboard.layout', { ...layout, mode: m });
+    setStoreLayout({ ...layout, mode: m });
   };
   // D-20: persiste la disposición libre del preset activo (al soltar una card).
   const onFreeChange = (next: FreeLayout): void =>
-    setPref('dashboard.layout', {
+    setStoreLayout({
       ...layout,
       freeLayouts: { ...layout.freeLayouts, [preset.id]: next },
     });
   // D-20: persiste pan/zoom del lienzo libre por preset (evita zoom inconsistente al cambiar).
   const onFreeViewChange = (v: { panX: number; panY: number; zoom: number }): void =>
-    setPref('dashboard.layout', {
+    setStoreLayout({
       ...layout,
       freeViews: { ...layout.freeViews, [preset.id]: v },
     });
   // Personalizado en cuadrícula: añade un widget a freeLayouts (fuente compartida con libre).
   const onAddCustomGridWidget = (widgetId: string): void => {
     const next = addWidget(savedFree, widgetId, { x: 100, y: 100 });
-    setPref('dashboard.layout', {
+    setStoreLayout({
       ...layout,
       freeLayouts: { ...layout.freeLayouts, [preset.id]: next },
     });
@@ -613,7 +640,7 @@ export function DashboardPage({
   const chartKindFor = (card: ChartCard): 'bars' | 'line' =>
     layout.chartKinds?.[card] === 'line' ? 'line' : 'bars';
   const setChartKind = (card: ChartCard, kind: 'bars' | 'line'): void =>
-    setPref('dashboard.layout', {
+    setStoreLayout({
       ...layout,
       chartKinds: { ...layout.chartKinds, [card]: kind },
     });
@@ -693,7 +720,7 @@ export function DashboardPage({
   };
   // Guardar: persiste layout + cards ocultas por preset y sale de edición.
   const saveEditing = (): void => {
-    setPref('dashboard.layout', {
+    setStoreLayout({
       ...layout,
       layouts: { ...layout.layouts, [preset.id]: draftLayouts ?? savedLayouts },
       hiddenByPreset: { ...layout.hiddenByPreset, [preset.id]: draftHidden },

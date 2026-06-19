@@ -532,6 +532,30 @@ export function addWidget(
   return [...layout, el];
 }
 
+// Añade un widget GENÉRICO (`gen:<uuid>`) al lienzo libre centrado en `at`. A diferencia de
+// `addWidget`, no exige que el id esté en `ITEM_SPECS`: el tamaño (en unidades de grid) lo
+// pasa el llamador desde `GenericSpec.defaultSize`. No-op si el widget ya está presente.
+export function addGenericToFree(
+  layout: FreeLayout,
+  widgetId: string,
+  at: { x: number; y: number },
+  gridSize: { w: number; h: number },
+): FreeLayout {
+  if (layout.some((e) => e.kind === 'widget' && e.widgetId === widgetId)) return layout;
+  const size = { w: gridSize.w * FREE_COL - FREE_GAP, h: gridSize.h * FREE_ROW - FREE_GAP };
+  const el: FreeWidget = {
+    kind: 'widget',
+    id: widgetId,
+    widgetId,
+    x: at.x - size.w / 2,
+    y: at.y - size.h / 2,
+    w: size.w,
+    h: size.h,
+    z: nextZ(layout),
+  };
+  return [...layout, el];
+}
+
 // Añade una nota vacía centrada en `at`. El `id` lo genera el llamador (crypto.randomUUID).
 export function addNote(
   layout: FreeLayout,
