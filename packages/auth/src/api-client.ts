@@ -8,6 +8,13 @@ export interface ApiClient {
   // Suscripción al stream SSE de /events. Devuelve una función para cerrar la
   // conexión. onEvent recibe cada AppEvent (ignora los heartbeats `ping`).
   subscribeEvents: (onEvent: (event: AppEvent) => void) => () => void;
+  // POST SSE de un único turno (chat). Parsea el stream y entrega cada evento.
+  postStream: (
+    path: string,
+    body: unknown,
+    onEvent: (eventType: string, data: unknown) => void,
+    signal?: AbortSignal,
+  ) => Promise<void>;
   // Helpers tipados de alto nivel: lanzan ApiError si la respuesta no es ok.
   get: <T>(path: string, query?: QueryParams) => Promise<T>;
   post: <T>(path: string, body?: unknown) => Promise<T>;
@@ -123,6 +130,41 @@ export function createApiClient(store: AuthStore, baseUrl = '/api'): ApiClient {
     return (text === '' ? undefined : JSON.parse(text)) as T;
   }
 
+  async function parseSseStream(
+    body: ReadableStream<Uint8Array>,
+    onEvent: (eventType: string, data: unknown) => void,
+  ): Promise<void> {
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let sep: number;
+      while ((sep = buffer.indexOf('\n\n')) !== -1) {
+        const block = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + 2);
+        let eventType = 'message';
+        const dataLines: string[] = [];
+        for (const line of block.split('\n')) {
+          if (line.startsWith('event:')) {
+            eventType = line.slice(6).trim();
+          } else if (line.startsWith('data:')) {
+            dataLines.push(line.slice(5).trim());
+          }
+        }
+        if (eventType === 'ping' || dataLines.length === 0) continue;
+        try {
+          const data = JSON.parse(dataLines.join('\n')) as unknown;
+          onEvent(eventType, data);
+        } catch {
+          // bloque malformado — ignorar
+        }
+      }
+    }
+  }
+
   return {
     async login(email, password) {
       // credentials:include para que el navegador almacene la cookie httpOnly del
@@ -181,6 +223,46 @@ export function createApiClient(store: AuthStore, baseUrl = '/api'): ApiClient {
       if (!res.ok) {
         throw new ApiError(res.status, await readErrorBody(res));
       }
+    },
+
+    async postStream(path, body, onEvent, signal) {
+      await tryRefresh();
+      const token = store.getState().accessToken;
+      const sig = signal ?? null;
+      const res = await fetch(url(path), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+        signal: sig,
+      });
+      if (res.status === 401) {
+        if (await tryRefresh()) {
+          const token2 = store.getState().accessToken;
+          const res2 = await fetch(url(path), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'text/event-stream',
+              ...(token2 ? { Authorization: `Bearer ${token2}` } : {}),
+            },
+            body: JSON.stringify(body),
+            signal: sig,
+          });
+          if (!res2.ok || !res2.body) {
+            throw new ApiError(res2.status, await readErrorBody(res2));
+          }
+          return parseSseStream(res2.body, onEvent);
+        }
+        throw new ApiError(401, await readErrorBody(res));
+      }
+      if (!res.ok || !res.body) {
+        throw new ApiError(res.status, await readErrorBody(res));
+      }
+      return parseSseStream(res.body, onEvent);
     },
 
     // SSE sobre fetch (el EventSource nativo no permite la cabecera Authorization).
