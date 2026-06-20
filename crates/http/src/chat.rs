@@ -317,11 +317,7 @@ fn run_agent_stream(
                     "remove_element", "arrange", "set_mode", "clear_canvas",
                 ];
                 if canvas_ops.contains(&tc.name.as_str()) {
-                    let op = CanvasOp {
-                        op: tc.name.clone(),
-                        element_id: tc.args["element_id"].as_str().map(|s| s.to_owned()),
-                        extra: tc.args.clone(),
-                    };
+                    let op = CanvasOp::from_tool_call(&tc.name, &tc.args);
                     yield Ok(Event::default()
                         .event("canvas_op")
                         .data(

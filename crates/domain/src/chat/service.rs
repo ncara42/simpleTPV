@@ -222,13 +222,7 @@ fn extract_canvas_ops_to_undo(rows: Vec<Option<serde_json::Value>>) -> Vec<Canva
             if !add_ops.contains(&name) {
                 return None;
             }
-            let args = &tc["args"];
-            let element_id = args["element_id"].as_str().map(|s| s.to_owned());
-            Some(CanvasOp {
-                op: name.to_owned(),
-                element_id,
-                extra: args.clone(),
-            })
+            Some(CanvasOp::from_tool_call(name, &tc["args"]))
         })
         .collect()
 }

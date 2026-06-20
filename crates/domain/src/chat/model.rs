@@ -113,6 +113,78 @@ pub struct CanvasOp {
     pub extra: serde_json::Value,
 }
 
+impl CanvasOp {
+    /// Construye una op de lienzo desde una tool call del LLM, normalizando las claves de los
+    /// argumentos de snake_case (como las declara el esquema de las tools: `widget_id`,
+    /// `store_id`, `generic_spec`…) a camelCase, que es lo que `applyCanvasOp` del frontend
+    /// espera (`widgetId`, `storeId`, `genericSpec`). Sin esto, `add_widget` se rechaza con
+    /// "add_widget sin widgetId" y el widget no se coloca aunque el agente lo anuncie.
+    /// `elementId` lo lleva su propio campo, así que se quita de `extra` para no duplicarlo al
+    /// aplanar.
+    pub fn from_tool_call(name: &str, args: &serde_json::Value) -> Self {
+        let element_id = args["element_id"].as_str().map(|s| s.to_owned());
+        let mut extra = camel_case_keys(args);
+        if let Some(obj) = extra.as_object_mut() {
+            obj.remove("elementId");
+        }
+        Self {
+            op: name.to_owned(),
+            element_id,
+            extra,
+        }
+    }
+}
+
+/// Convierte a camelCase las claves de NIVEL SUPERIOR de un objeto JSON (deja intactos los
+/// valores anidados para no tocar, p.ej., los `params` de un widget genérico).
+fn camel_case_keys(v: &serde_json::Value) -> serde_json::Value {
+    match v.as_object() {
+        Some(map) => serde_json::Value::Object(
+            map.iter()
+                .map(|(k, val)| (snake_to_camel(k), val.clone()))
+                .collect(),
+        ),
+        None => v.clone(),
+    }
+}
+
+fn snake_to_camel(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut upper = false;
+    for c in s.chars() {
+        if c == '_' {
+            upper = true;
+        } else if upper {
+            out.extend(c.to_uppercase());
+            upper = false;
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod canvas_op_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn from_tool_call_normaliza_widget_id_a_camel() {
+        let op = CanvasOp::from_tool_call(
+            "add_widget",
+            &json!({ "widget_id": "kpi-today", "position": "top-left", "element_id": "e1" }),
+        );
+        assert_eq!(op.op, "add_widget");
+        assert_eq!(op.element_id.as_deref(), Some("e1"));
+        // El frontend lee `widgetId` (camelCase) — debe existir tras la normalización.
+        assert_eq!(op.extra["widgetId"], json!("kpi-today"));
+        assert_eq!(op.extra["position"], json!("top-left"));
+        // `elementId` se sirve por su campo propio, no duplicado dentro de `extra`.
+        assert!(op.extra.get("elementId").is_none());
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct PruneResult {
     pub pruned: i64,
