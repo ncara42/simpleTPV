@@ -189,6 +189,10 @@ function Home() {
   });
   const notificationCount = alerts.length + pendingCash.length;
 
+  // F-fix (#188): en modo Libre el lienzo es `position: fixed` a pantalla completa y taparía el
+  // rail del chat; con este flag el contenedor lo eleva por encima (ver `.app-main-row--free`).
+  const dashMode = useDashboardStore((s) => s.layout.mode ?? 'grid');
+
   // F4.2 (#188): puente agente → lienzo. El ChatPanel aplica cada canvas_op sobre el store del
   // dashboard y devuelve el resultado; useChat lo reenvía al backend (feedback loop). El toast
   // avisa cuando el agente saca al usuario de «Personalizar» al cambiar a modo Libre.
@@ -254,7 +258,11 @@ function Home() {
           {/* F3.3 (#188): el rail del chatbot vive a la derecha de <main> en una fila flex y
               solo en la pestaña Dashboard. El ChatPanel persiste su propio colapso (localStorage)
               y gestiona la cola de mensajes (useChat). La aplicación de canvas_op llega en F4.2. */}
-          <div className={`app-main-row${tab === 'dashboard' ? ' app-main-row--chat' : ''}`}>
+          <div
+            className={`app-main-row${tab === 'dashboard' ? ' app-main-row--chat' : ''}${
+              tab === 'dashboard' && dashMode === 'free' ? ' app-main-row--free' : ''
+            }`}
+          >
             <main className="bo-main">
               {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
                   embebe la tabla — enlaza con "Ver todas las ventas →". */}

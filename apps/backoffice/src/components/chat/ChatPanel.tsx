@@ -168,13 +168,23 @@ export function ChatPanel({
         />
       )}
 
-      <ChatInput
-        streaming={chat.streaming}
-        queueLength={chat.queueLength}
-        disabled={!chat.model}
-        onSend={chat.send}
-        onStop={chat.stop}
-      />
+      {chat.modelsLoaded && chat.models.length === 0 ? (
+        <div className="chat-notice" role="status" data-testid="chat-no-ai">
+          <p className="chat-notice__title">El asistente de IA no está configurado</p>
+          <p className="chat-notice__body">
+            Define <code>OPENAI_API_KEY</code> o <code>ANTHROPIC_API_KEY</code> en el backend para
+            activarlo.
+          </p>
+        </div>
+      ) : (
+        <ChatInput
+          streaming={chat.streaming}
+          queueLength={chat.queueLength}
+          disabled={!chat.model}
+          onSend={chat.send}
+          onStop={chat.stop}
+        />
+      )}
 
       {chat.usage && (
         <footer className="chat-footer">

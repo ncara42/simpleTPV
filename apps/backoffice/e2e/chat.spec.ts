@@ -52,11 +52,36 @@ test('colapsar y expandir el panel persiste entre recargas', async ({ page }) =>
   await expect(page.getByTestId('chat-panel')).toBeVisible();
 });
 
+// Mockea solo la lista de modelos (y conversaciones vacías) y recarga para que el panel use
+// el mock — el backend real del E2E no tiene claves de IA, así que sin esto `/chat/models`
+// devuelve []. Patrón de reload idéntico al de `mockChat`.
+async function mockModels(page: import('@playwright/test').Page, models: unknown[]): Promise<void> {
+  await page.route('**/api/chat/models', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(models) }),
+  );
+  await page.route('**/api/chat/conversations', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+  );
+  await page.reload();
+  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
+}
+
 test('el panel expone el selector de modelo y el campo de mensaje', async ({ page }) => {
+  // Con IA configurada (modelos disponibles) el panel muestra el selector y el input.
+  await mockModels(page, MODELS);
   await expect(page.getByTestId('chat-panel')).toBeVisible();
-  // Controles clave del panel presentes (sin enviar: el streaming real es de F6).
   await expect(page.getByTestId('chat-model-select')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Enviar' })).toBeVisible();
+});
+
+test('sin proveedor de IA configurado, el panel avisa en vez de bloquear el input', async ({
+  page,
+}) => {
+  await mockModels(page, []);
+  await expect(page.getByTestId('chat-panel')).toBeVisible();
+  // En vez de un input bloqueado sin explicación, se muestra el aviso de IA no configurada.
+  await expect(page.getByTestId('chat-no-ai')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Enviar' })).toHaveCount(0);
 });
 
 // ── Streaming con provider simulado (route interception) ────────────────────────

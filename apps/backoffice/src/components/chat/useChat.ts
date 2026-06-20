@@ -87,6 +87,8 @@ export interface UseChat {
   error: string | null;
   queueLength: number;
   models: ModelInfo[];
+  /** True una vez resuelta la carga inicial de modelos (con o sin resultados). */
+  modelsLoaded: boolean;
   model: string;
   effort: Effort;
   setModel: (model: string) => void;
@@ -115,6 +117,9 @@ export function useChat(options: UseChatOptions = {}): UseChat {
   const [error, setError] = useState<string | null>(null);
   const [queue, setQueue] = useState<string[]>([]);
   const [models, setModels] = useState<ModelInfo[]>([]);
+  // Distingue «aún cargando modelos» de «cargado y vacío» (IA sin configurar en el backend):
+  // sin esto, el input quedaría bloqueado en silencio y sin explicación.
+  const [modelsLoaded, setModelsLoaded] = useState(false);
   const [model, setModelState] = useState<string>(() => readPref(LS_MODEL) ?? '');
   const [effort, setEffortState] = useState<Effort>(() => {
     const stored = readPref(LS_EFFORT);
@@ -178,6 +183,10 @@ export function useChat(options: UseChatOptions = {}): UseChat {
         });
       } catch (err) {
         if (!cancelled) setError(errorMessage(err));
+      } finally {
+        // Marca la carga como resuelta (con o sin modelos) para que la UI pueda mostrar el
+        // aviso de «IA no configurada» en vez de un input bloqueado sin explicación.
+        if (!cancelled) setModelsLoaded(true);
       }
     })();
     return () => {
@@ -462,6 +471,7 @@ export function useChat(options: UseChatOptions = {}): UseChat {
     error,
     queueLength: queue.length,
     models,
+    modelsLoaded,
     model,
     effort,
     setModel,

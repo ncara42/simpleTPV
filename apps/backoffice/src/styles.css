@@ -40,6 +40,19 @@
   flex: none;
 }
 
+/* Modo Libre: el lienzo es `position: fixed; inset: 0; z-index: 35` (cubre el viewport), así que
+   el chat NO puede quedar en flujo o lo taparía. Se ancla flotando arriba-derecha por encima del
+   lienzo (rail flotante), sin recortarlo. Colapsado = solo el botón; expandido = panel overlay. */
+.app-main-row--free > .chat-panel,
+.app-main-row--free > .chat-rail {
+  position: fixed;
+  top: 68px;
+  right: 0;
+  z-index: 40;
+  height: calc(100vh - 68px);
+  align-self: auto;
+}
+
 @media (max-width: 767px) {
   .bo-main {
     padding: 1.25rem 1.1rem 2.5rem;
