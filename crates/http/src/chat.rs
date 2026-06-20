@@ -698,63 +698,47 @@ fn auto_title(message: &str) -> String {
 fn build_chat_messages(
     rows: &[simpletpv_domain::chat::ChatMessageRow],
 ) -> Vec<simpletpv_ai::event::ChatMessage> {
-    use simpletpv_ai::event::{ChatMessage, ContentBlock, FunctionCall, ToolCallDef};
+    use simpletpv_ai::event::{ChatMessage, ContentBlock};
 
+    // Reconstrucción del historial para el siguiente turno. Se OMITEN los `tool_calls` de los
+    // mensajes assistant y las filas `role:"tool"`: los resultados de tools de datos no se
+    // persisten como filas tool (solo viven en memoria durante su turno) y las ops de canvas se
+    // registran aparte, así que reemitir `tool_calls` históricos dejaría `assistant.tool_calls`
+    // SIN sus mensajes `tool` → 400 en proveedores estrictos (DeepSeek vía OpenCode Zen:
+    // "insufficient tool messages following tool_calls"). El estado del lienzo ya viaja en el
+    // snapshot de cada mensaje y los textos del assistant resumen el resultado, así que basta el
+    // hilo de texto. Los assistant sin texto (portadores de solo-tool_calls) se descartan.
     rows.iter()
-        .map(|row| match row.role.as_str() {
-            "user" => {
-                let text = row.content[0]["text"].as_str().unwrap_or("").to_owned();
-                ChatMessage::User {
-                    content: vec![ContentBlock {
-                        kind: "text".to_owned(),
-                        text,
-                    }],
-                }
-            }
+        .filter_map(|row| match row.role.as_str() {
+            "tool" => None,
             "assistant" => {
                 let text = row.content[0]["text"].as_str().unwrap_or("").to_owned();
-                let tool_calls = row.tool_calls.as_ref().and_then(|tc| {
-                    tc.as_array().map(|arr| {
-                        arr.iter()
-                            .filter_map(|t| {
-                                Some(ToolCallDef {
-                                    id: t["id"].as_str()?.to_owned(),
-                                    kind: "function".to_owned(),
-                                    name: t["name"].as_str()?.to_owned(),
-                                    function: FunctionCall {
-                                        name: t["name"].as_str()?.to_owned(),
-                                        arguments: t["args"].to_string(),
-                                    },
-                                })
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                });
-                ChatMessage::Assistant {
+                if text.trim().is_empty() {
+                    return None;
+                }
+                Some(ChatMessage::Assistant {
                     content: vec![ContentBlock {
                         kind: "text".to_owned(),
                         text,
                     }],
-                    tool_calls: tool_calls.filter(|tc| !tc.is_empty()),
-                }
+                    tool_calls: None,
+                })
             }
-            "tool" => {
-                let tool_call_id = row
-                    .tool_results
-                    .as_ref()
-                    .and_then(|tr| tr[0]["toolCallId"].as_str().map(|s| s.to_owned()))
-                    .unwrap_or_default();
-                ChatMessage::Tool {
-                    tool_call_id,
-                    content: row.content.to_string(),
-                }
+            "user" => {
+                let text = row.content[0]["text"].as_str().unwrap_or("").to_owned();
+                Some(ChatMessage::User {
+                    content: vec![ContentBlock {
+                        kind: "text".to_owned(),
+                        text,
+                    }],
+                })
             }
-            _ => ChatMessage::User {
+            _ => Some(ChatMessage::User {
                 content: vec![ContentBlock {
                     kind: "text".to_owned(),
                     text: row.content.to_string(),
                 }],
-            },
+            }),
         })
         .collect()
 }
