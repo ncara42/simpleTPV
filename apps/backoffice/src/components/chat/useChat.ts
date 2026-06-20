@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   type CanvasOp,
+  type CanvasResultParams,
   type ChatConversation,
   type ChatMessage,
   type ConversationUsage,
@@ -15,8 +16,16 @@ import {
   listModels,
   type ModelInfo,
   pruneAfter,
+  reportCanvasResult,
   streamChat,
 } from '../../lib/chat.js';
+
+// Resultado de aplicar un canvas_op en el lienzo. El consumidor (dashboard) lo devuelve y el
+// hook lo reenvía al backend vía reportCanvasResult para el feedback loop del agente.
+export interface CanvasApplyResult {
+  accepted: boolean;
+  reason?: string;
+}
 
 // ── Persistencia de preferencias ────────────────────────────────────────────────
 
@@ -53,8 +62,13 @@ function errorMessage(error: unknown): string {
 export interface UseChatOptions {
   /** Solo carga datos cuando el panel está activo (tab Dashboard visible). */
   enabled?: boolean | undefined;
-  /** El backend emite un canvas_op durante el stream: el dashboard lo aplica. */
-  onCanvasOp?: ((toolCallId: string, op: CanvasOp) => void) | undefined;
+  /**
+   * El backend emite un canvas_op durante el stream: el dashboard lo aplica y devuelve el
+   * resultado ({ accepted, reason }). El hook lo reenvía al backend (reportCanvasResult) tras
+   * resolver el conversationId — clave en conversaciones nuevas, donde el id llega en `done`,
+   * DESPUÉS de los canvas_op.
+   */
+  onCanvasOp?: ((op: CanvasOp) => CanvasApplyResult | void) | undefined;
   /** Tras prune (editar/regenerar) hay que deshacer las ops add_* del lienzo. */
   onUndoCanvasOps?: ((ops: CanvasOp[]) => void) | undefined;
 }
@@ -204,6 +218,10 @@ export function useChat(options: UseChatOptions = {}): UseChat {
       abortRef.current = controller;
       let resolvedConvId: string | null = null;
       let accumulated = '';
+      // Resultados de cada canvas_op aplicado en el lienzo durante el turno. Se reportan al
+      // backend al final, cuando ya se conoce el conversationId (en conversaciones nuevas el
+      // id llega en `done`, después de los canvas_op).
+      const canvasResults: CanvasResultParams[] = [];
 
       const params = fromConv
         ? { conversationId: fromConv, message: text, model, effort }
@@ -223,7 +241,16 @@ export function useChat(options: UseChatOptions = {}): UseChat {
                 ...prev,
                 { id: ev.id, name: ev.name, args: ev.args },
               ]),
-            onCanvasOp: (ev) => optionsRef.current.onCanvasOp?.(ev.toolCallId, ev.op),
+            onCanvasOp: (ev) => {
+              const res = optionsRef.current.onCanvasOp?.(ev.op);
+              if (res) {
+                canvasResults.push(
+                  res.reason !== undefined
+                    ? { toolCallId: ev.toolCallId, accepted: res.accepted, reason: res.reason }
+                    : { toolCallId: ev.toolCallId, accepted: res.accepted },
+                );
+              }
+            },
             onDone: (ev) => {
               resolvedConvId = ev.conversationId;
             },
@@ -239,6 +266,18 @@ export function useChat(options: UseChatOptions = {}): UseChat {
         if (target && target !== activeIdRef.current) {
           activeIdRef.current = target;
           setActiveId(target);
+        }
+        // Reporta el resultado de cada canvas_op al backend (feedback loop): registra el
+        // tool_result real en el historial para que el próximo turno del LLM sepa si la
+        // operación se aplicó o se rechazó. No es bloqueante; un fallo no rompe el turno.
+        if (target && canvasResults.length) {
+          for (const r of canvasResults) {
+            try {
+              await reportCanvasResult(target, r);
+            } catch {
+              /* el reporte es best-effort: si falla, el LLM lo verá como pendiente */
+            }
+          }
         }
         // Si fue un Stop, stop() se encarga de finalizar y refrescar.
         if (!abortedRef.current && target) {

@@ -78,12 +78,21 @@ describe('estado UI', () => {
     expect(store().editing).toBe(false);
   });
 
-  it('setMode cambia el modo y sale de la edición', () => {
+  it('setMode a Libre sale de la edición (la edición arrastrable no aplica en Libre)', () => {
     store().setEditing(true);
     const r = store().setMode('free');
     expect(r.accepted).toBe(true);
     expect(store().layout.mode).toBe('free');
     expect(store().editing).toBe(false);
+  });
+
+  it('setMode a Cuadrícula respeta el estado de edición actual (no lo toca)', () => {
+    store().hydrate({ mode: 'free' });
+    store().setEditing(true);
+    store().setMode('grid');
+    expect(store().layout.mode).toBe('grid');
+    // No auto-sale de edición al volver a Cuadrícula (F4.2).
+    expect(store().editing).toBe(true);
   });
 });
 
@@ -113,6 +122,26 @@ describe('addWidget (catálogo)', () => {
     const r = store().addWidget('dash-bars');
     expect(r.accepted).toBe(false);
     expect(r.reason).toMatch(/ya está/);
+  });
+
+  it('escalona en el lienzo libre dos widgets distintos en la misma ancla (anti-solape)', () => {
+    store().hydrate({ mode: 'free' });
+    store().addWidget('dash-bars', 'center');
+    store().addWidget('dash-family', 'center');
+    const els = freeOf().filter((e) => e.kind === 'widget');
+    expect(els).toHaveLength(2);
+    // No quedan exactamente en la misma posición (offset diagonal aplicado).
+    expect(els[0]!.x === els[1]!.x && els[0]!.y === els[1]!.y).toBe(false);
+  });
+
+  it('no solapa en la rejilla dos widgets en top-left (escaneo de hueco libre)', () => {
+    store().addWidget('dash-bars', 'top-left'); // w7
+    store().addWidget('dash-family', 'top-left'); // w5 → cabe a la derecha en la fila 0
+    const lg = gridLg();
+    const a = lg.find((i) => i.i === 'dash-bars')!;
+    const b = lg.find((i) => i.i === 'dash-family')!;
+    const overlap = a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+    expect(overlap).toBe(false);
   });
 });
 
@@ -210,6 +239,20 @@ describe('remove / clear / arrange', () => {
     const r = store().removeElement('nope');
     expect(r.accepted).toBe(false);
     expect(r.reason).toMatch(/no encontrado/);
+  });
+
+  // Editar y reenviar (criterio F4.2): el undo de canvas_ops quita las add_* del turno por su
+  // id (widgetId para catálogo) y el reenvío no las duplica. Reproduce lo que hace
+  // handleUndoCanvasOps en App.tsx (op.elementId ?? op.widgetId → removeElement).
+  it('add_widget → undo (por widgetId) → re-add no duplica el widget en la rejilla', () => {
+    store().applyCanvasOp({ op: 'add_widget', widgetId: 'kpi-today' });
+    expect(gridLg().filter((i) => i.i === 'kpi-today')).toHaveLength(1);
+    // Undo: el CanvasOp persistido lleva widgetId (no elementId) para widgets de catálogo.
+    store().removeElement('kpi-today');
+    expect(gridLg().filter((i) => i.i === 'kpi-today')).toHaveLength(0);
+    // Reenvío del turno corregido: vuelve a añadirse una sola vez.
+    store().applyCanvasOp({ op: 'add_widget', widgetId: 'kpi-today' });
+    expect(gridLg().filter((i) => i.i === 'kpi-today')).toHaveLength(1);
   });
 
   it('removeElement desregistra un genérico del registry', () => {

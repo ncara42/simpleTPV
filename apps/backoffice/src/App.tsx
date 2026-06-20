@@ -27,18 +27,21 @@ import {
   Tag,
   Users,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
 import { ChatPanel } from './components/chat/ChatPanel.js';
 import { FunctionSearch } from './components/FunctionSearch.js';
+import { useToast } from './components/ToastProvider.js';
 import { DashboardPage } from './DashboardPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { HelpPage } from './HelpPage.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { useBranding } from './lib/branding.js';
 import { listPendingCashMovements } from './lib/cash.js';
+import type { CanvasOp } from './lib/chat.js';
+import { useDashboardStore } from './lib/dashboard-store.js';
 import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { switchApp, type Tab } from './lib/nav.js';
@@ -186,6 +189,33 @@ function Home() {
   });
   const notificationCount = alerts.length + pendingCash.length;
 
+  // F4.2 (#188): puente agente → lienzo. El ChatPanel aplica cada canvas_op sobre el store del
+  // dashboard y devuelve el resultado; useChat lo reenvía al backend (feedback loop). El toast
+  // avisa cuando el agente saca al usuario de «Personalizar» al cambiar a modo Libre.
+  const showToast = useToast();
+  const handleCanvasOp = useCallback(
+    (op: CanvasOp) => {
+      const store = useDashboardStore.getState();
+      const wasEditing = store.editing;
+      const result = store.applyCanvasOp(op);
+      if (op.op === 'set_mode' && op.mode === 'free' && wasEditing) {
+        showToast('Has salido del modo Personalizar', 'info');
+      }
+      return result;
+    },
+    [showToast],
+  );
+  // Deshacer canvas_ops tras editar/regenerar: solo las add_* son inversibles. El id del
+  // elemento es `elementId` (shapes/notas/genéricos) o `widgetId` (widgets de catálogo, cuyo
+  // id en el lienzo coincide con el widgetId).
+  const handleUndoCanvasOps = useCallback((ops: CanvasOp[]) => {
+    const store = useDashboardStore.getState();
+    for (const op of ops) {
+      const id = op.elementId ?? op.widgetId;
+      if (id) store.removeElement(id);
+    }
+  }, []);
+
   return (
     <div className="app-shell">
       <Sidebar
@@ -247,7 +277,9 @@ function Home() {
               {tab === 'settings' && <SettingsPage />}
               {tab === 'help' && <HelpPage />}
             </main>
-            {tab === 'dashboard' && <ChatPanel />}
+            {tab === 'dashboard' && (
+              <ChatPanel onCanvasOp={handleCanvasOp} onUndoCanvasOps={handleUndoCanvasOps} />
+            )}
           </div>
         </PageHeaderProvider>
       </div>

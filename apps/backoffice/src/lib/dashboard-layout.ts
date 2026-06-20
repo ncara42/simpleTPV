@@ -324,12 +324,55 @@ function anchorX(position: SemanticPosition, cols: number, w: number): number {
   return 0; // left
 }
 
-// y (en filas) según el ancla vertical: arriba = 0; abajo = bajo todo lo existente.
-function anchorY(position: SemanticPosition, items: readonly LayoutCoords[]): number {
-  if (position.startsWith('bottom')) {
-    return items.reduce((m, it) => Math.max(m, it.y + it.h), 0);
+// ¿Colisiona el rectángulo `r` con alguno de `items`? (solape en x e y a la vez).
+function collidesGrid(items: readonly LayoutCoords[], r: LayoutCoords): boolean {
+  return items.some(
+    (it) => r.x < it.x + it.w && r.x + r.w > it.x && r.y < it.y + it.h && r.y + r.h > it.y,
+  );
+}
+
+// Columnas candidatas (en orden de preferencia) para el ancla horizontal de la posición.
+function candidateXs(position: SemanticPosition, cols: number, w: number): number[] {
+  const max = Math.max(0, cols - w);
+  if (max === 0) return [0];
+  if (position.endsWith('right')) {
+    return Array.from({ length: max + 1 }, (_, i) => max - i); // derecha → izquierda
   }
-  return 0; // top / center → arriba (la rejilla fluye hacia abajo)
+  if (position.endsWith('center') || position === 'center') {
+    const center = Math.floor(max / 2);
+    // Desde el centro hacia afuera (centro, centro-1, centro+1, …).
+    const order = [center];
+    for (let d = 1; d <= max; d++) {
+      if (center - d >= 0) order.push(center - d);
+      if (center + d <= max) order.push(center + d);
+    }
+    return order;
+  }
+  return Array.from({ length: max + 1 }, (_, i) => i); // izquierda → derecha
+}
+
+// Primer hueco libre para un widget de tamaño w×h respetando la posición semántica. El
+// acumulador de ocupación es `items` (la ocupación ACTUAL del breakpoint). top/center
+// escanean filas desde arriba; bottom desde debajo de todo lo existente. Garantiza no solapar
+// (una fila vacía suficientemente abajo siempre ofrece hueco → termina). #188 F4.2.
+function firstFreeSlot(
+  items: readonly LayoutCoords[],
+  cols: number,
+  w: number,
+  h: number,
+  position: SemanticPosition,
+): { x: number; y: number } {
+  const baseY = position.startsWith('bottom')
+    ? items.reduce((m, it) => Math.max(m, it.y + it.h), 0)
+    : 0;
+  const xs = candidateXs(position, cols, w);
+  for (let y = baseY; y < baseY + 1000; y++) {
+    for (const x of xs) {
+      if (!collidesGrid(items, { i: '', x, y, w, h })) return { x, y };
+    }
+  }
+  // Inalcanzable en la práctica; fallback defensivo bajo todo lo existente.
+  return { x: anchorX(position, cols, w), y: baseY };
 }
 
 // Inserta un widget (catálogo o `gen:<uuid>`) en la rejilla, devolviendo unos `StoredLayouts`
@@ -350,13 +393,8 @@ export function addWidgetToGrid(
     const cols = GRID_BREAKPOINT_COLS[bp] ?? BOARD_COLS;
     const w = Math.min(size.w, cols);
     const existing = (layouts[bp] ?? []).filter((it) => it.i !== widgetId);
-    const item: LayoutCoords = {
-      i: widgetId,
-      x: anchorX(position, cols, w),
-      y: anchorY(position, existing),
-      w,
-      h: size.h,
-    };
+    const slot = firstFreeSlot(existing, cols, w, size.h, position);
+    const item: LayoutCoords = { i: widgetId, x: slot.x, y: slot.y, w, h: size.h };
     result[bp] = [...existing, item];
   }
   return result;

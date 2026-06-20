@@ -8,7 +8,7 @@ import { ChatConversationList } from './ChatConversationList.js';
 import { ChatHeader } from './ChatHeader.js';
 import { ChatInput } from './ChatInput.js';
 import { ChatMessages } from './ChatMessages.js';
-import { useChat } from './useChat.js';
+import { type CanvasApplyResult, useChat } from './useChat.js';
 
 const LS_COLLAPSED = 'dashboard.chatCollapsed';
 
@@ -41,7 +41,8 @@ function formatEur(value: string): string {
 export interface ChatPanelProps {
   /** Solo activo (carga y visible) en la pestaña Dashboard. */
   enabled?: boolean;
-  onCanvasOp?: (toolCallId: string, op: CanvasOp) => void;
+  /** Aplica un canvas_op en el lienzo y devuelve el resultado para el feedback loop. */
+  onCanvasOp?: (op: CanvasOp) => CanvasApplyResult | void;
   onUndoCanvasOps?: (ops: CanvasOp[]) => void;
 }
 

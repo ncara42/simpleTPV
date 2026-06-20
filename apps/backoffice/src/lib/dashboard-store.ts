@@ -74,8 +74,10 @@ function schedulePersist(layout: LayoutPref): void {
 }
 
 // ── Traducción de posición semántica (modo libre) ──────────────────────────────
-// Mapeo simple posición → coords de mundo para sembrar el lienzo. F4.2 lo refina con el
-// centro real del viewport y offset anti-solape; aquí basta una rejilla fija de anclas.
+// Mapeo posición → coords de mundo para sembrar el lienzo. El centro EXACTO del viewport
+// (pan/zoom de FreeBoard) no lo conoce el store; estas anclas fijas son una aproximación
+// estable y el offset anti-solape (`freeSlot`) escalona los elementos que caen en la misma
+// ancla durante un turno (el agente coloca varios). #188 F4.2.
 const FREE_ANCHORS: Record<SemanticPosition, { x: number; y: number }> = {
   'top-left': { x: 240, y: 200 },
   'top-center': { x: 700, y: 200 },
@@ -91,6 +93,22 @@ function asPosition(position: string | undefined): SemanticPosition {
 }
 function freeAnchor(position: string | undefined): { x: number; y: number } {
   return FREE_ANCHORS[asPosition(position)];
+}
+
+// Distancia (px) bajo la cual se considera que dos elementos «se apilan» en la misma ancla,
+// y el paso diagonal con el que se escalonan para que no queden uno encima de otro.
+const FREE_NEAR_PX = 120;
+const FREE_STEP_PX = 36;
+
+// Desplaza el ancla en diagonal según cuántos elementos ya están cerca de ella, evitando que
+// varios elementos colocados en la misma posición durante un turno queden superpuestos.
+function freeSlot(layout: FreeLayout, anchor: { x: number; y: number }): { x: number; y: number } {
+  const near = layout.filter(
+    (e) =>
+      Math.abs(e.x + e.w / 2 - anchor.x) < FREE_NEAR_PX &&
+      Math.abs(e.y + e.h / 2 - anchor.y) < FREE_NEAR_PX,
+  ).length;
+  return { x: anchor.x + near * FREE_STEP_PX, y: anchor.y + near * FREE_STEP_PX };
 }
 
 const GENERIC_TYPES = new Set<GenericWidgetType>([
@@ -137,7 +155,8 @@ function placeGeneric(
 ): LayoutPref {
   const genericWidgets = { ...layout.genericWidgets, [id]: spec };
   if (modeOf(layout) === 'free') {
-    const next = addGenericToFree(freeOf(layout), id, freeAnchor(position), spec.defaultSize);
+    const free = freeOf(layout);
+    const next = addGenericToFree(free, id, freeSlot(free, freeAnchor(position)), spec.defaultSize);
     return { ...withFree(layout, next), genericWidgets };
   }
   const next = addWidgetToGrid(gridOf(layout), id, spec.defaultSize, asPosition(position));
@@ -228,9 +247,10 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   setEditing: (editing) => set({ editing }),
 
   setMode: (mode) => {
-    const { layout } = get();
-    // Al cambiar de modo salimos de «Personalizar» (la edición arrastrable no aplica en Libre).
-    set({ editing: false });
+    const { layout, editing } = get();
+    // La edición arrastrable («Personalizar») solo aplica en Cuadrícula: al pasar a Libre se
+    // desactiva. Al pasar a Cuadrícula se respeta el estado actual (no se auto-entra/sale).
+    if (mode === 'free' && editing) set({ editing: false });
     get().setLayout({ ...layout, mode });
     return ACCEPTED;
   },
@@ -242,7 +262,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     }
     if (modeOf(layout) === 'free') {
       const free = freeOf(layout);
-      const next = addWidgetToFree(free, widgetId, freeAnchor(position));
+      const next = addWidgetToFree(free, widgetId, freeSlot(free, freeAnchor(position)));
       if (next === free) return rejected(`el widget ya está en el lienzo: ${widgetId}`);
       get().setLayout(withFree(layout, next));
     } else {
@@ -314,13 +334,14 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     if (modeOf(layout) !== 'free') return rejected('las formas solo se dibujan en modo Libre');
     if (!SHAPE_KINDS.has(kind as ShapeKind)) return rejected(`forma desconocida: ${kind}`);
     const shape = kind as ShapeKind;
-    const at = freeAnchor(position);
+    const free = freeOf(layout);
+    const at = freeSlot(free, freeAnchor(position));
     const box = { x: at.x, y: at.y, w: 220, h: 140 };
     const opts =
       shape === 'line' || shape === 'arrow'
         ? { stroke: DRAW_COLORS[0]!, strokeWidth: DRAW_STROKE_WIDTH, diag: 'main' as const }
         : { stroke: DRAW_COLORS[0]!, strokeWidth: DRAW_STROKE_WIDTH };
-    const next = addShapeEl(freeOf(layout), crypto.randomUUID(), shape, box, opts);
+    const next = addShapeEl(free, crypto.randomUUID(), shape, box, opts);
     get().setLayout(withFree(layout, next));
     return ACCEPTED;
   },
@@ -328,10 +349,11 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   addText: (text, position) => {
     const { layout } = get();
     if (modeOf(layout) !== 'free') return rejected('el texto solo se añade en modo Libre');
+    const free = freeOf(layout);
     const next = addTextEl(
-      freeOf(layout),
+      free,
       crypto.randomUUID(),
-      freeAnchor(position),
+      freeSlot(free, freeAnchor(position)),
       DRAW_COLORS[0]!,
     );
     // El helper crea el texto vacío; aplica el contenido del agente si lo hay.
@@ -345,7 +367,8 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   addNote: (text, position) => {
     const { layout } = get();
     if (modeOf(layout) !== 'free') return rejected('las notas solo se añaden en modo Libre');
-    const next = addNoteEl(freeOf(layout), crypto.randomUUID(), freeAnchor(position));
+    const free = freeOf(layout);
+    const next = addNoteEl(free, crypto.randomUUID(), freeSlot(free, freeAnchor(position)));
     // NOTA(F4.2): el `text` del agente se vuelca a un doc TipTap; aquí se crea la nota vacía.
     void text;
     get().setLayout(withFree(layout, next));

@@ -522,4 +522,19 @@ describe('addWidgetToGrid', () => {
     addWidgetToGrid(base, 'b', { w: 2, h: 1 }, 'top-left');
     expect(JSON.stringify(base)).toBe(snapshot);
   });
+
+  it('busca el primer hueco libre: no solapa con un widget ya en top-left (F4.2)', () => {
+    const base = { lg: [{ i: 'a', x: 0, y: 0, w: 6, h: 2 }] };
+    const result = addWidgetToGrid(base, 'b', { w: 6, h: 2 }, 'top-left');
+    const added = result.lg!.find((it) => it.i === 'b')!;
+    // El hueco libre más alto-izquierdo es la columna 6 de la fila 0 (a ocupa 0–5).
+    expect(added).toEqual({ i: 'b', x: 6, y: 0, w: 6, h: 2 });
+  });
+
+  it('apila en la fila siguiente cuando la primera está llena (F4.2)', () => {
+    const base = { lg: [{ i: 'a', x: 0, y: 0, w: 12, h: 2 }] };
+    const result = addWidgetToGrid(base, 'b', { w: 6, h: 2 }, 'top-left');
+    const added = result.lg!.find((it) => it.i === 'b')!;
+    expect(added).toEqual({ i: 'b', x: 0, y: 2, w: 6, h: 2 });
+  });
 });
