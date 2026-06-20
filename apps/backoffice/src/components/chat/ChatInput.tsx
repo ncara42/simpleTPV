@@ -44,6 +44,8 @@ export function ChatInput({ streaming, queueLength, disabled, onSend, onStop }: 
           rows={Math.min(6, Math.max(1, value.split('\n').length))}
           disabled={disabled}
         />
+        {/* El botón vive DENTRO del input (esquina derecha). Sin texto se desvanece; en
+            streaming pasa a rojo de parar y queda siempre visible. */}
         {streaming ? (
           <button
             type="button"
@@ -57,7 +59,7 @@ export function ChatInput({ streaming, queueLength, disabled, onSend, onStop }: 
         ) : (
           <button
             type="button"
-            className="chat-send-btn"
+            className={`chat-send-btn${value.trim() ? ' is-visible' : ''}`}
             onClick={submit}
             disabled={disabled || !value.trim()}
             aria-label="Enviar"

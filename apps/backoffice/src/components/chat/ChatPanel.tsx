@@ -1,6 +1,6 @@
 import './chat.css';
 
-import { History, MessageSquarePlus, PanelLeftClose, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import type { CanvasOp } from '../../lib/chat.js';
@@ -10,19 +10,21 @@ import { ChatInput } from './ChatInput.js';
 import { ChatMessages } from './ChatMessages.js';
 import { type CanvasApplyResult, useChat } from './useChat.js';
 
+// Clave histórica: '1' = cerrado (antes «colapsado»). Se reutiliza para no perder la
+// preferencia de usuarios actuales; `open` invierte la lectura/escritura.
 const LS_COLLAPSED = 'dashboard.chatCollapsed';
 
-function readCollapsed(): boolean {
+function readOpen(): boolean {
   try {
-    return localStorage.getItem(LS_COLLAPSED) === '1';
+    return localStorage.getItem(LS_COLLAPSED) !== '1';
   } catch {
-    return false;
+    return true;
   }
 }
 
-function writeCollapsed(value: boolean): void {
+function writeOpen(open: boolean): void {
   try {
-    localStorage.setItem(LS_COLLAPSED, value ? '1' : '0');
+    localStorage.setItem(LS_COLLAPSED, open ? '0' : '1');
   } catch {
     /* almacenamiento no disponible */
   }
@@ -54,45 +56,43 @@ export function ChatPanel({
   onUndoCanvasOps,
   getCanvasState,
 }: ChatPanelProps) {
-  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [open, setOpen] = useState(readOpen);
   const [showHistory, setShowHistory] = useState(false);
 
   const chat = useChat({
-    enabled: enabled && !collapsed,
+    enabled: enabled && open,
     onCanvasOp,
     onUndoCanvasOps,
     getCanvasState,
   });
 
   useEffect(() => {
-    writeCollapsed(collapsed);
-  }, [collapsed]);
+    writeOpen(open);
+  }, [open]);
 
-  if (collapsed) {
+  // Escape cierra el panel flotante (vuelve al FAB).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  if (!open) {
     return (
-      <aside className="chat-rail" aria-label="Asistente" data-testid="chat-rail">
-        <button
-          type="button"
-          className="chat-icon-btn"
-          onClick={() => setCollapsed(false)}
-          aria-label="Abrir asistente"
-          title="Abrir asistente"
-        >
-          <Sparkles size={18} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className="chat-icon-btn"
-          onClick={() => {
-            setCollapsed(false);
-            chat.newConversation();
-          }}
-          aria-label="Nueva conversación"
-          title="Nueva conversación"
-        >
-          <MessageSquarePlus size={18} aria-hidden="true" />
-        </button>
-      </aside>
+      <button
+        type="button"
+        className="chat-fab"
+        onClick={() => setOpen(true)}
+        aria-label="Abrir asistente"
+        aria-expanded={false}
+        title="Asistente"
+        data-testid="chat-fab"
+      >
+        <Sparkles size={22} aria-hidden="true" />
+      </button>
     );
   }
 
@@ -107,36 +107,18 @@ export function ChatPanel({
   };
 
   return (
-    <aside className="chat-panel" aria-label="Asistente" data-testid="chat-panel">
+    <aside className="chat-panel" role="dialog" aria-label="Asistente" data-testid="chat-panel">
       <ChatHeader
         models={chat.models}
         model={chat.model}
         onModelChange={chat.setModel}
         effort={chat.effort}
         onEffortChange={chat.setEffort}
+        showHistory={showHistory}
+        onToggleHistory={() => setShowHistory((v) => !v)}
         onNewConversation={handleNewConversation}
-        onCollapse={() => setCollapsed(true)}
+        onClose={() => setOpen(false)}
       />
-
-      <div className="chat-panel__subbar">
-        <button
-          type="button"
-          className={`chat-subbar-btn${showHistory ? ' is-active' : ''}`}
-          onClick={() => setShowHistory((v) => !v)}
-        >
-          <History size={13} aria-hidden="true" /> Historial
-        </button>
-        {showHistory && (
-          <button
-            type="button"
-            className="chat-icon-btn chat-icon-btn--text"
-            onClick={() => setShowHistory(false)}
-            aria-label="Cerrar historial"
-          >
-            <PanelLeftClose size={14} aria-hidden="true" />
-          </button>
-        )}
-      </div>
 
       {chat.error && (
         <div className="chat-error" role="alert">

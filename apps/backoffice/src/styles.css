@@ -13,9 +13,8 @@
    @simpletpv/ui/theme-apple.css. Aquí solo lo específico del backoffice. */
 
 /* ─── Contenido principal ─────────────────────────────────── */
-/* F3.3 (#188): fila que aloja <main> y, solo en Dashboard, el rail del chatbot a su
-   derecha. El scroll sigue siendo del documento (modelo actual intacto): <main> mantiene
-   su flujo y el rail se ancla con `position: sticky` bajo la TopBar (sticky, 68px). */
+/* El asistente del dashboard ya NO es una columna en flujo: se monta como overlay flotante
+   (FAB + panel `position: fixed`, ver chat.css), así que <main> ocupa el 100% del ancho. */
 .app-main-row {
   flex: 1;
   display: flex;
@@ -28,46 +27,9 @@
   min-width: 0;
 }
 
-/* El rail del chat queda pegado bajo la TopBar mientras el dashboard scrollea con el
-   documento. Sobreescribe el `height: 100%` agnóstico de chat.css con la altura del
-   viewport menos la TopBar. No se encoge con el ancho de <main>. */
-.app-main-row--chat > .chat-panel,
-.app-main-row--chat > .chat-rail {
-  position: sticky;
-  top: 68px;
-  align-self: flex-start;
-  height: calc(100vh - 68px);
-  flex: none;
-}
-
-/* Modo Libre: el lienzo es `position: fixed; inset: 0; z-index: 35` (cubre el viewport), así que
-   el chat NO puede quedar en flujo o lo taparía. Se ancla flotando arriba-derecha por encima del
-   lienzo (rail flotante), sin recortarlo. Colapsado = solo el botón; expandido = panel overlay. */
-.app-main-row--free > .chat-panel,
-.app-main-row--free > .chat-rail {
-  position: fixed;
-  top: 68px;
-  right: 0;
-  z-index: 40;
-  height: calc(100vh - 68px);
-  align-self: auto;
-}
-
 @media (max-width: 767px) {
   .bo-main {
     padding: 1.25rem 1.1rem 2.5rem;
-  }
-
-  /* En móvil el rail se apila bajo el dashboard (sin sticky ni fila). */
-  .app-main-row--chat {
-    flex-direction: column;
-  }
-
-  .app-main-row--chat > .chat-panel,
-  .app-main-row--chat > .chat-rail {
-    position: static;
-    height: auto;
-    width: 100%;
   }
 }
 

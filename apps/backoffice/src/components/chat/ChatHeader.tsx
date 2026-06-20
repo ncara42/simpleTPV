@@ -1,5 +1,5 @@
 import { Select, type SelectOption } from '@simpletpv/ui';
-import { PanelRightClose, Plus } from 'lucide-react';
+import { History, Plus, X } from 'lucide-react';
 import { useMemo } from 'react';
 
 import type { Effort, ModelInfo } from '../../lib/chat.js';
@@ -21,8 +21,10 @@ interface ChatHeaderProps {
   onModelChange: (model: string) => void;
   effort: Effort;
   onEffortChange: (effort: Effort) => void;
+  showHistory: boolean;
+  onToggleHistory: () => void;
   onNewConversation: () => void;
-  onCollapse: () => void;
+  onClose: () => void;
 }
 
 export function ChatHeader({
@@ -31,8 +33,10 @@ export function ChatHeader({
   onModelChange,
   effort,
   onEffortChange,
+  showHistory,
+  onToggleHistory,
   onNewConversation,
-  onCollapse,
+  onClose,
 }: ChatHeaderProps) {
   // Agrupados por provider: se ordenan por provider y se etiquetan con su prefijo.
   const modelOptions = useMemo<SelectOption[]>(() => {
@@ -47,37 +51,15 @@ export function ChatHeader({
 
   return (
     <header className="chat-header">
-      <div className="chat-header__row">
-        <Select
-          value={model}
-          onChange={onModelChange}
-          options={modelOptions}
-          placeholder="Modelo…"
-          ariaLabel="Modelo del asistente"
-          className="chat-header__model"
-          data-testid="chat-model-select"
-        />
-        <div className="chat-header__actions">
-          <button
-            type="button"
-            className="chat-icon-btn"
-            onClick={onNewConversation}
-            aria-label="Nueva conversación"
-            title="Nueva conversación"
-          >
-            <Plus size={16} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="chat-icon-btn"
-            onClick={onCollapse}
-            aria-label="Colapsar panel"
-            title="Colapsar panel"
-          >
-            <PanelRightClose size={16} aria-hidden="true" />
-          </button>
-        </div>
-      </div>
+      <Select
+        value={model}
+        onChange={onModelChange}
+        options={modelOptions}
+        placeholder="Modelo…"
+        ariaLabel="Modelo del asistente"
+        className="chat-header__model"
+        data-testid="chat-model-select"
+      />
 
       <div className="chat-effort" role="radiogroup" aria-label="Esfuerzo de razonamiento">
         {EFFORT_OPTIONS.map((opt) => (
@@ -94,6 +76,37 @@ export function ChatHeader({
             {opt.label}
           </button>
         ))}
+      </div>
+
+      <div className="chat-header__actions">
+        <button
+          type="button"
+          className={`chat-icon-btn${showHistory ? ' is-active' : ''}`}
+          onClick={onToggleHistory}
+          aria-pressed={showHistory}
+          aria-label="Historial"
+          title="Historial"
+        >
+          <History size={16} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="chat-icon-btn"
+          onClick={onNewConversation}
+          aria-label="Nueva conversación"
+          title="Nueva conversación"
+        >
+          <Plus size={16} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="chat-icon-btn"
+          onClick={onClose}
+          aria-label="Cerrar"
+          title="Cerrar"
+        >
+          <X size={16} aria-hidden="true" />
+        </button>
       </div>
     </header>
   );

@@ -20,31 +20,31 @@ test('el ChatPanel aparece solo en la pestaña Dashboard', async ({ page }) => {
   // En Dashboard el panel está montado y expandido por defecto.
   await expect(page.getByTestId('chat-panel')).toBeVisible();
 
-  // Al navegar a otra pestaña, el panel se desmonta por completo (ni panel ni rail).
+  // Al navegar a otra pestaña, el chat se desmonta por completo (ni panel ni FAB).
   await navTo(page, 'stock');
   await expect(page.getByTestId('chat-panel')).toHaveCount(0);
-  await expect(page.getByTestId('chat-rail')).toHaveCount(0);
+  await expect(page.getByTestId('chat-fab')).toHaveCount(0);
 
   // Al volver al Dashboard, reaparece.
   await navTo(page, 'dashboard');
   await expect(page.getByTestId('chat-panel')).toBeVisible();
 });
 
-test('colapsar y expandir el panel persiste entre recargas', async ({ page }) => {
+test('cerrar y abrir el panel (FAB) persiste entre recargas', async ({ page }) => {
   await expect(page.getByTestId('chat-panel')).toBeVisible();
 
-  // Colapsar: el panel deja paso al rail de iconos.
-  await page.getByRole('button', { name: 'Colapsar panel' }).click();
-  await expect(page.getByTestId('chat-rail')).toBeVisible();
+  // Cerrar: el panel deja paso al botón flotante (FAB).
+  await page.getByRole('button', { name: 'Cerrar' }).click();
+  await expect(page.getByTestId('chat-fab')).toBeVisible();
   await expect(page.getByTestId('chat-panel')).toHaveCount(0);
 
-  // El colapso persiste tras recargar.
+  // El estado cerrado persiste tras recargar.
   await page.reload();
   await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
-  await expect(page.getByTestId('chat-rail')).toBeVisible();
+  await expect(page.getByTestId('chat-fab')).toBeVisible();
   await expect(page.getByTestId('chat-panel')).toHaveCount(0);
 
-  // Expandir desde el rail y verificar que también persiste.
+  // Abrir desde el FAB y verificar que también persiste.
   await page.getByRole('button', { name: 'Abrir asistente' }).click();
   await expect(page.getByTestId('chat-panel')).toBeVisible();
   await page.reload();

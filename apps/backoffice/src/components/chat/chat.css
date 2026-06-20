@@ -1,28 +1,79 @@
-/* Panel lateral del asistente del dashboard. Sigue el design system del backoffice
+/* Asistente flotante del dashboard. Se abre desde un FAB (abajo-derecha) como panel glass
+   anclado arriba-derecha, por encima del dashboard y del lienzo libre. Sigue el design system
    (tokens --ui-*). Animaciones solo sobre transform/opacity. */
 
-.chat-panel {
-  display: flex;
-  flex-direction: column;
-  width: clamp(340px, 28vw, 420px);
-  height: 100%;
-  background: var(--ui-surface);
-  border-left: 1px solid var(--ui-border);
-  overflow: hidden;
+/* ── FAB (cerrado) ─────────────────────────────────────────────────────────────── */
+
+.chat-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 45;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg);
+  box-shadow: var(--ui-shadow-lg);
+  cursor: pointer;
+  transition:
+    transform var(--ui-motion-fast) var(--ui-ease),
+    background var(--ui-motion-fast) var(--ui-ease);
 }
 
-/* ── Rail colapsado ──────────────────────────────────────────────────────────── */
+.chat-fab:hover {
+  background: var(--ui-primary-hover);
+  transform: translateY(-1px);
+}
 
-.chat-rail {
+.chat-fab:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+/* ── Panel flotante (abierto) ──────────────────────────────────────────────────── */
+
+.chat-panel {
+  position: fixed;
+  top: 68px; /* mismo margen superior que el cluster Cuadrícula/Libre */
+  right: 16px;
+  bottom: 16px;
+  width: clamp(360px, 30vw, 440px);
+  z-index: 45; /* > 35 del lienzo libre */
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--ui-space-3);
-  width: 52px;
-  height: 100%;
-  padding: var(--ui-space-3) 0;
-  background: var(--ui-surface);
-  border-left: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  background: color-mix(in srgb, var(--ui-surface) 90%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--ui-shadow-lg);
+  overflow: hidden;
+  transform-origin: bottom right;
+  animation: chat-panel-in var(--ui-motion-medium) var(--ui-ease);
+}
+
+@keyframes chat-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-fab {
+    transition: none;
+  }
+  .chat-panel {
+    animation: none;
+  }
 }
 
 /* ── Botón de icono genérico ───────────────────────────────────────────────────── */
@@ -77,20 +128,19 @@
   cursor: not-allowed;
 }
 
-/* ── Cabecera ──────────────────────────────────────────────────────────────────── */
+.chat-icon-btn.is-active {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+
+/* ── Cabecera (una sola línea: modelo + effort + acciones) ─────────────────────── */
 
 .chat-header {
   display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-2);
-  padding: var(--ui-space-3);
-  border-bottom: 1px solid var(--ui-border);
-}
-
-.chat-header__row {
-  display: flex;
   align-items: center;
   gap: var(--ui-space-2);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border-bottom: 1px solid var(--ui-border);
 }
 
 .chat-header__model {
@@ -103,7 +153,7 @@
   gap: var(--ui-space-1);
 }
 
-/* Toggle de esfuerzo, estilo segmentado con badges de color. */
+/* Toggle de esfuerzo, estilo segmentado compacto con badges de color. */
 
 .chat-effort {
   display: inline-flex;
@@ -111,11 +161,10 @@
   padding: 2px;
   background: var(--ui-surface-subtle);
   border-radius: var(--ui-radius-pill);
-  align-self: flex-start;
 }
 
 .chat-effort__btn {
-  padding: var(--ui-space-1) var(--ui-space-3);
+  padding: 2px var(--ui-space-2);
   border: none;
   border-radius: var(--ui-radius-pill);
   background: transparent;
@@ -143,35 +192,6 @@
 .chat-effort__btn--high.is-active {
   background: var(--ui-danger-soft);
   color: var(--ui-danger);
-}
-
-/* ── Subbarra (historial) ──────────────────────────────────────────────────────── */
-
-.chat-panel__subbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--ui-space-2) var(--ui-space-3);
-  border-bottom: 1px solid var(--ui-border);
-}
-
-.chat-subbar-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ui-space-1);
-  padding: var(--ui-space-1) var(--ui-space-2);
-  border: none;
-  border-radius: var(--ui-radius-sm);
-  background: transparent;
-  color: var(--ui-text-muted);
-  font-size: var(--ui-text-xs);
-  cursor: pointer;
-}
-
-.chat-subbar-btn:hover,
-.chat-subbar-btn.is-active {
-  background: var(--ui-surface-subtle);
-  color: var(--ui-text);
 }
 
 /* ── Banner de error ───────────────────────────────────────────────────────────── */
@@ -325,7 +345,7 @@
   border-radius: var(--ui-radius-sm);
   font: inherit;
   font-size: var(--ui-text-sm);
-  background: var(--ui-bg);
+  background: var(--ui-surface);
   color: var(--ui-text);
 }
 
@@ -609,23 +629,24 @@
   font-size: var(--ui-text-2xs);
 }
 
+/* El input es redondo y el botón de enviar vive DENTRO, a la derecha (absoluto). */
 .chat-input__row {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--ui-space-2);
+  position: relative;
+  display: block;
 }
 
 .chat-input__area {
-  flex: 1;
+  width: 100%;
   resize: none;
   max-height: 160px;
-  padding: var(--ui-space-2) var(--ui-space-3);
+  /* padding-right reserva el hueco del botón embebido */
+  padding: var(--ui-space-2) calc(var(--ui-space-7) + 6px) var(--ui-space-2) var(--ui-space-3);
   border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-md);
+  border-radius: var(--ui-radius-lg);
   font: inherit;
   font-size: var(--ui-text-sm);
   line-height: 1.5;
-  background: var(--ui-bg);
+  background: var(--ui-surface);
   color: var(--ui-text);
 }
 
@@ -635,18 +656,32 @@
 }
 
 .chat-send-btn {
-  flex-shrink: 0;
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border: none;
-  border-radius: var(--ui-radius-md);
+  border-radius: var(--ui-radius-pill);
   background: var(--ui-primary);
   color: var(--ui-primary-fg);
   cursor: pointer;
-  transition: background var(--ui-motion-fast) var(--ui-ease);
+  opacity: 0;
+  transform: scale(0.85);
+  pointer-events: none;
+  transition:
+    opacity var(--ui-motion-fast) var(--ui-ease),
+    transform var(--ui-motion-fast) var(--ui-ease),
+    background var(--ui-motion-fast) var(--ui-ease);
+}
+
+.chat-send-btn.is-visible {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
 }
 
 .chat-send-btn:hover:not(:disabled) {
@@ -654,13 +689,27 @@
 }
 
 .chat-send-btn:disabled {
-  opacity: 0.4;
+  opacity: 0;
   cursor: not-allowed;
 }
 
+/* Parar (streaming): rojo y siempre visible. */
 .chat-send-btn--stop {
   background: var(--ui-danger);
   color: #fff;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-send-btn {
+    transition: opacity var(--ui-motion-fast) linear;
+    transform: none;
+  }
+  .chat-send-btn.is-visible {
+    transform: none;
+  }
 }
 
 /* ── Pie con coste ─────────────────────────────────────────────────────────────── */
@@ -671,4 +720,21 @@
   color: var(--ui-text-muted);
   font-size: var(--ui-text-2xs);
   text-align: right;
+}
+
+/* ── Móvil: el panel ocupa casi toda la pantalla ───────────────────────────────── */
+
+@media (max-width: 767px) {
+  .chat-panel {
+    top: 60px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    border-radius: var(--ui-radius-lg);
+  }
+  .chat-fab {
+    right: 12px;
+    bottom: 12px;
+  }
 }
