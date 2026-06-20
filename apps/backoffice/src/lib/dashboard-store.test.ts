@@ -10,9 +10,6 @@ const PRESET = 'personalizado';
 function freeOf(): FreeElement[] {
   return store().layout.freeLayouts?.[PRESET] ?? [];
 }
-function gridLg() {
-  return store().layout.layouts?.[PRESET]?.lg ?? [];
-}
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -97,10 +94,13 @@ describe('estado UI', () => {
 });
 
 describe('addWidget (catálogo)', () => {
-  it('coloca un widget del catálogo en la rejilla (modo grid por defecto)', () => {
+  it('coloca un widget del catálogo en el lienzo aunque el modo sea grid (→ freeLayouts)', () => {
+    // El preset «personalizado» deriva su lista de widgets de freeLayouts en AMBOS modos, así que
+    // el alta del agente cae en el lienzo libre aunque el modo activo sea grid. Regresión: antes
+    // escribía en el grid layout, que el render del preset no mira, y el widget no aparecía.
     const r = store().addWidget('kpi-today');
     expect(r.accepted).toBe(true);
-    expect(gridLg().map((i) => i.i)).toContain('kpi-today');
+    expect(freeOf().some((e) => e.kind === 'widget' && e.widgetId === 'kpi-today')).toBe(true);
   });
 
   it('coloca un widget del catálogo en el lienzo libre', () => {
@@ -132,16 +132,6 @@ describe('addWidget (catálogo)', () => {
     expect(els).toHaveLength(2);
     // No quedan exactamente en la misma posición (offset diagonal aplicado).
     expect(els[0]!.x === els[1]!.x && els[0]!.y === els[1]!.y).toBe(false);
-  });
-
-  it('no solapa en la rejilla dos widgets en top-left (escaneo de hueco libre)', () => {
-    store().addWidget('dash-bars', 'top-left'); // w7
-    store().addWidget('dash-family', 'top-left'); // w5 → cabe a la derecha en la fila 0
-    const lg = gridLg();
-    const a = lg.find((i) => i.i === 'dash-bars')!;
-    const b = lg.find((i) => i.i === 'dash-family')!;
-    const overlap = a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-    expect(overlap).toBe(false);
   });
 });
 
@@ -200,7 +190,7 @@ describe('insight / widgets genéricos', () => {
     expect(spec.type).toBe('insight');
     expect(spec.params?.markdown).toBe('**Ventas al alza**');
     expect(getWidgetSpec(id)).toBeDefined();
-    expect(gridLg().map((i) => i.i)).toContain(id);
+    expect(freeOf().some((e) => e.id === id)).toBe(true);
   });
 
   it('applyCanvasOp add_widget con genericSpec normaliza y coloca', () => {
@@ -244,15 +234,18 @@ describe('remove / clear / arrange', () => {
   // Editar y reenviar (criterio F4.2): el undo de canvas_ops quita las add_* del turno por su
   // id (widgetId para catálogo) y el reenvío no las duplica. Reproduce lo que hace
   // handleUndoCanvasOps en App.tsx (op.elementId ?? op.widgetId → removeElement).
-  it('add_widget → undo (por widgetId) → re-add no duplica el widget en la rejilla', () => {
+  it('add_widget → undo (por widgetId) → re-add no duplica el widget en el lienzo', () => {
+    const count = () =>
+      freeOf().filter((e) => e.kind === 'widget' && e.widgetId === 'kpi-today').length;
     store().applyCanvasOp({ op: 'add_widget', widgetId: 'kpi-today' });
-    expect(gridLg().filter((i) => i.i === 'kpi-today')).toHaveLength(1);
-    // Undo: el CanvasOp persistido lleva widgetId (no elementId) para widgets de catálogo.
+    expect(count()).toBe(1);
+    // Undo: el CanvasOp persistido lleva widgetId (no elementId) para widgets de catálogo, y el
+    // elemento libre usa el widgetId como id, así que removeElement(widgetId) lo encuentra.
     store().removeElement('kpi-today');
-    expect(gridLg().filter((i) => i.i === 'kpi-today')).toHaveLength(0);
+    expect(count()).toBe(0);
     // Reenvío del turno corregido: vuelve a añadirse una sola vez.
     store().applyCanvasOp({ op: 'add_widget', widgetId: 'kpi-today' });
-    expect(gridLg().filter((i) => i.i === 'kpi-today')).toHaveLength(1);
+    expect(count()).toBe(1);
   });
 
   it('removeElement desregistra un genérico del registry', () => {

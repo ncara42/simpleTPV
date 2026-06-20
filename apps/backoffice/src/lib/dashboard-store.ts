@@ -24,7 +24,6 @@ import {
   addShape as addShapeEl,
   addText as addTextEl,
   addWidget as addWidgetToFree,
-  addWidgetToGrid,
   autoArrangeFree,
   type DashboardMode,
   DRAW_COLORS,
@@ -143,9 +142,6 @@ function freeOf(layout: LayoutPref): FreeLayout {
 function withFree(layout: LayoutPref, next: FreeLayout): LayoutPref {
   return { ...layout, freeLayouts: { ...layout.freeLayouts, [ACTIVE_PRESET]: next } };
 }
-function gridOf(layout: LayoutPref): StoredLayouts {
-  return layout.layouts?.[ACTIVE_PRESET] ?? {};
-}
 function withGrid(layout: LayoutPref, next: StoredLayouts): LayoutPref {
   return { ...layout, layouts: { ...layout.layouts, [ACTIVE_PRESET]: next } };
 }
@@ -159,13 +155,13 @@ function placeGeneric(
   position: string | undefined,
 ): LayoutPref {
   const genericWidgets = { ...layout.genericWidgets, [id]: spec };
-  if (modeOf(layout) === 'free') {
-    const free = freeOf(layout);
-    const next = addGenericToFree(free, id, freeSlot(free, freeAnchor(position)), spec.defaultSize);
-    return { ...withFree(layout, next), genericWidgets };
-  }
-  const next = addWidgetToGrid(gridOf(layout), id, spec.defaultSize, asPosition(position));
-  return { ...withGrid(layout, next), genericWidgets };
+  // SIEMPRE al lienzo libre: el preset «personalizado» deriva su lista de widgets de
+  // `freeLayouts` en AMBOS modos (grid incluido; ver `customWidgetIds` en DashboardPage), igual
+  // que el alta manual (`onAddCustomGridWidget`). Escribir solo en el grid layout dejaba el
+  // widget fuera de la lista renderizada y no aparecía.
+  const free = freeOf(layout);
+  const next = addGenericToFree(free, id, freeSlot(free, freeAnchor(position)), spec.defaultSize);
+  return { ...withFree(layout, next), genericWidgets };
 }
 
 // Normaliza el `genericSpec` que envía el agente (CanvasOp, campos laxos) al `GenericSpec`
@@ -265,16 +261,13 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     if (!(widgetId in ITEM_SPECS)) {
       return rejected(`widgetId desconocido: ${widgetId}`);
     }
-    if (modeOf(layout) === 'free') {
-      const free = freeOf(layout);
-      const next = addWidgetToFree(free, widgetId, freeSlot(free, freeAnchor(position)));
-      if (next === free) return rejected(`el widget ya está en el lienzo: ${widgetId}`);
-      get().setLayout(withFree(layout, next));
-    } else {
-      const size = ITEM_SPECS[widgetId]!;
-      const next = addWidgetToGrid(gridOf(layout), widgetId, size, asPosition(position));
-      get().setLayout(withGrid(layout, next));
-    }
+    // SIEMPRE al lienzo libre (ver nota en `placeGeneric`): es la fuente de la lista de widgets
+    // del preset personalizado tanto en grid como en libre. Antes, en grid escribía en el grid
+    // layout y el widget no llegaba a renderizarse.
+    const free = freeOf(layout);
+    const next = addWidgetToFree(free, widgetId, freeSlot(free, freeAnchor(position)));
+    if (next === free) return rejected(`el widget ya está en el lienzo: ${widgetId}`);
+    get().setLayout(withFree(layout, next));
     return ACCEPTED;
   },
 
@@ -471,21 +464,15 @@ function freeElementLabel(el: FreeElement): string {
 export function buildCanvasSnapshot(): CanvasSnapshot {
   const { layout } = useDashboardStore.getState();
   const mode: DashboardMode = layout.mode ?? 'grid';
-  let all: CanvasSnapshotElement[];
-  if (mode === 'free') {
-    all = (layout.freeLayouts?.[ACTIVE_PRESET] ?? []).map((e) => ({
-      id: e.id,
-      label: freeElementLabel(e),
-      x: Math.round(e.x),
-      y: Math.round(e.y),
-    }));
-  } else {
-    all = (layout.layouts?.[ACTIVE_PRESET]?.lg ?? []).map((it) => ({
-      id: it.i,
-      label: getWidgetLabel(it.i),
-      x: it.x,
-      y: it.y,
-    }));
-  }
+  // Los elementos del preset «personalizado» viven en `freeLayouts` en AMBOS modos (en grid se
+  // renderizan como rejilla; ver `customWidgetIds` en DashboardPage). El snapshot que ve el agente
+  // se construye SIEMPRE desde el lienzo libre; antes en grid leía el grid layout y el agente no
+  // veía los widgets ya colocados (creía el lienzo vacío y los re-añadía).
+  const all: CanvasSnapshotElement[] = (layout.freeLayouts?.[ACTIVE_PRESET] ?? []).map((e) => ({
+    id: e.id,
+    label: freeElementLabel(e),
+    x: Math.round(e.x),
+    y: Math.round(e.y),
+  }));
   return { mode, elements: all.slice(0, SNAPSHOT_MAX), totalElements: all.length };
 }
