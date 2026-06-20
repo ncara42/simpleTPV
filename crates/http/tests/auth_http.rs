@@ -47,7 +47,7 @@ async fn build() -> (Router, PgPool) {
     let auth = AuthService::new(admin.clone(), auth_config());
     // cookie_secure=false: los tests van sobre http (oneshot). CORS vacío: los
     // tests no envían cabecera Origin.
-    let state = AppState::new(auth, user_state, db, admin.clone(), false, Vec::new());
+    let state = AppState::new(auth, user_state, db, admin.clone(), false, Vec::new(), None);
     (build_router(state), admin)
 }
 

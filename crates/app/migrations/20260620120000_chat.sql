@@ -42,6 +42,12 @@ CREATE INDEX "chat_conversation_org_user_idx" ON "chat_conversation" ("organizat
 CREATE INDEX "chat_message_conversation_idx" ON "chat_message" ("conversationId");
 CREATE INDEX "ai_usage_org_created_idx" ON "ai_usage" ("organizationId", "createdAt");
 
+-- El rol runtime `app` (RLS) opera estas tablas; `app_admin` (BYPASSRLS) las usa
+-- para lookups/limpieza. Mismo patrón que el resto de migraciones del repo.
+GRANT ALL ON "chat_conversation" TO app, app_admin;
+GRANT ALL ON "chat_message" TO app, app_admin;
+GRANT ALL ON "ai_usage" TO app, app_admin;
+
 ALTER TABLE "chat_conversation" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "chat_message" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "ai_usage" ENABLE ROW LEVEL SECURITY;

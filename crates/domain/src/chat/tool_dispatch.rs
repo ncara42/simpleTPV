@@ -6,8 +6,8 @@ use uuid::Uuid;
 use crate::dashboard::{
     period::{resolve_period, DashboardPeriod},
     service::{
-        discount_by_employee, product_rankings, sales_by_family, sales_by_hour,
-        sales_by_employee, sales_kpis, stockout_kpis,
+        discount_by_employee, product_rankings, sales_by_employee, sales_by_family, sales_by_hour,
+        sales_kpis, stockout_kpis,
     },
 };
 use crate::purchases::service as purchases_service;
@@ -75,7 +75,11 @@ pub async fn dispatch_tool(
 
         "purchase_orders" => {
             let status = args["status"].as_str().and_then(|s| {
-                if s == "all" { None } else { Some(s.to_uppercase()) }
+                if s == "all" {
+                    None
+                } else {
+                    Some(s.to_uppercase())
+                }
             });
             let result = purchases_service::list(pool, org, status, None).await?;
             Ok(serde_json::to_value(result).unwrap_or(serde_json::Value::Null))
@@ -91,8 +95,7 @@ pub async fn dispatch_tool(
         }
 
         "time_clock_today" => {
-            let store_id =
-                parse_uuid_opt(&args["store_id"]).ok_or(AppError::BadRequest)?;
+            let store_id = parse_uuid_opt(&args["store_id"]).ok_or(AppError::BadRequest)?;
             let user_id = parse_uuid_opt(&args["user_id"]).unwrap_or(Uuid::nil());
             let result = time_clock_service::today(pool, org, store_id, user_id).await?;
             Ok(serde_json::to_value(result).unwrap_or(serde_json::Value::Null))
@@ -123,18 +126,15 @@ pub async fn dispatch_tool(
 
         "supplier_prices_comparison" if is_admin => {
             use crate::suppliers::service as suppliers_service;
-            let product_id =
-                parse_uuid_opt(&args["product_id"]).ok_or(AppError::BadRequest)?;
+            let product_id = parse_uuid_opt(&args["product_id"]).ok_or(AppError::BadRequest)?;
             // comparison devuelve precios por proveedor para un producto
             let result = suppliers_service::list_prices(pool, org, None, Some(product_id)).await?;
             Ok(serde_json::to_value(result).unwrap_or(serde_json::Value::Null))
         }
 
-        _ => {
-            Ok(serde_json::json!({
-                "error": format!("Tool '{}' no disponible o no tienes permiso para usarla.", tool_name)
-            }))
-        }
+        _ => Ok(serde_json::json!({
+            "error": format!("Tool '{}' no disponible o no tienes permiso para usarla.", tool_name)
+        })),
     }
 }
 

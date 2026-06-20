@@ -78,14 +78,12 @@ pub async fn update_conversation_title(
 ) -> Result<(), AppError> {
     let title = title.to_owned();
     with_tenant_tx(pool, org, async move |tx, _after| {
-        sqlx::query(
-            r#"UPDATE "chat_conversation" SET title=$1,"updatedAt"=NOW() WHERE id=$2"#,
-        )
-        .bind(&title)
-        .bind(id)
-        .execute(&mut **tx)
-        .await
-        .map(|_| ())
+        sqlx::query(r#"UPDATE "chat_conversation" SET title=$1,"updatedAt"=NOW() WHERE id=$2"#)
+            .bind(&title)
+            .bind(id)
+            .execute(&mut **tx)
+            .await
+            .map(|_| ())
     })
     .await
 }
@@ -174,7 +172,10 @@ pub async fn prune_after(
         .await?;
 
         let Some(ref_ts) = ref_ts else {
-            return Ok(PruneResult { pruned: 0, canvas_ops_to_undo: vec![] });
+            return Ok(PruneResult {
+                pruned: 0,
+                canvas_ops_to_undo: vec![],
+            });
         };
 
         let tool_calls_rows: Vec<Option<serde_json::Value>> = sqlx::query_scalar(
@@ -205,7 +206,13 @@ pub async fn prune_after(
 }
 
 fn extract_canvas_ops_to_undo(rows: Vec<Option<serde_json::Value>>) -> Vec<CanvasOp> {
-    let add_ops = ["add_widget", "add_shape", "add_text", "add_note", "add_insight"];
+    let add_ops = [
+        "add_widget",
+        "add_shape",
+        "add_text",
+        "add_note",
+        "add_insight",
+    ];
     rows.into_iter()
         .flatten()
         .filter_map(|v| v.as_array().cloned())
@@ -324,8 +331,11 @@ pub async fn get_org_usage(
         let by_model = by_model
             .into_iter()
             .map(|(model, cost, turns)| {
-                let provider =
-                    if model.starts_with("claude") { "anthropic" } else { "openai" };
+                let provider = if model.starts_with("claude") {
+                    "anthropic"
+                } else {
+                    "openai"
+                };
                 OrgUsageByModel {
                     model: model.clone(),
                     provider: provider.to_owned(),

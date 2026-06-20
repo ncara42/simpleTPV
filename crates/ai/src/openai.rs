@@ -4,8 +4,8 @@ use reqwest::Client;
 use serde_json::{json, Value};
 
 use crate::{
-    AiError,
     event::{ChatRequest, Effort, LlmEvent, ToolCall, Usage},
+    AiError,
 };
 
 pub fn stream_openai(
@@ -132,8 +132,8 @@ struct PartialTool {
 
 fn map_openai_model(model: &str) -> &str {
     match model {
-        "gpt-4.1" | "gpt-4.1-mini" | "gpt-4.1-nano" | "gpt-4o" | "gpt-4o-mini"
-        | "o3" | "o4-mini" => model,
+        "gpt-4.1" | "gpt-4.1-mini" | "gpt-4.1-nano" | "gpt-4o" | "gpt-4o-mini" | "o3"
+        | "o4-mini" => model,
         _ => "gpt-4.1",
     }
 }
@@ -160,7 +160,10 @@ fn build_openai_messages(req: &ChatRequest) -> Vec<Value> {
                     .join("\n");
                 json!({ "role": "user", "content": text })
             }
-            ChatMessage::Assistant { content, tool_calls } => {
+            ChatMessage::Assistant {
+                content,
+                tool_calls,
+            } => {
                 let text = content
                     .iter()
                     .filter(|b| b.kind == "text")
@@ -186,11 +189,97 @@ fn build_openai_messages(req: &ChatRequest) -> Vec<Value> {
                     json!({ "role": "assistant", "content": text })
                 }
             }
-            ChatMessage::Tool { tool_call_id, content } => {
+            ChatMessage::Tool {
+                tool_call_id,
+                content,
+            } => {
                 json!({ "role": "tool", "tool_call_id": tool_call_id, "content": content })
             }
         };
         msgs.push(v);
     }
     msgs
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event::{ChatMessage, ContentBlock, FunctionCall, ToolCallDef};
+
+    fn text_block(s: &str) -> ContentBlock {
+        ContentBlock {
+            kind: "text".into(),
+            text: s.into(),
+        }
+    }
+
+    fn req(messages: Vec<ChatMessage>) -> ChatRequest {
+        ChatRequest {
+            model: "gpt-4.1".into(),
+            effort: Effort::Medium,
+            messages,
+            tools: vec![],
+            system: "Eres un asistente.".into(),
+        }
+    }
+
+    #[test]
+    fn map_openai_model_pasa_los_validos_y_cae_a_gpt41() {
+        assert_eq!(map_openai_model("o4-mini"), "o4-mini");
+        assert_eq!(map_openai_model("gpt-4o"), "gpt-4o");
+        assert_eq!(map_openai_model("modelo-raro"), "gpt-4.1");
+    }
+
+    #[test]
+    fn map_effort_traduce_a_reasoning_effort() {
+        assert_eq!(map_effort(&Effort::Low), "low");
+        assert_eq!(map_effort(&Effort::Medium), "medium");
+        assert_eq!(map_effort(&Effort::High), "high");
+    }
+
+    #[test]
+    fn build_messages_antepone_el_system() {
+        let msgs = build_openai_messages(&req(vec![ChatMessage::User {
+            content: vec![text_block("hola")],
+        }]));
+        assert_eq!(msgs[0]["role"], "system");
+        assert_eq!(msgs[0]["content"], "Eres un asistente.");
+        assert_eq!(msgs[1]["role"], "user");
+        assert_eq!(msgs[1]["content"], "hola");
+    }
+
+    #[test]
+    fn build_messages_serializa_assistant_con_tool_calls() {
+        let assistant = ChatMessage::Assistant {
+            content: vec![text_block("consulto las ventas")],
+            tool_calls: Some(vec![ToolCallDef {
+                id: "call_1".into(),
+                name: "sales_kpis".into(),
+                kind: "function".into(),
+                function: FunctionCall {
+                    name: "sales_kpis".into(),
+                    arguments: "{\"period\":\"today\"}".into(),
+                },
+            }]),
+        };
+        let msgs = build_openai_messages(&req(vec![assistant]));
+        let am = &msgs[1];
+        assert_eq!(am["role"], "assistant");
+        let tc = &am["tool_calls"][0];
+        assert_eq!(tc["id"], "call_1");
+        assert_eq!(tc["type"], "function");
+        assert_eq!(tc["function"]["name"], "sales_kpis");
+        assert_eq!(tc["function"]["arguments"], "{\"period\":\"today\"}");
+    }
+
+    #[test]
+    fn build_messages_tool_result_usa_rol_tool_con_tool_call_id() {
+        let msgs = build_openai_messages(&req(vec![ChatMessage::Tool {
+            tool_call_id: "call_1".into(),
+            content: "{\"total\":42}".into(),
+        }]));
+        assert_eq!(msgs[1]["role"], "tool");
+        assert_eq!(msgs[1]["tool_call_id"], "call_1");
+        assert_eq!(msgs[1]["content"], "{\"total\":42}");
+    }
 }

@@ -60,6 +60,7 @@ async fn build() -> (Router, PgPool, Uuid, Uuid) {
         admin.clone(),
         false,
         Vec::new(),
+        None,
     ));
     (router, admin, org, user)
 }

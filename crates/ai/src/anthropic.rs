@@ -4,8 +4,8 @@ use reqwest::Client;
 use serde_json::{json, Value};
 
 use crate::{
-    AiError,
     event::{ChatRequest, Effort, LlmEvent, ToolCall, Usage},
+    AiError,
 };
 
 pub fn stream_anthropic(
@@ -170,7 +170,10 @@ fn build_anthropic_messages(req: &ChatRequest) -> Vec<Value> {
                     .join("\n");
                 json!({ "role": "user", "content": [{ "type": "text", "text": text }] })
             }
-            ChatMessage::Assistant { content, tool_calls } => {
+            ChatMessage::Assistant {
+                content,
+                tool_calls,
+            } => {
                 let mut blocks: Vec<Value> = content
                     .iter()
                     .filter(|b| b.kind == "text" && !b.text.is_empty())
@@ -190,7 +193,10 @@ fn build_anthropic_messages(req: &ChatRequest) -> Vec<Value> {
                 }
                 json!({ "role": "assistant", "content": blocks })
             }
-            ChatMessage::Tool { tool_call_id, content } => {
+            ChatMessage::Tool {
+                tool_call_id,
+                content,
+            } => {
                 json!({
                     "role": "user",
                     "content": [{
@@ -218,4 +224,128 @@ fn convert_tools_anthropic(tools: &[Value]) -> Vec<Value> {
             }))
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event::{ChatMessage, ContentBlock, FunctionCall, ToolCallDef};
+
+    fn text_block(s: &str) -> ContentBlock {
+        ContentBlock {
+            kind: "text".into(),
+            text: s.into(),
+        }
+    }
+
+    #[test]
+    fn map_anthropic_model_resuelve_alias_con_fecha() {
+        assert_eq!(
+            map_anthropic_model("claude-opus-4-8"),
+            "claude-opus-4-8-20251101"
+        );
+        assert_eq!(
+            map_anthropic_model("claude-sonnet-4-6"),
+            "claude-sonnet-4-6-20251001"
+        );
+        // Desconocido → fallback a sonnet
+        assert_eq!(
+            map_anthropic_model("claude-loquesea"),
+            "claude-sonnet-4-6-20251001"
+        );
+    }
+
+    #[test]
+    fn thinking_budget_segun_effort() {
+        // Bajo = thinking desactivado; medio = 2000; alto = 8000.
+        assert_eq!(thinking_budget(&Effort::Low), None);
+        assert_eq!(thinking_budget(&Effort::Medium), Some(2000));
+        assert_eq!(thinking_budget(&Effort::High), Some(8000));
+    }
+
+    #[test]
+    fn build_messages_usa_bloques_de_contenido() {
+        // Anthropic exige content como array de bloques, no string plano.
+        let msgs = build_anthropic_messages(&ChatRequest {
+            model: "claude-sonnet-4-6".into(),
+            effort: Effort::Low,
+            messages: vec![ChatMessage::User {
+                content: vec![text_block("hola")],
+            }],
+            tools: vec![],
+            system: "sys".into(),
+        });
+        assert_eq!(msgs[0]["role"], "user");
+        assert_eq!(msgs[0]["content"][0]["type"], "text");
+        assert_eq!(msgs[0]["content"][0]["text"], "hola");
+    }
+
+    #[test]
+    fn build_messages_assistant_tool_call_es_tool_use_block() {
+        let assistant = ChatMessage::Assistant {
+            content: vec![text_block("consulto")],
+            tool_calls: Some(vec![ToolCallDef {
+                id: "tc_1".into(),
+                name: "sales_kpis".into(),
+                kind: "function".into(),
+                function: FunctionCall {
+                    name: "sales_kpis".into(),
+                    arguments: "{\"period\":\"week\"}".into(),
+                },
+            }]),
+        };
+        let msgs = build_anthropic_messages(&ChatRequest {
+            model: "claude-sonnet-4-6".into(),
+            effort: Effort::Low,
+            messages: vec![assistant],
+            tools: vec![],
+            system: "sys".into(),
+        });
+        let blocks = msgs[0]["content"].as_array().unwrap();
+        let tool_use = blocks.iter().find(|b| b["type"] == "tool_use").unwrap();
+        assert_eq!(tool_use["id"], "tc_1");
+        assert_eq!(tool_use["name"], "sales_kpis");
+        assert_eq!(tool_use["input"]["period"], "week");
+    }
+
+    #[test]
+    fn build_messages_tool_result_se_envia_como_user_con_tool_result() {
+        // En Anthropic los resultados de tool van en un mensaje role=user con bloque tool_result.
+        let msgs = build_anthropic_messages(&ChatRequest {
+            model: "claude-sonnet-4-6".into(),
+            effort: Effort::Low,
+            messages: vec![ChatMessage::Tool {
+                tool_call_id: "tc_1".into(),
+                content: "{\"total\":42}".into(),
+            }],
+            tools: vec![],
+            system: "sys".into(),
+        });
+        assert_eq!(msgs[0]["role"], "user");
+        let block = &msgs[0]["content"][0];
+        assert_eq!(block["type"], "tool_result");
+        assert_eq!(block["tool_use_id"], "tc_1");
+    }
+
+    #[test]
+    fn convert_tools_traduce_function_a_input_schema() {
+        let openai_tool = json!({
+            "type": "function",
+            "function": {
+                "name": "sales_kpis",
+                "description": "KPIs",
+                "parameters": { "type": "object", "properties": { "period": { "type": "string" } } }
+            }
+        });
+        let converted = convert_tools_anthropic(&[openai_tool]);
+        assert_eq!(converted[0]["name"], "sales_kpis");
+        assert_eq!(converted[0]["description"], "KPIs");
+        assert_eq!(converted[0]["input_schema"]["type"], "object");
+        assert_eq!(
+            converted[0]["input_schema"]["properties"]["period"]["type"],
+            "string"
+        );
+        // No debe llevar el wrapper "function" de OpenAI.
+        assert!(converted[0].get("function").is_none());
+    }
 }

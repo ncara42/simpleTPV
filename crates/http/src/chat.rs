@@ -12,9 +12,7 @@ use futures::Stream;
 use serde::Deserialize;
 use simpletpv_ai::{event::Effort, stream_chat, AiConfig, LlmEvent};
 use simpletpv_auth::Role;
-use simpletpv_domain::chat::{
-    self, CanvasOp, InsertConversation, InsertMessage, RecordUsageInput,
-};
+use simpletpv_domain::chat::{self, CanvasOp, InsertConversation, InsertMessage, RecordUsageInput};
 use simpletpv_shared::AppError;
 use uuid::Uuid;
 
@@ -64,17 +62,11 @@ pub struct CanvasResultBody {
     pub reason: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Default, Deserialize)]
 #[serde(default)]
 pub struct UsageQuery {
     pub from: Option<String>,
     pub to: Option<String>,
-}
-
-impl Default for UsageQuery {
-    fn default() -> Self {
-        Self { from: None, to: None }
-    }
 }
 
 // ── POST /chat/stream ──────────────────────────────────────────────────────────
@@ -95,7 +87,9 @@ pub async fn stream(
     // Crear o recuperar conversación
     let conv_id = if let Some(id) = body.conversation_id {
         // Verificar que existe y pertenece al usuario
-        chat::get_conversation(pool, org, id).await.map_err(ApiError::from)?;
+        chat::get_conversation(pool, org, id)
+            .await
+            .map_err(ApiError::from)?;
         id
     } else {
         // Nueva conversación — auto-título heurístico
@@ -148,7 +142,9 @@ pub async fn stream(
 
     // System prompt dinámico (F5): contexto de la organización + catálogo de widgets + tools
     // por rol + allowlist de endpoints + estado actual del lienzo (fresco, del body).
-    let org_ctx = chat::load_org_context(pool, org).await.map_err(ApiError::from)?;
+    let org_ctx = chat::load_org_context(pool, org)
+        .await
+        .map_err(ApiError::from)?;
     let system = chat::build_system_prompt(&org_ctx, is_admin, body.canvas_state.as_ref());
 
     let messages = build_chat_messages(&history);
@@ -166,14 +162,7 @@ pub async fn stream(
 
     // Ejecutar el bucle agente + generar SSE stream
     let sse_stream = run_agent_stream(
-        ai_config,
-        pool_clone,
-        org,
-        uid,
-        conv_id,
-        req,
-        is_admin,
-        model,
+        ai_config, pool_clone, org, uid, conv_id, req, is_admin, model,
     );
 
     Ok(Sse::new(sse_stream)
@@ -182,6 +171,9 @@ pub async fn stream(
 }
 
 // Bucle agente: hasta MAX_TOOL_ROUNDS iteraciones de LLM → tools → LLM.
+// Los parámetros son el contexto del turno (pool, tenant, request); agruparlos en
+// un struct no aporta claridad sobre pasarlos explícitos.
+#[allow(clippy::too_many_arguments)]
 fn run_agent_stream(
     ai_config: AiConfig,
     pool: sqlx::PgPool,
@@ -407,8 +399,7 @@ pub async fn finalize(
             conversation_id: conv_id,
             organization_id: org,
             role: "assistant".to_owned(),
-            content: serde_json::to_value(&body.partial_content)
-                .unwrap_or(serde_json::Value::Null),
+            content: serde_json::to_value(&body.partial_content).unwrap_or(serde_json::Value::Null),
             tool_calls: None,
             tool_results: None,
         },
@@ -515,10 +506,9 @@ pub async fn list_conversations(
     user: AuthUser,
 ) -> Result<Json<Vec<simpletpv_domain::chat::ChatConversationRow>>, ApiError> {
     user.require_role(&MGMT_ROLES)?;
-    let convs =
-        chat::list_conversations(state.db(), user.organization_id, user.user_id)
-            .await
-            .map_err(ApiError::from)?;
+    let convs = chat::list_conversations(state.db(), user.organization_id, user.user_id)
+        .await
+        .map_err(ApiError::from)?;
     Ok(Json(convs))
 }
 
@@ -530,10 +520,9 @@ pub async fn get_messages(
     Path(conv_id): Path<Uuid>,
 ) -> Result<Json<Vec<simpletpv_domain::chat::ChatMessageRow>>, ApiError> {
     user.require_role(&MGMT_ROLES)?;
-    let msgs =
-        chat::get_messages(state.db(), user.organization_id, conv_id)
-            .await
-            .map_err(ApiError::from)?;
+    let msgs = chat::get_messages(state.db(), user.organization_id, conv_id)
+        .await
+        .map_err(ApiError::from)?;
     Ok(Json(msgs))
 }
 
@@ -545,10 +534,9 @@ pub async fn get_conversation_usage(
     Path(conv_id): Path<Uuid>,
 ) -> Result<Json<simpletpv_domain::chat::ConversationUsage>, ApiError> {
     user.require_role(&MGMT_ROLES)?;
-    let usage =
-        chat::get_conversation_usage(state.db(), user.organization_id, conv_id)
-            .await
-            .map_err(ApiError::from)?;
+    let usage = chat::get_conversation_usage(state.db(), user.organization_id, conv_id)
+        .await
+        .map_err(ApiError::from)?;
     Ok(Json(usage))
 }
 
@@ -600,16 +588,12 @@ pub async fn get_org_usage(
     let from = q.from.as_deref().and_then(|s| {
         time::Date::parse(s, time::macros::format_description!("[year]-[month]-[day]"))
             .ok()
-            .map(|d| {
-                time::OffsetDateTime::new_utc(d, time::Time::MIDNIGHT)
-            })
+            .map(|d| time::OffsetDateTime::new_utc(d, time::Time::MIDNIGHT))
     });
     let to = q.to.as_deref().and_then(|s| {
         time::Date::parse(s, time::macros::format_description!("[year]-[month]-[day]"))
             .ok()
-            .map(|d| {
-                time::OffsetDateTime::new_utc(d, time::Time::MIDNIGHT)
-            })
+            .map(|d| time::OffsetDateTime::new_utc(d, time::Time::MIDNIGHT))
     });
 
     let usage = chat::get_org_usage(state.db(), user.organization_id, from, to)
@@ -637,9 +621,10 @@ fn provider_from_model(model: &str) -> String {
 }
 
 fn auto_title(message: &str) -> String {
-    let stop_words = ["el", "la", "los", "las", "un", "una", "de", "del", "en", "a", "y",
-        "o", "que", "se", "me", "te", "le", "lo", "es", "por", "con", "para", "como",
-        "más", "si", "no", "al", "su", "sus"];
+    let stop_words = [
+        "el", "la", "los", "las", "un", "una", "de", "del", "en", "a", "y", "o", "que", "se", "me",
+        "te", "le", "lo", "es", "por", "con", "para", "como", "más", "si", "no", "al", "su", "sus",
+    ];
     let words: Vec<&str> = message
         .split_whitespace()
         .filter(|w| w.len() > 2 && !stop_words.contains(&w.to_lowercase().as_str()))
@@ -649,7 +634,9 @@ fn auto_title(message: &str) -> String {
         return format!(
             "Conversación {}",
             time::OffsetDateTime::now_utc()
-                .format(time::macros::format_description!("[day]/[month] [hour]:[minute]"))
+                .format(time::macros::format_description!(
+                    "[day]/[month] [hour]:[minute]"
+                ))
                 .unwrap_or_default()
         );
     }
@@ -669,19 +656,16 @@ fn build_chat_messages(
     rows.iter()
         .map(|row| match row.role.as_str() {
             "user" => {
-                let text = row.content[0]["text"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_owned();
+                let text = row.content[0]["text"].as_str().unwrap_or("").to_owned();
                 ChatMessage::User {
-                    content: vec![ContentBlock { kind: "text".to_owned(), text }],
+                    content: vec![ContentBlock {
+                        kind: "text".to_owned(),
+                        text,
+                    }],
                 }
             }
             "assistant" => {
-                let text = row.content[0]["text"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_owned();
+                let text = row.content[0]["text"].as_str().unwrap_or("").to_owned();
                 let tool_calls = row.tool_calls.as_ref().and_then(|tc| {
                     tc.as_array().map(|arr| {
                         arr.iter()
@@ -700,7 +684,10 @@ fn build_chat_messages(
                     })
                 });
                 ChatMessage::Assistant {
-                    content: vec![ContentBlock { kind: "text".to_owned(), text }],
+                    content: vec![ContentBlock {
+                        kind: "text".to_owned(),
+                        text,
+                    }],
                     tool_calls: tool_calls.filter(|tc| !tc.is_empty()),
                 }
             }

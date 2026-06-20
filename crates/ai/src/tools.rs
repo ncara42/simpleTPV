@@ -362,3 +362,129 @@ pub fn all_tools_for_manager() -> Vec<Value> {
     tools.extend(data_tools());
     tools
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    fn tool_names(tools: &[Value]) -> HashSet<String> {
+        tools
+            .iter()
+            .map(|t| t["function"]["name"].as_str().unwrap().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn toda_tool_tiene_estructura_function_valida() {
+        for t in all_tools_for_admin() {
+            assert_eq!(t["type"], "function", "tool sin type=function: {t}");
+            let f = &t["function"];
+            assert!(f["name"].is_string(), "tool sin name: {t}");
+            assert!(f["description"].is_string(), "tool sin description: {t}");
+            assert_eq!(
+                f["parameters"]["type"], "object",
+                "parameters.type debe ser object: {t}"
+            );
+        }
+    }
+
+    #[test]
+    fn nombres_de_tool_son_unicos() {
+        let tools = all_tools_for_admin();
+        let names = tool_names(&tools);
+        assert_eq!(
+            names.len(),
+            tools.len(),
+            "hay nombres de tool duplicados en el catálogo admin"
+        );
+    }
+
+    #[test]
+    fn admin_ofrece_las_tools_admin_only() {
+        let admin = tool_names(&all_tools_for_admin());
+        for name in ["stores_list", "users_list", "supplier_prices_comparison"] {
+            assert!(admin.contains(name), "admin debería ofrecer {name}");
+        }
+    }
+
+    #[test]
+    fn manager_no_ve_tools_admin_only() {
+        let manager = tool_names(&all_tools_for_manager());
+        for name in ["stores_list", "users_list", "supplier_prices_comparison"] {
+            assert!(
+                !manager.contains(name),
+                "manager NO debería ver {name} (evita 403)"
+            );
+        }
+    }
+
+    #[test]
+    fn catalogo_de_manager_es_subconjunto_del_de_admin() {
+        let admin = tool_names(&all_tools_for_admin());
+        let manager = tool_names(&all_tools_for_manager());
+        assert!(
+            manager.is_subset(&admin),
+            "el catálogo de manager debe ser subconjunto del de admin"
+        );
+        // La única diferencia son las admin-only.
+        assert_eq!(admin.len() - manager.len(), admin_only_tools().len());
+    }
+
+    #[test]
+    fn canvas_y_data_tools_presentes_para_ambos_roles() {
+        let manager = tool_names(&all_tools_for_manager());
+        // Canvas
+        for name in ["add_widget", "remove_element", "set_mode", "clear_canvas"] {
+            assert!(manager.contains(name), "falta canvas tool {name}");
+        }
+        // Data
+        for name in ["sales_kpis", "product_rankings", "stock_alerts"] {
+            assert!(manager.contains(name), "falta data tool {name}");
+        }
+    }
+
+    #[test]
+    fn add_ops_inversibles_requieren_element_id_para_deshacer() {
+        // Sin element_id el frontend no puede invertir el add_* al editar/regenerar.
+        let canvas = canvas_tools();
+        for name in [
+            "add_widget",
+            "add_shape",
+            "add_text",
+            "add_note",
+            "add_insight",
+        ] {
+            let tool = canvas
+                .iter()
+                .find(|t| t["function"]["name"] == name)
+                .unwrap_or_else(|| panic!("falta canvas tool {name}"));
+            let required = tool["function"]["parameters"]["required"]
+                .as_array()
+                .unwrap();
+            assert!(
+                required.iter().any(|v| v == "element_id"),
+                "{name} debe requerir element_id"
+            );
+        }
+    }
+
+    #[test]
+    fn add_widget_acepta_posiciones_semanticas() {
+        let canvas = canvas_tools();
+        let add_widget = canvas
+            .iter()
+            .find(|t| t["function"]["name"] == "add_widget")
+            .unwrap();
+        let positions = add_widget["function"]["parameters"]["properties"]["position"]["enum"]
+            .as_array()
+            .unwrap();
+        // El frontend traduce estas etiquetas a coords; deben incluir las esquinas y el centro.
+        for p in ["top-left", "center", "bottom-right"] {
+            assert!(
+                positions.iter().any(|v| v == p),
+                "add_widget.position debería incluir {p}"
+            );
+        }
+    }
+}

@@ -237,6 +237,36 @@ export interface LayoutPref {
   genericWidgets?: Record<string, GenericSpec>;
 }
 
+// Migración única F0 (#188): un usuario con un preset antiguo (ventas/beneficio/
+// inventario/equipo) ve su composición copiada a `personalizado` y el preset fijado.
+// Es idempotente y NO destructiva: las claves antiguas se conservan por seguridad.
+// Devuelve el MISMO objeto si no hay nada que migrar, para que el llamador pueda
+// evitar persistir sin cambios (comparación por identidad).
+export function migrateLayoutPref(layout: LayoutPref): LayoutPref {
+  const oldPreset = layout.preset;
+  if (!oldPreset || oldPreset === 'personalizado') return layout;
+  const pid = oldPreset;
+  const migratedLayouts = layout.layouts?.[pid] ?? layout.layouts?.personalizado;
+  const migratedFreeLayouts = layout.freeLayouts?.[pid] ?? layout.freeLayouts?.personalizado;
+  const migratedFreeViews = layout.freeViews?.[pid] ?? layout.freeViews?.personalizado;
+  return {
+    ...layout,
+    preset: 'personalizado',
+    layouts: {
+      ...layout.layouts,
+      ...(migratedLayouts !== undefined ? { personalizado: migratedLayouts } : {}),
+    },
+    freeLayouts: {
+      ...layout.freeLayouts,
+      ...(migratedFreeLayouts !== undefined ? { personalizado: migratedFreeLayouts } : {}),
+    },
+    freeViews: {
+      ...layout.freeViews,
+      ...(migratedFreeViews !== undefined ? { personalizado: migratedFreeViews } : {}),
+    },
+  };
+}
+
 // Layout por defecto (breakpoint lg, 12 columnas): coloca primero las tarjetas KPI en una
 // banda superior (2 columnas cada una) y luego los paneles fluyendo en filas de 12, en
 // orden canónico. Reproduce la maquetación histórica como punto de partida del tablero.

@@ -47,6 +47,7 @@ async fn build() -> Router {
         admin,
         false,
         Vec::new(),
+        None,
     ))
 }
 

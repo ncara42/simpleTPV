@@ -57,8 +57,8 @@ import {
   type FreeLayout,
   type FreeWidget,
   type LayoutPref,
+  migrateLayoutPref,
   type PresetDef,
-  type PresetId,
   presetItemIds,
   PRESETS,
   reconcileFreeLayout,
@@ -442,29 +442,9 @@ export function DashboardPage({
     // Espera a la hidratación: el layout del store es `{}` hasta sembrarse desde el servidor.
     if (!hydrated || migrationDone.current) return;
     migrationDone.current = true;
-    const oldPreset = (layout as { preset?: string }).preset;
-    if (!oldPreset || oldPreset === 'personalizado') return;
-    const pid = oldPreset as PresetId;
-    const migratedLayouts = layout.layouts?.[pid] ?? layout.layouts?.personalizado;
-    const migratedFreeLayouts = layout.freeLayouts?.[pid] ?? layout.freeLayouts?.personalizado;
-    const migratedFreeViews = layout.freeViews?.[pid] ?? layout.freeViews?.personalizado;
-    const migrated: LayoutPref = {
-      ...layout,
-      preset: 'personalizado',
-      layouts: {
-        ...layout.layouts,
-        ...(migratedLayouts !== undefined ? { personalizado: migratedLayouts } : {}),
-      },
-      freeLayouts: {
-        ...layout.freeLayouts,
-        ...(migratedFreeLayouts !== undefined ? { personalizado: migratedFreeLayouts } : {}),
-      },
-      freeViews: {
-        ...layout.freeViews,
-        ...(migratedFreeViews !== undefined ? { personalizado: migratedFreeViews } : {}),
-      },
-    };
-    setStoreLayout(migrated);
+    const migrated = migrateLayoutPref(layout);
+    // `migrateLayoutPref` devuelve el mismo objeto si no hay nada que migrar.
+    if (migrated !== layout) setStoreLayout(migrated);
   }, [hydrated, layout, setStoreLayout]);
   // Reubica el foco al conmutar de modo: al entrar, al primer tile (es enfocable en
   // edición y su aria-label explica cómo moverlo con las flechas); al salir, al botón

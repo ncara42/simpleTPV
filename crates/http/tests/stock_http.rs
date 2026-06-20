@@ -51,6 +51,7 @@ async fn build() -> (Router, PgPool) {
             admin.clone(),
             false,
             Vec::new(),
+            None,
         )),
         admin,
     )

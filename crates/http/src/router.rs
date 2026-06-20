@@ -446,10 +446,7 @@ pub fn build_router(state: AppState) -> Router {
         // rutas REST para historial, uso y gestión de conversaciones.
         .route("/chat/stream", post(chat::stream))
         .route("/chat/conversations", get(chat::list_conversations))
-        .route(
-            "/chat/conversations/{id}/finalize",
-            post(chat::finalize),
-        )
+        .route("/chat/conversations/{id}/finalize", post(chat::finalize))
         .route(
             "/chat/conversations/{id}/canvas-result",
             post(chat::canvas_result),
@@ -458,10 +455,7 @@ pub fn build_router(state: AppState) -> Router {
             "/chat/conversations/{id}/after/{message_id}",
             delete(chat::prune_after),
         )
-        .route(
-            "/chat/conversations/{id}/messages",
-            get(chat::get_messages),
-        )
+        .route("/chat/conversations/{id}/messages", get(chat::get_messages))
         .route(
             "/chat/conversations/{id}/usage",
             get(chat::get_conversation_usage),

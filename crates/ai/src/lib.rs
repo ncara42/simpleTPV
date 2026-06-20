@@ -37,7 +37,10 @@ impl AiConfig {
                 "OPENAI_API_KEY o ANTHROPIC_API_KEY deben estar configurados".into(),
             ));
         }
-        Ok(Self { openai_key, anthropic_key })
+        Ok(Self {
+            openai_key,
+            anthropic_key,
+        })
     }
 
     pub fn is_anthropic(model: &str) -> bool {

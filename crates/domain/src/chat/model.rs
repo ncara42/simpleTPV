@@ -3,17 +3,25 @@ use serde::{Deserialize, Serialize};
 use time::PrimitiveDateTime;
 use uuid::Uuid;
 
+// Las columnas en BD son camelCase (convención Prisma); las queries del módulo
+// usan `SELECT *`/`RETURNING *`, así que `FromRow` necesita `#[sqlx(rename)]`
+// para casar cada campo snake_case con su columna (los `#[serde(rename)]` solo
+// afectan a la serialización JSON, no a la decodificación de SQLx).
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct ChatConversationRow {
     pub id: Uuid,
     #[serde(rename = "organizationId")]
+    #[sqlx(rename = "organizationId")]
     pub organization_id: Uuid,
     #[serde(rename = "userId")]
+    #[sqlx(rename = "userId")]
     pub user_id: Uuid,
     pub title: Option<String>,
     #[serde(rename = "createdAt")]
+    #[sqlx(rename = "createdAt")]
     pub created_at: PrimitiveDateTime,
     #[serde(rename = "updatedAt")]
+    #[sqlx(rename = "updatedAt")]
     pub updated_at: PrimitiveDateTime,
 }
 
@@ -21,16 +29,21 @@ pub struct ChatConversationRow {
 pub struct ChatMessageRow {
     pub id: Uuid,
     #[serde(rename = "conversationId")]
+    #[sqlx(rename = "conversationId")]
     pub conversation_id: Uuid,
     #[serde(rename = "organizationId")]
+    #[sqlx(rename = "organizationId")]
     pub organization_id: Uuid,
     pub role: String,
     pub content: serde_json::Value,
     #[serde(rename = "toolCalls")]
+    #[sqlx(rename = "toolCalls")]
     pub tool_calls: Option<serde_json::Value>,
     #[serde(rename = "toolResults")]
+    #[sqlx(rename = "toolResults")]
     pub tool_results: Option<serde_json::Value>,
     #[serde(rename = "createdAt")]
+    #[sqlx(rename = "createdAt")]
     pub created_at: PrimitiveDateTime,
 }
 
