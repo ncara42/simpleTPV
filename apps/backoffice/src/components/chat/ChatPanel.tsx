@@ -57,7 +57,7 @@ export function ChatPanel({ enabled = true, onCanvasOp, onUndoCanvasOps }: ChatP
 
   if (collapsed) {
     return (
-      <aside className="chat-rail" aria-label="Asistente">
+      <aside className="chat-rail" aria-label="Asistente" data-testid="chat-rail">
         <button
           type="button"
           className="chat-icon-btn"
@@ -94,7 +94,7 @@ export function ChatPanel({ enabled = true, onCanvasOp, onUndoCanvasOps }: ChatP
   };
 
   return (
-    <aside className="chat-panel" aria-label="Asistente">
+    <aside className="chat-panel" aria-label="Asistente" data-testid="chat-panel">
       <ChatHeader
         models={chat.models}
         model={chat.model}

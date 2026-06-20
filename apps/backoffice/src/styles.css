@@ -13,15 +13,48 @@
    @simpletpv/ui/theme-apple.css. Aquí solo lo específico del backoffice. */
 
 /* ─── Contenido principal ─────────────────────────────────── */
+/* F3.3 (#188): fila que aloja <main> y, solo en Dashboard, el rail del chatbot a su
+   derecha. El scroll sigue siendo del documento (modelo actual intacto): <main> mantiene
+   su flujo y el rail se ancla con `position: sticky` bajo la TopBar (sticky, 68px). */
+.app-main-row {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+
 .bo-main {
   flex: 1;
   padding: 2rem 2.5rem 3.5rem;
   min-width: 0;
 }
 
+/* El rail del chat queda pegado bajo la TopBar mientras el dashboard scrollea con el
+   documento. Sobreescribe el `height: 100%` agnóstico de chat.css con la altura del
+   viewport menos la TopBar. No se encoge con el ancho de <main>. */
+.app-main-row--chat > .chat-panel,
+.app-main-row--chat > .chat-rail {
+  position: sticky;
+  top: 68px;
+  align-self: flex-start;
+  height: calc(100vh - 68px);
+  flex: none;
+}
+
 @media (max-width: 767px) {
   .bo-main {
     padding: 1.25rem 1.1rem 2.5rem;
+  }
+
+  /* En móvil el rail se apila bajo el dashboard (sin sticky ni fila). */
+  .app-main-row--chat {
+    flex-direction: column;
+  }
+
+  .app-main-row--chat > .chat-panel,
+  .app-main-row--chat > .chat-rail {
+    position: static;
+    height: auto;
+    width: 100%;
   }
 }
 

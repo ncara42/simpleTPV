@@ -31,6 +31,7 @@ import { useState } from 'react';
 
 import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
+import { ChatPanel } from './components/chat/ChatPanel.js';
 import { FunctionSearch } from './components/FunctionSearch.js';
 import { DashboardPage } from './DashboardPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
@@ -220,26 +221,34 @@ function Home() {
             notificationCount={notificationCount}
             notificationsActive={tab === 'notifications'}
           />
-          <main className="bo-main">
-            {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
-                embebe la tabla — enlaza con "Ver todas las ventas →". */}
-            {tab === 'dashboard' && <DashboardPage onNavigate={(t) => setTab(t)} />}
-            {tab === 'sales' && <SalesHistoryPage initialStoreId={navStoreId} />}
-            {tab === 'notifications' && <NotificationsPage onResolve={{ resolveStock }} />}
-            {tab === 'catalog' && <CatalogPage initialFamilyId={navFamilyId} />}
-            {tab === 'families' && <FamiliesPage onOpenCatalogFamily={openCatalogFamily} />}
-            {tab === 'stock' && <StockPage initialStoreId={navStoreId} initialSearch={navSearch} />}
-            {tab === 'transfers' && <TransfersPage />}
-            {tab === 'promotions' && <PromotionsPage />}
-            {tab === 'users' && <UsersPage />}
-            {tab === 'timeclock' && <TimeClockPage />}
-            {tab === 'stores' && <StoresPage onOpenStoreView={openStoreView} />}
-            {tab === 'suppliers' && <SuppliersPage />}
-            {tab === 'verifactu' && <VerifactuPage />}
-            {tab === 'b2b' && <B2bPage />}
-            {tab === 'settings' && <SettingsPage />}
-            {tab === 'help' && <HelpPage />}
-          </main>
+          {/* F3.3 (#188): el rail del chatbot vive a la derecha de <main> en una fila flex y
+              solo en la pestaña Dashboard. El ChatPanel persiste su propio colapso (localStorage)
+              y gestiona la cola de mensajes (useChat). La aplicación de canvas_op llega en F4.2. */}
+          <div className={`app-main-row${tab === 'dashboard' ? ' app-main-row--chat' : ''}`}>
+            <main className="bo-main">
+              {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
+                  embebe la tabla — enlaza con "Ver todas las ventas →". */}
+              {tab === 'dashboard' && <DashboardPage onNavigate={(t) => setTab(t)} />}
+              {tab === 'sales' && <SalesHistoryPage initialStoreId={navStoreId} />}
+              {tab === 'notifications' && <NotificationsPage onResolve={{ resolveStock }} />}
+              {tab === 'catalog' && <CatalogPage initialFamilyId={navFamilyId} />}
+              {tab === 'families' && <FamiliesPage onOpenCatalogFamily={openCatalogFamily} />}
+              {tab === 'stock' && (
+                <StockPage initialStoreId={navStoreId} initialSearch={navSearch} />
+              )}
+              {tab === 'transfers' && <TransfersPage />}
+              {tab === 'promotions' && <PromotionsPage />}
+              {tab === 'users' && <UsersPage />}
+              {tab === 'timeclock' && <TimeClockPage />}
+              {tab === 'stores' && <StoresPage onOpenStoreView={openStoreView} />}
+              {tab === 'suppliers' && <SuppliersPage />}
+              {tab === 'verifactu' && <VerifactuPage />}
+              {tab === 'b2b' && <B2bPage />}
+              {tab === 'settings' && <SettingsPage />}
+              {tab === 'help' && <HelpPage />}
+            </main>
+            {tab === 'dashboard' && <ChatPanel />}
+          </div>
         </PageHeaderProvider>
       </div>
     </div>
