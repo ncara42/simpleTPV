@@ -44,13 +44,25 @@ export interface ChatPanelProps {
   /** Aplica un canvas_op en el lienzo y devuelve el resultado para el feedback loop. */
   onCanvasOp?: (op: CanvasOp) => CanvasApplyResult | void;
   onUndoCanvasOps?: (ops: CanvasOp[]) => void;
+  /** Snapshot fresco del lienzo para el system prompt del agente (F5). */
+  getCanvasState?: () => unknown;
 }
 
-export function ChatPanel({ enabled = true, onCanvasOp, onUndoCanvasOps }: ChatPanelProps) {
+export function ChatPanel({
+  enabled = true,
+  onCanvasOp,
+  onUndoCanvasOps,
+  getCanvasState,
+}: ChatPanelProps) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [showHistory, setShowHistory] = useState(false);
 
-  const chat = useChat({ enabled: enabled && !collapsed, onCanvasOp, onUndoCanvasOps });
+  const chat = useChat({
+    enabled: enabled && !collapsed,
+    onCanvasOp,
+    onUndoCanvasOps,
+    getCanvasState,
+  });
 
   useEffect(() => {
     writeCollapsed(collapsed);

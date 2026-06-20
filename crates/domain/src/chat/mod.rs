@@ -1,7 +1,9 @@
+pub mod context;
 pub mod model;
 pub mod service;
 pub mod tool_dispatch;
 
+pub use context::{build_system_prompt, load_org_context, OrgContext};
 pub use model::{
     CanvasOp, ChatConversationRow, ChatMessageRow, ConversationUsage, InsertConversation,
     InsertMessage, OrgUsageSummary, PruneResult, RecordUsageInput, UsageSummary,

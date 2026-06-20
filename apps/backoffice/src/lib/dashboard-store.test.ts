@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getWidgetSpec } from '../widgets/registry.js';
 import type { FreeElement, FreeShape, LayoutPref } from './dashboard-layout.js';
-import { useDashboardStore } from './dashboard-store.js';
+import { buildCanvasSnapshot, useDashboardStore } from './dashboard-store.js';
 
 const store = () => useDashboardStore.getState();
 const PRESET = 'personalizado';
@@ -317,5 +317,62 @@ describe('applyCanvasOp (despacho)', () => {
     const r = store().applyCanvasOp({ op: 'add_widget' });
     expect(r.accepted).toBe(false);
     expect(store().layout).toBe(layoutBefore);
+  });
+});
+
+describe('buildCanvasSnapshot (para el system prompt, F5)', () => {
+  it('lienzo vacío en Cuadrícula', () => {
+    const snap = buildCanvasSnapshot();
+    expect(snap.mode).toBe('grid');
+    expect(snap.elements).toHaveLength(0);
+    expect(snap.totalElements).toBe(0);
+  });
+
+  it('en Cuadrícula lista widgets con id y label humano', () => {
+    store().addWidget('kpi-today', 'top-left');
+    const snap = buildCanvasSnapshot();
+    expect(snap.mode).toBe('grid');
+    const el = snap.elements.find((e) => e.id === 'kpi-today');
+    expect(el).toBeDefined();
+    expect(el!.label).toBe('Facturación hoy');
+    expect(typeof el!.x).toBe('number');
+  });
+
+  it('en Libre incluye coords y etiqueta por tipo de elemento', () => {
+    store().hydrate({ mode: 'free' });
+    store().addWidget('dash-bars', 'center');
+    store().addShape('rect', 'top-left');
+    const snap = buildCanvasSnapshot();
+    expect(snap.mode).toBe('free');
+    expect(
+      snap.elements.some((e) => e.label === 'Ventas (gráfico)' || e.label.includes('Ventas')),
+    ).toBe(true);
+    expect(snap.elements.some((e) => e.label.startsWith('Forma'))).toBe(true);
+    expect(snap.elements.every((e) => typeof e.x === 'number' && typeof e.y === 'number')).toBe(
+      true,
+    );
+  });
+
+  it('trunca a 30 elementos pero reporta el total real', () => {
+    store().hydrate({ mode: 'free' });
+    // Inyecta 40 elementos directamente en el preset activo.
+    const many = Array.from({ length: 40 }, (_, i) => ({
+      kind: 'text' as const,
+      id: `t${i}`,
+      x: i,
+      y: i,
+      w: 100,
+      h: 40,
+      z: i,
+      text: `T${i}`,
+      color: '#000',
+      fontSize: 16,
+    }));
+    useDashboardStore.setState({
+      layout: { mode: 'free', freeLayouts: { personalizado: many } },
+    });
+    const snap = buildCanvasSnapshot();
+    expect(snap.elements).toHaveLength(30);
+    expect(snap.totalElements).toBe(40);
   });
 });

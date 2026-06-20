@@ -137,6 +137,9 @@ export interface StreamChatParams {
   message: string;
   model: string;
   effort: Effort;
+  // Estado del lienzo en el momento del mensaje (F5): el backend lo incluye en el system
+  // prompt para que el agente conozca qué hay en el dashboard. Forma libre.
+  canvasState?: unknown;
 }
 
 // ── API calls ──────────────────────────────────────────────────────────────────

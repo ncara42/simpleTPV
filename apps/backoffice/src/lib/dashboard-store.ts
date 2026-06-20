@@ -12,7 +12,11 @@
 
 import { create } from 'zustand';
 
-import { registerGenericWidget, unregisterGenericWidget } from '../widgets/registry.js';
+import {
+  getWidgetLabel,
+  registerGenericWidget,
+  unregisterGenericWidget,
+} from '../widgets/registry.js';
 import type { CanvasOp } from './chat.js';
 import {
   addGenericToFree,
@@ -25,6 +29,7 @@ import {
   type DashboardMode,
   DRAW_COLORS,
   DRAW_STROKE_WIDTH,
+  type FreeElement,
   type FreeLayout,
   GENERIC_DEFAULT_SIZE,
   type GenericSpec,
@@ -427,3 +432,60 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     }
   },
 }));
+
+// ── Snapshot del lienzo para el system prompt del agente (F5, #188) ─────────────
+// Forma que espera `build_system_prompt` en el backend: modo + elementos con id interno y
+// label humano (y coords en Libre), truncado a 30. Viaja en el body del POST /chat para que
+// el prompt refleje el estado FRESCO del lienzo (no el snapshot persistido, que puede ser stale).
+const SNAPSHOT_MAX = 30;
+
+export interface CanvasSnapshotElement {
+  id: string;
+  label: string;
+  x?: number;
+  y?: number;
+}
+export interface CanvasSnapshot {
+  mode: DashboardMode;
+  elements: CanvasSnapshotElement[];
+  totalElements: number;
+}
+
+// Label humano de un elemento del lienzo libre (widget→etiqueta del registry; resto→tipo).
+function freeElementLabel(el: FreeElement): string {
+  switch (el.kind) {
+    case 'widget':
+      return getWidgetLabel(el.widgetId);
+    case 'note':
+      return 'Nota';
+    case 'text':
+      return el.text ? `Texto: «${el.text.slice(0, 40)}»` : 'Texto';
+    case 'shape':
+      return `Forma (${el.shape})`;
+    case 'draw':
+      return 'Dibujo';
+  }
+}
+
+// Construye el snapshot del lienzo desde el estado actual del store.
+export function buildCanvasSnapshot(): CanvasSnapshot {
+  const { layout } = useDashboardStore.getState();
+  const mode: DashboardMode = layout.mode ?? 'grid';
+  let all: CanvasSnapshotElement[];
+  if (mode === 'free') {
+    all = (layout.freeLayouts?.[ACTIVE_PRESET] ?? []).map((e) => ({
+      id: e.id,
+      label: freeElementLabel(e),
+      x: Math.round(e.x),
+      y: Math.round(e.y),
+    }));
+  } else {
+    all = (layout.layouts?.[ACTIVE_PRESET]?.lg ?? []).map((it) => ({
+      id: it.i,
+      label: getWidgetLabel(it.i),
+      x: it.x,
+      y: it.y,
+    }));
+  }
+  return { mode, elements: all.slice(0, SNAPSHOT_MAX), totalElements: all.length };
+}

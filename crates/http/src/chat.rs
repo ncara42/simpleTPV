@@ -35,6 +35,11 @@ pub struct StreamChatBody {
     pub model: String,
     #[serde(default = "default_effort")]
     pub effort: String,
+    /// Estado del lienzo en el momento del mensaje (modo + elementos con id/label). Viaja
+    /// fresco desde el frontend en cada mensaje para que el system prompt no use un snapshot
+    /// stale. Forma libre: `{ mode, elements: [{ id, label, x?, y? }], totalElements }`.
+    #[serde(default)]
+    pub canvas_state: Option<serde_json::Value>,
 }
 
 fn default_effort() -> String {
@@ -141,13 +146,18 @@ pub async fn stream(
         simpletpv_ai::tools::all_tools_for_manager()
     };
 
+    // System prompt dinámico (F5): contexto de la organización + catálogo de widgets + tools
+    // por rol + allowlist de endpoints + estado actual del lienzo (fresco, del body).
+    let org_ctx = chat::load_org_context(pool, org).await.map_err(ApiError::from)?;
+    let system = chat::build_system_prompt(&org_ctx, is_admin, body.canvas_state.as_ref());
+
     let messages = build_chat_messages(&history);
     let req = simpletpv_ai::event::ChatRequest {
         model: body.model.clone(),
         effort,
         messages,
         tools,
-        system: system_prompt(),
+        system,
     };
 
     let ai_config = ai.clone();
@@ -649,10 +659,6 @@ fn auto_title(message: &str) -> String {
         None => s,
         Some(f) => f.to_uppercase().to_string() + c.as_str(),
     }
-}
-
-fn system_prompt() -> String {
-    include_str!("chat_system_prompt.txt").to_owned()
 }
 
 fn build_chat_messages(

@@ -71,6 +71,8 @@ export interface UseChatOptions {
   onCanvasOp?: ((op: CanvasOp) => CanvasApplyResult | void) | undefined;
   /** Tras prune (editar/regenerar) hay que deshacer las ops add_* del lienzo. */
   onUndoCanvasOps?: ((ops: CanvasOp[]) => void) | undefined;
+  /** Snapshot FRESCO del lienzo en el momento del envío (F5): viaja en el body para el prompt. */
+  getCanvasState?: (() => unknown) | undefined;
 }
 
 export interface UseChat {
@@ -223,9 +225,11 @@ export function useChat(options: UseChatOptions = {}): UseChat {
       // id llega en `done`, después de los canvas_op).
       const canvasResults: CanvasResultParams[] = [];
 
+      // Snapshot fresco del lienzo para el system prompt (F5).
+      const canvasState = optionsRef.current.getCanvasState?.();
       const params = fromConv
-        ? { conversationId: fromConv, message: text, model, effort }
-        : { message: text, model, effort };
+        ? { conversationId: fromConv, message: text, model, effort, canvasState }
+        : { message: text, model, effort, canvasState };
 
       try {
         await streamChat(

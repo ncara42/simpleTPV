@@ -41,7 +41,7 @@ import { api, useAuthStore } from './lib/auth.js';
 import { useBranding } from './lib/branding.js';
 import { listPendingCashMovements } from './lib/cash.js';
 import type { CanvasOp } from './lib/chat.js';
-import { useDashboardStore } from './lib/dashboard-store.js';
+import { buildCanvasSnapshot, useDashboardStore } from './lib/dashboard-store.js';
 import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { switchApp, type Tab } from './lib/nav.js';
@@ -278,7 +278,11 @@ function Home() {
               {tab === 'help' && <HelpPage />}
             </main>
             {tab === 'dashboard' && (
-              <ChatPanel onCanvasOp={handleCanvasOp} onUndoCanvasOps={handleUndoCanvasOps} />
+              <ChatPanel
+                onCanvasOp={handleCanvasOp}
+                onUndoCanvasOps={handleUndoCanvasOps}
+                getCanvasState={buildCanvasSnapshot}
+              />
             )}
           </div>
         </PageHeaderProvider>
