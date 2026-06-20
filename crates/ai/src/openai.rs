@@ -11,27 +11,41 @@ use crate::{
 pub fn stream_openai(
     client: Client,
     api_key: String,
+    base_url: Option<String>,
     req: ChatRequest,
 ) -> impl Stream<Item = Result<LlmEvent, AiError>> {
     stream! {
-        let model = map_openai_model(&req.model);
+        // Con gateway propio (base_url custom) el id de modelo viaja TAL CUAL (sus ids no son
+        // los de OpenAI); sin gateway se normaliza contra el catálogo conocido.
+        let is_gateway = base_url.is_some();
+        let model: String = if is_gateway {
+            req.model.clone()
+        } else {
+            map_openai_model(&req.model).to_string()
+        };
         let effort = map_effort(&req.effort);
 
         // Convertir mensajes al formato OpenAI
         let messages = build_openai_messages(&req);
 
-        let body = json!({
+        let mut body = json!({
             "model": model,
             "messages": messages,
             "tools": req.tools,
             "tool_choice": "auto",
-            "reasoning_effort": effort,
             "stream": true,
             "stream_options": { "include_usage": true },
         });
+        // `reasoning_effort` es específico de los modelos de razonamiento de OpenAI; muchos
+        // gateways OpenAI-compatibles lo rechazan con 400. Solo se envía contra api.openai.com.
+        if !is_gateway {
+            body["reasoning_effort"] = json!(effort);
+        }
 
+        let base = base_url.as_deref().unwrap_or("https://api.openai.com/v1");
+        let url = format!("{}/chat/completions", base.trim_end_matches('/'));
         let resp = client
-            .post("https://api.openai.com/v1/chat/completions")
+            .post(&url)
             .bearer_auth(&api_key)
             .json(&body)
             .send()

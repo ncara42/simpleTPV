@@ -364,6 +364,30 @@ fn run_agent_stream(
                 }
             }
 
+            // El historial debe llevar el mensaje del asistente CON sus tool_calls ANTES de los
+            // mensajes `role:"tool"` (regla OpenAI). OpenAI es laxo, pero gateways estrictos
+            // (DeepSeek vía OpenCode Zen) devuelven 400 "tool must be a response to a preceding
+            // message with tool_calls" si falta. Reconstruimos ese assistant.
+            let assistant_tool_calls: Vec<simpletpv_ai::event::ToolCallDef> = tool_calls
+                .iter()
+                .map(|tc| simpletpv_ai::event::ToolCallDef {
+                    id: tc.id.clone(),
+                    name: tc.name.clone(),
+                    kind: "function".to_owned(),
+                    function: simpletpv_ai::event::FunctionCall {
+                        name: tc.name.clone(),
+                        arguments: tc.args.to_string(),
+                    },
+                })
+                .collect();
+            req.messages.push(simpletpv_ai::event::ChatMessage::Assistant {
+                content: vec![simpletpv_ai::event::ContentBlock {
+                    kind: "text".to_owned(),
+                    text: tokens.clone(),
+                }],
+                tool_calls: Some(assistant_tool_calls),
+            });
+
             // Añadir tool_results al historial del request para la siguiente iteración
             req.messages.extend(tool_result_msgs);
         }
@@ -561,18 +585,41 @@ pub async fn list_models(
     user: AuthUser,
 ) -> Result<Json<Vec<simpletpv_ai::ModelInfo>>, ApiError> {
     user.require_role(&MGMT_ROLES)?;
-    let models = simpletpv_ai::available_models()
-        .into_iter()
-        .filter(|m| {
-            // Filtrar por providers configurados
-            let ai = state.ai();
-            match m.provider {
-                "openai" => ai.map(|c| c.openai_key.is_some()).unwrap_or(false),
-                "anthropic" => ai.map(|c| c.anthropic_key.is_some()).unwrap_or(false),
-                _ => false,
+    let ai = state.ai();
+    let mut models: Vec<simpletpv_ai::ModelInfo> = Vec::new();
+
+    if let Some(cfg) = ai {
+        // OpenAI / gateway. Con base_url custom se descubre la lista en vivo del gateway
+        // (todos sus modelos); en fallo de red se cae al catálogo estático.
+        if let Some(key) = &cfg.openai_key {
+            match &cfg.openai_base_url {
+                Some(base) => match simpletpv_ai::fetch_openai_models(base, key).await {
+                    Ok(m) => models.extend(m),
+                    Err(e) => {
+                        tracing::warn!(error = %e, "no se pudieron listar los modelos del gateway; uso catálogo estático");
+                        models.extend(
+                            simpletpv_ai::available_models()
+                                .into_iter()
+                                .filter(|m| m.provider == "openai"),
+                        );
+                    }
+                },
+                None => models.extend(
+                    simpletpv_ai::available_models()
+                        .into_iter()
+                        .filter(|m| m.provider == "openai"),
+                ),
             }
-        })
-        .collect::<Vec<_>>();
+        }
+        // Anthropic directo solo cuando NO hay gateway (con gateway, sus claude-* ya vienen arriba).
+        if cfg.anthropic_key.is_some() && cfg.openai_base_url.is_none() {
+            models.extend(
+                simpletpv_ai::available_models()
+                    .into_iter()
+                    .filter(|m| m.provider == "anthropic"),
+            );
+        }
+    }
     Ok(Json(models))
 }
 
