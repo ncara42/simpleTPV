@@ -7,5 +7,5 @@
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
-  "exclude": ["node_modules", "dist", "e2e"]
+  "exclude": ["node_modules", "dist", "e2e", "**/*.test.ts", "**/*.spec.ts"]
 }
