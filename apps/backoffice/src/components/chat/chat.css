@@ -266,11 +266,6 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   text-align: center;
 }
 
-/* El orbe de bienvenida respira sobre el saludo. */
-.chat-messages__empty .agent-orb--lg {
-  margin-bottom: var(--ui-space-4);
-}
-
 /* Las sugerencias mantienen su slider a todo el ancho dentro del estado vacío centrado. */
 .chat-messages__empty .suggestions {
   align-self: stretch;
@@ -725,11 +720,6 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
     0 0 0 4px color-mix(in srgb, var(--ui-brand) 9%, transparent),
     0 8px 22px -6px color-mix(in srgb, var(--ui-chart-accent) 50%, transparent);
   animation: agent-orb-breathe 4s var(--ui-ease) infinite;
-}
-
-.agent-orb--lg {
-  width: 50px;
-  height: 50px;
 }
 
 .agent-orb--sm {

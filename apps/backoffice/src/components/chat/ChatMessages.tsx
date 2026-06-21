@@ -332,7 +332,6 @@ export function ChatMessages({
 
         {isEmpty && (
           <div className="chat-messages__empty">
-            <span className="agent-orb agent-orb--lg" aria-hidden="true" />
             <p className="chat-messages__empty-title">{greeting}</p>
             {onSuggest && (
               <Suggestions>
