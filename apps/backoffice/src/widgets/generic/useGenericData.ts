@@ -48,6 +48,17 @@ export function toRecords(data: unknown): Array<Record<string, unknown>> {
   return [];
 }
 
+// Registro ESCALAR para widgets de valor único (kpiTile/progressMeter): el OBJETO tal cual (sus
+// campos escalares), o la primera fila si es un array. A diferencia de `toRecords`, NUNCA baja a un
+// array anidado: endpoints de KPI como `/dashboard/margin-kpis` traen un `series: number[]` que
+// `toRecords` confundía con la lista de filas → el kpiTile leía un número del sparkline y mostraba
+// "—" (p. ej. el Beneficio). Aquí el objeto manda.
+export function toRecord(data: unknown): Record<string, unknown> | undefined {
+  if (Array.isArray(data)) return data[0] as Record<string, unknown> | undefined;
+  if (data && typeof data === 'object') return data as Record<string, unknown>;
+  return undefined;
+}
+
 // Lee un campo numérico de un registro (tolerante a strings tipo "17.90").
 export function numField(row: Record<string, unknown>, field: string): number {
   const v = row[field];

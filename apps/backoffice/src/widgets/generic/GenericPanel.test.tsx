@@ -171,6 +171,49 @@ describe('GenericPanel — panel v2 (#204)', () => {
     expect(screen.getByText('Flores')).toBeInTheDocument();
   });
 
+  it('kpiTile lee el campo del OBJETO aunque el endpoint traiga un `series` array (Beneficio)', async () => {
+    // Regresión: /dashboard/margin-kpis devuelve {grossMargin, ..., series:number[]}. toRecords
+    // tomaba `series` como filas y el tile leía un número del sparkline → "—". Debe leer grossMargin.
+    getMock.mockImplementation((endpoint: string) => {
+      if (endpoint === '/dashboard/margin-kpis')
+        return Promise.resolve({
+          grossMargin: 50660.25,
+          realMargin: 50634.69,
+          marginPct: 0.59,
+          revenue: 84560.09,
+          series: [0.59, 0.6, 0.595, 0.603],
+        });
+      return Promise.resolve([]);
+    });
+
+    const spec: GenericSpec = {
+      type: 'composite',
+      kind: 'panel',
+      version: 2,
+      endpoint: '',
+      title: 'Beneficio',
+      defaultSize: { w: 8, h: 1 },
+      recipe: 'kpiRow',
+      density: 'comfortable',
+      slots: {
+        kpis: [
+          {
+            piece: 'kpiTile',
+            title: 'Beneficio',
+            endpoint: '/dashboard/margin-kpis',
+            valueField: 'grossMargin',
+            format: 'eur',
+          },
+        ],
+      },
+    };
+
+    renderWithClient(<GenericPanel spec={spec} />);
+    // El valor sale del objeto (grossMargin), no "—".
+    await waitFor(() => expect(screen.getByText(/50\.660,25\s?€/)).toBeInTheDocument());
+    expect(screen.queryByText('—')).toBeNull();
+  });
+
   it('heroChart+sideStats compone hero (gráfica) + side stats (KPIs) de verdad (#212)', async () => {
     getMock.mockImplementation((endpoint: string) => {
       if (endpoint === '/dashboard/sales-by-hour')

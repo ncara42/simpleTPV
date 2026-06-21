@@ -25,6 +25,7 @@ import {
   type GenericDataSource,
   numField,
   textField,
+  toRecord,
   toRecords,
   useGenericData,
 } from './useGenericData.js';
@@ -108,7 +109,10 @@ function PieceWidget({ piece }: { piece: PieceSpec }) {
 
   switch (piece.piece) {
     case 'kpiTile': {
-      const row = records[0];
+      // Registro ESCALAR (el objeto del endpoint), no `records[0]`: endpoints de KPI como
+      // margin-kpis traen `series:number[]` que `toRecords` tomaba como filas → el tile leía un
+      // número del sparkline y mostraba "—" (Beneficio). Con `toRecord` lee el objeto.
+      const row = toRecord(data);
       // Distingue "ausente/null" (→ estado vacío '—') de un 0 real: numField devuelve 0 para null,
       // así que se comprueba la presencia de la clave antes de leerla.
       const value =
@@ -203,7 +207,7 @@ function PieceWidget({ piece }: { piece: PieceSpec }) {
         </figure>
       );
     case 'progressMeter': {
-      const row = records[0];
+      const row = toRecord(data);
       const value = row && piece.valueField ? numField(row, piece.valueField) : null;
       const target =
         piece.target ?? (row && piece.targetField ? numField(row, piece.targetField) : undefined);
