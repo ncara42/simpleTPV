@@ -23,7 +23,6 @@ const TOOL_LABELS: Record<string, string> = {
   add_insight: 'Añadió un análisis',
   remove_element: 'Eliminó un elemento',
   arrange: 'Reordenó el lienzo',
-  set_mode: 'Cambió el modo del lienzo',
   clear_canvas: 'Vació el lienzo',
 };
 

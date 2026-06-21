@@ -2,13 +2,13 @@ import { Button, DataTable, type DataTableColumn, Input, Select } from '@simplet
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
+import { sileo } from 'sileo';
 
 import { useConfirm } from '../components/ConfirmProvider.js';
 import { CsvActionButton } from '../components/CsvActionButton.js';
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
 import { SectionToolbar } from '../components/SectionToolbar.js';
-import { useToast } from '../components/ToastProvider.js';
 import {
   createCustomer,
   type Customer,
@@ -72,7 +72,6 @@ function toInput(f: Form): CustomerInput {
 export function CustomersSection() {
   const qc = useQueryClient();
   const confirm = useConfirm();
-  const toast = useToast();
   const [form, setForm] = useState<Form | null>(null);
   const [search, setSearch] = useState('');
   // Modal de importación de clientes por CSV (alta en lote).
@@ -94,18 +93,18 @@ export function CustomersSection() {
     onSuccess: (_data, f) => {
       invalidate();
       setForm(null);
-      toast(f.id ? 'Cliente actualizado' : 'Cliente creado', 'success');
+      sileo.success({ title: f.id ? 'Cliente actualizado' : 'Cliente creado' });
     },
-    onError: (e) => toast(formErrorMessage(e, 'No se pudo guardar el cliente'), 'error'),
+    onError: (e) => sileo.error({ title: formErrorMessage(e, 'No se pudo guardar el cliente') }),
   });
 
   const removeMut = useMutation({
     mutationFn: (id: string) => deleteCustomer(id),
     onSuccess: () => {
       invalidate();
-      toast('Cliente eliminado', 'success');
+      sileo.success({ title: 'Cliente eliminado' });
     },
-    onError: (e) => toast(formErrorMessage(e, 'No se pudo eliminar el cliente'), 'error'),
+    onError: (e) => sileo.error({ title: formErrorMessage(e, 'No se pudo eliminar el cliente') }),
   });
 
   const tariffOptions = [

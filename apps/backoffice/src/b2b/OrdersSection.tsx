@@ -2,10 +2,10 @@ import { Badge, Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowUpRight } from 'lucide-react';
 import { useState } from 'react';
+import { sileo } from 'sileo';
 
 import { Modal } from '../components/Modal.js';
 import { SectionToolbar } from '../components/SectionToolbar.js';
-import { useToast } from '../components/ToastProvider.js';
 import {
   createWholesaleOrder,
   getWholesaleOrder,
@@ -42,7 +42,6 @@ interface DraftLine {
 
 // Modal de creación de pedido: cliente + líneas (producto + cantidad) + notas.
 function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const toast = useToast();
   const [customerId, setCustomerId] = useState('');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<DraftLine[]>([{ productId: '', qty: '1' }]);
@@ -68,10 +67,10 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
       );
     },
     onSuccess: () => {
-      toast('Pedido creado', 'success');
+      sileo.success({ title: 'Pedido creado' });
       onCreated();
     },
-    onError: (e) => toast(formErrorMessage(e, 'No se pudo crear el pedido'), 'error'),
+    onError: (e) => sileo.error({ title: formErrorMessage(e, 'No se pudo crear el pedido') }),
   });
 
   const customerOptions = [
@@ -182,7 +181,6 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
 // Modal de detalle: líneas con precio congelado, total y transiciones de estado.
 function OrderDetailModal({ orderId, onClose }: { orderId: string; onClose: () => void }) {
   const qc = useQueryClient();
-  const toast = useToast();
   const { data: order } = useQuery({
     queryKey: ['b2b-order', orderId],
     queryFn: () => getWholesaleOrder(orderId),
@@ -193,9 +191,9 @@ function OrderDetailModal({ orderId, onClose }: { orderId: string; onClose: () =
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['b2b-order', orderId] });
       void qc.invalidateQueries({ queryKey: ['b2b-orders'] });
-      toast('Estado del pedido actualizado', 'success');
+      sileo.success({ title: 'Estado del pedido actualizado' });
     },
-    onError: (e) => toast(formErrorMessage(e, 'No se pudo cambiar el estado'), 'error'),
+    onError: (e) => sileo.error({ title: formErrorMessage(e, 'No se pudo cambiar el estado') }),
   });
 
   return (

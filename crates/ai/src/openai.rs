@@ -94,6 +94,16 @@ pub fn stream_openai(
             };
             for choice in choices {
                 let delta = &choice["delta"];
+                // Razonamiento: los gateways OpenAI-compatibles de modelos de razonamiento
+                // (DeepSeek, OpenCode Zen…) lo emiten en `reasoning_content` (algunos en
+                // `reasoning`). Se reenvía como Thinking, separado del texto final.
+                let reasoning = delta["reasoning_content"]
+                    .as_str()
+                    .or_else(|| delta["reasoning"].as_str())
+                    .filter(|s| !s.is_empty());
+                if let Some(r) = reasoning {
+                    yield Ok(LlmEvent::Thinking(r.to_owned()));
+                }
                 // Token de texto
                 if let Some(content) = delta["content"].as_str() {
                     if !content.is_empty() {

@@ -11,13 +11,13 @@ pub fn canvas_tools() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "add_widget",
-                "description": "Añade un widget al dashboard. Usa widgets del catálogo existente o genéricos parametrizables.",
+                "description": "Añade un widget al dashboard. Usa widgets del catálogo existente o genéricos parametrizables. Para combinar ≥2 métricas en UNA tarjeta a medida, usa widget_id 'gen:composite' con generic_spec.type 'composite' y el árbol de layout en generic_spec.root.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "widget_id": {
                             "type": "string",
-                            "description": "ID del widget del catálogo (p.ej. 'kpi-today', 'dash-bars') o 'gen:<tipo>' para genérico (tipos: table, bar, line, area, pie, stacked, kpi, insight)."
+                            "description": "ID del widget del catálogo (p.ej. 'kpi-today', 'dash-bars') o 'gen:<tipo>' para genérico (tipos: table, bar, line, area, pie, stacked, kpi, insight, composite)."
                         },
                         "position": {
                             "type": "string",
@@ -41,14 +41,18 @@ pub fn canvas_tools() -> Vec<Value> {
                             "type": "object",
                             "description": "Solo para widgets genéricos (widget_id empieza con 'gen:'). Configura el origen de datos.",
                             "properties": {
-                                "type": { "type": "string", "enum": ["table", "bar", "line", "area", "pie", "stacked", "kpi", "insight"] },
-                                "endpoint": { "type": "string", "description": "Ruta relativa a /api (solo GET, solo endpoints de la allowlist)." },
+                                "type": { "type": "string", "enum": ["table", "bar", "line", "area", "pie", "stacked", "kpi", "insight", "composite"] },
+                                "endpoint": { "type": "string", "description": "Ruta relativa a /api (solo GET, solo endpoints de la allowlist). Cadena vacía '' cuando type es 'composite' (los endpoints van en las hojas del árbol)." },
                                 "params": { "type": "object", "description": "Query params adicionales." },
                                 "fields": { "type": "object", "description": "Mapeo campo→etiqueta para columnas/ejes." },
                                 "title": { "type": "string" },
                                 "default_size": {
                                     "type": "object",
                                     "properties": { "w": { "type": "integer" }, "h": { "type": "integer" } }
+                                },
+                                "root": {
+                                    "type": "object",
+                                    "description": "Solo type 'composite': árbol de layout. Nodo stack: { kind: 'stack', dir: 'row'|'col', span?: number, title?: string, gap?: number, children: [...] }. Nodo hoja: { kind: 'leaf', span?: number, title?: string, spec: { type, endpoint, fields?, params?, title? } }. Máx 3 niveles, máx 12 hojas; cada hoja debe usar un endpoint de la allowlist."
                                 }
                             },
                             "required": ["type", "endpoint"]
@@ -148,20 +152,6 @@ pub fn canvas_tools() -> Vec<Value> {
                         "action": { "type": "string", "enum": ["compact", "spread", "sort_by_type"] }
                     },
                     "required": ["action"]
-                }
-            }
-        }),
-        json!({
-            "type": "function",
-            "function": {
-                "name": "set_mode",
-                "description": "Cambia el modo del dashboard entre cuadrícula y lienzo libre. Pide confirmación al usuario antes de usar esta tool.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "mode": { "type": "string", "enum": ["grid", "free"] }
-                    },
-                    "required": ["mode"]
                 }
             }
         }),
@@ -435,7 +425,7 @@ mod tests {
     fn canvas_y_data_tools_presentes_para_ambos_roles() {
         let manager = tool_names(&all_tools_for_manager());
         // Canvas
-        for name in ["add_widget", "remove_element", "set_mode", "clear_canvas"] {
+        for name in ["add_widget", "remove_element", "clear_canvas"] {
             assert!(manager.contains(name), "falta canvas tool {name}");
         }
         // Data
@@ -486,5 +476,26 @@ mod tests {
                 "add_widget.position debería incluir {p}"
             );
         }
+    }
+
+    #[test]
+    fn add_widget_soporta_widgets_compuestos() {
+        let canvas = canvas_tools();
+        let add_widget = canvas
+            .iter()
+            .find(|t| t["function"]["name"] == "add_widget")
+            .unwrap();
+        let generic = &add_widget["function"]["parameters"]["properties"]["generic_spec"];
+        // El tipo 'composite' está disponible para que el agente componga tarjetas a medida (#189).
+        let types = generic["properties"]["type"]["enum"].as_array().unwrap();
+        assert!(
+            types.iter().any(|v| v == "composite"),
+            "generic_spec.type debería incluir 'composite'"
+        );
+        // El árbol de layout viaja en generic_spec.root (objeto libre; validación dura en frontend).
+        assert_eq!(
+            generic["properties"]["root"]["type"], "object",
+            "generic_spec.root debe declararse como objeto"
+        );
     }
 }

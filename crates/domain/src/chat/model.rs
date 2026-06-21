@@ -183,6 +183,39 @@ mod canvas_op_tests {
         // `elementId` se sirve por su campo propio, no duplicado dentro de `extra`.
         assert!(op.extra.get("elementId").is_none());
     }
+
+    #[test]
+    fn from_tool_call_preserva_arbol_composite() {
+        let args = json!({
+            "widget_id": "gen:composite",
+            "element_id": "elem-1",
+            "position": "center",
+            "generic_spec": {
+                "type": "composite",
+                "title": "Panel rendimiento",
+                "endpoint": "",
+                "root": {
+                    "kind": "stack",
+                    "dir": "row",
+                    "children": [
+                        { "kind": "leaf", "spec": { "type": "bar", "endpoint": "/dashboard/sales-by-employee", "title": "Ventas" } },
+                        { "kind": "leaf", "spec": { "type": "kpi", "endpoint": "/dashboard/sales-kpis", "title": "KPI" } }
+                    ]
+                }
+            }
+        });
+        let op = CanvasOp::from_tool_call("add_widget", &args);
+        // camel_case_keys normaliza el nivel superior: generic_spec → genericSpec.
+        let spec = &op.extra["genericSpec"];
+        assert_eq!(spec["type"], "composite");
+        // El árbol anidado llega intacto (camel_case_keys no toca valores anidados).
+        assert_eq!(spec["root"]["kind"], "stack");
+        assert_eq!(spec["root"]["children"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            spec["root"]["children"][0]["spec"]["endpoint"],
+            "/dashboard/sales-by-employee"
+        );
+    }
 }
 
 #[derive(Debug, Serialize)]

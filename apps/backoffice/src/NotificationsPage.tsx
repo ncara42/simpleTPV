@@ -5,11 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { api } from './lib/auth.js';
-import {
-  approveCashMovement,
-  denyCashMovement,
-  listPendingCashMovements,
-} from './lib/cash.js';
+import { approveCashMovement, denyCashMovement, listPendingCashMovements } from './lib/cash.js';
 import { fmtEur } from './lib/format.js';
 import { listAlerts, listExpiringBatches } from './lib/stock.js';
 import { ALERT_LABEL, df, EXPIRY_LABEL, expiryDaysText } from './stock/labels.js';

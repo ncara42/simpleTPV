@@ -27,21 +27,17 @@ import {
   Tag,
   Users,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 
 import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
-import { ChatPanel } from './components/chat/ChatPanel.js';
 import { FunctionSearch } from './components/FunctionSearch.js';
-import { useToast } from './components/ToastProvider.js';
 import { DashboardPage } from './DashboardPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { HelpPage } from './HelpPage.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { useBranding } from './lib/branding.js';
 import { listPendingCashMovements } from './lib/cash.js';
-import type { CanvasOp } from './lib/chat.js';
-import { buildCanvasSnapshot, useDashboardStore } from './lib/dashboard-store.js';
 import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { switchApp, type Tab } from './lib/nav.js';
@@ -107,18 +103,22 @@ function ShellTopBar({
   onNotifications,
   notificationCount,
   notificationsActive,
+  showSearch,
 }: {
   onNavigate: (tab: Tab) => void;
   onNotifications: () => void;
   notificationCount: number;
   notificationsActive: boolean;
+  // En el dashboard (lienzo libre) la TopBar queda tapada por el lienzo y el buscador vive en
+  // el clúster flotante junto al sidebar; aquí se omite para no montar DOS lanzadores (doble ⌘K).
+  showSearch: boolean;
 }) {
   const { title } = usePageHeaderValue();
   return (
     <TopBar
       title={title}
       titleTestId="page-heading"
-      search={<FunctionSearch onNavigate={onNavigate} />}
+      search={showSearch ? <FunctionSearch onNavigate={onNavigate} /> : undefined}
       activeApp="backoffice"
       onSwitchApp={switchApp}
       onNotifications={onNotifications}
@@ -189,32 +189,14 @@ function Home() {
   });
   const notificationCount = alerts.length + pendingCash.length;
 
-  // F4.2 (#188): puente agente → lienzo. El ChatPanel aplica cada canvas_op sobre el store del
-  // dashboard y devuelve el resultado; useChat lo reenvía al backend (feedback loop). El toast
-  // avisa cuando el agente saca al usuario de «Personalizar» al cambiar a modo Libre.
-  const showToast = useToast();
-  const handleCanvasOp = useCallback(
-    (op: CanvasOp) => {
-      const store = useDashboardStore.getState();
-      const wasEditing = store.editing;
-      const result = store.applyCanvasOp(op);
-      if (op.op === 'set_mode' && op.mode === 'free' && wasEditing) {
-        showToast('Has salido del modo Personalizar', 'info');
-      }
-      return result;
-    },
-    [showToast],
-  );
-  // Deshacer canvas_ops tras editar/regenerar: solo las add_* son inversibles. El id del
-  // elemento es `elementId` (shapes/notas/genéricos) o `widgetId` (widgets de catálogo, cuyo
-  // id en el lienzo coincide con el widgetId).
-  const handleUndoCanvasOps = useCallback((ops: CanvasOp[]) => {
-    const store = useDashboardStore.getState();
-    for (const op of ops) {
-      const id = op.elementId ?? op.widgetId;
-      if (id) store.removeElement(id);
-    }
-  }, []);
+  // Navegación entre pages: limpia los filtros «de paso» (tienda/familia/búsqueda) y cambia
+  // de tab. La comparten el sidebar, la TopBar y el buscador de funciones (flotante o en barra).
+  const navigateTo = (t: Tab): void => {
+    setNavStoreId(null);
+    setNavFamilyId(null);
+    setNavSearch(null);
+    setTab(t);
+  };
 
   return (
     <div className="app-shell">
@@ -222,34 +204,29 @@ function Home() {
         items={navItems}
         groups={NAV_GROUPS}
         groupsAsDropdowns
-        collapsible
+        floating
         logo={
           branding?.logoUrl ? (
             <img className="sidebar-logo-img" src={branding.logoUrl} alt="Logo" />
           ) : undefined
         }
         activeItem={tab}
-        onSelect={(id) => {
-          setNavStoreId(null);
-          setNavFamilyId(null);
-          setNavSearch(null);
-          setTab(id as Tab);
-        }}
+        onSelect={(id) => navigateTo(id as Tab)}
         account={{ name: 'Administrador', subtitle: 'Central · Admin' }}
         onLogout={logout}
+        onNotifications={toggleNotifications}
+        notificationCount={notificationCount}
+        // El buscador de funciones (⌘K) flota ENCIMA del sidebar (separado), no en la TopBar.
+        floatingActions={<FunctionSearch onNavigate={navigateTo} />}
       />
       <div className="app-content">
         <PageHeaderProvider>
           <ShellTopBar
-            onNavigate={(t) => {
-              setNavStoreId(null);
-              setNavFamilyId(null);
-              setNavSearch(null);
-              setTab(t);
-            }}
+            onNavigate={navigateTo}
             onNotifications={toggleNotifications}
             notificationCount={notificationCount}
             notificationsActive={tab === 'notifications'}
+            showSearch={false}
           />
           <div className="app-main-row">
             <main className="bo-main">
@@ -275,15 +252,8 @@ function Home() {
               {tab === 'help' && <HelpPage />}
             </main>
           </div>
-          {/* Asistente flotante (#188): overlay `position: fixed` (FAB + panel glass), solo en
-              la pestaña Dashboard. No es hijo en flujo de la fila → <main> ocupa todo el ancho. */}
-          {tab === 'dashboard' && (
-            <ChatPanel
-              onCanvasOp={handleCanvasOp}
-              onUndoCanvasOps={handleUndoCanvasOps}
-              getCanvasState={buildCanvasSnapshot}
-            />
-          )}
+          {/* El asistente vive ahora DENTRO de DashboardPage, como dock inferior unificado
+              (input + menú «+» de herramientas del lienzo). Ver ChatDock. */}
         </PageHeaderProvider>
       </div>
     </div>

@@ -1,55 +1,44 @@
 import { expect, test } from '@playwright/test';
 
-import { gotoApp, navTo, selectByLabel } from './helpers.js';
+import { gotoApp, navTo } from './helpers.js';
 
-// F3.3 (#188): integración del ChatPanel en el shell del backoffice. Tests estructurales —
-// el panel aparece solo en Dashboard, colapsa/expande y su estado persiste entre recargas.
-// El envío real de mensajes con streaming (requiere provider LLM) se cubre en F6 con un
-// provider fake; aquí solo verificamos la integración y el layout.
+// Rediseño del asistente: dock inferior unificado (input + menú «+» de herramientas) que
+// sustituye al panel lateral (FAB + glass). El dock es permanente en Dashboard; la conversación
+// vive en un popover que se despliega ENCIMA del input bajo demanda. Tests estructurales — el
+// envío real con streaming se cubre más abajo con un provider simulado (route interception).
 
-// El colapso del panel se persiste en localStorage (dashboard.chatCollapsed) y el storageState
-// se comparte entre tests: parte siempre de expandido para un estado conocido.
 test.beforeEach(async ({ page }) => {
   await gotoApp(page);
-  await page.evaluate(() => localStorage.removeItem('dashboard.chatCollapsed'));
-  await page.reload();
   await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
 });
 
-test('el ChatPanel aparece solo en la pestaña Dashboard', async ({ page }) => {
-  // En Dashboard el panel está montado y expandido por defecto.
-  await expect(page.getByTestId('chat-panel')).toBeVisible();
-
-  // Al navegar a otra pestaña, el chat se desmonta por completo (ni panel ni FAB).
-  await navTo(page, 'stock');
+test('el dock del asistente aparece solo en la pestaña Dashboard', async ({ page }) => {
+  // En Dashboard el dock (barra inferior) está montado.
+  await expect(page.getByTestId('chat-dock')).toBeVisible();
+  // El popover de conversación está cerrado por defecto.
   await expect(page.getByTestId('chat-panel')).toHaveCount(0);
-  await expect(page.getByTestId('chat-fab')).toHaveCount(0);
+
+  // Al navegar a otra pestaña, el chat se desmonta por completo.
+  await navTo(page, 'stock');
+  await expect(page.getByTestId('chat-dock')).toHaveCount(0);
 
   // Al volver al Dashboard, reaparece.
   await navTo(page, 'dashboard');
-  await expect(page.getByTestId('chat-panel')).toBeVisible();
+  await expect(page.getByTestId('chat-dock')).toBeVisible();
 });
 
-test('cerrar y abrir el panel (FAB) persiste entre recargas', async ({ page }) => {
+test('el popover de conversación se abre desde la barra y se cierra', async ({ page }) => {
+  await expect(page.getByTestId('chat-dock')).toBeVisible();
+  await expect(page.getByTestId('chat-panel')).toHaveCount(0);
+
+  // Abrir la conversación desde el botón de la barra.
+  await page.getByTestId('chat-toggle-panel').click();
   await expect(page.getByTestId('chat-panel')).toBeVisible();
 
-  // Cerrar: el panel deja paso al botón flotante (FAB).
+  // Cerrar con la × de la cabecera vuelve a dejar solo la barra.
   await page.getByRole('button', { name: 'Cerrar' }).click();
-  await expect(page.getByTestId('chat-fab')).toBeVisible();
   await expect(page.getByTestId('chat-panel')).toHaveCount(0);
-
-  // El estado cerrado persiste tras recargar.
-  await page.reload();
-  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
-  await expect(page.getByTestId('chat-fab')).toBeVisible();
-  await expect(page.getByTestId('chat-panel')).toHaveCount(0);
-
-  // Abrir desde el FAB y verificar que también persiste.
-  await page.getByRole('button', { name: 'Abrir asistente' }).click();
-  await expect(page.getByTestId('chat-panel')).toBeVisible();
-  await page.reload();
-  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
-  await expect(page.getByTestId('chat-panel')).toBeVisible();
+  await expect(page.getByTestId('chat-dock')).toBeVisible();
 });
 
 // Mockea solo la lista de modelos (y conversaciones vacías) y recarga para que el panel use
@@ -66,22 +55,26 @@ async function mockModels(page: import('@playwright/test').Page, models: unknown
   await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
 }
 
-test('el panel expone el selector de modelo y el campo de mensaje', async ({ page }) => {
-  // Con IA configurada (modelos disponibles) el panel muestra el selector y el input.
+test('el dock expone el input y el selector de modelo en el pie', async ({ page }) => {
+  // Con IA configurada (modelos disponibles) la barra muestra el input habilitado, enviar y el
+  // selector de modelo/esfuerzo en línea en el pie (estilo PromptInput de Claude).
   await mockModels(page, MODELS);
-  await expect(page.getByTestId('chat-panel')).toBeVisible();
-  await expect(page.getByTestId('chat-model-select')).toBeVisible();
+  await expect(page.getByTestId('chat-dock')).toBeVisible();
+  await expect(page.getByTestId('chat-input')).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Enviar' })).toBeVisible();
+  await expect(page.getByTestId('chat-model-select')).toBeVisible();
 });
 
-test('sin proveedor de IA configurado, el panel avisa en vez de bloquear el input', async ({
+test('sin proveedor de IA configurado, el popover avisa y el input queda deshabilitado', async ({
   page,
 }) => {
   await mockModels(page, []);
-  await expect(page.getByTestId('chat-panel')).toBeVisible();
-  // En vez de un input bloqueado sin explicación, se muestra el aviso de IA no configurada.
+  await expect(page.getByTestId('chat-dock')).toBeVisible();
+  // El input queda deshabilitado (sin proveedor no se puede enviar).
+  await expect(page.getByTestId('chat-input')).toBeDisabled();
+  // Al abrir el popover, se muestra el aviso de IA no configurada en vez de bloquear sin más.
+  await page.getByTestId('chat-toggle-panel').click();
   await expect(page.getByTestId('chat-no-ai')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Enviar' })).toHaveCount(0);
 });
 
 // ── Streaming con provider simulado (route interception) ────────────────────────
@@ -166,12 +159,12 @@ async function mockChat(
     // canvas-result / finalize / otros POST → 204.
     return route.fulfill({ status: 204, body: '' });
   });
-  // El panel cargó los modelos del backend real en el beforeEach (antes del mock);
+  // El dock cargó los modelos del backend real en el beforeEach (antes del mock);
   // recargamos para que `listModels` use el mock y se auto-seleccione un modelo, lo
   // que habilita el input (`disabled={!chat.model}`).
   await page.reload();
   await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
-  await expect(page.getByPlaceholder('Escribe un mensaje…')).toBeEnabled({ timeout: 10000 });
+  await expect(page.getByTestId('chat-input')).toBeEnabled({ timeout: 10000 });
 }
 
 function userMsg(conv: string, text: string): PersistedMsg {
@@ -204,7 +197,7 @@ function assistantMsg(
 }
 
 async function sendMessage(page: import('@playwright/test').Page, text: string) {
-  const input = page.getByPlaceholder('Escribe un mensaje…');
+  const input = page.getByTestId('chat-input');
   await input.fill(text);
   await page.getByRole('button', { name: 'Enviar' }).click();
 }
@@ -230,7 +223,7 @@ test('hace streaming de la respuesta del asistente', async ({ page }) => {
   await sendMessage(page, 'cómo van las ventas');
   // Tras el turno, el hilo muestra el mensaje del usuario y la respuesta del asistente.
   await expect(page.locator('.chat-bubble--user')).toContainText('cómo van las ventas');
-  await expect(page.locator('.chat-bubble--assistant')).toContainText('tus ventas van bien.');
+  await expect(page.locator('.chat-response')).toContainText('tus ventas van bien.');
 });
 
 // Nota (F6): el render de chips de tool_call y la aplicación de canvas_op (puente
@@ -255,11 +248,15 @@ test('permite cambiar de proveedor/modelo y de esfuerzo', async ({ page }) => {
     ]),
   );
 
-  // El selector (custom) de modelo ofrece los providers mockeados.
-  await selectByLabel(page, 'chat-model-select', 'Anthropic · Claude Opus 4.8');
+  // El selector modelo/esfuerzo vive en línea en el pie del composer (estilo Claude).
+  // Abrirlo ofrece los modelos de los providers mockeados.
+  await page.getByTestId('chat-model-select').click();
+  await page.getByRole('menuitemradio', { name: 'Claude Opus 4.8' }).click();
   await expect(page.getByTestId('chat-model-select')).toContainText('Claude Opus 4.8');
 
-  // El toggle de esfuerzo (radiogroup Bajo/Medio/Alto) es seleccionable.
-  await page.getByRole('radio', { name: 'Alto' }).click();
-  await expect(page.getByRole('radio', { name: 'Alto' })).toBeChecked();
+  // El esfuerzo se elige en el submenú "Esfuerzo" (Bajo/Medio/Alto).
+  await page.getByTestId('chat-model-select').click();
+  await page.getByTestId('chat-effort-toggle').click();
+  await page.getByRole('menuitemradio', { name: 'Alto' }).click();
+  await expect(page.getByTestId('chat-model-select')).toContainText('Alto');
 });

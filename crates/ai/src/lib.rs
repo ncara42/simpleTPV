@@ -61,7 +61,8 @@ pub fn stream_chat(config: &AiConfig, req: ChatRequest) -> Result<AiStream, AiEr
     // Con un gateway OpenAI-compatible (base_url custom) TODOS los modelos —incluidos los
     // `claude-*` que el gateway sirve bajo su propia API— van por el endpoint OpenAI. El path
     // de Anthropic directo (api.anthropic.com) solo se usa cuando NO hay gateway.
-    let use_anthropic_direct = config.openai_base_url.is_none() && AiConfig::is_anthropic(&req.model);
+    let use_anthropic_direct =
+        config.openai_base_url.is_none() && AiConfig::is_anthropic(&req.model);
 
     if use_anthropic_direct {
         let key = config

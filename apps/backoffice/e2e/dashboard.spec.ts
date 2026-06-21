@@ -23,17 +23,32 @@ async function clearFreeWidgets(page: Page): Promise<void> {
   }
 }
 
+// Las herramientas del lienzo (widget/nota/texto/dibujar/deshacer/ordenar) viven ahora dentro
+// del menú «+» del dock inferior: hay que abrirlo antes de pulsar cada acción (al pulsar una, el
+// menú se cierra). Cada acción dispara el handle imperativo de FreeBoard.
+async function clickTool(page: Page, testId: string): Promise<void> {
+  await page.getByTestId('dash-free-tools').click();
+  await page.getByTestId(testId).click();
+}
+
+// «Deshacer» con comprobación de disabled: abre el menú, deshace si puede; devuelve si actuó.
+async function undoOnce(page: Page): Promise<boolean> {
+  await page.getByTestId('dash-free-tools').click();
+  const undo = page.getByTestId('dash-free-undo');
+  if (await undo.isDisabled()) {
+    await page.keyboard.press('Escape');
+    return false;
+  }
+  await undo.click();
+  return true;
+}
+
 // Dashboard contra backend real (seed-demo). Los tests son estructurales (dashboard visible,
-// chip «Personalizado» presente, modo libre funcional). Parte autenticada vía storageState.
+// chip «Personalizado» presente, lienzo libre funcional). Parte autenticada vía storageState.
+// El dashboard es SIEMPRE un lienzo libre (el modo Cuadrícula se eliminó).
 test.beforeEach(async ({ page }) => {
   await gotoApp(page);
-  // El modo (D-20) se persiste global en /me/preferences. Si una ejecución previa dejó
-  // "Libre", volvemos a "Cuadrícula" para que los tests que esperan el tablero arranquen ok.
-  const grid = page.getByTestId('dash-mode-grid');
-  if ((await grid.getAttribute('aria-selected')) !== 'true') {
-    await grid.click();
-    await expect(page.getByTestId('dash-board')).toBeVisible();
-  }
+  await expect(page.getByTestId('dash-free')).toBeVisible();
 });
 
 // ── Tests skipped hasta F1.1/F1.2 (widgets configurables por el agente) ──────────────────
@@ -76,14 +91,16 @@ test.skip('preferencias por defecto: el dashboard recuerda el periodo elegido (I
 
 // ── Tests activos ─────────────────────────────────────────────────────────────────────────
 
-test('cabecera muestra chip Personalizado y el toggle de modo', async ({ page }) => {
+test('cabecera muestra chip Personalizado y el dashboard es un lienzo libre', async ({ page }) => {
   await expect(page.getByTestId('dashboard')).toBeVisible();
   // El chip no interactivo indica el preset activo.
   await expect(page.getByTestId('dash-preset-personalizado')).toBeVisible();
   await expect(page.getByTestId('dash-preset-personalizado')).toContainText('Personalizado');
-  // Los controles de modo siguen disponibles.
-  await expect(page.getByTestId('dash-mode-grid')).toBeVisible();
-  await expect(page.getByTestId('dash-mode-free')).toBeVisible();
+  // El lienzo libre es la única vista (el modo Cuadrícula y su toggle se eliminaron).
+  await expect(page.getByTestId('dash-free')).toBeVisible();
+  await expect(page.getByTestId('dash-free-toolbar')).toBeVisible();
+  await expect(page.getByTestId('dash-mode')).toHaveCount(0);
+  await expect(page.getByTestId('dash-board')).toHaveCount(0);
   // No existen los selectores de preset antiguo, periodo ni tienda.
   await expect(page.getByTestId('dash-preset-ventas')).toHaveCount(0);
   await expect(page.getByTestId('dash-preset-beneficio')).toHaveCount(0);
@@ -91,61 +108,33 @@ test('cabecera muestra chip Personalizado y el toggle de modo', async ({ page })
   await expect(page.getByTestId('dash-store')).toHaveCount(0);
 });
 
-test('Ventas es page propia: el dashboard no embebe la tabla y enlaza al final (I-17, D-06)', async ({
-  page,
-}) => {
-  // El dashboard ya no contiene el historial de ventas (E-10: scroll eterno).
+test('el dashboard no embebe la tabla de ventas (I-17, D-06)', async ({ page }) => {
+  // El dashboard ya no contiene el historial de ventas (E-10: scroll eterno); Ventas es
+  // page propia accesible desde el sidebar.
   await expect(page.getByTestId('dashboard')).toBeVisible();
   await expect(page.getByTestId('sales-table')).toHaveCount(0);
-  // El pie enlaza a la page de Ventas con su DataTable completo.
-  await page.getByTestId('dash-to-sales').click();
-  await expect(page.getByTestId('sales-table')).toBeVisible();
-  await expect(page.getByTestId('sales-totals')).toBeVisible();
 });
 
-test('Personalizado: lienzo vacío con + que abre el buscador de widgets', async ({ page }) => {
-  // El dashboard siempre arranca en «Personalizado» (único preset tras F0).
-  await expect(page.getByTestId('dash-mode')).toBeVisible();
-  await expect(page.getByTestId('dash-mode-grid')).toHaveAttribute('aria-selected', 'true');
-
-  // Limpia widgets que pudieran haber quedado de ejecuciones previas (estado persistido).
-  const freeBtn = page.getByTestId('dash-mode-free');
-  const widgets = page.locator('.dash-free-item--widget');
-  if ((await page.getByTestId('dash-custom-grid-empty').count()) === 0) {
-    await freeBtn.click();
-    await expect(page.getByTestId('dash-free')).toBeVisible();
-    await clearFreeWidgets(page);
-    await page.getByTestId('dash-mode-grid').click();
-  }
-
-  // Estado vacío en cuadrícula: "+" central que abre el buscador.
-  await expect(page.getByTestId('dash-custom-grid-empty')).toBeVisible();
-  await page.getByTestId('dash-custom-grid-add').click();
-
-  // Buscador: filtra el catálogo y añade un widget.
-  const search = page.getByTestId('dash-free-palette-search');
-  await expect(search).toBeVisible();
-  await search.fill('familia');
-  await page.locator('.dash-free-palette-list button').first().click();
-  // El widget aparece en el tablero cuadrícula (el estado vacío desaparece).
-  await expect(page.getByTestId('dash-custom-grid-empty')).toHaveCount(0);
-  await expect(page.getByTestId('dash-board')).toBeVisible();
-
-  // El mismo widget también aparece en Libre (comparten la fuente de datos).
-  await freeBtn.click();
+test('lienzo libre: añadir un widget desde la paleta y quitarlo', async ({ page }) => {
   await expect(page.getByTestId('dash-free')).toBeVisible();
+  // Parte de un estado conocido: sin widgets de ejecuciones previas.
+  await clearFreeWidgets(page);
+
+  const widgets = page.locator('.dash-free-item--widget');
+  await clickTool(page, 'dash-free-add-widget');
+  const palette = page.locator('.dash-free-palette');
+  await expect(palette).toBeVisible();
+  await palette.locator('button[role="menuitem"]').first().click();
   await expect(widgets).toHaveCount(1);
 
-  // Limpieza: quita el widget y vuelve a Cuadrícula para el resto de tests.
+  // Limpieza: quita el widget añadido.
   await widgets.first().locator('.dash-free-remove').dispatchEvent('click');
-  await page.getByTestId('dash-mode-grid').click();
-  await expect(page.getByTestId('dash-board')).toBeVisible();
+  await expect(widgets).toHaveCount(0);
 });
 
-test('Modo Libre: añadir nota y widget, quitar, deshacer y ordenar; minimapa visible', async ({
+test('lienzo libre: añadir nota y widget, quitar, deshacer y ordenar; minimapa visible', async ({
   page,
 }) => {
-  await page.getByTestId('dash-mode-free').click();
   await expect(page.getByTestId('dash-free')).toBeVisible();
   await expect(page.getByTestId('dash-free-toolbar')).toBeVisible();
   // El minimapa se pinta en la esquina del lienzo.
@@ -162,23 +151,23 @@ test('Modo Libre: añadir nota y widget, quitar, deshacer y ordenar; minimapa vi
   const baseCount = await items.count();
 
   // Añadir una NOTA: aparece una tarjeta de nota con su editor (carga diferida de TipTap).
-  await page.getByTestId('dash-free-add-note').click();
+  await clickTool(page, 'dash-free-add-note');
   await expect(notes).toHaveCount(1);
   await expect(notes.locator('.dash-free-note-content').first()).toBeVisible();
 
   // Deshacer ("botón volver") quita la nota recién creada.
-  await page.getByTestId('dash-free-undo').click();
+  await clickTool(page, 'dash-free-undo');
   await expect(notes).toHaveCount(0);
 
   // Añadir un WIDGET desde la paleta.
-  await page.getByTestId('dash-free-add-widget').click();
+  await clickTool(page, 'dash-free-add-widget');
   const palette = page.locator('.dash-free-palette');
   await expect(palette).toBeVisible();
   await palette.locator('button[role="menuitem"]').first().click();
   await expect(items).toHaveCount(baseCount + 1);
 
   // Deshacer también revierte el alta del widget.
-  await page.getByTestId('dash-free-undo').click();
+  await clickTool(page, 'dash-free-undo');
   await expect(items).toHaveCount(baseCount);
 
   // Ordenar: si hay widgets, mueve uno y verifica que Ordenar lo recoloca.
@@ -191,22 +180,17 @@ test('Modo Libre: añadir nota y widget, quitar, deshacer y ordenar; minimapa vi
       await page.mouse.move(fb.x + fb.width / 2 + 160, fb.y + fb.height / 2 + 120, { steps: 12 });
       await page.mouse.up();
       const tfMoved = await first.evaluate((el) => (el as HTMLElement).style.transform);
-      await page.getByTestId('dash-free-arrange').click();
+      await clickTool(page, 'dash-free-arrange');
       await expect
         .poll(() => first.evaluate((el) => (el as HTMLElement).style.transform))
         .not.toBe(tfMoved);
     }
   }
-
-  // Restaurar el modo por defecto.
-  await page.getByTestId('dash-mode-grid').click();
-  await expect(page.getByTestId('dash-board')).toBeVisible();
 });
 
-test('Modo Libre: la flecha de orientación aparece al alejarse y encuadra al pulsarla', async ({
+test('lienzo libre: la flecha de orientación aparece al alejarse y encuadra al pulsarla', async ({
   page,
 }) => {
-  await page.getByTestId('dash-mode-free').click();
   const canvas = page.getByTestId('dash-free');
   await expect(canvas).toBeVisible();
   // Sin formas/dibujos sueltos lejanos.
@@ -222,13 +206,11 @@ test('Modo Libre: la flecha de orientación aparece al alejarse y encuadra al pu
   // Pulsarla vuelve a encuadrar el contenido → la flecha desaparece.
   await arrow.click();
   await expect(arrow).toHaveCount(0);
-
-  await page.getByTestId('dash-mode-grid').click();
-  await expect(page.getByTestId('dash-board')).toBeVisible();
 });
 
-test('Modo Libre: herramientas de dibujo (forma, lápiz a mano y texto libre)', async ({ page }) => {
-  await page.getByTestId('dash-mode-free').click();
+test('lienzo libre: herramientas de dibujo (forma, lápiz a mano y texto libre)', async ({
+  page,
+}) => {
   await expect(page.getByTestId('dash-free-toolbar')).toBeVisible();
   await clearDrawElements(page);
 
@@ -242,8 +224,8 @@ test('Modo Libre: herramientas de dibujo (forma, lápiz a mano y texto libre)', 
   const shapes = page.locator('.dash-free-shape-svg');
   const shapesBase = await shapes.count();
 
-  // "Dibujar" abre el pill horizontal de herramientas encima de la barra inferior.
-  await page.getByTestId('dash-free-draw').click();
+  // "Dibujar" (en el menú «+») abre el pill horizontal de herramientas encima del dock.
+  await clickTool(page, 'dash-free-draw');
   await expect(page.getByTestId('dash-free-draw-pill')).toBeVisible();
 
   // Forma: rectángulo (arrastrar sobre el fondo).
@@ -265,8 +247,8 @@ test('Modo Libre: herramientas de dibujo (forma, lápiz a mano y texto libre)', 
   await expect(shapes).toHaveCount(shapesBase + 2);
 
   // Cierra el pill y crea un TEXTO libre.
-  await page.getByTestId('dash-free-draw').click();
-  await page.getByTestId('dash-free-add-text').click();
+  await clickTool(page, 'dash-free-draw');
+  await clickTool(page, 'dash-free-add-text');
   const textInput = page.locator('.dash-free-text-input');
   await expect(textInput).toBeVisible();
   await textInput.fill('Hola');
@@ -274,11 +256,7 @@ test('Modo Libre: herramientas de dibujo (forma, lápiz a mano y texto libre)', 
   await expect(page.locator('.dash-free-item--text')).toContainText('Hola');
 
   // Limpieza: deshacer hasta volver al estado base.
-  const undoBtn = page.getByTestId('dash-free-undo');
   for (let i = 0; i < 8 && (await items.count()) > base; i++) {
-    if (await undoBtn.isDisabled()) break;
-    await undoBtn.click();
+    if (!(await undoOnce(page))) break;
   }
-  await page.getByTestId('dash-mode-grid').click();
-  await expect(page.getByTestId('dash-board')).toBeVisible();
 });

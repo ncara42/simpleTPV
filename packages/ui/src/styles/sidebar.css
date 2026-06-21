@@ -418,12 +418,41 @@
   background: var(--sidebar-item-hover-bg);
 }
 
+.sidebar-account-menu-item--danger {
+  color: var(--ui-danger);
+}
+.sidebar-account-menu-item--danger .sidebar-account-menu-icon {
+  color: var(--ui-danger);
+}
+.sidebar-account-menu-item--danger:hover,
+.sidebar-account-menu-item--danger:focus-visible {
+  background: color-mix(in srgb, var(--ui-danger) 8%, transparent);
+}
+
 .sidebar-account-menu-icon {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--sidebar-group-label-color);
+}
+
+/* Badge numérico en los items del menú de cuenta (p. ej. notificaciones). */
+.sidebar-account-menu-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--ui-danger);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 /* Cierre de sesión simple (cuando no hay cuenta) */
@@ -502,7 +531,6 @@
     animation: none;
   }
 }
-
 
 /* ─── Modo dropdown (D-02): grupos plegados a una entrada ─────────────
    La cabecera del grupo se viste como un item (icono + label + chevron);
@@ -770,4 +798,320 @@
   height: 100%;
   object-fit: contain;
   border-radius: inherit;
+}
+
+/* ─── Sidebar flotante (pestaña [toggle+buscar] + cuerpo, unidos con cuello cóncavo) ───
+   Estilo «notificación»: una pestaña estrecha arriba (botón de desplegar + buscador en el
+   MISMO div horizontal, a la misma altura) que conecta con el cuerpo —más ancho— mediante
+   filetes CÓNCAVOS a ambos lados. Sin bordes: la forma se define con la sombra y los filetes.
+   El cuerpo aparece/desaparece EN SU SITIO (fundido), no se desliza. Solo en escritorio. */
+
+/* El toggle (pestaña) y el buscador flotante solo existen en escritorio. */
+.sidebar-toggle-tab,
+.sidebar-search-float {
+  display: none;
+}
+
+/* Geometría del sidebar flotante. En el shell para que la herede `.app-content` (hermano). */
+.app-shell {
+  --sidebar-float-gap: 12px;
+  /* Logo REDONDO: la marca vive en un círculo flotante arriba-izquierda. El cuerpo NO se mueve
+     (queda justo bajo el logo); la junta se resuelve con una máscara: un pseudo-elemento blanco
+     rellena los huecos cóncavos a los lados de la base del círculo, de modo que el blanco lo
+     acuna y no se cuela el gris del fondo. */
+  --sidebar-tab-w: 38px;
+  --sidebar-tab-h: 38px;
+  /* Separación entre los elementos de la fila superior: logo · avatar · buscador. */
+  --sidebar-top-gap: 8px;
+  /* Radio del filete CÓNCAVO que conecta el logo con el cuerpo por su derecha. Igualándolo al
+     radio del logo (tab-w/2) el círculo de recorte queda tangente A LA VEZ al logo y al borde
+     superior del cuerpo → la curva «cuadra» exacta, sin recta ni pico. */
+  --sidebar-neck: calc(var(--sidebar-tab-w) / 2);
+  --sidebar-corner: var(--ui-radius-lg, 18px);
+  --sidebar-float-top: calc(var(--sidebar-float-gap) + var(--sidebar-tab-h));
+  --sidebar-surface: var(--ui-surface);
+}
+
+@media (min-width: 768px) {
+  /* ── Cuerpo del sidebar: bajo la pestaña del toggle, ancho completo, sin borde. Esquinas
+     superiores REDONDEADAS (la izquierda la aporta la pestaña, que comparte el borde izquierdo);
+     la derecha, la propia esquina del cuerpo. Inferiores redondeadas. ── */
+  .sidebar--floating {
+    top: var(--sidebar-float-top);
+    left: var(--sidebar-float-gap);
+    width: var(--sidebar-width-expanded);
+    /* Altura al CONTENIDO (sin pie de cuenta): la tarjeta se recorta a lo que ocupan los items,
+       hasta como mucho el alto del viewport. */
+    height: auto;
+    max-height: calc(100vh - var(--sidebar-float-top) - var(--sidebar-float-gap));
+    border: none;
+    /* Esquina sup-izq RECTA: el logo está pegado al borde izquierdo (x=gap), así que si esa
+       esquina se redondease, la curva del cuerpo se separaría de la base del círculo y dejaría
+       un hueco gris. Recta, el blanco rellena bajo el logo (que la tapa) y la junta queda limpia.
+       El resto de esquinas, redondeadas. */
+    border-radius: 0 var(--sidebar-corner) var(--sidebar-corner) var(--sidebar-corner);
+    background: var(--sidebar-surface);
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.04),
+      0 18px 40px -12px rgb(0 0 0 / 0.2);
+    z-index: 40;
+    transform-origin: top center;
+    /* Aparece/desaparece EN SU SITIO (fundido + leve escala), nunca deslizándose a un lado. */
+    transition:
+      opacity 0.2s var(--ui-ease, ease),
+      transform 0.2s var(--ui-ease, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  /* El logo ya vive en la pestaña superior; el header interno (que lo duplicaba) se oculta
+     y el nav respira desde arriba, justo bajo el filete que rodea el logo. */
+  .sidebar--floating .sidebar-header {
+    display: none;
+  }
+  .sidebar--floating .sidebar-nav {
+    padding-top: 0.85rem;
+  }
+
+  /* En vistas NO-lienzo el contenido deja sitio al sidebar flotante. */
+  .sidebar--floating ~ .app-content {
+    margin-left: calc(var(--sidebar-width-expanded) + var(--sidebar-float-gap) * 2);
+  }
+
+  /* Oculto: el cuerpo desaparece EN SU SITIO; el contenido ocupa todo. El toggle y el
+     buscador permanecen. */
+  .sidebar--floating.is-hidden {
+    opacity: 0;
+    transform: scale(0.97);
+    pointer-events: none;
+    visibility: hidden;
+  }
+  .sidebar--floating.is-hidden ~ .app-content {
+    margin-left: 0;
+  }
+
+  /* ── Pestaña del TOGGLE: arriba-izquierda, comparte borde izquierdo con el cuerpo. Arriba
+     redondeada; abajo se funde con el cuerpo y a su DERECHA un filete CÓNCAVO conecta con él
+     (el cuerpo flarea hacia fuera). Es el único elemento enganchado al cuerpo. ── */
+  .sidebar-toggle-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: var(--sidebar-float-gap);
+    left: var(--sidebar-float-gap);
+    width: var(--sidebar-tab-w);
+    height: var(--sidebar-tab-h);
+    /* Por encima del cuerpo: el círculo asoma y su mitad inferior tapa la junta limpiamente. */
+    z-index: 41;
+    border: none;
+    /* Logo REDONDO de marca. Sin sombra de chrome (ensuciaba la junta con el cuerpo). */
+    border-radius: 50%;
+    background: var(--ui-brand);
+    box-shadow: none;
+    color: #fff;
+    cursor: pointer;
+    transition:
+      filter 0.12s ease,
+      transform 0.12s ease;
+  }
+  /* «Copa» enmascarada: blanco del cuerpo que rellena los dos huecos cóncavos a los lados de la
+     base del círculo (entre su arco inferior y el borde del cuerpo). Cubre la mitad inferior del
+     logo y recorta el disco con una máscara radial → solo quedan las medialunas blancas que
+     acunan la base. Así el círculo se asienta en el cuerpo sin que se vea el fondo gris, y SIN
+     mover el cuerpo. */
+  .sidebar-toggle-tab::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    /* Ensanchada a la derecha para alojar el filete cóncavo que sube hacia el logo. */
+    width: calc(100% + var(--sidebar-neck));
+    height: calc(50% + 6px);
+    background: var(--sidebar-surface);
+    /* DOS recortes combinados con intersección (mask-composite):
+       1) el disco del logo → medialunas que acunan su base;
+       2) un círculo en la esquina superior-derecha → el borde derecho se curva HACIA ADENTRO
+          (cóncavo), como el hueco que deja el search, en vez de flarear hacia afuera. */
+    -webkit-mask:
+      radial-gradient(
+        circle calc(var(--sidebar-tab-w) / 2) at calc(var(--sidebar-tab-w) / 2) 0,
+        #0000 0 calc(var(--sidebar-tab-w) / 2 - 0.5px),
+        #000 calc(var(--sidebar-tab-w) / 2)
+      ),
+      radial-gradient(
+        var(--sidebar-neck) at 100% 0,
+        #0000 0 calc(var(--sidebar-neck) - 0.5px),
+        #000 var(--sidebar-neck)
+      );
+    -webkit-mask-composite: source-in;
+    mask:
+      radial-gradient(
+        circle calc(var(--sidebar-tab-w) / 2) at calc(var(--sidebar-tab-w) / 2) 0,
+        #0000 0 calc(var(--sidebar-tab-w) / 2 - 0.5px),
+        #000 calc(var(--sidebar-tab-w) / 2)
+      ),
+      radial-gradient(
+        var(--sidebar-neck) at 100% 0,
+        #0000 0 calc(var(--sidebar-neck) - 0.5px),
+        #000 var(--sidebar-neck)
+      );
+    mask-composite: intersect;
+    pointer-events: none;
+  }
+  .sidebar-toggle-tab:hover {
+    filter: brightness(1.06);
+  }
+  .sidebar-toggle-tab:active {
+    transform: scale(0.97);
+  }
+  /* Contenido del logo: letra de marca o imagen corporativa, centrada en el cuadrado. */
+  .sidebar-tab-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 4px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: -0.03em;
+    color: #fff;
+    line-height: 1;
+  }
+  .sidebar-tab-logo .sidebar-logo-img {
+    border-radius: 50%;
+  }
+  .sidebar-toggle-tab:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-focus);
+  }
+  /* Colapsado (cuerpo oculto): el círculo queda como botón suelto para reabrir; una sombra
+     suave lo despega del contenido. Sin cuerpo, la copa enmascarada sobra. */
+  .sidebar-toggle-tab.is-collapsed {
+    box-shadow: 0 6px 18px -6px rgb(0 0 0 / 0.22);
+  }
+  .sidebar-toggle-tab.is-collapsed::after {
+    display: none;
+  }
+
+  /* ── Buscador: pill INDEPENDIENTE flotando aparte, a la DERECHA del CUERPO del sidebar y a la
+     MISMA ALTURA que el logo. Mantiene un gap con el borde derecho del sidebar: nunca lo pisa
+     ni parece parte de él. Va por encima del contenido (z mayor) con su propia sombra. ── */
+  /* Fila superior: [logo] [avatar] [buscador], cada uno separado por --sidebar-top-gap. */
+  .sidebar-account-float {
+    position: fixed;
+    top: var(--sidebar-float-gap);
+    left: calc(var(--sidebar-float-gap) + var(--sidebar-tab-w) + var(--sidebar-top-gap));
+    width: var(--sidebar-tab-w);
+    height: var(--sidebar-tab-h);
+    z-index: 42;
+  }
+  .sidebar-account-fab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 1px solid var(--ui-border);
+    border-radius: 50%;
+    background: var(--ui-surface);
+    cursor: pointer;
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.04),
+      0 10px 24px -14px rgb(0 0 0 / 0.22);
+    transition:
+      border-color 0.12s ease,
+      box-shadow 0.12s ease;
+  }
+
+  /* Punto rojo de notificaciones no leídas sobre el avatar. */
+  .sidebar-account-notif-dot {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--ui-danger);
+  }
+  .sidebar-account-fab:hover,
+  .sidebar-account-fab.open {
+    border-color: var(--ui-border-strong, var(--ui-border));
+  }
+  .sidebar-account-fab:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-focus);
+  }
+  .sidebar-account-fab .sidebar-account-avatar {
+    width: 100%;
+    height: 100%;
+  }
+  /* Menú de cuenta abriendo hacia ABAJO (el avatar está arriba), con cabecera nombre+rol. */
+  .sidebar-account-menu--down {
+    position: absolute;
+    z-index: 60;
+    top: calc(100% + 0.45rem);
+    left: 0;
+    right: auto;
+    bottom: auto;
+    min-width: 200px;
+    padding: 0.3rem;
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border-strong);
+    border-radius: 12px;
+    box-shadow: var(--ui-shadow-md);
+    animation: sidebar-account-pop-down 0.12s var(--ui-ease, ease);
+  }
+  @keyframes sidebar-account-pop-down {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .sidebar-account-menu-head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    padding: 0.4rem 0.6rem 0.5rem;
+    border-bottom: 1px solid var(--ui-border);
+    margin-bottom: 0.25rem;
+  }
+
+  .sidebar-search-float {
+    display: block;
+    position: fixed;
+    /* MISMA fila que logo + avatar: pill independiente a su derecha, separada con su margen. */
+    top: var(--sidebar-float-gap);
+    left: calc(var(--sidebar-float-gap) + (var(--sidebar-tab-w) + var(--sidebar-top-gap)) * 2);
+    z-index: 42;
+    transition: left 0.2s var(--ui-ease, ease);
+  }
+  .sidebar-search-float .topbar-search-launcher {
+    height: var(--sidebar-tab-h);
+    /* Borde derecho alineado con el del cuerpo: la fila superior abarca el ancho del cuerpo. */
+    width: calc(
+      var(--sidebar-width-expanded) - (var(--sidebar-tab-w) + var(--sidebar-top-gap)) * 2
+    );
+    border: 1px solid var(--ui-border);
+    border-radius: 9999px;
+    background: var(--ui-surface);
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.04),
+      0 10px 24px -14px rgb(0 0 0 / 0.22);
+  }
+  .sidebar-search-float .topbar-search-launcher:hover {
+    background: var(--ui-surface);
+    border-color: var(--ui-border-strong, var(--ui-border));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar--floating {
+    transition: none;
+  }
 }

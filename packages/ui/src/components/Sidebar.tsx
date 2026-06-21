@@ -58,9 +58,27 @@ export interface SidebarProps {
    * los items directos enseñan su nombre vía `title`. Persistido en localStorage.
    */
   collapsible?: boolean;
+  /**
+   * Sidebar flotante: se separa del borde (esquinas redondeadas, sombra) y puede
+   * ESCONDERSE del todo fuera de pantalla, dejando una franja a la izquierda. Al pasar
+   * el ratón por esa franja (o sobre el propio sidebar) reaparece flotando como overlay;
+   * los iconos enseñan su nombre vía `title`. El estado oculto se persiste en localStorage.
+   */
+  floating?: boolean;
+  /**
+   * Controles extra que flotan en el MISMO clúster que el icono de colapsar (a su derecha),
+   * p. ej. el buscador de funciones. Se deslizan con el sidebar (nunca quedan debajo). Solo
+   * tiene efecto con `floating`.
+   */
+  floatingActions?: React.ReactNode;
+  /** Abre el panel de notificaciones desde el menú del usuario. */
+  onNotifications?: () => void;
+  /** Nº de notificaciones sin leer; pinta un punto rojo sobre el avatar si > 0. */
+  notificationCount?: number;
 }
 
 const RAIL_STORAGE_KEY = 'ui.sidebar.collapsed';
+const HIDDEN_STORAGE_KEY = 'ui.sidebar.hidden';
 
 function readRailCollapsed(): boolean {
   try {
@@ -68,6 +86,33 @@ function readRailCollapsed(): boolean {
   } catch {
     return false;
   }
+}
+
+function readHidden(): boolean {
+  try {
+    return window.localStorage.getItem(HIDDEN_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function BellGlyph() {
+  return (
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </svg>
+  );
 }
 
 function LogoutGlyph() {
@@ -100,6 +145,10 @@ export function Sidebar({
   account,
   groupsAsDropdowns = false,
   collapsible = false,
+  floating = false,
+  floatingActions,
+  onNotifications,
+  notificationCount = 0,
 }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   // U-04: rail de iconos persistido. En móvil el panel siempre abre completo.
@@ -116,6 +165,23 @@ export function Sidebar({
     });
   }, []);
   const collapsed = collapsible && railCollapsed && !mobileOpen;
+
+  // Sidebar flotante: estado «oculto» persistido. Solo aplica con `floating`; en móvil el
+  // panel usa siempre su off-canvas propio (mobileOpen). Al ocultarse/mostrarse el sidebar
+  // APARECE en su sitio (fundido), no se desliza.
+  const [hidden, setHidden] = useState(() => floating && readHidden());
+  const toggleHidden = useCallback(() => {
+    setHidden((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(HIDDEN_STORAGE_KEY, next ? '1' : '0');
+      } catch {
+        /* almacenamiento no disponible: no se recuerda esta sesión */
+      }
+      return next;
+    });
+  }, []);
+  const isHidden = floating && hidden && !mobileOpen;
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [menuOpen, setMenuOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
@@ -320,10 +386,11 @@ export function Sidebar({
       />
 
       <aside
-        className={`sidebar${mobileOpen ? ' mobile-open' : ''}${collapsed ? ' collapsed' : ''}`}
+        className={`sidebar${mobileOpen ? ' mobile-open' : ''}${collapsed ? ' collapsed' : ''}${
+          floating ? ' sidebar--floating' : ''
+        }${isHidden ? ' is-hidden' : ''}`}
       >
-        {/* Header: logotipo (+ marca opcional) + control de contracción a rail,
-            ARRIBA y como icono visible (antes era un texto gris al fondo). */}
+        {/* Header: logotipo de la empresa. */}
         <div className="sidebar-header">
           <span className="sidebar-logo">{logo ?? 'S'}</span>
           {brand && (
@@ -332,7 +399,7 @@ export function Sidebar({
               {brand.subtitle && <span className="sidebar-brand-sub">{brand.subtitle}</span>}
             </span>
           )}
-          {collapsible && (
+          {collapsible && !floating && (
             <button
               type="button"
               className="sidebar-collapse"
@@ -469,20 +536,157 @@ export function Sidebar({
           )}
         </nav>
 
-        {/* Footer: cuenta (estilo ChatGPT) o cierre de sesión simple */}
-        {account ? (
-          <div className="sidebar-footer" ref={accountRef}>
-            {onLogout && menuOpen && (
-              <div
-                className="sidebar-account-menu"
-                role="menu"
-                aria-label="Cuenta"
-                ref={menuRef}
-                onKeyDown={onMenuKeyDown}
+        {/* Footer: cuenta (estilo ChatGPT) o cierre de sesión simple. En modo flotante la cuenta
+            se saca del pie y vive como avatar suelto junto al logo (ver más abajo), para que el
+            cuerpo se recorte a la altura de su contenido. */}
+        {!floating &&
+          (account ? (
+            <div className="sidebar-footer" ref={accountRef}>
+              {onLogout && menuOpen && (
+                <div
+                  className="sidebar-account-menu"
+                  role="menu"
+                  aria-label="Cuenta"
+                  ref={menuRef}
+                  onKeyDown={onMenuKeyDown}
+                >
+                  <button
+                    type="button"
+                    className="sidebar-account-menu-item sidebar-account-menu-item--danger"
+                    role="menuitem"
+                    onClick={() => {
+                      closeMenu();
+                      onLogout();
+                    }}
+                    data-testid="logout"
+                  >
+                    <span className="sidebar-account-menu-icon">
+                      <LogoutGlyph />
+                    </span>
+                    <span>Cerrar sesión</span>
+                  </button>
+                </div>
+              )}
+              <button
+                type="button"
+                className={`sidebar-account${menuOpen ? ' open' : ''}`}
+                ref={accountTriggerRef}
+                onClick={() => setMenuOpen((v) => !v)}
+                data-testid="account-menu"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                title={account.name}
               >
+                <span className="sidebar-account-avatar" aria-hidden="true">
+                  {initials(account.name)}
+                </span>
+                <span className="sidebar-account-meta">
+                  <span className="sidebar-account-name">{account.name}</span>
+                  {account.subtitle && (
+                    <span className="sidebar-account-sub">{account.subtitle}</span>
+                  )}
+                </span>
+              </button>
+            </div>
+          ) : (
+            onLogout && (
+              <div className="sidebar-footer">
+                <button
+                  type="button"
+                  className="sidebar-logout"
+                  onClick={onLogout}
+                  data-testid="logout"
+                >
+                  <span className="sidebar-item-icon">
+                    <LogoutGlyph />
+                  </span>
+                  <span className="sidebar-item-label">Salir</span>
+                </button>
+              </div>
+            )
+          ))}
+      </aside>
+
+      {/* Pestaña-LOGO: el ÚNICO elemento enganchado al cuerpo, conectado a él con un filete
+          CÓNCAVO a su derecha (el cuerpo blanco flarea y RODEA el logo, ver .sidebar-toggle-tab
+          en sidebar.css). Es a la vez la marca y la afordancia de ocultar/mostrar el sidebar
+          flotante: al hacer clic se pliega/despliega el cuerpo. */}
+      {floating && (
+        <button
+          type="button"
+          className={`sidebar-toggle-tab${isHidden ? ' is-collapsed' : ''}`}
+          onClick={toggleHidden}
+          data-testid="sidebar-toggle"
+          aria-pressed={!isHidden}
+          aria-label={isHidden ? 'Mostrar menú' : 'Ocultar menú'}
+          title={isHidden ? 'Mostrar menú' : 'Ocultar menú'}
+        >
+          <span className="sidebar-tab-logo" aria-hidden="true">
+            {logo ?? 'S'}
+          </span>
+        </button>
+      )}
+
+      {/* Avatar de cuenta: círculo suelto a la DERECHA del logo (modo flotante). Sustituye al pie
+          de cuenta; abre el menú (cerrar sesión) hacia ABAJO. Así el cuerpo no necesita pie y se
+          recorta a la altura de su contenido. */}
+      {floating && account && (
+        <div className="sidebar-account-float" ref={accountRef}>
+          <button
+            type="button"
+            className={`sidebar-account-fab${menuOpen ? ' open' : ''}`}
+            ref={accountTriggerRef}
+            onClick={() => setMenuOpen((v) => !v)}
+            data-testid="account-menu"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            title={account.name}
+          >
+            <span className="sidebar-account-avatar" aria-hidden="true">
+              {initials(account.name)}
+            </span>
+            {notificationCount > 0 && (
+              <span className="sidebar-account-notif-dot" aria-hidden="true" />
+            )}
+          </button>
+          {menuOpen && (
+            <div
+              className="sidebar-account-menu sidebar-account-menu--down"
+              role="menu"
+              aria-label="Cuenta"
+              ref={menuRef}
+              onKeyDown={onMenuKeyDown}
+            >
+              <div className="sidebar-account-menu-head">
+                <span className="sidebar-account-name">{account.name}</span>
+                {account.subtitle && (
+                  <span className="sidebar-account-sub">{account.subtitle}</span>
+                )}
+              </div>
+              {onNotifications && (
                 <button
                   type="button"
                   className="sidebar-account-menu-item"
+                  role="menuitem"
+                  onClick={() => {
+                    closeMenu();
+                    onNotifications();
+                  }}
+                  data-testid="nav-notifications"
+                >
+                  <span className="sidebar-account-menu-icon">
+                    <BellGlyph />
+                  </span>
+                  <span>Notificaciones</span>
+                  {notificationCount > 0 && (
+                    <span className="sidebar-account-menu-badge">{notificationCount}</span>
+                  )}
+                </button>
+              )}
+              {onLogout && (
+                <button
+                  type="button"
+                  className="sidebar-account-menu-item sidebar-account-menu-item--danger"
                   role="menuitem"
                   onClick={() => {
                     closeMenu();
@@ -495,47 +699,15 @@ export function Sidebar({
                   </span>
                   <span>Cerrar sesión</span>
                 </button>
-              </div>
-            )}
-            <button
-              type="button"
-              className={`sidebar-account${menuOpen ? ' open' : ''}`}
-              ref={accountTriggerRef}
-              onClick={() => setMenuOpen((v) => !v)}
-              data-testid="account-menu"
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              title={account.name}
-            >
-              <span className="sidebar-account-avatar" aria-hidden="true">
-                {initials(account.name)}
-              </span>
-              <span className="sidebar-account-meta">
-                <span className="sidebar-account-name">{account.name}</span>
-                {account.subtitle && (
-                  <span className="sidebar-account-sub">{account.subtitle}</span>
-                )}
-              </span>
-            </button>
-          </div>
-        ) : (
-          onLogout && (
-            <div className="sidebar-footer">
-              <button
-                type="button"
-                className="sidebar-logout"
-                onClick={onLogout}
-                data-testid="logout"
-              >
-                <span className="sidebar-item-icon">
-                  <LogoutGlyph />
-                </span>
-                <span className="sidebar-item-label">Salir</span>
-              </button>
+              )}
             </div>
-          )
-        )}
-      </aside>
+          )}
+        </div>
+      )}
+
+      {/* Buscador: pill INDEPENDIENTE, flotando aparte (sus propios márgenes), a la misma
+          altura que el toggle. No forma parte ni de la pill del toggle ni del sidebar. */}
+      {floating && floatingActions && <div className="sidebar-search-float">{floatingActions}</div>}
     </>
   );
 }

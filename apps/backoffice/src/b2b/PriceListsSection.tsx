@@ -1,11 +1,11 @@
 import { Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { sileo } from 'sileo';
 
 import { useConfirm } from '../components/ConfirmProvider.js';
 import { Modal } from '../components/Modal.js';
 import { SectionToolbar } from '../components/SectionToolbar.js';
-import { useToast } from '../components/ToastProvider.js';
 import {
   createPriceList,
   deletePriceList,
@@ -156,7 +156,6 @@ function PriceListDetail({
 export function PriceListsSection() {
   const qc = useQueryClient();
   const confirm = useConfirm();
-  const toast = useToast();
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [detailOf, setDetailOf] = useState<PriceListSummary | null>(null);
@@ -173,17 +172,17 @@ export function PriceListsSection() {
       invalidate();
       setCreating(false);
       setNewName('');
-      toast('Tarifa creada', 'success');
+      sileo.success({ title: 'Tarifa creada' });
     },
-    onError: (e) => toast(formErrorMessage(e, 'No se pudo crear la tarifa'), 'error'),
+    onError: (e) => sileo.error({ title: formErrorMessage(e, 'No se pudo crear la tarifa') }),
   });
   const removeMut = useMutation({
     mutationFn: (id: string) => deletePriceList(id),
     onSuccess: () => {
       invalidate();
-      toast('Tarifa eliminada', 'success');
+      sileo.success({ title: 'Tarifa eliminada' });
     },
-    onError: (e) => toast(formErrorMessage(e, 'No se pudo eliminar la tarifa'), 'error'),
+    onError: (e) => sileo.error({ title: formErrorMessage(e, 'No se pudo eliminar la tarifa') }),
   });
 
   return (

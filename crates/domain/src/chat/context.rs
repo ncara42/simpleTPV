@@ -51,6 +51,10 @@ const WIDGET_CATALOG: &[(&str, &str)] = &[
     ("dash-suppliers", "Comparativa de proveedores"),
     ("dash-rotation", "Rotación de productos"),
     ("dash-timeclock", "Fichajes de hoy"),
+    (
+        "gen:composite",
+        "Panel a medida (combina ≥2 métricas en una tarjeta)",
+    ),
 ];
 
 /// Allowlist de endpoints (solo lectura/GET) que puede apuntar un widget genérico, con los
@@ -133,14 +137,73 @@ const BEHAVIOR: &str = "\
 falla, comunícalo con claridad. Si falla por timeout, di «hubo un retraso, comprueba el lienzo».
 3. Ante ambigüedad (qué tienda, qué periodo), pregunta antes de actuar o usa valores por \
 defecto razonables (periodo: hoy; tienda: todas).
-4. Para dibujar formas, texto o notas necesitas el modo Libre. Si estás en Cuadrícula, \
-pregunta antes de cambiar con `set_mode`. NO invoques `add_shape`/`add_text`/`add_note`/\
-`add_insight` sin haber cambiado a Libre.
-5. `arrange` solo aplica en modo Libre; en Cuadrícula el grid ya está compacto, no lo invoques.
+4. El lienzo es siempre un lienzo libre: añade formas, texto y notas directamente con \
+`add_shape`/`add_text`/`add_note`/`add_insight`.
+5. Usa `arrange` para reordenar y compactar los elementos del lienzo cuando queden desordenados.
 6. No uses `clear_canvas` ni `remove_element` si el usuario podría querer revertir la acción: \
 esas operaciones no se deshacen al editar o regenerar el historial.
 7. Los widgets genéricos (`gen:<tipo>`) solo pueden apuntar a endpoints de la lista permitida.
 8. Cuando uses herramientas de canvas, explica brevemente al usuario lo que añades o modificas.";
+
+/// Guía del DSL de widgets compuestos (#189). Raw string para incluir el JSON de ejemplo sin
+/// escapar comillas. Solo usa endpoints y campos de la allowlist (ningún endpoint de escritura).
+const COMPOSITE_GUIDE: &str = r#"## Widgets compuestos (DSL de layout)
+
+Cuando el usuario quiera combinar 2 o más métricas relacionadas en UNA sola tarjeta, usa un \
+widget compuesto en lugar de añadir varios widgets sueltos:
+- `widget_id`: "gen:composite"
+- `generic_spec.type`: "composite"
+- `generic_spec.title`: título de la tarjeta (describe el conjunto, p. ej. "Rendimiento de ventas — este mes")
+- `generic_spec.endpoint`: "" (vacío; los endpoints viven en las hojas)
+- `generic_spec.default_size`: { "w": N, "h": N } en unidades de un grid de 12 columnas (ver tamaños abajo)
+- `generic_spec.root`: el árbol de layout (abajo)
+
+Nodos del árbol (CompositeNode):
+- stack: { "kind": "stack", "dir": "row"|"col", "span"?: N, "title"?: "...", "gap"?: N, "children": [...] }
+- hoja:  { "kind": "leaf",  "span"?: N, "title": "...", "spec": { "type", "endpoint", "fields"?, "params"? } }
+
+Reglas estructurales:
+- El endpoint de cada hoja debe estar en la allowlist de arriba (la misma que los widgets simples).
+- Máximo 3 niveles de anidación y máximo 12 hojas.
+- Una hoja no puede ser de tipo composite (no se anidan paneles dentro de hojas).
+- `span` solo aplica a hijos de un stack `dir: "row"` (reparto de columnas). En un stack `dir: "col"` los hijos ya ocupan el ancho completo: no uses `span` ahí.
+
+Reglas de DISEÑO (síguelas SIEMPRE para que el panel se vea bien desde el inicio):
+1. Título por hoja: pon SIEMPRE un `title` corto y claro en CADA hoja (p. ej. "Ventas por vendedor", "Ticket medio"). Es el rótulo que ve el usuario. NO repitas el título dentro de `spec` (basta el de la hoja; duplicarlo se ve mal).
+2. Tipo de gráfico según el dato:
+   - `bar`: comparar categorías (vendedores, familias, productos, tiendas).
+   - `line` o `area`: evolución temporal (por hora/día).
+   - `pie` o `donut`: reparto de un total, SOLO si hay 6 categorías o menos; si hay más, usa `bar` (una tarta con muchas porciones se ve mal).
+   - `kpi`: un único número clave (un solo campo en `fields`).
+   - `table`: ranking o listado con varias columnas y muchas filas.
+3. Composición:
+   - Raíz: `dir: "col"`.
+   - Agrupa de 2 a 4 KPIs relacionados en UNA fila (`dir: "row"`) arriba.
+   - Las gráficas van debajo. Máximo 2 gráficas por fila (más se aprietan). Una gráfica importante o ancha ponla como hoja directa de la columna raíz (ocupa todo el ancho).
+   - No mezcles una tabla con una gráfica en la misma fila estrecha: dale a la tabla su propia fila a ancho completo.
+4. Tamaño (`default_size`): NO sobredimensiones (un alto excesivo deja un hueco vacío feo). El alto ≈ las filas de contenido: una fila de KPIs cuenta ~2, cada fila de gráficas ~3, una tabla ~3.
+   - Solo 2 gráficas en una fila: { "w": 8, "h": 5 }.
+   - Fila de KPIs + 1 fila de gráficas: { "w": 12, "h": 5 }.
+   - Fila de KPIs + 2 filas (gráficas o tabla): { "w": 12, "h": 8 }.
+   - Algo pequeño (1–2 KPIs + 1 gráfica): { "w": 6, "h": 4 }.
+5. Menos es más: 2–4 visualizaciones coherentes, no 6. Si el usuario pide muchas cosas dispares, propón varios paneles en vez de uno saturado.
+
+Ejemplo — "Rendimiento de ventas — este mes", default_size { "w": 12, "h": 5 } (fila de 3 KPIs + fila de 2 gráficas de barras):
+{
+  "kind": "stack", "dir": "col",
+  "children": [
+    { "kind": "stack", "dir": "row", "children": [
+        { "kind": "leaf", "title": "Facturación", "spec": { "type": "kpi", "endpoint": "/dashboard/sales-kpis", "fields": ["revenue"], "params": { "period": "month" } } },
+        { "kind": "leaf", "title": "Ticket medio", "spec": { "type": "kpi", "endpoint": "/dashboard/sales-kpis", "fields": ["avgTicket"], "params": { "period": "month" } } },
+        { "kind": "leaf", "title": "Unidades por ticket", "spec": { "type": "kpi", "endpoint": "/dashboard/sales-kpis", "fields": ["upt"], "params": { "period": "month" } } }
+    ] },
+    { "kind": "stack", "dir": "row", "children": [
+        { "kind": "leaf", "title": "Ventas por vendedor", "spec": { "type": "bar", "endpoint": "/dashboard/sales-by-employee", "fields": ["userName", "total"], "params": { "period": "month" } } },
+        { "kind": "leaf", "title": "Ventas por familia", "spec": { "type": "bar", "endpoint": "/dashboard/sales-by-family", "fields": ["familyName", "total"], "params": { "period": "month" } } }
+    ] }
+  ]
+}
+"#;
 
 /// Carga el contexto de la organización (datos + recuentos) bajo el tenant del actor (RLS).
 pub async fn load_org_context(pool: &PgPool, org: Uuid) -> Result<OrgContext, AppError> {
@@ -191,22 +254,13 @@ pub async fn load_org_context(pool: &PgPool, org: Uuid) -> Result<OrgContext, Ap
 }
 
 /// Formatea el estado del lienzo (JSON enviado por el frontend) a texto legible para el LLM.
-/// Espera `{ mode, elements: [{ id, label, x?, y? }], totalElements }`. Trunca a 30 elementos
+/// Espera `{ elements: [{ id, label, x?, y? }], totalElements }`. Trunca a 30 elementos
 /// (el frontend ya trunca; cota defensiva). Razona con labels humanos pero conserva el id
 /// interno entre corchetes para que las tools puedan referenciarlo.
 fn format_canvas_state(canvas: Option<&serde_json::Value>) -> String {
     const MAX_ELEMENTS: usize = 30;
     let Some(canvas) = canvas else {
         return "No se ha enviado el estado del lienzo en este mensaje.".to_owned();
-    };
-    let mode = canvas
-        .get("mode")
-        .and_then(|m| m.as_str())
-        .unwrap_or("grid");
-    let mode_label = if mode == "free" {
-        "Libre"
-    } else {
-        "Cuadrícula"
     };
     let empty: Vec<serde_json::Value> = Vec::new();
     let elements = canvas
@@ -220,11 +274,11 @@ fn format_canvas_state(canvas: Option<&serde_json::Value>) -> String {
         .unwrap_or(elements.len());
 
     if elements.is_empty() {
-        return format!("Modo activo: {mode_label}. El lienzo está vacío.");
+        return "El lienzo está vacío.".to_owned();
     }
 
     let mut out = format!(
-        "Modo activo: {mode_label}. Elementos ({} de {total}):\n",
+        "Elementos del lienzo ({} de {total}):\n",
         elements.len().min(MAX_ELEMENTS),
     );
     for el in elements.iter().take(MAX_ELEMENTS) {
@@ -322,6 +376,10 @@ en `generic_spec.fields`:\n",
     }
     p.push('\n');
 
+    // 4b. Widgets compuestos (DSL de layout, #189).
+    p.push_str(COMPOSITE_GUIDE);
+    p.push('\n');
+
     // 5. Estado actual del lienzo.
     p.push_str("## Estado actual del lienzo\n\n");
     p.push_str(&format_canvas_state(canvas_state));
@@ -396,9 +454,26 @@ mod tests {
     fn incluye_instrucciones_de_comportamiento() {
         let p = build_system_prompt(&sample_org(), true, None);
         assert!(p.contains("español de España"));
-        assert!(p.contains("set_mode"));
+        // `set_mode` se eliminó: el lienzo es siempre libre, no hay modo que cambiar.
+        assert!(!p.contains("set_mode"));
         assert!(p.contains("arrange"));
         assert!(p.contains("clear_canvas"));
+    }
+
+    #[test]
+    fn incluye_seccion_de_widgets_compuestos_con_ejemplo() {
+        let p = build_system_prompt(&sample_org(), true, None);
+        assert!(p.contains("Widgets compuestos"));
+        assert!(p.contains("gen:composite"));
+        // El catálogo menciona el panel a medida.
+        assert!(p.contains("Panel a medida"));
+        // El ejemplo usa nodos del DSL y endpoints de la allowlist.
+        assert!(p.contains("\"kind\": \"stack\""));
+        assert!(p.contains("\"kind\": \"leaf\""));
+        assert!(p.contains("/dashboard/sales-kpis"));
+        // El árbol composite no introduce endpoints de escritura.
+        assert!(!p.contains("POST"));
+        assert!(!p.contains("DELETE"));
     }
 
     #[test]
@@ -410,7 +485,6 @@ mod tests {
     #[test]
     fn formatea_canvas_state_con_labels_e_ids() {
         let canvas = serde_json::json!({
-            "mode": "free",
             "elements": [
                 { "id": "dash-hour", "label": "Ventas por hora", "x": 120.0, "y": 80.0 },
                 { "id": "gen:abc", "label": "Top productos" },
@@ -418,7 +492,7 @@ mod tests {
             "totalElements": 2,
         });
         let p = build_system_prompt(&sample_org(), true, Some(&canvas));
-        assert!(p.contains("Modo activo: Libre"));
+        assert!(p.contains("Elementos del lienzo"));
         assert!(p.contains("Ventas por hora [dash-hour]"));
         assert!(p.contains("Top productos [gen:abc]"));
         assert!(p.contains("x≈120"));
@@ -430,12 +504,11 @@ mod tests {
             .map(|i| serde_json::json!({ "id": format!("w{i}"), "label": format!("W{i}") }))
             .collect();
         let canvas = serde_json::json!({
-            "mode": "grid",
             "elements": elements,
             "totalElements": 50,
         });
         let p = build_system_prompt(&sample_org(), true, Some(&canvas));
-        assert!(p.contains("Modo activo: Cuadrícula"));
+        assert!(p.contains("Elementos del lienzo (30 de 50)"));
         assert!(p.contains("W0 [w0]"));
         assert!(p.contains("20 elementos más"));
         // El elemento 35 está más allá del truncado: no aparece.

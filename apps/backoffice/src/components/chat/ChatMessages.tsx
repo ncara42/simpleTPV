@@ -1,24 +1,48 @@
-import { Check, ChevronRight, Pencil, RefreshCw } from 'lucide-react';
+import { ArrowDown, Check, ChevronRight, Copy, Pencil, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 
 import type { ChatMessage, ToolCall, ToolResult } from '../../lib/chat.js';
+import { ChatMarkdown } from './ChatMarkdown.js';
+import { Loader } from './Loader.js';
+import { Reasoning } from './Reasoning.js';
+import { Shimmer } from './Shimmer.js';
+import { Suggestion, Suggestions } from './Suggestions.js';
 import { toolLabel } from './toolLabels.js';
+
+// Prompts de arranque sugeridos en el estado vacío (orientados al dashboard).
+const SUGGESTIONS = [
+  'Muéstrame los KPIs de hoy',
+  'Ventas por hora de hoy',
+  'Ventas por familia',
+  'Alertas de stock',
+  'Top productos más vendidos',
+];
 
 interface ChatMessagesProps {
   messages: ChatMessage[];
   loading: boolean;
   streaming: boolean;
   streamingText: string;
+  streamingReasoning: string;
   streamingToolCalls: { id: string; name: string; args: unknown }[];
   onRegenerate: (assistantMessageId: string) => void;
   onEditAndResend: (userMessageId: string, newText: string) => void;
+  /** Envía un prompt sugerido desde el estado vacío. */
+  onSuggest?: (text: string) => void;
 }
 
 function messageText(message: ChatMessage): string {
   return message.content
     .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n')
+    .trim();
+}
+
+// Razonamiento persistido (bloques de contenido `thinking`), si el modelo lo produjo.
+function messageThinking(message: ChatMessage): string {
+  return message.content
+    .filter((b) => b.type === 'thinking')
     .map((b) => b.text)
     .join('\n')
     .trim();
@@ -43,16 +67,28 @@ interface ToolChipProps {
   pending: boolean;
 }
 
+// Estado del tool-call (espejo de los estados de Tool de ai-elements).
+const TOOL_BADGE: Record<'running' | 'completed' | 'error', string> = {
+  running: 'En curso',
+  completed: 'Hecho',
+  error: 'Cancelado',
+};
+const TOOL_STATE_CLASS: Record<'running' | 'completed' | 'error', string> = {
+  running: 'chat-tool-chip--pending',
+  completed: 'chat-tool-chip--done',
+  error: 'chat-tool-chip--aborted',
+};
+
 function ToolChip({ call, result, aborted, pending }: ToolChipProps) {
   const [open, setOpen] = useState(false);
-  const stateClass = aborted
-    ? 'chat-tool-chip--aborted'
-    : pending
-      ? 'chat-tool-chip--pending'
-      : 'chat-tool-chip--done';
+  const state: 'running' | 'completed' | 'error' = pending
+    ? 'running'
+    : aborted
+      ? 'error'
+      : 'completed';
 
   return (
-    <div className={`chat-tool-chip ${stateClass}`}>
+    <div className={`chat-tool-chip ${TOOL_STATE_CLASS[state]}`}>
       <button
         type="button"
         className="chat-tool-chip__head"
@@ -65,16 +101,22 @@ function ToolChip({ call, result, aborted, pending }: ToolChipProps) {
           aria-hidden="true"
         />
         <span className="chat-tool-chip__label">{toolLabel(call.name)}</span>
-        {pending ? (
-          <span className="chat-tool-chip__spinner" aria-hidden="true" />
-        ) : aborted ? null : (
-          <Check size={13} className="chat-tool-chip__check" aria-hidden="true" />
-        )}
+        <span className="chat-tool-chip__badge">
+          {state === 'running' && <Loader size={11} />}
+          {state === 'completed' && <Check size={12} aria-hidden="true" />}
+          {TOOL_BADGE[state]}
+        </span>
       </button>
       {open && (
         <div className="chat-tool-chip__body">
+          <p className="chat-tool-chip__section">Parámetros</p>
           <pre className="chat-tool-chip__json">{prettyJson(call.args)}</pre>
-          {result && <pre className="chat-tool-chip__json">{prettyJson(result.content)}</pre>}
+          {result && (
+            <>
+              <p className="chat-tool-chip__section">Resultado</p>
+              <pre className="chat-tool-chip__json">{prettyJson(result.content)}</pre>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -154,6 +196,93 @@ function UserBubble({ message, disabled, onEditAndResend }: UserBubbleProps) {
   );
 }
 
+// ── Mensaje del asistente (texto plano a todo el ancho + acciones, estilo ai-elements) ──
+
+interface AssistantMessageProps {
+  message: ChatMessage;
+  resultsByCall: Map<string, ToolResult>;
+  disabled: boolean;
+  onRegenerate: (assistantMessageId: string) => void;
+}
+
+function AssistantMessage({
+  message,
+  resultsByCall,
+  disabled,
+  onRegenerate,
+}: AssistantMessageProps) {
+  const text = messageText(message);
+  const thinking = messageThinking(message);
+  const calls = message.toolCalls ?? [];
+  const [copied, setCopied] = useState(false);
+
+  const copy = (): void => {
+    navigator.clipboard?.writeText(text).then(
+      () => {
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1500);
+      },
+      () => {
+        /* clipboard no disponible */
+      },
+    );
+  };
+
+  return (
+    <div className="chat-msg chat-msg--assistant">
+      {thinking && <Reasoning isStreaming={false}>{thinking}</Reasoning>}
+      {calls.length > 0 && (
+        <div className="chat-tool-chips">
+          {calls.map((call) => {
+            const result = resultsByCall.get(call.id);
+            return (
+              <ToolChip
+                key={call.id}
+                call={call}
+                result={result}
+                aborted={!result}
+                pending={false}
+              />
+            );
+          })}
+        </div>
+      )}
+      {text && (
+        <div className="chat-response chat-markdown">
+          <ChatMarkdown>{text}</ChatMarkdown>
+        </div>
+      )}
+      {text && (
+        <div className="chat-actions">
+          <button
+            type="button"
+            className="chat-action"
+            onClick={copy}
+            aria-label={copied ? 'Copiado' : 'Copiar'}
+            title={copied ? 'Copiado' : 'Copiar'}
+          >
+            {copied ? (
+              <Check size={14} aria-hidden="true" />
+            ) : (
+              <Copy size={14} aria-hidden="true" />
+            )}
+          </button>
+          <button
+            type="button"
+            className="chat-action"
+            disabled={disabled}
+            onClick={() => onRegenerate(message.id)}
+            aria-label="Regenerar"
+            title="Regenerar"
+          >
+            <RefreshCw size={14} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Lista completa ────────────────────────────────────────────────────────────────
 
 export function ChatMessages({
@@ -161,11 +290,14 @@ export function ChatMessages({
   loading,
   streaming,
   streamingText,
+  streamingReasoning,
   streamingToolCalls,
   onRegenerate,
   onEditAndResend,
+  onSuggest,
 }: ChatMessagesProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [atBottom, setAtBottom] = useState(true);
 
   // Índice global toolCallId → resultado (los results llegan en mensajes 'tool').
   const resultsByCall = useMemo(() => {
@@ -178,99 +310,108 @@ export function ChatMessages({
     return map;
   }, [messages]);
 
-  // Autoscroll al final cuando entran tokens o mensajes nuevos.
+  const checkBottom = (): void => {
+    const el = scrollRef.current;
+    if (el) setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 32);
+  };
+
+  const scrollToBottom = (): void => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+  };
+
+  // Stick-to-bottom: solo auto-scrollea si el usuario ya estaba al final (no le interrumpe
+  // mientras lee hacia arriba). El botón flotante lo lleva al final cuando quiera.
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, streamingText, streaming]);
+    if (el && atBottom) el.scrollTop = el.scrollHeight;
+  }, [messages, streamingText, streamingReasoning, streaming, atBottom]);
 
   const isEmpty = !loading && !streaming && messages.length === 0;
 
   return (
-    <div className="chat-messages" ref={scrollRef}>
-      {loading && <p className="chat-messages__hint">Cargando conversación…</p>}
+    <div className="chat-conversation">
+      <div className="chat-messages" ref={scrollRef} onScroll={checkBottom}>
+        {loading && (
+          <Shimmer as="p" className="chat-messages__hint">
+            Cargando conversación…
+          </Shimmer>
+        )}
 
-      {isEmpty && (
-        <div className="chat-messages__empty">
-          <p>Pídele algo al asistente →</p>
-        </div>
-      )}
+        {isEmpty && (
+          <div className="chat-messages__empty">
+            <p className="chat-messages__empty-title">¿En qué te ayudo con el dashboard?</p>
+            {onSuggest && (
+              <Suggestions>
+                {SUGGESTIONS.map((s) => (
+                  <Suggestion key={s} suggestion={s} onClick={onSuggest} />
+                ))}
+              </Suggestions>
+            )}
+          </div>
+        )}
 
-      {messages.map((message) => {
-        if (message.role === 'tool') return null;
-        if (message.role === 'user') {
+        {messages.map((message) => {
+          if (message.role === 'tool') return null;
+          if (message.role === 'user') {
+            return (
+              <UserBubble
+                key={message.id}
+                message={message}
+                disabled={streaming}
+                onEditAndResend={onEditAndResend}
+              />
+            );
+          }
+
           return (
-            <UserBubble
+            <AssistantMessage
               key={message.id}
               message={message}
+              resultsByCall={resultsByCall}
               disabled={streaming}
-              onEditAndResend={onEditAndResend}
+              onRegenerate={onRegenerate}
             />
           );
-        }
+        })}
 
-        const text = messageText(message);
-        const calls = message.toolCalls ?? [];
-        return (
-          <div key={message.id} className="chat-msg chat-msg--assistant">
-            {calls.length > 0 && (
+        {streaming && (
+          <div className="chat-msg chat-msg--assistant">
+            {streamingReasoning && (
+              <Reasoning isStreaming={!streamingText}>{streamingReasoning}</Reasoning>
+            )}
+            {streamingToolCalls.length > 0 && (
               <div className="chat-tool-chips">
-                {calls.map((call) => {
-                  const result = resultsByCall.get(call.id);
-                  return (
-                    <ToolChip
-                      key={call.id}
-                      call={call}
-                      result={result}
-                      aborted={!result}
-                      pending={false}
-                    />
-                  );
-                })}
+                {streamingToolCalls.map((call) => (
+                  <ToolChip
+                    key={call.id}
+                    call={{ name: call.name, args: call.args }}
+                    aborted={false}
+                    pending={!streamingText}
+                  />
+                ))}
               </div>
             )}
-            {text && (
-              <div className="chat-bubble chat-bubble--assistant chat-markdown">
-                <Markdown remarkPlugins={[remarkGfm]}>{text}</Markdown>
-              </div>
-            )}
-            <div className="chat-msg__toolbar">
-              <button
-                type="button"
-                className="chat-msg__action"
-                disabled={streaming}
-                onClick={() => onRegenerate(message.id)}
-              >
-                <RefreshCw size={12} aria-hidden="true" /> Regenerar
-              </button>
-            </div>
-          </div>
-        );
-      })}
-
-      {streaming && (
-        <div className="chat-msg chat-msg--assistant">
-          {streamingToolCalls.length > 0 && (
-            <div className="chat-tool-chips">
-              {streamingToolCalls.map((call) => (
-                <ToolChip
-                  key={call.id}
-                  call={{ name: call.name, args: call.args }}
-                  aborted={false}
-                  pending={!streamingText}
-                />
-              ))}
-            </div>
-          )}
-          <div className="chat-bubble chat-bubble--assistant chat-markdown">
             {streamingText ? (
-              <Markdown remarkPlugins={[remarkGfm]}>{streamingText}</Markdown>
+              <div className="chat-response chat-markdown">
+                <ChatMarkdown>{streamingText}</ChatMarkdown>
+                <span className="chat-cursor" aria-hidden="true" />
+              </div>
             ) : (
-              <span className="chat-messages__hint">Pensando…</span>
+              !streamingReasoning && <Shimmer className="chat-messages__hint">Pensando…</Shimmer>
             )}
-            <span className="chat-cursor" aria-hidden="true" />
           </div>
-        </div>
+        )}
+      </div>
+      {!atBottom && (
+        <button
+          type="button"
+          className="chat-scroll-btn"
+          onClick={scrollToBottom}
+          aria-label="Ir al final"
+          title="Ir al final"
+        >
+          <ArrowDown size={16} aria-hidden="true" />
+        </button>
       )}
     </div>
   );

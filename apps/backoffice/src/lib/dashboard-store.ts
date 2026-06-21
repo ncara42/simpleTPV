@@ -25,7 +25,7 @@ import {
   addText as addTextEl,
   addWidget as addWidgetToFree,
   autoArrangeFree,
-  type DashboardMode,
+  type CompositeNode,
   DRAW_COLORS,
   DRAW_STROKE_WIDTH,
   type FreeElement,
@@ -35,6 +35,8 @@ import {
   type GenericWidgetType,
   ITEM_SPECS,
   type LayoutPref,
+  MAX_COMPOSITE_DEPTH,
+  MAX_COMPOSITE_LEAVES,
   type PresetId,
   removeElement as removeElementEl,
   type SemanticPosition,
@@ -67,8 +69,17 @@ const DEBOUNCE_MS = 500;
 let persistFn: Persister | null = null;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Gate CRÍTICO: NO persistir hasta haber hidratado desde el servidor (fuente de verdad:
+// `state.hydrated`). El layout inicial es `{}`; persistirlo antes de hidratar PISA el layout
+// bueno con un objeto vacío. Pasa en dev por `StrictMode` (monta→desmonta→monta): el cleanup del
+// persister llama `flushPersist` en el desmontaje, cuando `layout` aún es `{}` y la hidratación
+// (asíncrona) no ha corrido → `PUT {}` borraba todos los widgets al refrescar.
+function persistEnabled(): boolean {
+  return useDashboardStore.getState().hydrated;
+}
+
 function schedulePersist(layout: LayoutPref): void {
-  if (!persistFn) return;
+  if (!persistFn || !persistEnabled()) return;
   if (debounceTimer) clearTimeout(debounceTimer);
   const fn = persistFn;
   debounceTimer = setTimeout(() => {
@@ -125,6 +136,7 @@ const GENERIC_TYPES = new Set<GenericWidgetType>([
   'donut',
   'kpi',
   'insight',
+  'composite',
 ]);
 function asGenericType(type: string | undefined): GenericWidgetType | null {
   return type && GENERIC_TYPES.has(type as GenericWidgetType) ? (type as GenericWidgetType) : null;
@@ -133,9 +145,6 @@ function asGenericType(type: string | undefined): GenericWidgetType | null {
 const SHAPE_KINDS = new Set<ShapeKind>(['rect', 'ellipse', 'line', 'arrow']);
 
 // ── Helpers de escritura inmutable sobre el preset activo ──────────────────────
-function modeOf(layout: LayoutPref): DashboardMode {
-  return layout.mode ?? 'grid';
-}
 function freeOf(layout: LayoutPref): FreeLayout {
   return layout.freeLayouts?.[ACTIVE_PRESET] ?? [];
 }
@@ -144,6 +153,14 @@ function withFree(layout: LayoutPref, next: FreeLayout): LayoutPref {
 }
 function withGrid(layout: LayoutPref, next: StoredLayouts): LayoutPref {
   return { ...layout, layouts: { ...layout.layouts, [ACTIVE_PRESET]: next } };
+}
+
+// Deriva el id de lienzo de un widget genérico a partir del `element_id` que envía el agente.
+// DETERMINISTA a propósito: el undo (App.handleUndoCanvasOps, #189 E2E 4) elimina el widget por
+// el MISMO id con el que se colocó, así que ambos lados deben derivarlo igual. El prefijo `gen:`
+// es obligatorio para que `renderItem` (DashboardPage) lo enrute al registry de genéricos.
+export function genericElementId(elementId: string): string {
+  return elementId.startsWith('gen:') ? elementId : `gen:${elementId}`;
 }
 
 // Coloca un widget genérico (ya registrado) en el preset activo según el modo. Devuelve el
@@ -164,12 +181,167 @@ function placeGeneric(
   return { ...withFree(layout, next), genericWidgets };
 }
 
+// ── Validación del árbol composite (DSL enriquecido, #189) ──────────────────────
+// El árbol `generic_spec.root` viaja DENTRO de un valor JSON desde el agente y NO pasa por la
+// normalización snake→camel del backend (`camel_case_keys` solo toca claves de nivel superior).
+// Por eso la validación dura (input no confiable) vive aquí: tipos, allowlist de endpoints,
+// profundidad y nº de hojas.
+
+// Allowlist de endpoints (solo lectura/GET) que puede apuntar una hoja. Espejo de
+// `WIDGETABLE_ENDPOINTS` del backend (crates/domain/src/chat/context.rs). Cualquier hoja con un
+// endpoint fuera de esta lista se poda.
+const WIDGETABLE_ENDPOINTS = new Set<string>([
+  '/dashboard/sales-by-family',
+  '/dashboard/sales-by-hour',
+  '/dashboard/sales-by-employee',
+  '/dashboard/discount-by-employee',
+  '/dashboard/product-rankings',
+  '/dashboard/sales-kpis',
+  '/dashboard/margin-kpis',
+  '/dashboard/stockout-kpis',
+  '/stock/alerts',
+  '/stock/expiring',
+  '/products',
+  '/product-families',
+  '/suppliers',
+]);
+
+function asRecord(v: unknown): Record<string, unknown> | null {
+  return v != null && typeof v === 'object' && !Array.isArray(v)
+    ? (v as Record<string, unknown>)
+    : null;
+}
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v);
+}
+function asSize(v: unknown): { w: number; h: number } | null {
+  const r = asRecord(v);
+  if (!r) return null;
+  const w = Number(r.w);
+  const h = Number(r.h);
+  return Number.isFinite(w) && Number.isFinite(h) ? { w, h } : null;
+}
+// `fields` puede llegar como array de columnas o como mapa campo→etiqueta (Object.values).
+function normalizeFields(v: unknown): string[] | undefined {
+  if (Array.isArray(v)) return v.map(String);
+  const rec = asRecord(v);
+  return rec ? Object.values(rec).map(String) : undefined;
+}
+
+// Normaliza y valida la `spec` de una hoja: snake_case→camelCase + tipo válido (no composite)
+// + endpoint en la allowlist. Devuelve null para PODAR la hoja.
+function normalizeLeafSpec(rawSpec: unknown): Omit<GenericSpec, 'root'> | null {
+  const raw = asRecord(rawSpec);
+  if (!raw) return null;
+  const type = asGenericType(typeof raw.type === 'string' ? raw.type : undefined);
+  if (!type || type === 'composite') return null; // una hoja no anida otro panel
+  const endpoint = typeof raw.endpoint === 'string' ? raw.endpoint : '';
+  if (!WIDGETABLE_ENDPOINTS.has(endpoint)) return null;
+
+  const defaultSize = asSize(raw.defaultSize ?? raw.default_size) ?? GENERIC_DEFAULT_SIZE[type];
+  const fields = normalizeFields(raw.fields);
+  const params = asRecord(raw.params) as GenericSpec['params'] | null;
+  const period = raw.period;
+  const storeId = raw.storeId ?? raw.store_id;
+
+  return {
+    type,
+    endpoint,
+    // Sin título por defecto en las hojas (no 'Widget'): el rótulo lo aporta el `title` del nodo
+    // hoja (CompositeNode.leaf.title). Así no sale un "Widget" redundante junto al rótulo.
+    title: typeof raw.title === 'string' ? raw.title : '',
+    defaultSize,
+    ...(fields ? { fields } : {}),
+    ...(params ? { params } : {}),
+    ...(typeof period === 'string' ? { period: period as NonNullable<GenericSpec['period']> } : {}),
+    ...(typeof storeId === 'string' ? { storeId } : {}),
+  };
+}
+
+// Valida un nodo del árbol recursivamente. Un nodo a `depth >= MAX_COMPOSITE_DEPTH` se rechaza
+// (consistente con el corte de render en GenericComposite: la raíz es depth 0 → máx MAX niveles).
+// Un `stack` sin hijos válidos se poda; una `leaf` con spec inválida se poda.
+function validateCompositeNode(raw: unknown, depth: number): CompositeNode | null {
+  if (depth >= MAX_COMPOSITE_DEPTH) return null;
+  const node = asRecord(raw);
+  if (!node) return null;
+
+  if (node.kind === 'stack') {
+    const dir = node.dir === 'col' ? 'col' : node.dir === 'row' ? 'row' : null;
+    if (!dir) return null;
+    const childrenRaw = Array.isArray(node.children) ? node.children : [];
+    const children = childrenRaw
+      .map((c) => validateCompositeNode(c, depth + 1))
+      .filter((c): c is CompositeNode => c != null);
+    if (children.length === 0) return null;
+    return {
+      kind: 'stack',
+      dir,
+      children,
+      ...(isFiniteNumber(node.span) ? { span: node.span } : {}),
+      ...(typeof node.title === 'string' ? { title: node.title } : {}),
+      ...(isFiniteNumber(node.gap) ? { gap: node.gap } : {}),
+    };
+  }
+
+  if (node.kind === 'leaf') {
+    const spec = normalizeLeafSpec(node.spec);
+    if (!spec) return null;
+    return {
+      kind: 'leaf',
+      spec,
+      ...(isFiniteNumber(node.span) ? { span: node.span } : {}),
+      ...(typeof node.title === 'string' ? { title: node.title } : {}),
+    };
+  }
+
+  return null;
+}
+
+function countLeaves(node: CompositeNode): number {
+  return node.kind === 'leaf' ? 1 : node.children.reduce((sum, c) => sum + countLeaves(c), 0);
+}
+
+// Poda hojas si superan `max`: BFS que conserva las primeras `max` hojas (las más superficiales)
+// y descarta el resto; un stack que queda sin hijos también se elimina. Devuelve null si todo el
+// árbol se poda.
+function pruneLeaves(root: CompositeNode, max: number): CompositeNode | null {
+  if (countLeaves(root) <= max) return root;
+  const keep = new Set<CompositeNode>();
+  const queue: CompositeNode[] = [root];
+  while (queue.length > 0 && keep.size < max) {
+    const node = queue.shift()!;
+    if (node.kind === 'leaf') keep.add(node);
+    else queue.push(...node.children);
+  }
+  const rebuild = (node: CompositeNode): CompositeNode | null => {
+    if (node.kind === 'leaf') return keep.has(node) ? node : null;
+    const children = node.children.map(rebuild).filter((c): c is CompositeNode => c != null);
+    return children.length > 0 ? { ...node, children } : null;
+  };
+  return rebuild(root);
+}
+
 // Normaliza el `genericSpec` que envía el agente (CanvasOp, campos laxos) al `GenericSpec`
-// persistido (campos estrictos). Devuelve null si el tipo no es válido.
-// NOTA(F5): la validación del endpoint contra la allowlist se añade en Fase 5.
+// persistido (campos estrictos). Devuelve null si el tipo no es válido, o (composite) si el
+// árbol resulta vacío/sin hojas válidas.
 function normalizeGenericSpec(raw: NonNullable<CanvasOp['genericSpec']>): GenericSpec | null {
   const type = asGenericType(raw.type);
   if (!type) return null;
+
+  if (type === 'composite') {
+    const validated = validateCompositeNode(raw.root, 0);
+    const root = validated ? pruneLeaves(validated, MAX_COMPOSITE_LEAVES) : null;
+    if (!root) return null;
+    return {
+      type,
+      endpoint: '',
+      title: raw.title ?? 'Panel',
+      defaultSize: raw.defaultSize ?? GENERIC_DEFAULT_SIZE.composite,
+      root,
+    };
+  }
+
   return {
     type,
     endpoint: raw.endpoint,
@@ -181,10 +353,8 @@ function normalizeGenericSpec(raw: NonNullable<CanvasOp['genericSpec']>): Generi
 }
 
 export interface DashboardState {
-  /** Disposición persistida del dashboard (modo, layouts grid/libre, genéricos). */
+  /** Disposición persistida del dashboard (lienzo libre + widgets genéricos). */
   layout: LayoutPref;
-  /** Modo «Personalizar» (tablero arrastrable). Estado puramente UI, no se persiste. */
-  editing: boolean;
   /** True una vez sembrado desde las preferencias del servidor (evita re-hidratar). */
   hydrated: boolean;
 }
@@ -199,10 +369,7 @@ export interface DashboardActions {
   flushPersist: () => void;
   /** Reemplaza el layout completo y programa la persistencia con debounce. */
   setLayout: (next: LayoutPref) => void;
-  // ── Estado UI ──
-  setEditing: (editing: boolean) => void;
   // ── Operaciones de lienzo (devuelven {accepted, reason}) ──
-  setMode: (mode: DashboardMode) => CanvasResult;
   addWidget: (widgetId: string, position?: string) => CanvasResult;
   removeElement: (elementId: string) => CanvasResult;
   removeWidget: (widgetId: string) => CanvasResult;
@@ -211,7 +378,12 @@ export interface DashboardActions {
   addShape: (kind: string, position?: string) => CanvasResult;
   addText: (text: string, position?: string) => CanvasResult;
   addNote: (text: string, position?: string) => CanvasResult;
-  addInsight: (content: string, title?: string, position?: string) => CanvasResult;
+  addInsight: (
+    content: string,
+    title?: string,
+    position?: string,
+    elementId?: string,
+  ) => CanvasResult;
   /** Despacha una operación del agente a la acción correspondiente. */
   applyCanvasOp: (op: CanvasOp) => CanvasResult;
 }
@@ -220,7 +392,6 @@ export type DashboardStore = DashboardState & DashboardActions;
 
 export const useDashboardStore = create<DashboardStore>((set, get) => ({
   layout: {},
-  editing: false,
   hydrated: false,
 
   hydrate: (layout) => {
@@ -228,6 +399,14 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       clearTimeout(debounceTimer);
       debounceTimer = null;
     }
+    // Reconstruye el registry de genéricos desde el layout persistido: WIDGET_REGISTRY es estado
+    // de módulo (no se persiste), así que tras recargar hay que re-registrar cada `gen:<uuid>` o
+    // `renderItem('gen:…')` (#189 slice 0.1) no encontraría su spec y la tarjeta saldría vacía.
+    for (const [id, spec] of Object.entries(layout.genericWidgets ?? {})) {
+      registerGenericWidget(id, spec);
+    }
+    // `hydrated: true` habilita la persistencia (ver `persistEnabled`): a partir de aquí cualquier
+    // escritura parte del layout real del servidor, no del `{}` inicial.
     set({ layout, hydrated: true });
   },
   setPersister: (fn) => {
@@ -238,22 +417,13 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       clearTimeout(debounceTimer);
       debounceTimer = null;
     }
+    // No vuelques el layout si aún no se ha hidratado: sería el `{}` inicial y pisaría el bueno.
+    if (!persistEnabled()) return;
     persistFn?.(get().layout);
   },
   setLayout: (next) => {
     set({ layout: next });
     schedulePersist(next);
-  },
-
-  setEditing: (editing) => set({ editing }),
-
-  setMode: (mode) => {
-    const { layout, editing } = get();
-    // La edición arrastrable («Personalizar») solo aplica en Cuadrícula: al pasar a Libre se
-    // desactiva. Al pasar a Cuadrícula se respeta el estado actual (no se auto-entra/sale).
-    if (mode === 'free' && editing) set({ editing: false });
-    get().setLayout({ ...layout, mode });
-    return ACCEPTED;
   },
 
   addWidget: (widgetId, position) => {
@@ -320,16 +490,12 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
 
   arrange: () => {
     const { layout } = get();
-    // El auto-arreglo solo aplica al lienzo libre; en Cuadrícula es un no-op aceptado (RGL ya
-    // mantiene su propio empaquetado).
-    if (modeOf(layout) !== 'free') return ACCEPTED;
     get().setLayout(withFree(layout, autoArrangeFree(freeOf(layout))));
     return ACCEPTED;
   },
 
   addShape: (kind, position) => {
     const { layout } = get();
-    if (modeOf(layout) !== 'free') return rejected('las formas solo se dibujan en modo Libre');
     if (!SHAPE_KINDS.has(kind as ShapeKind)) return rejected(`forma desconocida: ${kind}`);
     const shape = kind as ShapeKind;
     const free = freeOf(layout);
@@ -346,7 +512,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
 
   addText: (text, position) => {
     const { layout } = get();
-    if (modeOf(layout) !== 'free') return rejected('el texto solo se añade en modo Libre');
     const free = freeOf(layout);
     const next = addTextEl(
       free,
@@ -364,7 +529,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
 
   addNote: (text, position) => {
     const { layout } = get();
-    if (modeOf(layout) !== 'free') return rejected('las notas solo se añaden en modo Libre');
     const free = freeOf(layout);
     const next = addNoteEl(free, crypto.randomUUID(), freeSlot(free, freeAnchor(position)));
     // NOTA(F4.2): el `text` del agente se vuelca a un doc TipTap; aquí se crea la nota vacía.
@@ -373,9 +537,10 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     return ACCEPTED;
   },
 
-  addInsight: (content, title, position) => {
+  addInsight: (content, title, position, elementId) => {
     const { layout } = get();
-    const id = `gen:${crypto.randomUUID()}`;
+    // Id determinista desde el element_id del agente para que el undo lo encuentre (#189).
+    const id = elementId ? genericElementId(elementId) : `gen:${crypto.randomUUID()}`;
     const spec: GenericSpec = {
       type: 'insight',
       endpoint: '',
@@ -393,8 +558,15 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       case 'add_widget': {
         if (op.genericSpec) {
           const spec = normalizeGenericSpec(op.genericSpec);
-          if (!spec) return rejected(`tipo de widget genérico no válido: ${op.genericSpec.type}`);
-          const id = `gen:${crypto.randomUUID()}`;
+          if (!spec) {
+            return rejected(
+              op.genericSpec.type === 'composite'
+                ? 'panel compuesto inválido: árbol vacío, demasiado profundo o sin hojas con endpoint permitido'
+                : `tipo de widget genérico no válido: ${op.genericSpec.type}`,
+            );
+          }
+          // Id determinista desde el element_id del agente para que el undo lo encuentre (#189).
+          const id = op.elementId ? genericElementId(op.elementId) : `gen:${crypto.randomUUID()}`;
           registerGenericWidget(id, spec);
           get().setLayout(placeGeneric(get().layout, id, spec, op.position));
           return ACCEPTED;
@@ -409,15 +581,12 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       case 'add_note':
         return get().addNote(op.text ?? op.content ?? '', op.position);
       case 'add_insight':
-        return get().addInsight(op.content ?? op.text ?? '', undefined, op.position);
+        return get().addInsight(op.content ?? op.text ?? '', undefined, op.position, op.elementId);
       case 'remove_element':
         if (!op.elementId) return rejected('remove_element sin elementId');
         return get().removeElement(op.elementId);
       case 'arrange':
         return get().arrange();
-      case 'set_mode':
-        if (!op.mode) return rejected('set_mode sin mode');
-        return get().setMode(op.mode);
       case 'clear_canvas':
         return get().clearCanvas();
       default:
@@ -427,8 +596,8 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
 }));
 
 // ── Snapshot del lienzo para el system prompt del agente (F5, #188) ─────────────
-// Forma que espera `build_system_prompt` en el backend: modo + elementos con id interno y
-// label humano (y coords en Libre), truncado a 30. Viaja en el body del POST /chat para que
+// Forma que espera `build_system_prompt` en el backend: elementos con id interno y label
+// humano (con coords del lienzo libre), truncado a 30. Viaja en el body del POST /chat para que
 // el prompt refleje el estado FRESCO del lienzo (no el snapshot persistido, que puede ser stale).
 const SNAPSHOT_MAX = 30;
 
@@ -439,7 +608,6 @@ export interface CanvasSnapshotElement {
   y?: number;
 }
 export interface CanvasSnapshot {
-  mode: DashboardMode;
   elements: CanvasSnapshotElement[];
   totalElements: number;
 }
@@ -463,16 +631,13 @@ function freeElementLabel(el: FreeElement): string {
 // Construye el snapshot del lienzo desde el estado actual del store.
 export function buildCanvasSnapshot(): CanvasSnapshot {
   const { layout } = useDashboardStore.getState();
-  const mode: DashboardMode = layout.mode ?? 'grid';
-  // Los elementos del preset «personalizado» viven en `freeLayouts` en AMBOS modos (en grid se
-  // renderizan como rejilla; ver `customWidgetIds` en DashboardPage). El snapshot que ve el agente
-  // se construye SIEMPRE desde el lienzo libre; antes en grid leía el grid layout y el agente no
-  // veía los widgets ya colocados (creía el lienzo vacío y los re-añadía).
+  // Los elementos del preset «personalizado» viven en `freeLayouts`. El snapshot que ve el agente
+  // se construye desde el lienzo libre (única vista del dashboard).
   const all: CanvasSnapshotElement[] = (layout.freeLayouts?.[ACTIVE_PRESET] ?? []).map((e) => ({
     id: e.id,
     label: freeElementLabel(e),
     x: Math.round(e.x),
     y: Math.round(e.y),
   }));
-  return { mode, elements: all.slice(0, SNAPSHOT_MAX), totalElements: all.length };
+  return { elements: all.slice(0, SNAPSHOT_MAX), totalElements: all.length };
 }

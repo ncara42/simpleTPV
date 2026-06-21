@@ -1,8 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getWidgetSpec } from '../widgets/registry.js';
-import type { FreeElement, FreeShape, LayoutPref } from './dashboard-layout.js';
-import { buildCanvasSnapshot, useDashboardStore } from './dashboard-store.js';
+import type {
+  CompositeNode,
+  FreeElement,
+  FreeShape,
+  GenericSpec,
+  LayoutPref,
+} from './dashboard-layout.js';
+import { buildCanvasSnapshot, genericElementId, useDashboardStore } from './dashboard-store.js';
 
 const store = () => useDashboardStore.getState();
 const PRESET = 'personalizado';
@@ -13,7 +19,7 @@ function freeOf(): FreeElement[] {
 
 beforeEach(() => {
   vi.useFakeTimers();
-  useDashboardStore.setState({ layout: {}, editing: false, hydrated: false });
+  useDashboardStore.setState({ layout: {}, hydrated: false });
   store().setPersister(null);
 });
 
@@ -27,39 +33,70 @@ describe('hidratación y persistencia', () => {
   it('hydrate siembra el layout, marca hydrated y NO persiste', () => {
     const spy = vi.fn();
     store().setPersister(spy);
-    store().hydrate({ mode: 'free' });
+    store().hydrate({ chartKinds: { sales: 'line' } });
     vi.advanceTimersByTime(1000);
-    expect(store().layout.mode).toBe('free');
+    expect(store().layout.chartKinds?.sales).toBe('line');
     expect(store().hydrated).toBe(true);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('hydrate re-registra en el registry los genéricos persistidos (visibles tras recargar)', () => {
+    // El registry es estado de módulo: tras recargar, renderItem('gen:…') solo encuentra el spec
+    // si hydrate lo reconstruye desde layout.genericWidgets (#189 slice 0.1).
+    const spec: GenericSpec = {
+      type: 'bar',
+      endpoint: '/dashboard/sales-by-employee',
+      title: 'Ventas',
+      defaultSize: { w: 6, h: 2 },
+    };
+    store().hydrate({ genericWidgets: { 'gen:persisted': spec } });
+    const registered = getWidgetSpec('gen:persisted');
+    expect(registered).toBeDefined();
+    expect(registered!.genericSpec?.type).toBe('bar');
+    expect(typeof registered!.render).toBe('function');
+  });
+
+  it('NO persiste antes de hidratar (evita pisar el layout con {} — StrictMode mount/unmount)', () => {
+    // Reproduce la causa del wipe: el persister está puesto pero aún no se ha hidratado; ni
+    // setLayout ni flushPersist (cleanup en el desmontaje) deben escribir el `{}` inicial.
+    const spy = vi.fn();
+    store().setPersister(spy);
+    expect(store().hydrated).toBe(false);
+    store().setLayout({ chartKinds: { sales: 'bars' } });
+    store().flushPersist();
+    vi.advanceTimersByTime(1000);
     expect(spy).not.toHaveBeenCalled();
   });
 
   it('setLayout persiste con debounce de 500ms', () => {
     const spy = vi.fn();
     store().setPersister(spy);
-    store().setLayout({ mode: 'grid' });
+    useDashboardStore.setState({ hydrated: true }); // habilita la persistencia (post-hidratación)
+    store().setLayout({ chartKinds: { sales: 'bars' } });
     vi.advanceTimersByTime(499);
     expect(spy).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy).toHaveBeenCalledWith({ mode: 'grid' });
+    expect(spy).toHaveBeenCalledWith({ chartKinds: { sales: 'bars' } });
   });
 
   it('debouncea varias escrituras en un solo PUT con el último snapshot', () => {
     const spy = vi.fn();
     store().setPersister(spy);
-    store().setLayout({ mode: 'grid' });
+    useDashboardStore.setState({ hydrated: true });
+    store().setLayout({ chartKinds: { sales: 'bars' } });
     vi.advanceTimersByTime(200);
-    store().setLayout({ mode: 'free' });
+    store().setLayout({ chartKinds: { sales: 'line' } });
     vi.advanceTimersByTime(500);
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy).toHaveBeenCalledWith({ mode: 'free' });
+    expect(spy).toHaveBeenCalledWith({ chartKinds: { sales: 'line' } });
   });
 
   it('flushPersist fuerza el PUT pendiente y cancela el debounce', () => {
     const spy = vi.fn();
     store().setPersister(spy);
-    store().setLayout({ mode: 'grid' });
+    useDashboardStore.setState({ hydrated: true });
+    store().setLayout({ chartKinds: { sales: 'bars' } });
     store().flushPersist();
     expect(spy).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(1000);
@@ -67,44 +104,18 @@ describe('hidratación y persistencia', () => {
   });
 });
 
-describe('estado UI', () => {
-  it('setEditing alterna el modo Personalizar', () => {
-    store().setEditing(true);
-    expect(store().editing).toBe(true);
-    store().setEditing(false);
-    expect(store().editing).toBe(false);
-  });
-
-  it('setMode a Libre sale de la edición (la edición arrastrable no aplica en Libre)', () => {
-    store().setEditing(true);
-    const r = store().setMode('free');
-    expect(r.accepted).toBe(true);
-    expect(store().layout.mode).toBe('free');
-    expect(store().editing).toBe(false);
-  });
-
-  it('setMode a Cuadrícula respeta el estado de edición actual (no lo toca)', () => {
-    store().hydrate({ mode: 'free' });
-    store().setEditing(true);
-    store().setMode('grid');
-    expect(store().layout.mode).toBe('grid');
-    // No auto-sale de edición al volver a Cuadrícula (F4.2).
-    expect(store().editing).toBe(true);
-  });
-});
-
 describe('addWidget (catálogo)', () => {
-  it('coloca un widget del catálogo en el lienzo aunque el modo sea grid (→ freeLayouts)', () => {
-    // El preset «personalizado» deriva su lista de widgets de freeLayouts en AMBOS modos, así que
-    // el alta del agente cae en el lienzo libre aunque el modo activo sea grid. Regresión: antes
+  it('coloca un widget del catálogo en el lienzo libre (→ freeLayouts)', () => {
+    // El preset «personalizado» deriva su lista de widgets de freeLayouts, así que
+    // el alta del agente cae en el lienzo libre (fuente de la lista de widgets del preset). Antes
     // escribía en el grid layout, que el render del preset no mira, y el widget no aparecía.
     const r = store().addWidget('kpi-today');
     expect(r.accepted).toBe(true);
     expect(freeOf().some((e) => e.kind === 'widget' && e.widgetId === 'kpi-today')).toBe(true);
   });
 
-  it('coloca un widget del catálogo en el lienzo libre', () => {
-    store().hydrate({ mode: 'free' });
+  it('coloca un widget en una posición semántica del lienzo', () => {
+    store().hydrate({});
     const r = store().addWidget('dash-bars', 'center');
     expect(r.accepted).toBe(true);
     expect(freeOf().some((e) => e.kind === 'widget' && e.widgetId === 'dash-bars')).toBe(true);
@@ -117,7 +128,7 @@ describe('addWidget (catálogo)', () => {
   });
 
   it('rechaza un widget duplicado en el lienzo libre', () => {
-    store().hydrate({ mode: 'free' });
+    store().hydrate({});
     store().addWidget('dash-bars');
     const r = store().addWidget('dash-bars');
     expect(r.accepted).toBe(false);
@@ -125,7 +136,7 @@ describe('addWidget (catálogo)', () => {
   });
 
   it('escalona en el lienzo libre dos widgets distintos en la misma ancla (anti-solape)', () => {
-    store().hydrate({ mode: 'free' });
+    store().hydrate({});
     store().addWidget('dash-bars', 'center');
     store().addWidget('dash-family', 'center');
     const els = freeOf().filter((e) => e.kind === 'widget');
@@ -135,9 +146,9 @@ describe('addWidget (catálogo)', () => {
   });
 });
 
-describe('formas / texto / notas (solo modo Libre)', () => {
-  it('añade una forma en modo Libre', () => {
-    store().hydrate({ mode: 'free' });
+describe('formas / texto / notas', () => {
+  it('añade una forma', () => {
+    store().hydrate({});
     const r = store().addShape('rect', 'top-left');
     expect(r.accepted).toBe(true);
     const shapes = freeOf().filter((e): e is FreeShape => e.kind === 'shape');
@@ -145,33 +156,22 @@ describe('formas / texto / notas (solo modo Libre)', () => {
     expect(shapes[0]!.shape).toBe('rect');
   });
 
-  it('rechaza una forma en modo Cuadrícula', () => {
-    const r = store().addShape('rect');
-    expect(r.accepted).toBe(false);
-    expect(r.reason).toMatch(/Libre/);
-  });
-
   it('rechaza una forma desconocida', () => {
-    store().hydrate({ mode: 'free' });
+    store().hydrate({});
     const r = store().addShape('hexagon');
     expect(r.accepted).toBe(false);
   });
 
-  it('añade texto con su contenido en modo Libre', () => {
-    store().hydrate({ mode: 'free' });
+  it('añade texto con su contenido', () => {
+    store().hydrate({});
     const r = store().addText('Hola', 'center');
     expect(r.accepted).toBe(true);
     const text = freeOf().find((e) => e.kind === 'text');
     expect(text && 'text' in text ? text.text : '').toBe('Hola');
   });
 
-  it('rechaza texto y notas en modo Cuadrícula', () => {
-    expect(store().addText('x').accepted).toBe(false);
-    expect(store().addNote('x').accepted).toBe(false);
-  });
-
-  it('añade una nota en modo Libre', () => {
-    store().hydrate({ mode: 'free' });
+  it('añade una nota', () => {
+    store().hydrate({});
     const r = store().addNote('nota', 'bottom-right');
     expect(r.accepted).toBe(true);
     expect(freeOf().some((e) => e.kind === 'note')).toBe(true);
@@ -191,6 +191,14 @@ describe('insight / widgets genéricos', () => {
     expect(spec.params?.markdown).toBe('**Ventas al alza**');
     expect(getWidgetSpec(id)).toBeDefined();
     expect(freeOf().some((e) => e.id === id)).toBe(true);
+  });
+
+  it('add_insight con elementId del agente coloca bajo id determinista (undo posible)', () => {
+    const r = store().applyCanvasOp({ op: 'add_insight', content: '**x**', elementId: 'ins-1' });
+    expect(r.accepted).toBe(true);
+    expect(store().layout.genericWidgets?.['gen:ins-1']).toBeDefined();
+    expect(store().removeElement(genericElementId('ins-1')).accepted).toBe(true);
+    expect(store().layout.genericWidgets?.['gen:ins-1']).toBeUndefined();
   });
 
   it('applyCanvasOp add_widget con genericSpec normaliza y coloca', () => {
@@ -215,9 +223,174 @@ describe('insight / widgets genéricos', () => {
   });
 });
 
+describe('normalizeGenericSpec — composite (#189)', () => {
+  // El árbol composite se valida vía applyCanvasOp (normalizeGenericSpec es privado); el spec
+  // normalizado queda en layout.genericWidgets. Helper para leer el único genérico colocado.
+  function lastGenericSpec(): GenericSpec {
+    const widgets = store().layout.genericWidgets ?? {};
+    const id = Object.keys(widgets)[0]!;
+    return widgets[id]!;
+  }
+  function leaf(endpoint: string, extra: Record<string, unknown> = {}): unknown {
+    return { kind: 'leaf', spec: { type: 'bar', endpoint, ...extra } };
+  }
+  function addComposite(root: unknown): { accepted: boolean; reason?: string } {
+    return store().applyCanvasOp({
+      op: 'add_widget',
+      position: 'center',
+      genericSpec: { type: 'composite', endpoint: '', title: 'Panel', root },
+    });
+  }
+
+  it('árbol válido se normaliza y acepta (dos hojas en fila)', () => {
+    const r = addComposite({
+      kind: 'stack',
+      dir: 'row',
+      children: [
+        leaf('/dashboard/sales-by-employee', { fields: ['userName', 'total'], title: 'Ventas' }),
+        leaf('/dashboard/sales-kpis', { type: 'kpi', fields: ['revenue'], title: 'KPI' }),
+      ],
+    });
+    expect(r.accepted).toBe(true);
+    const spec = lastGenericSpec();
+    expect(spec.type).toBe('composite');
+    expect(spec.endpoint).toBe('');
+    expect(spec.defaultSize).toEqual({ w: 8, h: 5 });
+    expect(spec.root?.kind).toBe('stack');
+    if (spec.root?.kind === 'stack') {
+      expect(spec.root.dir).toBe('row');
+      expect(spec.root.children).toHaveLength(2);
+    }
+  });
+
+  it('hoja con endpoint fuera de allowlist se poda, resto intacto', () => {
+    const r = addComposite({
+      kind: 'stack',
+      dir: 'row',
+      children: [leaf('/dashboard/sales-by-employee'), leaf('/evil/secret-export')],
+    });
+    expect(r.accepted).toBe(true);
+    const spec = lastGenericSpec();
+    expect(spec.root?.kind).toBe('stack');
+    if (spec.root?.kind === 'stack') {
+      expect(spec.root.children).toHaveLength(1);
+      const only = spec.root.children[0]!;
+      expect(only.kind).toBe('leaf');
+      if (only.kind === 'leaf') expect(only.spec.endpoint).toBe('/dashboard/sales-by-employee');
+    }
+  });
+
+  it('árbol demasiado profundo (hoja más allá del máximo) se rechaza', () => {
+    // stack(0) → stack(1) → stack(2) → leaf(3): la hoja cae fuera del límite y todo colapsa.
+    const r = addComposite({
+      kind: 'stack',
+      dir: 'col',
+      children: [
+        {
+          kind: 'stack',
+          dir: 'col',
+          children: [
+            { kind: 'stack', dir: 'col', children: [leaf('/dashboard/sales-by-employee')] },
+          ],
+        },
+      ],
+    });
+    expect(r.accepted).toBe(false);
+    expect(r.reason).toMatch(/compuesto|inválido/i);
+    expect(Object.keys(store().layout.genericWidgets ?? {})).toHaveLength(0);
+  });
+
+  it('más de 12 hojas: se poda desde el exceso (cap a 12)', () => {
+    const children = Array.from({ length: 15 }, () =>
+      leaf('/dashboard/sales-kpis', { type: 'kpi' }),
+    );
+    const r = addComposite({ kind: 'stack', dir: 'row', children });
+    expect(r.accepted).toBe(true);
+    const spec = lastGenericSpec();
+    expect(countLeaves(spec.root)).toBe(12);
+  });
+
+  it('spec de hoja en snake_case se normaliza a camelCase', () => {
+    const r = addComposite({
+      kind: 'stack',
+      dir: 'row',
+      children: [
+        leaf('/dashboard/sales-by-employee', { default_size: { w: 4, h: 3 }, store_id: 'S1' }),
+      ],
+    });
+    expect(r.accepted).toBe(true);
+    const spec = lastGenericSpec();
+    expect(spec.root?.kind).toBe('stack');
+    if (spec.root?.kind === 'stack' && spec.root.children[0]?.kind === 'leaf') {
+      const leafSpec = spec.root.children[0].spec;
+      expect(leafSpec.defaultSize).toEqual({ w: 4, h: 3 });
+      expect(leafSpec.storeId).toBe('S1');
+      // Las claves snake_case originales no sobreviven al spec normalizado.
+      expect((leafSpec as Record<string, unknown>).default_size).toBeUndefined();
+      expect((leafSpec as Record<string, unknown>).store_id).toBeUndefined();
+    } else {
+      throw new Error('estructura de árbol inesperada');
+    }
+  });
+
+  it('árbol con todas las hojas inválidas → widget rechazado', () => {
+    const r = addComposite({
+      kind: 'stack',
+      dir: 'row',
+      children: [
+        leaf('/no-permitido'),
+        { kind: 'leaf', spec: { type: 'pyramid', endpoint: '/dashboard/sales-kpis' } },
+      ],
+    });
+    expect(r.accepted).toBe(false);
+    expect(Object.keys(store().layout.genericWidgets ?? {})).toHaveLength(0);
+  });
+
+  it('coloca el compuesto bajo un id derivado del element_id y el undo lo elimina (E2E 4)', () => {
+    const elementId = 'elem-abc';
+    const r = store().applyCanvasOp({
+      op: 'add_widget',
+      position: 'center',
+      elementId,
+      widgetId: 'gen:composite',
+      genericSpec: {
+        type: 'composite',
+        endpoint: '',
+        title: 'Panel',
+        root: {
+          kind: 'stack',
+          dir: 'row',
+          children: [
+            leaf('/dashboard/sales-by-employee'),
+            leaf('/dashboard/sales-kpis', { type: 'kpi' }),
+          ],
+        },
+      },
+    });
+    expect(r.accepted).toBe(true);
+    // Id determinista: gen:<element_id>; renderItem lo enruta y el undo lo encuentra.
+    const id = genericElementId(elementId);
+    expect(id).toBe('gen:elem-abc');
+    expect(store().layout.genericWidgets?.[id]).toBeDefined();
+    expect(getWidgetSpec(id)).toBeDefined();
+    // Undo (lo que hace App.handleUndoCanvasOps para genéricos): removeElement(genericElementId).
+    const undo = store().removeElement(id);
+    expect(undo.accepted).toBe(true);
+    expect(store().layout.genericWidgets?.[id]).toBeUndefined();
+    expect(getWidgetSpec(id)).toBeUndefined();
+    expect(freeOf().some((e) => e.id === id)).toBe(false);
+  });
+});
+
+// Cuenta hojas de un árbol composite normalizado (para aserciones de poda).
+function countLeaves(node: CompositeNode | undefined): number {
+  if (!node) return 0;
+  return node.kind === 'leaf' ? 1 : node.children.reduce((s, c) => s + countLeaves(c), 0);
+}
+
 describe('remove / clear / arrange', () => {
   it('removeElement quita un elemento del lienzo libre', () => {
-    store().hydrate({ mode: 'free' });
+    store().hydrate({});
     store().addWidget('dash-bars');
     const id = freeOf()[0]!.id;
     const r = store().removeElement(id);
@@ -257,7 +430,7 @@ describe('remove / clear / arrange', () => {
   });
 
   it('clearCanvas vacía rejilla, lienzo y genéricos', () => {
-    store().hydrate({ mode: 'free' });
+    store().hydrate({});
     store().addWidget('dash-bars');
     store().addInsight('x');
     const r = store().clearCanvas();
@@ -267,7 +440,7 @@ describe('remove / clear / arrange', () => {
   });
 
   it('arrange reorganiza el lienzo libre', () => {
-    store().hydrate({ mode: 'free' });
+    store().hydrate({});
     store().addWidget('dash-bars', 'bottom-right');
     store().addWidget('dash-family', 'bottom-right');
     const r = store().arrange();
@@ -275,25 +448,16 @@ describe('remove / clear / arrange', () => {
     // autoArrangeFree coloca el primero en el origen del flujo.
     expect(freeOf().some((e) => e.x === 0 && e.y === 0)).toBe(true);
   });
-
-  it('arrange es no-op aceptado en modo Cuadrícula', () => {
-    const before = store().layout;
-    const r = store().arrange();
-    expect(r.accepted).toBe(true);
-    expect(store().layout).toBe(before);
-  });
 });
 
 describe('applyCanvasOp (despacho)', () => {
   it('despacha cada tipo de operación', () => {
-    store().hydrate({ mode: 'free' });
+    store().hydrate({});
     expect(store().applyCanvasOp({ op: 'add_widget', widgetId: 'kpi-today' }).accepted).toBe(true);
     expect(store().applyCanvasOp({ op: 'add_shape', kind: 'arrow' }).accepted).toBe(true);
     expect(store().applyCanvasOp({ op: 'add_text', text: 'hi' }).accepted).toBe(true);
     expect(store().applyCanvasOp({ op: 'add_note', text: 'n' }).accepted).toBe(true);
     expect(store().applyCanvasOp({ op: 'arrange' }).accepted).toBe(true);
-    expect(store().applyCanvasOp({ op: 'set_mode', mode: 'grid' }).accepted).toBe(true);
-    expect(store().layout.mode).toBe('grid');
     expect(store().applyCanvasOp({ op: 'clear_canvas' }).accepted).toBe(true);
   });
 
@@ -302,7 +466,6 @@ describe('applyCanvasOp (despacho)', () => {
       false,
     );
     expect(store().applyCanvasOp({ op: 'remove_element' }).accepted).toBe(false);
-    expect(store().applyCanvasOp({ op: 'set_mode' }).accepted).toBe(false);
   });
 
   it('add_widget sin genericSpec ni widgetId se rechaza', () => {
@@ -314,29 +477,26 @@ describe('applyCanvasOp (despacho)', () => {
 });
 
 describe('buildCanvasSnapshot (para el system prompt, F5)', () => {
-  it('lienzo vacío en Cuadrícula', () => {
+  it('lienzo vacío', () => {
     const snap = buildCanvasSnapshot();
-    expect(snap.mode).toBe('grid');
     expect(snap.elements).toHaveLength(0);
     expect(snap.totalElements).toBe(0);
   });
 
-  it('en Cuadrícula lista widgets con id y label humano', () => {
+  it('lista widgets con id y label humano', () => {
     store().addWidget('kpi-today', 'top-left');
     const snap = buildCanvasSnapshot();
-    expect(snap.mode).toBe('grid');
     const el = snap.elements.find((e) => e.id === 'kpi-today');
     expect(el).toBeDefined();
     expect(el!.label).toBe('Facturación hoy');
     expect(typeof el!.x).toBe('number');
   });
 
-  it('en Libre incluye coords y etiqueta por tipo de elemento', () => {
-    store().hydrate({ mode: 'free' });
+  it('incluye coords y etiqueta por tipo de elemento', () => {
+    store().hydrate({});
     store().addWidget('dash-bars', 'center');
     store().addShape('rect', 'top-left');
     const snap = buildCanvasSnapshot();
-    expect(snap.mode).toBe('free');
     expect(
       snap.elements.some((e) => e.label === 'Ventas (gráfico)' || e.label.includes('Ventas')),
     ).toBe(true);
@@ -347,7 +507,7 @@ describe('buildCanvasSnapshot (para el system prompt, F5)', () => {
   });
 
   it('trunca a 30 elementos pero reporta el total real', () => {
-    store().hydrate({ mode: 'free' });
+    store().hydrate({});
     // Inyecta 40 elementos directamente en el preset activo.
     const many = Array.from({ length: 40 }, (_, i) => ({
       kind: 'text' as const,
@@ -362,7 +522,7 @@ describe('buildCanvasSnapshot (para el system prompt, F5)', () => {
       fontSize: 16,
     }));
     useDashboardStore.setState({
-      layout: { mode: 'free', freeLayouts: { personalizado: many } },
+      layout: { freeLayouts: { personalizado: many } },
     });
     const snap = buildCanvasSnapshot();
     expect(snap.elements).toHaveLength(30);

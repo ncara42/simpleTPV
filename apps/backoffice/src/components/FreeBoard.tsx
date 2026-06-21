@@ -1,26 +1,23 @@
 import {
   ArrowUpRight,
   Circle,
-  LayoutGrid,
   Maximize2,
   Minus,
   MousePointer2,
   Pencil,
   Plus,
-  Shapes,
   Slash,
   Square,
-  StickyNote,
-  Type,
-  Undo2,
   X,
 } from 'lucide-react';
 import {
   memo,
   type ReactNode,
+  type Ref,
   type RefObject,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -93,6 +90,28 @@ interface View {
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
+/** Metadatos reactivos del lienzo que la barra inferior externa necesita reflejar. */
+export interface CanvasMeta {
+  /** Hay pasos en la pila de deshacer. */
+  canUndo: boolean;
+  /** El pill de dibujo está abierto. */
+  drawOpen: boolean;
+}
+
+/** API imperativa del lienzo expuesta a la barra inferior (el dock del dashboard). Las
+ *  acciones de toolbar viven aquí porque dependen del estado interno del lienzo (centro de
+ *  vista, historial, herramienta activa); el dock las invoca a través de este handle. */
+export interface FreeBoardHandle {
+  addWidget: (widgetId: string) => void;
+  addNote: () => void;
+  addText: () => void;
+  toggleDraw: () => void;
+  undo: () => void;
+  arrange: () => void;
+  /** Snapshot de los widgets de catálogo disponibles para añadir (no presentes). */
+  listWidgets: () => { id: string; label: string }[];
+}
+
 interface FreeBoardProps {
   /** Disposición inicial (ya migrada/reconciliada con el preset). */
   elements: FreeLayout;
@@ -106,6 +125,10 @@ interface FreeBoardProps {
   initialView?: { panX: number; panY: number; zoom: number };
   /** Se invoca (debounced 500 ms) cuando el usuario cambia la vista (pan/zoom). */
   onViewChange?: (view: { panX: number; panY: number; zoom: number }) => void;
+  /** Handle imperativo para que el dock inferior dispare las acciones del lienzo. */
+  ref?: Ref<FreeBoardHandle>;
+  /** Notifica cambios en el estado que la barra externa refleja (deshacer / dibujo). */
+  onCanvasMeta?: (meta: CanvasMeta) => void;
 }
 
 export function FreeBoard({
@@ -115,6 +138,8 @@ export function FreeBoard({
   onChange,
   initialView,
   onViewChange,
+  ref,
+  onCanvasMeta,
 }: FreeBoardProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [els, setEls] = useState<FreeElement[]>(elements);
@@ -125,7 +150,6 @@ export function FreeBoard({
   const [view, setView] = useState<View>(
     () => initialViewRef.current ?? { panX: 0, panY: 0, zoom: 1 },
   );
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [tool, setTool] = useState<ToolId>('select');
   const [drawOpen, setDrawOpen] = useState(false);
@@ -481,7 +505,6 @@ export function FreeBoard({
   const onAddWidget = useCallback(
     (widgetId: string): void => {
       mutate(addWidget(elsRef.current, widgetId, viewCenterWorld()));
-      setPaletteOpen(false);
     },
     [mutate, viewCenterWorld],
   );
@@ -557,6 +580,25 @@ export function FreeBoard({
   const available = availableWidgets(els);
   const drawing = tool !== 'select';
 
+  // ── Puente con la barra inferior externa (dock): handle imperativo + meta reactiva. ──
+  useImperativeHandle(
+    ref,
+    (): FreeBoardHandle => ({
+      addWidget: onAddWidget,
+      addNote: onAddNote,
+      addText: onAddText,
+      toggleDraw,
+      undo,
+      arrange: onArrange,
+      listWidgets: () =>
+        availableWidgets(elsRef.current).map((id) => ({ id, label: itemLabel(id) })),
+    }),
+    [onAddWidget, onAddNote, onAddText, toggleDraw, undo, onArrange, itemLabel],
+  );
+  useEffect(() => {
+    onCanvasMeta?.({ canUndo: past.length > 0, drawOpen });
+  }, [past.length, drawOpen, onCanvasMeta]);
+
   // Minimapa + flecha de orientación (solo con viewport medido y algún elemento).
   const hasViewport = viewportSize.width > 0 && viewportSize.height > 0;
   const projection =
@@ -625,71 +667,10 @@ export function FreeBoard({
         </div>
       )}
 
-      {/* Toolbar de acciones del lienzo (barra inferior). */}
-      <div className="dash-free-toolbar" data-testid="dash-free-toolbar">
-        <div className="dash-free-toolbar-add">
-          <button
-            type="button"
-            className="dash-free-tool"
-            data-testid="dash-free-add-widget"
-            aria-haspopup="menu"
-            aria-expanded={paletteOpen}
-            onClick={() => setPaletteOpen((o) => !o)}
-          >
-            <Plus size={15} aria-hidden="true" /> Widget
-          </button>
-          {paletteOpen && (
-            <WidgetPalette
-              items={available}
-              label={itemLabel}
-              onPick={onAddWidget}
-              onClose={() => setPaletteOpen(false)}
-            />
-          )}
-        </div>
-        <button
-          type="button"
-          className="dash-free-tool"
-          data-testid="dash-free-add-note"
-          onClick={onAddNote}
-        >
-          <StickyNote size={15} aria-hidden="true" /> Nota
-        </button>
-        <button
-          type="button"
-          className={`dash-free-tool${drawOpen ? ' is-active' : ''}`}
-          data-testid="dash-free-draw"
-          aria-pressed={drawOpen}
-          onClick={toggleDraw}
-        >
-          <Shapes size={15} aria-hidden="true" /> Dibujar
-        </button>
-        <button
-          type="button"
-          className="dash-free-tool"
-          data-testid="dash-free-add-text"
-          onClick={onAddText}
-        >
-          <Type size={15} aria-hidden="true" /> Texto
-        </button>
-        <button
-          type="button"
-          className="dash-free-tool"
-          data-testid="dash-free-undo"
-          onClick={undo}
-          disabled={past.length === 0}
-        >
-          <Undo2 size={15} aria-hidden="true" /> Deshacer
-        </button>
-        <button
-          type="button"
-          className="dash-free-tool"
-          data-testid="dash-free-arrange"
-          onClick={onArrange}
-        >
-          <LayoutGrid size={15} aria-hidden="true" /> Ordenar
-        </button>
-      </div>
+      {/* Las acciones del lienzo (widget/nota/texto/dibujar/deshacer/ordenar) viven ahora en
+          el dock inferior unificado del dashboard, junto al input del asistente. Se disparan
+          vía el handle imperativo (FreeBoardHandle). El pill de dibujo sigue aquí porque sus
+          subherramientas dependen del estado interno del lienzo. */}
 
       <div
         ref={viewportRef}

@@ -148,50 +148,76 @@
   min-width: 0;
 }
 
+/* Desplegable de esfuerzo: solo el icono ⚡ + chevron, sin texto. */
+.chat-header__effort {
+  flex-shrink: 0;
+}
+
+/* Igual que .chat-icon-btn: mismo tamaño, radio, transición y hover.
+   Solo cambia el fondo de reposo (color del nivel) y abre un desplegable. */
+.chat-header__effort .ui-select-trigger {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  gap: 0;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  justify-content: center;
+  box-shadow: none;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+
+.chat-header__effort .ui-select-trigger:hover,
+.chat-header__effort .ui-select-trigger[aria-expanded='true'] {
+  background: var(--ui-surface-subtle);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.chat-header__effort .ui-select-trigger:focus-visible {
+  border-color: transparent;
+  box-shadow: var(--ui-focus, 0 0 0 4px rgba(0, 113, 227, 0.32));
+}
+
+.chat-header__effort .ui-select-chevron {
+  display: none;
+}
+
+/* Fondo de reposo coloreado según nivel. */
+.chat-header__effort--low .ui-select-trigger {
+  background: var(--ui-success-soft);
+}
+.chat-header__effort--medium .ui-select-trigger {
+  background: var(--ui-warning-soft);
+}
+.chat-header__effort--high .ui-select-trigger {
+  background: var(--ui-danger-soft);
+}
+
 .chat-header__actions {
   display: flex;
   gap: var(--ui-space-1);
 }
 
-/* Toggle de esfuerzo, estilo segmentado compacto con badges de color. */
+/* ── Cabeceras de grupo en el desplegable de modelos ───────────────────────────── */
 
-.chat-effort {
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  background: var(--ui-surface-subtle);
-  border-radius: var(--ui-radius-pill);
-}
-
-.chat-effort__btn {
-  padding: 2px var(--ui-space-2);
-  border: none;
-  border-radius: var(--ui-radius-pill);
-  background: transparent;
-  color: var(--ui-text-muted);
+li.ui-select-option.is-disabled[data-value^='__group_'] {
+  padding-block: var(--ui-space-1) 2px;
   font-size: var(--ui-text-2xs);
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--ui-motion-fast) var(--ui-ease);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-muted);
+  cursor: default;
+  opacity: 1;
 }
 
-.chat-effort__btn:hover {
-  color: var(--ui-text);
-}
-
-.chat-effort__btn--low.is-active {
-  background: var(--ui-success-soft);
-  color: var(--ui-success);
-}
-
-.chat-effort__btn--medium.is-active {
-  background: var(--ui-warning-soft);
-  color: var(--ui-warning);
-}
-
-.chat-effort__btn--high.is-active {
-  background: var(--ui-danger-soft);
-  color: var(--ui-danger);
+li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
+  margin-top: var(--ui-space-1);
+  border-top: 1px solid var(--ui-border);
+  padding-top: var(--ui-space-2);
 }
 
 /* ── Banner de error ───────────────────────────────────────────────────────────── */
@@ -230,7 +256,8 @@
 }
 
 .chat-messages__empty {
-  margin: auto;
+  width: 100%;
+  margin-block: auto;
   color: var(--ui-text-muted);
   font-size: var(--ui-text-sm);
   text-align: center;
@@ -268,10 +295,13 @@
   border-bottom-right-radius: var(--ui-radius-xs);
 }
 
-.chat-bubble--assistant {
-  background: var(--ui-surface-subtle);
+/* Respuesta del asistente: texto plano a todo el ancho, SIN burbuja (estilo ai-elements). */
+.chat-response {
+  width: 100%;
   color: var(--ui-text);
-  border-bottom-left-radius: var(--ui-radius-xs);
+  font-size: var(--ui-text-sm);
+  line-height: 1.6;
+  word-break: break-word;
 }
 
 /* Cursor de streaming */
@@ -297,7 +327,146 @@
   }
 }
 
-/* ── Acciones de mensaje (editar/regenerar) ────────────────────────────────────── */
+/* ── Acciones bajo la respuesta del asistente (copiar/regenerar, estilo ai-elements) ── */
+
+.chat-actions {
+  display: flex;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.chat-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+
+.chat-action:hover:not(:disabled) {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+
+.chat-action:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+.chat-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Shimmer: texto con barrido de luz para estados de carga (ai-elements) ───────── */
+
+.shimmer-text {
+  display: inline-block;
+  background: linear-gradient(
+    90deg,
+    var(--ui-text-muted) 0%,
+    var(--ui-text-muted) 35%,
+    var(--ui-text) 50%,
+    var(--ui-text-muted) 65%,
+    var(--ui-text-muted) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: shimmer-sweep var(--shimmer-duration, 2s) linear infinite;
+}
+
+@keyframes shimmer-sweep {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text {
+    animation: none;
+    color: var(--ui-text-muted);
+    -webkit-text-fill-color: var(--ui-text-muted);
+  }
+}
+
+/* ── Reasoning: bloque colapsable de razonamiento del modelo (ai-elements) ────────── */
+
+.reasoning {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-subtle);
+  overflow: hidden;
+}
+
+.reasoning__trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: none;
+  background: transparent;
+  color: var(--ui-text-muted);
+  font: inherit;
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--ui-motion-fast) var(--ui-ease);
+}
+
+.reasoning__trigger:hover {
+  color: var(--ui-text);
+}
+
+.reasoning__trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+.reasoning__trigger svg {
+  flex: none;
+  color: var(--ui-text-muted);
+}
+
+.reasoning__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reasoning__caret {
+  transition: transform var(--ui-motion-fast) var(--ui-ease);
+}
+
+.reasoning.is-open .reasoning__caret {
+  transform: rotate(180deg);
+}
+
+.reasoning__content {
+  padding: 0.45rem 0.6rem 0.5rem;
+  border-top: 1px solid var(--ui-border);
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-xs);
+  line-height: 1.55;
+}
+
+/* ── Acciones de mensaje (editar usuario) ───────────────────────────────────────── */
 
 .chat-msg__toolbar {
   display: flex;
@@ -715,11 +884,14 @@
 /* ── Pie con coste ─────────────────────────────────────────────────────────────── */
 
 .chat-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-2);
   padding: var(--ui-space-2) var(--ui-space-3);
   border-top: 1px solid var(--ui-border);
   color: var(--ui-text-muted);
   font-size: var(--ui-text-2xs);
-  text-align: right;
 }
 
 /* ── Móvil: el panel ocupa casi toda la pantalla ───────────────────────────────── */
@@ -736,5 +908,783 @@
   .chat-fab {
     right: 12px;
     bottom: 12px;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════════
+   Dock inferior del asistente (rediseño): barra única `[+ herramientas] [input] [↑]`
+   con la forma del PromptInput de ai-elements, más un popover de conversación encima.
+   Sustituye al panel lateral (FAB + glass). Anclado abajo-centro dentro del lienzo.
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+.chat-dock {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30; /* sobre el lienzo (shell, minimapa, zoom) */
+  width: min(680px, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* Popover de conversación: se despliega ENCIMA del input. */
+.chat-dock__panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(60vh, 540px);
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  background: color-mix(in srgb, var(--ui-surface) 92%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 16px 44px rgb(0 0 0 / 0.2);
+  transform-origin: bottom center;
+  animation: chat-panel-in var(--ui-motion-medium) var(--ui-ease);
+}
+
+/* ── Composer (PromptInput) ──────────────────────────────────────────────────────── */
+
+.prompt-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  background: color-mix(in srgb, var(--ui-surface) 94%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.08);
+  transition:
+    border-color var(--ui-motion-fast) var(--ui-ease),
+    box-shadow var(--ui-motion-fast) var(--ui-ease);
+}
+
+.prompt-input:focus-within {
+  border-color: color-mix(in srgb, var(--ui-primary) 45%, var(--ui-border));
+  box-shadow: 0 8px 26px rgb(0 0 0 / 0.12);
+}
+
+.prompt-input.is-disabled {
+  opacity: 0.75;
+}
+
+.prompt-input__queue {
+  margin: 0;
+  padding: 0 0.35rem;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-2xs);
+}
+
+.prompt-input__textarea {
+  width: 100%;
+  resize: none;
+  min-height: 42px;
+  max-height: 220px;
+  padding: 0.4rem 0.5rem 0.1rem;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  line-height: 1.55;
+  color: var(--ui-text);
+}
+
+.prompt-input__textarea:focus {
+  outline: none;
+}
+
+.prompt-input__textarea::placeholder {
+  color: var(--ui-text-muted);
+}
+
+.prompt-input__textarea:disabled {
+  color: var(--ui-text-muted);
+  cursor: not-allowed;
+}
+
+.prompt-input__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.prompt-input__tools {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.prompt-input__submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    opacity var(--ui-motion-fast) var(--ui-ease);
+}
+
+.prompt-input__submit:hover:not(:disabled) {
+  background: var(--ui-primary-hover);
+}
+
+.prompt-input__submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.prompt-input__submit:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* Parar (enviado/streaming): rojo y siempre activo. */
+.prompt-input__submit--stop {
+  background: var(--ui-danger);
+  color: #fff;
+}
+
+/* Spinner del estado «enviado» (esperando primera respuesta). */
+.prompt-input__spin {
+  animation: prompt-spin 0.8s linear infinite;
+}
+
+@keyframes prompt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Menú «+» de herramientas del lienzo ─────────────────────────────────────────── */
+
+.canvas-tools {
+  position: relative;
+  display: inline-flex;
+}
+
+.canvas-tools__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease),
+    border-color var(--ui-motion-fast) var(--ui-ease);
+}
+
+.canvas-tools__trigger:hover,
+.canvas-tools__trigger.is-open {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong, var(--ui-border));
+}
+
+.canvas-tools__trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* El desplegable abre HACIA ARRIBA (la barra está abajo). */
+.canvas-tools__menu {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 31;
+  min-width: 12rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.35rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-lg);
+  transform-origin: bottom left;
+  animation: chat-panel-in var(--ui-motion-medium) var(--ui-ease);
+}
+
+.canvas-tools__item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.6rem;
+  border: none;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: var(--ui-text);
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--ui-motion-fast) var(--ui-ease);
+}
+
+.canvas-tools__item:hover:not(:disabled),
+.canvas-tools__item.is-active {
+  background: var(--ui-surface-subtle);
+}
+
+.canvas-tools__item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.canvas-tools__item:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+.canvas-tools__item svg {
+  color: var(--ui-text-muted);
+  flex: none;
+}
+
+.canvas-tools__sep {
+  height: 1px;
+  margin: 0.25rem 0.2rem;
+  background: var(--ui-border);
+}
+
+/* La paleta de widgets, abierta desde el menú, también abre hacia arriba. */
+.canvas-tools .dash-free-palette {
+  top: auto;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
+}
+
+/* Botón de mostrar/ocultar la conversación (junto al «+»). */
+.chat-dock__history-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-pill);
+  background: transparent;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+
+.chat-dock__history-toggle:hover,
+.chat-dock__history-toggle.is-active {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+
+.chat-dock__history-toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* Cabecera del popover (solo título + acciones; el modelo/esfuerzo se movió al composer). */
+.chat-header__title {
+  flex: 1;
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  color: var(--ui-text);
+}
+
+/* Grupo de acciones a la derecha del pie: selector modelo/esfuerzo + enviar. */
+.prompt-input__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* ── Selector combinado modelo + esfuerzo (en línea en el pie, estilo Claude) ─────── */
+
+.me-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.me-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 240px;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-pill);
+  background: transparent;
+  color: var(--ui-text-muted);
+  font: inherit;
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+
+.me-menu__trigger:hover,
+.me-menu__trigger.is-open {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+
+.me-menu__trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+.me-menu__trigger-model {
+  color: var(--ui-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.me-menu__trigger-effort {
+  color: var(--ui-text-muted);
+  font-weight: 500;
+}
+
+.me-menu__trigger svg {
+  color: var(--ui-text-muted);
+  flex: none;
+}
+
+.me-menu__panel {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 32;
+  min-width: 14rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0.35rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-lg);
+  transform-origin: bottom right;
+  animation: chat-panel-in var(--ui-motion-medium) var(--ui-ease);
+}
+
+.me-menu__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.me-menu__group-label {
+  margin: 0.3rem 0.5rem 0.1rem;
+  font-size: var(--ui-text-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-muted);
+}
+
+.me-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: none;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: var(--ui-text);
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--ui-motion-fast) var(--ui-ease);
+}
+
+.me-menu__item:hover,
+.me-menu__item.is-open,
+.me-menu__item.is-selected {
+  background: var(--ui-surface-subtle);
+}
+
+.me-menu__item:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+.me-menu__item-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.me-menu__item-value {
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-xs);
+}
+
+/* El check de seleccionado va en color de acento; la flecha de expandir, en muted. */
+.me-menu__item svg {
+  color: var(--ui-primary);
+  flex: none;
+}
+
+.me-menu__item--expand svg {
+  color: var(--ui-text-muted);
+}
+
+.me-menu__badge {
+  padding: 1px 6px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-2xs);
+  font-weight: 600;
+}
+
+.me-menu__sep {
+  display: block;
+  height: 1px;
+  margin: 0.3rem 0.2rem;
+  background: var(--ui-border);
+}
+
+.me-menu__effort {
+  position: relative;
+}
+
+/* Subpanel de esfuerzo: a la IZQUIERDA del panel de modelos (el trigger vive a la derecha). */
+.me-menu__panel--sub {
+  bottom: 0;
+  right: calc(100% + 0.4rem);
+  min-width: 13rem;
+}
+
+.me-menu__hint {
+  margin: 0.1rem 0.5rem 0.4rem;
+  font-size: var(--ui-text-2xs);
+  line-height: 1.4;
+  color: var(--ui-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-dock__panel,
+  .canvas-tools__menu,
+  .me-menu__panel {
+    animation: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .chat-dock {
+    bottom: 0.75rem;
+    width: calc(100vw - 1.25rem);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════════
+   Componentes ai-elements replicados (diseño claro): Conversation (scroll), Suggestions,
+   Loader, Code Block, Tool (badge), Context.
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+/* Conversation: contenedor relativo + botón flotante de ir-al-final. */
+.chat-conversation {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.chat-scroll-btn {
+  position: absolute;
+  bottom: 0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  box-shadow: var(--ui-shadow-lg);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+
+.chat-scroll-btn:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+
+.chat-scroll-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* Empty state + Suggestions. */
+.chat-messages__empty-title {
+  margin: 0 0 var(--ui-space-3);
+  color: var(--ui-text);
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+}
+
+/* Una sola línea con scroll horizontal (slider) a todo el ancho del panel (full-bleed), sin
+   barra de scroll visible y arrastrable a mano. Estilo ScrollArea de ai-elements. */
+.suggestions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+  /* full-bleed: rompe el padding lateral del contenedor para ocupar el 100% del panel,
+     y re-inserta ese padding dentro para que los chips no queden pegados al borde. */
+  margin-inline: calc(-1 * var(--ui-space-3));
+  padding-inline: var(--ui-space-3);
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Edge antiguo */
+  cursor: grab;
+  user-select: none;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+}
+
+.suggestions::-webkit-scrollbar {
+  display: none; /* WebKit/Chrome/Safari */
+}
+
+.suggestions:active {
+  cursor: grabbing;
+}
+
+.suggestion {
+  flex: none;
+  white-space: nowrap;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+  font-size: var(--ui-text-xs);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    border-color var(--ui-motion-fast) var(--ui-ease);
+}
+
+.suggestion:hover {
+  background: var(--ui-surface-subtle);
+  border-color: var(--ui-border-strong, var(--ui-border));
+}
+
+.suggestion:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* Loader: anillo girando. */
+.chat-loader {
+  display: inline-block;
+  border: 2px solid color-mix(in srgb, var(--ui-text-muted) 35%, transparent);
+  border-top-color: var(--ui-text-muted);
+  border-radius: 50%;
+  animation: chat-loader-spin 0.7s linear infinite;
+}
+
+@keyframes chat-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-loader {
+    animation-duration: 1.6s;
+  }
+}
+
+/* Code Block: bloque con botón de copiar. */
+.code-block {
+  position: relative;
+  margin: var(--ui-space-2) 0;
+}
+
+.code-block__head {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+}
+
+.code-block__copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+
+.code-block:hover .code-block__copy,
+.code-block__copy:focus-visible {
+  opacity: 1;
+}
+
+.code-block__copy:hover {
+  color: var(--ui-text);
+}
+
+.code-block__copy:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* Tool: badge de estado + secciones del cuerpo. */
+.chat-tool-chip__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface-subtle);
+  font-size: var(--ui-text-2xs);
+  font-weight: 600;
+  color: var(--ui-text-muted);
+}
+
+.chat-tool-chip--done .chat-tool-chip__badge {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+
+.chat-tool-chip--pending .chat-tool-chip__badge {
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
+}
+
+.chat-tool-chip__badge svg {
+  flex: none;
+}
+
+.chat-tool-chip__section {
+  margin: var(--ui-space-2) 0 2px;
+  font-size: var(--ui-text-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ui-text-muted);
+}
+
+.chat-tool-chip__section:first-child {
+  margin-top: 0;
+}
+
+/* Context: trigger de uso + popover con desglose. */
+.ctx {
+  position: relative;
+  display: inline-flex;
+}
+
+.ctx__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  font: inherit;
+  font-size: var(--ui-text-2xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+
+.ctx__trigger:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+
+.ctx__trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+.ctx__panel {
+  position: absolute;
+  bottom: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 33;
+  min-width: 12rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-lg);
+  color: var(--ui-text);
+  font-size: var(--ui-text-xs);
+  animation: chat-panel-in var(--ui-motion-medium) var(--ui-ease);
+}
+
+.ctx__head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--ui-border);
+  font-weight: 600;
+}
+
+.ctx__row,
+.ctx__foot {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.12rem 0;
+  color: var(--ui-text-muted);
+}
+
+.ctx__foot {
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctx__panel {
+    animation: none;
   }
 }

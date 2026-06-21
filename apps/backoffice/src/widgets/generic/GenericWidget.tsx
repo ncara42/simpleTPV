@@ -1,5 +1,6 @@
 import type { GenericSpec } from '../../lib/dashboard-layout.js';
 import { GenericChart } from './GenericChart.js';
+import { GenericComposite } from './GenericComposite.js';
 import { GenericInsight } from './GenericInsight.js';
 import { GenericKpi } from './GenericKpi.js';
 import { GenericTable } from './GenericTable.js';
@@ -25,6 +26,8 @@ export function GenericWidget({ spec }: GenericWidgetProps) {
     case 'pie':
     case 'donut':
       return <GenericChart spec={spec} />;
+    case 'composite':
+      return <GenericComposite spec={spec} />;
     default:
       return null;
   }

@@ -1,36 +1,15 @@
 import './dashboard.css';
-import 'react-grid-layout/css/styles.css';
 
 import { Badge, Chart, Input, Select, Sparkline } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import {
-  BarChart2,
-  Check,
-  ChevronDown,
-  LayoutGrid,
-  LineChart,
-  Move,
-  Plus,
-  RotateCcw,
-  Search,
-  Undo2,
-  X,
-} from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  type Layout,
-  type LayoutItem,
-  moveElement,
-  noCompactor,
-  Responsive,
-  type ResponsiveLayouts,
-  useContainerWidth,
-} from 'react-grid-layout';
+import { BarChart2, ChevronDown, LineChart, Search } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { ChatDock } from './components/chat/ChatDock.js';
 import { DaySelector } from './components/DaySelector.js';
-import { FreeBoard } from './components/FreeBoard.js';
-import { WidgetPalette } from './components/WidgetPalette.js';
+import { type CanvasMeta, FreeBoard, type FreeBoardHandle } from './components/FreeBoard.js';
+import type { CanvasOp } from './lib/chat.js';
 import {
   type DashboardPeriod,
   type FamilySales,
@@ -49,23 +28,14 @@ import {
   type SalesCompareMode,
 } from './lib/dashboard.js';
 import {
-  addWidget,
-  availableWidgets,
-  buildDefaultLayout,
   type ChartCard,
-  type DashboardMode,
   type FreeLayout,
-  type FreeWidget,
   type LayoutPref,
   migrateLayoutPref,
-  type PresetDef,
-  presetItemIds,
   PRESETS,
   reconcileFreeLayout,
-  reconcileLayout,
-  type StoredLayouts,
 } from './lib/dashboard-layout.js';
-import { useDashboardStore } from './lib/dashboard-store.js';
+import { buildCanvasSnapshot, genericElementId, useDashboardStore } from './lib/dashboard-store.js';
 import {
   deltaTone,
   fmtDelta,
@@ -83,7 +53,7 @@ import { compareSupplierPrices } from './lib/supplier-prices.js';
 import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
 import { STATUS_LABEL } from './purchases/labels.js';
 import { ALERT_LABEL, df, EXPIRY_LABEL, expiryDaysText } from './stock/labels.js';
-import { getWidgetLabel } from './widgets/registry.js';
+import { getWidgetLabel, getWidgetSpec } from './widgets/registry.js';
 
 // Subtítulo de panel según el periodo seleccionado (más claro que "Periodo actual").
 const PERIOD_SUBTITLE: Record<DashboardPeriod, string> = {
@@ -150,39 +120,6 @@ const COMPARE_MODES: SalesCompareMode[] = ['day', 'month', 'year'];
 // neutro 'brand'. Convierte el tono semántico de una métrica al de la sparkline.
 const toSparkTone = (tone: 'up' | 'down' | 'flat'): SparkTone => (tone === 'flat' ? 'brand' : tone);
 
-// ── Tablero (react-grid-layout) ──
-// Rejilla de 12 columnas en escritorio que se reduce en pantallas estrechas; alto de fila
-// y márgenes fijos. El arrastre hace snap a estas unidades; el fondo de puntos (solo en
-// edición) es decorativo. v2 usa estos breakpoints/cols por separado.
-const BOARD_ROW_HEIGHT = 150;
-const BOARD_MARGIN: [number, number] = [16, 16];
-const BOARD_CONTAINER_PADDING: [number, number] = [0, 0];
-const BOARD_BREAKPOINTS = { lg: 1000, md: 768, sm: 640, xs: 480, xxs: 0 };
-const BOARD_COLS_BY_BP: Record<string, number> = { lg: 12, md: 12, sm: 6, xs: 4, xxs: 2 };
-// Compactor sin compactación (colocación libre con huecos) PERO con preventCollision: al
-// soltar una card sobre una celda ocupada, vuelve a su sitio en vez de solaparse. Evita que
-// las cards se oculten unas bajo otras y mantiene siempre el mismo margen entre ellas.
-const BOARD_COMPACTOR = { ...noCompactor, preventCollision: true };
-
-// Etiqueta legible de cada panel para el aria-label del tile (las tarjetas KPI usan su
-// `label` de cardDefs). Las tres pestañas de rankings comparten título.
-const PANEL_LABELS: Record<string, string> = {
-  'dash-bars': 'Ventas',
-  'dash-family': 'Ventas por familia',
-  'dash-stockout': 'Roturas de stock',
-  'rank-sales': 'Rankings de producto',
-  'rank-margin': 'Rankings de producto',
-  'rank-rotation': 'Rankings de producto',
-  'dash-expiring': 'Lotes por caducar',
-  'dash-purchase-orders': 'Pedidos de compra',
-  'dash-hour': 'Ventas por hora',
-  'dash-sales-emp': 'Ventas por vendedor',
-  'dash-discount-emp': 'Descuento por empleado',
-  'dash-suppliers': 'Comparativa de proveedores',
-  'dash-rotation': 'Rotación',
-  'dash-timeclock': 'Fichajes de hoy',
-};
-
 export function DashboardPage({
   onNavigate,
 }: {
@@ -200,31 +137,6 @@ export function DashboardPage({
   const [hourDay, setHourDay] = useState<string>(() =>
     new Intl.DateTimeFormat('en-CA').format(new Date()),
   );
-  // Modo "Personalizar" (D-19): reordenar cards y paneles por arrastre. El borrador
-  // (draft) mantiene el orden mientras se edita; se confirma con Guardar o se descarta.
-  // F4.1 (#188): `editing` vive en el store del dashboard (compartido con el ChatPanel del
-  // agente, que puede desactivarlo al cambiar a modo Libre).
-  const editing = useDashboardStore((s) => s.editing);
-  const setEditing = useDashboardStore((s) => s.setEditing);
-  // Borrador del layout del tablero mientras se edita; se confirma con Guardar o se descarta.
-  const [draftLayouts, setDraftLayouts] = useState<StoredLayouts | null>(null);
-  // D-21: cards/paneles quitados durante la edición (orden = pila de deshacer). Se inicializa
-  // con los ya ocultos del preset al entrar en edición; se confirma con Guardar.
-  const [draftHidden, setDraftHidden] = useState<string[]>([]);
-  // El fondo de puntos se desmonta tras su animación de salida: al dejar la edición se marca
-  // "saliendo" para reproducir la animación inversa antes de quitarlo del DOM.
-  const [dotsLeaving, setDotsLeaving] = useState(false);
-  // Ancho del contenedor para react-grid-layout v2 (sustituye al WidthProvider de v1).
-  const { width: boardWidth, mounted: boardMounted, containerRef: boardRef } = useContainerWidth();
-  // Breakpoint activo del tablero (lo reporta RGL); el reposicionado por teclado opera
-  // sobre el layout de ESE breakpoint.
-  const [boardBreakpoint, setBoardBreakpoint] = useState<string>('lg');
-  // Gestión de foco al entrar/salir de edición: al cambiar `editing` la cabecera
-  // intercambia su contenido, así que reubicamos el foco para no perderlo en <body>.
-  const editToggleRef = useRef<HTMLButtonElement>(null);
-  const wasEditing = useRef(false);
-  // Paleta de "Agregar widgets" en la cuadrícula de Personalizado (preset vacío).
-  const [customGridPaletteOpen, setCustomGridPaletteOpen] = useState(false);
   const store = storeId || undefined;
 
   // Preferencias ANTES de las queries: el preset activo decide qué se pinta Y
@@ -258,58 +170,35 @@ export function DashboardPage({
   // Único preset activo: «personalizado». Los presets anteriores se migraron en F0.
   const preset = PRESETS[0]!;
   const vis = new Set([...preset.cards, ...preset.panels]);
-  // Estable por preset: evita recalcular y, en modo libre, invalidar la memo de nodos del
-  // lienzo en cada re-render por datos. (renderItem sí cambia con los datos, por diseño.)
-  const itemIds = useMemo(() => presetItemIds(preset), [preset]);
-
-  // D-20: modo global (cuadrícula / libre). Ningún preset lo fuerza: el usuario decide.
-  const isCustomPreset = preset.id === 'personalizado';
-  const mode: DashboardMode = layout.mode ?? 'grid';
+  // El dashboard es siempre un lienzo libre (D-20): los widgets viven en `freeLayouts` del
+  // preset activo. Habilita las queries de cada widget presente en el lienzo.
   const savedFree = reconcileFreeLayout(layout.freeLayouts?.[preset.id] ?? [], preset);
-
-  // «Personalizado» no tiene items predefinidos: en cuadrícula los widgets derivan del
-  // lienzo libre (freeLayouts) para que ambos modos compartan la misma lista de widgets.
-  const customWidgetIds: string[] = isCustomPreset
-    ? savedFree.filter((e): e is FreeWidget => e.kind === 'widget').map((e) => e.widgetId)
-    : [];
-  // Ids efectivos para el tablero: para Personalizado son los widgets añadidos por el usuario.
-  const effectiveItemIds = isCustomPreset ? customWidgetIds : itemIds;
-  // D-21: cards quitadas del tablero por preset (persistidas). En edición se usa el borrador
-  // (draftHidden) para reflejar quitar/deshacer en vivo antes de Guardar.
-  const savedHidden = layout.hiddenByPreset?.[preset.id] ?? [];
-  const hiddenIds = editing ? draftHidden : savedHidden;
-  // Ids realmente visibles en el tablero (los efectivos menos los quitados).
-  const visibleItemIds = effectiveItemIds.filter((id) => !hiddenIds.includes(id));
-
-  // Habilita queries de widgets visibles:
-  // - Libre: todos los del lienzo del preset activo.
-  // - Cuadrícula de Personalizado: los widgets añadidos (mismos que el lienzo).
-  // - Cuadrícula estándar: los del preset (ya están en vis).
-  if (mode === 'free') {
-    for (const el of savedFree) {
-      if (el.kind === 'widget') vis.add(el.widgetId);
-    }
-  } else if (isCustomPreset) {
-    for (const id of customWidgetIds) vis.add(id);
+  for (const el of savedFree) {
+    if (el.kind === 'widget') vis.add(el.widgetId);
   }
 
-  // Colocación 2D en el tablero, reconciliada contra los ids efectivos del preset.
-  // Para Personalizado se reconcilia contra los widgets añadidos (no los del preset base).
-  const savedRaw = layout.layouts?.[preset.id] ?? {};
-  const savedLayouts: StoredLayouts = {};
-  {
-    const pseudoPreset: PresetDef = isCustomPreset
-      ? { ...preset, cards: customWidgetIds, panels: [] }
-      : preset;
-    for (const [bp, items] of Object.entries(savedRaw)) {
-      savedLayouts[bp] = reconcileLayout(items, visibleItemIds);
+  // ── Asistente (dock inferior) ↔ lienzo ──────────────────────────────────────────────
+  // El handle imperativo de FreeBoard alimenta el menú «+» de herramientas del dock; `canvasMeta`
+  // refleja deshacer/dibujo. El puente agente→lienzo (canvas_ops) sigue pasando por el store.
+  const freeBoardRef = useRef<FreeBoardHandle>(null);
+  const [canvasMeta, setCanvasMeta] = useState<CanvasMeta>({ canUndo: false, drawOpen: false });
+  const handleCanvasOp = useCallback(
+    (op: CanvasOp) => useDashboardStore.getState().applyCanvasOp(op),
+    [],
+  );
+  // Deshacer canvas_ops tras editar/regenerar: solo las add_* son inversibles. Los widgets
+  // genéricos (genericSpec, incl. composite, e insight) se colocan bajo un id derivado del
+  // element_id del agente (`genericElementId`), así que el undo debe derivarlo IGUAL (#189 E2E 4);
+  // el resto usa `elementId` (shapes/notas) o `widgetId` (catálogo, cuyo id en el lienzo == widgetId).
+  const handleUndoCanvasOps = useCallback((ops: CanvasOp[]) => {
+    const store = useDashboardStore.getState();
+    for (const op of ops) {
+      const isGeneric = Boolean(op.genericSpec) || op.op === 'add_insight';
+      const id =
+        isGeneric && op.elementId ? genericElementId(op.elementId) : (op.elementId ?? op.widgetId);
+      if (id) store.removeElement(id);
     }
-    savedLayouts.lg = reconcileLayout(
-      savedRaw.lg ?? buildDefaultLayout(pseudoPreset),
-      visibleItemIds,
-    );
-  }
-  const activeLayouts = editing && draftLayouts ? draftLayouts : savedLayouts;
+  }, []);
 
   // placeholderData: al cambiar de tienda/periodo se conservan los datos previos
   // durante el refetch en vez de vaciarse. Así los nodos del DOM (key estable por
@@ -446,27 +335,6 @@ export function DashboardPage({
     // `migrateLayoutPref` devuelve el mismo objeto si no hay nada que migrar.
     if (migrated !== layout) setStoreLayout(migrated);
   }, [hydrated, layout, setStoreLayout]);
-  // Reubica el foco al conmutar de modo: al entrar, al primer tile (es enfocable en
-  // edición y su aria-label explica cómo moverlo con las flechas); al salir, al botón
-  // "Personalizar". No roba el foco en el montaje inicial (solo en transiciones reales).
-  useEffect(() => {
-    if (editing === wasEditing.current) return;
-    wasEditing.current = editing;
-    // preventScroll: enfocar NO debe arrastrar el scroll al tile/botón; el usuario se queda
-    // en la posición en la que estaba al pulsar Personalizar / Guardar.
-    if (editing) {
-      boardRef.current?.querySelector<HTMLElement>('.dash-tile')?.focus({ preventScroll: true });
-    } else {
-      editToggleRef.current?.focus({ preventScroll: true });
-    }
-  }, [editing, boardRef]);
-  // Red de seguridad: si la animación de salida del fondo de puntos no emite animationend
-  // (p. ej. con prefers-reduced-motion, animation:none), lo desmonta igualmente.
-  useEffect(() => {
-    if (!dotsLeaving) return;
-    const t = setTimeout(() => setDotsLeaving(false), 500);
-    return () => clearTimeout(t);
-  }, [dotsLeaving]);
   const cardDefs: Array<{ id: string; label: string; node: React.ReactNode }> = [
     {
       id: 'kpi-today',
@@ -583,16 +451,6 @@ export function DashboardPage({
     },
   ];
 
-  // D-20: cambio de modo (grid/libre). Al cambiar de modo salimos de la edición del grid
-  // (editing/draft son conceptos del tablero RGL, no del lienzo libre).
-  const setMode = (m: DashboardMode): void => {
-    if (editing) {
-      setEditing(false);
-      setDotsLeaving(true);
-      setDraftLayouts(null);
-    }
-    setStoreLayout({ ...layout, mode: m });
-  };
   // D-20: persiste la disposición libre del preset activo (al soltar una card).
   const onFreeChange = (next: FreeLayout): void =>
     setStoreLayout({
@@ -605,16 +463,6 @@ export function DashboardPage({
       ...layout,
       freeViews: { ...layout.freeViews, [preset.id]: v },
     });
-  // Personalizado en cuadrícula: añade un widget a freeLayouts (fuente compartida con libre).
-  const onAddCustomGridWidget = (widgetId: string): void => {
-    const next = addWidget(savedFree, widgetId, { x: 100, y: 100 });
-    setStoreLayout({
-      ...layout,
-      freeLayouts: { ...layout.freeLayouts, [preset.id]: next },
-    });
-    setCustomGridPaletteOpen(false);
-  };
-  const customGridAvailable = availableWidgets(savedFree);
   // U-02: toggle barras ↔ línea LOCAL a cada card (persistido por card en el layout).
   // Cambiar el de una card no toca el de la otra.
   const chartKindFor = (card: ChartCard): 'bars' | 'line' =>
@@ -627,125 +475,7 @@ export function DashboardPage({
   const salesKind = chartKindFor('sales');
   const hourKind = chartKindFor('hour');
 
-  // ── Modo Personalizar (D-19): tablero arrastrable con snap (react-grid-layout) ──
-  // Aplica los flags de modo a cada item: en edición es arrastrable (nunca redimensionable);
-  // fuera de edición es estático (bloqueado). Los flags son de MODO y no se persisten.
-  const layoutsWithMode = (layouts: StoredLayouts): ResponsiveLayouts => {
-    const out: Record<string, LayoutItem[]> = {};
-    for (const [bp, items] of Object.entries(layouts)) {
-      out[bp] = (items ?? []).map((it) => ({
-        ...it,
-        static: !editing,
-        isDraggable: editing,
-        isResizable: false,
-      }));
-    }
-    return out;
-  };
-  // Captura los cambios del tablero en el borrador (solo en edición), guardando solo las
-  // coordenadas (sin los flags de modo) para no contaminar lo persistido.
-  const onBoardLayoutChange = (_current: Layout, all: ResponsiveLayouts): void => {
-    if (!editing) return;
-    const stripped: StoredLayouts = {};
-    for (const [bp, items] of Object.entries(all)) {
-      stripped[bp] = (items ?? []).map(({ i, x, y, w, h }) => ({ i, x, y, w, h }));
-    }
-    // Modo controlado de RGL: re-emite onLayoutChange en cada render. Si las coordenadas
-    // no cambian respecto al borrador, devolvemos el mismo array (React corta el ciclo).
-    setDraftLayouts((prev) =>
-      prev && JSON.stringify(prev) === JSON.stringify(stripped) ? prev : stripped,
-    );
-  };
-  // Entra a edición tomando una instantánea del layout guardado y de los ocultos como borrador.
-  const startEditing = (): void => {
-    setDraftLayouts(savedLayouts);
-    setDraftHidden(savedHidden);
-    setEditing(true);
-  };
-  const cancelEditing = (): void => {
-    setEditing(false);
-    setDotsLeaving(true);
-    setDraftLayouts(null);
-    setDraftHidden([]);
-  };
-  // D-21: quita una card del tablero (se apila para deshacer) y la saca del borrador de layout.
-  const removeTile = (id: string): void => {
-    setDraftHidden((prev) => (prev.includes(id) ? prev : [...prev, id]));
-    setDraftLayouts((prev) => {
-      if (!prev) return prev;
-      const next: StoredLayouts = {};
-      for (const [bp, items] of Object.entries(prev)) {
-        next[bp] = (items ?? []).filter((it) => it.i !== id);
-      }
-      return next;
-    });
-  };
-  // D-21: deshace el último «quitar» (restaura la última card sacada del tablero).
-  const undoRemove = (): void => {
-    setDraftHidden((prev) => prev.slice(0, -1));
-  };
-  // Restablecer: restaura TODAS las cards del preset y el layout por defecto (sin salir).
-  const resetEditing = (): void => {
-    setDraftHidden([]);
-    const target: PresetDef =
-      isCustomPreset && customWidgetIds.length > 0
-        ? { ...preset, cards: customWidgetIds, panels: [] }
-        : preset;
-    const def = buildDefaultLayout(target);
-    // Restablece también el breakpoint ACTIVO, no solo lg: moveItem edita base[boardBreakpoint]
-    // (que es md cuando el tablero mide <1000px), y RGL no re-deriva el layout del bp actual
-    // desde lg mientras no cambie de breakpoint. Sin limpiar el bp activo, el movimiento
-    // persistiría tras pulsar Restablecer.
-    setDraftLayouts(boardBreakpoint === 'lg' ? { lg: def } : { lg: def, [boardBreakpoint]: def });
-  };
-  // Guardar: persiste layout + cards ocultas por preset y sale de edición.
-  const saveEditing = (): void => {
-    setStoreLayout({
-      ...layout,
-      layouts: { ...layout.layouts, [preset.id]: draftLayouts ?? savedLayouts },
-      hiddenByPreset: { ...layout.hiddenByPreset, [preset.id]: draftHidden },
-    });
-    setEditing(false);
-    setDotsLeaving(true);
-    setDraftLayouts(null);
-    setDraftHidden([]);
-  };
-  // Accesibilidad: react-grid-layout no soporta arrastre por teclado, así que en edición
-  // cada tile es enfocable y las flechas reposicionan el elemento una celda en el layout
-  // del breakpoint activo (mismo comportamiento que el arrastre, vía moveElement).
-  const moveItem = (id: string, dx: number, dy: number): void => {
-    setDraftLayouts((prev) => {
-      const base = prev ?? savedLayouts;
-      const bp = boardBreakpoint;
-      const items = base[bp] ?? base.lg ?? [];
-      const cols = BOARD_COLS_BY_BP[bp] ?? 12;
-      const it = items.find((x) => x.i === id);
-      if (!it) return prev;
-      const nx = Math.max(0, Math.min(cols - it.w, it.x + dx));
-      const ny = Math.max(0, it.y + dy);
-      if (nx === it.x && ny === it.y) return prev;
-      // preventCollision=true: si la celda destino está ocupada, no mueve (coherente con el
-      // arrastre). compactType=null → sin reempaquetado; allowOverlap=false → sin solape.
-      const moved = moveElement(items, it, nx, ny, true, true, null, cols, false).map(
-        ({ i, x, y, w, h }) => ({ i, x, y, w, h }),
-      );
-      return { ...base, [bp]: moved };
-    });
-  };
-  const TILE_MOVES: Record<string, [number, number]> = {
-    ArrowLeft: [-1, 0],
-    ArrowRight: [1, 0],
-    ArrowUp: [0, -1],
-    ArrowDown: [0, 1],
-  };
-  const onTileKeyDown = (id: string, e: React.KeyboardEvent): void => {
-    if (!editing) return;
-    const move = TILE_MOVES[e.key];
-    if (!move) return;
-    e.preventDefault();
-    moveItem(id, move[0], move[1]);
-  };
-  // Etiqueta legible de un elemento del tablero (tarjeta KPI o panel) para el aria-label.
+  // Etiqueta legible de un elemento del lienzo (tarjeta KPI o panel) para el aria-label.
   const boardItemLabel = (id: string): string =>
     cardDefs.find((c) => c.id === id)?.label ?? getWidgetLabel(id);
 
@@ -1322,328 +1052,49 @@ export function DashboardPage({
     }
   };
 
-  // Nodo de un elemento del tablero por id (tarjeta KPI o panel).
+  // Nodo de un elemento del tablero por id (tarjeta KPI o panel, o widget genérico del agente).
+  // Los `gen:*` (creados por el chatbot, #188/#189) los resuelve el registry vía su `render`;
+  // sin esto, ningún widget genérico —simple o compuesto— sería visible en el lienzo.
   const renderItem = (id: string): React.ReactNode => {
+    if (id.startsWith('gen:')) {
+      return getWidgetSpec(id)?.render?.() ?? null;
+    }
     const card = cardDefs.find((c) => c.id === id);
     return card ? card.node : (renderPanel(id)?.node ?? null);
   };
 
-  // Acciones de modo: toggle Cuadrícula/Libre + «Personalizar» (este último solo en
-  // cuadrícula con contenido). Se renderiza en la cabecera flotante en modo Libre y en el
-  // cluster sticky en Cuadrícula (solo una de las dos a la vez → el editToggleRef no choca).
-  const modeActions = (
-    <>
-      <div
-        className="dash-mode-switch"
-        role="tablist"
-        aria-label="Modo del dashboard"
-        data-testid="dash-mode"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'grid'}
-          className={mode === 'grid' ? 'is-active' : ''}
-          onClick={() => setMode('grid')}
-          data-testid="dash-mode-grid"
-        >
-          <LayoutGrid size={14} aria-hidden="true" />
-          Cuadrícula
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'free'}
-          className={mode === 'free' ? 'is-active' : ''}
-          onClick={() => setMode('free')}
-          data-testid="dash-mode-free"
-        >
-          <Move size={14} aria-hidden="true" />
-          Libre
-        </button>
-      </div>
-      {mode === 'grid' && !(isCustomPreset && effectiveItemIds.length === 0) && (
-        <button
-          ref={editToggleRef}
-          type="button"
-          className="dash-edit-toggle"
-          onClick={startEditing}
-          data-testid="dash-edit-toggle"
-        >
-          <LayoutGrid size={15} aria-hidden="true" />
-          Personalizar
-        </button>
-      )}
-    </>
-  );
-
   return (
-    <section
-      className={`catalog${editing ? ' is-editing-board' : ''}${mode === 'free' ? ' dashboard--free' : ''}`}
-      data-testid="dashboard"
-    >
-      {/* Lienzo de puntos a pantalla completa durante la edición (detrás del contenido;
-          el sidebar/topbar lo tapan en sus zonas por su mayor z-index). Permanece montado
-          mientras sale (dotsLeaving) para reproducir la animación inversa antes de quitarlo. */}
-      {(editing || dotsLeaving) && (
-        <div
-          className={`dash-dots${!editing && dotsLeaving ? ' dash-dots--leaving' : ''}`}
-          data-testid="dash-dots"
-          aria-hidden="true"
-          onAnimationEnd={() => {
-            if (dotsLeaving) setDotsLeaving(false);
-          }}
-        />
-      )}
+    <section className="catalog dashboard--free" data-testid="dashboard">
       <header className="catalog-head is-actions-only dash-head">
         <div className="catalog-actions">
-          {editing ? (
-            // Barra del modo edición: chip de contexto + pista, separador y acciones
-            // (Restablecer/Cancelar tipo ghost · Guardar primario).
-            <div className="dash-edit-bar" data-testid="dash-edit-bar">
-              <span className="dash-edit-lead-icon" aria-hidden="true">
-                <Move size={16} />
-              </span>
-              {/* role=status: el lector de pantalla anuncia que se ha entrado en modo edición. */}
-              <span className="dash-edit-hint" role="status">
-                <strong>Editando el panel</strong>
-              </span>
-              <span className="dash-edit-sep" aria-hidden="true" />
-              <div className="dash-edit-actions">
-                <button
-                  type="button"
-                  className="dash-edit-btn"
-                  onClick={undoRemove}
-                  disabled={draftHidden.length === 0}
-                  data-testid="dash-edit-undo"
-                >
-                  <Undo2 size={15} aria-hidden="true" />
-                  Deshacer
-                </button>
-                <button
-                  type="button"
-                  className="dash-edit-btn"
-                  onClick={resetEditing}
-                  data-testid="dash-edit-reset"
-                >
-                  <RotateCcw size={15} aria-hidden="true" />
-                  Restablecer
-                </button>
-                <button
-                  type="button"
-                  className="dash-edit-btn"
-                  onClick={cancelEditing}
-                  data-testid="dash-edit-cancel"
-                >
-                  <X size={15} aria-hidden="true" />
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  className="dash-edit-btn is-primary"
-                  onClick={saveEditing}
-                  data-testid="dash-edit-save"
-                >
-                  <Check size={15} aria-hidden="true" />
-                  Guardar
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <span className="dash-preset-label" data-testid="dash-preset-personalizado">
-                Personalizado
-              </span>
-              {/* En modo Libre el toggle vive en la cabecera flotante centrada (en Cuadrícula
-                  va en el cluster sticky de abajo). */}
-              {mode === 'free' && <div className="dash-head-right">{modeActions}</div>}
-            </>
-          )}
+          <span className="dash-preset-label" data-testid="dash-preset-personalizado">
+            Personalizado
+          </span>
         </div>
       </header>
 
-      {/* Cuadrícula: el grupo [Cuadrícula·Libre] + Personalizar NO vive en la cabecera (que ya
-          no es sticky ni pinta fondo y se va con el scroll); es un cluster sticky propio,
-          pegado arriba-derecha mientras recorres el dashboard. (En Libre va en la cabecera
-          flotante centrada, ver más arriba en el header.) */}
-      {!editing && mode === 'grid' && <div className="dash-sticky-actions">{modeActions}</div>}
+      {/* D-20: el dashboard es siempre un lienzo libre (edgeless). Sus propias herramientas
+          (paleta de widgets, dibujo, deshacer, minimapa…) viven dentro de FreeBoard. */}
+      <FreeBoard
+        key={preset.id}
+        ref={freeBoardRef}
+        elements={savedFree}
+        renderItem={renderItem}
+        itemLabel={boardItemLabel}
+        onChange={onFreeChange}
+        {...(layout.freeViews?.[preset.id] ? { initialView: layout.freeViews[preset.id] } : {})}
+        onViewChange={onFreeViewChange}
+        onCanvasMeta={setCanvasMeta}
+      />
 
-      {/* D-20: dos modos. El div del tablero permanece SIEMPRE en el DOM para que
-          useContainerWidth mida el ancho correcto al volver a cuadrícula (sin él, boardWidth
-          sería 0 al montar y las cards aparecerían aplastadas). Se oculta via CSS cuando no
-          estamos en cuadrícula. El lienzo libre (FreeBoard) se monta/desmonta según el modo. */}
-      <div
-        ref={boardRef}
-        className={`dash-board${editing ? ' is-editing' : ''}`}
-        data-testid="dash-board"
-        style={
-          mode !== 'grid'
-            ? {
-                visibility: 'hidden',
-                height: 0,
-                minHeight: 0,
-                overflow: 'hidden',
-                pointerEvents: 'none',
-              }
-            : undefined
-        }
-      >
-        {boardMounted &&
-          mode === 'grid' &&
-          (isCustomPreset && effectiveItemIds.length === 0 ? (
-            // Estado vacío de Personalizado en cuadrícula: maqueta-fantasma que comunica que
-            // estás componiendo un tablero en rejilla, con un CTA para abrir el buscador.
-            <div className="dash-custom-empty" data-testid="dash-custom-grid-empty">
-              <div className="dash-custom-empty-inner">
-                {/* Mini-maqueta de cuadrícula: tres KPI arriba, un gráfico ancho y un panel. */}
-                <div className="dash-custom-ghost" aria-hidden="true">
-                  <span className="dash-ghost-tile" style={{ '--d': 0 } as React.CSSProperties} />
-                  <span className="dash-ghost-tile" style={{ '--d': 1 } as React.CSSProperties} />
-                  <span className="dash-ghost-tile" style={{ '--d': 2 } as React.CSSProperties} />
-                  <span
-                    className="dash-ghost-tile dash-ghost-tile--wide dash-ghost-tile--accent"
-                    style={{ '--d': 3 } as React.CSSProperties}
-                  />
-                  <span
-                    className="dash-ghost-tile dash-ghost-tile--tall"
-                    style={{ '--d': 4 } as React.CSSProperties}
-                  />
-                  <span
-                    className="dash-ghost-tile dash-ghost-tile--panel"
-                    style={{ '--d': 5 } as React.CSSProperties}
-                  />
-                </div>
-                <h2 className="dash-custom-empty-title">Diseña tu panel a medida</h2>
-                <p className="dash-custom-empty-text">
-                  Añade las tarjetas y gráficas que necesites y colócalas en la cuadrícula. Cámbiate
-                  a <strong>Libre</strong> para moverlas a cualquier sitio.
-                </p>
-                {customGridPaletteOpen ? (
-                  <WidgetPalette
-                    variant="center"
-                    items={customGridAvailable}
-                    label={boardItemLabel}
-                    onPick={onAddCustomGridWidget}
-                    onClose={() => setCustomGridPaletteOpen(false)}
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    className="dash-custom-empty-cta"
-                    data-testid="dash-custom-grid-add"
-                    onClick={() => setCustomGridPaletteOpen(true)}
-                  >
-                    <Plus size={18} aria-hidden="true" />
-                    Agregar widgets
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <Responsive
-              width={boardWidth}
-              breakpoints={BOARD_BREAKPOINTS}
-              cols={BOARD_COLS_BY_BP}
-              rowHeight={BOARD_ROW_HEIGHT}
-              margin={BOARD_MARGIN}
-              containerPadding={BOARD_CONTAINER_PADDING}
-              // Sin compactación (las cards se quedan donde las sueltas, con huecos permitidos)
-              // pero con preventCollision: soltar sobre una celda ocupada devuelve la card a su
-              // sitio en vez de solaparse. Nunca se ocultan unas bajo otras.
-              compactor={BOARD_COMPACTOR}
-              layouts={layoutsWithMode(activeLayouts)}
-              onLayoutChange={onBoardLayoutChange}
-              onBreakpointChange={(bp) => setBoardBreakpoint(bp)}
-            >
-              {visibleItemIds.map((id) => (
-                <div
-                  key={id}
-                  className={`dash-tile${editing ? ' is-editing' : ''}`}
-                  {...(editing
-                    ? {
-                        tabIndex: 0,
-                        role: 'button',
-                        'aria-label': `${boardItemLabel(id)}. Usa las flechas para moverla en el tablero.`,
-                        onKeyDown: (e: React.KeyboardEvent) => onTileKeyDown(id, e),
-                      }
-                    : {})}
-                >
-                  {/* En edición: botón para quitar la card del tablero (con deshacer en la barra). */}
-                  {editing && (
-                    <button
-                      type="button"
-                      className="dash-tile-remove"
-                      data-testid={`dash-tile-remove-${id}`}
-                      aria-label={`Quitar ${boardItemLabel(id)}`}
-                      title="Quitar del tablero"
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeTile(id);
-                      }}
-                    >
-                      <X size={13} aria-hidden="true" />
-                    </button>
-                  )}
-                  {renderItem(id)}
-                </div>
-              ))}
-            </Responsive>
-          ))}
-      </div>
-
-      {mode === 'free' && (
-        <FreeBoard
-          key={preset.id}
-          elements={savedFree}
-          renderItem={renderItem}
-          itemLabel={boardItemLabel}
-          onChange={onFreeChange}
-          {...(layout.freeViews?.[preset.id] ? { initialView: layout.freeViews[preset.id] } : {})}
-          onViewChange={onFreeViewChange}
-        />
-      )}
-
-      {/* I-17/D-06: la tabla de ventas ya no se embebe — el dashboard cierra
-          con el acceso a la page de Ventas (DataTable completo). En «Personalizado»
-          (lienzo a medida del usuario) no aplica: el acceso a Ventas sobra. */}
-      {!isCustomPreset && (
-        <footer className="dash-foot">
-          <button
-            type="button"
-            className="link-btn"
-            onClick={() => onNavigate?.('sales')}
-            data-testid="dash-to-sales"
-          >
-            Ver todas las ventas →
-          </button>
-        </footer>
-      )}
-
-      {/* Personalizado en Cuadrícula con widgets: botón «+» circular flotante para seguir
-          añadiendo (en el estado vacío el CTA central ya cubre la primera vez). */}
-      {mode === 'grid' && isCustomPreset && effectiveItemIds.length > 0 && (
-        <div className="dash-custom-fab" data-testid="dash-custom-fab">
-          {customGridPaletteOpen && (
-            <WidgetPalette
-              items={customGridAvailable}
-              label={boardItemLabel}
-              onPick={onAddCustomGridWidget}
-              onClose={() => setCustomGridPaletteOpen(false)}
-            />
-          )}
-          <button
-            type="button"
-            className="dash-custom-fab-btn"
-            data-testid="dash-custom-fab-add"
-            aria-label="Agregar widgets"
-            aria-expanded={customGridPaletteOpen}
-            onClick={() => setCustomGridPaletteOpen((o) => !o)}
-          >
-            <Plus size={24} aria-hidden="true" />
-          </button>
-        </div>
-      )}
+      {/* Dock inferior unificado: input del asistente + menú «+» de herramientas del lienzo. */}
+      <ChatDock
+        canvasRef={freeBoardRef}
+        canvasMeta={canvasMeta}
+        onCanvasOp={handleCanvasOp}
+        onUndoCanvasOps={handleUndoCanvasOps}
+        getCanvasState={buildCanvasSnapshot}
+      />
     </section>
   );
 }

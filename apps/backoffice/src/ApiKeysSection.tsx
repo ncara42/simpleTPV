@@ -2,11 +2,11 @@ import { Button, DataTable, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useState } from 'react';
+import { sileo } from 'sileo';
 
 import { useConfirm } from './components/ConfirmProvider.js';
 import { Modal } from './components/Modal.js';
 import { SectionToolbar } from './components/SectionToolbar.js';
-import { useToast } from './components/ToastProvider.js';
 import { createApiKey, listApiKeys, revokeApiKey } from './lib/api-keys.js';
 import { formErrorMessage } from './lib/form-error.js';
 
@@ -68,7 +68,6 @@ const EMPTY_FORM: CreateForm = { name: '', priceListId: '' };
 export function ApiKeysSection() {
   const qc = useQueryClient();
   const confirm = useConfirm();
-  const toast = useToast();
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateForm>(EMPTY_FORM);
   const [justCreated, setJustCreated] = useState<{ id: string; key: string } | null>(null);
@@ -96,9 +95,9 @@ export function ApiKeysSection() {
     mutationFn: (id: string) => revokeApiKey(id),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['api-keys'] });
-      toast('API key revocada', 'success');
+      sileo.success({ title: 'API key revocada' });
     },
-    onError: (e) => toast(formErrorMessage(e, 'No se pudo revocar la API key'), 'error'),
+    onError: (e) => sileo.error({ title: formErrorMessage(e, 'No se pudo revocar la API key') }),
   });
 
   const active = keys.filter((k) => !k.revokedAt);

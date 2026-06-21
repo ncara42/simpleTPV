@@ -82,6 +82,7 @@ export interface UseChat {
   loadingMessages: boolean;
   streaming: boolean;
   streamingText: string;
+  streamingReasoning: string;
   streamingToolCalls: { id: string; name: string; args: unknown }[];
   usage: ConversationUsage | null;
   error: string | null;
@@ -110,6 +111,7 @@ export function useChat(options: UseChatOptions = {}): UseChat {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState('');
+  const [streamingReasoning, setStreamingReasoning] = useState('');
   const [streamingToolCalls, setStreamingToolCalls] = useState<
     { id: string; name: string; args: unknown }[]
   >([]);
@@ -210,6 +212,7 @@ export function useChat(options: UseChatOptions = {}): UseChat {
       setError(null);
       setStreamingText('');
       streamingTextRef.current = '';
+      setStreamingReasoning('');
       setStreamingToolCalls([]);
 
       const fromConv = activeIdRef.current;
@@ -229,6 +232,7 @@ export function useChat(options: UseChatOptions = {}): UseChat {
       abortRef.current = controller;
       let resolvedConvId: string | null = null;
       let accumulated = '';
+      let accumulatedReasoning = '';
       // Resultados de cada canvas_op aplicado en el lienzo durante el turno. Se reportan al
       // backend al final, cuando ya se conoce el conversationId (en conversaciones nuevas el
       // id llega en `done`, después de los canvas_op).
@@ -248,6 +252,10 @@ export function useChat(options: UseChatOptions = {}): UseChat {
               accumulated += ev.text;
               streamingTextRef.current = accumulated;
               setStreamingText(accumulated);
+            },
+            onReasoning: (ev) => {
+              accumulatedReasoning += ev.text;
+              setStreamingReasoning(accumulatedReasoning);
             },
             onToolCall: (ev) =>
               setStreamingToolCalls((prev) => [
@@ -298,6 +306,7 @@ export function useChat(options: UseChatOptions = {}): UseChat {
         }
         setStreamingText('');
         streamingTextRef.current = '';
+        setStreamingReasoning('');
         setStreamingToolCalls([]);
         setStreaming(false);
         streamingRef.current = false;
@@ -338,6 +347,7 @@ export function useChat(options: UseChatOptions = {}): UseChat {
 
     setStreamingText('');
     streamingTextRef.current = '';
+    setStreamingReasoning('');
     setStreamingToolCalls([]);
     setStreaming(false);
     streamingRef.current = false;
@@ -466,6 +476,7 @@ export function useChat(options: UseChatOptions = {}): UseChat {
     loadingMessages,
     streaming,
     streamingText,
+    streamingReasoning,
     streamingToolCalls,
     usage,
     error,

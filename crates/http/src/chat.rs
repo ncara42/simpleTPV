@@ -205,6 +205,7 @@ fn run_agent_stream(
             };
 
             let mut tokens = String::new();
+            let mut thinking = String::new();
             let mut tool_calls: Vec<simpletpv_ai::ToolCall> = Vec::new();
 
             tokio::pin!(llm_stream);
@@ -216,8 +217,14 @@ fn run_agent_stream(
                             .event("token")
                             .data(serde_json::json!({ "text": t }).to_string()));
                     }
-                    Ok(LlmEvent::Thinking(_)) => {
-                        // No se reenvía al frontend (solo para razonamiento interno)
+                    Ok(LlmEvent::Thinking(t)) => {
+                        // Razonamiento del modelo (Anthropic thinking o `reasoning_content` de
+                        // gateways OpenAI-compatibles): se reenvía como evento `reasoning` para
+                        // pintarlo en el bloque colapsable del frontend y se persiste.
+                        thinking.push_str(&t);
+                        yield Ok(Event::default()
+                            .event("reasoning")
+                            .data(serde_json::json!({ "text": t }).to_string()));
                     }
                     Ok(LlmEvent::ToolCall(tc)) => {
                         yield Ok(Event::default()
@@ -248,7 +255,16 @@ fn run_agent_stream(
             } else {
                 Some(serde_json::to_value(&tool_calls).unwrap_or(serde_json::Value::Null))
             };
-            let content_json = serde_json::json!([{ "type": "text", "text": tokens }]);
+            // El bloque de razonamiento (si lo hubo) se persiste ANTES del texto, para que el
+            // historial lo muestre en el bloque colapsable.
+            let content_json = if thinking.is_empty() {
+                serde_json::json!([{ "type": "text", "text": tokens }])
+            } else {
+                serde_json::json!([
+                    { "type": "thinking", "text": thinking },
+                    { "type": "text", "text": tokens },
+                ])
+            };
             let _ = chat::append_message(
                 &pool,
                 org,
@@ -314,7 +330,7 @@ fn run_agent_stream(
                 // Canvas ops → reenviar al frontend como canvas_op, NO ejecutar en backend
                 let canvas_ops = [
                     "add_widget", "add_shape", "add_text", "add_note", "add_insight",
-                    "remove_element", "arrange", "set_mode", "clear_canvas",
+                    "remove_element", "arrange", "clear_canvas",
                 ];
                 if canvas_ops.contains(&tc.name.as_str()) {
                     let op = CanvasOp::from_tool_call(&tc.name, &tc.args);

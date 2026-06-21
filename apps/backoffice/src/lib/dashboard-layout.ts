@@ -107,12 +107,9 @@ export interface LayoutCoords {
   h: number;
 }
 
-// Layout por breakpoint: { lg: [...], sm: [...] }. Lo que se persiste por preset.
+// Layout por breakpoint: { lg: [...], sm: [...] }. Lo que se persiste por preset (legacy:
+// solo lo lee la migración; el dashboard ya no renderiza la rejilla, solo el lienzo libre).
 export type StoredLayouts = Record<string, LayoutCoords[]>;
-
-// Modo de presentación del dashboard (D-20): tablero con snap a rejilla (grid) o lienzo
-// edgeless con zoom/pan y colocación a píxel libre estilo Affine (free).
-export type DashboardMode = 'grid' | 'free';
 
 // ── Lienzo libre (D-20): elementos del lienzo ──
 // Base común a PÍXEL (coords de mundo). `z` = orden de apilado (mayor = delante), necesario
@@ -185,7 +182,29 @@ export type GenericWidgetType =
   | 'pie'
   | 'donut'
   | 'kpi'
-  | 'insight';
+  | 'insight'
+  | 'composite';
+
+// ── DSL de layout enriquecido (#189) ──
+// Límites de seguridad del árbol composite: el agente emite datos no confiables y la
+// validación dura vive en `normalizeGenericSpec` (ver dashboard-store.ts). Profundidad
+// contada desde la raíz (depth 0); un nodo es válido/visible solo si `depth < MAX`.
+export const MAX_COMPOSITE_DEPTH = 3;
+export const MAX_COMPOSITE_LEAVES = 12;
+
+// Nodo recursivo del DSL. Un `stack` agrupa hijos en fila/columna (con span/gap/título de
+// sección opcionales); una `leaf` es una mini-visualización (un GenericSpec sin `root`, para
+// que no anide composites dentro de hojas). Representa el árbol YA validado/normalizado.
+export type CompositeNode =
+  | {
+      kind: 'stack';
+      dir: 'row' | 'col';
+      span?: number;
+      title?: string;
+      gap?: number;
+      children: CompositeNode[];
+    }
+  | { kind: 'leaf'; span?: number; title?: string; spec: Omit<GenericSpec, 'root'> };
 
 // Configuración persistida de un widget genérico. `endpoint` es relativo a `/api` y debe
 // estar en la allowlist (validada en frontend, ver Fase 5). `params` son query params;
@@ -200,6 +219,8 @@ export interface GenericSpec {
   storeId?: string | null;
   title: string;
   defaultSize: { w: number; h: number };
+  /** Solo cuando `type === 'composite'`: árbol de layout (#189). `endpoint` es '' en ese caso. */
+  root?: CompositeNode;
 }
 
 // Tamaño por defecto (unidades de grid) por tipo de widget genérico. El agente puede
@@ -214,6 +235,7 @@ export const GENERIC_DEFAULT_SIZE: Record<GenericWidgetType, { w: number; h: num
   donut: { w: 4, h: 3 },
   kpi: { w: 2, h: 1 },
   insight: { w: 4, h: 2 },
+  composite: { w: 8, h: 5 },
 };
 
 // Preferencia de layout: preset activo, modo, tipo de gráfico por card, colocación 2D del
@@ -221,8 +243,6 @@ export const GENERIC_DEFAULT_SIZE: Record<GenericWidgetType, { w: number; h: num
 // Las claves antiguas (cardOrder/panelOrder, hiddenByPreset, chartKind global) se ignoran.
 export interface LayoutPref {
   preset?: PresetId;
-  /** D-20: modo de presentación (tablero con snap o lienzo libre). Global a la dashboard. */
-  mode?: DashboardMode;
   /** U-02: representación (barras o línea) de cada card con toggle, independiente. */
   chartKinds?: Partial<Record<ChartCard, 'bars' | 'line'>>;
   /** D-19: colocación 2D por preset (layouts por breakpoint de react-grid-layout). */
@@ -557,12 +577,18 @@ export function migrateFreeLayout(saved: readonly unknown[]): FreeLayout {
 // Reconcilia la disposición libre guardada con el catálogo actual. A diferencia del grid, el
 // modo libre deja al usuario AÑADIR/QUITAR libremente, así que NO se fuerza la composición del
 // preset: solo se siembra desde el preset cuando no hay nada guardado. Con datos guardados:
-// conserva todo lo del usuario, mantiene las notas y descarta widgets cuyo id ya no exista.
+// conserva todo lo del usuario, mantiene las notas y descarta widgets de catálogo cuyo id ya no
+// exista. Los widgets genéricos del agente (`gen:*`, #188/#189) se conservan SIEMPRE: no están en
+// `ITEM_SPECS` (no son del catálogo fijo) sino que su spec vive en `LayoutPref.genericWidgets`, así
+// que filtrarlos por el catálogo los borraba del lienzo (no se renderizaban ni en grid ni en libre).
 export function reconcileFreeLayout(saved: readonly unknown[], preset: PresetDef): FreeLayout {
   const migrated = migrateFreeLayout(saved);
   if (migrated.length === 0) return buildDefaultFreeLayout(preset);
-  // Solo los widgets dependen del catálogo: notas, formas, trazos y textos se conservan siempre.
-  return migrated.filter((e) => e.kind !== 'widget' || e.widgetId in ITEM_SPECS);
+  // Notas/formas/trazos/textos se conservan siempre; los widgets se conservan si son del catálogo
+  // (en ITEM_SPECS) o genéricos (`gen:*`). Solo se descartan ids de catálogo obsoletos.
+  return migrated.filter(
+    (e) => e.kind !== 'widget' || e.widgetId in ITEM_SPECS || e.widgetId.startsWith('gen:'),
+  );
 }
 
 // Siguiente `z` (encima de todo).

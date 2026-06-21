@@ -7,7 +7,6 @@ describe('migrateLayoutPref (regresión F0: presets → personalizado)', () => {
     const ventasLayout = { lg: [{ i: 'kpi-today', x: 0, y: 0, w: 2, h: 1 }] };
     const before: LayoutPref = {
       preset: 'ventas',
-      mode: 'grid',
       layouts: { ventas: ventasLayout },
       freeLayouts: { ventas: [] },
       freeViews: { ventas: { panX: 5, panY: 10, zoom: 1.2 } },
@@ -32,7 +31,7 @@ describe('migrateLayoutPref (regresión F0: presets → personalizado)', () => {
   });
 
   it('sin preset devuelve el mismo objeto (no hay nada que migrar)', () => {
-    const layout: LayoutPref = { mode: 'free' };
+    const layout: LayoutPref = { chartKinds: { sales: 'line' } };
     expect(migrateLayoutPref(layout)).toBe(layout);
   });
 

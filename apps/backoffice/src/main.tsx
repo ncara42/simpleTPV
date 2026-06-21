@@ -5,10 +5,10 @@ import { ErrorScreen } from '@simpletpv/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Toaster } from 'sileo';
 
 import App from './App.js';
 import { ConfirmProvider } from './components/ConfirmProvider.js';
-import { ToastProvider } from './components/ToastProvider.js';
 import { initSentry } from './observability/sentry.js';
 
 initSentry();
@@ -22,11 +22,10 @@ createRoot(document.getElementById('root')!).render(
         el SDK (producción con DSN); en dev/test actúa como boundary normal. */}
     <Sentry.ErrorBoundary fallback={<ErrorScreen />}>
       <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          <ConfirmProvider>
-            <App />
-          </ConfirmProvider>
-        </ToastProvider>
+        <Toaster position="bottom-right" />
+        <ConfirmProvider>
+          <App />
+        </ConfirmProvider>
       </QueryClientProvider>
     </Sentry.ErrorBoundary>
   </StrictMode>,

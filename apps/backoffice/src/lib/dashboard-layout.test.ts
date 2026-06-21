@@ -262,6 +262,27 @@ describe('reconcileFreeLayout', () => {
     const result = reconcileFreeLayout(saved, ventas);
     expect(result.map((e) => e.id).sort()).toEqual(['kpi-today', 'n1']);
   });
+
+  it('CONSERVA los widgets genéricos del agente (gen:*), aunque no estén en ITEM_SPECS (#188/#189)', () => {
+    // Regresión: el filtro por catálogo borraba los gen:* del lienzo → no se renderizaban (ni el
+    // composite). Deben sobrevivir igual que el catálogo; solo se descartan ids de catálogo obsoletos.
+    const saved = [
+      { kind: 'widget', id: 'kpi-today', widgetId: 'kpi-today', x: 0, y: 0, w: 184, h: 144, z: 0 },
+      {
+        kind: 'widget',
+        id: 'gen:comp-1',
+        widgetId: 'gen:comp-1',
+        x: 500,
+        y: 360,
+        w: 784,
+        h: 784,
+        z: 1,
+      },
+      { i: 'obsoleta', x: 5, y: 5, w: 1, h: 1 },
+    ];
+    const result = reconcileFreeLayout(saved, ventas);
+    expect(result.map((e) => e.id).sort()).toEqual(['gen:comp-1', 'kpi-today']);
+  });
 });
 
 describe('helpers de añadir/quitar/orden', () => {

@@ -56,7 +56,6 @@ export type CanvasOpType =
   | 'add_insight'
   | 'remove_element'
   | 'arrange'
-  | 'set_mode'
   | 'clear_canvas';
 
 export interface CanvasOp {
@@ -70,8 +69,6 @@ export interface CanvasOp {
   kind?: string;
   text?: string;
   content?: string;
-  // set_mode
-  mode?: 'grid' | 'free';
   // generic widget
   genericSpec?: {
     type: string;
@@ -80,12 +77,19 @@ export interface CanvasOp {
     fields?: Record<string, string>;
     title?: string;
     defaultSize?: { w: number; h: number };
+    // Árbol de layout para tipo 'composite' (#189). No confiable: lo valida y sanea
+    // `normalizeGenericSpec` (dashboard-store). `camel_case_keys` del backend no lo toca.
+    root?: unknown;
   };
 }
 
 // ── Eventos SSE del stream ─────────────────────────────────────────────────────
 
 export interface TokenEvent {
+  text: string;
+}
+
+export interface ReasoningEvent {
   text: string;
 }
 
@@ -112,6 +116,7 @@ export interface ErrorEvent {
 
 export type SseEventMap = {
   token: TokenEvent;
+  reasoning: ReasoningEvent;
   tool_call: ToolCallEvent;
   canvas_op: CanvasOpEvent;
   done: DoneEvent;
@@ -122,6 +127,7 @@ export type SseEventType = keyof SseEventMap;
 
 export interface ChatStreamCallbacks {
   onToken?: (ev: TokenEvent) => void;
+  onReasoning?: (ev: ReasoningEvent) => void;
   onToolCall?: (ev: ToolCallEvent) => void;
   onCanvasOp?: (ev: CanvasOpEvent) => void;
   onDone?: (ev: DoneEvent) => void;
@@ -157,6 +163,9 @@ export async function streamChat(
       switch (typed) {
         case 'token':
           callbacks.onToken?.(data as TokenEvent);
+          break;
+        case 'reasoning':
+          callbacks.onReasoning?.(data as ReasoningEvent);
           break;
         case 'tool_call':
           callbacks.onToolCall?.(data as ToolCallEvent);
