@@ -70,24 +70,26 @@
   padding: 0;
 }
 
-/* Views NO-dashboard: la página flota como una superficie sobre el fondo. Reutiliza el
-   contenido actual (tablas/secciones) sin rediseñarlo. Holgura inferior para el dock. */
+/* Views NO-dashboard: NO hay card de fondo. El contenido flota directamente sobre el lienzo de
+   puntitos (mismo patrón que .dash-free), como si cada apartado del sidebar colocase un widget
+   grande en el lienzo. Holgura arriba para la etiqueta de view flotante y abajo para el dock. */
 .bo-main--surface {
-  margin: 3.4rem 1.25rem 6rem;
-  padding: 1.75rem 2rem 2rem;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg, 18px);
-  box-shadow:
-    0 1px 2px rgb(0 0 0 / 0.04),
-    0 18px 40px -12px rgb(0 0 0 / 0.2);
-  min-height: calc(100vh - 9.4rem);
+  margin: 0;
+  padding: 3.4rem 1.5rem 6rem;
+  min-height: 100vh;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background-color: var(--ui-surface-subtle);
+  --dot: color-mix(in srgb, var(--ui-text-muted) 38%, transparent);
+  background-image: radial-gradient(var(--dot) 1.5px, transparent 1.6px);
+  background-size: 24px 24px;
 }
 
 @media (max-width: 767px) {
   .bo-main--surface {
-    margin: 3.2rem 0.6rem 6rem;
-    padding: 1.1rem 1rem 1.25rem;
+    padding: 3.2rem 0.75rem 6rem;
   }
 }
 
