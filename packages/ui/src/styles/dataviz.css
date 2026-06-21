@@ -1,0 +1,346 @@
+/* Librería de dataviz (#189) — átomos y moléculas con diseño horneado sobre tokens --ui-*.
+   El agente compone estas piezas vía DSL; la tipografía, color y espaciado SIEMPRE salen de
+   aquí (nunca px sueltos del agente). Solo propiedades compositor-friendly en transiciones. */
+
+/* ── StatValue ── */
+.dv-stat-value {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.dv-stat-value--sm {
+  font-size: var(--ui-text-lg);
+}
+.dv-stat-value--md {
+  font-size: var(--ui-text-2xl);
+}
+.dv-stat-value--lg {
+  font-size: var(--ui-text-4xl);
+}
+
+/* ── StatLabel ── */
+.dv-stat-label {
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.045em;
+  color: var(--ui-text-soft);
+}
+
+/* ── DeltaBadge ── */
+.dv-delta {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--ui-space-1);
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--ui-radius-pill);
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.dv-delta--up {
+  color: var(--ui-success);
+  background: var(--ui-success-soft);
+}
+.dv-delta--down {
+  color: var(--ui-danger);
+  background: var(--ui-danger-soft);
+}
+.dv-delta--flat {
+  color: var(--ui-text-soft);
+  background: var(--ui-surface-subtle);
+}
+
+/* ── TrendCaption ── */
+.dv-trend-caption {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
+}
+.dv-trend-caption--up {
+  color: var(--ui-success);
+}
+.dv-trend-caption--down {
+  color: var(--ui-danger);
+}
+
+/* ── MiniSparkline ── */
+.dv-mini-spark {
+  display: block;
+  line-height: 0;
+  height: 40px;
+}
+.dv-mini-spark > .ui-spark {
+  height: 100%;
+}
+
+/* ── ChartLegend ── */
+.dv-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-1) var(--ui-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
+}
+.dv-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  min-width: 0;
+}
+.dv-legend-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--ui-radius-pill);
+  flex: none;
+}
+
+/* ── SectionHeader ── */
+.dv-section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.dv-section-title {
+  margin: 0;
+  font-size: var(--ui-text-md);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+}
+.dv-section-sub {
+  margin: 0;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
+}
+
+/* ── StatusPill ── */
+.dv-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.5rem;
+  border-radius: var(--ui-radius-pill);
+  font-size: var(--ui-text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.dv-status-pill--ok {
+  color: var(--ui-success);
+  background: var(--ui-success-soft);
+}
+.dv-status-pill--warn {
+  color: var(--ui-warning);
+  background: var(--ui-warning-soft);
+}
+.dv-status-pill--danger {
+  color: var(--ui-danger);
+  background: var(--ui-danger-soft);
+}
+
+/* ── WidgetStates (loading/error/empty) ── */
+.dv-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-height: 3rem;
+  padding: var(--ui-space-3);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
+  text-align: center;
+}
+.dv-state--loading {
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-subtle);
+  animation: dv-pulse 1.4s ease-in-out infinite;
+}
+@keyframes dv-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dv-state--loading {
+    animation: none;
+  }
+}
+
+/* ════════════════════════ MOLÉCULAS ════════════════════════ */
+
+/* ── KpiTile ── */
+.dv-kpi-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+  min-width: 0;
+}
+.dv-kpi-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-2);
+}
+
+/* ── RankBarList (BarList) ── */
+.dv-rank {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dv-rank-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  min-width: 0;
+}
+.dv-rank-bar {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 1.55rem;
+  padding: 0 var(--ui-space-2);
+  border-radius: var(--ui-radius-sm);
+}
+.dv-rank-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text);
+}
+.dv-rank-value {
+  flex: none;
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-muted);
+}
+
+/* ── SegmentBar (CategoryBar) ── */
+.dv-segment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  min-width: 0;
+}
+.dv-segment-bar {
+  display: flex;
+  height: 0.75rem;
+  border-radius: var(--ui-radius-pill);
+  overflow: hidden;
+  background: var(--ui-surface-subtle);
+}
+.dv-segment-part {
+  height: 100%;
+}
+.dv-segment-part:not(:last-child) {
+  border-right: 2px solid var(--ui-surface);
+}
+
+/* ── ProgressMeter (ProgressBar) ── */
+.dv-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  min-width: 0;
+}
+.dv-progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ui-space-2);
+}
+.dv-progress-figure {
+  font-size: var(--ui-text-base);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text);
+}
+.dv-progress-target {
+  font-weight: 500;
+  color: var(--ui-text-muted);
+}
+.dv-progress-track {
+  height: 0.5rem;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface-subtle);
+  overflow: hidden;
+}
+.dv-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-chart-accent);
+}
+
+/* ── Frames de gráfica / tabla (figure: título + cuerpo, llenan su celda) ── */
+.dv-chart,
+.dv-grid,
+.dv-stock-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  margin: 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ── StockAlertList ── */
+.dv-stock {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dv-stock-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2) 0;
+  border-bottom: 1px solid var(--ui-border-subtle, var(--ui-border));
+}
+.dv-stock-row:last-child {
+  border-bottom: none;
+}
+.dv-stock-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.dv-stock-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text);
+}
+.dv-stock-detail {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
+}
+.dv-stock-qty {
+  flex: none;
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text);
+}
+.dv-stock-threshold {
+  font-weight: 500;
+  color: var(--ui-text-muted);
+}

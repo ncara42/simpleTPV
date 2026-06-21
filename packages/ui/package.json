@@ -9,6 +9,7 @@
     "./alert.css": "./src/styles/alert.css",
     "./chart.css": "./src/styles/chart.css",
     "./datatable.css": "./src/styles/datatable.css",
+    "./dataviz.css": "./src/styles/dataviz.css",
     "./login.css": "./src/styles/login.css",
     "./select.css": "./src/styles/select.css",
     "./sidebar.css": "./src/styles/sidebar.css",
