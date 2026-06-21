@@ -233,6 +233,52 @@ jobs:
           fi
 
   # -----------------------------------------------------------------------
+  # Regresión visual (#211) — paneles v2 y bloques del dashboard, sin backend
+  # (el harness aislado visual.html stubea /api con datos mock). Corre DENTRO del
+  # contenedor oficial de Playwright para que los screenshots casen pixel a pixel
+  # con los baselines `-linux` commiteados (generados en la misma imagen).
+  # -----------------------------------------------------------------------
+  visual:
+    name: Regresión visual (Playwright)
+    runs-on: ubuntu-latest
+    needs: [quality]
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    container:
+      image: mcr.microsoft.com/playwright:v1.60.0-noble
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+        with:
+          version: 11.1.3
+
+      - name: Setup Node 22
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run visual regression (Backoffice)
+        run: pnpm --filter @simpletpv/backoffice test:visual
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-visual-report
+          path: |
+            apps/backoffice/test-results/
+            apps/backoffice/playwright-report/
+          retention-days: 7
+
+  # -----------------------------------------------------------------------
   # Deploy a producción — solo en push a main, tras pasar quality + e2e.
   # Usa la API autenticada de Dokploy (application.deploy) en lugar del webhook
   # de rama /api/deploy/<token>. La API con x-api-key dispara el redeploy

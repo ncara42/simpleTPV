@@ -1,0 +1,18 @@
+/* Estilos del harness de regresión visual (#211). Cada frame ocupa el ancho del viewport para que
+   los breakpoints (320/768/1024/1440) disparen las media queries de los layouts v2; alto fijo para
+   que las gráficas (flex 1) tengan suelo y el screenshot sea estable. */
+.vis-root {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 16px;
+  background: var(--ui-color-bg, #fff);
+}
+.vis-frame {
+  width: 100%;
+  height: 320px;
+  box-sizing: border-box;
+}
+.vis-frame > * {
+  height: 100%;
+}

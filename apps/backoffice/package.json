@@ -9,7 +9,9 @@
     "preview": "vite preview --port 4174",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:visual": "playwright test -c playwright.visual.config.ts",
+    "visual:baselines": "bash scripts/visual-baselines.sh"
   },
   "dependencies": {
     "@sentry/react": "^10.55.0",

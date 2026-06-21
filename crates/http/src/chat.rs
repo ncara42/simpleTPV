@@ -254,6 +254,13 @@ fn run_agent_stream(
         let mut total_input = 0u32;
         let mut total_output = 0u32;
         let mut tool_rounds = 0usize;
+        // Métrica de calidad del agente v2 (#210): nº de tool-calls e iteraciones por turno, por
+        // categoría. Se emiten al cerrar el turno (target `chat_metrics`) para medir sobre sesiones
+        // reales el coste de tool-calling de la superficie v2 (block:/gen:panel).
+        let mut total_tool_calls = 0usize;
+        let mut total_canvas_ops = 0usize;
+        let mut total_view_actions = 0usize;
+        let mut total_data_tools = 0usize;
 
         loop {
             let llm_stream = match stream_chat(&ai_config, req.clone()) {
@@ -307,6 +314,8 @@ fn run_agent_stream(
                     }
                 }
             }
+
+            total_tool_calls += tool_calls.len();
 
             // Guardar mensaje del asistente
             let assistant_msg_id = Uuid::new_v4();
@@ -364,6 +373,22 @@ fn run_agent_stream(
 
                 let _ = chat::touch_conversation(&pool, org, conv_id).await;
 
+                // Métrica de calidad del agente v2 (#210): resumen del turno (iteraciones + nº de
+                // tool-calls por categoría). Permite medir sobre sesiones reales el coste de
+                // tool-calling antes/después de la superficie v2.
+                tracing::info!(
+                    target: "chat_metrics",
+                    event = "turn",
+                    conversation = %conv_id,
+                    tool_rounds,
+                    tool_calls = total_tool_calls,
+                    canvas_ops = total_canvas_ops,
+                    view_actions = total_view_actions,
+                    data_tools = total_data_tools,
+                    hit_round_limit = tool_rounds >= MAX_TOOL_ROUNDS,
+                    "agent turn finished",
+                );
+
                 let usage_summary = serde_json::json!({
                     "inputTokens": total_input,
                     "outputTokens": total_output,
@@ -390,6 +415,7 @@ fn run_agent_stream(
                 // View actions → reenviar al frontend como view_action (scroll/resaltar/filtrar),
                 // NO ejecutar en backend. ACK inmediato: son fire-and-forget sobre la vista.
                 if VIEW_ACTION_NAMES.contains(&tc.name.as_str()) {
+                    total_view_actions += 1;
                     yield Ok(Event::default()
                         .event("view_action")
                         .data(
@@ -409,6 +435,7 @@ fn run_agent_stream(
 
                 // Canvas ops → reenviar al frontend como canvas_op, NO ejecutar en backend
                 if CANVAS_OP_NAMES.contains(&tc.name.as_str()) {
+                    total_canvas_ops += 1;
                     let op = CanvasOp::from_tool_call(&tc.name, &tc.args);
                     yield Ok(Event::default()
                         .event("canvas_op")
@@ -428,6 +455,7 @@ fn run_agent_stream(
                 }
 
                 // Data tools → ejecutar en backend
+                total_data_tools += 1;
                 match simpletpv_domain::chat::dispatch_tool(
                     &pool,
                     org,
@@ -566,6 +594,21 @@ pub async fn canvas_result(
     user.require_role(&MGMT_ROLES)?;
     let pool = state.db();
     let org = user.organization_id;
+
+    // Métrica de calidad del agente v2 (#210): cada resultado de canvas op vuelve aquí. Un
+    // rechazo = panel que no se renderizó (respuesta vacía); aceptado-con-reason = la validación
+    // REPARÓ la spec del agente (la hipótesis: las reparaciones reducen las respuestas vacías).
+    // Target dedicado `chat_metrics` para filtrar/agregar sobre sesiones reales sin ruido.
+    tracing::info!(
+        target: "chat_metrics",
+        event = "canvas_result",
+        conversation = %conv_id,
+        accepted = body.accepted,
+        rejected = !body.accepted,
+        repaired = body.accepted && body.reason.is_some(),
+        reason = body.reason.as_deref().unwrap_or(""),
+        "canvas op result",
+    );
 
     // El canvas_result se registra como un tool_result en el último mensaje de tool
     // del assistant. En esta implementación simplificada lo guardamos como mensaje

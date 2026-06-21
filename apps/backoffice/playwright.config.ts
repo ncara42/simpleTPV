@@ -2,6 +2,9 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
+  // La regresión visual (#211) vive en su propio config (playwright.visual.config.ts): no usa
+  // backend ni login, así que se excluye del e2e funcional.
+  testIgnore: /visual\.spec\.ts/,
   fullyParallel: false,
   retries: 0,
   workers: 1,
