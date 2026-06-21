@@ -221,6 +221,78 @@ export interface GenericSpec {
   defaultSize: { w: number; h: number };
   /** Solo cuando `type === 'composite'`: árbol de layout (#189). `endpoint` es '' en ese caso. */
   root?: CompositeNode;
+  // ── DSL v2 (#204): panel por receta + slots tipados ──
+  // Cuando `kind === 'panel'`, el render despacha a GenericPanel (no a GenericComposite). El
+  // `type` se conserva en 'composite' por compat (mismo bucket de tamaño/hidratación); `kind`
+  // tiene prioridad en el render. El árbol libre (`root`) NO se usa en v2 — lo reemplazan recipe+slots.
+  kind?: 'panel';
+  version?: number;
+  recipe?: RecipeId;
+  density?: PanelDensity;
+  slots?: Partial<Record<SlotName, PieceSpec[]>>;
+}
+
+// ── DSL v2 (#204): vocabulario de piezas + recetas ──
+// El agente ENSAMBLA piezas con diseño horneado dentro de recetas con slots tipados. La
+// granularidad alta vive en el VOCABULARIO (piezas); la baja, en los GRADOS DE LIBERTAD
+// (recetas cerradas, slots tipados). La allowlist/recetas/slots viven en `dashboard-pieces.ts`.
+
+// Molécula referenciada por una hoja-pieza (cada una con diseño horneado: orden, cap, formato,
+// degradación). `insight` NO es pieza de slot (es el fallback v1 type:'insight').
+export type PieceId =
+  | 'kpiTile'
+  | 'comparisonBars'
+  | 'trendLine'
+  | 'trendArea'
+  | 'shareDonut'
+  | 'rankBarList'
+  | 'segmentBar'
+  | 'progressMeter'
+  | 'dataGrid';
+
+// Receta cerrada: dicta el grid-template (ancho/alto/gutter), no el agente.
+export type RecipeId =
+  | 'kpiRow'
+  | 'kpiRow+oneChart'
+  | 'kpiRow+twoCharts'
+  | 'heroChart+sideStats'
+  | 'tableFull';
+
+// Slot tipado dentro de una receta. `kpis` solo admite kpiTile; `charts` admite el set de gráficas.
+export type SlotName = 'kpis' | 'charts';
+
+export type PanelDensity = 'compact' | 'comfortable';
+
+// Formato es-ES de una cifra (enum; el agente nunca toca el formateo, lo hornea la pieza).
+export type PieceFormat = 'eur' | 'percent' | 'decimal' | 'units' | 'integer';
+
+// Columna de un dataGrid: campo + etiqueta legible + formato/alineación opcionales.
+export interface DataGridColumnSpec {
+  field: string;
+  label: string;
+  format?: PieceFormat;
+  align?: 'left' | 'right' | 'center';
+}
+
+// Hoja-pieza: referencia una molécula (`piece`) + bindings de datos (endpoint/params/campos) +
+// enums clampados. Sin geometría libre (la receta dicta el layout).
+export interface PieceSpec {
+  piece: PieceId;
+  title?: string;
+  endpoint?: string;
+  labelField?: string;
+  valueField?: string;
+  deltaField?: string;
+  sparkField?: string;
+  targetField?: string;
+  target?: number;
+  format?: PieceFormat;
+  maxRows?: number;
+  maxBars?: number;
+  columns?: DataGridColumnSpec[];
+  params?: Record<string, string | number | boolean>;
+  period?: DashboardPeriod;
+  storeId?: string | null;
 }
 
 // Tamaño por defecto (unidades de grid) por tipo de widget genérico. El agente puede

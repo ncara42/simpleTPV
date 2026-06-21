@@ -298,6 +298,84 @@
   min-height: 0;
 }
 
+/* ════════════════════════ LAYOUTS v2 (#204) ════════════════════════ */
+/* El grid-template deriva de ENUMS (recipe/columns/density), nunca de px del agente. */
+
+/* ── PanelShell ── */
+.dv-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.dv-panel--comfortable {
+  gap: var(--ui-space-3);
+}
+.dv-panel--compact {
+  gap: var(--ui-space-2);
+}
+.dv-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ── KpiRow ── (fila de 1-4 KPIs; wrap responsive) */
+.dv-kpi-row {
+  display: grid;
+  gap: var(--ui-space-3);
+  flex: 0 0 auto;
+}
+.dv-kpi-row--1 {
+  grid-template-columns: 1fr;
+}
+.dv-kpi-row--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.dv-kpi-row--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.dv-kpi-row--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 540px) {
+  .dv-kpi-row--3,
+  .dv-kpi-row--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── ChartGrid ── (1-2 gráficas por fila; las gráficas llenan el alto) */
+.dv-chart-grid {
+  display: grid;
+  gap: var(--ui-space-3);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.dv-chart-grid--1 {
+  grid-template-columns: 1fr;
+}
+.dv-chart-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* Énfasis "hero" (receta heroChart+sideStats): la gráfica principal gana presencia con un suelo
+   de alto, para que no quede aplastada en un tile bajo. */
+.dv-chart-grid--hero {
+  min-height: 14rem;
+}
+@media (max-width: 540px) {
+  .dv-chart-grid--2 {
+    grid-template-columns: 1fr;
+  }
+}
+.dv-chart-grid > * {
+  min-width: 0;
+  min-height: 0;
+}
+
 /* ── InsightCard ── */
 .dv-insight {
   display: flex;

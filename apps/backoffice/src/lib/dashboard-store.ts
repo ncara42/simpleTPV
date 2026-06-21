@@ -26,6 +26,7 @@ import {
   addWidget as addWidgetToFree,
   autoArrangeFree,
   type CompositeNode,
+  type DataGridColumnSpec,
   DRAW_COLORS,
   DRAW_STROKE_WIDTH,
   type FreeElement,
@@ -37,12 +38,29 @@ import {
   type LayoutPref,
   MAX_COMPOSITE_DEPTH,
   MAX_COMPOSITE_LEAVES,
+  type PanelDensity,
+  type PieceId,
+  type PieceSpec,
   type PresetId,
   removeElement as removeElementEl,
   type SemanticPosition,
   type ShapeKind,
+  type SlotName,
   type StoredLayouts,
 } from './dashboard-layout.js';
+import {
+  asFormat,
+  asRecipe,
+  clampInt,
+  clampRecipe,
+  inferFormat,
+  MAX_BARS,
+  MAX_ROWS,
+  PIECE_ALLOWLIST,
+  RECIPE_SIZE,
+  SLOT_PIECES,
+  slotForPiece,
+} from './dashboard-pieces.js';
 
 // Único preset activo tras la migración F0 (#174). Todas las operaciones de lienzo escriben
 // en este preset; los presets antiguos quedan en `layout` por legacy pero no se editan.
@@ -322,33 +340,237 @@ function pruneLeaves(root: CompositeNode, max: number): CompositeNode | null {
   return rebuild(root);
 }
 
+// ── Validación v2 (DSL de paneles por receta + slots, #204) ─────────────────────
+// A diferencia del composite v1 (que SOLO PODA y devuelve null → respuestas vacías), la rama v2
+// REPARA: clampa enums, infiere formato, REUBICA una pieza al slot que la admite y trunca el
+// exceso. La única poda DURA es el endpoint fuera de la allowlist (defensa RLS/input no confiable).
+// Cada ajuste se acumula en `reasons` y vuelve al LLM vía `CanvasResult.reason`.
+
+// Lee la primera clave presente como string no vacío (tolera snake_case y camelCase del agente).
+function pickStr(raw: Record<string, unknown>, ...keys: string[]): string | undefined {
+  for (const k of keys) {
+    const v = raw[k];
+    if (typeof v === 'string' && v !== '') return v;
+  }
+  return undefined;
+}
+
+// Columnas de un dataGrid: field + label (legible) + format/align opcionales (infiere format por campo).
+function normalizeColumns(v: unknown): DataGridColumnSpec[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const cols = v
+    .map((c): DataGridColumnSpec | null => {
+      const r = asRecord(c);
+      if (!r) return null;
+      const field = pickStr(r, 'field', 'key');
+      if (!field) return null;
+      const label = pickStr(r, 'label', 'header') ?? field;
+      const format = asFormat(r.format) ?? inferFormat(field);
+      const align =
+        r.align === 'right' || r.align === 'center' || r.align === 'left' ? r.align : undefined;
+      return { field, label, ...(format ? { format } : {}), ...(align ? { align } : {}) };
+    })
+    .filter((c): c is DataGridColumnSpec => c != null);
+  return cols.length ? cols : undefined;
+}
+
+// Normaliza una hoja-pieza. Devuelve la pieza saneada + el slot definitivo (puede REUBICARSE), o
+// null si se descarta (pieza desconocida o endpoint fuera de allowlist). `reasons` recoge ajustes.
+function normalizePiece(
+  rawPiece: unknown,
+  slot: SlotName,
+  reasons: string[],
+): { piece: PieceSpec; slot: SlotName } | null {
+  const raw = asRecord(rawPiece);
+  if (!raw) return null;
+  const pieceId = typeof raw.piece === 'string' ? raw.piece : '';
+  if (!PIECE_ALLOWLIST.has(pieceId as PieceId)) {
+    reasons.push(`descarté una pieza desconocida (${pieceId || 'sin id'})`);
+    return null;
+  }
+  const piece = pieceId as PieceId;
+
+  // Slot tipado: si la pieza no pertenece al slot donde llega, se REUBICA al que la admite.
+  let targetSlot = slot;
+  if (!SLOT_PIECES[slot].has(piece)) {
+    const fit = slotForPiece(piece);
+    if (!fit) {
+      reasons.push(`descarté «${piece}»: sin slot válido`);
+      return null;
+    }
+    reasons.push(`reubiqué «${piece}» del slot ${slot} al slot ${fit}`);
+    targetSlot = fit;
+  }
+
+  // Endpoint: ÚNICA poda dura (allowlist = espejo de WIDGETABLE_ENDPOINTS del backend).
+  const endpoint = pickStr(raw, 'endpoint') ?? '';
+  if (!WIDGETABLE_ENDPOINTS.has(endpoint)) {
+    reasons.push(`descarté «${piece}»: endpoint no permitido (${endpoint || 'vacío'})`);
+    return null;
+  }
+
+  const valueField = pickStr(raw, 'valueField', 'value_field');
+  const labelField = pickStr(raw, 'labelField', 'label_field');
+  const deltaField = pickStr(raw, 'deltaField', 'delta_field');
+  const sparkField = pickStr(raw, 'sparkField', 'spark_field');
+  const targetField = pickStr(raw, 'targetField', 'target_field');
+  const period = pickStr(raw, 'period');
+  const storeId = pickStr(raw, 'storeId', 'store_id');
+  const params = asRecord(raw.params) as PieceSpec['params'] | null;
+  const maxBars = clampInt(raw.maxBars ?? raw.max_bars, 1, MAX_BARS);
+  const maxRows = clampInt(raw.maxRows ?? raw.max_rows, 1, MAX_ROWS);
+  const columns = piece === 'dataGrid' ? normalizeColumns(raw.columns) : undefined;
+  const title = pickStr(raw, 'title');
+
+  // Formato: explícito → inferido por nombre de campo → (default horneado de la molécula).
+  let format = asFormat(raw.format);
+  if (!format) {
+    const inferred = inferFormat(valueField);
+    if (inferred) {
+      format = inferred;
+      reasons.push(`inferí format=${inferred} para ${valueField}`);
+    }
+  }
+
+  const spec: PieceSpec = {
+    piece,
+    endpoint,
+    ...(title ? { title } : {}),
+    ...(labelField ? { labelField } : {}),
+    ...(valueField ? { valueField } : {}),
+    ...(deltaField ? { deltaField } : {}),
+    ...(sparkField ? { sparkField } : {}),
+    ...(targetField ? { targetField } : {}),
+    ...(isFiniteNumber(raw.target) ? { target: raw.target } : {}),
+    ...(format ? { format } : {}),
+    ...(maxBars !== undefined ? { maxBars } : {}),
+    ...(maxRows !== undefined ? { maxRows } : {}),
+    ...(columns ? { columns } : {}),
+    ...(params ? { params } : {}),
+    ...(period ? { period: period as NonNullable<GenericSpec['period']> } : {}),
+    ...(storeId ? { storeId } : {}),
+  };
+  return { piece: spec, slot: targetSlot };
+}
+
+// Normaliza un panel v2 (kind:'panel'): repara slots/piezas, clampa receta/densidad, trunca el
+// exceso. Devuelve null SOLO si no queda ninguna pieza válida (el caller cae a InsightCard).
+function normalizePanelSpec(
+  raw: NonNullable<CanvasOp['genericSpec']>,
+  reasons: string[],
+): GenericSpec | null {
+  const slotsRaw = asRecord(raw.slots) ?? {};
+  const kpis: PieceSpec[] = [];
+  const charts: PieceSpec[] = [];
+
+  for (const slot of ['kpis', 'charts'] as SlotName[]) {
+    const arr = Array.isArray(slotsRaw[slot]) ? (slotsRaw[slot] as unknown[]) : [];
+    for (const rawPiece of arr) {
+      const res = normalizePiece(rawPiece, slot, reasons);
+      if (res) (res.slot === 'kpis' ? kpis : charts).push(res.piece);
+    }
+  }
+
+  // Truncado total (reusa la cota del composite): recorta charts por la cola, luego kpis.
+  const total = kpis.length + charts.length;
+  if (total > MAX_COMPOSITE_LEAVES) {
+    const overflow = total - MAX_COMPOSITE_LEAVES;
+    const cutCharts = Math.min(overflow, charts.length);
+    charts.splice(charts.length - cutCharts, cutCharts);
+    const stillOver = overflow - cutCharts;
+    if (stillOver > 0) kpis.splice(kpis.length - stillOver, stillOver);
+    reasons.push(`recorté el panel a ${MAX_COMPOSITE_LEAVES} piezas`);
+  }
+
+  if (kpis.length + charts.length === 0) return null;
+
+  const counts = {
+    kpis: kpis.length,
+    charts: charts.length,
+    firstChartIsTable: charts[0]?.piece === 'dataGrid',
+  };
+  const recipe = clampRecipe(raw.recipe, counts);
+  if (asRecipe(raw.recipe) == null && raw.recipe !== undefined) {
+    reasons.push(`ajusté la receta a «${recipe}»`);
+  }
+  const density: PanelDensity = raw.density === 'compact' ? 'compact' : 'comfortable';
+
+  const slots: Partial<Record<SlotName, PieceSpec[]>> = {};
+  if (kpis.length) slots.kpis = kpis;
+  if (charts.length) slots.charts = charts;
+
+  return {
+    type: 'composite', // bucket de compat; `kind:'panel'` manda en el render
+    kind: 'panel',
+    version: 2,
+    endpoint: '',
+    title: typeof raw.title === 'string' && raw.title ? raw.title : 'Panel',
+    defaultSize: asSize(raw.defaultSize) ?? RECIPE_SIZE[recipe],
+    recipe,
+    density,
+    slots,
+  };
+}
+
 // Normaliza el `genericSpec` que envía el agente (CanvasOp, campos laxos) al `GenericSpec`
-// persistido (campos estrictos). Devuelve null si el tipo no es válido, o (composite) si el
-// árbol resulta vacío/sin hojas válidas.
-function normalizeGenericSpec(raw: NonNullable<CanvasOp['genericSpec']>): GenericSpec | null {
+// persistido (campos estrictos). Devuelve `{ spec, reasons }`: `spec` es null si el tipo v1 no es
+// válido o el composite resulta vacío; `reasons` lista las reparaciones v2 (vuelven al LLM).
+function normalizeGenericSpec(raw: NonNullable<CanvasOp['genericSpec']>): {
+  spec: GenericSpec | null;
+  reasons: string[];
+} {
+  const reasons: string[] = [];
+
+  // Rama v2 (#204): panel por receta + slots tipados. ANTES de la rama composite v1.
+  if (raw.kind === 'panel' || raw.version === 2) {
+    const panel = normalizePanelSpec(raw, reasons);
+    if (panel) return { spec: panel, reasons };
+    // Sin piezas válidas → fallback a InsightCard (type:'insight'), nunca panel vacío.
+    const title = typeof raw.title === 'string' && raw.title ? raw.title : 'Panel';
+    reasons.push(
+      'el panel no tenía piezas con endpoint permitido: lo degradé a una tarjeta de texto',
+    );
+    return {
+      spec: {
+        type: 'insight',
+        endpoint: '',
+        title,
+        defaultSize: GENERIC_DEFAULT_SIZE.insight,
+        params: { markdown: `**${title}**\n\nNo se pudieron resolver datos para este panel.` },
+      },
+      reasons,
+    };
+  }
+
   const type = asGenericType(raw.type);
-  if (!type) return null;
+  if (!type) return { spec: null, reasons };
 
   if (type === 'composite') {
     const validated = validateCompositeNode(raw.root, 0);
     const root = validated ? pruneLeaves(validated, MAX_COMPOSITE_LEAVES) : null;
-    if (!root) return null;
+    if (!root) return { spec: null, reasons };
     return {
-      type,
-      endpoint: '',
-      title: raw.title ?? 'Panel',
-      defaultSize: raw.defaultSize ?? GENERIC_DEFAULT_SIZE.composite,
-      root,
+      spec: {
+        type,
+        endpoint: '',
+        title: raw.title ?? 'Panel',
+        defaultSize: raw.defaultSize ?? GENERIC_DEFAULT_SIZE.composite,
+        root,
+      },
+      reasons,
     };
   }
 
   return {
-    type,
-    endpoint: raw.endpoint,
-    title: raw.title ?? 'Widget',
-    defaultSize: raw.defaultSize ?? GENERIC_DEFAULT_SIZE[type],
-    ...(raw.params ? { params: raw.params } : {}),
-    ...(raw.fields ? { fields: Object.values(raw.fields) } : {}),
+    spec: {
+      type,
+      endpoint: raw.endpoint ?? '',
+      title: raw.title ?? 'Widget',
+      defaultSize: raw.defaultSize ?? GENERIC_DEFAULT_SIZE[type],
+      ...(raw.params ? { params: raw.params } : {}),
+      ...(raw.fields ? { fields: Object.values(raw.fields) } : {}),
+    },
+    reasons,
   };
 }
 
@@ -557,7 +779,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     switch (op.op) {
       case 'add_widget': {
         if (op.genericSpec) {
-          const spec = normalizeGenericSpec(op.genericSpec);
+          const { spec, reasons } = normalizeGenericSpec(op.genericSpec);
           if (!spec) {
             return rejected(
               op.genericSpec.type === 'composite'
@@ -569,7 +791,8 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
           const id = op.elementId ? genericElementId(op.elementId) : `gen:${crypto.randomUUID()}`;
           registerGenericWidget(id, spec);
           get().setLayout(placeGeneric(get().layout, id, spec, op.position));
-          return ACCEPTED;
+          // Reparaciones v2 (#204): vuelven al LLM vía reason aunque la op se acepte.
+          return reasons.length > 0 ? { accepted: true, reason: reasons.join('; ') } : ACCEPTED;
         }
         if (!op.widgetId) return rejected('add_widget sin widgetId');
         return get().addWidget(op.widgetId, op.position);

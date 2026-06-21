@@ -3,10 +3,15 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/auth.js';
 import type { GenericSpec } from '../../lib/dashboard-layout.js';
 
+// Fuente de datos mínima que necesita un fetch genérico: endpoint + params + period/storeId.
+// `GenericSpec` la satisface estructuralmente; las hojas-pieza v2 (#204) construyen una a medida
+// sin envolverla en un GenericSpec completo.
+export type GenericDataSource = Pick<GenericSpec, 'endpoint' | 'params' | 'period' | 'storeId'>;
+
 // Construye los query params de un widget genérico: sus `params` + period/storeId.
 // El cliente `api` espera Record<string, string | null | undefined>, así que todo se
 // serializa a texto. Los valores nulos/ausentes se omiten.
-export function buildGenericQuery(spec: GenericSpec): Record<string, string> {
+export function buildGenericQuery(spec: GenericDataSource): Record<string, string> {
   const query: Record<string, string> = {};
   for (const [key, value] of Object.entries(spec.params ?? {})) {
     if (value !== null && value !== undefined) query[key] = String(value);
@@ -19,7 +24,7 @@ export function buildGenericQuery(spec: GenericSpec): Record<string, string> {
 // TanStack Query contra el endpoint del widget (relativo a la base del API). La key
 // incluye endpoint + query para revalidar al cambiar period/storeId. Devuelve `unknown`:
 // cada componente sabe cómo mapear su forma de datos según `spec.fields`.
-export function useGenericData(spec: GenericSpec) {
+export function useGenericData(spec: GenericDataSource) {
   const query = buildGenericQuery(spec);
   return useQuery<unknown>({
     queryKey: ['generic-widget', spec.endpoint, query],

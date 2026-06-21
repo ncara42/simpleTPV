@@ -71,8 +71,8 @@ export interface CanvasOp {
   content?: string;
   // generic widget
   genericSpec?: {
-    type: string;
-    endpoint: string;
+    type?: string;
+    endpoint?: string;
     params?: Record<string, string>;
     fields?: Record<string, string>;
     title?: string;
@@ -80,6 +80,13 @@ export interface CanvasOp {
     // Árbol de layout para tipo 'composite' (#189). No confiable: lo valida y sanea
     // `normalizeGenericSpec` (dashboard-store). `camel_case_keys` del backend no lo toca.
     root?: unknown;
+    // DSL v2 (#204): panel por receta + slots tipados. `kind:'panel'` activa la rama reparadora;
+    // recipe/density/slots viajan como valores no confiables (los sanea normalizePanelSpec).
+    kind?: string;
+    version?: number;
+    recipe?: string;
+    density?: string;
+    slots?: unknown;
   };
 }
 

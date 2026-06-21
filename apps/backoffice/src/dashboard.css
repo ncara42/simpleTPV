@@ -1741,6 +1741,30 @@
   flex: 1 1 auto;
   min-height: 0;
 }
+
+/* ── Panel v2 (#204): tarjeta a medida (receta + slots). Misma chrome que el composite. ── */
+.dash-generic--panel {
+  gap: 0;
+  padding: 16px;
+  border: 1px solid var(--ui-border, #e5e7eb);
+  border-radius: var(--ui-radius-lg, 16px);
+  background: var(--ui-surface, #fff);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+  overflow: hidden;
+  transition: box-shadow 150ms ease;
+}
+.dash-generic--panel:hover {
+  box-shadow: 0 4px 14px rgb(0 0 0 / 8%);
+}
+.dash-generic--panel > .dv-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* La gráfica/lista de cada pieza llena su celda del ChartGrid. */
+.dash-generic--panel .dv-chart .ui-chart {
+  flex: 1 1 auto;
+  min-height: 0;
+}
 .dash-generic-md {
   font-size: 0.85rem;
   line-height: 1.5;

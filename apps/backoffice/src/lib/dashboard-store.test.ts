@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getWidgetSpec } from '../widgets/registry.js';
+import type { CanvasOp } from './chat.js';
 import type {
   CompositeNode,
   FreeElement,
@@ -379,6 +380,241 @@ describe('normalizeGenericSpec — composite (#189)', () => {
     expect(store().layout.genericWidgets?.[id]).toBeUndefined();
     expect(getWidgetSpec(id)).toBeUndefined();
     expect(freeOf().some((e) => e.id === id)).toBe(false);
+  });
+});
+
+describe('normalizeGenericSpec — panel v2 (#204): REPARA en vez de podar', () => {
+  function addPanel(genericSpec: NonNullable<CanvasOp['genericSpec']>) {
+    return store().applyCanvasOp({ op: 'add_widget', position: 'center', genericSpec });
+  }
+  function lastSpec(): GenericSpec {
+    const widgets = store().layout.genericWidgets ?? {};
+    return widgets[Object.keys(widgets)[0]!]!;
+  }
+
+  it('panel válido (kind:panel + slots tipados) se normaliza y acepta', () => {
+    const r = addPanel({
+      kind: 'panel',
+      title: 'Rendimiento de ventas',
+      recipe: 'kpiRow+oneChart',
+      density: 'comfortable',
+      slots: {
+        kpis: [
+          {
+            piece: 'kpiTile',
+            title: 'Facturación',
+            endpoint: '/dashboard/sales-kpis',
+            valueField: 'revenue',
+            format: 'eur',
+          },
+        ],
+        charts: [
+          {
+            piece: 'comparisonBars',
+            title: 'Por vendedor',
+            endpoint: '/dashboard/sales-by-employee',
+            labelField: 'userName',
+            valueField: 'total',
+          },
+        ],
+      },
+    });
+    expect(r.accepted).toBe(true);
+    const spec = lastSpec();
+    expect(spec.kind).toBe('panel');
+    expect(spec.type).toBe('composite'); // bucket de compat
+    expect(spec.recipe).toBe('kpiRow+oneChart');
+    expect(spec.density).toBe('comfortable');
+    expect(spec.slots?.kpis).toHaveLength(1);
+    expect(spec.slots?.charts?.[0]?.piece).toBe('comparisonBars');
+    expect(spec.defaultSize).toEqual({ w: 6, h: 4 }); // RECIPE_SIZE
+  });
+
+  it('REUBICA una pieza en el slot equivocado (no la descarta) y lo reporta en reason', () => {
+    const r = addPanel({
+      kind: 'panel',
+      title: 'X',
+      recipe: 'kpiRow',
+      slots: {
+        kpis: [
+          {
+            piece: 'comparisonBars',
+            endpoint: '/dashboard/sales-by-employee',
+            labelField: 'userName',
+            valueField: 'total',
+          },
+        ],
+      },
+    });
+    expect(r.accepted).toBe(true);
+    expect(r.reason).toMatch(/reubiqué/);
+    const spec = lastSpec();
+    expect(spec.slots?.charts?.[0]?.piece).toBe('comparisonBars');
+    expect(spec.slots?.kpis ?? []).toHaveLength(0);
+  });
+
+  it('INFIERE el format ausente por nombre de campo (revenue→eur)', () => {
+    const r = addPanel({
+      kind: 'panel',
+      title: 'X',
+      recipe: 'kpiRow',
+      slots: {
+        kpis: [{ piece: 'kpiTile', endpoint: '/dashboard/sales-kpis', valueField: 'revenue' }],
+      },
+    });
+    expect(r.accepted).toBe(true);
+    expect(r.reason).toMatch(/inferí format=eur/);
+    expect(lastSpec().slots?.kpis?.[0]?.format).toBe('eur');
+  });
+
+  it('CLAMPA una receta inválida a la más cercana por nº de slots (2 charts → kpiRow+twoCharts)', () => {
+    const r = addPanel({
+      kind: 'panel',
+      title: 'X',
+      recipe: 'piramide',
+      slots: {
+        kpis: [{ piece: 'kpiTile', endpoint: '/dashboard/sales-kpis', valueField: 'revenue' }],
+        charts: [
+          {
+            piece: 'comparisonBars',
+            endpoint: '/dashboard/sales-by-employee',
+            labelField: 'userName',
+            valueField: 'total',
+          },
+          {
+            piece: 'trendArea',
+            endpoint: '/dashboard/sales-by-hour',
+            labelField: 'hour',
+            valueField: 'revenue',
+          },
+        ],
+      },
+    });
+    expect(r.accepted).toBe(true);
+    expect(r.reason).toMatch(/ajusté la receta/);
+    expect(lastSpec().recipe).toBe('kpiRow+twoCharts');
+  });
+
+  it('CLAMPA maxBars/maxRows fuera de rango al máximo horneado', () => {
+    const r = addPanel({
+      kind: 'panel',
+      title: 'X',
+      recipe: 'kpiRow+oneChart',
+      slots: {
+        charts: [
+          {
+            piece: 'comparisonBars',
+            endpoint: '/dashboard/sales-by-employee',
+            labelField: 'userName',
+            valueField: 'total',
+            maxBars: 99,
+          },
+        ],
+      },
+    });
+    expect(r.accepted).toBe(true);
+    expect(lastSpec().slots?.charts?.[0]?.maxBars).toBe(8);
+  });
+
+  it('PODA DURA: pieza con endpoint fuera de allowlist se descarta, el resto queda intacto', () => {
+    const r = addPanel({
+      kind: 'panel',
+      title: 'X',
+      recipe: 'kpiRow+oneChart',
+      slots: {
+        kpis: [{ piece: 'kpiTile', endpoint: '/dashboard/sales-kpis', valueField: 'revenue' }],
+        charts: [
+          { piece: 'comparisonBars', endpoint: '/evil/export', labelField: 'a', valueField: 'b' },
+        ],
+      },
+    });
+    expect(r.accepted).toBe(true);
+    expect(r.reason).toMatch(/endpoint no permitido/);
+    const spec = lastSpec();
+    expect(spec.slots?.kpis).toHaveLength(1);
+    expect(spec.slots?.charts ?? []).toHaveLength(0);
+  });
+
+  it('FALLBACK: panel sin piezas válidas degrada a tarjeta de texto (nunca panel vacío)', () => {
+    const r = addPanel({
+      kind: 'panel',
+      title: 'Roto',
+      recipe: 'kpiRow',
+      slots: { kpis: [{ piece: 'kpiTile', endpoint: '/evil/x', valueField: 'revenue' }] },
+    });
+    expect(r.accepted).toBe(true);
+    expect(r.reason).toMatch(/tarjeta de texto/);
+    const spec = lastSpec();
+    expect(spec.type).toBe('insight');
+    expect(spec.kind).toBeUndefined();
+    expect(typeof spec.params?.markdown).toBe('string');
+  });
+
+  it('normaliza snake_case del agente (label_field/value_field/max_rows/store_id)', () => {
+    const r = addPanel({
+      kind: 'panel',
+      title: 'X',
+      recipe: 'tableFull',
+      slots: {
+        charts: [
+          {
+            piece: 'rankBarList',
+            endpoint: '/dashboard/product-rankings',
+            label_field: 'name',
+            value_field: 'units',
+            max_rows: 5,
+            store_id: 'S1',
+          },
+        ],
+      },
+    });
+    expect(r.accepted).toBe(true);
+    const charts = lastSpec().slots?.charts ?? [];
+    const piece = charts[0]!;
+    expect(piece.labelField).toBe('name');
+    expect(piece.valueField).toBe('units');
+    expect(piece.maxRows).toBe(5);
+    expect(piece.storeId).toBe('S1');
+  });
+
+  it('detecta v2 por version:2 aunque falte kind', () => {
+    const r = addPanel({
+      version: 2,
+      title: 'X',
+      recipe: 'kpiRow',
+      slots: {
+        kpis: [
+          {
+            piece: 'kpiTile',
+            endpoint: '/dashboard/sales-kpis',
+            valueField: 'revenue',
+            format: 'eur',
+          },
+        ],
+      },
+    });
+    expect(r.accepted).toBe(true);
+    expect(lastSpec().kind).toBe('panel');
+  });
+
+  it('TRUNCA el panel al máximo de piezas (12)', () => {
+    const charts = Array.from({ length: 15 }, () => ({
+      piece: 'comparisonBars',
+      endpoint: '/dashboard/sales-by-employee',
+      labelField: 'userName',
+      valueField: 'total',
+    }));
+    const r = addPanel({
+      kind: 'panel',
+      title: 'X',
+      recipe: 'kpiRow+twoCharts',
+      slots: { charts },
+    });
+    expect(r.accepted).toBe(true);
+    expect(r.reason).toMatch(/recorté el panel a 12/);
+    const spec = lastSpec();
+    const count = (spec.slots?.kpis?.length ?? 0) + (spec.slots?.charts?.length ?? 0);
+    expect(count).toBe(12);
   });
 });
 
