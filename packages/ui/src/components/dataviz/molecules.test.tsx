@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { KpiTile, ProgressMeter, RankBarList, SegmentBar } from './index.js';
+import { InsightCard, KpiTile, ProgressMeter, RankBarList, SegmentBar } from './index.js';
 
 describe('KpiTile', () => {
   it('pinta rótulo + valor; con delta muestra la insignia', () => {
@@ -76,6 +76,28 @@ describe('SegmentBar', () => {
   it('total 0 → estado vacío', () => {
     render(<SegmentBar items={[{ label: 'A', value: 0 }]} />);
     expect(screen.getByText('Sin datos.')).toBeInTheDocument();
+  });
+});
+
+describe('InsightCard', () => {
+  it('pinta el título y el contenido del slot', () => {
+    render(
+      <InsightCard title="Resumen">
+        <p>Ventas en alza este mes.</p>
+      </InsightCard>,
+    );
+    expect(screen.getByText('Resumen')).toBeInTheDocument();
+    expect(screen.getByText('Ventas en alza este mes.')).toBeInTheDocument();
+  });
+
+  it('sin título solo pinta el cuerpo', () => {
+    const { container } = render(
+      <InsightCard>
+        <span>cuerpo</span>
+      </InsightCard>,
+    );
+    expect(container.querySelector('.dv-section-header')).toBeNull();
+    expect(screen.getByText('cuerpo')).toBeInTheDocument();
   });
 });
 

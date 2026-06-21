@@ -1,7 +1,7 @@
-import { DataTable, type DataTableColumn } from '@simpletpv/ui';
+import { DataGrid, type DataGridColumn } from '@simpletpv/ui';
 
 import type { GenericSpec } from '../../lib/dashboard-layout.js';
-import { textField, toRecords, useGenericData } from './useGenericData.js';
+import { toRecords, useGenericData } from './useGenericData.js';
 
 interface GenericTableProps {
   spec: GenericSpec;
@@ -9,8 +9,10 @@ interface GenericTableProps {
 
 type Row = Record<string, unknown>;
 
-// Tabla parametrizable. `spec.fields` define las columnas a mostrar (en orden); si falta,
-// se infieren de las claves del primer registro. Hace su propia query contra `spec.endpoint`.
+// Tabla parametrizable: delega en la molécula DataGrid (cabeceras + alineación + zebra + estados
+// horneados). `spec.fields` define las columnas (en orden); si falta, se infieren de las claves del
+// primer registro. Conserva el contrato del agente (type:'table' + fields) — F2 (#203) mejora el
+// diseño SIN tocar el DSL. La capa de datos (useGenericData) vive aquí; la molécula es presentacional.
 export function GenericTable({ spec }: GenericTableProps) {
   const { data, isLoading, isError } = useGenericData(spec);
   const records = toRecords(data) as Row[];
@@ -22,22 +24,16 @@ export function GenericTable({ spec }: GenericTableProps) {
         ? Object.keys(records[0]!)
         : [];
 
-  const columns: DataTableColumn<Row>[] = fields.map((field) => ({
-    key: field,
-    header: field,
-    render: (row) => textField(row, field),
-  }));
+  const columns: DataGridColumn[] = fields.map((field) => ({ key: field, header: field }));
 
   return (
-    <div className="dash-generic dash-generic--table">
-      <div className="dash-generic-title">{spec.title}</div>
-      <DataTable
+    <div className="dash-generic dash-generic--table" data-testid="dash-generic-table">
+      <DataGrid
+        title={spec.title}
         columns={columns}
         rows={records}
-        rowKey={(_row, index) => String(index)}
-        loading={isLoading}
-        emptyState={isError ? 'No se pudieron cargar los datos.' : 'Sin datos.'}
-        data-testid="dash-generic-table"
+        isLoading={isLoading}
+        isError={isError}
       />
     </div>
   );

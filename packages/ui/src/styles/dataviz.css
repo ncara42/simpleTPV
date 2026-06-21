@@ -298,6 +298,21 @@
   min-height: 0;
 }
 
+/* ── InsightCard ── */
+.dv-insight {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  min-width: 0;
+  min-height: 0;
+}
+.dv-insight-body {
+  font-size: var(--ui-text-sm);
+  line-height: 1.5;
+  color: var(--ui-text);
+  min-width: 0;
+}
+
 /* ── StockAlertList ── */
 .dv-stock {
   display: flex;

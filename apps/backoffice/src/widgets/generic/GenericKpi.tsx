@@ -1,4 +1,4 @@
-import { Sparkline } from '@simpletpv/ui';
+import { KpiTile, type KpiTileProps } from '@simpletpv/ui';
 
 import type { GenericSpec } from '../../lib/dashboard-layout.js';
 import { numField, toRecords, useGenericData } from './useGenericData.js';
@@ -7,8 +7,10 @@ interface GenericKpiProps {
   spec: GenericSpec;
 }
 
-// KPI parametrizable: un valor grande + etiqueta + sparkline opcional. `spec.fields[0]` es
-// el campo del valor; `spec.fields[1]` (opcional) un campo array de números para la sparkline.
+// KPI parametrizable: delega en la molécula KpiTile (diseño + estados loading/error horneados).
+// `spec.fields[0]` es el campo del valor; `spec.fields[1]` (opcional) un campo array de números
+// para la sparkline. Conserva el contrato del agente (type:'kpi' + fields) — F2 (#203) mejora el
+// diseño SIN tocar el DSL. La capa de datos (useGenericData) vive aquí; la molécula es presentacional.
 export function GenericKpi({ spec }: GenericKpiProps) {
   const { data, isLoading, isError } = useGenericData(spec);
   const [valueField, seriesField] = spec.fields ?? [];
@@ -21,18 +23,21 @@ export function GenericKpi({ spec }: GenericKpiProps) {
       ? (row[seriesField] as unknown[]).map((v) => Number(v)).filter((n) => Number.isFinite(n))
       : [];
 
+  const state = isError ? 'error' : isLoading ? 'loading' : undefined;
+
+  // Construcción condicional: con `exactOptionalPropertyTypes` no se pasa `undefined` a props
+  // opcionales (spark/state) — se omiten cuando no aplican.
+  const kpiProps: KpiTileProps = {
+    label: spec.title,
+    value,
+    format: 'decimal',
+    ...(series.length >= 2 ? { spark: series } : {}),
+    ...(state ? { state } : {}),
+  };
+
   return (
     <div className="dash-generic dash-generic--kpi" data-testid="dash-generic-kpi">
-      <span className="dash-generic-kpi-label">{spec.title}</span>
-      <span className="dash-generic-kpi-value">
-        {isError ? '—' : isLoading ? '…' : value != null ? formatNumber(value) : '—'}
-      </span>
-      {series.length >= 2 && <Sparkline data={series} ariaLabel={`Tendencia de ${spec.title}`} />}
+      <KpiTile {...kpiProps} />
     </div>
   );
-}
-
-const NUMBER_FMT = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 });
-function formatNumber(value: number): string {
-  return NUMBER_FMT.format(value);
 }

@@ -1,3 +1,4 @@
+import { InsightCard } from '@simpletpv/ui';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -7,16 +8,19 @@ interface GenericInsightProps {
   spec: GenericSpec;
 }
 
-// Tarjeta de insight: markdown persistente que el agente escribe en el lienzo (no consulta
-// ningún endpoint). El contenido vive en `spec.params.markdown`; `spec.title` es el encabezado.
+// Tarjeta de insight: markdown persistente que el agente escribe en el lienzo (no consulta ningún
+// endpoint). Delega la chrome de tarjeta (encabezado + cuerpo) en la molécula InsightCard (#203, F2);
+// el render de markdown se queda en la app (react-markdown no vive en la librería compartida). El
+// contenido está en `spec.params.markdown`; `spec.title` es el encabezado.
 export function GenericInsight({ spec }: GenericInsightProps) {
   const markdown = typeof spec.params?.markdown === 'string' ? spec.params.markdown : '';
   return (
-    <article className="dash-generic dash-generic--insight" data-testid="dash-generic-insight">
-      <h3 className="dash-generic-title">{spec.title}</h3>
-      <div className="dash-generic-md">
-        <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
-      </div>
-    </article>
+    <div className="dash-generic dash-generic--insight" data-testid="dash-generic-insight">
+      <InsightCard title={spec.title}>
+        <div className="dash-generic-md">
+          <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
+        </div>
+      </InsightCard>
+    </div>
   );
 }

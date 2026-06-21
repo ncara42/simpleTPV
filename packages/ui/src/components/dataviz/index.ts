@@ -32,6 +32,7 @@ export {
 } from './charts.js';
 export { DataGrid, type DataGridColumn, type DataGridProps } from './DataGrid.js';
 export { formatDelta, formatValue, type StatFormat } from './format.js';
+export { InsightCard, type InsightCardProps } from './InsightCard.js';
 export { KpiTile, type KpiTileProps } from './KpiTile.js';
 export { ProgressMeter, type ProgressMeterProps } from './ProgressMeter.js';
 export { type RankBarItem, RankBarList, type RankBarListProps } from './RankBarList.js';
