@@ -70,12 +70,21 @@
   padding: 0;
 }
 
-/* Views NO-dashboard: NO hay card de fondo. El contenido flota directamente sobre el lienzo de
-   puntitos (mismo patrón que .dash-free), como si cada apartado del sidebar colocase un widget
-   grande en el lienzo. Holgura arriba para la etiqueta de view flotante y abajo para el dock. */
+/* Views NO-dashboard: el lienzo de puntitos es FULL-BLEED (cubre todo el viewport, por debajo del
+   sidebar flotante), igual que .dashboard--free. Se anula la columna reservada del sidebar para que
+   no quede una franja gris sólida a la izquierda y el sidebar flote DE VERDAD sobre el contenido.
+   El contenido se sangra a la izquierda para no quedar tapado por el sidebar. */
+.sidebar--floating ~ .app-content--surface {
+  margin-left: 0;
+}
+
+/* NO hay card de fondo. El contenido flota directo sobre los puntitos, como si abrir un apartado
+   del sidebar colocase un widget grande en el lienzo. Holgura: arriba para la etiqueta de view,
+   izquierda para el sidebar flotante, abajo para el dock del asistente. */
 .bo-main--surface {
   margin: 0;
-  padding: 3.4rem 1.5rem 6rem;
+  padding: 3.4rem 1.5rem 6rem
+    calc(var(--sidebar-width-expanded) + var(--sidebar-float-gap) * 2 + 0.5rem);
   min-height: 100vh;
   background: none;
   border: none;
@@ -87,7 +96,13 @@
   background-size: 24px 24px;
 }
 
+/* Sidebar oculto: el contenido recupera el sangrado mínimo (ya no hay barra que esquivar). */
+.sidebar--floating.is-hidden ~ .app-content--surface .bo-main--surface {
+  padding-left: 1.5rem;
+}
+
 @media (max-width: 767px) {
+  /* En móvil el sidebar usa off-canvas: el contenido no necesita sangrado lateral. */
   .bo-main--surface {
     padding: 3.2rem 0.75rem 6rem;
   }

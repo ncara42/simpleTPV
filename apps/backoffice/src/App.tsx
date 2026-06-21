@@ -202,7 +202,9 @@ function Home() {
           />
         }
       />
-      <div className="app-content">
+      {/* En views NO-lienzo anulamos la columna reservada del sidebar flotante: el lienzo de
+          puntitos va full-bleed y el sidebar flota por encima (como en el Dashboard). */}
+      <div className={`app-content${isCanvas ? '' : ' app-content--surface'}`}>
         <PageHeaderProvider>
           {/* Nombre de la view activa, flotando arriba del contenido (reemplaza el header). */}
           {activeLabel && (
