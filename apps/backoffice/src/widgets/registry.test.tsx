@@ -12,11 +12,20 @@ import {
 } from './registry.js';
 
 describe('WIDGET_REGISTRY', () => {
-  it('siembra los 22 widgets del catálogo', () => {
-    // Solo los del catálogo (los genéricos se registran en runtime).
-    const catalogEntries = [...WIDGET_REGISTRY.values()].filter((w) => w.kind !== 'generic');
-    expect(catalogEntries).toHaveLength(22);
+  it('siembra los 22 widgets fijos del catálogo', () => {
+    // Solo los fijos (los genéricos se registran en runtime; los bloques #205 van con prefijo block:).
+    const fixed = [...WIDGET_REGISTRY.values()].filter(
+      (w) => w.kind !== 'generic' && !w.id.startsWith('block:'),
+    );
+    expect(fixed).toHaveLength(22);
     expect(WIDGET_REGISTRY.size).toBeGreaterThanOrEqual(22);
+  });
+
+  it('siembra los bloques pre-cableados (#205) como metadatos block:<id>', () => {
+    const blocks = [...WIDGET_REGISTRY.keys()].filter((id) => id.startsWith('block:'));
+    expect(blocks).toContain('block:sales-overview');
+    expect(blocks).toContain('block:stock-risk');
+    expect(WIDGET_REGISTRY.get('block:sales-overview')?.label).toBe('Resumen de ventas');
   });
 
   it('cada entrada del catálogo tiene label, kind y defaultSize', () => {

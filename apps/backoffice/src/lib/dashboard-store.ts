@@ -18,6 +18,7 @@ import {
   unregisterGenericWidget,
 } from '../widgets/registry.js';
 import type { CanvasOp } from './chat.js';
+import { buildBlockSpec } from './dashboard-blocks.js';
 import {
   addGenericToFree,
   addNote as addNoteEl,
@@ -793,6 +794,19 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
           get().setLayout(placeGeneric(get().layout, id, spec, op.position));
           // Reparaciones v2 (#204): vuelven al LLM vía reason aunque la op se acepte.
           return reasons.length > 0 ? { accepted: true, reason: reasons.join('; ') } : ACCEPTED;
+        }
+        // Bloque pre-cableado (#205): `widget_id='block:<id>'` → panel v2 fijo, colocado como un
+        // genérico (id gen:) para reusar render/undo/hidratación. `params` se hereda por las hojas.
+        if (op.widgetId?.startsWith('block:')) {
+          const spec = buildBlockSpec(op.widgetId, {
+            ...(op.period ? { period: op.period } : {}),
+            ...(op.storeId != null ? { storeId: op.storeId } : {}),
+          });
+          if (!spec) return rejected(`bloque desconocido: ${op.widgetId}`);
+          const id = op.elementId ? genericElementId(op.elementId) : `gen:${crypto.randomUUID()}`;
+          registerGenericWidget(id, spec);
+          get().setLayout(placeGeneric(get().layout, id, spec, op.position));
+          return ACCEPTED;
         }
         if (!op.widgetId) return rejected('add_widget sin widgetId');
         return get().addWidget(op.widgetId, op.position);

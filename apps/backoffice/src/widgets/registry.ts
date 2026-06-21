@@ -5,6 +5,7 @@
 
 import { createElement, type ReactElement } from 'react';
 
+import { BLOCK_CATALOG } from '../lib/dashboard-blocks.js';
 import {
   addWidget,
   type FreeLayout,
@@ -73,6 +74,18 @@ export const WIDGET_REGISTRY = new Map<string, WidgetSpec>(
     } satisfies WidgetSpec,
   ]),
 );
+
+// Siembra los BLOQUES pre-cableados (#205) como metadatos de catálogo (`block:<id>` → label +
+// tamaño). El agente los coloca con `add_widget widget_id='block:<id>'`; la colocación produce un
+// panel v2 bajo un id `gen:` (ver applyCanvasOp), así que aquí solo viven los metadatos.
+for (const [id, meta] of Object.entries(BLOCK_CATALOG)) {
+  WIDGET_REGISTRY.set(id, {
+    id,
+    label: meta.label,
+    kind: 'panel',
+    defaultSize: meta.defaultSize,
+  });
+}
 
 // Devuelve la etiqueta legible de un widget (catálogo, genérico registrado, o el id).
 export function getWidgetLabel(id: string): string {
