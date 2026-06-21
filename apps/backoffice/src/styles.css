@@ -761,3 +761,35 @@
     animation: none;
   }
 }
+
+/* Resaltado temporal cuando el asistente señala un elemento de la vista (highlight_on_view):
+   un destello de marca que se desvanece. El scroll-margin evita que el título flotante o el dock
+   inferior tapen el objetivo al hacer scroll hasta él. */
+.view-action-highlight {
+  scroll-margin-top: 6rem;
+  scroll-margin-bottom: 8rem;
+  border-radius: var(--ui-radius-md, 12px);
+  animation: view-action-pulse 2.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes view-action-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--ui-brand, #4f46e5) 70%, transparent);
+    background-color: color-mix(in oklab, var(--ui-brand, #4f46e5) 16%, transparent);
+  }
+  35% {
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--ui-brand, #4f46e5) 55%, transparent);
+    background-color: color-mix(in oklab, var(--ui-brand, #4f46e5) 10%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    background-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view-action-highlight {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--ui-brand, #4f46e5);
+  }
+}

@@ -33,6 +33,7 @@ import { useState } from 'react';
 import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
 import { AssistantDock } from './components/chat/AssistantDock.js';
+import { viewContextFor } from './components/chat/view-context.js';
 import { FloatingActions } from './components/FloatingActions.js';
 import { DashboardPage } from './DashboardPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
@@ -238,8 +239,9 @@ function Home() {
           </div>
           {/* Asistente unificado a nivel de shell: input + (en el Dashboard) menú «+» de
               herramientas del lienzo. Presente en TODAS las views; el binding del lienzo lo
-              registra DashboardPage vía canvas-bridge. */}
-          <AssistantDock />
+              registra DashboardPage vía canvas-bridge. La vista activa define su saludo,
+              sugerencias y el contexto que viaja al backend. */}
+          <AssistantDock view={viewContextFor(tab)} />
         </PageHeaderProvider>
       </div>
     </div>

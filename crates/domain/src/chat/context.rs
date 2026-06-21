@@ -321,22 +321,8 @@ fn format_canvas_state(canvas: Option<&serde_json::Value>) -> String {
     out
 }
 
-/// Construye el system prompt completo. Función PURA (sin BD): recibe el contexto ya
-/// consultado, el rol (para filtrar herramientas) y el estado del lienzo de este mensaje.
-pub fn build_system_prompt(
-    org: &OrgContext,
-    is_admin: bool,
-    canvas_state: Option<&serde_json::Value>,
-) -> String {
-    let mut p = String::new();
-
-    p.push_str(
-        "Eres el asistente del dashboard de simpletpv, un punto de venta multitienda. Ayudas a \
-gerentes y administradores a analizar datos de ventas, stock, personal y finanzas, y a \
-componer el dashboard visual mediante herramientas.\n\n",
-    );
-
-    // 1. Contexto de la organización.
+/// Bloque de contexto de la organización (común a todas las vistas).
+fn push_org_context(p: &mut String, org: &OrgContext) {
     p.push_str("## Tu organización\n\n");
     p.push_str(&format!(
         "- Nombre: {}\n- País: {}\n- Moneda: {}\n- Locale: {}\n- Tiendas: {}\n- Productos \
@@ -349,15 +335,10 @@ activos: {}\n- Empleados: {}\n\n",
         org.product_count,
         org.employee_count,
     ));
+}
 
-    // 2. Catálogo de widgets.
-    p.push_str("## Widgets del catálogo\n\nUsa estos ids en `add_widget` (campo `widget_id`):\n");
-    for (id, label) in WIDGET_CATALOG {
-        p.push_str(&format!("- `{id}` — {label}\n"));
-    }
-    p.push('\n');
-
-    // 3. Herramientas de datos (filtradas por rol).
+/// Bloque de herramientas de datos filtradas por rol (común a todas las vistas).
+fn push_data_tools(p: &mut String, is_admin: bool) {
     p.push_str(
         "## Herramientas de datos\n\nConsulta los datos reales con estas herramientas: \
 `sales_kpis`, `sales_by_hour`, `sales_by_family`, `product_rankings`, `stock_alerts`, \
@@ -378,6 +359,59 @@ están reservadas a administradores y no están disponibles para ti.\n",
         "Periodos válidos: today, yesterday, this_week, last_week, this_month, last_month, \
 this_year.\n\n",
     );
+}
+
+/// Construye el system prompt completo. Función PURA (sin BD): recibe el contexto ya
+/// consultado, el rol (para filtrar herramientas), el estado del lienzo de este mensaje y la
+/// vista del backoffice donde está el usuario.
+///
+/// `view_id` ausente o `"dashboard"` ⇒ modo LIENZO: el asistente del dashboard, con catálogo de
+/// widgets, paneles y estado del lienzo (comportamiento histórico). Cualquier otra vista ⇒ modo
+/// INFORMATIVO: solo consulta y orienta sobre la pantalla actual (el backend además le retira las
+/// herramientas de lienzo). `view_label` es la etiqueta humana para la prosa del prompt.
+pub fn build_system_prompt(
+    org: &OrgContext,
+    is_admin: bool,
+    canvas_state: Option<&serde_json::Value>,
+    view_id: Option<&str>,
+    view_label: Option<&str>,
+) -> String {
+    if matches!(view_id, None | Some("dashboard")) {
+        build_dashboard_prompt(org, is_admin, canvas_state)
+    } else {
+        let label = view_label
+            .filter(|l| !l.trim().is_empty())
+            .unwrap_or("el backoffice");
+        build_view_prompt(org, is_admin, label)
+    }
+}
+
+/// Modo lienzo (Dashboard): asistente con herramientas de composición del tablero.
+fn build_dashboard_prompt(
+    org: &OrgContext,
+    is_admin: bool,
+    canvas_state: Option<&serde_json::Value>,
+) -> String {
+    let mut p = String::new();
+
+    p.push_str(
+        "Eres el asistente del dashboard de simpletpv, un punto de venta multitienda. Ayudas a \
+gerentes y administradores a analizar datos de ventas, stock, personal y finanzas, y a \
+componer el dashboard visual mediante herramientas.\n\n",
+    );
+
+    // 1. Contexto de la organización.
+    push_org_context(&mut p, org);
+
+    // 2. Catálogo de widgets.
+    p.push_str("## Widgets del catálogo\n\nUsa estos ids en `add_widget` (campo `widget_id`):\n");
+    for (id, label) in WIDGET_CATALOG {
+        p.push_str(&format!("- `{id}` — {label}\n"));
+    }
+    p.push('\n');
+
+    // 3. Herramientas de datos (filtradas por rol).
+    push_data_tools(&mut p, is_admin);
 
     // 4. Allowlist de endpoints para widgets genéricos + campos de respuesta.
     p.push_str(
@@ -406,6 +440,51 @@ en `generic_spec.fields`:\n",
     p
 }
 
+/// Modo informativo (resto de vistas): el asistente consulta datos y orienta sobre la pantalla
+/// actual, pero NO compone el tablero (no recibe herramientas de lienzo).
+fn build_view_prompt(org: &OrgContext, is_admin: bool, view_label: &str) -> String {
+    let mut p = String::new();
+
+    p.push_str(&format!(
+        "Eres el asistente de simpletpv, un punto de venta multitienda. Ayudas a gerentes y \
+administradores a analizar sus datos de ventas, stock, personal y finanzas.\n\n\
+Ahora mismo el usuario está en la vista «{view_label}» del backoffice (no en el dashboard). Tu \
+papel aquí es informar y analizar sobre esta pantalla, no componer el tablero.\n\n",
+    ));
+
+    // Contexto de la organización + herramientas de datos (sin catálogo de widgets ni lienzo).
+    push_org_context(&mut p, org);
+    push_data_tools(&mut p, is_admin);
+
+    // Herramientas de pantalla: actúan sobre la vista actual (no sobre el lienzo).
+    p.push_str(
+        "## Herramientas de pantalla\n\nPuedes actuar sobre la pantalla que el usuario tiene \
+delante:\n\
+- `highlight_on_view` — hace scroll hasta un elemento/sección/columna por su texto visible y lo \
+resalta. Úsalo cuando pregunten dónde está algo o te pidan señalarlo.\n\
+- `filter_view` — escribe en el buscador de la vista para filtrar el listado por texto (nombre, \
+SKU, código…). Cadena vacía limpia el filtro.\n\
+Estas acciones no modifican datos: son ayudas de navegación sobre la vista actual.\n\n",
+    );
+
+    p.push_str(&format!(
+        "## Comportamiento esperado\n\n\
+1. Responde SIEMPRE en español de España (tuteo peninsular). Sé conciso y directo.\n\
+2. No inventes datos: consulta siempre la herramienta correspondiente. Si una herramienta \
+falla, comunícalo con claridad.\n\
+3. Ante ambigüedad (qué tienda, qué periodo), pregunta antes de actuar o usa valores por \
+defecto razonables (periodo: hoy; tienda: todas).\n\
+4. Estás ayudando sobre la vista «{view_label}»: orienta al usuario sobre lo que ve, resume sus \
+datos y resuelve sus dudas. Si pregunta dónde está algo, usa `highlight_on_view`; si quiere \
+filtrar el listado, usa `filter_view`.\n\
+5. NO dispones de las herramientas del lienzo (añadir o mover widgets, formas o notas): solo el \
+Dashboard permite componer el tablero. Si el usuario te pide montar o cambiar widgets, dile que \
+cambie al Dashboard para hacerlo.\n",
+    ));
+
+    p
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -424,7 +503,7 @@ mod tests {
 
     #[test]
     fn incluye_contexto_de_organizacion() {
-        let p = build_system_prompt(&sample_org(), true, None);
+        let p = build_system_prompt(&sample_org(), true, None, None, None);
         assert!(p.contains("CBD Premium"));
         assert!(p.contains("Tiendas: 7"));
         assert!(p.contains("Productos activos: 240"));
@@ -435,7 +514,7 @@ mod tests {
 
     #[test]
     fn incluye_catalogo_de_widgets() {
-        let p = build_system_prompt(&sample_org(), true, None);
+        let p = build_system_prompt(&sample_org(), true, None, None, None);
         assert!(p.contains("kpi-today"));
         assert!(p.contains("dash-timeclock"));
         // Los 22 widgets del catálogo aparecen listados.
@@ -446,17 +525,17 @@ mod tests {
 
     #[test]
     fn filtra_herramientas_admin_por_rol() {
-        let admin = build_system_prompt(&sample_org(), true, None);
+        let admin = build_system_prompt(&sample_org(), true, None, None, None);
         assert!(admin.contains("también dispones de"));
         assert!(admin.contains("users_list"));
 
-        let manager = build_system_prompt(&sample_org(), false, None);
+        let manager = build_system_prompt(&sample_org(), false, None, None, None);
         assert!(manager.contains("reservadas a administradores"));
     }
 
     #[test]
     fn incluye_allowlist_de_endpoints_sin_escritura() {
-        let p = build_system_prompt(&sample_org(), true, None);
+        let p = build_system_prompt(&sample_org(), true, None, None, None);
         assert!(p.contains("/dashboard/sales-by-family"));
         assert!(p.contains("/stock/alerts"));
         assert!(p.contains("Campos:"));
@@ -467,7 +546,7 @@ mod tests {
 
     #[test]
     fn incluye_instrucciones_de_comportamiento() {
-        let p = build_system_prompt(&sample_org(), true, None);
+        let p = build_system_prompt(&sample_org(), true, None, None, None);
         assert!(p.contains("español de España"));
         // `set_mode` se eliminó: el lienzo es siempre libre, no hay modo que cambiar.
         assert!(!p.contains("set_mode"));
@@ -476,8 +555,50 @@ mod tests {
     }
 
     #[test]
+    fn modo_vista_informa_y_oculta_el_lienzo() {
+        let p = build_system_prompt(&sample_org(), true, None, Some("sales"), Some("Ventas"));
+        // Menciona la vista y deja claro que no compone el tablero.
+        assert!(p.contains("vista «Ventas»"));
+        assert!(p.contains("no en el dashboard"));
+        assert!(p.contains("NO dispones de las herramientas del lienzo"));
+        // No inyecta la superficie del lienzo (catálogo, paneles, estado).
+        assert!(!p.contains("Widgets del catálogo"));
+        assert!(!p.contains("Paneles a medida y bloques"));
+        assert!(!p.contains("Estado actual del lienzo"));
+        // Pero sigue ofreciendo herramientas de datos para informar.
+        assert!(p.contains("sales_kpis"));
+        assert!(p.contains("español de España"));
+        // Y ofrece las herramientas de pantalla (scroll/resaltar/filtrar).
+        assert!(p.contains("highlight_on_view"));
+        assert!(p.contains("filter_view"));
+    }
+
+    #[test]
+    fn sin_view_o_dashboard_usa_el_modo_lienzo() {
+        // Ausencia de vista (compat) y vista "dashboard" ⇒ prompt de lienzo completo.
+        let sin_view = build_system_prompt(&sample_org(), true, None, None, None);
+        let dashboard = build_system_prompt(
+            &sample_org(),
+            true,
+            None,
+            Some("dashboard"),
+            Some("Dashboard"),
+        );
+        for p in [&sin_view, &dashboard] {
+            assert!(p.contains("Widgets del catálogo"));
+            assert!(p.contains("Paneles a medida y bloques"));
+        }
+    }
+
+    #[test]
+    fn modo_vista_con_etiqueta_vacia_usa_fallback() {
+        let p = build_system_prompt(&sample_org(), true, None, Some("sales"), Some("  "));
+        assert!(p.contains("vista «el backoffice»"));
+    }
+
+    #[test]
     fn incluye_seccion_de_paneles_v2_con_bloques_recetas_y_piezas() {
-        let p = build_system_prompt(&sample_org(), true, None);
+        let p = build_system_prompt(&sample_org(), true, None, None, None);
         assert!(p.contains("Paneles a medida y bloques"));
         // Superficie v2: gen:panel + bloques pre-cableados.
         assert!(p.contains("gen:panel"));
@@ -501,7 +622,7 @@ mod tests {
         // F5 (#206): el catálogo de piezas/recetas/bloques NO debe inflar el prompt frente al
         // antiguo COMPOSITE_GUIDE (que ya tenía ~55 líneas de prosa). Cota holgada como guardia.
         // Tamaño actual ~8,5k chars (~2,1k tokens). Cota a 11k = guardia anti-runaway (no doblar).
-        let p = build_system_prompt(&sample_org(), true, None);
+        let p = build_system_prompt(&sample_org(), true, None, None, None);
         eprintln!("system_prompt chars = {}", p.len());
         assert!(
             p.len() < 11_000,
@@ -548,7 +669,7 @@ mod tests {
 
     #[test]
     fn sin_canvas_state_lo_indica() {
-        let p = build_system_prompt(&sample_org(), true, None);
+        let p = build_system_prompt(&sample_org(), true, None, None, None);
         assert!(p.contains("No se ha enviado el estado del lienzo"));
     }
 
@@ -561,7 +682,7 @@ mod tests {
             ],
             "totalElements": 2,
         });
-        let p = build_system_prompt(&sample_org(), true, Some(&canvas));
+        let p = build_system_prompt(&sample_org(), true, Some(&canvas), None, None);
         assert!(p.contains("Elementos del lienzo"));
         assert!(p.contains("Ventas por hora [dash-hour]"));
         assert!(p.contains("Top productos [gen:abc]"));
@@ -577,7 +698,7 @@ mod tests {
             "elements": elements,
             "totalElements": 50,
         });
-        let p = build_system_prompt(&sample_org(), true, Some(&canvas));
+        let p = build_system_prompt(&sample_org(), true, Some(&canvas), None, None);
         assert!(p.contains("Elementos del lienzo (30 de 50)"));
         assert!(p.contains("W0 [w0]"));
         assert!(p.contains("20 elementos más"));

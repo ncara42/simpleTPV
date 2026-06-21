@@ -111,6 +111,17 @@ export interface CanvasOpEvent {
   op: CanvasOp;
 }
 
+// Acción de pantalla (scroll/resaltar/filtrar) sobre la vista actual. El backend la emite igual
+// que un canvas_op, pero el frontend la ejecuta contra el DOM de la vista, no contra el lienzo.
+export type ViewActionName = 'highlight_on_view' | 'filter_view';
+
+export interface ViewActionEvent {
+  toolCallId: string;
+  action: ViewActionName;
+  /** Argumentos de la tool: `{ target }` para highlight, `{ query }` para filter. */
+  args: unknown;
+}
+
 export interface DoneEvent {
   messageId: string;
   conversationId: string;
@@ -126,6 +137,7 @@ export type SseEventMap = {
   reasoning: ReasoningEvent;
   tool_call: ToolCallEvent;
   canvas_op: CanvasOpEvent;
+  view_action: ViewActionEvent;
   done: DoneEvent;
   error: ErrorEvent;
 };
@@ -137,6 +149,7 @@ export interface ChatStreamCallbacks {
   onReasoning?: (ev: ReasoningEvent) => void;
   onToolCall?: (ev: ToolCallEvent) => void;
   onCanvasOp?: (ev: CanvasOpEvent) => void;
+  onViewAction?: (ev: ViewActionEvent) => void;
   onDone?: (ev: DoneEvent) => void;
   onError?: (ev: ErrorEvent) => void;
 }
@@ -145,14 +158,24 @@ export interface ChatStreamCallbacks {
 
 export type Effort = 'low' | 'medium' | 'high';
 
+/** Vista del backoffice donde está el usuario (id + etiqueta del sidebar). */
+export interface ViewContextParam {
+  id: string;
+  label: string;
+}
+
 export interface StreamChatParams {
   conversationId?: string; // si se omite el backend crea una nueva conversación
   message: string;
   model: string;
   effort: Effort;
   // Estado del lienzo en el momento del mensaje (F5): el backend lo incluye en el system
-  // prompt para que el agente conozca qué hay en el dashboard. Forma libre.
+  // prompt para que el agente conozca qué hay en el dashboard. Forma libre. Solo se envía
+  // desde el Dashboard (fuera de él, el agente no compone el tablero).
   canvasState?: unknown;
+  // Vista activa del backoffice: el backend acota el system prompt y, fuera del dashboard,
+  // retira las herramientas de lienzo (el agente solo informa, no modifica widgets).
+  viewContext?: ViewContextParam;
 }
 
 // ── API calls ──────────────────────────────────────────────────────────────────
@@ -179,6 +202,9 @@ export async function streamChat(
           break;
         case 'canvas_op':
           callbacks.onCanvasOp?.(data as CanvasOpEvent);
+          break;
+        case 'view_action':
+          callbacks.onViewAction?.(data as ViewActionEvent);
           break;
         case 'done':
           callbacks.onDone?.(data as DoneEvent);

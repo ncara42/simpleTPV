@@ -18,6 +18,7 @@ import {
   pruneAfter,
   reportCanvasResult,
   streamChat,
+  type ViewContextParam,
 } from '../../lib/chat.js';
 
 // Resultado de aplicar un canvas_op en el lienzo. El consumidor (dashboard) lo devuelve y el
@@ -71,8 +72,19 @@ export interface UseChatOptions {
   onCanvasOp?: ((op: CanvasOp) => CanvasApplyResult | void) | undefined;
   /** Tras prune (editar/regenerar) hay que deshacer las ops add_* del lienzo. */
   onUndoCanvasOps?: ((ops: CanvasOp[]) => void) | undefined;
+  /**
+   * Acción de pantalla del agente fuera del dashboard (scroll/resaltar/filtrar). Se ejecuta sobre
+   * el DOM de la vista; es fire-and-forget (no reporta resultado al backend).
+   */
+  onViewAction?: ((action: string, args: unknown) => void) | undefined;
   /** Snapshot FRESCO del lienzo en el momento del envío (F5): viaja en el body para el prompt. */
   getCanvasState?: (() => unknown) | undefined;
+  /**
+   * Vista activa del backoffice (id + etiqueta). Viaja en el body para que el backend acote el
+   * system prompt; fuera del dashboard el agente no recibe las herramientas de lienzo, así que
+   * tampoco se envía `canvasState`.
+   */
+  view?: ViewContextParam | undefined;
 }
 
 export interface UseChat {
@@ -238,11 +250,19 @@ export function useChat(options: UseChatOptions = {}): UseChat {
       // id llega en `done`, después de los canvas_op).
       const canvasResults: CanvasResultParams[] = [];
 
-      // Snapshot fresco del lienzo para el system prompt (F5).
-      const canvasState = optionsRef.current.getCanvasState?.();
-      const params = fromConv
-        ? { conversationId: fromConv, message: text, model, effort, canvasState }
-        : { message: text, model, effort, canvasState };
+      // Vista activa: viaja al backend para acotar el prompt. Solo en el Dashboard el agente
+      // compone el lienzo, así que solo allí tiene sentido enviar el snapshot del lienzo.
+      const view = optionsRef.current.view;
+      const isDashboard = !view || view.id === 'dashboard';
+      const canvasState = isDashboard ? optionsRef.current.getCanvasState?.() : undefined;
+      const base = {
+        message: text,
+        model,
+        effort,
+        ...(view ? { viewContext: view } : {}),
+        ...(canvasState !== undefined ? { canvasState } : {}),
+      };
+      const params = fromConv ? { conversationId: fromConv, ...base } : base;
 
       try {
         await streamChat(
@@ -272,6 +292,7 @@ export function useChat(options: UseChatOptions = {}): UseChat {
                 );
               }
             },
+            onViewAction: (ev) => optionsRef.current.onViewAction?.(ev.action, ev.args),
             onDone: (ev) => {
               resolvedConvId = ev.conversationId;
             },

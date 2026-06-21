@@ -9,15 +9,6 @@ import { Shimmer } from './Shimmer.js';
 import { Suggestion, Suggestions } from './Suggestions.js';
 import { toolLabel } from './toolLabels.js';
 
-// Prompts de arranque sugeridos en el estado vacío (orientados al dashboard).
-const SUGGESTIONS = [
-  'Muéstrame los KPIs de hoy',
-  'Ventas por hora de hoy',
-  'Ventas por familia',
-  'Alertas de stock',
-  'Top productos más vendidos',
-];
-
 interface ChatMessagesProps {
   messages: ChatMessage[];
   loading: boolean;
@@ -29,6 +20,10 @@ interface ChatMessagesProps {
   onEditAndResend: (userMessageId: string, newText: string) => void;
   /** Envía un prompt sugerido desde el estado vacío. */
   onSuggest?: (text: string) => void;
+  /** Saludo del estado vacío, dependiente de la vista activa. */
+  greeting: string;
+  /** Prompts de arranque sugeridos, dependientes de la vista activa. */
+  suggestions: string[];
 }
 
 function messageText(message: ChatMessage): string {
@@ -295,6 +290,8 @@ export function ChatMessages({
   onRegenerate,
   onEditAndResend,
   onSuggest,
+  greeting,
+  suggestions,
 }: ChatMessagesProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(true);
@@ -339,10 +336,10 @@ export function ChatMessages({
 
         {isEmpty && (
           <div className="chat-messages__empty">
-            <p className="chat-messages__empty-title">¿En qué te ayudo con el dashboard?</p>
+            <p className="chat-messages__empty-title">{greeting}</p>
             {onSuggest && (
               <Suggestions>
-                {SUGGESTIONS.map((s) => (
+                {suggestions.map((s) => (
                   <Suggestion key={s} suggestion={s} onClick={onSuggest} />
                 ))}
               </Suggestions>
@@ -397,7 +394,7 @@ export function ChatMessages({
                 <span className="chat-cursor" aria-hidden="true" />
               </div>
             ) : (
-              !streamingReasoning && <Shimmer className="chat-messages__hint">Pensando…</Shimmer>
+              !streamingReasoning && <Shimmer className="chat-messages__hint">Pensando</Shimmer>
             )}
           </div>
         )}

@@ -22,7 +22,34 @@ use crate::state::AppState;
 
 const MGMT_ROLES: [Role; 2] = [Role::Admin, Role::Manager];
 
+/// Nombres de las herramientas de lienzo: el backend las reenvía al frontend como `canvas_op`
+/// (no las ejecuta) y, fuera del dashboard, las retira de la lista que ve el LLM.
+const CANVAS_OP_NAMES: [&str; 8] = [
+    "add_widget",
+    "add_shape",
+    "add_text",
+    "add_note",
+    "add_insight",
+    "remove_element",
+    "arrange",
+    "clear_canvas",
+];
+
+/// Nombres de las herramientas de pantalla: el backend las reenvía al frontend como `view_action`
+/// (no las ejecuta) para actuar sobre la vista actual. Solo se ofrecen fuera del dashboard.
+const VIEW_ACTION_NAMES: [&str; 2] = ["highlight_on_view", "filter_view"];
+
 // ── Tipos de request / response ───────────────────────────────────────────────
+
+/// Vista del backoffice donde está el usuario (id + etiqueta del sidebar). Acota el system
+/// prompt y, fuera del dashboard, hace que el agente no reciba las herramientas de lienzo.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewContext {
+    pub id: String,
+    #[serde(default)]
+    pub label: String,
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -38,6 +65,10 @@ pub struct StreamChatBody {
     /// stale. Forma libre: `{ mode, elements: [{ id, label, x?, y? }], totalElements }`.
     #[serde(default)]
     pub canvas_state: Option<serde_json::Value>,
+    /// Vista activa del backoffice. Ausente ⇒ se asume dashboard (compatibilidad). Fuera del
+    /// dashboard el agente solo informa: se le retiran las herramientas de lienzo.
+    #[serde(default)]
+    pub view_context: Option<ViewContext>,
 }
 
 fn default_effort() -> String {
@@ -134,18 +165,47 @@ pub async fn stream(
 
     // Construir ChatRequest
     let effort = parse_effort(&body.effort);
-    let tools = if is_admin {
+    // Solo el Dashboard compone el tablero. Fuera de él (ausencia de vista ⇒ dashboard por
+    // compat) el agente solo informa: se le retiran las herramientas de lienzo.
+    let is_dashboard = body
+        .view_context
+        .as_ref()
+        .is_none_or(|v| v.id == "dashboard");
+    let mut tools = if is_admin {
         simpletpv_ai::tools::all_tools_for_admin()
     } else {
         simpletpv_ai::tools::all_tools_for_manager()
     };
+    if !is_dashboard {
+        // Fuera del dashboard: el agente no compone el tablero (se retiran las canvas ops) pero sí
+        // puede actuar sobre la pantalla actual (scroll/resaltar/filtrar).
+        tools.retain(|t| {
+            let name = t
+                .get("function")
+                .and_then(|f| f.get("name"))
+                .and_then(|n| n.as_str());
+            name.is_none_or(|n| !CANVAS_OP_NAMES.contains(&n))
+        });
+        tools.extend(simpletpv_ai::tools::view_action_tools());
+    }
 
     // System prompt dinámico (F5): contexto de la organización + catálogo de widgets + tools
-    // por rol + allowlist de endpoints + estado actual del lienzo (fresco, del body).
+    // por rol + allowlist de endpoints + estado actual del lienzo (fresco, del body). Fuera del
+    // dashboard se acota a un prompt informativo de la vista activa.
     let org_ctx = chat::load_org_context(pool, org)
         .await
         .map_err(ApiError::from)?;
-    let system = chat::build_system_prompt(&org_ctx, is_admin, body.canvas_state.as_ref());
+    let (view_id, view_label) = match body.view_context.as_ref() {
+        Some(v) => (Some(v.id.as_str()), Some(v.label.as_str())),
+        None => (None, None),
+    };
+    let system = chat::build_system_prompt(
+        &org_ctx,
+        is_admin,
+        body.canvas_state.as_ref(),
+        view_id,
+        view_label,
+    );
 
     let messages = build_chat_messages(&history);
     let req = simpletpv_ai::event::ChatRequest {
@@ -327,12 +387,28 @@ fn run_agent_stream(
             let mut tool_result_msgs: Vec<simpletpv_ai::event::ChatMessage> = Vec::new();
 
             for tc in &tool_calls {
+                // View actions → reenviar al frontend como view_action (scroll/resaltar/filtrar),
+                // NO ejecutar en backend. ACK inmediato: son fire-and-forget sobre la vista.
+                if VIEW_ACTION_NAMES.contains(&tc.name.as_str()) {
+                    yield Ok(Event::default()
+                        .event("view_action")
+                        .data(
+                            serde_json::json!({
+                                "toolCallId": tc.id,
+                                "action": tc.name,
+                                "args": tc.args,
+                            })
+                            .to_string(),
+                        ));
+                    tool_result_msgs.push(simpletpv_ai::event::ChatMessage::Tool {
+                        tool_call_id: tc.id.clone(),
+                        content: "view_action_dispatched".to_owned(),
+                    });
+                    continue;
+                }
+
                 // Canvas ops → reenviar al frontend como canvas_op, NO ejecutar en backend
-                let canvas_ops = [
-                    "add_widget", "add_shape", "add_text", "add_note", "add_insight",
-                    "remove_element", "arrange", "clear_canvas",
-                ];
-                if canvas_ops.contains(&tc.name.as_str()) {
+                if CANVAS_OP_NAMES.contains(&tc.name.as_str()) {
                     let op = CanvasOp::from_tool_call(&tc.name, &tc.args);
                     yield Ok(Event::default()
                         .event("canvas_op")
