@@ -29,15 +29,14 @@ export function FunctionSearch({ onNavigate }: { onNavigate: (tab: Tab) => void 
     <>
       <button
         type="button"
-        className="topbar-search-launcher"
+        className="float-action-btn"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-label="Buscar funciones"
+        title={`Buscar funciones (${SHORTCUT_HINT})`}
         data-testid="function-search-launcher"
       >
-        <Search size={15} aria-hidden="true" className="topbar-search-launcher-icon" />
-        <span className="topbar-search-launcher-text">Buscar…</span>
-        <kbd className="topbar-search-launcher-kbd">{SHORTCUT_HINT}</kbd>
+        <Search size={17} aria-hidden="true" />
       </button>
       {/* onNavigate solo navega; el cierre (con su animación de salida) lo gestiona
           el propio palette y termina en onClose → desmontar. */}

@@ -117,9 +117,15 @@
   gap: var(--sidebar-top-gap, 8px);
 }
 
-/* La lupa deja de ocupar el ancho completo del sidebar: en el clúster es una pill compacta. */
-.sidebar-search-float .float-actions .topbar-search-launcher {
-  width: clamp(150px, 16vw, 220px);
+/* La lupa es ahora un botón icono: el clúster se estira hasta el borde derecho y
+   el conmutador Backoffice↔TPV flota al extremo derecho. */
+@media (min-width: 768px) {
+  .sidebar-search-float {
+    right: var(--sidebar-float-gap);
+  }
+}
+.float-actions .float-switch {
+  margin-left: auto;
 }
 
 /* Botones redondos del clúster (home, campana): mismo tamaño que el logo del sidebar. */
