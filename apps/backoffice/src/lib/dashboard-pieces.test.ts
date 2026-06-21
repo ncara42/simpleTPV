@@ -1,13 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
+// Contrato compartido TS↔Rust (#206). Import directo (resolveJsonModule); la raíz pnpm permite
+// leer fuera de apps/backoffice. El test gemelo en Rust verifica el otro lado contra el mismo JSON.
+import contract from '../../../../docs/contracts/dataviz-contract.json';
+import { BLOCK_IDS } from './dashboard-blocks.js';
 import {
   asFormat,
   asRecipe,
   clampInt,
   clampRecipe,
   inferFormat,
+  PIECE_ALLOWLIST,
+  PIECE_FORMATS,
+  RECIPE_ALLOWLIST,
   recipeChartColumns,
   slotForPiece,
+  WIDGETABLE_ENDPOINTS,
 } from './dashboard-pieces.js';
 
 describe('dashboard-pieces — reparadores del DSL v2 (#204)', () => {
@@ -90,6 +98,28 @@ describe('dashboard-pieces — reparadores del DSL v2 (#204)', () => {
       expect(recipeChartColumns('kpiRow+twoCharts')).toBe(2);
       expect(recipeChartColumns('kpiRow+oneChart')).toBe(1);
       expect(recipeChartColumns('tableFull')).toBe(1);
+    });
+  });
+
+  // PARIDAD TS↔Rust (#206 F5): el frontend y el backend (crates/ai/tools.rs, crates/domain/context.rs)
+  // deben coincidir en piezas/recetas/formatos/endpoints/bloques. La fuente de verdad es el contrato
+  // docs/contracts/dataviz-contract.json; un test gemelo en Rust verifica el otro lado.
+  describe('paridad con el contrato compartido', () => {
+    it('PIECE_ALLOWLIST coincide con el contrato', () => {
+      expect([...PIECE_ALLOWLIST].sort()).toEqual([...contract.pieces].sort());
+    });
+    it('RECIPE_ALLOWLIST coincide con el contrato', () => {
+      expect([...RECIPE_ALLOWLIST]).toEqual(contract.recipes);
+    });
+    it('PIECE_FORMATS coincide con el contrato', () => {
+      expect([...PIECE_FORMATS]).toEqual(contract.formats);
+    });
+    it('WIDGETABLE_ENDPOINTS coincide con el contrato', () => {
+      expect([...WIDGETABLE_ENDPOINTS].sort()).toEqual([...contract.endpoints].sort());
+    });
+    it('los bloques coinciden con el contrato', () => {
+      const ids = BLOCK_IDS.map((id) => id.replace(/^block:/, ''));
+      expect([...ids].sort()).toEqual([...contract.blocks].sort());
     });
   });
 });

@@ -61,6 +61,7 @@ import {
   RECIPE_SIZE,
   SLOT_PIECES,
   slotForPiece,
+  WIDGETABLE_ENDPOINTS,
 } from './dashboard-pieces.js';
 
 // Único preset activo tras la migración F0 (#174). Todas las operaciones de lienzo escriben
@@ -204,26 +205,7 @@ function placeGeneric(
 // El árbol `generic_spec.root` viaja DENTRO de un valor JSON desde el agente y NO pasa por la
 // normalización snake→camel del backend (`camel_case_keys` solo toca claves de nivel superior).
 // Por eso la validación dura (input no confiable) vive aquí: tipos, allowlist de endpoints,
-// profundidad y nº de hojas.
-
-// Allowlist de endpoints (solo lectura/GET) que puede apuntar una hoja. Espejo de
-// `WIDGETABLE_ENDPOINTS` del backend (crates/domain/src/chat/context.rs). Cualquier hoja con un
-// endpoint fuera de esta lista se poda.
-const WIDGETABLE_ENDPOINTS = new Set<string>([
-  '/dashboard/sales-by-family',
-  '/dashboard/sales-by-hour',
-  '/dashboard/sales-by-employee',
-  '/dashboard/discount-by-employee',
-  '/dashboard/product-rankings',
-  '/dashboard/sales-kpis',
-  '/dashboard/margin-kpis',
-  '/dashboard/stockout-kpis',
-  '/stock/alerts',
-  '/stock/expiring',
-  '/products',
-  '/product-families',
-  '/suppliers',
-]);
+// profundidad y nº de hojas. `WIDGETABLE_ENDPOINTS` es ahora fuente única en dashboard-pieces.ts.
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v != null && typeof v === 'object' && !Array.isArray(v)

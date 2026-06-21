@@ -5,19 +5,94 @@ use serde_json::{json, Value};
 //   - Data queries: consultan datos de la organización.
 // El backend filtra la lista por rol del AuthUser antes de enviarla al LLM.
 
+// ── Vocabulario v2 del dashboard (#206, EPIC #201) ──────────────────────────────
+// Espejo del contrato docs/contracts/dataviz-contract.json y de
+// apps/backoffice/src/lib/dashboard-pieces.ts. El constrained decoding del function-calling impide
+// piezas/recetas/endpoints inválidos mejor que la prosa. La PARIDAD se verifica en los tests.
+pub const PIECES: &[&str] = &[
+    "kpiTile",
+    "comparisonBars",
+    "trendLine",
+    "trendArea",
+    "shareDonut",
+    "rankBarList",
+    "segmentBar",
+    "progressMeter",
+    "dataGrid",
+];
+const KPI_PIECES: &[&str] = &["kpiTile"];
+const CHART_PIECES: &[&str] = &[
+    "comparisonBars",
+    "trendLine",
+    "trendArea",
+    "shareDonut",
+    "rankBarList",
+    "segmentBar",
+    "progressMeter",
+    "dataGrid",
+];
+pub const RECIPES: &[&str] = &[
+    "kpiRow",
+    "kpiRow+oneChart",
+    "kpiRow+twoCharts",
+    "heroChart+sideStats",
+    "tableFull",
+];
+pub const FORMATS: &[&str] = &["eur", "percent", "decimal", "units", "integer"];
+pub const WIDGETABLE_ENDPOINTS: &[&str] = &[
+    "/dashboard/sales-by-family",
+    "/dashboard/sales-by-hour",
+    "/dashboard/sales-by-employee",
+    "/dashboard/discount-by-employee",
+    "/dashboard/product-rankings",
+    "/dashboard/sales-kpis",
+    "/dashboard/margin-kpis",
+    "/dashboard/stockout-kpis",
+    "/stock/alerts",
+    "/stock/expiring",
+    "/products",
+    "/product-families",
+    "/suppliers",
+];
+pub const BLOCK_IDS: &[&str] = &[
+    "block:sales-overview",
+    "block:stock-risk",
+    "block:staff-performance",
+    "block:product-ranking",
+];
+
+// Esquema de una hoja-pieza para un slot. `pieces` acota el enum admitido (kpis vs charts).
+fn piece_item_schema(pieces: &[&str]) -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "piece": { "type": "string", "enum": pieces, "description": "Molécula con diseño horneado (orden, cap, formato, degradación)." },
+            "title": { "type": "string", "description": "Rótulo corto de la pieza." },
+            "endpoint": { "type": "string", "enum": WIDGETABLE_ENDPOINTS, "description": "Endpoint de lectura de la allowlist." },
+            "label_field": { "type": "string", "description": "Campo de etiqueta (eje X / categoría)." },
+            "value_field": { "type": "string", "description": "Campo numérico del valor." },
+            "format": { "type": "string", "enum": FORMATS, "description": "Formato es-ES; si se omite se infiere por el nombre del campo." },
+            "max_bars": { "type": "integer", "minimum": 1, "maximum": 12, "description": "Solo comparisonBars (clamp a 8)." },
+            "max_rows": { "type": "integer", "minimum": 1, "maximum": 10, "description": "Solo rankBarList/dataGrid." },
+            "columns": { "type": "array", "description": "Solo dataGrid: [{ field, label, format?, align? }].", "items": { "type": "object" } }
+        },
+        "required": ["piece", "endpoint"]
+    })
+}
+
 pub fn canvas_tools() -> Vec<Value> {
     vec![
         json!({
             "type": "function",
             "function": {
                 "name": "add_widget",
-                "description": "Añade un widget al dashboard. Usa widgets del catálogo existente o genéricos parametrizables. Para combinar ≥2 métricas en UNA tarjeta a medida, usa widget_id 'gen:composite' con generic_spec.type 'composite' y el árbol de layout en generic_spec.root.",
+                "description": "Añade un widget al dashboard. TRES formas, de menos a más esfuerzo: (1) BLOQUE pre-cableado (widget_id 'block:<id>') = un panel entero ya diseñado con UNA llamada — el preferido; (2) widget del CATÁLOGO simple (widget_id 'kpi-today', 'dash-bars', …); (3) PANEL a medida (widget_id 'gen:panel' + generic_spec con kind 'panel', recipe y slots). NO emitas geometría (w/h/span/gap): la receta dicta el layout. El DSL v1 (type/root/composite) está OBSOLETO.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "widget_id": {
                             "type": "string",
-                            "description": "ID del widget del catálogo (p.ej. 'kpi-today', 'dash-bars') o 'gen:<tipo>' para genérico (tipos: table, bar, line, area, pie, stacked, kpi, insight, composite)."
+                            "description": "ID del widget. Bloques: 'block:sales-overview', 'block:stock-risk', 'block:staff-performance', 'block:product-ranking'. Catálogo: 'kpi-today', 'dash-bars', etc. Panel a medida: 'gen:panel'."
                         },
                         "position": {
                             "type": "string",
@@ -27,7 +102,7 @@ pub fn canvas_tools() -> Vec<Value> {
                         "period": {
                             "type": "string",
                             "enum": ["today", "yesterday", "week", "month", "quarter", "year"],
-                            "description": "Periodo de datos. Por defecto 'today'."
+                            "description": "Periodo de datos. Por defecto 'today'. En bloques/paneles se hereda por todas las piezas."
                         },
                         "store_id": {
                             "type": "string",
@@ -39,23 +114,28 @@ pub fn canvas_tools() -> Vec<Value> {
                         },
                         "generic_spec": {
                             "type": "object",
-                            "description": "Solo para widgets genéricos (widget_id empieza con 'gen:'). Configura el origen de datos.",
+                            "description": "Solo para 'gen:panel'. DSL v2: kind 'panel' + recipe (dicta el layout) + slots con piezas. Cada pieza ya tiene su diseño horneado; tú solo ENSAMBLAS.",
                             "properties": {
-                                "type": { "type": "string", "enum": ["table", "bar", "line", "area", "pie", "stacked", "kpi", "insight", "composite"] },
-                                "endpoint": { "type": "string", "description": "Ruta relativa a /api (solo GET, solo endpoints de la allowlist). Cadena vacía '' cuando type es 'composite' (los endpoints van en las hojas del árbol)." },
-                                "params": { "type": "object", "description": "Query params adicionales." },
-                                "fields": { "type": "object", "description": "Mapeo campo→etiqueta para columnas/ejes." },
-                                "title": { "type": "string" },
-                                "default_size": {
+                                "kind": { "type": "string", "enum": ["panel"], "description": "Usa 'panel' (DSL v2)." },
+                                "recipe": { "type": "string", "enum": RECIPES, "description": "Receta cerrada: define ancho/alto/columnas. No emitas geometría." },
+                                "density": { "type": "string", "enum": ["compact", "comfortable"] },
+                                "title": { "type": "string", "description": "Título de la tarjeta." },
+                                "slots": {
                                     "type": "object",
-                                    "properties": { "w": { "type": "integer" }, "h": { "type": "integer" } }
+                                    "description": "Piezas por slot tipado. 'kpis' solo admite kpiTile; 'charts' admite gráficas/listas/tablas. Una pieza en el slot equivocado se reubica.",
+                                    "properties": {
+                                        "kpis": { "type": "array", "items": piece_item_schema(KPI_PIECES) },
+                                        "charts": { "type": "array", "items": piece_item_schema(CHART_PIECES) }
+                                    }
                                 },
-                                "root": {
-                                    "type": "object",
-                                    "description": "Solo type 'composite': árbol de layout. Nodo stack: { kind: 'stack', dir: 'row'|'col', span?: number, title?: string, gap?: number, children: [...] }. Nodo hoja: { kind: 'leaf', span?: number, title?: string, spec: { type, endpoint, fields?, params?, title? } }. Máx 3 niveles, máx 12 hojas; cada hoja debe usar un endpoint de la allowlist."
-                                }
-                            },
-                            "required": ["type", "endpoint"]
+                                "_comment_v1": "Campos v1 OBSOLETOS (solo compatibilidad con layouts ya guardados). NO los uses.",
+                                "type": { "type": "string", "enum": ["table", "bar", "line", "area", "pie", "stacked", "kpi", "insight", "composite"], "description": "OBSOLETO (v1). Usa kind:'panel'." },
+                                "endpoint": { "type": "string", "description": "OBSOLETO (v1). Los endpoints van en cada pieza de slots." },
+                                "params": { "type": "object", "description": "OBSOLETO (v1)." },
+                                "fields": { "type": "object", "description": "OBSOLETO (v1)." },
+                                "default_size": { "type": "object", "description": "OBSOLETO (v1): la receta dicta el tamaño." },
+                                "root": { "type": "object", "description": "OBSOLETO (v1 composite). Usa recipe + slots." }
+                            }
                         }
                     },
                     "required": ["widget_id", "position", "element_id"]
@@ -486,16 +566,123 @@ mod tests {
             .find(|t| t["function"]["name"] == "add_widget")
             .unwrap();
         let generic = &add_widget["function"]["parameters"]["properties"]["generic_spec"];
-        // El tipo 'composite' está disponible para que el agente componga tarjetas a medida (#189).
+        // El tipo 'composite' sigue en el schema por compat (OBSOLETO en F5, se retira en F6).
         let types = generic["properties"]["type"]["enum"].as_array().unwrap();
         assert!(
             types.iter().any(|v| v == "composite"),
-            "generic_spec.type debería incluir 'composite'"
+            "generic_spec.type debería incluir 'composite' (v1 compat)"
         );
         // El árbol de layout viaja en generic_spec.root (objeto libre; validación dura en frontend).
         assert_eq!(
             generic["properties"]["root"]["type"], "object",
             "generic_spec.root debe declararse como objeto"
         );
+    }
+
+    fn enum_strs(v: &Value) -> Vec<String> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_str().unwrap().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn add_widget_expone_dsl_v2_panel() {
+        let canvas = canvas_tools();
+        let add_widget = canvas
+            .iter()
+            .find(|t| t["function"]["name"] == "add_widget")
+            .unwrap();
+        let gs = &add_widget["function"]["parameters"]["properties"]["generic_spec"];
+        // kind 'panel'
+        assert!(enum_strs(&gs["properties"]["kind"]["enum"]).contains(&"panel".to_string()));
+        // recipe enum = RECIPES
+        assert_eq!(
+            enum_strs(&gs["properties"]["recipe"]["enum"]),
+            RECIPES.to_vec()
+        );
+        // slots.charts.items.piece enum = CHART_PIECES; kpis.items.piece = ['kpiTile']
+        let charts_item = &gs["properties"]["slots"]["properties"]["charts"]["items"];
+        assert_eq!(
+            enum_strs(&charts_item["properties"]["piece"]["enum"]),
+            CHART_PIECES.to_vec()
+        );
+        let kpis_item = &gs["properties"]["slots"]["properties"]["kpis"]["items"];
+        assert_eq!(
+            enum_strs(&kpis_item["properties"]["piece"]["enum"]),
+            KPI_PIECES.to_vec()
+        );
+        // endpoint enum dentro de una pieza = allowlist; format enum = FORMATS
+        assert_eq!(
+            enum_strs(&charts_item["properties"]["endpoint"]["enum"]),
+            WIDGETABLE_ENDPOINTS.to_vec()
+        );
+        assert_eq!(
+            enum_strs(&charts_item["properties"]["format"]["enum"]),
+            FORMATS.to_vec()
+        );
+    }
+
+    #[test]
+    fn add_widget_no_expone_endpoints_de_escritura() {
+        // El enum de endpoints de las piezas es solo lectura: ningún POST/PUT/DELETE.
+        let s = serde_json::to_string(&canvas_tools()).unwrap();
+        for ep in WIDGETABLE_ENDPOINTS {
+            assert!(!ep.contains("write") && !ep.contains("delete"));
+        }
+        assert!(!s.contains("POST") && !s.contains("DELETE"));
+    }
+
+    #[test]
+    fn pieces_es_la_union_de_los_slots() {
+        // PIECES debe ser exactamente kpis ∪ charts (sin huérfanas).
+        let mut union: Vec<&str> = KPI_PIECES
+            .iter()
+            .chain(CHART_PIECES.iter())
+            .copied()
+            .collect();
+        union.sort_unstable();
+        let mut all: Vec<&str> = PIECES.to_vec();
+        all.sort_unstable();
+        assert_eq!(all, union);
+    }
+
+    #[test]
+    fn el_schema_de_tools_no_se_dispara() {
+        // F5 (#206): los enums (piezas/recetas/endpoints/formatos) endurecen el schema vía constrained
+        // decoding pero NO deben disparar el tamaño del payload de tools. Cota holgada como guardia.
+        // Tamaño actual ~11,5k chars (~2,9k tokens). Cota a 15k = guardia anti-runaway (no doblar).
+        let s = serde_json::to_string(&all_tools_for_admin()).unwrap();
+        eprintln!("tools_json chars = {}", s.len());
+        assert!(
+            s.len() < 15_000,
+            "el schema de tools creció demasiado: {}",
+            s.len()
+        );
+    }
+
+    #[test]
+    fn paridad_vocabulario_con_contrato_compartido() {
+        // Fuente única: docs/contracts/dataviz-contract.json. El test gemelo en TS verifica el otro
+        // lado; si una copia diverge del contrato, su test falla → no hay drift silencioso (#206).
+        let contract: Value = serde_json::from_str(include_str!(
+            "../../../docs/contracts/dataviz-contract.json"
+        ))
+        .expect("contrato JSON válido");
+        let strs = |s: &[&str]| s.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        assert_eq!(strs(PIECES), enum_strs(&contract["pieces"]), "pieces");
+        assert_eq!(strs(RECIPES), enum_strs(&contract["recipes"]), "recipes");
+        assert_eq!(strs(FORMATS), enum_strs(&contract["formats"]), "formats");
+        assert_eq!(
+            strs(WIDGETABLE_ENDPOINTS),
+            enum_strs(&contract["endpoints"]),
+            "endpoints"
+        );
+        let blocks: Vec<String> = BLOCK_IDS
+            .iter()
+            .map(|b| b.trim_start_matches("block:").to_string())
+            .collect();
+        assert_eq!(blocks, enum_strs(&contract["blocks"]), "blocks");
     }
 }

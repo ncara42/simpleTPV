@@ -27,6 +27,26 @@ export const RECIPE_ALLOWLIST: readonly RecipeId[] = [
   'tableFull',
 ];
 
+// Allowlist de endpoints (solo lectura/GET) que puede apuntar una hoja/pieza. ESPEJO de
+// `WIDGETABLE_ENDPOINTS` del backend (crates/domain/src/chat/context.rs) y del contrato
+// docs/contracts/dataviz-contract.json — la PARIDAD se verifica en tests a ambos lados (#206).
+// Cualquier endpoint fuera de esta lista se poda (única poda dura: defensa RLS/input no confiable).
+export const WIDGETABLE_ENDPOINTS: ReadonlySet<string> = new Set<string>([
+  '/dashboard/sales-by-family',
+  '/dashboard/sales-by-hour',
+  '/dashboard/sales-by-employee',
+  '/dashboard/discount-by-employee',
+  '/dashboard/product-rankings',
+  '/dashboard/sales-kpis',
+  '/dashboard/margin-kpis',
+  '/dashboard/stockout-kpis',
+  '/stock/alerts',
+  '/stock/expiring',
+  '/products',
+  '/product-families',
+  '/suppliers',
+]);
+
 // Slot → piezas admitidas. `kpis` solo kpiTile; `charts` el set de gráficas/listas/tablas. Una
 // pieza en el slot equivocado se REUBICA al slot que la admita; si ninguno, se descarta esa pieza.
 export const SLOT_PIECES: Record<SlotName, ReadonlySet<PieceId>> = {

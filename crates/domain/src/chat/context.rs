@@ -51,9 +51,26 @@ const WIDGET_CATALOG: &[(&str, &str)] = &[
     ("dash-suppliers", "Comparativa de proveedores"),
     ("dash-rotation", "Rotación de productos"),
     ("dash-timeclock", "Fichajes de hoy"),
+    // Bloques pre-cableados (#205): un panel entero ya diseñado con UNA llamada (lo más fácil).
     (
-        "gen:composite",
-        "Panel a medida (combina ≥2 métricas en una tarjeta)",
+        "block:sales-overview",
+        "BLOQUE — Resumen de ventas (KPIs + tendencia por hora)",
+    ),
+    (
+        "block:stock-risk",
+        "BLOQUE — Riesgo de stock (venta perdida + alertas + caducidades)",
+    ),
+    (
+        "block:staff-performance",
+        "BLOQUE — Rendimiento del equipo (ranking de ventas por vendedor)",
+    ),
+    (
+        "block:product-ranking",
+        "BLOQUE — Ranking de productos por ventas",
+    ),
+    (
+        "gen:panel",
+        "Panel a medida por receta + piezas (combina varias métricas en una tarjeta)",
     ),
 ];
 
@@ -105,12 +122,12 @@ const WIDGETABLE_ENDPOINTS: &[(&str, &str, &str)] = &[
     (
         "/stock/alerts",
         "Productos agotados o por debajo del mínimo.",
-        "productName, storeName, quantity, threshold",
+        "productName, storeName, alertType, severity",
     ),
     (
         "/stock/expiring",
         "Lotes próximos a caducar.",
-        "productName, batch, expiresAt, quantity",
+        "productName, lotCode, expiryDate, quantity, daysToExpiry",
     ),
     (
         "/products",
@@ -145,63 +162,60 @@ esas operaciones no se deshacen al editar o regenerar el historial.
 7. Los widgets genéricos (`gen:<tipo>`) solo pueden apuntar a endpoints de la lista permitida.
 8. Cuando uses herramientas de canvas, explica brevemente al usuario lo que añades o modificas.";
 
-/// Guía del DSL de widgets compuestos (#189). Raw string para incluir el JSON de ejemplo sin
-/// escapar comillas. Solo usa endpoints y campos de la allowlist (ningún endpoint de escritura).
-const COMPOSITE_GUIDE: &str = r#"## Widgets compuestos (DSL de layout)
+/// Guía del DSL v2 de paneles (#206): catálogo de BLOQUES + RECETAS + PIEZAS. Sin reglas de diseño
+/// en prosa: el diseño está HORNEADO en cada pieza (orden, cap de barras, donut≤6, formato es-ES) y
+/// en cada receta (ancho/alto/columnas). El agente solo ENSAMBLA. Raw string para el JSON de ejemplo.
+const PANEL_GUIDE: &str = r#"## Paneles a medida y bloques (DSL v2)
 
-Cuando el usuario quiera combinar 2 o más métricas relacionadas en UNA sola tarjeta, usa un \
-widget compuesto en lugar de añadir varios widgets sueltos:
-- `widget_id`: "gen:composite"
-- `generic_spec.type`: "composite"
-- `generic_spec.title`: título de la tarjeta (describe el conjunto, p. ej. "Rendimiento de ventas — este mes")
-- `generic_spec.endpoint`: "" (vacío; los endpoints viven en las hojas)
-- `generic_spec.default_size`: { "w": N, "h": N } en unidades de un grid de 12 columnas (ver tamaños abajo)
-- `generic_spec.root`: el árbol de layout (abajo)
+Para combinar varias métricas en UNA tarjeta tienes DOS caminos. Prefiere SIEMPRE el más simple.
+NUNCA emitas geometría (w/h/span/gap): la receta y las piezas ya tienen su diseño horneado.
 
-Nodos del árbol (CompositeNode):
-- stack: { "kind": "stack", "dir": "row"|"col", "span"?: N, "title"?: "...", "gap"?: N, "children": [...] }
-- hoja:  { "kind": "leaf",  "span"?: N, "title": "...", "spec": { "type", "endpoint", "fields"?, "params"? } }
+### A) Bloques pre-cableados (lo más fácil — un panel entero con UNA llamada)
+`add_widget` con `widget_id` = uno de:
+- `block:sales-overview` — KPIs de ventas (facturación, ticket medio, uds./ticket) + tendencia por hora.
+- `block:stock-risk` — venta perdida estimada + roturas abiertas + tablas de alertas y caducidades.
+- `block:staff-performance` — ranking de ventas por vendedor + nº de ventas por vendedor.
+- `block:product-ranking` — top de productos por ventas.
+`period` y `store_id` (de la propia llamada) se heredan por todas las piezas. No construyas slots.
 
-Reglas estructurales:
-- El endpoint de cada hoja debe estar en la allowlist de arriba (la misma que los widgets simples).
-- Máximo 3 niveles de anidación y máximo 12 hojas.
-- Una hoja no puede ser de tipo composite (no se anidan paneles dentro de hojas).
-- `span` solo aplica a hijos de un stack `dir: "row"` (reparto de columnas). En un stack `dir: "col"` los hijos ya ocupan el ancho completo: no uses `span` ahí.
+### B) Panel a medida por receta + piezas (si ningún bloque encaja)
+`add_widget` con `widget_id` "gen:panel" y `generic_spec`:
+- `kind`: "panel"
+- `recipe`: una de [kpiRow, kpiRow+oneChart, kpiRow+twoCharts, heroChart+sideStats, tableFull]. La receta DICTA el layout.
+- `density`: "comfortable" | "compact"
+- `title`: título de la tarjeta.
+- `slots`: { "kpis": [piezas kpiTile], "charts": [piezas de gráfica/lista/tabla] }
 
-Reglas de DISEÑO (síguelas SIEMPRE para que el panel se vea bien desde el inicio):
-1. Título por hoja: pon SIEMPRE un `title` corto y claro en CADA hoja (p. ej. "Ventas por vendedor", "Ticket medio"). Es el rótulo que ve el usuario. NO repitas el título dentro de `spec` (basta el de la hoja; duplicarlo se ve mal).
-2. Tipo de gráfico según el dato:
-   - `bar`: comparar categorías (vendedores, familias, productos, tiendas).
-   - `line` o `area`: evolución temporal (por hora/día).
-   - `pie` o `donut`: reparto de un total, SOLO si hay 6 categorías o menos; si hay más, usa `bar` (una tarta con muchas porciones se ve mal).
-   - `kpi`: un único número clave (un solo campo en `fields`).
-   - `table`: ranking o listado con varias columnas y muchas filas.
-3. Composición:
-   - Raíz: `dir: "col"`.
-   - Agrupa de 2 a 4 KPIs relacionados en UNA fila (`dir: "row"`) arriba.
-   - Las gráficas van debajo. Máximo 2 gráficas por fila (más se aprietan). Una gráfica importante o ancha ponla como hoja directa de la columna raíz (ocupa todo el ancho).
-   - No mezcles una tabla con una gráfica en la misma fila estrecha: dale a la tabla su propia fila a ancho completo.
-4. Tamaño (`default_size`): NO sobredimensiones (un alto excesivo deja un hueco vacío feo). El alto ≈ las filas de contenido: una fila de KPIs cuenta ~2, cada fila de gráficas ~3, una tabla ~3.
-   - Solo 2 gráficas en una fila: { "w": 8, "h": 5 }.
-   - Fila de KPIs + 1 fila de gráficas: { "w": 12, "h": 5 }.
-   - Fila de KPIs + 2 filas (gráficas o tabla): { "w": 12, "h": 8 }.
-   - Algo pequeño (1–2 KPIs + 1 gráfica): { "w": 6, "h": 4 }.
-5. Menos es más: 2–4 visualizaciones coherentes, no 6. Si el usuario pide muchas cosas dispares, propón varios paneles en vez de uno saturado.
+Piezas (cada una bonita por construcción — no configuras estilo):
+- `kpiTile` (slot kpis) — un número clave grande. Campos: endpoint, value_field, format?, title.
+- `comparisonBars` (charts) — barras comparando categorías (vendedores/familias/tiendas). label_field + value_field.
+- `trendLine` / `trendArea` (charts) — evolución temporal (por hora/día). label_field (eje temporal) + value_field.
+- `shareDonut` (charts) — reparto de un total (degrada solo a barras si hay muchas categorías). label_field + value_field.
+- `rankBarList` (charts) — ranking horizontal (top productos/vendedores). label_field + value_field, max_rows?.
+- `segmentBar` (charts) — barra única de reparto. label_field + value_field.
+- `progressMeter` (charts) — progreso hacia un objetivo. value_field + target?.
+- `dataGrid` (charts) — tabla. columns: [{ field, label, format?, align? }].
 
-Ejemplo — "Rendimiento de ventas — este mes", default_size { "w": 12, "h": 5 } (fila de 3 KPIs + fila de 2 gráficas de barras):
+`format` (eur, percent, decimal, units, integer) es OPCIONAL: si lo omites se infiere por el nombre del campo.
+El `period`/`store_id` van en `params` de cada pieza (p. ej. "params": { "period": "month" }).
+Una pieza en el slot equivocado se reubica sola; un endpoint fuera de la allowlist se descarta. No repitas reglas de maquetado.
+
+Ejemplo — panel "Rendimiento de ventas — este mes" (recipe kpiRow+twoCharts):
 {
-  "kind": "stack", "dir": "col",
-  "children": [
-    { "kind": "stack", "dir": "row", "children": [
-        { "kind": "leaf", "title": "Facturación", "spec": { "type": "kpi", "endpoint": "/dashboard/sales-kpis", "fields": ["revenue"], "params": { "period": "month" } } },
-        { "kind": "leaf", "title": "Ticket medio", "spec": { "type": "kpi", "endpoint": "/dashboard/sales-kpis", "fields": ["avgTicket"], "params": { "period": "month" } } },
-        { "kind": "leaf", "title": "Unidades por ticket", "spec": { "type": "kpi", "endpoint": "/dashboard/sales-kpis", "fields": ["upt"], "params": { "period": "month" } } }
-    ] },
-    { "kind": "stack", "dir": "row", "children": [
-        { "kind": "leaf", "title": "Ventas por vendedor", "spec": { "type": "bar", "endpoint": "/dashboard/sales-by-employee", "fields": ["userName", "total"], "params": { "period": "month" } } },
-        { "kind": "leaf", "title": "Ventas por familia", "spec": { "type": "bar", "endpoint": "/dashboard/sales-by-family", "fields": ["familyName", "total"], "params": { "period": "month" } } }
-    ] }
-  ]
+  "kind": "panel",
+  "recipe": "kpiRow+twoCharts",
+  "density": "comfortable",
+  "title": "Rendimiento de ventas — este mes",
+  "slots": {
+    "kpis": [
+      { "piece": "kpiTile", "title": "Facturación", "endpoint": "/dashboard/sales-kpis", "value_field": "revenue", "format": "eur", "params": { "period": "month" } },
+      { "piece": "kpiTile", "title": "Ticket medio", "endpoint": "/dashboard/sales-kpis", "value_field": "avgTicket", "format": "eur", "params": { "period": "month" } }
+    ],
+    "charts": [
+      { "piece": "trendArea", "title": "Ventas por hora", "endpoint": "/dashboard/sales-by-hour", "label_field": "hour", "value_field": "revenue", "format": "eur", "params": { "period": "month" } },
+      { "piece": "rankBarList", "title": "Top vendedores", "endpoint": "/dashboard/sales-by-employee", "label_field": "userName", "value_field": "total", "format": "eur", "params": { "period": "month" } }
+    ]
+  }
 }
 "#;
 
@@ -376,8 +390,8 @@ en `generic_spec.fields`:\n",
     }
     p.push('\n');
 
-    // 4b. Widgets compuestos (DSL de layout, #189).
-    p.push_str(COMPOSITE_GUIDE);
+    // 4b. Paneles a medida y bloques (DSL v2, #206).
+    p.push_str(PANEL_GUIDE);
     p.push('\n');
 
     // 5. Estado actual del lienzo.
@@ -461,19 +475,74 @@ mod tests {
     }
 
     #[test]
-    fn incluye_seccion_de_widgets_compuestos_con_ejemplo() {
+    fn incluye_seccion_de_paneles_v2_con_bloques_recetas_y_piezas() {
         let p = build_system_prompt(&sample_org(), true, None);
-        assert!(p.contains("Widgets compuestos"));
-        assert!(p.contains("gen:composite"));
-        // El catálogo menciona el panel a medida.
-        assert!(p.contains("Panel a medida"));
-        // El ejemplo usa nodos del DSL y endpoints de la allowlist.
-        assert!(p.contains("\"kind\": \"stack\""));
-        assert!(p.contains("\"kind\": \"leaf\""));
+        assert!(p.contains("Paneles a medida y bloques"));
+        // Superficie v2: gen:panel + bloques pre-cableados.
+        assert!(p.contains("gen:panel"));
+        assert!(p.contains("block:sales-overview"));
+        assert!(p.contains("block:stock-risk"));
+        // Recetas y piezas (vocabulario v2), no nodos del árbol v1.
+        assert!(p.contains("kpiRow+twoCharts"));
+        assert!(p.contains("kpiTile"));
+        assert!(p.contains("rankBarList"));
         assert!(p.contains("/dashboard/sales-kpis"));
-        // El árbol composite no introduce endpoints de escritura.
+        // El DSL v1 (stack/leaf) NO aparece en el prompt: se retiró de la superficie del agente.
+        assert!(!p.contains("\"kind\": \"stack\""));
+        assert!(!p.contains("\"kind\": \"leaf\""));
+        // Sin endpoints de escritura.
         assert!(!p.contains("POST"));
         assert!(!p.contains("DELETE"));
+    }
+
+    #[test]
+    fn el_prompt_no_se_dispara_en_tamano() {
+        // F5 (#206): el catálogo de piezas/recetas/bloques NO debe inflar el prompt frente al
+        // antiguo COMPOSITE_GUIDE (que ya tenía ~55 líneas de prosa). Cota holgada como guardia.
+        // Tamaño actual ~8,5k chars (~2,1k tokens). Cota a 11k = guardia anti-runaway (no doblar).
+        let p = build_system_prompt(&sample_org(), true, None);
+        eprintln!("system_prompt chars = {}", p.len());
+        assert!(
+            p.len() < 11_000,
+            "el system prompt creció demasiado: {} chars",
+            p.len()
+        );
+    }
+
+    #[test]
+    fn paridad_endpoints_y_bloques_con_contrato_compartido() {
+        // Fuente única: docs/contracts/dataviz-contract.json (test gemelo en TS y en crates/ai).
+        let contract: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../docs/contracts/dataviz-contract.json"
+        ))
+        .expect("contrato JSON válido");
+        let from_contract = |k: &str| -> Vec<String> {
+            contract[k]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_str().unwrap().to_string())
+                .collect()
+        };
+
+        let mut endpoints: Vec<String> = WIDGETABLE_ENDPOINTS
+            .iter()
+            .map(|(p, _, _)| p.to_string())
+            .collect();
+        let mut contract_eps = from_contract("endpoints");
+        endpoints.sort();
+        contract_eps.sort();
+        assert_eq!(endpoints, contract_eps, "endpoints del prompt vs contrato");
+
+        // Los bloques del catálogo del prompt (ids con prefijo block:) deben coincidir con el contrato.
+        let mut blocks: Vec<String> = WIDGET_CATALOG
+            .iter()
+            .filter_map(|(id, _)| id.strip_prefix("block:").map(str::to_string))
+            .collect();
+        let mut contract_blocks = from_contract("blocks");
+        blocks.sort();
+        contract_blocks.sort();
+        assert_eq!(blocks, contract_blocks, "bloques del catálogo vs contrato");
     }
 
     #[test]

@@ -1,0 +1,32 @@
+{
+  "_comment": "Contrato ÚNICO del vocabulario v2 del dashboard (EPIC #201). Fuente de verdad compartida entre el frontend (apps/backoffice: dashboard-pieces.ts) y el backend (crates/ai: tools.rs schema, crates/domain: context.rs prompt). Tests de PARIDAD en ambos lados fallan si una copia diverge de este contrato (#206 F5).",
+  "pieces": [
+    "kpiTile",
+    "comparisonBars",
+    "trendLine",
+    "trendArea",
+    "shareDonut",
+    "rankBarList",
+    "segmentBar",
+    "progressMeter",
+    "dataGrid"
+  ],
+  "recipes": ["kpiRow", "kpiRow+oneChart", "kpiRow+twoCharts", "heroChart+sideStats", "tableFull"],
+  "formats": ["eur", "percent", "decimal", "units", "integer"],
+  "endpoints": [
+    "/dashboard/sales-by-family",
+    "/dashboard/sales-by-hour",
+    "/dashboard/sales-by-employee",
+    "/dashboard/discount-by-employee",
+    "/dashboard/product-rankings",
+    "/dashboard/sales-kpis",
+    "/dashboard/margin-kpis",
+    "/dashboard/stockout-kpis",
+    "/stock/alerts",
+    "/stock/expiring",
+    "/products",
+    "/product-families",
+    "/suppliers"
+  ],
+  "blocks": ["sales-overview", "stock-risk", "staff-performance", "product-ranking"]
+}
