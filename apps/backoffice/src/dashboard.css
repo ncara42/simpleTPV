@@ -1052,7 +1052,10 @@
 .dash-free-item-body {
   width: 100%;
   height: 100%;
-  pointer-events: none;
+  /* Interactivo: los widgets llevan controles propios (toggles de periodo, tipo de gráfica,
+     barras clicables, hover de la gráfica). El arrastre del lienzo se inicia solo cuando el puntero
+     se mueve de verdad (umbral en FreeBoard.startDrag), así que un click/hover sobre un control NO
+     se lo queda el contenedor arrastrable. */
   user-select: none;
 }
 /* La card/panel rellena el item; los paneles recortan su contenido (sin scrollbar). */
