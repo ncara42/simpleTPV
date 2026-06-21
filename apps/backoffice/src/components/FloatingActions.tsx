@@ -1,6 +1,7 @@
 import { Bell, Home } from 'lucide-react';
 
-import { switchApp, type Tab } from '../lib/nav.js';
+import type { Tab } from '../lib/nav.js';
+import { usePageActionsValue } from '../lib/pageActions.js';
 import { FunctionSearch } from './FunctionSearch.js';
 
 interface FloatingActionsProps {
@@ -15,8 +16,9 @@ interface FloatingActionsProps {
 }
 
 // Clúster de acciones flotante sobre el sidebar (sustituye al header/TopBar): lupa de funciones
-// (⌘K) + botón home + campana de notificaciones + conmutador Backoffice↔TPV. Todo en una fila de
-// pills/botones redondos a la altura del logo del sidebar flotante.
+// (⌘K) + botón home + campana de notificaciones + acciones de la vista activa (export/import…).
+// El cambio a TPV ya NO vive aquí: es la última entrada del sidebar (appSwitch). Todo en una fila
+// de pills/botones redondos a la altura del logo del sidebar flotante.
 export function FloatingActions({
   onNavigate,
   onHome,
@@ -24,6 +26,8 @@ export function FloatingActions({
   notificationCount,
   notificationsActive,
 }: FloatingActionsProps) {
+  const pageActions = usePageActionsValue();
+
   return (
     <div className="float-actions" data-testid="float-actions">
       <FunctionSearch onNavigate={onNavigate} />
@@ -57,26 +61,9 @@ export function FloatingActions({
           </span>
         )}
       </button>
-      <div className="float-switch" role="group" aria-label="Cambiar de app">
-        <button
-          type="button"
-          className="float-switch-btn is-active"
-          aria-pressed="true"
-          onClick={() => switchApp('backoffice')}
-          data-testid="switch-backoffice"
-        >
-          Backoffice
-        </button>
-        <button
-          type="button"
-          className="float-switch-btn"
-          aria-pressed="false"
-          onClick={() => switchApp('tpv')}
-          data-testid="switch-tpv"
-        >
-          TPV
-        </button>
-      </div>
+      {/* Acciones de la vista activa (export/import…): se anclan al borde derecho del
+          clúster (margin-left:auto), donde antes vivía el conmutador Backoffice↔TPV. */}
+      <div className="float-page-actions">{pageActions}</div>
     </div>
   );
 }

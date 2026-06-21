@@ -1,8 +1,8 @@
 import { Badge, DataTable, type DataTableColumn, Select, usePageHeader } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { Download, SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
 
-import { CsvActionButton } from './components/CsvActionButton.js';
 import { useTableColumns } from './components/useTableColumns.js';
 import {
   listSales,
@@ -15,6 +15,7 @@ import { exportRowsToCsv } from './lib/csv.js';
 import { type FamilyNode, listFamilies } from './lib/families.js';
 import { useFeatures } from './lib/features.js';
 import { fmtEur, fmtRate } from './lib/format.js';
+import { usePageActions } from './lib/pageActions.js';
 
 const hour = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
 const PAYMENT_LABEL: Record<string, string> = { CASH: 'Efectivo', CARD: 'Tarjeta' };
@@ -280,6 +281,34 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
     </div>
   );
 
+  usePageActions(
+    <>
+      {features.data_export && (
+        <button
+          type="button"
+          className="float-action-btn"
+          onClick={() => void exportCsv()}
+          aria-label="Exportar CSV"
+          title="Exportar CSV"
+          data-testid="sales-export"
+        >
+          <Download size={17} aria-hidden="true" />
+        </button>
+      )}
+      <button
+        type="button"
+        className={`float-action-btn${columnsEditorOpen ? ' is-active' : ''}`}
+        onClick={toggleColumnsEditor}
+        aria-label="Ajustar columnas"
+        title="Columnas"
+        aria-expanded={columnsEditorOpen}
+        data-testid="sales-columns-toggle"
+      >
+        <SlidersHorizontal size={17} aria-hidden="true" />
+      </button>
+    </>,
+  );
+
   return (
     <section className="catalog">
       {views.length > 0 && (
@@ -306,21 +335,6 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
       )}
 
       {columnsEditor}
-
-      <div className="table-actions">
-        {features.data_export && (
-          <CsvActionButton kind="export" onClick={() => void exportCsv()} testId="sales-export" />
-        )}
-        <button
-          type="button"
-          className="ui-dt-cols-trigger"
-          onClick={toggleColumnsEditor}
-          data-testid="sales-columns-toggle"
-          aria-expanded={columnsEditorOpen}
-        >
-          Columnas
-        </button>
-      </div>
 
       <DataTable
         columns={effectiveColumns}

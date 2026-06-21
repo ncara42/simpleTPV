@@ -176,6 +176,32 @@
   color: var(--sidebar-text-active);
 }
 
+/* Variante «peligro» (p. ej. «Cerrar sesión» en el panel de cuenta): tinta roja y hover rojo suave. */
+.sidebar-item--danger {
+  color: var(--ui-danger);
+}
+.sidebar-item--danger:hover {
+  background: color-mix(in srgb, var(--ui-danger) 8%, transparent);
+  color: var(--ui-danger);
+}
+
+/* Cambio de app (TPV): última entrada de la lista, separada por una línea
+   divisoria y con acento azul (--ui-primary) para distinguirla de la navegación
+   propia del backoffice. El icono hereda el color (color: inherit) → sale azul. */
+.sidebar-app-switch {
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--ui-border);
+}
+.sidebar-item--app {
+  color: var(--ui-primary, #0071e3);
+  font-weight: 600;
+}
+.sidebar-item--app:hover {
+  background: color-mix(in srgb, var(--ui-primary, #0071e3) 8%, transparent);
+  color: var(--ui-primary, #0071e3);
+}
+
 .sidebar-item-icon {
   width: 19px;
   height: 19px;
@@ -435,24 +461,6 @@
   align-items: center;
   justify-content: center;
   color: var(--sidebar-group-label-color);
-}
-
-/* Badge numérico en los items del menú de cuenta (p. ej. notificaciones). */
-.sidebar-account-menu-badge {
-  margin-left: auto;
-  flex-shrink: 0;
-  min-width: 1.1rem;
-  height: 1.1rem;
-  padding: 0 0.35rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9999px;
-  background: var(--ui-danger);
-  color: #fff;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  line-height: 1;
 }
 
 /* Cierre de sesión simple (cuando no hay cuenta) */
@@ -827,8 +835,23 @@
      radio del logo (tab-w/2) el círculo de recorte queda tangente A LA VEZ al logo y al borde
      superior del cuerpo → la curva «cuadra» exacta, sin recta ni pico. */
   --sidebar-neck: calc(var(--sidebar-tab-w) / 2);
+  /* Cuánto BAJA el cuerpo flotante por debajo del logo «S» para que la fila de botones
+     (S · avatar · buscar · home · campana) respire. El cuello cóncavo se alarga esta
+     misma cantidad para seguir tocando la base del logo: no se separan físicamente. */
+  --sidebar-neck-drop: 12px;
+  /* Radio del arco cóncavo derecho = radio del logo + la caída. Así el punto más bajo del
+     arco sigue cuadrando tangente al borde superior del cuerpo, ya bajado. Con drop=0 esto
+     vale exactamente --sidebar-neck → la geometría original es el caso particular. */
+  --sidebar-neck-r: calc(var(--sidebar-neck) + var(--sidebar-neck-drop));
+  /* Borde izquierdo del avatar (2º círculo de la fila): logo + su ancho + separación. El panel
+     de cuenta cuelga de aquí, igual que el cuerpo del sidebar cuelga del logo. */
+  --sidebar-avatar-left: calc(
+    var(--sidebar-float-gap) + var(--sidebar-tab-w) + var(--sidebar-top-gap)
+  );
   --sidebar-corner: var(--ui-radius-lg, 18px);
-  --sidebar-float-top: calc(var(--sidebar-float-gap) + var(--sidebar-tab-h));
+  --sidebar-float-top: calc(
+    var(--sidebar-float-gap) + var(--sidebar-tab-h) + var(--sidebar-neck-drop)
+  );
   --sidebar-surface: var(--ui-surface);
 }
 
@@ -888,6 +911,16 @@
     margin-left: 0;
   }
 
+  /* Eclipsado: el cuerpo se desvanece EN SU SITIO mientras el panel de cuenta (que cuelga del
+     avatar) está abierto, para que solo haya un panel colgante a la vez. A diferencia de
+     is-hidden, NO libera la columna del contenido: así no hay salto al abrir/cerrar el panel. */
+  .sidebar--floating.is-eclipsed {
+    opacity: 0;
+    transform: scale(0.97);
+    pointer-events: none;
+    visibility: hidden;
+  }
+
   /* ── Pestaña del TOGGLE: arriba-izquierda, comparte borde izquierdo con el cuerpo. Arriba
      redondeada; abajo se funde con el cuerpo y a su DERECHA un filete CÓNCAVO conecta con él
      (el cuerpo flarea hacia fuera). Es el único elemento enganchado al cuerpo. ── */
@@ -923,14 +956,16 @@
     position: absolute;
     left: 0;
     top: 50%;
-    /* Ensanchada a la derecha para alojar el filete cóncavo que sube hacia el logo. */
-    width: calc(100% + var(--sidebar-neck));
-    height: calc(50% + 6px);
+    /* Ensanchada a la derecha (radio del arco) y ALARGADA hacia abajo (la caída) para que el
+       cuello cóncavo descienda hasta el borde superior del cuerpo, ya bajado. */
+    width: calc(100% + var(--sidebar-neck-r));
+    height: calc(50% + 6px + var(--sidebar-neck-drop));
     background: var(--sidebar-surface);
     /* DOS recortes combinados con intersección (mask-composite):
        1) el disco del logo → medialunas que acunan su base;
-       2) un círculo en la esquina superior-derecha → el borde derecho se curva HACIA ADENTRO
-          (cóncavo), como el hueco que deja el search, en vez de flarear hacia afuera. */
+       2) un arco cóncavo de radio --sidebar-neck-r anclado en la esquina sup-derecha: su punto
+          más bajo cae justo en el borde superior del cuerpo (tangencia exacta), de modo que el
+          cuello se estrecha a la altura del logo y flarea limpio hacia el cuerpo sin escalón. */
     -webkit-mask:
       radial-gradient(
         circle calc(var(--sidebar-tab-w) / 2) at calc(var(--sidebar-tab-w) / 2) 0,
@@ -938,9 +973,9 @@
         #000 calc(var(--sidebar-tab-w) / 2)
       ),
       radial-gradient(
-        var(--sidebar-neck) at 100% 0,
-        #0000 0 calc(var(--sidebar-neck) - 0.5px),
-        #000 var(--sidebar-neck)
+        var(--sidebar-neck-r) at 100% 0,
+        #0000 0 calc(var(--sidebar-neck-r) - 0.5px),
+        #000 var(--sidebar-neck-r)
       );
     -webkit-mask-composite: source-in;
     mask:
@@ -950,9 +985,9 @@
         #000 calc(var(--sidebar-tab-w) / 2)
       ),
       radial-gradient(
-        var(--sidebar-neck) at 100% 0,
-        #0000 0 calc(var(--sidebar-neck) - 0.5px),
-        #000 var(--sidebar-neck)
+        var(--sidebar-neck-r) at 100% 0,
+        #0000 0 calc(var(--sidebar-neck-r) - 0.5px),
+        #000 var(--sidebar-neck-r)
       );
     mask-composite: intersect;
     pointer-events: none;
@@ -1000,7 +1035,7 @@
   .sidebar-account-float {
     position: fixed;
     top: var(--sidebar-float-gap);
-    left: calc(var(--sidebar-float-gap) + var(--sidebar-tab-w) + var(--sidebar-top-gap));
+    left: var(--sidebar-avatar-left);
     width: var(--sidebar-tab-w);
     height: var(--sidebar-tab-h);
     z-index: 42;
@@ -1035,8 +1070,7 @@
     border-radius: 50%;
     background: var(--ui-danger);
   }
-  .sidebar-account-fab:hover,
-  .sidebar-account-fab.open {
+  .sidebar-account-fab:hover {
     border-color: var(--ui-border-strong, var(--ui-border));
   }
   .sidebar-account-fab:focus-visible {
@@ -1047,39 +1081,99 @@
     width: 100%;
     height: 100%;
   }
-  /* Menú de cuenta abriendo hacia ABAJO (el avatar está arriba), con cabecera nombre+rol. */
-  .sidebar-account-menu--down {
-    position: absolute;
-    z-index: 60;
-    top: calc(100% + 0.45rem);
-    left: 0;
-    right: auto;
-    bottom: auto;
-    min-width: 200px;
-    padding: 0.3rem;
-    background: var(--ui-surface);
-    border: 1px solid var(--ui-border-strong);
-    border-radius: 12px;
-    box-shadow: var(--ui-shadow-md);
-    animation: sidebar-account-pop-down 0.12s var(--ui-ease, ease);
+
+  /* ── Avatar ABIERTO = «logo» del panel de cuenta ───────────────────────────────────────────
+     Al desplegar el menú, el avatar deja de ser un botón suelto y pasa a comportarse igual que
+     el logo «S»: sin borde ni sombra de chrome y con el MISMO cuello cóncavo (::after) que acuna
+     su base y conecta con el panel que cuelga debajo. Geometría idéntica a .sidebar-toggle-tab
+     (mismo círculo 38×38, misma caída): se reutilizan --sidebar-neck-r y --sidebar-neck-drop. */
+  .sidebar-account-fab.open {
+    border-color: transparent;
+    box-shadow: none;
+    /* Por encima del panel (z-index 1) dentro del contexto del float, para coronarlo. */
+    z-index: 2;
   }
-  @keyframes sidebar-account-pop-down {
+  /* Mientras el panel está abierto el punto rojo sobra (la opción «Notificaciones» ya está a la vista). */
+  .sidebar-account-fab.open .sidebar-account-notif-dot {
+    display: none;
+  }
+  .sidebar-account-fab.open::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: calc(100% + var(--sidebar-neck-r));
+    height: calc(50% + 6px + var(--sidebar-neck-drop));
+    background: var(--sidebar-surface);
+    -webkit-mask:
+      radial-gradient(
+        circle calc(var(--sidebar-tab-w) / 2) at calc(var(--sidebar-tab-w) / 2) 0,
+        #0000 0 calc(var(--sidebar-tab-w) / 2 - 0.5px),
+        #000 calc(var(--sidebar-tab-w) / 2)
+      ),
+      radial-gradient(
+        var(--sidebar-neck-r) at 100% 0,
+        #0000 0 calc(var(--sidebar-neck-r) - 0.5px),
+        #000 var(--sidebar-neck-r)
+      );
+    -webkit-mask-composite: source-in;
+    mask:
+      radial-gradient(
+        circle calc(var(--sidebar-tab-w) / 2) at calc(var(--sidebar-tab-w) / 2) 0,
+        #0000 0 calc(var(--sidebar-tab-w) / 2 - 0.5px),
+        #000 calc(var(--sidebar-tab-w) / 2)
+      ),
+      radial-gradient(
+        var(--sidebar-neck-r) at 100% 0,
+        #0000 0 calc(var(--sidebar-neck-r) - 0.5px),
+        #000 var(--sidebar-neck-r)
+      );
+    mask-composite: intersect;
+    pointer-events: none;
+  }
+  /* ── Panel de cuenta: un «sidebar» en miniatura que cuelga del avatar ───────────────────────
+     Mismo lenguaje que el cuerpo flotante (.sidebar--floating): tarjeta blanca, esquina sup-izq
+     RECTA (la corona el avatar), resto redondeado, misma sombra. Cuelga desde la posición del
+     avatar (--sidebar-avatar-left) al mismo nivel que el cuerpo del sidebar (--sidebar-float-top),
+     y su ancho alcanza justo el borde derecho del sidebar para integrarse. */
+  .sidebar-account-panel {
+    position: fixed;
+    top: var(--sidebar-float-top);
+    left: var(--sidebar-avatar-left);
+    width: calc(
+      var(--sidebar-width-expanded) - var(--sidebar-tab-w) - var(--sidebar-top-gap)
+    );
+    /* Dentro del contexto del float (z 42): sobre el cuerpo del sidebar (z 40); el avatar (z 2)
+       lo corona y su cuello cóncavo cubre la junta. */
+    z-index: 1;
+    padding: 0.5rem 0.5rem;
+    /* Aire arriba para que el primer item respire bajo el cuello cóncavo del avatar. */
+    padding-top: 0.85rem;
+    background: var(--sidebar-surface);
+    border-radius: 0 var(--sidebar-corner) var(--sidebar-corner) var(--sidebar-corner);
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.04),
+      0 18px 40px -12px rgb(0 0 0 / 0.2);
+    transform-origin: top left;
+    animation: sidebar-account-panel-in 0.18s var(--ui-ease, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+  @keyframes sidebar-account-panel-in {
     from {
       opacity: 0;
-      transform: translateY(-4px);
+      transform: scale(0.97);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: scale(1);
     }
   }
-  .sidebar-account-menu-head {
+  .sidebar-account-panel-items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.05rem;
-    padding: 0.4rem 0.6rem 0.5rem;
-    border-bottom: 1px solid var(--ui-border);
-    margin-bottom: 0.25rem;
+    gap: 1px;
   }
 
   .sidebar-search-float {

@@ -1,11 +1,10 @@
 import { Button, Input, Select } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Download, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { useConfirm } from './components/ConfirmProvider.js';
-import { CsvActionButton } from './components/CsvActionButton.js';
 import { Modal } from './components/Modal.js';
 import {
   EMPTY_PRODUCT_FORM,
@@ -33,6 +32,7 @@ import {
 } from './lib/family-tree.js';
 import { formErrorMessage } from './lib/form-error.js';
 import { fmtEur } from './lib/format.js';
+import { usePageActions } from './lib/pageActions.js';
 import { createProduct, listProducts, updateProduct } from './lib/products.js';
 
 // Forma del JSON de intercambio del árbol de familias (export/import). Anidada
@@ -379,6 +379,33 @@ export function FamiliesPage({
 
   const handleExport = (): void => downloadJson('familias.json', view.map(toJsonFamily));
 
+  // Export/Import en el clúster flotante (junto al conmutador Backoffice↔TPV),
+  // no en una banda propia sobre la card.
+  usePageActions(
+    <>
+      <button
+        type="button"
+        className="float-action-btn"
+        onClick={handleExport}
+        aria-label="Exportar familias"
+        title="Exportar familias"
+        data-testid="families-export"
+      >
+        <Download size={17} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className="float-action-btn"
+        onClick={() => setImporting(true)}
+        aria-label="Importar familias"
+        title="Importar familias"
+        data-testid="families-import"
+      >
+        <Upload size={17} aria-hidden="true" />
+      </button>
+    </>,
+  );
+
   const downloadTemplate = (): void =>
     downloadJson('familias-plantilla.json', [
       {
@@ -695,14 +722,6 @@ export function FamiliesPage({
 
   return (
     <section className="catalog">
-      <div className="table-actions">
-        <CsvActionButton kind="export" onClick={handleExport} testId="families-export" />
-        <CsvActionButton
-          kind="import"
-          onClick={() => setImporting(true)}
-          testId="families-import"
-        />
-      </div>
       <div className="table-panel">
         <div className="table-toolbar">
           <div className="sales-filters">

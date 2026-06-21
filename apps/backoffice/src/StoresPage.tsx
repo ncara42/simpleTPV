@@ -1,16 +1,16 @@
 import { Button } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Download, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { useConfirm } from './components/ConfirmProvider.js';
-import { CsvActionButton } from './components/CsvActionButton.js';
 import { createStore, deleteStore, listStores, type Store, updateStore } from './lib/admin.js';
 import { exportRowsToCsv } from './lib/csv.js';
 import { getSalesToday } from './lib/dashboard.js';
 import { formErrorMessage } from './lib/form-error.js';
 import { fmtEur } from './lib/format.js';
+import { usePageActions } from './lib/pageActions.js';
 import { StoreCard } from './stores/StoreCard.js';
 import { StoreDetailModal } from './stores/StoreDetailModal.js';
 import { type StoreForm, StoreFormModal } from './stores/StoreFormModal.js';
@@ -119,12 +119,21 @@ export function StoresPage({
   };
 
   usePageHeader('Tiendas', `${stores.length} ubicaciones`);
+  usePageActions(
+    <button
+      type="button"
+      className="float-action-btn"
+      onClick={handleExport}
+      aria-label="Exportar CSV"
+      title="Exportar CSV"
+      data-testid="stores-export"
+    >
+      <Download size={17} aria-hidden="true" />
+    </button>,
+  );
 
   return (
     <section className="catalog">
-      <div className="table-actions">
-        <CsvActionButton kind="export" onClick={handleExport} testId="stores-export" />
-      </div>
       <div className="users-toolbar">
         <div className="sales-filters" />
         <div className="ui-dt-toolbar-actions">

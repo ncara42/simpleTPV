@@ -1,7 +1,7 @@
 import type { PurchaseOrder } from '@simpletpv/auth';
 import { Badge, Button, DataTable, Input } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
 import {
@@ -14,9 +14,12 @@ import { STATUS_LABEL } from './labels.js';
 
 export function OrdersSection({
   supplierId,
+  tabs,
 }: {
   // Vista detalle de proveedor (I-18/D-07): solo sus pedidos.
   supplierId?: string;
+  // Pestañas de página (solo en la vista Proveedores, no en el detalle embebido).
+  tabs?: ReactNode;
 } = {}) {
   const qc = useQueryClient();
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -31,9 +34,6 @@ export function OrdersSection({
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['purchase-orders'] }),
   });
 
-  if (isLoading) {
-    return <p className="catalog-empty">Cargando…</p>;
-  }
   return (
     <>
       <DataTable
@@ -41,6 +41,8 @@ export function OrdersSection({
         rowTestId="order-row"
         rows={orders}
         rowKey={(o) => o.id}
+        loading={isLoading}
+        header={tabs}
         emptyState={
           supplierId ? (
             <span className="catalog-empty" data-testid="orders-empty">

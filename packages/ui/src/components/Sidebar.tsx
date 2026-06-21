@@ -75,6 +75,17 @@ export interface SidebarProps {
   onNotifications?: () => void;
   /** Nº de notificaciones sin leer; pinta un punto rojo sobre el avatar si > 0. */
   notificationCount?: number;
+  /**
+   * Acción de cambio de app (p. ej. ir al TPV). Se pinta al FINAL de la lista de
+   * navegación, separada por una línea divisoria y con acento azul, para
+   * diferenciarla de las entradas del propio backoffice.
+   */
+  appSwitch?: {
+    label: string;
+    icon: React.ReactNode;
+    onClick: () => void;
+    testId?: string;
+  };
 }
 
 const RAIL_STORAGE_KEY = 'ui.sidebar.collapsed';
@@ -149,6 +160,7 @@ export function Sidebar({
   floatingActions,
   onNotifications,
   notificationCount = 0,
+  appSwitch,
 }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   // U-04: rail de iconos persistido. En móvil el panel siempre abre completo.
@@ -187,6 +199,9 @@ export function Sidebar({
   const accountRef = useRef<HTMLDivElement>(null);
   const accountTriggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  // El logo flotante tiene su propio handler (onToggleClick): se excluye del cierre-por-clic-fuera
+  // del panel de cuenta para que al pulsarlo cierre el panel y REVELE el cuerpo (no lo oculte).
+  const toggleTabRef = useRef<HTMLButtonElement>(null);
 
   const toggleGroup = useCallback((groupId: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
@@ -198,7 +213,10 @@ export function Sidebar({
   useEffect(() => {
     if (!menuOpen) return;
     const onPointerDown = (e: PointerEvent) => {
-      if (!accountRef.current?.contains(e.target as Node)) setMenuOpen(false);
+      const target = e.target as Node;
+      if (!accountRef.current?.contains(target) && !toggleTabRef.current?.contains(target)) {
+        setMenuOpen(false);
+      }
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -253,6 +271,27 @@ export function Sidebar({
     setOpenGroup(null);
     setAnchored(false);
   }, [clearTimers]);
+
+  // Los dos paneles colgantes del clúster flotante (cuerpo del sidebar bajo el logo, panel de
+  // cuenta bajo el avatar) son mutuamente excluyentes: abrir el de cuenta eclipsa el cuerpo y
+  // cierra cualquier grupo desplegado; el cuerpo reaparece al cerrarlo (clic fuera / opción).
+  const toggleAccountMenu = useCallback(() => {
+    setMenuOpen((prev) => {
+      const next = !prev;
+      if (next) closeDropdown();
+      return next;
+    });
+  }, [closeDropdown]);
+
+  // Pulsar el logo con el panel de cuenta abierto solo lo cierra (revela el cuerpo); si no, hace
+  // su función normal de ocultar/mostrar el cuerpo del sidebar flotante.
+  const onToggleClick = useCallback(() => {
+    if (menuOpen) {
+      setMenuOpen(false);
+      return;
+    }
+    toggleHidden();
+  }, [menuOpen, toggleHidden]);
 
   // Hover sostenido >200ms abre el preview (sin anclar). El anclado no se pisa.
   const onGroupEnter = useCallback(
@@ -388,7 +427,7 @@ export function Sidebar({
       <aside
         className={`sidebar${mobileOpen ? ' mobile-open' : ''}${collapsed ? ' collapsed' : ''}${
           floating ? ' sidebar--floating' : ''
-        }${isHidden ? ' is-hidden' : ''}`}
+        }${isHidden ? ' is-hidden' : ''}${floating && menuOpen ? ' is-eclipsed' : ''}`}
       >
         {/* Header: logotipo de la empresa. */}
         <div className="sidebar-header">
@@ -534,6 +573,26 @@ export function Sidebar({
               })}
             </>
           )}
+
+          {/* Cambio de app (p. ej. TPV): última entrada de la lista, tras una línea
+              divisoria y con acento azul para distinguirla del propio backoffice. */}
+          {appSwitch && (
+            <div className="sidebar-app-switch">
+              <button
+                type="button"
+                className="sidebar-item sidebar-item--app"
+                onClick={() => {
+                  appSwitch.onClick();
+                  setMobileOpen(false);
+                }}
+                title={appSwitch.label}
+                data-testid={appSwitch.testId ?? 'sidebar-app-switch'}
+              >
+                <span className="sidebar-item-icon">{appSwitch.icon}</span>
+                <span className="sidebar-item-label">{appSwitch.label}</span>
+              </button>
+            </div>
+          )}
         </nav>
 
         {/* Footer: cuenta (estilo ChatGPT) o cierre de sesión simple. En modo flotante la cuenta
@@ -614,8 +673,11 @@ export function Sidebar({
       {floating && (
         <button
           type="button"
-          className={`sidebar-toggle-tab${isHidden ? ' is-collapsed' : ''}`}
-          onClick={toggleHidden}
+          // Con el panel de cuenta abierto el cuerpo del sidebar se eclipsa: el logo queda como
+          // círculo suelto (is-collapsed) para que su cuello cóncavo no cuelgue hacia la nada.
+          className={`sidebar-toggle-tab${isHidden || menuOpen ? ' is-collapsed' : ''}`}
+          ref={toggleTabRef}
+          onClick={onToggleClick}
           data-testid="sidebar-toggle"
           aria-pressed={!isHidden}
           aria-label={isHidden ? 'Mostrar menú' : 'Ocultar menú'}
@@ -636,7 +698,7 @@ export function Sidebar({
             type="button"
             className={`sidebar-account-fab${menuOpen ? ' open' : ''}`}
             ref={accountTriggerRef}
-            onClick={() => setMenuOpen((v) => !v)}
+            onClick={toggleAccountMenu}
             data-testid="account-menu"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
@@ -651,55 +713,55 @@ export function Sidebar({
           </button>
           {menuOpen && (
             <div
-              className="sidebar-account-menu sidebar-account-menu--down"
+              className="sidebar-account-panel"
               role="menu"
               aria-label="Cuenta"
               ref={menuRef}
               onKeyDown={onMenuKeyDown}
             >
-              <div className="sidebar-account-menu-head">
-                <span className="sidebar-account-name">{account.name}</span>
-                {account.subtitle && (
-                  <span className="sidebar-account-sub">{account.subtitle}</span>
+              <ul className="sidebar-account-panel-items">
+                {onNotifications && (
+                  <li>
+                    <button
+                      type="button"
+                      className="sidebar-item"
+                      role="menuitem"
+                      onClick={() => {
+                        closeMenu();
+                        onNotifications();
+                      }}
+                      data-testid="nav-notifications"
+                    >
+                      <span className="sidebar-item-icon">
+                        <BellGlyph />
+                      </span>
+                      <span className="sidebar-item-label">Alertas</span>
+                      {notificationCount > 0 && (
+                        <span className="sidebar-item-badge">{notificationCount}</span>
+                      )}
+                    </button>
+                  </li>
                 )}
-              </div>
-              {onNotifications && (
-                <button
-                  type="button"
-                  className="sidebar-account-menu-item"
-                  role="menuitem"
-                  onClick={() => {
-                    closeMenu();
-                    onNotifications();
-                  }}
-                  data-testid="nav-notifications"
-                >
-                  <span className="sidebar-account-menu-icon">
-                    <BellGlyph />
-                  </span>
-                  <span>Notificaciones</span>
-                  {notificationCount > 0 && (
-                    <span className="sidebar-account-menu-badge">{notificationCount}</span>
-                  )}
-                </button>
-              )}
-              {onLogout && (
-                <button
-                  type="button"
-                  className="sidebar-account-menu-item sidebar-account-menu-item--danger"
-                  role="menuitem"
-                  onClick={() => {
-                    closeMenu();
-                    onLogout();
-                  }}
-                  data-testid="logout"
-                >
-                  <span className="sidebar-account-menu-icon">
-                    <LogoutGlyph />
-                  </span>
-                  <span>Cerrar sesión</span>
-                </button>
-              )}
+                {onLogout && (
+                  <li>
+                    <button
+                      type="button"
+                      className="sidebar-item sidebar-item--danger"
+                      role="menuitem"
+                      onClick={() => {
+                        closeMenu();
+                        onLogout();
+                      }}
+                      data-testid="logout"
+                    >
+                      <span className="sidebar-item-icon">
+                        <LogoutGlyph />
+                      </span>
+                      <span className="sidebar-item-label">Cerrar sesión</span>
+                    </button>
+                  </li>
+                )}
+              </ul>
             </div>
           )}
         </div>
