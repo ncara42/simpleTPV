@@ -74,7 +74,7 @@ bcrypt = "0.15"
 # Hash encadenado de los registros VeriFactu (#152/#155): SHA-256.
 sha2 = "0.10"
 # HTTP cliente para las llamadas a los providers LLM (OpenAI, Anthropic) — streaming SSE.
-reqwest = { version = "0.12", features = ["json", "stream"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
 # SSE generado en Rust (elevado desde http crate que lo tenía como dep local).
 async-stream = "0.3"
 # Stream combinators para los events SSE.
