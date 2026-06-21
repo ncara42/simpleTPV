@@ -1198,7 +1198,7 @@ function ChartKindToggle({
 }) {
   return (
     <div
-      className="dash-preset-switch dash-chart-kind"
+      className="dash-chart-kind"
       role="tablist"
       aria-label="Tipo de gráfico"
       data-testid="dash-chart-kind"

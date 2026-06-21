@@ -203,6 +203,42 @@
   height: calc(30px + 0.36rem + 2px);
   border-radius: 9999px;
 }
+/* Conmutador barras ↔ línea (U-02): píldora segmentada de dos iconos, a juego con las demás pills
+   del header (misma altura/radio/tokens). El estilo se había perdido al migrar los presets (F0),
+   que se llevó la clase .dash-preset-switch; este selector lo restituye sobre .dash-chart-kind. */
+.dash-chart-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  height: calc(30px + 0.36rem + 2px);
+  padding: 0 0.2rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface-subtle);
+  flex: none;
+}
+.dash-chart-kind button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: none;
+  border-radius: 9999px;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.dash-chart-kind button:hover {
+  color: var(--ui-text);
+}
+.dash-chart-kind button.is-active {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
 /* Leyenda de color implícita en el disparador del compare: gris = anterior, verde = actual. */
 .dash-compare-prev {
   color: var(--ui-text-soft);
