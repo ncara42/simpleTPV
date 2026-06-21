@@ -376,6 +376,36 @@
   min-height: 0;
 }
 
+/* ── HeroSplit ── (receta heroChart+sideStats: gráfica hero 2fr + columna de stats 1fr) */
+.dv-hero-split {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--ui-space-3);
+  flex: 1 1 auto;
+  min-height: 14rem;
+}
+.dv-hero-split-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.dv-hero-split-main > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.dv-hero-split-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  min-width: 0;
+}
+@media (max-width: 540px) {
+  .dv-hero-split {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── InsightCard ── */
 .dv-insight {
   display: flex;

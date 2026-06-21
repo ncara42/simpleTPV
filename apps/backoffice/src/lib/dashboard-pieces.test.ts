@@ -25,9 +25,12 @@ describe('dashboard-pieces — reparadores del DSL v2 (#204)', () => {
       expect(inferFormat('total')).toBe('eur');
       expect(inferFormat('avgTicket')).toBe('eur');
     });
-    it('tasas/porcentajes → percent', () => {
-      expect(inferFormat('discountRate')).toBe('percent');
-      expect(inferFormat('marginPct')).toBe('percent');
+    it('tasas/porcentajes (fracción 0..1) → percentRatio', () => {
+      expect(inferFormat('discountRate')).toBe('percentRatio');
+      expect(inferFormat('returnRate')).toBe('percentRatio');
+      expect(inferFormat('avgDiscountPct')).toBe('percentRatio');
+      expect(inferFormat('marginPct')).toBe('percentRatio');
+      expect(inferFormat('rate')).toBe('percentRatio');
     });
     it('upt → decimal; unidades → units', () => {
       expect(inferFormat('upt')).toBe('decimal');
@@ -39,7 +42,7 @@ describe('dashboard-pieces — reparadores del DSL v2 (#204)', () => {
       expect(inferFormat('ticketCount')).toBe('units');
       expect(inferFormat('salesUnits')).toBe('units');
       expect(inferFormat('totalUnits')).toBe('units');
-      expect(inferFormat('priceRatio')).toBe('percent');
+      expect(inferFormat('priceRatio')).toBe('percentRatio');
       expect(inferFormat('avgUnitsPerTicket')).toBe('decimal');
     });
     it('campo desconocido o ausente → undefined', () => {
@@ -70,6 +73,20 @@ describe('dashboard-pieces — reparadores del DSL v2 (#204)', () => {
       expect(clampRecipe('xxx', { kpis: 0, charts: 1, firstChartIsTable: false })).toBe(
         'heroChart+sideStats',
       );
+    });
+    it('una receta válida pero contradictoria con el nº de piezas se re-deriva (#212)', () => {
+      // kpiRow (0 charts) pedida con 4 charts → no encaja → kpiRow+twoCharts.
+      expect(clampRecipe('kpiRow', { kpis: 1, charts: 4, firstChartIsTable: false })).toBe(
+        'kpiRow+twoCharts',
+      );
+      // kpiRow+twoCharts (≥2) pedida con 1 chart + kpis → kpiRow+oneChart.
+      expect(
+        clampRecipe('kpiRow+twoCharts', { kpis: 2, charts: 1, firstChartIsTable: false }),
+      ).toBe('kpiRow+oneChart');
+      // heroChart+sideStats (1 chart) pedida sin charts → kpiRow.
+      expect(
+        clampRecipe('heroChart+sideStats', { kpis: 3, charts: 0, firstChartIsTable: false }),
+      ).toBe('kpiRow');
     });
   });
 

@@ -473,8 +473,10 @@ function normalizePanelSpec(
     firstChartIsTable: charts[0]?.piece === 'dataGrid',
   };
   const recipe = clampRecipe(raw.recipe, counts);
-  if (asRecipe(raw.recipe) == null && raw.recipe !== undefined) {
-    reasons.push(`ajusté la receta a «${recipe}»`);
+  // Avisa tanto si la receta pedida era inválida como si era válida pero contradecía el nº de
+  // piezas (clampRecipe la re-derivó). El reason vuelve al LLM vía CanvasResult.reason (#212).
+  if (raw.recipe !== undefined && recipe !== asRecipe(raw.recipe)) {
+    reasons.push(`ajusté la receta a «${recipe}» (no encajaba con las piezas)`);
   }
   const density: PanelDensity = raw.density === 'compact' ? 'compact' : 'comfortable';
 

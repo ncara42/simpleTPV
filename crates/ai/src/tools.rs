@@ -18,6 +18,7 @@ pub const PIECES: &[&str] = &[
     "rankBarList",
     "segmentBar",
     "progressMeter",
+    "stockAlertList",
     "dataGrid",
 ];
 const KPI_PIECES: &[&str] = &["kpiTile"];
@@ -29,6 +30,7 @@ const CHART_PIECES: &[&str] = &[
     "rankBarList",
     "segmentBar",
     "progressMeter",
+    "stockAlertList",
     "dataGrid",
 ];
 pub const RECIPES: &[&str] = &[
@@ -38,7 +40,14 @@ pub const RECIPES: &[&str] = &[
     "heroChart+sideStats",
     "tableFull",
 ];
-pub const FORMATS: &[&str] = &["eur", "percent", "decimal", "units", "integer"];
+pub const FORMATS: &[&str] = &[
+    "eur",
+    "percent",
+    "percentRatio",
+    "decimal",
+    "units",
+    "integer",
+];
 pub const WIDGETABLE_ENDPOINTS: &[&str] = &[
     "/dashboard/sales-by-family",
     "/dashboard/sales-by-hour",

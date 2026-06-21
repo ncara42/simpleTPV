@@ -37,6 +37,8 @@ export { KpiTile, type KpiTileProps } from './KpiTile.js';
 export {
   ChartGrid,
   type ChartGridProps,
+  HeroSplit,
+  type HeroSplitProps,
   KpiRow,
   type KpiRowProps,
   PanelShell,

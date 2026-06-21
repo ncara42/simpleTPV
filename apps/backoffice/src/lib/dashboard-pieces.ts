@@ -15,6 +15,7 @@ export const PIECE_ALLOWLIST: ReadonlySet<PieceId> = new Set<PieceId>([
   'rankBarList',
   'segmentBar',
   'progressMeter',
+  'stockAlertList',
   'dataGrid',
 ]);
 
@@ -59,6 +60,7 @@ export const SLOT_PIECES: Record<SlotName, ReadonlySet<PieceId>> = {
     'rankBarList',
     'segmentBar',
     'progressMeter',
+    'stockAlertList',
     'dataGrid',
   ]),
 };
@@ -76,6 +78,7 @@ export const RECIPE_SIZE: Record<RecipeId, { w: number; h: number }> = {
 export const PIECE_FORMATS: readonly PieceFormat[] = [
   'eur',
   'percent',
+  'percentRatio',
   'decimal',
   'units',
   'integer',
@@ -95,20 +98,47 @@ export function asRecipe(v: unknown): RecipeId | null {
     : null;
 }
 
-// Clampa una receta inválida a la más cercana según qué slots traen piezas. Sin charts → kpiRow;
-// 1 chart → kpiRow+oneChart; ≥2 charts → kpiRow+twoCharts; solo charts (sin kpis) y 1 pieza →
-// tableFull si es dataGrid, si no heroChart+sideStats.
-export function clampRecipe(
-  raw: unknown,
-  counts: { kpis: number; charts: number; firstChartIsTable: boolean },
-): RecipeId {
-  const exact = asRecipe(raw);
-  if (exact) return exact;
+// Conteo de piezas por slot, usado para derivar/validar la receta.
+export interface SlotCounts {
+  kpis: number;
+  charts: number;
+  firstChartIsTable: boolean;
+}
+
+// Deriva la receta más cercana según qué slots traen piezas. Sin charts → kpiRow; 1 chart →
+// kpiRow+oneChart; ≥2 charts → kpiRow+twoCharts; solo charts (sin kpis) y 1 pieza → tableFull si es
+// dataGrid, si no heroChart+sideStats.
+export function deriveRecipe(counts: SlotCounts): RecipeId {
   if (counts.charts === 0) return 'kpiRow';
   if (counts.charts >= 2) return 'kpiRow+twoCharts';
   // exactamente 1 chart
   if (counts.kpis === 0) return counts.firstChartIsTable ? 'tableFull' : 'heroChart+sideStats';
   return 'kpiRow+oneChart';
+}
+
+// ¿La receta encaja con el nº de charts? El layout de cada receta lo dicta el nº de columnas de
+// charts, así que validar por `counts.charts` evita geometrías contradictorias (p. ej. kpiRow con
+// 4 charts → 1 fila apretada). kpiRow = solo kpis; oneChart/hero/tableFull = 1 chart; twoCharts ≥2.
+export function recipeFits(recipe: RecipeId, counts: SlotCounts): boolean {
+  switch (recipe) {
+    case 'kpiRow':
+      return counts.charts === 0;
+    case 'kpiRow+oneChart':
+    case 'heroChart+sideStats':
+    case 'tableFull':
+      return counts.charts === 1;
+    case 'kpiRow+twoCharts':
+      return counts.charts >= 2;
+  }
+}
+
+// Clampa la receta: respeta la explícita SOLO si es válida y encaja con los counts; si no (inválida
+// o contradictoria con el nº de piezas), la re-deriva. El caller (store) emite un `reason` cuando el
+// resultado difiere de lo pedido, para que el desajuste vuelva al LLM (#212).
+export function clampRecipe(raw: unknown, counts: SlotCounts): RecipeId {
+  const exact = asRecipe(raw);
+  if (exact && recipeFits(exact, counts)) return exact;
+  return deriveRecipe(counts);
 }
 
 // Nº de columnas de charts que dicta la receta (1 o 2). El layout deriva de aquí, no del agente.
@@ -130,8 +160,12 @@ export function slotForPiece(piece: PieceId): SlotName | null {
 export function inferFormat(field: string | undefined): PieceFormat | undefined {
   if (!field) return undefined;
   const f = field.toLowerCase();
-  // 1) Porcentajes/tasas (sufijo o keyword) — antes que eur.
-  if (/(pct|percent|porcentaje)/.test(f) || /rate$/.test(f) || /ratio$/.test(f)) return 'percent';
+  // 1) Porcentajes/tasas (sufijo o keyword) — antes que eur. Los campos de tasa del dashboard
+  // (discountRate, returnRate, avgDiscountPct, marginPct, stockout rate) llegan como fracción
+  // 0..1, así que se infiere `percentRatio` (×100). `percent` (0..100) queda para uso explícito (#208).
+  if (/(pct|percent|porcentaje)/.test(f) || /rate$/.test(f) || /ratio$/.test(f)) {
+    return 'percentRatio';
+  }
   // 2) Ratios "por ticket"/upt → decimal.
   if (f === 'upt' || /perticket|por_ticket|peritem/.test(f)) return 'decimal';
   // 3) Unidades/conteos → units (gana al substring eur: `ticketCount`, `salesUnits`).

@@ -113,27 +113,20 @@ const BLOCKS: Record<string, BlockDef> = {
       charts: [
         withParams(
           {
-            piece: 'dataGrid',
+            piece: 'stockAlertList',
             title: 'Alertas de stock',
             endpoint: '/stock/alerts',
-            columns: [
-              { field: 'productName', label: 'Producto' },
-              { field: 'alertType', label: 'Tipo' },
-              { field: 'severity', label: 'Severidad' },
-            ],
+            labelField: 'productName',
           },
           p,
         ),
         withParams(
           {
-            piece: 'dataGrid',
+            piece: 'stockAlertList',
             title: 'Lotes por caducar',
             endpoint: '/stock/expiring',
-            columns: [
-              { field: 'productName', label: 'Producto' },
-              { field: 'daysToExpiry', label: 'Días', format: 'integer', align: 'right' },
-              { field: 'quantity', label: 'Cantidad', format: 'units', align: 'right' },
-            ],
+            labelField: 'productName',
+            valueField: 'quantity',
           },
           p,
         ),

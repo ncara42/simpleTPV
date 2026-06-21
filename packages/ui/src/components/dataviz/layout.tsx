@@ -36,6 +36,22 @@ export function KpiRow({ columns = 3, children }: KpiRowProps) {
   );
 }
 
+// Composición side-by-side de la receta heroChart+sideStats (#212): una gráfica hero ancha (2fr) a
+// la izquierda y una columna de KPIs (stats, 1fr) a la derecha. En móvil colapsa a una columna
+// (stats debajo). Geometría horneada (2fr/1fr), no del agente.
+export interface HeroSplitProps {
+  hero: ReactNode;
+  side: ReactNode;
+}
+export function HeroSplit({ hero, side }: HeroSplitProps) {
+  return (
+    <div className="dv-hero-split" data-testid="dv-hero-split">
+      <div className="dv-hero-split-main">{hero}</div>
+      <div className="dv-hero-split-side">{side}</div>
+    </div>
+  );
+}
+
 // Rejilla de 1-2 gráficas por fila con alturas horneadas. `emphasis='hero'` da más alto a la
 // primera (para heroChart+sideStats). Columnas del ENUM, no de span/gap.
 export interface ChartGridProps {

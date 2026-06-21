@@ -10,9 +10,9 @@ vi.mock('../../lib/auth.js', () => ({ api: { get: (...args: unknown[]) => getMoc
 
 import { GenericPanel } from './GenericPanel.js';
 
-function renderWithClient(node: React.ReactElement): void {
+function renderWithClient(node: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(<QueryClientProvider client={qc}>{node}</QueryClientProvider>);
+  return render(<QueryClientProvider client={qc}>{node}</QueryClientProvider>);
 }
 
 describe('GenericPanel — panel v2 (#204)', () => {
@@ -103,5 +103,127 @@ describe('GenericPanel — panel v2 (#204)', () => {
     expect(screen.getByTestId('dv-chart-grid')).toBeInTheDocument();
     expect(screen.queryByTestId('dv-kpi-row')).toBeNull();
     expect(screen.getByText('Solo tabla')).toBeInTheDocument();
+  });
+
+  it('stockAlertList mapea /stock/alerts (rotura) y /stock/expiring (caducidad) (#209)', async () => {
+    getMock.mockImplementation((endpoint: string) => {
+      if (endpoint === '/stock/alerts')
+        return Promise.resolve([
+          {
+            productName: 'Aceite CBD',
+            storeName: 'Centro',
+            alertType: 'OUT_OF_STOCK',
+            severity: 'critical',
+          },
+          { productName: 'Crema CBD', storeName: 'Sur', alertType: 'LOW_STOCK', severity: 'soft' },
+        ]);
+      if (endpoint === '/stock/expiring')
+        return Promise.resolve([
+          {
+            productName: 'Flores',
+            lotCode: 'L-22',
+            daysToExpiry: 3,
+            quantity: '12',
+            status: 'expiring',
+          },
+        ]);
+      return Promise.resolve([]);
+    });
+
+    const spec: GenericSpec = {
+      type: 'composite',
+      kind: 'panel',
+      version: 2,
+      endpoint: '',
+      title: 'Riesgo de stock',
+      defaultSize: { w: 8, h: 5 },
+      recipe: 'kpiRow+twoCharts',
+      density: 'comfortable',
+      slots: {
+        charts: [
+          {
+            piece: 'stockAlertList',
+            title: 'Alertas de stock',
+            endpoint: '/stock/alerts',
+            labelField: 'productName',
+          },
+          {
+            piece: 'stockAlertList',
+            title: 'Lotes por caducar',
+            endpoint: '/stock/expiring',
+            labelField: 'productName',
+            valueField: 'quantity',
+          },
+        ],
+      },
+    };
+
+    const { container } = renderWithClient(<GenericPanel spec={spec} />);
+
+    // Rotura: estado por severidad (sin cantidad).
+    await waitFor(() => expect(screen.getByText('Sin stock')).toBeInTheDocument());
+    expect(screen.getByText('Stock bajo')).toBeInTheDocument();
+    expect(screen.getByText('Aceite CBD')).toBeInTheDocument();
+    // La alerta crítica usa la píldora danger.
+    expect(container.querySelector('.dv-status-pill--danger')).toBeInTheDocument();
+    // Caducidad: estado "Caduca en N d" + cantidad formateada.
+    await waitFor(() => expect(screen.getByText('Caduca en 3 d')).toBeInTheDocument());
+    expect(screen.getByText('Flores')).toBeInTheDocument();
+  });
+
+  it('heroChart+sideStats compone hero (gráfica) + side stats (KPIs) de verdad (#212)', async () => {
+    getMock.mockImplementation((endpoint: string) => {
+      if (endpoint === '/dashboard/sales-by-hour')
+        return Promise.resolve([
+          { hour: '10', revenue: 100 },
+          { hour: '11', revenue: 140 },
+        ]);
+      if (endpoint === '/dashboard/sales-kpis') return Promise.resolve({ revenue: 5000 });
+      return Promise.resolve([]);
+    });
+
+    const spec: GenericSpec = {
+      type: 'composite',
+      kind: 'panel',
+      version: 2,
+      endpoint: '',
+      title: 'Ventas del día',
+      defaultSize: { w: 8, h: 5 },
+      recipe: 'heroChart+sideStats',
+      density: 'comfortable',
+      slots: {
+        kpis: [
+          {
+            piece: 'kpiTile',
+            title: 'Facturación',
+            endpoint: '/dashboard/sales-kpis',
+            valueField: 'revenue',
+            format: 'eur',
+          },
+        ],
+        charts: [
+          {
+            piece: 'trendArea',
+            title: 'Ventas por hora',
+            endpoint: '/dashboard/sales-by-hour',
+            labelField: 'hour',
+            valueField: 'revenue',
+          },
+        ],
+      },
+    };
+
+    const { container } = renderWithClient(<GenericPanel spec={spec} />);
+
+    // Composición side-by-side real: hero (gráfica) a un lado, stats (KPI) al otro.
+    const split = container.querySelector('.dv-hero-split');
+    expect(split).toBeInTheDocument();
+    expect(container.querySelector('.dv-hero-split-main')).toBeInTheDocument();
+    expect(container.querySelector('.dv-hero-split-side')).toBeInTheDocument();
+    // El KPI vive en la columna de stats, no en una KpiRow apilada arriba.
+    expect(screen.queryByTestId('dv-kpi-row')).toBeNull();
+    expect(screen.getByText('Ventas por hora')).toBeInTheDocument();
+    expect(screen.getByText('Facturación')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/5\.?000,00\s?€/)).toBeInTheDocument());
   });
 });

@@ -195,9 +195,10 @@ Piezas (cada una bonita por construcción — no configuras estilo):
 - `rankBarList` (charts) — ranking horizontal (top productos/vendedores). label_field + value_field, max_rows?.
 - `segmentBar` (charts) — barra única de reparto. label_field + value_field.
 - `progressMeter` (charts) — progreso hacia un objetivo. value_field + target?.
+- `stockAlertList` (charts) — lista de alertas de stock con estado por severidad. Solo para `/stock/alerts` (roturas) o `/stock/expiring` (caducidades); label_field = productName.
 - `dataGrid` (charts) — tabla. columns: [{ field, label, format?, align? }].
 
-`format` (eur, percent, decimal, units, integer) es OPCIONAL: si lo omites se infiere por el nombre del campo.
+`format` (eur, percent, percentRatio, decimal, units, integer) es OPCIONAL: si lo omites se infiere por el nombre del campo. Las tasas del dashboard (discountRate, returnRate, avgDiscountPct, marginPct, rate) llegan como fracción 0..1 → usa `percentRatio` (×100); `percent` es para valores ya en 0..100.
 El `period`/`store_id` van en `params` de cada pieza (p. ej. "params": { "period": "month" }).
 Una pieza en el slot equivocado se reubica sola; un endpoint fuera de la allowlist se descarta. No repitas reglas de maquetado.
 
