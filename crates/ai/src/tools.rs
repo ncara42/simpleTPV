@@ -86,7 +86,7 @@ pub fn canvas_tools() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "add_widget",
-                "description": "Añade un widget al dashboard. TRES formas, de menos a más esfuerzo: (1) BLOQUE pre-cableado (widget_id 'block:<id>') = un panel entero ya diseñado con UNA llamada — el preferido; (2) widget del CATÁLOGO simple (widget_id 'kpi-today', 'dash-bars', …); (3) PANEL a medida (widget_id 'gen:panel' + generic_spec con kind 'panel', recipe y slots). NO emitas geometría (w/h/span/gap): la receta dicta el layout. El DSL v1 (type/root/composite) está OBSOLETO.",
+                "description": "Añade un widget al dashboard. TRES formas, de menos a más esfuerzo: (1) BLOQUE pre-cableado (widget_id 'block:<id>') = un panel entero ya diseñado con UNA llamada — el preferido; (2) widget del CATÁLOGO simple (widget_id 'kpi-today', 'dash-bars', …); (3) PANEL a medida (widget_id 'gen:panel' + generic_spec con kind 'panel', recipe y slots). NO emitas geometría (w/h/span/gap): la receta dicta el layout. Para combinar varias métricas en una tarjeta usa un bloque o gen:panel (no hay árbol de layout libre).",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -127,14 +127,7 @@ pub fn canvas_tools() -> Vec<Value> {
                                         "kpis": { "type": "array", "items": piece_item_schema(KPI_PIECES) },
                                         "charts": { "type": "array", "items": piece_item_schema(CHART_PIECES) }
                                     }
-                                },
-                                "_comment_v1": "Campos v1 OBSOLETOS (solo compatibilidad con layouts ya guardados). NO los uses.",
-                                "type": { "type": "string", "enum": ["table", "bar", "line", "area", "pie", "stacked", "kpi", "insight", "composite"], "description": "OBSOLETO (v1). Usa kind:'panel'." },
-                                "endpoint": { "type": "string", "description": "OBSOLETO (v1). Los endpoints van en cada pieza de slots." },
-                                "params": { "type": "object", "description": "OBSOLETO (v1)." },
-                                "fields": { "type": "object", "description": "OBSOLETO (v1)." },
-                                "default_size": { "type": "object", "description": "OBSOLETO (v1): la receta dicta el tamaño." },
-                                "root": { "type": "object", "description": "OBSOLETO (v1 composite). Usa recipe + slots." }
+                                }
                             }
                         }
                     },
@@ -559,23 +552,39 @@ mod tests {
     }
 
     #[test]
-    fn add_widget_soporta_widgets_compuestos() {
+    fn add_widget_retira_el_composite_v1_de_la_superficie() {
+        // F6 (#207): el DSL v1 (type/root/composite/endpoint/params/fields/default_size) se RETIRA del
+        // schema visible. El agente solo emite block:/gen:panel; la hidratación frontend sigue
+        // aceptando layouts v1 ya persistidos, pero el LLM no puede emitirlos.
         let canvas = canvas_tools();
         let add_widget = canvas
             .iter()
             .find(|t| t["function"]["name"] == "add_widget")
             .unwrap();
-        let generic = &add_widget["function"]["parameters"]["properties"]["generic_spec"];
-        // El tipo 'composite' sigue en el schema por compat (OBSOLETO en F5, se retira en F6).
-        let types = generic["properties"]["type"]["enum"].as_array().unwrap();
+        let props =
+            &add_widget["function"]["parameters"]["properties"]["generic_spec"]["properties"];
+        for retired in [
+            "type",
+            "root",
+            "endpoint",
+            "params",
+            "fields",
+            "default_size",
+        ] {
+            assert!(
+                props.get(retired).is_none(),
+                "generic_spec.{retired} (v1) NO debe estar en el schema"
+            );
+        }
+        // Solo queda la superficie v2.
+        for v2 in ["kind", "recipe", "density", "slots"] {
+            assert!(props.get(v2).is_some(), "falta generic_spec.{v2} (v2)");
+        }
+        // El JSON serializado del schema no menciona 'composite' en ningún sitio.
+        let s = serde_json::to_string(&canvas).unwrap();
         assert!(
-            types.iter().any(|v| v == "composite"),
-            "generic_spec.type debería incluir 'composite' (v1 compat)"
-        );
-        // El árbol de layout viaja en generic_spec.root (objeto libre; validación dura en frontend).
-        assert_eq!(
-            generic["properties"]["root"]["type"], "object",
-            "generic_spec.root debe declararse como objeto"
+            !s.contains("composite"),
+            "el schema no debe mencionar composite"
         );
     }
 

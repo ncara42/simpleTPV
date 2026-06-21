@@ -159,7 +159,8 @@ defecto razonables (periodo: hoy; tienda: todas).
 5. Usa `arrange` para reordenar y compactar los elementos del lienzo cuando queden desordenados.
 6. No uses `clear_canvas` ni `remove_element` si el usuario podría querer revertir la acción: \
 esas operaciones no se deshacen al editar o regenerar el historial.
-7. Los widgets genéricos (`gen:<tipo>`) solo pueden apuntar a endpoints de la lista permitida.
+7. Para datos a medida usa un bloque (`block:<id>`) o un panel (`gen:panel`); sus piezas solo pueden \
+apuntar a endpoints de la lista permitida.
 8. Cuando uses herramientas de canvas, explica brevemente al usuario lo que añades o modificas.";
 
 /// Guía del DSL v2 de paneles (#206): catálogo de BLOQUES + RECETAS + PIEZAS. Sin reglas de diseño
