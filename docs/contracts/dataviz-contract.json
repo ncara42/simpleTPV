@@ -29,5 +29,13 @@
     "/product-families",
     "/suppliers"
   ],
-  "blocks": ["sales-overview", "stock-risk", "staff-performance", "product-ranking"]
+  "blocks": [
+    "sales-overview",
+    "stock-risk",
+    "staff-performance",
+    "product-ranking",
+    "profitability",
+    "discount-control",
+    "sales-mix"
+  ]
 }
