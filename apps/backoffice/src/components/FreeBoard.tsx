@@ -131,6 +131,18 @@ interface FreeBoardProps {
   onCanvasMeta?: (meta: CanvasMeta) => void;
 }
 
+// Firma de contenido de una disposición (id + tipo + widget + caja + z). Detecta cambios EXTERNOS
+// de `elements` (p.ej. canvas_ops del chat aplicadas al store desde el shell) e ignora el eco del
+// propio `onChange`, que devuelve una disposición de contenido idéntico.
+function freeElementsSig(layout: readonly FreeElement[]): string {
+  return layout
+    .map(
+      (e) =>
+        `${e.id}|${e.kind}|${'widgetId' in e ? e.widgetId : ''}|${Math.round(e.x)}|${Math.round(e.y)}|${Math.round(e.w)}|${Math.round(e.h)}|${e.z}`,
+    )
+    .join(';');
+}
+
 export function FreeBoard({
   elements,
   renderItem,
@@ -166,6 +178,16 @@ export function FreeBoard({
   elsRef.current = els;
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+
+  // FreeBoard es la fuente de verdad de las interacciones (drag/zoom/dibujo), por eso siembra `els`
+  // desde `elements` solo al montar. Pero el chat aplica canvas_ops al dashboard-store desde el
+  // shell (con el lienzo montado), y eso debe verse EN VIVO. Adopta `elements` cuando su CONTENIDO
+  // difiere del estado actual; compara por firma para ignorar el eco del propio `onChange` (vuelve
+  // idéntico) y NO corre durante un drag (el move no emite `onChange`, así que `elements` no cambia).
+  useEffect(() => {
+    setEls((cur) => (freeElementsSig(cur) === freeElementsSig(elements) ? cur : elements));
+  }, [elements]);
+
   const toolRef = useRef(tool);
   toolRef.current = tool;
   const colorRef = useRef(drawColor);
