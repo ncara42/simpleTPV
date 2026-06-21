@@ -12,19 +12,25 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
 });
 
-test('el dock del asistente aparece solo en la pestaña Dashboard', async ({ page }) => {
-  // En Dashboard el dock (barra inferior) está montado.
+test('el dock del asistente está presente en todas las views; el «+» de lienzo solo en Dashboard', async ({
+  page,
+}) => {
+  // En Dashboard el dock (barra inferior) está montado, con el menú «+» de herramientas del lienzo.
   await expect(page.getByTestId('chat-dock')).toBeVisible();
+  await expect(page.getByTestId('dash-free-tools')).toBeVisible();
   // El popover de conversación está cerrado por defecto.
   await expect(page.getByTestId('chat-panel')).toHaveCount(0);
 
-  // Al navegar a otra pestaña, el chat se desmonta por completo.
+  // El dock vive ahora en el shell: al navegar a otra view SIGUE presente, pero como chat puro
+  // (sin el «+» de herramientas, porque esa view no tiene lienzo).
   await navTo(page, 'stock');
-  await expect(page.getByTestId('chat-dock')).toHaveCount(0);
+  await expect(page.getByTestId('chat-dock')).toBeVisible();
+  await expect(page.getByTestId('dash-free-tools')).toHaveCount(0);
 
-  // Al volver al Dashboard, reaparece.
+  // Al volver al Dashboard, el «+» reaparece.
   await navTo(page, 'dashboard');
   await expect(page.getByTestId('chat-dock')).toBeVisible();
+  await expect(page.getByTestId('dash-free-tools')).toBeVisible();
 });
 
 test('el popover de conversación se abre desde la barra y se cierra', async ({ page }) => {

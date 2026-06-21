@@ -91,11 +91,15 @@ test.skip('preferencias por defecto: el dashboard recuerda el periodo elegido (I
 
 // ── Tests activos ─────────────────────────────────────────────────────────────────────────
 
-test('cabecera muestra chip Personalizado y el dashboard es un lienzo libre', async ({ page }) => {
+test('la etiqueta flotante muestra la view activa y el dashboard es un lienzo libre', async ({
+  page,
+}) => {
   await expect(page.getByTestId('dashboard')).toBeVisible();
-  // El chip no interactivo indica el preset activo.
-  await expect(page.getByTestId('dash-preset-personalizado')).toBeVisible();
-  await expect(page.getByTestId('dash-preset-personalizado')).toContainText('Personalizado');
+  // Sin header: el nombre de la view activa flota arriba (sustituye al chip de preset).
+  await expect(page.getByTestId('page-heading')).toBeVisible();
+  await expect(page.getByTestId('page-heading')).toContainText('Dashboard');
+  // El chip de preset antiguo ya no existe (lo sustituye la etiqueta flotante de view).
+  await expect(page.getByTestId('dash-preset-personalizado')).toHaveCount(0);
   // El lienzo libre es la única vista (el modo Cuadrícula y su toggle se eliminaron).
   await expect(page.getByTestId('dash-free')).toBeVisible();
   await expect(page.getByTestId('dash-free-toolbar')).toBeVisible();

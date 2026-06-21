@@ -7,8 +7,8 @@ import '@simpletpv/ui/topbar.css';
 import './catalog.css';
 import './styles.css';
 
-import { LoginForm, type NavGroup, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
-import { PageHeaderProvider, usePageHeaderValue } from '@simpletpv/ui';
+import { LoginForm, type NavGroup, type NavItem, Sidebar } from '@simpletpv/ui';
+import { PageHeaderProvider } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeftRight,
@@ -32,7 +32,8 @@ import { useState } from 'react';
 
 import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
-import { FunctionSearch } from './components/FunctionSearch.js';
+import { AssistantDock } from './components/chat/AssistantDock.js';
+import { FloatingActions } from './components/FloatingActions.js';
 import { DashboardPage } from './DashboardPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
 import { HelpPage } from './HelpPage.js';
@@ -41,7 +42,7 @@ import { useBranding } from './lib/branding.js';
 import { listPendingCashMovements } from './lib/cash.js';
 import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
-import { switchApp, type Tab } from './lib/nav.js';
+import type { Tab } from './lib/nav.js';
 import { listAlerts } from './lib/stock.js';
 import { NotificationsPage } from './NotificationsPage.js';
 import { PromotionsPage } from './PromotionsPage.js';
@@ -93,41 +94,6 @@ const ALL_NAV: NavItem[] = [
 // VeriFactu/Notificaciones quitando su id de este set.
 const HIDDEN_TABS = new Set<Tab>(['notifications', 'verifactu']);
 const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab));
-
-// El título de la vista activa ocupa la zona izquierda de la TopBar; la búsqueda
-// de funciones (Ctrl+K) pasa a la zona derecha, entre la campana y el conmutador
-// de app. U-11/D-17: la campana vuelve a la TopBar con el badge de roturas y abre
-// Notificaciones (esa page sigue fuera del menú lateral; la campana es su acceso,
-// como dictaba D-09).
-function ShellTopBar({
-  onNavigate,
-  onNotifications,
-  notificationCount,
-  notificationsActive,
-  showSearch,
-}: {
-  onNavigate: (tab: Tab) => void;
-  onNotifications: () => void;
-  notificationCount: number;
-  notificationsActive: boolean;
-  // En el dashboard (lienzo libre) la TopBar queda tapada por el lienzo y el buscador vive en
-  // el clúster flotante junto al sidebar; aquí se omite para no montar DOS lanzadores (doble ⌘K).
-  showSearch: boolean;
-}) {
-  const { title } = usePageHeaderValue();
-  return (
-    <TopBar
-      title={title}
-      titleTestId="page-heading"
-      search={showSearch ? <FunctionSearch onNavigate={onNavigate} /> : undefined}
-      activeApp="backoffice"
-      onSwitchApp={switchApp}
-      onNotifications={onNotifications}
-      notificationCount={notificationCount}
-      notificationsActive={notificationsActive}
-    />
-  );
-}
 
 function Home() {
   const logout = useAuthStore((s) => s.clear);
@@ -199,6 +165,13 @@ function Home() {
     setTab(t);
   };
 
+  // Nombre de la view activa (el mismo label del sidebar): se pinta como etiqueta flotante
+  // arriba del lienzo —donde antes vivía el chip del dashboard— sustituyendo al título del header.
+  const activeLabel = ALL_NAV.find((item) => item.id === tab)?.label ?? '';
+  // El Dashboard es el único lienzo libre full-bleed; el resto de views flotan como una
+  // superficie sobre el fondo (se reutiliza su contenido actual, sin rediseñar cards).
+  const isCanvas = tab === 'dashboard';
+
   return (
     <div className="app-shell">
       <Sidebar
@@ -217,20 +190,28 @@ function Home() {
         onLogout={logout}
         onNotifications={toggleNotifications}
         notificationCount={notificationCount}
-        // El buscador de funciones (⌘K) flota ENCIMA del sidebar (separado), no en la TopBar.
-        floatingActions={<FunctionSearch onNavigate={navigateTo} />}
-      />
-      <div className="app-content">
-        <PageHeaderProvider>
-          <ShellTopBar
+        // Clúster de acciones flotante sobre el sidebar (sustituye al header): lupa ⌘K + home +
+        // campana + conmutador Backoffice↔TPV.
+        floatingActions={
+          <FloatingActions
             onNavigate={navigateTo}
+            onHome={() => navigateTo('dashboard')}
             onNotifications={toggleNotifications}
             notificationCount={notificationCount}
             notificationsActive={tab === 'notifications'}
-            showSearch={false}
           />
+        }
+      />
+      <div className="app-content">
+        <PageHeaderProvider>
+          {/* Nombre de la view activa, flotando arriba del contenido (reemplaza el header). */}
+          {activeLabel && (
+            <span className="view-title-float" data-testid="page-heading">
+              {activeLabel}
+            </span>
+          )}
           <div className="app-main-row">
-            <main className="bo-main">
+            <main className={`bo-main${isCanvas ? ' bo-main--canvas' : ' bo-main--surface'}`}>
               {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
                   embebe la tabla — enlaza con "Ver todas las ventas →". */}
               {tab === 'dashboard' && <DashboardPage onNavigate={(t) => setTab(t)} />}
@@ -253,8 +234,10 @@ function Home() {
               {tab === 'help' && <HelpPage />}
             </main>
           </div>
-          {/* El asistente vive ahora DENTRO de DashboardPage, como dock inferior unificado
-              (input + menú «+» de herramientas del lienzo). Ver ChatDock. */}
+          {/* Asistente unificado a nivel de shell: input + (en el Dashboard) menú «+» de
+              herramientas del lienzo. Presente en TODAS las views; el binding del lienzo lo
+              registra DashboardPage vía canvas-bridge. */}
+          <AssistantDock />
         </PageHeaderProvider>
       </div>
     </div>

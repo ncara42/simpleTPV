@@ -738,9 +738,9 @@ test('U-10/U-09: avisos de stock en panel propio encima y botón Columnas en la 
 test('U-11/U-12: la campana abre Notificaciones y "Resolver" lleva a Stock del producto', async ({
   page,
 }) => {
-  // La campana de la TopBar vuelve (D-17) con badge de roturas.
-  await expect(page.getByTestId('topbar-notifications')).toBeVisible();
-  await page.getByTestId('topbar-notifications').click();
+  // La campana vive en el clúster de acciones flotante (sustituye a la TopBar), con badge de roturas.
+  await expect(page.getByTestId('float-notifications')).toBeVisible();
+  await page.getByTestId('float-notifications').click();
   await expect(page.getByTestId('notifications-page')).toBeVisible();
   // Cada alerta tiene su botón Resolver → Stock filtrado por el producto.
   const firstAlert = page.getByTestId('alert-row').first();
@@ -751,7 +751,7 @@ test('U-11/U-12: la campana abre Notificaciones y "Resolver" lleva a Stock del p
 });
 
 test('La campana togglea Notificaciones y vuelve a la página anterior', async ({ page }) => {
-  const bell = page.getByTestId('topbar-notifications');
+  const bell = page.getByTestId('float-notifications');
 
   // Desde Stock: abrir Notificaciones con la campana, cerrarla y volver a Stock.
   await navTo(page, 'stock');

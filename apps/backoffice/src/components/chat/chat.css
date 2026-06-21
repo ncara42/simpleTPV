@@ -918,11 +918,14 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
    ════════════════════════════════════════════════════════════════════════════════ */
 
 .chat-dock {
-  position: absolute;
+  position: fixed;
   bottom: 1rem;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 30; /* sobre el lienzo (shell, minimapa, zoom) */
+  /* El dock vive ahora en el shell (sibling del lienzo, que es position:fixed inset:0 z-35).
+     Debe quedar POR ENCIMA del lienzo en todas las views; bajo el cuerpo del sidebar (z-40),
+     con el que no solapa espacialmente (dock abajo-centro, sidebar a la izquierda). */
+  z-index: 39;
   width: min(680px, calc(100vw - 2rem));
   display: flex;
   flex-direction: column;

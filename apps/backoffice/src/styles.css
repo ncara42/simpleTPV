@@ -33,6 +33,156 @@
   }
 }
 
+/* ─── Shell flotante sin header ───────────────────────────────────────────────
+   Se eliminó la TopBar: el nombre de la view, el clúster de acciones (lupa · home ·
+   campana · conmutador) y el dock del asistente flotan sobre el contenido/lienzo.
+   El Dashboard es un lienzo libre full-bleed (.dashboard--free es fixed inset:0);
+   el resto de views flotan como una superficie sobre el fondo. ───────────────── */
+
+/* Nombre de la view activa: pill flotante arriba-centro, donde antes vivía el chip del
+   dashboard y el título del header. Sobre el lienzo (fixed z-35) → z alto. No captura
+   el ratón (es solo etiqueta; el lienzo de debajo sigue siendo arrastrable). */
+.view-title-float {
+  position: fixed;
+  top: 0.85rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 39;
+  padding: 0.4rem 1.15rem;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--ui-surface) 84%, transparent);
+  border: 1px solid var(--ui-border);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 8px 26px rgb(0 0 0 / 0.14);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Dashboard: lienzo libre full-bleed (la propia .dashboard--free se sale del flujo). */
+.bo-main--canvas {
+  padding: 0;
+}
+
+/* Views NO-dashboard: la página flota como una superficie sobre el fondo. Reutiliza el
+   contenido actual (tablas/secciones) sin rediseñarlo. Holgura inferior para el dock. */
+.bo-main--surface {
+  margin: 3.4rem 1.25rem 6rem;
+  padding: 1.75rem 2rem 2rem;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg, 18px);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 18px 40px -12px rgb(0 0 0 / 0.2);
+  min-height: calc(100vh - 9.4rem);
+}
+
+@media (max-width: 767px) {
+  .bo-main--surface {
+    margin: 3.2rem 0.6rem 6rem;
+    padding: 1.1rem 1rem 1.25rem;
+  }
+}
+
+/* ─── Clúster de acciones flotante (sustituye a la TopBar) ────────────────────
+   Vive dentro de .sidebar-search-float (solo escritorio). Fila: lupa · home ·
+   campana · conmutador, a la altura del logo del sidebar flotante. ───────────── */
+.float-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sidebar-top-gap, 8px);
+}
+
+/* La lupa deja de ocupar el ancho completo del sidebar: en el clúster es una pill compacta. */
+.sidebar-search-float .float-actions .topbar-search-launcher {
+  width: clamp(150px, 16vw, 220px);
+}
+
+/* Botones redondos del clúster (home, campana): mismo tamaño que el logo del sidebar. */
+.float-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex: none;
+  width: var(--sidebar-tab-h, 38px);
+  height: var(--sidebar-tab-h, 38px);
+  border-radius: 9999px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 10px 24px -14px rgb(0 0 0 / 0.22);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.float-action-btn:hover {
+  background: var(--ui-surface-subtle);
+  border-color: var(--ui-border-strong, var(--ui-border));
+}
+.float-action-btn.is-active {
+  background: var(--ui-brand-soft, var(--ui-surface-subtle));
+  color: var(--ui-brand-ink, var(--ui-text));
+  border-color: transparent;
+}
+.float-action-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  background: var(--ui-danger);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Conmutador Backoffice↔TPV (mismo patrón que la antigua .topbar-switch). */
+.float-switch {
+  display: inline-flex;
+  flex: none;
+  padding: 0.18rem;
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 10px 24px -14px rgb(0 0 0 / 0.22);
+}
+.float-switch-btn {
+  height: 28px;
+  padding: 0 0.8rem;
+  border-radius: 9999px;
+  border: none;
+  background: none;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+}
+.float-switch-btn.is-active {
+  background: var(--ui-brand-soft, var(--ui-surface-subtle));
+  color: var(--ui-brand-ink, var(--ui-text));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
 /* Eyebrow del topbar (específico del backoffice). */
 .topbar-eyebrow {
   font-size: 0.66rem;

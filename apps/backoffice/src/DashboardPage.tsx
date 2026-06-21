@@ -4,12 +4,11 @@ import { Badge, Chart, Input, Select, Sparkline } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { BarChart2, ChevronDown, LineChart, Search } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import { ChatDock } from './components/chat/ChatDock.js';
 import { DaySelector } from './components/DaySelector.js';
 import { type CanvasMeta, FreeBoard, type FreeBoardHandle } from './components/FreeBoard.js';
-import type { CanvasOp } from './lib/chat.js';
+import { useCanvasBridge } from './lib/canvas-bridge.js';
 import {
   type DashboardPeriod,
   type FamilySales,
@@ -35,7 +34,7 @@ import {
   PRESETS,
   reconcileFreeLayout,
 } from './lib/dashboard-layout.js';
-import { buildCanvasSnapshot, genericElementId, useDashboardStore } from './lib/dashboard-store.js';
+import { useDashboardStore } from './lib/dashboard-store.js';
 import {
   deltaTone,
   fmtDelta,
@@ -177,28 +176,19 @@ export function DashboardPage({
     if (el.kind === 'widget') vis.add(el.widgetId);
   }
 
-  // ── Asistente (dock inferior) ↔ lienzo ──────────────────────────────────────────────
-  // El handle imperativo de FreeBoard alimenta el menú «+» de herramientas del dock; `canvasMeta`
-  // refleja deshacer/dibujo. El puente agente→lienzo (canvas_ops) sigue pasando por el store.
+  // ── Asistente (dock del shell) ↔ lienzo ─────────────────────────────────────────────
+  // El ChatDock vive ahora en el shell (visible en todas las views). El menú «+» de herramientas
+  // necesita el handle imperativo de FreeBoard y su `canvasMeta` (deshacer/dibujo): se registran en
+  // el canvas-bridge mientras esta página está montada y se limpian al desmontar. Las canvas_ops
+  // del agente van directas al dashboard-store (ver AssistantDock), no por aquí.
   const freeBoardRef = useRef<FreeBoardHandle>(null);
   const [canvasMeta, setCanvasMeta] = useState<CanvasMeta>({ canUndo: false, drawOpen: false });
-  const handleCanvasOp = useCallback(
-    (op: CanvasOp) => useDashboardStore.getState().applyCanvasOp(op),
-    [],
-  );
-  // Deshacer canvas_ops tras editar/regenerar: solo las add_* son inversibles. Los widgets
-  // genéricos (genericSpec, incl. composite, e insight) se colocan bajo un id derivado del
-  // element_id del agente (`genericElementId`), así que el undo debe derivarlo IGUAL (#189 E2E 4);
-  // el resto usa `elementId` (shapes/notas) o `widgetId` (catálogo, cuyo id en el lienzo == widgetId).
-  const handleUndoCanvasOps = useCallback((ops: CanvasOp[]) => {
-    const store = useDashboardStore.getState();
-    for (const op of ops) {
-      const isGeneric = Boolean(op.genericSpec) || op.op === 'add_insight';
-      const id =
-        isGeneric && op.elementId ? genericElementId(op.elementId) : (op.elementId ?? op.widgetId);
-      if (id) store.removeElement(id);
-    }
-  }, []);
+  // Registra/actualiza el binding al montar y cuando cambia `canvasMeta` (deshacer/dibujo).
+  useEffect(() => {
+    useCanvasBridge.getState().setBinding({ canvasRef: freeBoardRef, canvasMeta });
+  }, [canvasMeta]);
+  // Limpia el binding solo al desmontar (al salir del Dashboard → el dock pasa a chat puro).
+  useEffect(() => () => useCanvasBridge.getState().setBinding(null), []);
 
   // placeholderData: al cambiar de tienda/periodo se conservan los datos previos
   // durante el refetch en vez de vaciarse. Así los nodos del DOM (key estable por
@@ -1065,16 +1055,9 @@ export function DashboardPage({
 
   return (
     <section className="catalog dashboard--free" data-testid="dashboard">
-      <header className="catalog-head is-actions-only dash-head">
-        <div className="catalog-actions">
-          <span className="dash-preset-label" data-testid="dash-preset-personalizado">
-            Personalizado
-          </span>
-        </div>
-      </header>
-
       {/* D-20: el dashboard es siempre un lienzo libre (edgeless). Sus propias herramientas
-          (paleta de widgets, dibujo, deshacer, minimapa…) viven dentro de FreeBoard. */}
+          (paleta de widgets, dibujo, deshacer, minimapa…) viven dentro de FreeBoard. El nombre de
+          la view y el dock del asistente los pone el shell (ver App.tsx / AssistantDock). */}
       <FreeBoard
         key={preset.id}
         ref={freeBoardRef}
@@ -1085,15 +1068,6 @@ export function DashboardPage({
         {...(layout.freeViews?.[preset.id] ? { initialView: layout.freeViews[preset.id] } : {})}
         onViewChange={onFreeViewChange}
         onCanvasMeta={setCanvasMeta}
-      />
-
-      {/* Dock inferior unificado: input del asistente + menú «+» de herramientas del lienzo. */}
-      <ChatDock
-        canvasRef={freeBoardRef}
-        canvasMeta={canvasMeta}
-        onCanvasOp={handleCanvasOp}
-        onUndoCanvasOps={handleUndoCanvasOps}
-        getCanvasState={buildCanvasSnapshot}
       />
     </section>
   );

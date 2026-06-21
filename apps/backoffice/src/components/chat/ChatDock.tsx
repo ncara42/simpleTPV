@@ -15,10 +15,13 @@ import { PromptComposer } from './PromptComposer.js';
 import { type CanvasApplyResult, useChat } from './useChat.js';
 
 export interface ChatDockProps {
-  /** Handle imperativo del lienzo para el menú «+» de herramientas. */
-  canvasRef: RefObject<FreeBoardHandle | null>;
-  /** Estado reactivo del lienzo (deshacer / dibujo) para reflejarlo en el menú. */
-  canvasMeta: CanvasMeta;
+  /**
+   * Handle imperativo del lienzo para el menú «+» de herramientas. Opcional: el dock vive en el
+   * shell y aparece en TODAS las views; solo el Dashboard tiene lienzo. Sin él se oculta el «+».
+   */
+  canvasRef?: RefObject<FreeBoardHandle | null>;
+  /** Estado reactivo del lienzo (deshacer / dibujo). Opcional (ver `canvasRef`). */
+  canvasMeta?: CanvasMeta;
   /** Aplica un canvas_op en el lienzo y devuelve el resultado para el feedback loop. */
   onCanvasOp?: (op: CanvasOp) => CanvasApplyResult | void;
   onUndoCanvasOps?: (ops: CanvasOp[]) => void;
@@ -84,11 +87,13 @@ export function ChatDock({
 
   const leading = (
     <>
-      <CanvasToolsMenu
-        canvasRef={canvasRef}
-        canUndo={canvasMeta.canUndo}
-        drawActive={canvasMeta.drawOpen}
-      />
+      {canvasRef && canvasMeta && (
+        <CanvasToolsMenu
+          canvasRef={canvasRef}
+          canUndo={canvasMeta.canUndo}
+          drawActive={canvasMeta.drawOpen}
+        />
+      )}
       <button
         type="button"
         className={`chat-dock__history-toggle${panelOpen ? ' is-active' : ''}`}
