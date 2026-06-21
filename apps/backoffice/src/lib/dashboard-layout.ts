@@ -315,6 +315,8 @@ export const GENERIC_DEFAULT_SIZE: Record<GenericWidgetType, { w: number; h: num
 // Las claves antiguas (cardOrder/panelOrder, hiddenByPreset, chartKind global) se ignoran.
 export interface LayoutPref {
   preset?: PresetId;
+  /** Nombre editable del lienzo mostrado en la cabecera. Por defecto «Canvas 1». */
+  name?: string;
   /** U-02: representación (barras o línea) de cada card con toggle, independiente. */
   chartKinds?: Partial<Record<ChartCard, 'bars' | 'line'>>;
   /** D-19: colocación 2D por preset (layouts por breakpoint de react-grid-layout). */

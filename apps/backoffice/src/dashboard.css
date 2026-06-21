@@ -5,7 +5,7 @@
    números tabulares con tracking tight.
    ════════════════════════════════════════════════════════════════════ */
 
-/* ─── Cabecera: chip de modo activo ─── */
+/* ─── Cabecera: nombre del lienzo (editable al pulsar) ─── */
 .dash-preset-label {
   font-size: 0.8125rem;
   font-weight: 600;
@@ -13,6 +13,49 @@
   letter-spacing: 0.01em;
   padding: 0 0.25rem;
   user-select: none;
+}
+/* Disparador en reposo: hereda la tipografía del label, sin chrome de botón.
+   Sutil affordance de editable: hairline al pasar el ratón y radio suave. */
+.dash-preset-label-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 1.6rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  font-family: inherit;
+  cursor: text;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.dash-preset-label-btn:hover {
+  color: var(--ui-text);
+  background: var(--ui-surface-subtle);
+  border-color: var(--ui-border);
+}
+.dash-preset-label-btn:focus-visible {
+  outline: none;
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-focus);
+}
+/* Modo edición: input transparente alineado píxel a píxel con el botón. */
+.dash-preset-label-input {
+  height: 1.6rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font-family: inherit;
+  user-select: text;
+  min-width: 6rem;
+  width: 9rem;
+}
+.dash-preset-label-input:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
 }
 
 /* ════════════════════════════════════════════════════════════

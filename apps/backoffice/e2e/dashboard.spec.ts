@@ -91,11 +91,13 @@ test.skip('preferencias por defecto: el dashboard recuerda el periodo elegido (I
 
 // ── Tests activos ─────────────────────────────────────────────────────────────────────────
 
-test('cabecera muestra chip Personalizado y el dashboard es un lienzo libre', async ({ page }) => {
+test('cabecera muestra el nombre por defecto del lienzo y el dashboard es un lienzo libre', async ({
+  page,
+}) => {
   await expect(page.getByTestId('dashboard')).toBeVisible();
-  // El chip no interactivo indica el preset activo.
+  // Nombre por defecto del lienzo, editable al pulsar encima.
   await expect(page.getByTestId('dash-preset-personalizado')).toBeVisible();
-  await expect(page.getByTestId('dash-preset-personalizado')).toContainText('Personalizado');
+  await expect(page.getByTestId('dash-preset-personalizado')).toContainText('Canvas 1');
   // El lienzo libre es la única vista (el modo Cuadrícula y su toggle se eliminaron).
   await expect(page.getByTestId('dash-free')).toBeVisible();
   await expect(page.getByTestId('dash-free-toolbar')).toBeVisible();
@@ -106,6 +108,16 @@ test('cabecera muestra chip Personalizado y el dashboard es un lienzo libre', as
   await expect(page.getByTestId('dash-preset-beneficio')).toHaveCount(0);
   await expect(page.getByTestId('dash-period')).toHaveCount(0);
   await expect(page.getByTestId('dash-store')).toHaveCount(0);
+});
+
+test('el nombre del lienzo se renombra al pulsar encima', async ({ page }) => {
+  await expect(page.getByTestId('dashboard')).toBeVisible();
+  await page.getByTestId('dash-preset-personalizado').click();
+  const input = page.getByTestId('dash-preset-name-input');
+  await expect(input).toBeVisible();
+  await input.fill('Mi panel');
+  await input.press('Enter');
+  await expect(page.getByTestId('dash-preset-personalizado')).toContainText('Mi panel');
 });
 
 test('el dashboard no embebe la tabla de ventas (I-17, D-06)', async ({ page }) => {

@@ -7,6 +7,7 @@ import { BarChart2, ChevronDown, LineChart, Search } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ChatDock } from './components/chat/ChatDock.js';
+import { DashTitle } from './components/DashTitle.js';
 import { DaySelector } from './components/DaySelector.js';
 import { type CanvasMeta, FreeBoard, type FreeBoardHandle } from './components/FreeBoard.js';
 import type { CanvasOp } from './lib/chat.js';
@@ -182,6 +183,13 @@ export function DashboardPage({
   // refleja deshacer/dibujo. El puente agente→lienzo (canvas_ops) sigue pasando por el store.
   const freeBoardRef = useRef<FreeBoardHandle>(null);
   const [canvasMeta, setCanvasMeta] = useState<CanvasMeta>({ canUndo: false, drawOpen: false });
+  // Renombrado del lienzo desde la cabecera. Lee el layout fresco del store (evita
+  // cerrar sobre una instantánea obsoleta) y persiste vía el setter con debounce.
+  const renameDashboard = useCallback((name: string) => {
+    // Omite `name` cuando se vacía (vuelve al valor por defecto) en vez de guardar undefined.
+    const { name: _prev, ...rest } = useDashboardStore.getState().layout;
+    useDashboardStore.getState().setLayout(name ? { ...rest, name } : rest);
+  }, []);
   const handleCanvasOp = useCallback(
     (op: CanvasOp) => useDashboardStore.getState().applyCanvasOp(op),
     [],
@@ -1067,9 +1075,7 @@ export function DashboardPage({
     <section className="catalog dashboard--free" data-testid="dashboard">
       <header className="catalog-head is-actions-only dash-head">
         <div className="catalog-actions">
-          <span className="dash-preset-label" data-testid="dash-preset-personalizado">
-            Personalizado
-          </span>
+          <DashTitle value={layout.name} onCommit={renameDashboard} />
         </div>
       </header>
 

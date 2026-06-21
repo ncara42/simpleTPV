@@ -196,47 +196,34 @@
   .topbar-title {
     font-size: 1.2rem;
   }
-
-  /* En móvil el lanzador se reduce a su icono para no desbordar la barra junto
-     al título + campana + conmutador. El palette sigue siendo accesible. */
-  .topbar-search-launcher {
-    width: auto;
-    padding: 0 0.5rem;
-  }
-  .topbar-search-launcher-text,
-  .topbar-search-launcher-kbd {
-    display: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .topbar-switch-btn,
-  .topbar-notif {
+  .topbar-notif,
+  .topbar-search-launcher {
     transition: none;
   }
 }
 
 /* ─── U-06: lanzador de búsqueda en el header (zona derecha, entre la campana y
-   el conmutador). Es un botón compacto con la pista de atajo dentro; abre el
-   palette central donde se escribe y se ven sugerencias. ─────────────────── */
+   el conmutador). Botón redondo de icono con idéntico acabado a la campana; abre
+   el palette central donde se escribe y se ven sugerencias. ───────────────── */
 .topbar-search-launcher {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  width: 36px;
   height: 36px;
-  width: clamp(8.5rem, 14vw, 13rem);
-  min-width: 0;
-  padding: 0 0.5rem 0 0.75rem;
   border: 1px solid var(--ui-border);
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-pill);
   background: var(--ui-surface-subtle);
-  color: var(--ui-text-soft);
-  font-size: 0.86rem;
+  color: var(--ui-text-muted);
   cursor: pointer;
   transition:
-    border-color 0.12s ease,
-    background 0.12s ease,
-    color 0.12s ease;
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
 }
 .topbar-search-launcher:hover {
   border-color: var(--ui-border-strong);
@@ -250,29 +237,7 @@
 }
 .topbar-search-launcher-icon {
   flex-shrink: 0;
-  color: var(--ui-text-soft);
-}
-.topbar-search-launcher-text {
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* Pista de atajo: pastilla discreta a la derecha del lanzador. */
-.topbar-search-launcher-kbd {
-  flex-shrink: 0;
-  padding: 0.05rem 0.4rem;
-  border: 1px solid var(--ui-border);
-  border-radius: 6px;
-  background: var(--ui-surface);
-  color: var(--ui-text-muted);
-  font-size: 0.7rem;
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: 0.01em;
-  font-family: inherit;
+  color: inherit;
 }
 
 /* Móvil: hueco a la izquierda para la hamburguesa fija del sidebar. */
