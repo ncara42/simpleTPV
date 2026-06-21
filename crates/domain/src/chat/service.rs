@@ -101,6 +101,13 @@ pub async fn touch_conversation(pool: &PgPool, org: Uuid, id: Uuid) -> Result<()
 
 pub async fn delete_conversation(pool: &PgPool, org: Uuid, id: Uuid) -> Result<(), AppError> {
     with_tenant_tx(pool, org, async move |tx, _after| {
+        // El FK chat_message → chat_conversation es ON DELETE RESTRICT: hay que borrar los
+        // mensajes ANTES que la conversación, o el DELETE falla (se traduce a 409 Conflict). Las
+        // filas de ai_usage usan ON DELETE SET NULL: se conservan para el histórico de coste.
+        sqlx::query(r#"DELETE FROM "chat_message" WHERE "conversationId"=$1"#)
+            .bind(id)
+            .execute(&mut **tx)
+            .await?;
         sqlx::query(r#"DELETE FROM "chat_conversation" WHERE id=$1"#)
             .bind(id)
             .execute(&mut **tx)
