@@ -266,7 +266,6 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 .chat-messages__hint {
   color: var(--ui-text-muted);
   font-size: var(--ui-text-xs);
-  font-style: italic;
 }
 
 .chat-msg {
@@ -1219,6 +1218,10 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 
 .me-menu {
   position: relative;
+  /* Contexto de apilamiento propio por encima del textarea del composer: si no, el flyout de
+     esfuerzo (que solapa la zona del input) queda pintado DEBAJO del textarea y el clic no llega. */
+  z-index: 1;
+  isolation: isolate;
   display: inline-flex;
 }
 
@@ -1275,8 +1278,8 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   right: 0;
   z-index: 32;
   min-width: 14rem;
-  max-height: 60vh;
-  overflow-y: auto;
+  /* Sin overflow aquí: el flyout de esfuerzo cuelga a la izquierda y `overflow-y:auto` forzaría
+     `overflow-x:auto`, recortándolo. El scroll vive en `.me-menu__scroll` (solo la lista). */
   padding: 0.35rem;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg);
@@ -1367,6 +1370,12 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   background: var(--ui-border);
 }
 
+/* Solo la lista de modelos scrollea; mantiene el flyout de esfuerzo fuera del overflow. */
+.me-menu__scroll {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
 .me-menu__effort {
   position: relative;
 }
@@ -1376,6 +1385,9 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   bottom: 0;
   right: calc(100% + 0.4rem);
   min-width: 13rem;
+  /* Sin animación de entrada: el desplazamiento del flyout dejaba el ítem «inestable» para
+     Playwright (clic expira). El panel principal conserva su `chat-panel-in`. */
+  animation: none;
 }
 
 .me-menu__hint {
