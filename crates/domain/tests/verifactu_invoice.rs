@@ -144,10 +144,10 @@ async fn sell(c: &Ctx, product: Uuid, qty: i64) -> SaleWithLines {
     .unwrap()
 }
 
-/// El único registro INVOICE de una venta: (status, qrData, hash, total del payload).
+/// El único registro INVOICE de una venta: (status, qrData, hash, importeTotal).
 async fn invoice_record(c: &Ctx, sale_id: Uuid) -> (String, Option<String>, String, String) {
     sqlx::query_as(
-        r#"SELECT status::text, "qrData", hash, payload->>'total'
+        r#"SELECT status::text, "qrData", hash, payload->>'importeTotal'
            FROM "VerifactuRecord"
            WHERE "saleId" = $1 AND type = 'INVOICE'::"VerifactuType""#,
     )
@@ -202,8 +202,8 @@ async fn cada_venta_crea_registro_verifactu_invoice() {
         assert_eq!(st, "PENDING", "el registro nace PENDING (envío diferido)");
         assert!(qr.is_some(), "qrData de cotejo presente");
         assert_eq!(hash.len(), 64, "huella SHA-256 en hex");
-        // payload->>'total' = total de la venta con 2 decimales, positivo (factura).
-        let parsed: Decimal = total.parse().expect("total numérico en el payload");
+        // payload->>'importeTotal' = total de la venta con 2 decimales, positivo.
+        let parsed: Decimal = total.parse().expect("importeTotal numérico en el payload");
         assert!(parsed > Decimal::ZERO, "factura: importe positivo");
         assert_eq!(
             parsed, sale.total,
