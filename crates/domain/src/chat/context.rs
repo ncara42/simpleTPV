@@ -394,10 +394,10 @@ activos: {}\n- Empleados: {}\n\n",
 están reservadas a administradores y no están disponibles para ti.\n",
         );
     }
-    p.push_str(
-        "Periodos válidos: today, yesterday, this_week, last_week, this_month, last_month, \
-this_year.\n\n",
-    );
+    // Vocabulario de periodos EXACTO del enum `DashboardPeriod::parse` (lo consumen tanto las data
+    // tools como las piezas/bloques vía `?period=`). Cualquier otro token → la data tool cae a
+    // `today` y el endpoint del widget responde 400. NO existen variantes this_/last_.
+    p.push_str("Periodos válidos: today, yesterday, week, month, year.\n\n");
 
     // 4. Allowlist de endpoints para widgets genéricos + campos de respuesta.
     p.push_str(
