@@ -23,16 +23,16 @@
  *                        multi-instancia). Si no, almacén en memoria.
  *  - MCP_ALLOWED_ORIGINS Orígenes CORS permitidos (CSV). Ej: https://claude.ai
  *  - MCP_TRUST_PROXY     Saltos de proxy de confianza para Express (`trust proxy`).
- *                        El modo HTTP SIEMPRE va tras un proxy inverso
- *                        (Traefik/Cloudflare): si llega `X-Forwarded-For` y esto
- *                        vale `false`, el rate-limiter del SDK lanza
- *                        ERR_ERL_UNEXPECTED_X_FORWARDED_FOR (500 en /register,
- *                        /token, /authorize). Por eso el **default en modo HTTP es
- *                        `1`** (confía en 1 salto: el proxy inverso de delante).
- *                        Acepta un número de saltos, `true`/`false`, o subred/
- *                        `loopback`. Para local SIN proxy, pon `MCP_TRUST_PROXY=false`
- *                        explícito. NO uses `true` en producción: es permisivo y
- *                        permite spoofing del IP de cliente.
+ *                        Tras un proxy inverso (Traefik/Cloudflare): si llega
+ *                        `X-Forwarded-For` y esto vale `false`, el rate-limiter del
+ *                        SDK lanza ERR_ERL_UNEXPECTED_X_FORWARDED_FOR (500 en
+ *                        /register, /token, /authorize). Acepta nº de saltos (ej.
+ *                        `1` para un único proxy delante), `true`/`false`, o subred/
+ *                        `loopback`. **Default `false`** = SEGURO POR DEFECTO: no
+ *                        confía en XFF si no se configura (evita spoofing del IP de
+ *                        cliente / bypass del rate-limit en un despliegue sin proxy).
+ *                        La imagen Docker —que SIEMPRE va tras proxy— lo fija a `1`
+ *                        vía `ENV` en el Dockerfile. NO uses `true` en producción.
  */
 
 export interface HttpConfig {
@@ -94,9 +94,9 @@ export function getHttpConfig(): HttpConfig {
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
-    // Modo HTTP = siempre tras proxy inverso → default `1` si no se configura
-    // (evita ERR_ERL_UNEXPECTED_X_FORWARDED_FOR). Para local sin proxy: =false.
-    trustProxy: parseTrustProxy(process.env['MCP_TRUST_PROXY'] ?? '1'),
+    // Seguro por defecto: sin MCP_TRUST_PROXY → false (no confía en XFF). La imagen
+    // Docker (siempre tras proxy) la fija a `1` vía ENV; ver Dockerfile/comentario arriba.
+    trustProxy: parseTrustProxy(process.env['MCP_TRUST_PROXY']),
   };
   return _config;
 }
