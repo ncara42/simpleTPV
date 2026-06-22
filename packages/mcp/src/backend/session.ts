@@ -15,6 +15,7 @@
 import { decodeJwt } from 'jose';
 
 import { getHttpConfig } from '../oauth/config.js';
+import { decryptSecret, encryptSecret } from '../oauth/crypto.js';
 import type { OAuthStore } from '../oauth/store.js';
 
 interface CachedToken {
@@ -50,7 +51,7 @@ export async function getBackendAccessToken(
   const { apiUrl } = getHttpConfig();
   const res = await fetch(`${apiUrl}/auth/refresh`, {
     method: 'POST',
-    headers: { Cookie: session.refreshCookieEnc },
+    headers: { Cookie: decryptSecret(session.refreshCookieEnc) },
   });
 
   if (!res.ok) {
@@ -65,12 +66,16 @@ export async function getBackendAccessToken(
     throw new BackendSessionError('el refresh del backend no devolvió accessToken');
   }
 
-  // El backend rota la cookie de refresh: capturamos la nueva y actualizamos.
+  // El backend rota la cookie de refresh: capturamos la nueva, la ciframos y
+  // actualizamos. Si no rotó, mantenemos la sesión cifrada actual.
   const setCookie = res.headers.getSetCookie().find((c) => c.startsWith('refreshToken='));
-  const rotated = setCookie
-    ? (setCookie.split(';')[0] ?? session.refreshCookieEnc)
-    : session.refreshCookieEnc;
-  await store.saveBackendSession(grantId, { ...session, refreshCookieEnc: rotated });
+  const rotatedPlain = setCookie ? (setCookie.split(';')[0] ?? '') : '';
+  if (rotatedPlain) {
+    await store.saveBackendSession(grantId, {
+      ...session,
+      refreshCookieEnc: encryptSecret(rotatedPlain),
+    });
+  }
 
   const claims = decodeJwt(body.accessToken);
   const expSecs = typeof claims.exp === 'number' ? claims.exp : Math.floor(Date.now() / 1000) + 900;

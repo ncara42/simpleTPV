@@ -28,8 +28,10 @@ import { type BackendAuthContext, runWithBackendAuth } from '../api.js';
 import { backendLogin, BackendLoginError } from '../backend/login.js';
 import { getBackendAccessToken } from '../backend/session.js';
 import { getHttpConfig } from '../oauth/config.js';
+import { encryptSecret } from '../oauth/crypto.js';
 import { SimpleTpvOAuthProvider } from '../oauth/provider.js';
 import { InMemoryOAuthStore } from '../oauth/store.js';
+import { createRedisStore } from '../oauth/store-redis.js';
 import { tokenVerifier } from '../oauth/verifier.js';
 import { createMcpServer } from '../server.js';
 
@@ -62,9 +64,9 @@ setInterval(
   5 * 60 * 1000,
 ).unref();
 
-export function startHttpServer(): void {
+export async function startHttpServer(): Promise<void> {
   const cfg = getHttpConfig();
-  const store = new InMemoryOAuthStore();
+  const store = cfg.redisUrl ? await createRedisStore(cfg.redisUrl) : new InMemoryOAuthStore();
   const provider = new SimpleTpvOAuthProvider(store);
 
   const app = express();
@@ -141,10 +143,10 @@ export function startHttpServer(): void {
       return;
     }
 
-    // Sesión de backend (sin passthrough): ligada al grant, para los saltos MCP→backend.
+    // Sesión de backend (sin passthrough): ligada al grant, cookie cifrada en reposo.
     const grantId = randomUUID();
     await store.saveBackendSession(grantId, {
-      refreshCookieEnc: login.refreshCookie,
+      refreshCookieEnc: encryptSecret(login.refreshCookie),
       organizationId: login.organizationId,
       sub: login.sub,
       role: login.role,
@@ -276,6 +278,7 @@ export function startHttpServer(): void {
     console.error(`SimpleTpv MCP (OAuth 2.1) → ${cfg.resourceUrl.href}`);
     console.error(`  Issuer: ${cfg.issuerUrl.href}`);
     console.error(`  PRM:    ${getOAuthProtectedResourceMetadataUrl(cfg.resourceUrl)}`);
+    console.error(`  Store:  ${cfg.redisUrl ? 'Redis' : 'memoria (no apto para producción)'}`);
     if (cfg.allowedOrigins.length > 0) {
       console.error(`  CORS:   ${cfg.allowedOrigins.join(', ')}`);
     }

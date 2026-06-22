@@ -17,6 +17,10 @@
  *  - MCP_JWT_PRIVATE_JWK JWK privada EC P-256 (JSON) para firmar los access
  *                        tokens del MCP. Si falta, en local se genera una
  *                        efímera (los tokens no sobreviven a un reinicio).
+ *  - MCP_ENC_KEY         Clave (base64/hex/texto) para cifrar la cookie de
+ *                        backend en reposo (AES-256-GCM). Si falta → efímera.
+ *  - REDIS_URL           Si está, el estado OAuth vive en Redis (durable,
+ *                        multi-instancia). Si no, almacén en memoria.
  *  - MCP_ALLOWED_ORIGINS Orígenes CORS permitidos (CSV). Ej: https://claude.ai
  */
 
@@ -27,6 +31,8 @@ export interface HttpConfig {
   bindHost: string;
   apiUrl: string;
   privateJwk: string | undefined;
+  encKey: string | undefined;
+  redisUrl: string | undefined;
   allowedOrigins: string[];
 }
 
@@ -53,6 +59,8 @@ export function getHttpConfig(): HttpConfig {
     bindHost: process.env['MCP_BIND'] ?? '127.0.0.1',
     apiUrl: process.env['TPV_API_URL'] ?? 'http://localhost:3001',
     privateJwk: process.env['MCP_JWT_PRIVATE_JWK'],
+    encKey: process.env['MCP_ENC_KEY'],
+    redisUrl: process.env['REDIS_URL'],
     allowedOrigins: (process.env['MCP_ALLOWED_ORIGINS'] ?? '')
       .split(',')
       .map((s) => s.trim())

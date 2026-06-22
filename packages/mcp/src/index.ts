@@ -25,5 +25,5 @@ if (mode === 'stdio') {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 } else {
-  startHttpServer();
+  await startHttpServer();
 }
