@@ -33,14 +33,30 @@ según `EVAL_RUBRIC` (coherencia, jerarquía, anti-saturación, fidelidad; 0–1
 
 **Umbral del gate** (`EVAL_THRESHOLD`): `valid = 100 %` **y** `score medio ≥ 8`.
 
-Procedimiento manual (requiere API key + API levantada con datos demo):
+El runner [`apps/backoffice/src/lib/agent-eval-live.ts`](../apps/backoffice/src/lib/agent-eval-live.ts)
+automatiza el procedimiento (antes manual): por cada `EVAL_REQUESTS` ejecuta el agente vía SSE de
+`/chat/stream`, recoge sus `CanvasOp`, los pasa por `validateComposition`, comprueba que la
+composición «aterriza» en el subsistema esperado (`compositionHits` vs `expectsAnyOf`) y la puntúa
+con el juez LLM (`buildJudgePrompt` + `parseJudgeScores`). Agrega contra `EVAL_THRESHOLD` y falla el
+test si no llega.
 
-1. Levantar API + seed demo (ver `#213` para el repro local con BD aislada).
-2. Para cada `EVAL_REQUESTS[i].prompt`: `POST /chat/stream`, recolectar los `canvas_op` del SSE.
-3. `validateComposition(ops)` → registrar `valid` y violaciones.
-4. Pasar la composición + intención al juez LLM con `EVAL_RUBRIC` → puntuaciones.
-5. Agregar: `validPct` y `meanScore`. Comparar con `EVAL_THRESHOLD`. Si baja del umbral, **no
-   mergear** el cambio de prompt/vocabulario.
+```bash
+# Requiere API levantada con datos demo + gateway LLM. Variables:
+export EVAL_API_URL=http://localhost:3001      # base de la API Rust (incluye prefijo si aplica)
+export EVAL_TOKEN=<JWT de un admin con datos demo>
+export EVAL_AGENT_MODEL=<modelo barato del agente>
+export EVAL_JUDGE_MODEL=<modelo barato del juez>
+export OPENAI_BASE_URL=<gateway OpenAI-compatible>   # o EVAL_JUDGE_BASE_URL
+export OPENAI_API_KEY=<key>                          # o EVAL_JUDGE_API_KEY
+# Opcionales: EVAL_CHAT_PATH (def. /chat/stream), EVAL_EFFORT (def. low), EVAL_TIMEOUT_MS
+
+pnpm --filter @simpletpv/backoffice eval:agent
+```
+
+Sin esas variables el test se **salta** con un mensaje que lista las que faltan (no corre en CI). Las
+funciones puras del runner (parseo SSE, prompt del juez, agregación) sí están cubiertas por Vitest en
+CI (`agent-eval-live.test.ts`). Si la tanda baja del umbral, **no mergear** el cambio de
+prompt/vocabulario.
 
 ## Cuándo correrlo
 
