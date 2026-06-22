@@ -135,7 +135,9 @@ test('Tiendas: el estado operativo PERSISTE tras recargar (I-09, E-02)', async (
   await expect(page.getByTestId('store-ops-save')).toContainText('Guardado', { timeout: 5000 });
   // Recargar: el estado viene del backend, no de un useState (anti-test E-02).
   await page.reload();
-  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
+  // F0 (react-router): recargar MANTIENE la ruta actual (ya no resetea a dashboard).
+  // Readiness route-agnóstica: el clúster de acciones del shell está en todas las views.
+  await expect(page.getByTestId('float-actions')).toBeVisible({ timeout: 15000 });
   await navTo(page, 'stores');
   await page.getByTestId('store-card').filter({ hasText: 'Sur' }).click();
   await expect(page.getByTestId('store-ops-verified')).toBeChecked({ checked: !wasVerified });
@@ -166,7 +168,9 @@ test('Tiendas: crear, editar y borrar persisten (I-10)', async ({ page }) => {
   await expect(page.getByTestId('store-form')).toHaveCount(0);
   // Persiste tras recargar.
   await page.reload();
-  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
+  // F0 (react-router): recargar MANTIENE la ruta actual (ya no resetea a dashboard).
+  // Readiness route-agnóstica: el clúster de acciones del shell está en todas las views.
+  await expect(page.getByTestId('float-actions')).toBeVisible({ timeout: 15000 });
   await navTo(page, 'stores');
   const renamed = page.getByTestId('store-card').filter({ hasText: `Tienda E2E ${code} Editada` });
   await expect(renamed).toBeVisible();
@@ -290,7 +294,9 @@ test('Stock: ajustar existencias PERSISTE tras recargar (E-01)', async ({ page }
   await expect(page.getByTestId('stock-adjust-form')).toHaveCount(0);
   // Recargar: la cantidad debe venir del backend, no de un overlay local.
   await page.reload();
-  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
+  // F0 (react-router): recargar MANTIENE la ruta actual (ya no resetea a dashboard).
+  // Readiness route-agnóstica: el clúster de acciones del shell está en todas las views.
+  await expect(page.getByTestId('float-actions')).toBeVisible({ timeout: 15000 });
   await navTo(page, 'stock');
   const row = page.getByTestId('stock-row').filter({ hasText: productName }).first();
   await expect(row).toBeVisible();
@@ -707,7 +713,9 @@ test('U-08: la marca corporativa se aplica como tema en vivo y persiste', async 
   await expect.poll(brandVar).toBe('#aa00ff');
   // Persiste tras recargar (viene de la organización, no de localStorage).
   await page.reload();
-  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
+  // F0 (react-router): recargar MANTIENE la ruta actual (ya no resetea a dashboard).
+  // Readiness route-agnóstica: el clúster de acciones del shell está en todas las views.
+  await expect(page.getByTestId('float-actions')).toBeVisible({ timeout: 15000 });
   await expect.poll(brandVar).toBe('#aa00ff');
   // Restaurar el estado original (color guardado previo, o el default).
   await navTo(page, 'settings');
