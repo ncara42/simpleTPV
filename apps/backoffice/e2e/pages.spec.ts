@@ -666,12 +666,14 @@ test('U-04: sidebar contraído a rail — flyout lateral con anclaje y navegaci�
   // Contraído no se ven las labels del rail (solo iconos).
   await expect(page.getByTestId('nav-group-inventory').locator('.sidebar-item-label')).toBeHidden();
   // Clic en el grupo ancla el flyout lateral con sus opciones (labels visibles).
+  // Tras S-27, Inventario/stock es DIRECTO; el grupo conserva Familias y Traspasos,
+  // así que el flyout se ejercita navegando a Traspasos.
   await page.getByTestId('nav-group-inventory').click();
-  await expect(page.getByTestId('nav-stock')).toBeVisible();
-  await page.getByTestId('nav-stock').click();
-  // Navega a Stock y el flyout se cierra.
-  await expect(page.getByTestId('stock-page')).toBeVisible();
-  await expect(page.getByTestId('nav-stock')).toBeHidden();
+  await expect(page.getByTestId('nav-transfers')).toBeVisible();
+  await page.getByTestId('nav-transfers').click();
+  // Navega a Traspasos y el flyout se cierra.
+  await expect(page.getByTestId('transfers-page')).toBeVisible();
+  await expect(page.getByTestId('nav-transfers')).toBeHidden();
   // Vuelta a expandido.
   await page.getByTestId('sidebar-collapse').click();
   await expect(page.locator('aside.sidebar.collapsed')).toHaveCount(0);

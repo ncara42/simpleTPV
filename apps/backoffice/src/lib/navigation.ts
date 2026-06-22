@@ -52,8 +52,11 @@ export const NAV_GROUPS: readonly NavGroupMeta[] = [
 ] as const;
 
 /**
- * Catálogo único de entradas. El orden es el del menú actual (D-09); S-27 lo
- * reordenará consumiendo esta misma fuente.
+ * Catálogo único de entradas. Orden post-S-27 (piedra angular, P169/P170): tras
+ * Dashboard, los 4 dominios de mayor frecuencia van como entradas DIRECTAS (sin
+ * `group`, 1 clic) en orden por uso — Ventas → Catálogo → Inventario → Proveedores —;
+ * el resto queda en sus grupos plegables. El label de existencias es 'Inventario'
+ * (S-12, término ganador P068; 'Stock' deja de usarse como nombre de página/menú).
  */
 export const NAV_NODES: readonly NavNode[] = [
   {
@@ -62,7 +65,34 @@ export const NAV_NODES: readonly NavNode[] = [
     label: 'Dashboard',
     synonyms: ['inicio', 'home', 'resumen', 'kpis', 'paneles', 'metricas'],
   },
-  // Catálogo e inventario
+  // ── 4 dominios directos (piedra angular, por frecuencia de uso) ──────────────
+  {
+    id: 'sales',
+    path: '/sales',
+    label: 'Ventas',
+    synonyms: ['ventas', 'tickets', 'facturas', 'historico'],
+  },
+  {
+    id: 'catalog',
+    path: '/catalog',
+    label: 'Catálogo',
+    synonyms: ['productos', 'articulos', 'precios', 'referencias', 'sku'],
+  },
+  {
+    id: 'stock',
+    path: '/stock',
+    label: 'Inventario',
+    synonyms: ['stock', 'existencias', 'almacen', 'roturas'],
+  },
+  {
+    id: 'suppliers',
+    path: '/suppliers',
+    label: 'Proveedores',
+    synonyms: ['proveedor', 'compras', 'tarifas', 'reponer'],
+  },
+  // ── Grupo "Catálogo e inventario" (operaciones secundarias) ──────────────────
+  // Catálogo e Inventario son ahora directos; el grupo conserva Familias y Traspasos
+  // (+ Notificaciones oculta). El label se mantiene coherente; su rediseño es S-04.
   {
     id: 'notifications',
     path: '/notifications',
@@ -72,25 +102,11 @@ export const NAV_NODES: readonly NavNode[] = [
     synonyms: ['avisos', 'alertas', 'campana'],
   },
   {
-    id: 'catalog',
-    path: '/catalog',
-    label: 'Catálogo',
-    group: 'inventory',
-    synonyms: ['productos', 'articulos', 'precios', 'referencias', 'sku'],
-  },
-  {
     id: 'families',
     path: '/families',
     label: 'Familias',
     group: 'inventory',
     synonyms: ['arquetipos', 'subfamilias', 'arbol', 'categorias'],
-  },
-  {
-    id: 'stock',
-    path: '/stock',
-    label: 'Stock',
-    group: 'inventory',
-    synonyms: ['inventario', 'existencias', 'almacen', 'roturas'],
   },
   {
     id: 'transfers',
@@ -99,21 +115,7 @@ export const NAV_NODES: readonly NavNode[] = [
     group: 'inventory',
     synonyms: ['traspaso', 'mover stock', 'enviar', 'recepcion'],
   },
-  {
-    id: 'suppliers',
-    path: '/suppliers',
-    label: 'Proveedores',
-    group: 'inventory',
-    synonyms: ['proveedor', 'compras', 'tarifas', 'reponer'],
-  },
-  // Ventas y clientes
-  {
-    id: 'sales',
-    path: '/sales',
-    label: 'Ventas',
-    group: 'commercial',
-    synonyms: ['ventas', 'tickets', 'facturas', 'historico'],
-  },
+  // ── Ventas y clientes ────────────────────────────────────────────────────────
   {
     id: 'b2b',
     path: '/b2b',

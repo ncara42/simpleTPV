@@ -45,14 +45,13 @@ export async function selectByLabel(
   await page.locator('[role="option"]', { hasText: label }).first().click();
 }
 
-// Mapa page→grupo del menú dropdown (D-02/D-09). Dashboard y Ayuda son directas.
+// Mapa page→grupo del menú dropdown. Tras S-27 (piedra angular) los 4 dominios
+// directos (Ventas, Catálogo, Inventario/stock, Proveedores) NO están agrupados:
+// se clican directos (como Dashboard y Ayuda). Solo quedan agrupadas las pages
+// secundarias.
 const NAV_GROUP_OF: Record<string, string> = {
-  catalog: 'inventory',
   families: 'inventory',
-  stock: 'inventory',
   transfers: 'inventory',
-  suppliers: 'inventory',
-  sales: 'commercial',
   b2b: 'commercial',
   promotions: 'commercial',
   stores: 'org',

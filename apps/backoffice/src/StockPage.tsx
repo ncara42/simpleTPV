@@ -27,7 +27,10 @@ export function StockPage({
     return unsubscribe;
   }, [qc]);
 
-  usePageHeader('Stock', 'Stock por tienda en tiempo real');
+  // S-12: 'Inventario' es el término visible del dominio de existencias ('Stock'
+  // deja de usarse como nombre de página). El título visible lo pinta el shell
+  // desde el label de navigation.ts; esto alimenta el contexto de cabecera.
+  usePageHeader('Inventario', 'Existencias por tienda en tiempo real');
 
   return (
     <section className="catalog" data-testid="stock-page">

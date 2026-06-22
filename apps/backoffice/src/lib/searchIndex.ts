@@ -59,11 +59,13 @@ const SEARCH_INDEX: SearchEntry[] = [
     synonyms: ['arquetipos', 'subfamilias', 'arbol', 'categorias'],
   },
   {
-    label: 'Stock',
+    // S-12: el término visible es 'Inventario'; 'stock'/'existencias' quedan como
+    // sinónimos OCULTOS para que teclearlos siga encontrando la sección (P073).
+    label: 'Inventario',
     tab: 'stock',
     group: 'Catálogo e inventario',
     hint: 'Existencias',
-    synonyms: ['existencias', 'inventario', 'ajuste de stock', 'unidades'],
+    synonyms: ['stock', 'existencias', 'ajuste de stock', 'unidades'],
   },
   {
     label: 'Roturas de stock',

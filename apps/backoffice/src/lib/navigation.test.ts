@@ -35,6 +35,26 @@ describe('navigation — catálogo único', () => {
       if (node.group) expect(groupIds.has(node.group)).toBe(true);
     }
   });
+
+  // S-27: los 4 dominios de la piedra angular son entradas DIRECTAS (sin grupo),
+  // tras Dashboard y en orden por frecuencia (Ventas → Catálogo → Inventario →
+  // Proveedores).
+  it('S-27: los 4 dominios directos no tienen grupo y van en orden tras Dashboard', () => {
+    const directDomains = ['sales', 'catalog', 'stock', 'suppliers'] as const;
+    for (const id of directDomains) {
+      expect(nodeOf(id)?.group).toBeUndefined();
+    }
+    const visibleOrder = NAV_NODES.filter((n) => !n.hidden).map((n) => n.id);
+    expect(visibleOrder.slice(0, 5)).toEqual(['dashboard', ...directDomains]);
+  });
+
+  // S-12: el término visible del dominio de existencias es 'Inventario'; 'stock'
+  // queda como sinónimo oculto (no como label).
+  it('S-12: la entrada de existencias usa el label "Inventario" con "stock" como sinónimo', () => {
+    const node = nodeOf('stock');
+    expect(node?.label).toBe('Inventario');
+    expect(node?.synonyms).toContain('stock');
+  });
 });
 
 describe('tabToPath / pathToTab — ida y vuelta', () => {

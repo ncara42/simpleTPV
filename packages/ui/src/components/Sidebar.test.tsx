@@ -67,3 +67,37 @@ describe('Sidebar (U-04 rail)', () => {
     expect(screen.queryByTestId('nav-stock')).toBeNull(); // flyout cerrado
   });
 });
+
+describe('Sidebar (S-27 entradas directas)', () => {
+  beforeEach(() => window.localStorage.clear());
+
+  // Tras S-27, los dominios sin `group` se pintan como entradas DIRECTAS (1 clic)
+  // respetando el orden del array fuente; las pages con `group` quedan bajo su
+  // dropdown. Este caso fija ese contrato del render (Sidebar no se toca en S-27).
+  it('renderiza los items sin grupo como entradas directas en el orden de la fuente', () => {
+    const ordered: NavItem[] = [
+      { id: 'dashboard', label: 'Dashboard', icon: <span>D</span> },
+      { id: 'sales', label: 'Ventas', icon: <span>V</span> },
+      { id: 'catalog', label: 'Catálogo', icon: <span>C</span> },
+      { id: 'stock', label: 'Inventario', icon: <span>S</span> },
+      { id: 'suppliers', label: 'Proveedores', icon: <span>P</span> },
+      { id: 'families', label: 'Familias', icon: <span>F</span>, group: 'inv' },
+    ];
+    renderSidebar({ items: ordered });
+
+    const directIds = ['dashboard', 'sales', 'catalog', 'stock', 'suppliers'];
+    const rendered = directIds.map((id) => screen.getByTestId(`nav-${id}`));
+    rendered.forEach((el) => expect(el).toBeVisible());
+
+    // El orden del DOM coincide con el de la fuente (cada uno precede al siguiente).
+    for (let i = 1; i < rendered.length; i++) {
+      const precedes =
+        rendered[i - 1]!.compareDocumentPosition(rendered[i]!) & Node.DOCUMENT_POSITION_FOLLOWING;
+      expect(precedes).toBeTruthy();
+    }
+
+    // La page con grupo NO es una entrada directa: vive bajo el dropdown del grupo.
+    expect(screen.getByTestId('nav-group-inv')).toBeInTheDocument();
+    expect(screen.queryByTestId('nav-families')).toBeNull();
+  });
+});
