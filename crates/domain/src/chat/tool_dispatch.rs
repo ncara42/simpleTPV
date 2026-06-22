@@ -6,8 +6,8 @@ use uuid::Uuid;
 use crate::dashboard::{
     period::{resolve_period, DashboardPeriod},
     service::{
-        discount_by_employee, product_rankings, sales_by_employee, sales_by_family, sales_by_hour,
-        sales_kpis, stockout_kpis,
+        discount_by_employee, margin_kpis, product_rankings, sales_by_employee, sales_by_family,
+        sales_by_hour, sales_by_store, sales_kpis, stockout_kpis,
     },
 };
 use crate::purchases::service as purchases_service;
@@ -92,6 +92,37 @@ pub async fn dispatch_tool(
             let by_sales = sales_by_employee(pool, org, range, store_id).await?;
             let by_disc = discount_by_employee(pool, org, range, store_id).await?;
             Ok(serde_json::json!({ "bySales": by_sales, "byDiscount": by_disc }))
+        }
+
+        "sales_by_store" => {
+            let period = parse_period(&args["period"]);
+            let range = resolve_period(period, now, None, None)?;
+            let result = sales_by_store(pool, org, range, None).await?;
+            Ok(serde_json::to_value(result).unwrap_or(serde_json::Value::Null))
+        }
+
+        "margin_kpis" => {
+            let period = parse_period(&args["period"]);
+            let range = resolve_period(period, now, None, None)?;
+            let store_id = parse_uuid_opt(&args["store_id"]);
+            let result = margin_kpis(pool, org, range, store_id).await?;
+            Ok(serde_json::to_value(result).unwrap_or(serde_json::Value::Null))
+        }
+
+        "stockout_kpis" => {
+            let period = parse_period(&args["period"]);
+            let range = resolve_period(period, now, None, None)?;
+            let store_id = parse_uuid_opt(&args["store_id"]);
+            let result = stockout_kpis(pool, org, range, store_id).await?;
+            Ok(serde_json::to_value(result).unwrap_or(serde_json::Value::Null))
+        }
+
+        "discount_by_employee" => {
+            let period = parse_period(&args["period"]);
+            let range = resolve_period(period, now, None, None)?;
+            let store_id = parse_uuid_opt(&args["store_id"]);
+            let result = discount_by_employee(pool, org, range, store_id).await?;
+            Ok(serde_json::to_value(result).unwrap_or(serde_json::Value::Null))
         }
 
         "time_clock_today" => {
