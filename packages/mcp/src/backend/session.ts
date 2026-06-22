@@ -25,6 +25,8 @@ interface CachedToken {
 }
 
 const cache = new Map<string, CachedToken>();
+/** Refresh en curso por grant (single-flight): evita refrescos concurrentes. */
+const inflight = new Map<string, Promise<string>>();
 const MARGIN_MS = 60 * 1000;
 
 export class BackendSessionError extends Error {}
@@ -43,6 +45,23 @@ export async function getBackendAccessToken(
     if (cached && Date.now() < cached.expiresAt) return cached.token;
   }
 
+  // Single-flight por grant. El refresh token del backend es de UN SOLO USO con
+  // rotación de familia (SEC-06): si dos llamadas concurrentes (p. ej. el
+  // `Promise.all` de get_company_overview) refrescan con el MISMO token a la vez,
+  // el backend lo trata como reuso y REVOCA la familia entera → todo da 401 hasta
+  // un login nuevo. Compartiendo el refresh en curso, el token se consume una vez.
+  const existing = inflight.get(grantId);
+  if (existing) return existing;
+
+  const p = refreshBackendToken(store, grantId).finally(() => {
+    inflight.delete(grantId);
+  });
+  inflight.set(grantId, p);
+  return p;
+}
+
+/** Ejecuta el `/auth/refresh` real contra el backend y cachea el access token. */
+async function refreshBackendToken(store: OAuthStore, grantId: string): Promise<string> {
   const session = await store.getBackendSession(grantId);
   if (!session || !session.refreshCookieEnc) {
     throw new BackendSessionError('sesión de backend no encontrada; vuelve a iniciar sesión');
