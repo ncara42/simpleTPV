@@ -1,9 +1,8 @@
-import { ArrowDown, Check, ChevronRight, Copy, Pencil, RefreshCw } from 'lucide-react';
+import { ArrowDown, Check, ChevronDown, Copy, Pencil, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { ChatMessage, ToolCall, ToolResult } from '../../lib/chat.js';
+import type { ChatMessage, ToolResult } from '../../lib/chat.js';
 import { ChatMarkdown } from './ChatMarkdown.js';
-import { Loader } from './Loader.js';
 import { Reasoning } from './Reasoning.js';
 import { Shimmer } from './Shimmer.js';
 import { Suggestion, Suggestions } from './Suggestions.js';
@@ -43,76 +42,88 @@ function messageThinking(message: ChatMessage): string {
     .trim();
 }
 
-function prettyJson(value: unknown): string {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
+// ── Traza de actividad del agente (línea de tiempo de pasos) ───────────────────────
+// Sustituye los chips de tool por una timeline elegante: cada tool-call es un paso con su nodo
+// de estado sobre una línea conectora. Color semántico por tipo: CONSULTAS de datos (acento
+// índigo) vs ACCIONES sobre el lienzo/pantalla (marca teal). Espejo de CANVAS_OP_NAMES /
+// VIEW_ACTION_NAMES del backend (crates/http/src/chat.rs).
+
+const CANVAS_OP_NAMES: ReadonlySet<string> = new Set([
+  'add_widget',
+  'add_shape',
+  'add_text',
+  'add_note',
+  'add_insight',
+  'remove_element',
+  'arrange',
+  'clear_canvas',
+]);
+const VIEW_ACTION_NAMES: ReadonlySet<string> = new Set(['highlight_on_view', 'filter_view']);
+const isActionTool = (name: string): boolean =>
+  CANVAS_OP_NAMES.has(name) || VIEW_ACTION_NAMES.has(name);
+
+// ¿La canvas op fue rechazada? El resultado vuelve como tool_result {accepted, reason}.
+function canvasRejected(result: ToolResult | undefined): boolean {
+  if (!result || result.content == null || typeof result.content !== 'object') return false;
+  return (result.content as { accepted?: boolean }).accepted === false;
 }
 
-// ── Chip de tool-call ────────────────────────────────────────────────────────────
-
-interface ToolChipProps {
-  call: Pick<ToolCall, 'name' | 'args'>;
-  result?: ToolResult | undefined;
-  /** Sin resultado y conversación finalizada → abortado (gris). */
-  aborted: boolean;
-  /** En curso durante el streaming (spinner). */
-  pending: boolean;
+interface TraceCall {
+  id?: string;
+  name: string;
 }
 
-// Estado del tool-call (espejo de los estados de Tool de ai-elements).
-const TOOL_BADGE: Record<'running' | 'completed' | 'error', string> = {
-  running: 'En curso',
-  completed: 'Hecho',
-  error: 'Cancelado',
-};
-const TOOL_STATE_CLASS: Record<'running' | 'completed' | 'error', string> = {
-  running: 'chat-tool-chip--pending',
-  completed: 'chat-tool-chip--done',
-  error: 'chat-tool-chip--aborted',
-};
+interface AgentTraceProps {
+  calls: TraceCall[];
+  resultsByCall?: Map<string, ToolResult> | undefined;
+  /** Turno en curso: pasos «en marcha» y traza abierta por defecto. */
+  streaming: boolean;
+}
 
-function ToolChip({ call, result, aborted, pending }: ToolChipProps) {
-  const [open, setOpen] = useState(false);
-  const state: 'running' | 'completed' | 'error' = pending
-    ? 'running'
-    : aborted
-      ? 'error'
-      : 'completed';
+function AgentTrace({ calls, resultsByCall, streaming }: AgentTraceProps) {
+  // Abierta mientras el agente trabaja; plegada al persistirse (igual que el razonamiento).
+  const [open, setOpen] = useState(streaming);
+  if (calls.length === 0) return null;
 
   return (
-    <div className={`chat-tool-chip ${TOOL_STATE_CLASS[state]}`}>
+    <div className={`agent-trace${open ? ' is-open' : ''}`}>
       <button
         type="button"
-        className="chat-tool-chip__head"
-        onClick={() => setOpen((v) => !v)}
+        className="agent-trace__head"
+        onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
+        data-testid="chat-agent-trace"
       >
-        <ChevronRight
-          size={13}
-          className={`chat-tool-chip__caret${open ? ' is-open' : ''}`}
-          aria-hidden="true"
-        />
-        <span className="chat-tool-chip__label">{toolLabel(call.name)}</span>
-        <span className="chat-tool-chip__badge">
-          {state === 'running' && <Loader size={11} />}
-          {state === 'completed' && <Check size={12} aria-hidden="true" />}
-          {TOOL_BADGE[state]}
+        <span className="agent-trace__spark" aria-hidden="true" />
+        <span className="agent-trace__title">
+          {streaming ? (
+            <Shimmer>Trabajando…</Shimmer>
+          ) : (
+            `Proceso · ${calls.length} ${calls.length === 1 ? 'paso' : 'pasos'}`
+          )}
         </span>
+        <ChevronDown size={13} className="agent-trace__caret" aria-hidden="true" />
       </button>
       {open && (
-        <div className="chat-tool-chip__body">
-          <p className="chat-tool-chip__section">Parámetros</p>
-          <pre className="chat-tool-chip__json">{prettyJson(call.args)}</pre>
-          {result && (
-            <>
-              <p className="chat-tool-chip__section">Resultado</p>
-              <pre className="chat-tool-chip__json">{prettyJson(result.content)}</pre>
-            </>
-          )}
-        </div>
+        <ol className="agent-trace__steps">
+          {calls.map((call, i) => {
+            const action = isActionTool(call.name);
+            const rejected =
+              action && call.id ? canvasRejected(resultsByCall?.get(call.id)) : false;
+            const status = streaming ? 'running' : rejected ? 'rejected' : 'done';
+            return (
+              <li
+                key={call.id ?? `${call.name}-${i}`}
+                className={`agent-step agent-step--${action ? 'action' : 'query'} is-${status}`}
+              >
+                <span className="agent-step__node" aria-hidden="true">
+                  {status === 'done' ? <Check size={9} strokeWidth={3} /> : null}
+                </span>
+                <span className="agent-step__label">{toolLabel(call.name)}</span>
+              </li>
+            );
+          })}
+        </ol>
       )}
     </div>
   );
@@ -191,7 +202,7 @@ function UserBubble({ message, disabled, onEditAndResend }: UserBubbleProps) {
   );
 }
 
-// ── Mensaje del asistente (texto plano a todo el ancho + acciones, estilo ai-elements) ──
+// ── Mensaje del asistente (texto a todo el ancho + traza + acciones) ───────────────
 
 interface AssistantMessageProps {
   message: ChatMessage;
@@ -226,22 +237,7 @@ function AssistantMessage({
   return (
     <div className="chat-msg chat-msg--assistant">
       {thinking && <Reasoning isStreaming={false}>{thinking}</Reasoning>}
-      {calls.length > 0 && (
-        <div className="chat-tool-chips">
-          {calls.map((call) => {
-            const result = resultsByCall.get(call.id);
-            return (
-              <ToolChip
-                key={call.id}
-                call={call}
-                result={result}
-                aborted={!result}
-                pending={false}
-              />
-            );
-          })}
-        </div>
-      )}
+      <AgentTrace calls={calls} resultsByCall={resultsByCall} streaming={false} />
       {text && (
         <div className="chat-response chat-markdown">
           <ChatMarkdown>{text}</ChatMarkdown>
@@ -376,25 +372,20 @@ export function ChatMessages({
             {streamingReasoning && (
               <Reasoning isStreaming={!streamingText}>{streamingReasoning}</Reasoning>
             )}
-            {streamingToolCalls.length > 0 && (
-              <div className="chat-tool-chips">
-                {streamingToolCalls.map((call) => (
-                  <ToolChip
-                    key={call.id}
-                    call={{ name: call.name, args: call.args }}
-                    aborted={false}
-                    pending={!streamingText}
-                  />
-                ))}
-              </div>
-            )}
+            <AgentTrace calls={streamingToolCalls} streaming={true} />
             {streamingText ? (
               <div className="chat-response chat-markdown">
                 <ChatMarkdown>{streamingText}</ChatMarkdown>
                 <span className="chat-cursor" aria-hidden="true" />
               </div>
             ) : (
-              !streamingReasoning && <Shimmer className="chat-messages__hint">Pensando</Shimmer>
+              !streamingReasoning &&
+              streamingToolCalls.length === 0 && (
+                <div className="chat-thinking">
+                  <span className="agent-orb agent-orb--sm is-active" aria-hidden="true" />
+                  <Shimmer className="chat-messages__hint">Pensando</Shimmer>
+                </div>
+              )
             )}
           </div>
         )}

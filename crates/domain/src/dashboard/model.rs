@@ -94,6 +94,20 @@ pub struct SalesByEmployeeItem {
     pub total: f64,
 }
 
+// ── sales-by-store (desglose multitienda: facturación + ticket medio + margen) ─
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SalesByStoreItem {
+    pub store_id: Uuid,
+    pub store_name: String,
+    pub revenue: f64,
+    pub sales_count: i64,
+    pub avg_ticket: f64,
+    pub margin: f64,
+    pub margin_pct: f64,
+}
+
 // ── margin-kpis / stockout-kpis ──────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]

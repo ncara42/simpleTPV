@@ -1,20 +1,53 @@
 import { describe, expect, it } from 'vitest';
 
 import { BLOCK_CATALOG, BLOCK_IDS, buildBlockSpec } from './dashboard-blocks.js';
-import { PIECE_ALLOWLIST, RECIPE_ALLOWLIST } from './dashboard-pieces.js';
+import { PIECE_ALLOWLIST, RECIPE_ALLOWLIST, WIDGETABLE_ENDPOINTS } from './dashboard-pieces.js';
 
 describe('dashboard-blocks — bloques pre-cableados (#205)', () => {
-  it('el catálogo expone 4 bloques con prefijo block: y tamaño', () => {
+  it('el catálogo expone los 8 bloques con prefijo block: y tamaño', () => {
     expect(BLOCK_IDS).toEqual([
       'block:sales-overview',
       'block:stock-risk',
       'block:staff-performance',
       'block:product-ranking',
+      'block:profitability',
+      'block:discount-control',
+      'block:sales-mix',
+      'block:store-comparison',
     ]);
     for (const id of BLOCK_IDS) {
       expect(BLOCK_CATALOG[id]?.label).toBeTruthy();
       expect(BLOCK_CATALOG[id]?.defaultSize.w).toBeGreaterThan(0);
     }
+  });
+
+  it('los bloques nuevos (#201) construyen su receta e intención correctas', () => {
+    // Rentabilidad: KPIs de margen + barras de ventas por familia.
+    const prof = buildBlockSpec('block:profitability', {});
+    expect(prof?.recipe).toBe('kpiRow+oneChart');
+    expect(prof?.slots?.kpis?.map((p) => p.valueField)).toEqual([
+      'revenue',
+      'realMargin',
+      'marginPct',
+    ]);
+    expect(prof?.slots?.charts?.[0]?.piece).toBe('comparisonBars');
+    // Control de descuento: tasas (percentRatio) + 2 barras por empleado.
+    const disc = buildBlockSpec('block:discount-control', {});
+    expect(disc?.recipe).toBe('kpiRow+twoCharts');
+    expect(disc?.slots?.kpis?.every((p) => p.format === 'percentRatio')).toBe(true);
+    expect(disc?.slots?.charts).toHaveLength(2);
+    // Mix de ventas: donut hero + KPIs laterales.
+    const mix = buildBlockSpec('block:sales-mix', {});
+    expect(mix?.recipe).toBe('heroChart+sideStats');
+    expect(mix?.slots?.charts?.[0]?.piece).toBe('shareDonut');
+    expect(mix?.slots?.kpis).toHaveLength(2);
+    // Comparativa entre tiendas (#224): ranking de facturación + barras de margen por tienda.
+    const store = buildBlockSpec('block:store-comparison', {});
+    expect(store?.recipe).toBe('kpiRow+twoCharts');
+    expect(store?.slots?.charts?.map((c) => c.piece)).toEqual(['rankBarList', 'comparisonBars']);
+    expect(store?.slots?.charts?.every((c) => c.endpoint === '/dashboard/sales-by-store')).toBe(
+      true,
+    );
   });
 
   it('buildBlockSpec(sales-overview) construye un panel v2 con KPIs + tendencia', () => {
@@ -49,6 +82,9 @@ describe('dashboard-blocks — bloques pre-cableados (#205)', () => {
       for (const leaf of leaves) {
         expect(PIECE_ALLOWLIST.has(leaf.piece)).toBe(true);
         expect(leaf.endpoint).toBeTruthy();
+        // Los bloques saltan normalizePanelSpec (son de confianza): blindamos aquí que cada hoja
+        // apunte a un endpoint de la allowlist, igual que haría la normalización de un gen:panel.
+        expect(WIDGETABLE_ENDPOINTS.has(leaf.endpoint!)).toBe(true);
       }
     }
   });

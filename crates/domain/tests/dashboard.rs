@@ -467,3 +467,58 @@ async fn stockout_kpis_cuenta_abiertas_y_resueltas() {
 
     teardown(&c).await;
 }
+
+/// sales_by_store (#224): desglose por tienda con facturación, nº de tickets, ticket medio y
+/// margen real. Asevera los valores exactos (acotado a la tienda), que la tienda aparece en el
+/// desglose multitienda (sin filtro) y que el orden es descendente por facturación — la base de
+/// la comparación entre tiendas del agente.
+#[tokio::test]
+async fn sales_by_store_desglosa_facturacion_ticket_y_margen() {
+    let c = setup().await;
+
+    let pfx = &c.store.simple().to_string()[..8];
+    let t1 = now_utc() - time::Duration::minutes(10);
+    let t2 = now_utc() - time::Duration::minutes(5);
+    insert_sale(&c, &format!("S{pfx}-1"), "10.00", t1).await;
+    insert_sale(&c, &format!("S{pfx}-2"), "30.00", t2).await;
+
+    let range = resolve_period(DashboardPeriod::Today, now_utc(), None, None).unwrap();
+
+    // Acotado a la tienda nueva: una fila con los valores exactos.
+    let scoped = service::sales_by_store(&c.app, c.org, range, Some(c.store))
+        .await
+        .unwrap();
+    let row = scoped
+        .iter()
+        .find(|s| s.store_id == c.store)
+        .expect("la tienda aparece en el desglose acotado");
+    assert_eq!(row.sales_count, 2, "2 tickets");
+    assert!((row.revenue - 40.0).abs() < 1e-9, "facturación = 10 + 30");
+    assert!(
+        (row.avg_ticket - 20.0).abs() < 1e-9,
+        "ticket medio = 40 / 2"
+    );
+    // costPrice por defecto 0 → margen real = ΣlineTotal (40) y % margen = 1.0 (verifica la fórmula).
+    assert!((row.margin - 40.0).abs() < 1e-9, "margen real = ΣlineTotal");
+    assert!(
+        (row.margin_pct - 1.0).abs() < 1e-9,
+        "% margen = 1.0 con coste 0"
+    );
+
+    // Sin filtro de tienda: el desglose multitienda incluye la tienda (base de la comparación) y
+    // va de mayor a menor facturación.
+    let all = service::sales_by_store(&c.app, c.org, range, None)
+        .await
+        .unwrap();
+    let mine = all
+        .iter()
+        .find(|s| s.store_id == c.store)
+        .expect("la tienda aparece en el desglose multitienda");
+    assert!((mine.revenue - 40.0).abs() < 1e-9);
+    assert!(
+        all.windows(2).all(|w| w[0].revenue >= w[1].revenue - 1e-9),
+        "el desglose va de mayor a menor facturación"
+    );
+
+    teardown(&c).await;
+}

@@ -10,8 +10,8 @@ use simpletpv_domain::dashboard::period::{
 };
 use simpletpv_domain::dashboard::{
     service, ArchetypeRotationItem, DiscountByEmployeeItem, MarginKpis, ProductRankings,
-    ProductRotationItem, SalesByEmployeeItem, SalesByFamilyItem, SalesByHourItem, SalesKpis,
-    SalesToday, StockoutKpis,
+    ProductRotationItem, SalesByEmployeeItem, SalesByFamilyItem, SalesByHourItem, SalesByStoreItem,
+    SalesKpis, SalesToday, StockoutKpis,
 };
 use simpletpv_shared::AppError;
 use uuid::Uuid;
@@ -177,6 +177,19 @@ pub async fn sales_by_employee(
     let range = q.range()?;
     Ok(Json(
         service::sales_by_employee(state.db(), user.organization_id, range, q.store_id).await?,
+    ))
+}
+
+/// `GET /dashboard/sales-by-store` — desglose multitienda (facturación, ticket medio, margen).
+pub async fn sales_by_store(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<PeriodQuery>,
+) -> Result<Json<Vec<SalesByStoreItem>>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    let range = q.range()?;
+    Ok(Json(
+        service::sales_by_store(state.db(), user.organization_id, range, q.store_id).await?,
     ))
 }
 
