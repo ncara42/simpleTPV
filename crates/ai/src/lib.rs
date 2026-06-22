@@ -151,6 +151,14 @@ pub fn available_models() -> Vec<ModelInfo> {
     models
 }
 
+/// Catálogo estático de modelos OpenAI. Es el fallback de `GET /chat/models`: se usa sin
+/// gateway, y también cuando el gateway falla o devuelve 0 modelos. NUNCA es vacío (el
+/// catálogo por defecto siempre trae algún id), de modo que con IA configurada el chat no
+/// queda deshabilitado en silencio por un descubrimiento de modelos vacío.
+pub fn static_openai_models() -> Vec<ModelInfo> {
+    openai_models()
+}
+
 /// Descubre los modelos de un gateway OpenAI-compatible vía su endpoint `/v1/models`
 /// (`{base_url}/models`). Devuelve todos los ids que sirva, como provider `openai`. Permite que
 /// modelos nuevos del gateway (p.ej. OpenCode Zen) aparezcan en el selector sin tocar código.
@@ -184,4 +192,24 @@ pub async fn fetch_openai_models(base_url: &str, api_key: &str) -> Result<Vec<Mo
         })
         .unwrap_or_default();
     Ok(models)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn static_openai_models_nunca_es_vacio() {
+        // Invariante crítico del fallback de `/chat/models`: si fuese vacío, el chat
+        // quedaría deshabilitado en silencio (input bloqueado) aun con IA configurada.
+        let models = static_openai_models();
+        assert!(
+            !models.is_empty(),
+            "el catálogo de fallback OpenAI no puede ser vacío"
+        );
+        assert!(
+            models.iter().all(|m| m.provider == "openai"),
+            "el catálogo de fallback solo expone modelos del provider openai"
+        );
+    }
 }

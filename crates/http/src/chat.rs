@@ -720,26 +720,26 @@ pub async fn list_models(
     let mut models: Vec<simpletpv_ai::ModelInfo> = Vec::new();
 
     if let Some(cfg) = ai {
-        // OpenAI / gateway. Con base_url custom se descubre la lista en vivo del gateway
-        // (todos sus modelos); en fallo de red se cae al catálogo estático.
+        // OpenAI / gateway. Con base_url custom se descubre la lista EN VIVO del gateway
+        // (todos sus modelos); si la llamada falla O devuelve una lista vacía se cae al
+        // catálogo estático.
         if let Some(key) = &cfg.openai_key {
             match &cfg.openai_base_url {
                 Some(base) => match simpletpv_ai::fetch_openai_models(base, key).await {
-                    Ok(m) => models.extend(m),
+                    // Lista viva no vacía: la del gateway manda.
+                    Ok(m) if !m.is_empty() => models.extend(m),
+                    // 200 con `data` vacío o de formato inesperado: NO dejar el chat
+                    // deshabilitado en silencio teniendo IA configurada — fallback.
+                    Ok(_) => {
+                        tracing::warn!("el gateway no devolvió modelos; uso catálogo estático");
+                        models.extend(simpletpv_ai::static_openai_models());
+                    }
                     Err(e) => {
                         tracing::warn!(error = %e, "no se pudieron listar los modelos del gateway; uso catálogo estático");
-                        models.extend(
-                            simpletpv_ai::available_models()
-                                .into_iter()
-                                .filter(|m| m.provider == "openai"),
-                        );
+                        models.extend(simpletpv_ai::static_openai_models());
                     }
                 },
-                None => models.extend(
-                    simpletpv_ai::available_models()
-                        .into_iter()
-                        .filter(|m| m.provider == "openai"),
-                ),
+                None => models.extend(simpletpv_ai::static_openai_models()),
             }
         }
         // Anthropic directo solo cuando NO hay gateway (con gateway, sus claude-* ya vienen arriba).
