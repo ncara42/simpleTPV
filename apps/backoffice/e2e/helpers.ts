@@ -45,19 +45,28 @@ export async function selectByLabel(
   await page.locator('[role="option"]', { hasText: label }).first().click();
 }
 
-// Mapa page→grupo del menú dropdown. Tras S-27 (piedra angular) los 4 dominios
-// directos (Ventas, Catálogo, Inventario/stock, Proveedores) NO están agrupados:
-// se clican directos (como Dashboard y Ayuda). Solo quedan agrupadas las pages
-// secundarias.
+// Mapa page→grupo del menú dropdown. ESPEJO de NAV_GROUPS en App.tsx (shell flotante): todas las
+// pages salvo dashboard y help viven dentro de un grupo desplegable, así que navTo debe abrir el
+// grupo antes de clicar el item. (Si esto se desincroniza de NAV_GROUPS, los tests de las pages
+// afectadas cuelgan 30s esperando un item oculto.)
 const NAV_GROUP_OF: Record<string, string> = {
+  // Catálogo e inventario
+  notifications: 'inventory',
+  catalog: 'inventory',
   families: 'inventory',
+  stock: 'inventory',
   transfers: 'inventory',
+  suppliers: 'inventory',
+  // Ventas y clientes
+  sales: 'commercial',
   b2b: 'commercial',
   promotions: 'commercial',
+  // Organización
   stores: 'org',
   users: 'org',
   timeclock: 'org',
   settings: 'org',
+  verifactu: 'org',
 };
 
 // Navega por el menú de grupos: ancla el dropdown del grupo (clic) y elige la
