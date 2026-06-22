@@ -1,4 +1,9 @@
-CREATE TABLE "chat_conversation" (
+-- Idempotente (IF NOT EXISTS) a propósito: estas tablas pueden existir ya en la BD
+-- creadas por la migración Prisma equivalente (20260620120000_chat) durante el corte
+-- Prisma→Rust. Sin esto, el binario Rust crashea al arrancar ("relation already exists")
+-- y Dokploy mantiene el contenedor viejo. GRANT/ENABLE RLS y DROP+CREATE POLICY ya son
+-- idempotentes. Mismo esquema que la copia Prisma (INT≡INTEGER).
+CREATE TABLE IF NOT EXISTS "chat_conversation" (
     "id" UUID NOT NULL,
     "organizationId" UUID NOT NULL,
     "userId" UUID NOT NULL,
@@ -9,7 +14,7 @@ CREATE TABLE "chat_conversation" (
     CONSTRAINT "chat_conversation_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "chat_message" (
+CREATE TABLE IF NOT EXISTS "chat_message" (
     "id" UUID NOT NULL,
     "conversationId" UUID NOT NULL,
     "organizationId" UUID NOT NULL,
@@ -22,7 +27,7 @@ CREATE TABLE "chat_message" (
     CONSTRAINT "chat_message_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "ai_usage" (
+CREATE TABLE IF NOT EXISTS "ai_usage" (
     "id" UUID NOT NULL,
     "organizationId" UUID NOT NULL,
     "userId" UUID NOT NULL,
@@ -38,9 +43,9 @@ CREATE TABLE "ai_usage" (
     CONSTRAINT "ai_usage_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "chat_conversation_org_user_idx" ON "chat_conversation" ("organizationId", "userId");
-CREATE INDEX "chat_message_conversation_idx" ON "chat_message" ("conversationId");
-CREATE INDEX "ai_usage_org_created_idx" ON "ai_usage" ("organizationId", "createdAt");
+CREATE INDEX IF NOT EXISTS "chat_conversation_org_user_idx" ON "chat_conversation" ("organizationId", "userId");
+CREATE INDEX IF NOT EXISTS "chat_message_conversation_idx" ON "chat_message" ("conversationId");
+CREATE INDEX IF NOT EXISTS "ai_usage_org_created_idx" ON "ai_usage" ("organizationId", "createdAt");
 
 -- El rol runtime `app` (RLS) opera estas tablas; `app_admin` (BYPASSRLS) las usa
 -- para lookups/limpieza. Mismo patrón que el resto de migraciones del repo.
