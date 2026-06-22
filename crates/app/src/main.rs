@@ -456,8 +456,13 @@ async fn run_migrations(pool: &sqlx::PgPool) -> anyhow::Result<()> {
             .execute(pool)
             .await
             .map_err(|e| anyhow::anyhow!("migración {} ({}): {}", m.version, m.desc, e))?;
+        // checksum/execution_time EXPLÍCITOS (no por DEFAULT): la _sqlx_migrations de
+        // prod la creó el sqlx real SIN defaults en esas columnas (NOT NULL), así que
+        // omitirlas metía NULL → violación. Este runner no valida checksums (ver arriba),
+        // por eso basta un bytea vacío. Robusto en cualquier BD (con o sin defaults).
         sqlx::query(
-            "INSERT INTO _sqlx_migrations (version, description, success) VALUES ($1, $2, true)",
+            "INSERT INTO _sqlx_migrations (version, description, success, checksum, execution_time) \
+             VALUES ($1, $2, true, ''::bytea, 0)",
         )
         .bind(m.version)
         .bind(m.desc)
