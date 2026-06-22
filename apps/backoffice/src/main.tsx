@@ -5,6 +5,7 @@ import { ErrorScreen } from '@simpletpv/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'sileo';
 
 import App from './App.js';
@@ -24,7 +25,9 @@ createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <Toaster position="bottom-right" />
         <ConfirmProvider>
-          <App />
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
         </ConfirmProvider>
       </QueryClientProvider>
     </Sentry.ErrorBoundary>

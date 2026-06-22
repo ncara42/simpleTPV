@@ -28,7 +28,16 @@ import {
   Tag,
   Users,
 } from 'lucide-react';
-import { useState } from 'react';
+import type { ReactNode } from 'react';
+import {
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from 'react-router-dom';
 
 import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
@@ -43,6 +52,15 @@ import { listPendingCashMovements } from './lib/cash.js';
 import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import type { Tab } from './lib/nav.js';
+import {
+  NAV_GROUPS,
+  NAV_NODES,
+  type NavGroupId,
+  nodeOf,
+  pathToTab,
+  singleStoreParam,
+  tabToPath,
+} from './lib/navigation.js';
 import { listAlerts } from './lib/stock.js';
 import { NotificationsPage } from './NotificationsPage.js';
 import { PromotionsPage } from './PromotionsPage.js';
@@ -56,96 +74,60 @@ import { TransfersPage } from './TransfersPage.js';
 import { UsersPage } from './UsersPage.js';
 import { VerifactuPage } from './VerifactuPage.js';
 
-// Menú de 5 entradas (D-02/D-09): Dashboard y Ayuda son pages directas; los tres
-// grupos se despliegan como dropdown (hover sostenido >200ms = preview; clic =
-// anclado). El mapa de contenido por grupo es el cerrado en informe_decisiones D-09.
-const NAV_GROUPS: NavGroup[] = [
-  { id: 'inventory', label: 'Catálogo e inventario', icon: <Package size={18} /> },
-  { id: 'commercial', label: 'Ventas y clientes', icon: <Receipt size={18} /> },
-  { id: 'org', label: 'Organización', icon: <Store size={18} /> },
-];
+// Iconos del menú por id de pestaña. Viven en el shell (no en `navigation.ts`, que es
+// datos puros) para no acoplar la fuente única a lucide/React.
+const NAV_ICONS: Record<Tab, ReactNode> = {
+  dashboard: <LayoutDashboard size={18} />,
+  notifications: <Bell size={18} />,
+  catalog: <Package size={18} />,
+  families: <Tag size={18} />,
+  stock: <BarChart2 size={18} />,
+  transfers: <ArrowLeftRight size={18} />,
+  suppliers: <ShoppingCart size={18} />,
+  sales: <Receipt size={18} />,
+  b2b: <Handshake size={18} />,
+  promotions: <Percent size={18} />,
+  stores: <Store size={18} />,
+  users: <Users size={18} />,
+  timeclock: <Clock size={18} />,
+  settings: <Palette size={18} />,
+  verifactu: <CheckSquare size={18} />,
+  help: <LifeBuoy size={18} />,
+};
 
-const ALL_NAV: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-  { id: 'notifications', label: 'Notificaciones', icon: <Bell size={18} />, group: 'inventory' },
-  // Catálogo e inventario (D-09): Catálogo · Familias · Stock · Traspasos · Proveedores
-  { id: 'catalog', label: 'Catálogo', icon: <Package size={18} />, group: 'inventory' },
-  { id: 'families', label: 'Familias', icon: <Tag size={18} />, group: 'inventory' },
-  { id: 'stock', label: 'Stock', icon: <BarChart2 size={18} />, group: 'inventory' },
-  { id: 'transfers', label: 'Traspasos', icon: <ArrowLeftRight size={18} />, group: 'inventory' },
-  { id: 'suppliers', label: 'Proveedores', icon: <ShoppingCart size={18} />, group: 'inventory' },
-  // Ventas y clientes (D-09): Ventas · Clientes B2B · Promociones
-  { id: 'sales', label: 'Ventas', icon: <Receipt size={18} />, group: 'commercial' },
-  { id: 'b2b', label: 'Clientes B2B', icon: <Handshake size={18} />, group: 'commercial' },
-  { id: 'promotions', label: 'Promociones', icon: <Percent size={18} />, group: 'commercial' },
-  // Organización (D-09 + U-08): Tiendas · Usuarios · Control horario · Ajustes
-  { id: 'stores', label: 'Tiendas', icon: <Store size={18} />, group: 'org' },
-  { id: 'users', label: 'Usuarios', icon: <Users size={18} />, group: 'org' },
-  { id: 'timeclock', label: 'Control horario', icon: <Clock size={18} />, group: 'org' },
-  { id: 'settings', label: 'Ajustes', icon: <Palette size={18} />, group: 'org' },
-  { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'org' },
-  { id: 'help', label: 'Ayuda', icon: <LifeBuoy size={18} /> },
-];
+const GROUP_ICONS: Record<NavGroupId, ReactNode> = {
+  inventory: <Package size={18} />,
+  commercial: <Receipt size={18} />,
+  org: <Store size={18} />,
+};
 
-// VeriFactu se mantiene fuera del menú (backend sin UI). Notificaciones también:
-// su acceso es la campana de la TopBar (mismo destino y badge), así que la entrada
-// del menú era redundante. Compras dejó de ser una página propia: sus secciones
-// viven ahora dentro de Proveedores (P1-B). El código se conserva para reactivar
-// VeriFactu/Notificaciones quitando su id de este set.
-const HIDDEN_TABS = new Set<Tab>(['notifications', 'verifactu']);
-const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab));
+// Grupos para el Sidebar (fuente única `NAV_GROUPS` + iconos del shell).
+const SIDEBAR_GROUPS: NavGroup[] = NAV_GROUPS.map((g) => ({
+  id: g.id,
+  label: g.label,
+  icon: GROUP_ICONS[g.id],
+}));
 
-function Home() {
+// Layout del shell flotante (sustituye al antiguo header): Sidebar flotante +
+// clúster de acciones flotante (lupa ⌘K + home + campana + switch) + título de view
+// flotante + lienzo con <Outlet/> + asistente global. La navegación es por ruta:
+// `activeItem` y el título se derivan de `useLocation()`.
+function ShellLayout() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const logout = useAuthStore((s) => s.clear);
-  const [tab, setTab] = useState<Tab>('dashboard');
-  // Tab al que volver cuando se cierra Notificaciones desde la campana (no hay
-  // router → el "volver" es explícito vía prevTab). Fallback robusto a dashboard.
-  const [prevTab, setPrevTab] = useState<Tab>('dashboard');
-  // La campana togglea Notificaciones: si está abierta, vuelve a la página previa;
-  // si no, recuerda la actual y abre Notificaciones. Lee tab/prevTab del render
-  // actual (sin updater anidado) para no chocar con la regla de hooks/setState.
-  const toggleNotifications = (): void => {
-    if (tab === 'notifications') {
-      setTab(prevTab === 'notifications' ? 'dashboard' : prevTab);
-    } else {
-      setPrevTab(tab);
-      setTab('notifications');
-    }
-  };
-  // U-08: tema corporativo (color aplicado como tokens; el logo va al sidebar).
+  // U-08: tema corporativo (color como tokens; el logo va al sidebar).
   const branding = useBranding();
-  // Feature flags (#127 B): oculta del menú los módulos apagados a nivel org (el
-  // backoffice es central → resolución de org). El backend sigue bloqueando con 403.
+  // Feature flags (#127 B): oculta del menú los módulos apagados a nivel org. El
+  // backend sigue bloqueando con 403; las rutas apagadas redirigen (ver <FlagRoute>).
   const features = useFeatures();
-  const navItems = NAV.filter((item) => {
-    if (item.id === 'b2b') return features.b2b;
-    if (item.id === 'timeclock') return features.time_clock;
-    return true;
-  });
-  // Filtro de tienda preseleccionado al usar un acceso directo desde Tiendas
-  // ("Ver stock"/"Ver ventas"). Se aplica al montar Stock/Ventas; la navegación
-  // manual por el sidebar lo limpia para no arrastrar el filtro.
-  const [navStoreId, setNavStoreId] = useState<string | null>(null);
-  const openStoreView = (view: 'stock' | 'sales', storeId: string): void => {
-    setNavStoreId(storeId);
-    setTab(view);
-  };
-  // Atajo del panel de Familias (I-13): el contador navega a Catálogo filtrado.
-  const [navFamilyId, setNavFamilyId] = useState<string | null>(null);
-  const openCatalogFamily = (familyId: string): void => {
-    setNavFamilyId(familyId);
-    setTab('catalog');
-  };
-  // U-12: "Resolver" una notificación → Stock filtrado por tienda y producto.
-  const [navSearch, setNavSearch] = useState<string | null>(null);
-  const resolveStock = (storeId: string, productName: string): void => {
-    setNavStoreId(storeId);
-    setNavSearch(productName);
-    setTab('stock');
-  };
-  // U-11/D-17: badge de la campana = roturas de stock activas + solicitudes de
-  // caja pendientes (#146). Mismas queryKeys que Notificaciones (refresca con el
-  // SSE de esa vista).
+
+  // Pestaña activa derivada de la URL (null en rutas desconocidas → dashboard).
+  const tab: Tab = pathToTab(location.pathname) ?? 'dashboard';
+  const isNotifications = tab === 'notifications';
+
+  // U-11/D-17: badge de la campana = roturas de stock activas + solicitudes de caja
+  // pendientes (#146). Mismas queryKeys que Notificaciones (refresca con su SSE).
   const { data: alerts = [] } = useQuery({
     queryKey: ['stock-alerts'],
     queryFn: () => listAlerts(),
@@ -156,27 +138,38 @@ function Home() {
   });
   const notificationCount = alerts.length + pendingCash.length;
 
-  // Navegación entre pages: limpia los filtros «de paso» (tienda/familia/búsqueda) y cambia
-  // de tab. La comparten el sidebar, la TopBar y el buscador de funciones (flotante o en barra).
-  const navigateTo = (t: Tab): void => {
-    setNavStoreId(null);
-    setNavFamilyId(null);
-    setNavSearch(null);
-    setTab(t);
+  // Items del menú desde la fuente única: oculta los `hidden` y los flags apagados.
+  const navItems: NavItem[] = NAV_NODES.filter((n) => !n.hidden)
+    .filter((n) => !n.flag || features[n.flag])
+    .map((n) => ({
+      id: n.id,
+      label: n.label,
+      icon: NAV_ICONS[n.id],
+      ...(n.group ? { group: n.group } : {}),
+    }));
+
+  // La campana togglea Notificaciones: si está abierta, vuelve atrás (con fallback a
+  // dashboard si no hay historial interno); si no, navega a /notifications.
+  const toggleNotifications = (): void => {
+    if (isNotifications) {
+      if (window.history.length > 1) navigate(-1);
+      else navigate('/');
+    } else {
+      navigate('/notifications');
+    }
   };
 
-  // Nombre de la view activa (el mismo label del sidebar): se pinta como etiqueta flotante
-  // arriba del lienzo —donde antes vivía el chip del dashboard— sustituyendo al título del header.
-  const activeLabel = ALL_NAV.find((item) => item.id === tab)?.label ?? '';
-  // El Dashboard es el único lienzo libre full-bleed; el resto de views flotan como una
-  // superficie sobre el fondo (se reutiliza su contenido actual, sin rediseñar cards).
+  // Nombre de la view activa (el mismo label del sidebar): etiqueta flotante arriba
+  // del lienzo, sustituye al título del header.
+  const activeLabel = nodeOf(tab)?.label ?? '';
+  // El Dashboard es el único lienzo libre full-bleed; el resto flota como superficie.
   const isCanvas = tab === 'dashboard';
 
   return (
     <div className="app-shell">
       <Sidebar
         items={navItems}
-        groups={NAV_GROUPS}
+        groups={SIDEBAR_GROUPS}
         groupsAsDropdowns
         floating
         logo={
@@ -185,28 +178,25 @@ function Home() {
           ) : undefined
         }
         activeItem={tab}
-        onSelect={(id) => navigateTo(id as Tab)}
+        onSelect={(id) => navigate(tabToPath(id as Tab))}
         account={{ name: 'Administrador', subtitle: 'Central · Admin' }}
         onLogout={logout}
         onNotifications={toggleNotifications}
         notificationCount={notificationCount}
-        // Clúster de acciones flotante sobre el sidebar (sustituye al header): lupa ⌘K + home +
-        // campana + conmutador Backoffice↔TPV.
         floatingActions={
           <FloatingActions
-            onNavigate={navigateTo}
-            onHome={() => navigateTo('dashboard')}
+            onNavigate={(t) => navigate(tabToPath(t))}
+            onHome={() => navigate('/')}
             onNotifications={toggleNotifications}
             notificationCount={notificationCount}
-            notificationsActive={tab === 'notifications'}
+            notificationsActive={isNotifications}
           />
         }
       />
-      {/* En views NO-lienzo anulamos la columna reservada del sidebar flotante: el lienzo de
-          puntitos va full-bleed y el sidebar flota por encima (como en el Dashboard). */}
+      {/* En views NO-lienzo anulamos la columna reservada del sidebar flotante: el
+          lienzo va full-bleed y el sidebar flota por encima. */}
       <div className={`app-content${isCanvas ? '' : ' app-content--surface'}`}>
         <PageHeaderProvider>
-          {/* Nombre de la view activa, flotando arriba del contenido (reemplaza el header). */}
           {activeLabel && (
             <span className="view-title-float" data-testid="page-heading">
               {activeLabel}
@@ -214,35 +204,111 @@ function Home() {
           )}
           <div className="app-main-row">
             <main className={`bo-main${isCanvas ? ' bo-main--canvas' : ' bo-main--surface'}`}>
-              {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
-                  embebe la tabla — enlaza con "Ver todas las ventas →". */}
-              {tab === 'dashboard' && <DashboardPage onNavigate={(t) => setTab(t)} />}
-              {tab === 'sales' && <SalesHistoryPage initialStoreId={navStoreId} />}
-              {tab === 'notifications' && <NotificationsPage onResolve={{ resolveStock }} />}
-              {tab === 'catalog' && <CatalogPage initialFamilyId={navFamilyId} />}
-              {tab === 'families' && <FamiliesPage onOpenCatalogFamily={openCatalogFamily} />}
-              {tab === 'stock' && (
-                <StockPage initialStoreId={navStoreId} initialSearch={navSearch} />
-              )}
-              {tab === 'transfers' && <TransfersPage />}
-              {tab === 'promotions' && <PromotionsPage />}
-              {tab === 'users' && <UsersPage />}
-              {tab === 'timeclock' && <TimeClockPage />}
-              {tab === 'stores' && <StoresPage onOpenStoreView={openStoreView} />}
-              {tab === 'suppliers' && <SuppliersPage />}
-              {tab === 'verifactu' && <VerifactuPage />}
-              {tab === 'b2b' && <B2bPage />}
-              {tab === 'settings' && <SettingsPage />}
-              {tab === 'help' && <HelpPage />}
+              <Outlet />
             </main>
           </div>
-          {/* Asistente unificado a nivel de shell: input + (en el Dashboard) menú «+» de
-              herramientas del lienzo. Presente en TODAS las views; el binding del lienzo lo
-              registra DashboardPage vía canvas-bridge. */}
+          {/* Asistente unificado a nivel de shell; presente en TODAS las views. */}
           <AssistantDock />
         </PageHeaderProvider>
       </div>
     </div>
+  );
+}
+
+// ── Contenedores de ruta: leen los deep-links de la URL y alimentan los `initial*`
+// de las pages hoja (que conservan sus props sin cambios). ──────────────────────
+
+function DashboardRoute() {
+  const navigate = useNavigate();
+  return <DashboardPage onNavigate={(t) => navigate(tabToPath(t))} />;
+}
+
+function StockRoute() {
+  const [params] = useSearchParams();
+  return (
+    <StockPage
+      initialStoreId={singleStoreParam(params.get('store'))}
+      initialSearch={params.get('q')}
+    />
+  );
+}
+
+function SalesRoute() {
+  const [params] = useSearchParams();
+  return <SalesHistoryPage initialStoreId={singleStoreParam(params.get('store'))} />;
+}
+
+function CatalogRoute() {
+  const [params] = useSearchParams();
+  return <CatalogPage initialFamilyId={params.get('family')} />;
+}
+
+function FamiliesRoute() {
+  const navigate = useNavigate();
+  return (
+    <FamiliesPage onOpenCatalogFamily={(familyId) => navigate(`/catalog?family=${familyId}`)} />
+  );
+}
+
+function StoresRoute() {
+  const navigate = useNavigate();
+  return <StoresPage onOpenStoreView={(view, storeId) => navigate(`/${view}?store=${storeId}`)} />;
+}
+
+function NotificationsRoute() {
+  const navigate = useNavigate();
+  const resolveStock = (storeId: string, productName: string): void => {
+    navigate(`/stock?store=${storeId}&q=${encodeURIComponent(productName)}`);
+  };
+  return <NotificationsPage onResolve={{ resolveStock }} />;
+}
+
+// Ruta condicionada por feature flag: si está apagado, redirige a dashboard (el
+// backend igualmente bloquea con 403). Coherente con el filtrado del menú.
+function FlagRoute({ flag, children }: { flag: 'b2b' | 'time_clock'; children: ReactNode }) {
+  const features = useFeatures();
+  return features[flag] ? <>{children}</> : <Navigate to="/" replace />;
+}
+
+function Home() {
+  return (
+    <Routes>
+      <Route element={<ShellLayout />}>
+        <Route index element={<DashboardRoute />} />
+        <Route path="catalog" element={<CatalogRoute />} />
+        <Route path="families" element={<FamiliesRoute />} />
+        <Route path="stock" element={<StockRoute />} />
+        <Route path="transfers" element={<TransfersPage />} />
+        <Route path="suppliers" element={<SuppliersPage />} />
+        <Route path="sales" element={<SalesRoute />} />
+        <Route
+          path="b2b"
+          element={
+            <FlagRoute flag="b2b">
+              <B2bPage />
+            </FlagRoute>
+          }
+        />
+        <Route path="promotions" element={<PromotionsPage />} />
+        <Route path="stores" element={<StoresRoute />} />
+        <Route path="users" element={<UsersPage />} />
+        <Route
+          path="timeclock"
+          element={
+            <FlagRoute flag="time_clock">
+              <TimeClockPage />
+            </FlagRoute>
+          }
+        />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="help" element={<HelpPage />} />
+        {/* Ocultas del menú (HIDDEN_TABS) pero accesibles por URL. */}
+        <Route path="notifications" element={<NotificationsRoute />} />
+        <Route path="verifactu" element={<VerifactuPage />} />
+        {/* Ruta no encontrada → dashboard. */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
   );
 }
 
