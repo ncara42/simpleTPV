@@ -394,8 +394,9 @@ activos: {}\n- Empleados: {}\n\n",
 fn push_data_tools(p: &mut String, is_admin: bool) {
     p.push_str(
         "## Herramientas de datos\n\nConsulta los datos reales con estas herramientas: \
-`sales_kpis`, `sales_by_hour`, `sales_by_family`, `product_rankings`, `stock_alerts`, \
-`purchase_orders`, `sales_by_employee`, `time_clock_today`.\n",
+`sales_kpis`, `margin_kpis`, `sales_by_hour`, `sales_by_family`, `sales_by_store`, \
+`product_rankings`, `stock_alerts`, `stockout_kpis`, `purchase_orders`, `sales_by_employee`, \
+`discount_by_employee`, `time_clock_today`.\n",
     );
     if is_admin {
         p.push_str(
@@ -410,7 +411,8 @@ están reservadas a administradores y no están disponibles para ti.\n",
     }
     p.push_str(
         "Periodos válidos (mismos en las tools de datos y en `period` de `add_widget`/piezas): \
-today, yesterday, week, month, quarter, year.\n\n",
+today, yesterday, week, month, quarter, year (acumulado del periodo en curso) y last_week, \
+last_month, last_quarter, last_year (periodo cerrado anterior, para comparar).\n\n",
     );
 }
 

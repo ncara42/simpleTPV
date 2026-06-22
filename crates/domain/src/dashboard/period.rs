@@ -14,9 +14,16 @@ use time::{Date, Duration, Month, PrimitiveDateTime, Time};
 pub enum DashboardPeriod {
     Today,
     Yesterday,
+    /// Periodos «hasta hoy» (acumulado del periodo en curso).
     Week,
     Month,
+    Quarter,
     Year,
+    /// Periodos cerrados anteriores (rango completo, para comparar contra el actual).
+    LastWeek,
+    LastMonth,
+    LastQuarter,
+    LastYear,
     Custom,
 }
 
@@ -27,7 +34,12 @@ impl DashboardPeriod {
             "yesterday" => Self::Yesterday,
             "week" => Self::Week,
             "month" => Self::Month,
+            "quarter" => Self::Quarter,
             "year" => Self::Year,
+            "last_week" => Self::LastWeek,
+            "last_month" => Self::LastMonth,
+            "last_quarter" => Self::LastQuarter,
+            "last_year" => Self::LastYear,
             "custom" => Self::Custom,
             _ => return None,
         })
@@ -62,6 +74,14 @@ fn start_of_month(d: PrimitiveDateTime) -> PrimitiveDateTime {
 
 fn start_of_year(d: PrimitiveDateTime) -> PrimitiveDateTime {
     let date = Date::from_calendar_date(d.year(), Month::January, 1).expect("1 de enero válido");
+    PrimitiveDateTime::new(date, Time::MIDNIGHT)
+}
+
+/// Día 1 del trimestre natural de `d` (Q1=ene, Q2=abr, Q3=jul, Q4=oct).
+fn start_of_quarter(d: PrimitiveDateTime) -> PrimitiveDateTime {
+    let q_first_month = ((u8::from(d.month()) as u32 - 1) / 3) * 3 + 1; // 1, 4, 7, 10
+    let month = Month::try_from(q_first_month as u8).expect("mes de trimestre válido");
+    let date = Date::from_calendar_date(d.year(), month, 1).expect("día 1 válido");
     PrimitiveDateTime::new(date, Time::MIDNIGHT)
 }
 
@@ -106,10 +126,43 @@ pub fn resolve_period(
             from: start_of_month(now),
             to: tomorrow_start,
         },
+        DashboardPeriod::Quarter => DateRange {
+            from: start_of_quarter(now),
+            to: tomorrow_start,
+        },
         DashboardPeriod::Year => DateRange {
             from: start_of_year(now),
             to: tomorrow_start,
         },
+        // Periodos cerrados anteriores: rango COMPLETO del periodo previo [inicio, inicio_actual).
+        DashboardPeriod::LastWeek => {
+            let this_week = start_of_week(now);
+            DateRange {
+                from: add_days(this_week, -7),
+                to: this_week,
+            }
+        }
+        DashboardPeriod::LastMonth => {
+            let this_month = start_of_month(now);
+            DateRange {
+                from: add_months_first(this_month, -1),
+                to: this_month,
+            }
+        }
+        DashboardPeriod::LastQuarter => {
+            let this_quarter = start_of_quarter(now);
+            DateRange {
+                from: add_months_first(this_quarter, -3),
+                to: this_quarter,
+            }
+        }
+        DashboardPeriod::LastYear => {
+            let this_year = start_of_year(now);
+            DateRange {
+                from: add_years_first(this_year, -1),
+                to: this_year,
+            }
+        }
         DashboardPeriod::Custom => {
             let (Some(from_s), Some(to_s)) = (custom_from, custom_to) else {
                 return Err(AppError::BadRequest); // custom requiere from y to
@@ -222,6 +275,49 @@ mod tests {
 
         let yr = resolve_period(DashboardPeriod::Year, now(), None, None).unwrap();
         assert_eq!(yr.from, datetime!(2026-01-01 0:00));
+    }
+
+    #[test]
+    fn quarter_acumulado_hasta_hoy() {
+        // 2026-06-17 está en Q2 (abr-jun) → desde 1-abr hasta mañana (acumulado).
+        let q = resolve_period(DashboardPeriod::Quarter, now(), None, None).unwrap();
+        assert_eq!(q.from, datetime!(2026-04-01 0:00));
+        assert_eq!(q.to, datetime!(2026-06-18 0:00));
+    }
+
+    #[test]
+    fn periodos_cerrados_anteriores() {
+        // now = miércoles 2026-06-17 → semana en curso desde lunes 15.
+        let lw = resolve_period(DashboardPeriod::LastWeek, now(), None, None).unwrap();
+        assert_eq!(lw.from, datetime!(2026-06-08 0:00));
+        assert_eq!(lw.to, datetime!(2026-06-15 0:00)); // [lun previo, lun actual)
+
+        let lm = resolve_period(DashboardPeriod::LastMonth, now(), None, None).unwrap();
+        assert_eq!(lm.from, datetime!(2026-05-01 0:00));
+        assert_eq!(lm.to, datetime!(2026-06-01 0:00));
+
+        // Q2 en curso (1-abr) → trimestre anterior Q1 completo [1-ene, 1-abr).
+        let lq = resolve_period(DashboardPeriod::LastQuarter, now(), None, None).unwrap();
+        assert_eq!(lq.from, datetime!(2026-01-01 0:00));
+        assert_eq!(lq.to, datetime!(2026-04-01 0:00));
+
+        let ly = resolve_period(DashboardPeriod::LastYear, now(), None, None).unwrap();
+        assert_eq!(ly.from, datetime!(2025-01-01 0:00));
+        assert_eq!(ly.to, datetime!(2026-01-01 0:00));
+    }
+
+    #[test]
+    fn parse_acepta_los_nuevos_tokens() {
+        for s in [
+            "quarter",
+            "last_week",
+            "last_month",
+            "last_quarter",
+            "last_year",
+        ] {
+            assert!(DashboardPeriod::parse(s).is_some(), "parse {s}");
+        }
+        assert!(DashboardPeriod::parse("this_month").is_none());
     }
 
     #[test]
