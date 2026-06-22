@@ -1,6 +1,6 @@
-//! VeriFactu (#155): huella SHA-256 encadenada + registro de facturas (ventas) y
-//! rectificativos (devoluciones), dentro de la tx que factura. El envío a la AEAT
-//! (cola/reintentos) llega en el siguiente slice.
+//! VeriFactu (#155): huella SHA-256 encadenada + registro de facturas (ventas),
+//! rectificativos (devoluciones) y anulaciones (ventas VOIDED, #230), dentro de la
+//! tx que opera. El envío a la AEAT (cola/reintentos) vive en `queue`.
 
 pub mod hash;
 pub mod queue;
@@ -10,4 +10,4 @@ pub use hash::{
     build_qr_data, compute_alta_hash, compute_anulacion_hash, AltaHashInput, AnulacionHashInput,
 };
 pub use queue::{process_pending_batch, SandboxProvider, VerifactuProvider};
-pub use record::{record_invoice, record_rectification};
+pub use record::{record_anulacion, record_invoice, record_rectification};
