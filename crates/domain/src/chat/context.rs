@@ -81,6 +81,10 @@ const WIDGET_CATALOG: &[(&str, &str)] = &[
         "BLOQUE — Mix de ventas (donut de ventas por familia + facturación y ticket medio)",
     ),
     (
+        "block:store-comparison",
+        "BLOQUE — Comparativa entre tiendas (ranking de facturación + margen por tienda)",
+    ),
+    (
         "gen:panel",
         "Panel a medida por receta + piezas (combina varias métricas en una tarjeta)",
     ),
@@ -105,6 +109,11 @@ const WIDGETABLE_ENDPOINTS: &[(&str, &str, &str)] = &[
         "/dashboard/sales-by-employee",
         "Ventas por vendedor.",
         "userName, total, salesCount",
+    ),
+    (
+        "/dashboard/sales-by-store",
+        "Desglose por tienda: facturación, ticket medio y margen (compara tiendas).",
+        "storeName, revenue, avgTicket, margin, marginPct, salesCount",
     ),
     (
         "/dashboard/discount-by-employee",
@@ -195,6 +204,7 @@ Para combinar varias métricas en UNA tarjeta tienes DOS caminos. NUNCA emitas g
 - `block:sales-mix` — donut de ventas por familia (protagonista) + facturación y ticket medio.
 - `block:discount-control` — tasas de descuento/devolución + descuento y ventas por empleado.
 - `block:staff-performance` — ranking de ventas por vendedor + nº de ventas por vendedor.
+- `block:store-comparison` — ranking de facturación por tienda + margen por tienda (compara tiendas).
 - `block:product-ranking` — top de productos por ventas.
 - `block:stock-risk` — venta perdida estimada + roturas abiertas + alertas y caducidades.
 `period` y `store_id` (de la propia llamada) se heredan por todas las piezas. No construyas slots.
@@ -222,10 +232,10 @@ Elige la pieza por la INTENCIÓN, no por los datos:
 - detalle fila a fila / valores exactos → `dataGrid` (columns:[{ field, label, format?, align? }]).
 
 Reglas de diseño (duras):
-- Las GRÁFICAS (comparisonBars/trend*/shareDonut/rankBarList/segmentBar/progressMeter/stockAlertList/dataGrid) necesitan endpoints de LISTA: sales-by-family, sales-by-hour, sales-by-employee, discount-by-employee, product-rankings (da el top por ventas), stock/alerts, stock/expiring, products, product-families, suppliers. Los endpoints de KPI (sales-kpis, margin-kpis, stockout-kpis) son ESCALARES: úsalos SOLO en `kpiTile`/`progressMeter`, nunca en una gráfica (no se renderiza).
+- Las GRÁFICAS (comparisonBars/trend*/shareDonut/rankBarList/segmentBar/progressMeter/stockAlertList/dataGrid) necesitan endpoints de LISTA: sales-by-family, sales-by-hour, sales-by-employee, sales-by-store (desglose por tienda), discount-by-employee, product-rankings (da el top por ventas), stock/alerts, stock/expiring, products, product-families, suppliers. Los endpoints de KPI (sales-kpis, margin-kpis, stockout-kpis) son ESCALARES: úsalos SOLO en `kpiTile`/`progressMeter`, nunca en una gráfica (no se renderiza).
 - No satures: una sola idea por panel, ≤4 piezas. Peticiones amplias («un dashboard de X», «cierre de mes») → monta 2-4 bloques/paneles coordinados, no uno gigante (p. ej. cierre de mes = `block:sales-overview` + `block:profitability` + `block:product-ranking` + `block:stock-risk`).
 - Barras para comparar magnitudes y rankings (`comparisonBars` ordena desc y muestra hasta 8 barras; para más categorías o un ranking explícito usa `rankBarList`); donut SOLO para snapshot de reparto con ≤6 partes (con más degrada a barras); NUNCA donut para evolución, ranking ni comparar magnitudes.
-- Periodo por defecto: `today` para "hoy/flash", `month` para "resumen / cómo vamos / cierre de mes / control o seguimiento", `year` para tendencias largas. Tienda: todas salvo que se nombre una. NO hay endpoint de desglose por tienda: si piden comparar tiendas, enfoca UNA con `store_id`, o consulta los datos por tienda (`stores_list` + una consulta por tienda) y nárralo; no finjas un desglose que no existe.
+- Periodo por defecto: `today` para "hoy/flash", `month` para "resumen / cómo vamos / cierre de mes / control o seguimiento", `year` para tendencias largas. Tienda: todas salvo que se nombre una. Para COMPARAR tiendas («qué tienda sube/baja», «el rezagado», «por tienda») usa el bloque `block:store-comparison` (o una pieza sobre `/dashboard/sales-by-store`), que desglosa facturación, ticket medio y margen por tienda en una gráfica; no enfoques una sola tienda ni inventes el desglose.
 - `format` (eur, percent, percentRatio, decimal, units, integer) opcional: si lo omites se infiere por el nombre del campo. Tasas del dashboard (discountRate, returnRate, avgDiscountPct, marginPct, rate) son fracción 0..1 → `percentRatio` (×100); `percent` es para 0..100. Pásalo explícito cuando el campo sea ambiguo.
 - El `period`/`store_id` van en `params` de cada pieza. Una pieza en slot equivocado se reubica; un endpoint fuera de la allowlist se descarta.
 
@@ -233,6 +243,7 @@ Ejemplos (petición → composición):
 - «Móntame un cuadro de ventas» (vago) → un bloque: `add_widget` widget_id "block:sales-overview", period "today". Lo más simple gana.
 - «¿Qué tengo que reponer?» (acción, no tendencia) → `add_widget` widget_id "block:stock-risk".
 - «Mi mejor vendedor» → `add_widget` widget_id "block:staff-performance".
+- «¿Qué tienda va por detrás este mes?» (comparar tiendas) → `add_widget` widget_id "block:store-comparison", period "month".
 - «Cómo va el negocio este mes, con margen y mis mejores vendedores» → panel a medida (recipe kpiRow+twoCharts):
 {
   "kind": "panel",

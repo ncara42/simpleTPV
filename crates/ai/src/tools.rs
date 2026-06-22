@@ -52,6 +52,7 @@ pub const WIDGETABLE_ENDPOINTS: &[&str] = &[
     "/dashboard/sales-by-family",
     "/dashboard/sales-by-hour",
     "/dashboard/sales-by-employee",
+    "/dashboard/sales-by-store",
     "/dashboard/discount-by-employee",
     "/dashboard/product-rankings",
     "/dashboard/sales-kpis",
@@ -71,6 +72,7 @@ pub const BLOCK_IDS: &[&str] = &[
     "block:profitability",
     "block:discount-control",
     "block:sales-mix",
+    "block:store-comparison",
 ];
 
 // Esquema de una hoja-pieza para un slot. `pieces` acota el enum admitido (kpis vs charts).
@@ -104,7 +106,7 @@ pub fn canvas_tools() -> Vec<Value> {
                     "properties": {
                         "widget_id": {
                             "type": "string",
-                            "description": "ID del widget. Bloques (un panel entero ya diseñado, PREFIÉRELOS): 'block:sales-overview', 'block:stock-risk', 'block:staff-performance', 'block:product-ranking', 'block:profitability', 'block:discount-control', 'block:sales-mix'. Catálogo (1 métrica): 'kpi-today', 'dash-bars', etc. Panel a medida (si ningún bloque encaja): 'gen:panel'."
+                            "description": "ID del widget. Bloques (un panel entero ya diseñado, PREFIÉRELOS): 'block:sales-overview', 'block:stock-risk', 'block:staff-performance', 'block:product-ranking', 'block:profitability', 'block:discount-control', 'block:sales-mix', 'block:store-comparison'. Catálogo (1 métrica): 'kpi-today', 'dash-bars', etc. Panel a medida (si ningún bloque encaja): 'gen:panel'."
                         },
                         "position": {
                             "type": "string",

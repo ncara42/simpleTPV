@@ -4,7 +4,7 @@ import { BLOCK_CATALOG, BLOCK_IDS, buildBlockSpec } from './dashboard-blocks.js'
 import { PIECE_ALLOWLIST, RECIPE_ALLOWLIST, WIDGETABLE_ENDPOINTS } from './dashboard-pieces.js';
 
 describe('dashboard-blocks — bloques pre-cableados (#205)', () => {
-  it('el catálogo expone los 7 bloques con prefijo block: y tamaño', () => {
+  it('el catálogo expone los 8 bloques con prefijo block: y tamaño', () => {
     expect(BLOCK_IDS).toEqual([
       'block:sales-overview',
       'block:stock-risk',
@@ -13,6 +13,7 @@ describe('dashboard-blocks — bloques pre-cableados (#205)', () => {
       'block:profitability',
       'block:discount-control',
       'block:sales-mix',
+      'block:store-comparison',
     ]);
     for (const id of BLOCK_IDS) {
       expect(BLOCK_CATALOG[id]?.label).toBeTruthy();
@@ -40,6 +41,13 @@ describe('dashboard-blocks — bloques pre-cableados (#205)', () => {
     expect(mix?.recipe).toBe('heroChart+sideStats');
     expect(mix?.slots?.charts?.[0]?.piece).toBe('shareDonut');
     expect(mix?.slots?.kpis).toHaveLength(2);
+    // Comparativa entre tiendas (#224): ranking de facturación + barras de margen por tienda.
+    const store = buildBlockSpec('block:store-comparison', {});
+    expect(store?.recipe).toBe('kpiRow+twoCharts');
+    expect(store?.slots?.charts?.map((c) => c.piece)).toEqual(['rankBarList', 'comparisonBars']);
+    expect(store?.slots?.charts?.every((c) => c.endpoint === '/dashboard/sales-by-store')).toBe(
+      true,
+    );
   });
 
   it('buildBlockSpec(sales-overview) construye un panel v2 con KPIs + tendencia', () => {
