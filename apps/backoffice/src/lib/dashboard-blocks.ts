@@ -173,7 +173,8 @@ const BLOCKS: Record<string, BlockDef> = {
     }),
   },
 
-  // Ranking de productos: top de ventas (toRecords toma topSales, la primera lista de la respuesta).
+  // Ranking de productos por ventas. `rankBy:'sales'` → el endpoint devuelve una única lista
+  // `items` con `value` uniforme alcanzable por la pieza (#225); sin él solo llegaba `topSales`.
   'product-ranking': {
     label: 'Ranking de productos',
     recipe: 'tableFull',
@@ -184,9 +185,56 @@ const BLOCKS: Record<string, BlockDef> = {
             piece: 'rankBarList',
             title: 'Top productos por ventas',
             endpoint: '/dashboard/product-rankings',
+            params: { rankBy: 'sales' },
             labelField: 'name',
-            valueField: 'total',
+            valueField: 'value',
             format: 'eur',
+          },
+          p,
+        ),
+      ],
+    }),
+  },
+
+  // Top productos por margen. `rankBy:'margin'` expone la lista de margen (antes inalcanzable: era
+  // la 2ª lista de la respuesta y `toRecords` solo toma la primera).
+  'top-margin': {
+    label: 'Top productos por margen',
+    recipe: 'tableFull',
+    build: (p) => ({
+      charts: [
+        withParams(
+          {
+            piece: 'rankBarList',
+            title: 'Top productos por margen',
+            endpoint: '/dashboard/product-rankings',
+            params: { rankBy: 'margin' },
+            labelField: 'name',
+            valueField: 'value',
+            format: 'eur',
+          },
+          p,
+        ),
+      ],
+    }),
+  },
+
+  // Productos de peor rotación (stock muerto). `rankBy:'rotation'` expone `worstRotation` (3ª lista,
+  // antes inalcanzable); el valor son unidades vendidas en el periodo (orden ascendente).
+  'dead-stock': {
+    label: 'Peor rotación (stock muerto)',
+    recipe: 'tableFull',
+    build: (p) => ({
+      charts: [
+        withParams(
+          {
+            piece: 'rankBarList',
+            title: 'Productos de peor rotación',
+            endpoint: '/dashboard/product-rankings',
+            params: { rankBy: 'rotation' },
+            labelField: 'name',
+            valueField: 'value',
+            format: 'integer',
           },
           p,
         ),

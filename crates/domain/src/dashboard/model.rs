@@ -153,6 +153,24 @@ pub struct ProductRankings {
     pub worst_rotation: Vec<RankByUnits>,
 }
 
+/// Una fila de ranking proyectada a una forma uniforme (`value`) para que las piezas
+/// de gráfica la rendericen vía `valueField:'value'`. Ver #225: el endpoint completo
+/// devuelve tres listas y `toRecords` solo alcanza la primera; con `?rankBy=` se
+/// devuelve una única lista `items` con esta forma común.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RankedProduct {
+    pub product_id: Uuid,
+    pub name: String,
+    pub value: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RankedProducts {
+    pub items: Vec<RankedProduct>,
+}
+
 // ── product-rotation / archetype-rotation ────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]

@@ -4,14 +4,15 @@
 use axum::extract::{Query, State};
 use axum::Json;
 use serde::Deserialize;
+use serde::Serialize;
 use simpletpv_auth::Role;
 use simpletpv_domain::dashboard::period::{
     resolve_period, CompareMode, DashboardPeriod, DateRange,
 };
 use simpletpv_domain::dashboard::{
     service, ArchetypeRotationItem, DiscountByEmployeeItem, MarginKpis, ProductRankings,
-    ProductRotationItem, SalesByEmployeeItem, SalesByFamilyItem, SalesByHourItem, SalesKpis,
-    SalesToday, StockoutKpis,
+    ProductRotationItem, RankedProduct, RankedProducts, SalesByEmployeeItem, SalesByFamilyItem,
+    SalesByHourItem, SalesKpis, SalesToday, StockoutKpis,
 };
 use simpletpv_shared::AppError;
 use uuid::Uuid;
@@ -57,6 +58,19 @@ pub struct RankingsQuery {
     store_id: Option<Uuid>,
     #[serde(default)]
     limit: Option<i64>,
+    /// Proyección a una única lista `items` (#225): `sales` | `margin` | `rotation`.
+    /// Ausente → respuesta legacy con las tres listas.
+    #[serde(default)]
+    rank_by: Option<String>,
+}
+
+/// Respuesta de `product-rankings`: forma legacy (tres listas) o, con `?rankBy=`,
+/// una única lista `items` alcanzable por las piezas de gráfica.
+#[derive(Serialize)]
+#[serde(untagged)]
+pub enum RankingsResponse {
+    Full(ProductRankings),
+    Ranked(RankedProducts),
 }
 
 /// Resuelve el `DateRange` del periodo desde una `PeriodQuery` (valida `custom`).
@@ -211,8 +225,10 @@ pub async fn product_rankings(
     State(state): State<AppState>,
     user: AuthUser,
     Query(q): Query<RankingsQuery>,
-) -> Result<Json<ProductRankings>, ApiError> {
+) -> Result<Json<RankingsResponse>, ApiError> {
     user.require_role(&MGMT_ROLES)?;
+    // Validar `rankBy` antes de consultar: rechaza valores fuera del contrato.
+    let rank_by = q.rank_by.as_deref().map(parse_rank_by).transpose()?;
     let pq = PeriodQuery {
         period: q.period,
         from: q.from,
@@ -220,16 +236,70 @@ pub async fn product_rankings(
         store_id: q.store_id,
     };
     let range = pq.range()?;
-    Ok(Json(
-        service::product_rankings(
-            state.db(),
-            user.organization_id,
-            range,
-            pq.store_id,
-            q.limit.unwrap_or(10),
-        )
-        .await?,
-    ))
+    let rankings = service::product_rankings(
+        state.db(),
+        user.organization_id,
+        range,
+        pq.store_id,
+        q.limit.unwrap_or(10),
+    )
+    .await?;
+    Ok(Json(match rank_by {
+        Some(dim) => RankingsResponse::Ranked(project_rankings(rankings, dim)),
+        None => RankingsResponse::Full(rankings),
+    }))
+}
+
+/// Dimensión de ranking solicitada vía `?rankBy=`.
+#[derive(Clone, Copy)]
+enum RankDimension {
+    Sales,
+    Margin,
+    Rotation,
+}
+
+/// Parsea `rankBy` al enum; valor desconocido → 400 (BadRequest).
+fn parse_rank_by(raw: &str) -> Result<RankDimension, ApiError> {
+    match raw {
+        "sales" => Ok(RankDimension::Sales),
+        "margin" => Ok(RankDimension::Margin),
+        "rotation" => Ok(RankDimension::Rotation),
+        _ => Err(AppError::BadRequest.into()),
+    }
+}
+
+/// Proyecta las tres listas a una única `items` con forma uniforme (`value`).
+fn project_rankings(r: ProductRankings, dim: RankDimension) -> RankedProducts {
+    let items = match dim {
+        RankDimension::Sales => r
+            .top_sales
+            .into_iter()
+            .map(|x| RankedProduct {
+                product_id: x.product_id,
+                name: x.name,
+                value: x.total,
+            })
+            .collect(),
+        RankDimension::Margin => r
+            .top_margin
+            .into_iter()
+            .map(|x| RankedProduct {
+                product_id: x.product_id,
+                name: x.name,
+                value: x.margin,
+            })
+            .collect(),
+        RankDimension::Rotation => r
+            .worst_rotation
+            .into_iter()
+            .map(|x| RankedProduct {
+                product_id: x.product_id,
+                name: x.name,
+                value: x.units,
+            })
+            .collect(),
+    };
+    RankedProducts { items }
 }
 
 /// `GET /dashboard/product-rotation`.
@@ -262,4 +332,79 @@ pub async fn archetype_rotation(
 fn now_utc() -> time::PrimitiveDateTime {
     let n = time::OffsetDateTime::now_utc();
     time::PrimitiveDateTime::new(n.date(), n.time())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use simpletpv_domain::dashboard::{RankByMargin, RankBySales, RankByUnits};
+
+    fn sample() -> ProductRankings {
+        let id = Uuid::nil();
+        ProductRankings {
+            top_sales: vec![RankBySales {
+                product_id: id,
+                name: "A".into(),
+                total: 40.0,
+                units: 4.0,
+            }],
+            top_margin: vec![RankByMargin {
+                product_id: id,
+                name: "B".into(),
+                margin: 12.5,
+            }],
+            worst_rotation: vec![RankByUnits {
+                product_id: id,
+                name: "C".into(),
+                units: 1.0,
+            }],
+        }
+    }
+
+    #[test]
+    fn parse_rank_by_accepts_contract_values() {
+        assert!(matches!(parse_rank_by("sales"), Ok(RankDimension::Sales)));
+        assert!(matches!(parse_rank_by("margin"), Ok(RankDimension::Margin)));
+        assert!(matches!(
+            parse_rank_by("rotation"),
+            Ok(RankDimension::Rotation)
+        ));
+    }
+
+    #[test]
+    fn parse_rank_by_rejects_unknown_value() {
+        assert!(parse_rank_by("bogus").is_err());
+        assert!(parse_rank_by("").is_err());
+    }
+
+    #[test]
+    fn project_sales_uses_total_as_value() {
+        let p = project_rankings(sample(), RankDimension::Sales);
+        assert_eq!(p.items.len(), 1);
+        assert!((p.items[0].value - 40.0).abs() < 1e-9);
+        assert_eq!(p.items[0].name, "A");
+    }
+
+    #[test]
+    fn project_margin_uses_margin_as_value() {
+        let p = project_rankings(sample(), RankDimension::Margin);
+        assert!((p.items[0].value - 12.5).abs() < 1e-9);
+        assert_eq!(p.items[0].name, "B");
+    }
+
+    #[test]
+    fn project_rotation_uses_units_as_value() {
+        let p = project_rankings(sample(), RankDimension::Rotation);
+        assert!((p.items[0].value - 1.0).abs() < 1e-9);
+        assert_eq!(p.items[0].name, "C");
+    }
+
+    #[test]
+    fn ranked_response_serializes_as_items_array() {
+        let p = project_rankings(sample(), RankDimension::Margin);
+        let json = serde_json::to_value(RankingsResponse::Ranked(p)).unwrap();
+        // `toRecords` del frontend toma la primera (única) lista del objeto.
+        assert!(json.get("items").and_then(|v| v.as_array()).is_some());
+        assert_eq!(json["items"][0]["value"], 12.5);
+    }
 }

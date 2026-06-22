@@ -68,6 +68,8 @@ const WIDGET_CATALOG: &[(&str, &str)] = &[
         "block:product-ranking",
         "BLOQUE — Ranking de productos por ventas",
     ),
+    ("block:top-margin", "BLOQUE — Top de productos por margen"),
+    ("block:dead-stock", "BLOQUE — Peor rotación (stock muerto)"),
     (
         "gen:panel",
         "Panel a medida por receta + piezas (combina varias métricas en una tarjeta)",
@@ -101,8 +103,9 @@ const WIDGETABLE_ENDPOINTS: &[(&str, &str, &str)] = &[
     ),
     (
         "/dashboard/product-rankings",
-        "Ranking de productos por ventas, margen o rotación (param: rankBy).",
-        "name, total, units",
+        "Ranking de productos por ventas, margen o rotación (param: rankBy=sales|margin|rotation \
+         → lista única items con value).",
+        "name, total, units (o name, value con rankBy)",
     ),
     (
         "/dashboard/sales-kpis",
@@ -177,6 +180,8 @@ NUNCA emitas geometría (w/h/span/gap): la receta y las piezas ya tienen su dise
 - `block:stock-risk` — venta perdida estimada + roturas abiertas + tablas de alertas y caducidades.
 - `block:staff-performance` — ranking de ventas por vendedor + nº de ventas por vendedor.
 - `block:product-ranking` — top de productos por ventas.
+- `block:top-margin` — top de productos por margen.
+- `block:dead-stock` — productos de peor rotación (stock muerto, unidades del periodo).
 `period` y `store_id` (de la propia llamada) se heredan por todas las piezas. No construyas slots.
 
 ### B) Panel a medida por receta + piezas (si ningún bloque encaja)
