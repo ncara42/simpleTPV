@@ -72,6 +72,12 @@ export async function startHttpServer(): Promise<void> {
   const app = express();
   app.disable('x-powered-by');
 
+  // Detrás de un proxy inverso (Traefik/Cloudflare) llega `X-Forwarded-For`. El
+  // rate-limiter que el SDK monta en /register /token /authorize exige saber en
+  // qué proxies confiar; con `trust proxy` en false lanza
+  // ERR_ERL_UNEXPECTED_X_FORWARDED_FOR (500). Configurable vía MCP_TRUST_PROXY.
+  app.set('trust proxy', cfg.trustProxy);
+
   // CORS: lista blanca si está configurada; si no, refleja el origen (los
   // tokens son por usuario, no un secreto compartido).
   app.use(

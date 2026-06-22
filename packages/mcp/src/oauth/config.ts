@@ -22,6 +22,15 @@
  *  - REDIS_URL           Si está, el estado OAuth vive en Redis (durable,
  *                        multi-instancia). Si no, almacén en memoria.
  *  - MCP_ALLOWED_ORIGINS Orígenes CORS permitidos (CSV). Ej: https://claude.ai
+ *  - MCP_TRUST_PROXY     Saltos de proxy de confianza para Express (`trust proxy`).
+ *                        OBLIGATORIO tras un proxy inverso (Traefik/Cloudflare):
+ *                        si llega `X-Forwarded-For` y esto vale `false`, el
+ *                        rate-limiter del SDK lanza ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+ *                        (500 en /register, /token, /authorize). Acepta un número
+ *                        de saltos (ej. `1` para un único proxy inverso delante),
+ *                        `true`/`false`, o un valor de subred/`loopback`. Default
+ *                        `false` (local sin proxy). NO uses `true` en producción:
+ *                        es permisivo y permite spoofing del IP de cliente.
  */
 
 export interface HttpConfig {
@@ -34,9 +43,27 @@ export interface HttpConfig {
   encKey: string | undefined;
   redisUrl: string | undefined;
   allowedOrigins: string[];
+  /** Valor para Express `app.set('trust proxy', …)`. Ver MCP_TRUST_PROXY. */
+  trustProxy: boolean | number | string;
 }
 
 let _config: HttpConfig | null = null;
+
+/**
+ * Parsea MCP_TRUST_PROXY al tipo que espera Express `trust proxy`:
+ *  - sin definir / vacío → false (local, sin proxy delante)
+ *  - "true" / "false"    → booleano
+ *  - entero (ej. "1")    → número de saltos de confianza
+ *  - cualquier otra cosa → string (subred CSV, "loopback", etc.)
+ */
+export function parseTrustProxy(raw: string | undefined): boolean | number | string {
+  const value = (raw ?? '').trim();
+  if (value === '') return false;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  if (/^\d+$/.test(value)) return Number.parseInt(value, 10);
+  return value;
+}
 
 export function getHttpConfig(): HttpConfig {
   if (_config) return _config;
@@ -65,6 +92,7 @@ export function getHttpConfig(): HttpConfig {
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
+    trustProxy: parseTrustProxy(process.env['MCP_TRUST_PROXY']),
   };
   return _config;
 }
