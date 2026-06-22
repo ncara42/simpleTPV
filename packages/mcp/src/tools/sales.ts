@@ -40,9 +40,12 @@ export function registerSalesTools(server: McpServer): void {
   readTool(
     server,
     'get_z_report',
-    'Informe Z (cierre diario): resumen de ventas, desglose fiscal por tipo de IVA, número de secuencia y totales de caja. Equivale al cierre de día del TPV.',
+    'Informe Z (cierre diario) de una tienda: resumen de ventas, desglose fiscal por tipo de IVA, número de secuencia y totales de caja. Requiere indicar la tienda (el cierre es por tienda).',
     {
-      storeId: z.string().uuid().optional(),
+      storeId: z
+        .string()
+        .uuid()
+        .describe('UUID de tienda (obligatorio; el cierre Z es por tienda)'),
       date: z.string().optional().describe('Fecha YYYY-MM-DD (default: hoy)'),
     },
     (params) => apiGet('/z-report', params),

@@ -77,6 +77,16 @@ export function ok(data: unknown): CallToolResult {
   return { content: [{ type: 'text', text: JSON.stringify(data) }] };
 }
 
+/**
+ * Envuelve una llamada de las tools COMPUESTAS para que un sub-endpoint que falle
+ * (p. ej. un 404 puntual) no tumbe toda la respuesta: devuelve `{ error: msg }` en
+ * lugar de propagar. Así una pregunta como "analízame las ventas" sigue devolviendo
+ * el resto de cortes aunque uno concreto no esté disponible.
+ */
+export function safe<T>(p: Promise<T>): Promise<T | { error: string }> {
+  return p.catch((e) => ({ error: e instanceof Error ? e.message : String(e) }));
+}
+
 export function fail(e: unknown): CallToolResult {
   const msg = e instanceof Error ? e.message : String(e);
   return { content: [{ type: 'text', text: `Error: ${msg}` }], isError: true };
