@@ -24,7 +24,9 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import cors from 'cors';
 import express, { type Request, type Response } from 'express';
 
+import { type BackendAuthContext, runWithBackendAuth } from '../api.js';
 import { backendLogin, BackendLoginError } from '../backend/login.js';
+import { getBackendAccessToken } from '../backend/session.js';
 import { getHttpConfig } from '../oauth/config.js';
 import { SimpleTpvOAuthProvider } from '../oauth/provider.js';
 import { InMemoryOAuthStore } from '../oauth/store.js';
@@ -42,6 +44,8 @@ const SCOPES_SUPPORTED = ['tpv:read'];
 interface SessionEntry {
   transport: StreamableHTTPServerTransport;
   lastUsed: number;
+  /** Grant (usuario) dueño de la sesión: se verifica en cada reutilización. */
+  grantId: string;
 }
 const sessions = new Map<string, SessionEntry>();
 
@@ -180,7 +184,17 @@ export function startHttpServer(): void {
     resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(cfg.resourceUrl),
   });
 
+  // Contexto de backend del usuario (sin passthrough): las tools obtienen el
+  // token de backend del grant vía AsyncLocalStorage.
+  const buildAuthCtx = (grantId: string): BackendAuthContext => ({
+    apiUrl: cfg.apiUrl,
+    getBackendToken: (forceRefresh = false) => getBackendAccessToken(store, grantId, forceRefresh),
+  });
+
   const handleMcp = async (req: Request, res: Response): Promise<void> => {
+    // El grant lo puso el verifier en req.auth.extra al validar el Bearer.
+    const grantId =
+      typeof req.auth?.extra?.['grantId'] === 'string' ? req.auth.extra['grantId'] : '';
     const sessionId = req.headers['mcp-session-id'];
 
     if (typeof sessionId === 'string') {
@@ -193,8 +207,19 @@ export function startHttpServer(): void {
         });
         return;
       }
+      // Anti-secuestro: la sesión pertenece a un grant; otro token no la usa.
+      if (entry.grantId !== grantId) {
+        res.status(403).json({
+          jsonrpc: '2.0',
+          error: { code: -32000, message: 'La sesión no pertenece a este token' },
+          id: null,
+        });
+        return;
+      }
       entry.lastUsed = Date.now();
-      await entry.transport.handleRequest(req, res, req.body);
+      await runWithBackendAuth(buildAuthCtx(grantId), () =>
+        entry.transport.handleRequest(req, res, req.body),
+      );
       return;
     }
 
@@ -220,7 +245,7 @@ export function startHttpServer(): void {
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (id) => {
-        sessions.set(id, { transport, lastUsed: Date.now() });
+        sessions.set(id, { transport, lastUsed: Date.now(), grantId });
       },
     });
     transport.onclose = () => {
@@ -229,7 +254,9 @@ export function startHttpServer(): void {
 
     const server: McpServer = createMcpServer();
     await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
+    await runWithBackendAuth(buildAuthCtx(grantId), () =>
+      transport.handleRequest(req, res, req.body),
+    );
   };
 
   const jsonBody = express.json({ limit: MAX_BODY });

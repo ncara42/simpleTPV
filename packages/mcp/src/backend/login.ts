@@ -51,7 +51,9 @@ export async function backendLogin(email: string, password: string): Promise<Bac
     throw new BackendLoginError('claims incompletas en el token del backend');
   }
 
-  const refreshCookie = res.headers.getSetCookie().find((c) => c.startsWith('refreshToken=')) ?? '';
+  // Guardamos solo `refreshToken=valor` (sin atributos) para reenviarlo como Cookie.
+  const setCookie = res.headers.getSetCookie().find((c) => c.startsWith('refreshToken='));
+  const refreshCookie = setCookie ? (setCookie.split(';')[0] ?? '') : '';
 
   return {
     accessToken: body.accessToken,
