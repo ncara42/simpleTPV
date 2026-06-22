@@ -141,15 +141,15 @@ test('lienzo libre: añadir nota y widget, quitar, deshacer y ordenar; minimapa 
 }) => {
   await expect(page.getByTestId('dash-free')).toBeVisible();
   await expect(page.getByTestId('dash-free-toolbar')).toBeVisible();
-  // El minimapa se pinta en la esquina del lienzo.
-  await expect(page.getByTestId('dash-free-minimap')).toBeVisible();
 
-  // El layout libre persiste en /me/preferences: limpia notas de ejecuciones previas.
+  // El preset «personalizado» nace VACÍO (se compone con el agente): sin contenido no hay
+  // minimapa. Limpia notas y widgets de ejecuciones previas para partir de un lienzo vacío.
   const notes = page.locator('.dash-free-item--note');
   for (let n = await notes.count(); n > 0; n = await notes.count()) {
     await notes.first().locator('.dash-free-remove').dispatchEvent('click');
     await expect(notes).toHaveCount(n - 1);
   }
+  await clearFreeWidgets(page);
 
   const items = page.locator('.dash-free-item');
   const baseCount = await items.count();
@@ -158,6 +158,8 @@ test('lienzo libre: añadir nota y widget, quitar, deshacer y ordenar; minimapa 
   await clickTool(page, 'dash-free-add-note');
   await expect(notes).toHaveCount(1);
   await expect(notes.locator('.dash-free-note-content').first()).toBeVisible();
+  // Con contenido en el lienzo, el minimapa se pinta en la esquina.
+  await expect(page.getByTestId('dash-free-minimap')).toBeVisible();
 
   // Deshacer ("botón volver") quita la nota recién creada.
   await clickTool(page, 'dash-free-undo');
@@ -170,26 +172,25 @@ test('lienzo libre: añadir nota y widget, quitar, deshacer y ordenar; minimapa 
   await palette.locator('button[role="menuitem"]').first().click();
   await expect(items).toHaveCount(baseCount + 1);
 
-  // Deshacer también revierte el alta del widget.
-  await clickTool(page, 'dash-free-undo');
-  await expect(items).toHaveCount(baseCount);
-
-  // Ordenar: si hay widgets, mueve uno y verifica que Ordenar lo recoloca.
-  if (baseCount > 0) {
-    const first = items.first();
-    const fb = await first.boundingBox();
-    if (fb) {
-      await page.mouse.move(fb.x + fb.width / 2, fb.y + fb.height / 2);
-      await page.mouse.down();
-      await page.mouse.move(fb.x + fb.width / 2 + 160, fb.y + fb.height / 2 + 120, { steps: 12 });
-      await page.mouse.up();
-      const tfMoved = await first.evaluate((el) => (el as HTMLElement).style.transform);
-      await clickTool(page, 'dash-free-arrange');
-      await expect
-        .poll(() => first.evaluate((el) => (el as HTMLElement).style.transform))
-        .not.toBe(tfMoved);
-    }
+  // Ordenar recoloca un widget movido. Se arrastra desde la zona superior de la tarjeta
+  // (no el centro, donde una pieza pesada captura el puntero) para mover de forma fiable.
+  const first = items.first();
+  const fb = await first.boundingBox();
+  if (fb) {
+    await page.mouse.move(fb.x + fb.width / 2, fb.y + 12);
+    await page.mouse.down();
+    await page.mouse.move(fb.x + fb.width / 2 + 160, fb.y + 132, { steps: 12 });
+    await page.mouse.up();
+    const tfMoved = await first.evaluate((el) => (el as HTMLElement).style.transform);
+    await clickTool(page, 'dash-free-arrange');
+    await expect
+      .poll(() => first.evaluate((el) => (el as HTMLElement).style.transform))
+      .not.toBe(tfMoved);
   }
+
+  // Limpieza: quita el widget añadido para no contaminar el lienzo entre runs.
+  await clearFreeWidgets(page);
+  await expect(items).toHaveCount(baseCount);
 });
 
 test('lienzo libre: la flecha de orientación aparece al alejarse y encuadra al pulsarla', async ({
@@ -200,7 +201,16 @@ test('lienzo libre: la flecha de orientación aparece al alejarse y encuadra al 
   // Sin formas/dibujos sueltos lejanos.
   await clearDrawElements(page);
 
-  // Alejar la vista con el teclado hasta perder de vista el dashboard.
+  // El preset «personalizado» nace vacío: añade un widget para tener contenido al que
+  // orientarse (la flecha solo aparece cuando hay algo fuera de la vista).
+  await clearFreeWidgets(page);
+  await clickTool(page, 'dash-free-add-widget');
+  const palette = page.locator('.dash-free-palette');
+  await expect(palette).toBeVisible();
+  await palette.locator('button[role="menuitem"]').first().click();
+  await expect(page.locator('.dash-free-item--widget')).toHaveCount(1);
+
+  // Alejar la vista con el teclado hasta perder de vista el contenido.
   await canvas.focus();
   for (let i = 0; i < 80; i++) await page.keyboard.press('ArrowRight');
 
@@ -210,6 +220,9 @@ test('lienzo libre: la flecha de orientación aparece al alejarse y encuadra al 
   // Pulsarla vuelve a encuadrar el contenido → la flecha desaparece.
   await arrow.click();
   await expect(arrow).toHaveCount(0);
+
+  // Limpieza: quita el widget añadido.
+  await clearFreeWidgets(page);
 });
 
 test('lienzo libre: herramientas de dibujo (forma, lápiz a mano y texto libre)', async ({

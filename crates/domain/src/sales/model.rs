@@ -131,11 +131,23 @@ pub struct SalesTotals {
     pub avg_margin_pct: Decimal,
 }
 
+/// Fila del historial: venta + nombres denormalizados de tienda y vendedor (el frontend
+/// los pinta como columnas «Tienda»/«Vendedor»). NestJS los servía como relaciones anidadas;
+/// aquí van planos (`storeName`/`sellerName`) para no re-anidar en SQL.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaleListItem {
+    #[serde(flatten)]
+    pub sale: Sale,
+    pub store_name: String,
+    pub seller_name: String,
+}
+
 /// Página del historial de ventas.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SalesPage {
-    pub items: Vec<Sale>,
+    pub items: Vec<SaleListItem>,
     pub page: i64,
     pub page_size: i64,
     pub total_items: i64,
