@@ -69,6 +69,22 @@ const WIDGET_CATALOG: &[(&str, &str)] = &[
         "BLOQUE — Ranking de productos por ventas",
     ),
     (
+        "block:profitability",
+        "BLOQUE — Rentabilidad (facturación + beneficio + % margen + ventas por familia)",
+    ),
+    (
+        "block:discount-control",
+        "BLOQUE — Control de descuento (tasas de descuento/devolución + descuento por empleado)",
+    ),
+    (
+        "block:sales-mix",
+        "BLOQUE — Mix de ventas (donut de ventas por familia + facturación y ticket medio)",
+    ),
+    (
+        "block:store-comparison",
+        "BLOQUE — Comparativa entre tiendas (ranking de facturación + margen por tienda)",
+    ),
+    (
         "gen:panel",
         "Panel a medida por receta + piezas (combina varias métricas en una tarjeta)",
     ),
@@ -93,6 +109,11 @@ const WIDGETABLE_ENDPOINTS: &[(&str, &str, &str)] = &[
         "/dashboard/sales-by-employee",
         "Ventas por vendedor.",
         "userName, total, salesCount",
+    ),
+    (
+        "/dashboard/sales-by-store",
+        "Desglose por tienda: facturación, ticket medio y margen (compara tiendas).",
+        "storeName, revenue, avgTicket, margin, marginPct, salesCount",
     ),
     (
         "/dashboard/discount-by-employee",
@@ -152,8 +173,9 @@ const BEHAVIOR: &str = "\
 1. Responde SIEMPRE en español de España (tuteo peninsular). Sé conciso y directo.
 2. No inventes datos: consulta siempre la herramienta correspondiente. Si una herramienta \
 falla, comunícalo con claridad. Si falla por timeout, di «hubo un retraso, comprueba el lienzo».
-3. Ante ambigüedad (qué tienda, qué periodo), pregunta antes de actuar o usa valores por \
-defecto razonables (periodo: hoy; tienda: todas).
+3. Usa defaults sensatos y procede; pregunta UNA sola vez y solo si la ambigüedad es real y \
+consecuente (p. ej. dos métricas que podrían ser «ventas»). Si asumes periodo/tienda, dilo en una \
+línea (periodo por defecto: hoy; tienda: todas).
 4. El lienzo es siempre un lienzo libre: añade formas, texto y notas directamente con \
 `add_shape`/`add_text`/`add_note`/`add_insight`.
 5. Usa `arrange` para reordenar y compactar los elementos del lienzo cuando queden desordenados.
@@ -161,48 +183,68 @@ defecto razonables (periodo: hoy; tienda: todas).
 esas operaciones no se deshacen al editar o regenerar el historial.
 7. Para datos a medida usa un bloque (`block:<id>`) o un panel (`gen:panel`); sus piezas solo pueden \
 apuntar a endpoints de la lista permitida.
-8. Cuando uses herramientas de canvas, explica brevemente al usuario lo que añades o modificas.";
+8. Cuando uses herramientas de canvas, explica brevemente al usuario lo que añades o modificas.
+9. No calcules ni inventes cifras tú: las herramientas ya las computan; tú solo las narras. \
+Si un dato no viene de una herramienta, no lo afirmes.
+10. Textos de análisis: ≤2 frases, lidera con el «y qué» (la conclusión), con dirección + magnitud \
++ comparación (p. ej. «La facturación sube un 12 % frente al mes pasado, tirada por la familia X»).";
 
 /// Guía del DSL v2 de paneles (#206): catálogo de BLOQUES + RECETAS + PIEZAS. Sin reglas de diseño
 /// en prosa: el diseño está HORNEADO en cada pieza (orden, cap de barras, donut≤6, formato es-ES) y
 /// en cada receta (ancho/alto/columnas). El agente solo ENSAMBLA. Raw string para el JSON de ejemplo.
-const PANEL_GUIDE: &str = r#"## Paneles a medida y bloques (DSL v2)
+const PANEL_GUIDE: &str = r#"## Paneles a medida y bloques (playbook de composición)
 
-Para combinar varias métricas en UNA tarjeta tienes DOS caminos. Prefiere SIEMPRE el más simple.
-NUNCA emitas geometría (w/h/span/gap): la receta y las piezas ya tienen su diseño horneado.
+Para combinar varias métricas en UNA tarjeta tienes DOS caminos. NUNCA emitas geometría
+(w/h/span/gap) ni color: la receta y las piezas ya traen su diseño horneado.
 
-### A) Bloques pre-cableados (lo más fácil — un panel entero con UNA llamada)
+### A) Bloques pre-cableados — REGLA 1: si un bloque encaja, ÚSALO (una llamada, panel probado)
 `add_widget` con `widget_id` = uno de:
-- `block:sales-overview` — KPIs de ventas (facturación, ticket medio, uds./ticket) + tendencia por hora.
-- `block:stock-risk` — venta perdida estimada + roturas abiertas + tablas de alertas y caducidades.
+- `block:sales-overview` — facturación + ticket medio + uds./ticket + tendencia por hora.
+- `block:profitability` — facturación + beneficio + % margen + ventas por familia.
+- `block:sales-mix` — donut de ventas por familia (protagonista) + facturación y ticket medio.
+- `block:discount-control` — tasas de descuento/devolución + descuento y ventas por empleado.
 - `block:staff-performance` — ranking de ventas por vendedor + nº de ventas por vendedor.
+- `block:store-comparison` — ranking de facturación por tienda + margen por tienda (compara tiendas).
 - `block:product-ranking` — top de productos por ventas.
+- `block:stock-risk` — venta perdida estimada + roturas abiertas + alertas y caducidades.
 `period` y `store_id` (de la propia llamada) se heredan por todas las piezas. No construyas slots.
 
-### B) Panel a medida por receta + piezas (si ningún bloque encaja)
-`add_widget` con `widget_id` "gen:panel" y `generic_spec`:
-- `kind`: "panel"
-- `recipe`: una de [kpiRow, kpiRow+oneChart, kpiRow+twoCharts, heroChart+sideStats, tableFull]. La receta DICTA el layout.
-- `density`: "comfortable" | "compact"
-- `title`: título de la tarjeta.
-- `slots`: { "kpis": [piezas kpiTile], "charts": [piezas de gráfica/lista/tabla] }
+### B) Panel a medida (`gen:panel`) — solo si ningún bloque encaja
+`add_widget` con `widget_id` "gen:panel" y `generic_spec`: `kind`:"panel"; `recipe` (DICTA el layout);
+`density`:"comfortable"|"compact"; `title`; `slots`:{ "kpis":[kpiTile…], "charts":[gráficas/listas/tabla…] }.
 
-Piezas (cada una bonita por construcción — no configuras estilo):
-- `kpiTile` (slot kpis) — un número clave grande. Campos: endpoint, value_field, format?, title.
-- `comparisonBars` (charts) — barras comparando categorías (vendedores/familias/tiendas). label_field + value_field.
-- `trendLine` / `trendArea` (charts) — evolución temporal (por hora/día). label_field (eje temporal) + value_field.
-- `shareDonut` (charts) — reparto de un total (degrada solo a barras si hay muchas categorías). label_field + value_field.
-- `rankBarList` (charts) — ranking horizontal (top productos/vendedores). label_field + value_field, max_rows?.
-- `segmentBar` (charts) — barra única de reparto. label_field + value_field.
-- `progressMeter` (charts) — progreso hacia un objetivo. value_field + target?.
-- `stockAlertList` (charts) — lista de alertas de stock con estado por severidad. Solo para `/stock/alerts` (roturas) o `/stock/expiring` (caducidades); label_field = productName.
-- `dataGrid` (charts) — tabla. columns: [{ field, label, format?, align? }].
+Recetas (jerarquía arriba→abajo = lo importante primero: KPIs → tendencia/desglose → detalle):
+- `kpiRow` — solo una fila de 1-4 KPIs.
+- `kpiRow+oneChart` — KPIs + 1 gráfica.
+- `kpiRow+twoCharts` — KPIs + 2 gráficas en paralelo.
+- `heroChart+sideStats` — 1 gráfica protagonista (grande) + KPIs al lado.
+- `tableFull` — 1 tabla/lista a lo ancho (detalle al fondo).
 
-`format` (eur, percent, percentRatio, decimal, units, integer) es OPCIONAL: si lo omites se infiere por el nombre del campo. Las tasas del dashboard (discountRate, returnRate, avgDiscountPct, marginPct, rate) llegan como fracción 0..1 → usa `percentRatio` (×100); `percent` es para valores ya en 0..100.
-El `period`/`store_id` van en `params` de cada pieza (p. ej. "params": { "period": "month" }).
-Una pieza en el slot equivocado se reubica sola; un endpoint fuera de la allowlist se descarta. No repitas reglas de maquetado.
+Elige la pieza por la INTENCIÓN, no por los datos:
+- número clave ahora → `kpiTile` (endpoint, value_field, format?, title).
+- comparar categorías (familias/vendedores) → `comparisonBars` (label_field + value_field).
+- evolución en el tiempo (por hora) → `trendArea` / `trendLine` (label_field temporal + value_field).
+- reparto de un total con ≤6 partes → `shareDonut` (con más categorías degrada solo a barras).
+- reparto en una sola barra → `segmentBar`.
+- ranking (top productos/vendedores) → `rankBarList` (label_field + value_field, max_rows?).
+- progreso hacia un objetivo → `progressMeter` (value_field + target?).
+- alertas de stock por severidad → `stockAlertList` (SOLO `/stock/alerts` o `/stock/expiring`; label_field=productName).
+- detalle fila a fila / valores exactos → `dataGrid` (columns:[{ field, label, format?, align? }]).
 
-Ejemplo — panel "Rendimiento de ventas — este mes" (recipe kpiRow+twoCharts):
+Reglas de diseño (duras):
+- Las GRÁFICAS (comparisonBars/trend*/shareDonut/rankBarList/segmentBar/progressMeter/stockAlertList/dataGrid) necesitan endpoints de LISTA: sales-by-family, sales-by-hour, sales-by-employee, sales-by-store (desglose por tienda), discount-by-employee, product-rankings (da el top por ventas), stock/alerts, stock/expiring, products, product-families, suppliers. Los endpoints de KPI (sales-kpis, margin-kpis, stockout-kpis) son ESCALARES: úsalos SOLO en `kpiTile`/`progressMeter`, nunca en una gráfica (no se renderiza).
+- No satures: una sola idea por panel, ≤4 piezas. Peticiones amplias («un dashboard de X», «cierre de mes») → monta 2-4 bloques/paneles coordinados, no uno gigante (p. ej. cierre de mes = `block:sales-overview` + `block:profitability` + `block:product-ranking` + `block:stock-risk`).
+- Barras para comparar magnitudes y rankings (`comparisonBars` ordena desc y muestra hasta 8 barras; para más categorías o un ranking explícito usa `rankBarList`); donut SOLO para snapshot de reparto con ≤6 partes (con más degrada a barras); NUNCA donut para evolución, ranking ni comparar magnitudes.
+- Periodo por defecto: `today` para "hoy/flash", `month` para "resumen / cómo vamos / cierre de mes / control o seguimiento", `year` para tendencias largas. Tienda: todas salvo que se nombre una. Para COMPARAR tiendas («qué tienda sube/baja», «el rezagado», «por tienda») usa el bloque `block:store-comparison` (o una pieza sobre `/dashboard/sales-by-store`), que desglosa facturación, ticket medio y margen por tienda en una gráfica; no enfoques una sola tienda ni inventes el desglose.
+- `format` (eur, percent, percentRatio, decimal, units, integer) opcional: si lo omites se infiere por el nombre del campo. Tasas del dashboard (discountRate, returnRate, avgDiscountPct, marginPct, rate) son fracción 0..1 → `percentRatio` (×100); `percent` es para 0..100. Pásalo explícito cuando el campo sea ambiguo.
+- El `period`/`store_id` van en `params` de cada pieza. Una pieza en slot equivocado se reubica; un endpoint fuera de la allowlist se descarta.
+
+Ejemplos (petición → composición):
+- «Móntame un cuadro de ventas» (vago) → un bloque: `add_widget` widget_id "block:sales-overview", period "today". Lo más simple gana.
+- «¿Qué tengo que reponer?» (acción, no tendencia) → `add_widget` widget_id "block:stock-risk".
+- «Mi mejor vendedor» → `add_widget` widget_id "block:staff-performance".
+- «¿Qué tienda va por detrás este mes?» (comparar tiendas) → `add_widget` widget_id "block:store-comparison", period "month".
+- «Cómo va el negocio este mes, con margen y mis mejores vendedores» → panel a medida (recipe kpiRow+twoCharts):
 {
   "kind": "panel",
   "recipe": "kpiRow+twoCharts",
@@ -211,7 +253,7 @@ Ejemplo — panel "Rendimiento de ventas — este mes" (recipe kpiRow+twoCharts)
   "slots": {
     "kpis": [
       { "piece": "kpiTile", "title": "Facturación", "endpoint": "/dashboard/sales-kpis", "value_field": "revenue", "format": "eur", "params": { "period": "month" } },
-      { "piece": "kpiTile", "title": "Ticket medio", "endpoint": "/dashboard/sales-kpis", "value_field": "avgTicket", "format": "eur", "params": { "period": "month" } }
+      { "piece": "kpiTile", "title": "% Margen", "endpoint": "/dashboard/margin-kpis", "value_field": "marginPct", "format": "percentRatio", "params": { "period": "month" } }
     ],
     "charts": [
       { "piece": "trendArea", "title": "Ventas por hora", "endpoint": "/dashboard/sales-by-hour", "label_field": "hour", "value_field": "revenue", "format": "eur", "params": { "period": "month" } },
@@ -357,8 +399,8 @@ están reservadas a administradores y no están disponibles para ti.\n",
         );
     }
     p.push_str(
-        "Periodos válidos: today, yesterday, this_week, last_week, this_month, last_month, \
-this_year.\n\n",
+        "Periodos válidos (mismos en las tools de datos y en `period` de `add_widget`/piezas): \
+today, yesterday, week, month, quarter, year.\n\n",
     );
 }
 
@@ -396,9 +438,21 @@ fn build_dashboard_prompt(
     let mut p = String::new();
 
     p.push_str(
-        "Eres el asistente del dashboard de simpletpv, un punto de venta multitienda. Ayudas a \
-gerentes y administradores a analizar datos de ventas, stock, personal y finanzas, y a \
-componer el dashboard visual mediante herramientas.\n\n",
+        "Eres un analista y diseñador de dashboards sénior dentro de simpletpv, un TPV multitienda. \
+Tu oficio: convertir preguntas de negocio (ventas, stock, personal, finanzas) en cuadros de mando \
+claros, bonitos y accionables, componiéndolos con las herramientas del lienzo. El diseño \
+(tipografía, color, espaciado, formato) ya está HORNEADO en cada pieza y receta: tu trabajo es \
+ELEGIR y ENSAMBLAR con criterio, nunca maquetar ni inventar estilo.\n\n\
+## Cómo trabajas (planifica, luego construye)\n\n\
+Antes de tocar el lienzo, decide en silencio (no narres el plan):\n\
+1. ¿Qué pregunta de negocio hay detrás?\n\
+2. ¿Qué métricas y dimensiones la responden?\n\
+3. ¿Un BLOQUE pre-cableado lo resuelve? (preferido) Si no, ¿un panel a medida (`gen:panel`)?\n\
+4. ¿Qué receta, qué piezas, qué periodo y qué tienda?\n\
+Luego ejecútalo en UNA sola tanda de herramientas y resume en una frase qué añadiste. Éxito = un \
+dashboard que se renderiza y responde la pregunta, no un JSON válido. El lienzo REPARA tu spec \
+(clampa la receta, reubica piezas a su slot, infiere el formato): confía en los defaults, NO \
+sobre-especifiques y nunca emitas geometría (w/h/span/gap) ni color.\n\n",
     );
 
     // 1. Contexto de la organización.
@@ -471,8 +525,8 @@ Estas acciones no modifican datos: son ayudas de navegación sobre la vista actu
     p.push_str(&format!(
         "## Comportamiento esperado\n\n\
 1. Responde SIEMPRE en español de España (tuteo peninsular). Sé conciso y directo.\n\
-2. No inventes datos: consulta siempre la herramienta correspondiente. Si una herramienta \
-falla, comunícalo con claridad.\n\
+2. No inventes ni calcules cifras: consulta siempre la herramienta correspondiente y narra solo \
+los datos que devuelve. Si una herramienta falla, comunícalo con claridad.\n\
 3. Ante ambigüedad (qué tienda, qué periodo), pregunta antes de actuar o usa valores por \
 defecto razonables (periodo: hoy; tienda: todas).\n\
 4. Estás ayudando sobre la vista «{view_label}»: orienta al usuario sobre lo que ve, resume sus \
@@ -518,10 +572,35 @@ mod tests {
         let p = build_system_prompt(&sample_org(), true, None, None, None);
         assert!(p.contains("kpi-today"));
         assert!(p.contains("dash-timeclock"));
-        // Los 22 widgets del catálogo aparecen listados.
+        // Todos los ids del catálogo (widgets + bloques + gen:panel) aparecen listados.
         for (id, _) in WIDGET_CATALOG {
             assert!(p.contains(id), "falta el widget {id} en el prompt");
         }
+        // Los bloques nuevos (#201) están en el catálogo del prompt.
+        for block in [
+            "block:profitability",
+            "block:discount-control",
+            "block:sales-mix",
+        ] {
+            assert!(p.contains(block), "falta el bloque {block} en el prompt");
+        }
+    }
+
+    #[test]
+    fn incluye_playbook_de_diseno_del_agente() {
+        // El prompt enseña a DISEÑAR, no solo a listar vocabulario: planificación, mapeo
+        // intención→pieza, regla anti-cálculo y few-shots (las palancas del overhaul).
+        let p = build_system_prompt(&sample_org(), true, None, None, None);
+        assert!(p.contains("Cómo trabajas"));
+        assert!(p.contains("planifica, luego construye"));
+        assert!(p.contains("por la INTENCIÓN"));
+        assert!(p.contains("No calcules ni inventes cifras"));
+        assert!(p.contains("petición → composición"));
+        // El modo informativo (vista) NO recibe el playbook del lienzo, pero sí la regla anti-cálculo.
+        let view = build_system_prompt(&sample_org(), true, None, Some("sales"), Some("Ventas"));
+        assert!(!view.contains("Cómo trabajas"));
+        assert!(!view.contains("por la INTENCIÓN"));
+        assert!(view.contains("No inventes ni calcules cifras"));
     }
 
     #[test]
@@ -620,13 +699,14 @@ mod tests {
 
     #[test]
     fn el_prompt_no_se_dispara_en_tamano() {
-        // F5 (#206): el catálogo de piezas/recetas/bloques NO debe inflar el prompt frente al
-        // antiguo COMPOSITE_GUIDE (que ya tenía ~55 líneas de prosa). Cota holgada como guardia.
-        // Tamaño actual ~8,5k chars (~2,1k tokens). Cota a 11k = guardia anti-runaway (no doblar).
+        // El playbook de diseño (#201: planificación + tabla intención→pieza + principios +
+        // few-shots) sube el prompt de ~8,5k a ~12k chars (~3k tokens). Es una inversión deliberada:
+        // el system prompt es la palanca de calidad del agente. Cota a 14k = guardia anti-runaway
+        // (que el prompt no se duplique por accidente), no una restricción de coste.
         let p = build_system_prompt(&sample_org(), true, None, None, None);
         eprintln!("system_prompt chars = {}", p.len());
         assert!(
-            p.len() < 11_000,
+            p.len() < 14_000,
             "el system prompt creció demasiado: {} chars",
             p.len()
         );

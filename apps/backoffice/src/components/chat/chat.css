@@ -256,11 +256,19 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 }
 
 .chat-messages__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   width: 100%;
   margin-block: auto;
   color: var(--ui-text-muted);
   font-size: var(--ui-text-sm);
   text-align: center;
+}
+
+/* Las sugerencias mantienen su slider a todo el ancho dentro del estado vacío centrado. */
+.chat-messages__empty .suggestions {
+  align-self: stretch;
 }
 
 .chat-messages__hint {
@@ -272,6 +280,20 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-1);
+  animation: chat-msg-in 0.32s var(--ui-ease) both;
+}
+
+@keyframes chat-msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-msg {
+    animation: none;
+  }
 }
 
 .chat-msg--user {
@@ -306,11 +328,12 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 /* Cursor de streaming */
 .chat-cursor {
   display: inline-block;
-  width: 7px;
-  height: 1em;
+  width: 6px;
+  height: 1.05em;
   margin-left: 2px;
+  border-radius: 1px;
   vertical-align: text-bottom;
-  background: var(--ui-text-muted);
+  background: var(--ui-brand);
   animation: chat-blink 1s steps(2, start) infinite;
 }
 
@@ -523,46 +546,42 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   gap: var(--ui-space-2);
 }
 
-/* ── Chips de tool-call ─────────────────────────────────────────────────────────── */
+/* ── Traza de actividad del agente (timeline de pasos del turno) ─────────────────── */
 
-.chat-tool-chips {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-1);
-  margin-bottom: var(--ui-space-1);
-}
-
-.chat-tool-chip {
+.agent-trace {
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-  background: var(--ui-bg);
-  font-size: var(--ui-text-2xs);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-subtle);
+  overflow: hidden;
 }
 
-.chat-tool-chip__head {
+.agent-trace__head {
   display: flex;
   align-items: center;
-  gap: var(--ui-space-1);
+  gap: 0.45rem;
   width: 100%;
-  padding: var(--ui-space-1) var(--ui-space-2);
+  padding: 0.4rem 0.55rem;
   border: none;
   background: transparent;
-  color: var(--ui-text);
-  cursor: pointer;
-  text-align: left;
-}
-
-.chat-tool-chip__caret {
-  flex-shrink: 0;
   color: var(--ui-text-muted);
-  transition: transform var(--ui-motion-fast) var(--ui-ease);
+  font: inherit;
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--ui-motion-fast) var(--ui-ease);
 }
 
-.chat-tool-chip__caret.is-open {
-  transform: rotate(90deg);
+.agent-trace__head:hover {
+  color: var(--ui-text);
 }
 
-.chat-tool-chip__label {
+.agent-trace__head:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+.agent-trace__title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -570,25 +589,107 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   white-space: nowrap;
 }
 
-.chat-tool-chip__check {
-  color: var(--ui-success);
-}
-
-.chat-tool-chip--aborted {
-  opacity: 0.6;
-}
-
-.chat-tool-chip--aborted .chat-tool-chip__label {
+.agent-trace__caret {
+  flex: none;
   color: var(--ui-text-muted);
+  transition: transform var(--ui-motion-fast) var(--ui-ease);
 }
 
-.chat-tool-chip__spinner {
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--ui-border-strong);
-  border-top-color: var(--ui-brand);
-  border-radius: 50%;
+.agent-trace.is-open .agent-trace__caret {
+  transform: rotate(180deg);
+}
+
+/* Mini-orbe de la cabecera (misma identidad visual que el orbe grande). */
+.agent-trace__spark {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  border-radius: var(--ui-radius-pill);
+  background: radial-gradient(
+    circle at 32% 28%,
+    color-mix(in srgb, var(--ui-brand) 72%, white) 0%,
+    var(--ui-brand) 42%,
+    var(--ui-chart-accent) 100%
+  );
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-brand) 12%, transparent);
+}
+
+.agent-trace__steps {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem 0.6rem 0.5rem;
+  border-top: 1px solid var(--ui-border);
+}
+
+/* Línea conectora vertical que enhebra los nodos de la timeline. */
+.agent-trace__steps::before {
+  content: '';
+  position: absolute;
+  left: calc(0.6rem + 5px);
+  top: 0.85rem;
+  bottom: 0.85rem;
+  width: 1.5px;
+  background: var(--ui-border-strong);
+}
+
+.agent-step {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text);
+}
+
+.agent-step__node {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 11px;
+  height: 11px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface);
+  border: 1.5px solid var(--ui-border-strong);
+  color: #fff;
+}
+
+/* Color semántico del nodo: consultas (acento índigo) vs acciones de lienzo (marca teal). */
+.agent-step--query.is-done .agent-step__node {
+  background: var(--ui-chart-accent);
+  border-color: var(--ui-chart-accent);
+}
+
+.agent-step--action.is-done .agent-step__node {
+  background: var(--ui-brand);
+  border-color: var(--ui-brand);
+}
+
+.agent-step.is-running .agent-step__node {
+  background: transparent;
+  border-color: var(--ui-brand);
+  border-top-color: transparent;
   animation: chat-spin 0.7s linear infinite;
+}
+
+.agent-step.is-rejected .agent-step__node {
+  background: var(--ui-danger);
+  border-color: var(--ui-danger);
+}
+
+.agent-step.is-rejected .agent-step__label {
+  color: var(--ui-text-muted);
+  text-decoration: line-through;
+}
+
+.agent-step__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @keyframes chat-spin {
@@ -598,26 +699,62 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chat-tool-chip__spinner {
+  .agent-step.is-running .agent-step__node {
     animation: none;
   }
 }
 
-.chat-tool-chip__body {
-  padding: 0 var(--ui-space-2) var(--ui-space-2);
+/* ── Orbe del agente (presencia IA — solo CSS, sin canvas ni WebGL) ───────────────── */
+
+.agent-orb {
+  display: inline-block;
+  flex: none;
+  border-radius: var(--ui-radius-pill);
+  background: radial-gradient(
+    circle at 33% 28%,
+    color-mix(in srgb, var(--ui-brand) 70%, white) 0%,
+    var(--ui-brand) 38%,
+    var(--ui-chart-accent) 100%
+  );
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--ui-brand) 9%, transparent),
+    0 8px 22px -6px color-mix(in srgb, var(--ui-chart-accent) 50%, transparent);
+  animation: agent-orb-breathe 4s var(--ui-ease) infinite;
 }
 
-.chat-tool-chip__json {
-  margin: var(--ui-space-1) 0 0;
-  padding: var(--ui-space-2);
-  max-height: 220px;
-  overflow: auto;
-  background: var(--ui-surface-subtle);
-  border-radius: var(--ui-radius-xs);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: var(--ui-text-2xs);
-  white-space: pre-wrap;
-  word-break: break-word;
+.agent-orb--sm {
+  width: 16px;
+  height: 16px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-brand) 12%, transparent);
+}
+
+.agent-orb.is-active {
+  animation-duration: 1.6s;
+}
+
+@keyframes agent-orb-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.07);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-orb {
+    animation: none;
+  }
+}
+
+/* Indicador "pensando" (orbe + shimmer) mientras no hay tokens ni pasos todavía. */
+.chat-thinking {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 /* ── Markdown del asistente ────────────────────────────────────────────────────── */
@@ -1504,12 +1641,14 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   cursor: pointer;
   transition:
     background var(--ui-motion-fast) var(--ui-ease),
-    border-color var(--ui-motion-fast) var(--ui-ease);
+    border-color var(--ui-motion-fast) var(--ui-ease),
+    transform var(--ui-motion-fast) var(--ui-ease);
 }
 
 .suggestion:hover {
   background: var(--ui-surface-subtle);
-  border-color: var(--ui-border-strong, var(--ui-border));
+  border-color: color-mix(in srgb, var(--ui-brand) 40%, var(--ui-border));
+  transform: translateY(-1px);
 }
 
 .suggestion:focus-visible {
