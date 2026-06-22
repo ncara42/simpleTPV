@@ -610,6 +610,28 @@
 .catalog > .bo-tabs {
   margin-bottom: 1.5rem;
 }
+/* Subtabs DENTRO de la card (Clientes B2B y Proveedores): no son una píldora
+   flotante sino la cabecera del panel. A ancho completo, sin marco propio y con
+   filete inferior que la separa del toolbar; el `overflow: hidden` de la card
+   (.table-panel o .ui-dt) recorta sus esquinas superiores al radio del panel.
+   Dos contenedores porque unas secciones usan .table-panel y otras el slot
+   `header` del DataTable (.ui-dt-header). */
+.table-panel > .bo-tabs,
+.ui-dt-header > .bo-tabs {
+  width: 100%;
+  gap: 0.1rem;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: none;
+}
+/* La pestaña activa por defecto usa fondo blanco (var(--ui-surface)); dentro de la
+   card blanca sería invisible, así que aquí pasa al tono sutil. */
+.table-panel > .bo-tabs .bo-tab.active,
+.ui-dt-header > .bo-tabs .bo-tab.active {
+  background: var(--ui-surface-subtle);
+}
 /* Fila de subtabs con acción a la derecha (Stock → Traspasos). */
 .stock-tabs-row {
   display: flex;

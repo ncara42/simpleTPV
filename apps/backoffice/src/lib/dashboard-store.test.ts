@@ -495,6 +495,33 @@ describe('normalizeGenericSpec — panel v2 (#204): REPARA en vez de podar', () 
     expect(lastSpec().recipe).toBe('kpiRow+twoCharts');
   });
 
+  it('RECONCILIA una receta válida pero contradictoria con el nº de piezas y avisa (#212)', () => {
+    const r = addPanel({
+      kind: 'panel',
+      title: 'X',
+      recipe: 'kpiRow', // válida, pero pide 0 charts y le pasamos 2
+      slots: {
+        charts: [
+          {
+            piece: 'comparisonBars',
+            endpoint: '/dashboard/sales-by-employee',
+            labelField: 'userName',
+            valueField: 'total',
+          },
+          {
+            piece: 'trendArea',
+            endpoint: '/dashboard/sales-by-hour',
+            labelField: 'hour',
+            valueField: 'revenue',
+          },
+        ],
+      },
+    });
+    expect(r.accepted).toBe(true);
+    expect(r.reason).toMatch(/ajusté la receta.*no encajaba/);
+    expect(lastSpec().recipe).toBe('kpiRow+twoCharts');
+  });
+
   it('CLAMPA maxBars/maxRows fuera de rango al máximo horneado', () => {
     const r = addPanel({
       kind: 'panel',

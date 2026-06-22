@@ -266,7 +266,27 @@ pub async fn create(
         // SEC-02): atómico con la venta. Si la creación del registro fiscal
         // encadenado falla, toda la venta hace rollback → nunca queda una factura
         // sin su registro. El ENVÍO a la AEAT es best-effort y lo procesa la cola.
-        crate::verifactu::record_invoice(tx, org, sale_id, &ticket_number, totals.total).await?;
+        // Desglose de IVA del ticket (con el descuento de ticket prorrateado): la
+        // Σ de cuotas es el `CuotaTotal` que entra en la huella oficial, y el
+        // desglose por tipo se guarda en el payload del registro (para el XML AEAT).
+        let tax_lines: Vec<TaxLine> = totals
+            .lines
+            .iter()
+            .map(|l| TaxLine {
+                tax_rate: l.priced.tax_rate,
+                line_total: l.line_total,
+            })
+            .collect();
+        let tax_breakdown = build_tax_breakdown(&tax_lines, totals.ticket_discount);
+        crate::verifactu::record_invoice(
+            tx,
+            org,
+            sale_id,
+            &ticket_number,
+            totals.total,
+            &tax_breakdown,
+        )
+        .await?;
 
         Ok(Ok(SaleWithLines { sale, lines }))
     })

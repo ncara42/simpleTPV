@@ -1,15 +1,15 @@
 import type { ImportResult } from '@simpletpv/auth';
 import { Badge, Button, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Download, Plus, Upload } from 'lucide-react';
 import { useState } from 'react';
 
-import { CsvActionButton } from '../components/CsvActionButton.js';
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
 import { listStores } from '../lib/admin.js';
 import { exportRowsToCsv, parseCsvRows } from '../lib/csv.js';
 import { formErrorMessage } from '../lib/form-error.js';
+import { usePageActions } from '../lib/pageActions.js';
 import { listProducts } from '../lib/products.js';
 import { createTransfer, listTransfers, sendTransfer } from '../lib/stock.js';
 import { dt, STATUS_LABEL } from './labels.js';
@@ -150,16 +150,34 @@ export function TransfersSection() {
     return { inserted, errors };
   };
 
+  // Export/Import en el clúster flotante (junto al conmutador Backoffice↔TPV).
+  usePageActions(
+    <>
+      <button
+        type="button"
+        className="float-action-btn"
+        onClick={handleExport}
+        aria-label="Exportar traspasos"
+        title="Exportar traspasos"
+        data-testid="transfers-export"
+      >
+        <Download size={17} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className="float-action-btn"
+        onClick={() => setImporting(true)}
+        aria-label="Importar traspasos"
+        title="Importar traspasos"
+        data-testid="transfers-import"
+      >
+        <Upload size={17} aria-hidden="true" />
+      </button>
+    </>,
+  );
+
   return (
     <>
-      <div className="table-actions">
-        <CsvActionButton kind="export" onClick={handleExport} testId="transfers-export" />
-        <CsvActionButton
-          kind="import"
-          onClick={() => setImporting(true)}
-          testId="transfers-import"
-        />
-      </div>
       <div className="table-panel">
         <DataTable
           columns={transferColumns}

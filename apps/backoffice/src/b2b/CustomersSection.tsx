@@ -1,11 +1,10 @@
 import { Button, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
-import { useState } from 'react';
+import { Download, Plus, Upload } from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 import { sileo } from 'sileo';
 
 import { useConfirm } from '../components/ConfirmProvider.js';
-import { CsvActionButton } from '../components/CsvActionButton.js';
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
 import { SectionToolbar } from '../components/SectionToolbar.js';
@@ -20,6 +19,7 @@ import {
 } from '../lib/b2b.js';
 import { exportRowsToCsv, importRowsViaCreate } from '../lib/csv.js';
 import { formErrorMessage } from '../lib/form-error.js';
+import { usePageActions } from '../lib/pageActions.js';
 
 interface Form {
   id?: string;
@@ -69,7 +69,7 @@ function toInput(f: Form): CustomerInput {
   return input;
 }
 
-export function CustomersSection() {
+export function CustomersSection({ tabs }: { tabs?: ReactNode }) {
   const qc = useQueryClient();
   const confirm = useConfirm();
   const [form, setForm] = useState<Form | null>(null);
@@ -152,6 +152,33 @@ export function CustomersSection() {
       createCustomer,
     );
 
+  // Export/Import viven en el clúster flotante (junto al conmutador Backoffice↔TPV),
+  // no en una banda propia sobre la tabla. Se registran como acciones de la view.
+  usePageActions(
+    <>
+      <button
+        type="button"
+        className="float-action-btn"
+        onClick={handleExport}
+        aria-label="Exportar CSV"
+        title="Exportar CSV"
+        data-testid="b2b-customers-export"
+      >
+        <Download size={17} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className="float-action-btn"
+        onClick={() => setImporting(true)}
+        aria-label="Importar CSV"
+        title="Importar CSV"
+        data-testid="b2b-customers-import"
+      >
+        <Upload size={17} aria-hidden="true" />
+      </button>
+    </>,
+  );
+
   type CustomerRow = (typeof customers)[number];
   const customerColumns: DataTableColumn<CustomerRow>[] = [
     { key: 'name', header: 'Nombre', render: (c) => c.name },
@@ -202,16 +229,8 @@ export function CustomersSection() {
 
   return (
     <>
-      <div className="table-actions">
-        <CsvActionButton kind="export" onClick={handleExport} testId="b2b-customers-export" />
-        <CsvActionButton
-          kind="import"
-          onClick={() => setImporting(true)}
-          testId="b2b-customers-import"
-        />
-      </div>
-
       <div className="table-panel" data-testid="b2b-customers">
+        {tabs}
         <SectionToolbar
           actionLabel="Nuevo cliente"
           onAction={() => setForm({ ...EMPTY })}

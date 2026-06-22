@@ -125,30 +125,34 @@ export function ModelEffortMenu({
 
       {open && (
         <div className="me-menu__panel" role="menu" aria-label="Modelos">
-          {groups.map((g) => (
-            <div key={g.provider} className="me-menu__group">
-              {multiProvider && <p className="me-menu__group-label">{g.label}</p>}
-              {g.models.map((m) => {
-                const isSel = m.id === model;
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={isSel}
-                    className={`me-menu__item${isSel ? ' is-selected' : ''}`}
-                    data-testid="chat-model-option"
-                    onClick={() => pickModel(m.id)}
-                  >
-                    <span className="me-menu__item-label">
-                      {stripProviderPrefix(m.label, m.provider)}
-                    </span>
-                    {isSel && <Check size={15} aria-hidden="true" />}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+          {/* Solo la lista de modelos scrollea; el panel queda con overflow visible para que el
+              flyout de esfuerzo (que cuelga a la izquierda) no se recorte. */}
+          <div className="me-menu__scroll">
+            {groups.map((g) => (
+              <div key={g.provider} className="me-menu__group">
+                {multiProvider && <p className="me-menu__group-label">{g.label}</p>}
+                {g.models.map((m) => {
+                  const isSel = m.id === model;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={isSel}
+                      className={`me-menu__item${isSel ? ' is-selected' : ''}`}
+                      data-testid="chat-model-option"
+                      onClick={() => pickModel(m.id)}
+                    >
+                      <span className="me-menu__item-label">
+                        {stripProviderPrefix(m.label, m.provider)}
+                      </span>
+                      {isSel && <Check size={15} aria-hidden="true" />}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
 
           <span className="me-menu__sep" aria-hidden="true" />
 

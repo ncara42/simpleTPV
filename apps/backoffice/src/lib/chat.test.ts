@@ -104,6 +104,22 @@ describe('streamChat dispatcher', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
+  it('enruta view_action a onViewAction', async () => {
+    const viewAction = {
+      toolCallId: 'tc3',
+      action: 'highlight_on_view' as const,
+      args: { target: 'SKU' },
+    };
+    postStream.mockImplementation(
+      async (_p: string, _q: unknown, onEvent: (t: string, d: unknown) => void) => {
+        onEvent('view_action', viewAction);
+      },
+    );
+    const onViewAction = vi.fn();
+    await streamChat({ message: 'x', model: 'gpt-4.1', effort: 'low' }, { onViewAction });
+    expect(onViewAction).toHaveBeenCalledWith(viewAction);
+  });
+
   it('reenvía el evento error a onError', async () => {
     const err: ErrorEvent = { message: 'modelo no disponible' };
     postStream.mockImplementation(

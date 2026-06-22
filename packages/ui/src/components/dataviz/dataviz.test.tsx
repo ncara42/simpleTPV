@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import { formatAxisValue } from './format.js';
 import {
   ChartLegend,
   DeltaBadge,
@@ -23,6 +24,11 @@ describe('formatValue (es-ES)', () => {
   it('formatea porcentaje con sufijo', () => {
     expect(formatValue(3.5, 'percent')).toBe('3,5 %');
   });
+  it('percentRatio multiplica una fracción 0..1 ×100', () => {
+    expect(formatValue(0.15, 'percentRatio')).toBe('15 %');
+    expect(formatValue(0.1534, 'percentRatio')).toBe('15,34 %');
+    expect(formatValue(0, 'percentRatio')).toBe('0 %');
+  });
   it('formatea decimal a máx 2', () => {
     expect(formatValue(3.766, 'decimal')).toBe('3,77');
   });
@@ -37,6 +43,24 @@ describe('formatValue (es-ES)', () => {
     expect(formatValue(null, 'eur')).toBe('—');
     expect(formatValue(undefined, 'decimal')).toBe('—');
     expect(formatValue(Number.NaN, 'integer')).toBe('—');
+  });
+});
+
+describe('formatAxisValue (etiquetas de eje compactas)', () => {
+  it('abrevia magnitudes (eur/units/decimal/integer) para no recortarse en el gutter', () => {
+    expect(formatAxisValue(10000, 'eur')).toBe('10k');
+    expect(formatAxisValue(84560.09, 'eur')).toBe('84,6k');
+    expect(formatAxisValue(1200000, 'eur')).toBe('1,2M');
+    expect(formatAxisValue(850, 'eur')).toBe('850');
+    expect(formatAxisValue(10870, 'units')).toBe('10,9k');
+  });
+  it('mantiene el % en tasas (si no, "60" confunde)', () => {
+    expect(formatAxisValue(60, 'percent')).toBe('60 %');
+    expect(formatAxisValue(0.6, 'percentRatio')).toBe('60 %');
+  });
+  it('vacío para nulo/no finito', () => {
+    expect(formatAxisValue(null, 'eur')).toBe('');
+    expect(formatAxisValue(Number.NaN, 'eur')).toBe('');
   });
 });
 

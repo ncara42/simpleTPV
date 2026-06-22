@@ -1,7 +1,7 @@
 import { Chart } from '../Chart.js';
 import { PieChart } from '../PieChart.js';
 import { SectionHeader, WidgetStates } from './atoms.js';
-import { formatValue, type StatFormat } from './format.js';
+import { formatAxisValue, formatValue, type StatFormat } from './format.js';
 import { RankBarList } from './RankBarList.js';
 
 // Moléculas de gráficas: envuelven Chart/PieChart de @simpletpv/ui añadiendo título consistente
@@ -48,6 +48,7 @@ function SeriesChart({
           data={data}
           kind={kind}
           formatValue={(v) => formatValue(v, format)}
+          formatAxis={(v) => formatAxisValue(v, format)}
           ariaLabel={title ?? 'Gráfica'}
         />
       );

@@ -62,6 +62,7 @@ const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 3;
 const ZOOM_STEP = 1.2;
 const PAN_THRESHOLD = 4; // px para distinguir pan de click
+const DRAG_THRESHOLD_PX = 4; // px para distinguir arrastre de un elemento de un click en su contenido
 const FIT_PADDING = 48;
 const WHEEL_ZOOM_SENSITIVITY = 0.002;
 const KEY_PAN = 48; // px de pan por flecha en el fondo
@@ -131,6 +132,18 @@ interface FreeBoardProps {
   onCanvasMeta?: (meta: CanvasMeta) => void;
 }
 
+// Firma de contenido de una disposición (id + tipo + widget + caja + z). Detecta cambios EXTERNOS
+// de `elements` (p.ej. canvas_ops del chat aplicadas al store desde el shell) e ignora el eco del
+// propio `onChange`, que devuelve una disposición de contenido idéntico.
+function freeElementsSig(layout: readonly FreeElement[]): string {
+  return layout
+    .map(
+      (e) =>
+        `${e.id}|${e.kind}|${'widgetId' in e ? e.widgetId : ''}|${Math.round(e.x)}|${Math.round(e.y)}|${Math.round(e.w)}|${Math.round(e.h)}|${e.z}`,
+    )
+    .join(';');
+}
+
 export function FreeBoard({
   elements,
   renderItem,
@@ -166,6 +179,16 @@ export function FreeBoard({
   elsRef.current = els;
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+
+  // FreeBoard es la fuente de verdad de las interacciones (drag/zoom/dibujo), por eso siembra `els`
+  // desde `elements` solo al montar. Pero el chat aplica canvas_ops al dashboard-store desde el
+  // shell (con el lienzo montado), y eso debe verse EN VIVO. Adopta `elements` cuando su CONTENIDO
+  // difiere del estado actual; compara por firma para ignorar el eco del propio `onChange` (vuelve
+  // idéntico) y NO corre durante un drag (el move no emite `onChange`, así que `elements` no cambia).
+  useEffect(() => {
+    setEls((cur) => (freeElementsSig(cur) === freeElementsSig(elements) ? cur : elements));
+  }, [elements]);
+
   const toolRef = useRef(tool);
   toolRef.current = tool;
   const colorRef = useRef(drawColor);
@@ -843,7 +866,13 @@ const ElementView = memo(function ElementView({
   onTextBlur,
   children,
 }: ElementViewProps) {
-  const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const drag = useRef<{
+    startX: number;
+    startY: number;
+    x: number;
+    y: number;
+    moved: boolean;
+  } | null>(null);
   const [editingText, setEditingText] = useState(el.kind === 'text' && el.text === '');
 
   // Un texto recién creado (vacío) entra directamente en edición.
@@ -856,22 +885,39 @@ const ElementView = memo(function ElementView({
     e.stopPropagation(); // no arranques el pan del fondo
     if (e.button !== 0) return;
     onFocus(el.id);
-    e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { x: e.clientX, y: e.clientY, moved: false };
+    // NO capturamos el puntero aquí: capturarlo en pointerdown le roba el click/hover a los
+    // controles interactivos del widget (toggles, barras). Se captura al confirmar el arrastre (al
+    // superar el umbral en moveDrag), igual que los chips de sugerencia. Un click sin mover pasa
+    // limpio al hijo.
+    drag.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      x: e.clientX,
+      y: e.clientY,
+      moved: false,
+    };
   };
   const moveDrag = (e: React.PointerEvent): void => {
     const d = drag.current;
     if (!d) return;
     const z = zoomRef.current || 1;
-    if (!d.moved) onDragStart();
-    d.moved = true;
+    if (!d.moved) {
+      // Bajo el umbral aún es un click (no un arrastre): no muevas ni captures → el control del
+      // widget recibe su evento.
+      if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < DRAG_THRESHOLD_PX) return;
+      onDragStart();
+      e.currentTarget.setPointerCapture(e.pointerId); // ahora sí: arrastre real
+      d.moved = true;
+    }
     onMove(el.id, (e.clientX - d.x) / z, (e.clientY - d.y) / z);
     d.x = e.clientX;
     d.y = e.clientY;
   };
   const endDrag = (e: React.PointerEvent): void => {
     const d = drag.current;
-    e.currentTarget.releasePointerCapture(e.pointerId);
+    if (d?.moved && e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
     drag.current = null;
     if (d?.moved) onCommit();
   };

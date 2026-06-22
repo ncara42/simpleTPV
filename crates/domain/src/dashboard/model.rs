@@ -94,18 +94,19 @@ pub struct SalesByEmployeeItem {
     pub total: f64,
 }
 
-/// Desglose de ventas por tienda (#224): facturación, ticket medio, margen real (€) y
-/// nº de ventas. Incluye TODAS las tiendas de la org (las de cero ventas en 0) para que el
-/// agente identifique al rezagado.
+// ── sales-by-store (#224): desglose multitienda (facturación + ticket medio + margen) ─
+/// Incluye TODAS las tiendas de la org (las de cero ventas en 0) para que el agente
+/// identifique al rezagado.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SalesByStoreItem {
     pub store_id: Uuid,
     pub store_name: String,
     pub revenue: f64,
+    pub sales_count: i64,
     pub avg_ticket: f64,
     pub margin: f64,
-    pub sales_count: i64,
+    pub margin_pct: f64,
 }
 
 // ── margin-kpis / stockout-kpis ──────────────────────────────────────────────

@@ -113,27 +113,20 @@ const BLOCKS: Record<string, BlockDef> = {
       charts: [
         withParams(
           {
-            piece: 'dataGrid',
+            piece: 'stockAlertList',
             title: 'Alertas de stock',
             endpoint: '/stock/alerts',
-            columns: [
-              { field: 'productName', label: 'Producto' },
-              { field: 'alertType', label: 'Tipo' },
-              { field: 'severity', label: 'Severidad' },
-            ],
+            labelField: 'productName',
           },
           p,
         ),
         withParams(
           {
-            piece: 'dataGrid',
+            piece: 'stockAlertList',
             title: 'Lotes por caducar',
             endpoint: '/stock/expiring',
-            columns: [
-              { field: 'productName', label: 'Producto' },
-              { field: 'daysToExpiry', label: 'Días', format: 'integer', align: 'right' },
-              { field: 'quantity', label: 'Cantidad', format: 'units', align: 'right' },
-            ],
+            labelField: 'productName',
+            valueField: 'quantity',
           },
           p,
         ),
@@ -242,8 +235,161 @@ const BLOCKS: Record<string, BlockDef> = {
     }),
   },
 
-  // Comparativa entre tiendas (#224): facturación por tienda + margen por tienda. Responde la
-  // pregunta multitienda («¿qué tienda sube/baja, quién es el rezagado?») con una sola tarjeta.
+  // Rentabilidad: KPIs de margen (facturación / beneficio / % margen) + ventas por familia (de
+  // dónde sale el dinero). Cubre el hueco de margen/beneficio que ningún otro bloque tenía.
+  profitability: {
+    label: 'Rentabilidad',
+    recipe: 'kpiRow+oneChart',
+    build: (p) => ({
+      kpis: [
+        withParams(
+          {
+            piece: 'kpiTile',
+            title: 'Facturación',
+            endpoint: '/dashboard/margin-kpis',
+            valueField: 'revenue',
+            format: 'eur',
+          },
+          p,
+        ),
+        withParams(
+          {
+            piece: 'kpiTile',
+            title: 'Beneficio',
+            endpoint: '/dashboard/margin-kpis',
+            valueField: 'realMargin',
+            format: 'eur',
+          },
+          p,
+        ),
+        withParams(
+          {
+            piece: 'kpiTile',
+            title: '% Margen',
+            endpoint: '/dashboard/margin-kpis',
+            valueField: 'marginPct',
+            format: 'percentRatio',
+          },
+          p,
+        ),
+      ],
+      charts: [
+        withParams(
+          {
+            piece: 'comparisonBars',
+            title: 'Ventas por familia',
+            endpoint: '/dashboard/sales-by-family',
+            labelField: 'familyName',
+            valueField: 'total',
+            format: 'eur',
+          },
+          p,
+        ),
+      ],
+    }),
+  },
+
+  // Control de descuento y devoluciones: tasas (fuga de margen) + quién descuenta vs quién vende.
+  // discountRate/returnRate/avgDiscountPct llegan como fracción 0..1 → percentRatio.
+  'discount-control': {
+    label: 'Control de descuento',
+    recipe: 'kpiRow+twoCharts',
+    build: (p) => ({
+      kpis: [
+        withParams(
+          {
+            piece: 'kpiTile',
+            title: 'Tasa de descuento',
+            endpoint: '/dashboard/sales-kpis',
+            valueField: 'discountRate',
+            format: 'percentRatio',
+          },
+          p,
+        ),
+        withParams(
+          {
+            piece: 'kpiTile',
+            title: 'Tasa de devolución',
+            endpoint: '/dashboard/sales-kpis',
+            valueField: 'returnRate',
+            format: 'percentRatio',
+          },
+          p,
+        ),
+      ],
+      charts: [
+        withParams(
+          {
+            piece: 'comparisonBars',
+            title: 'Descuento por empleado',
+            endpoint: '/dashboard/discount-by-employee',
+            labelField: 'userName',
+            valueField: 'avgDiscountPct',
+            format: 'percentRatio',
+          },
+          p,
+        ),
+        withParams(
+          {
+            piece: 'comparisonBars',
+            title: 'Ventas por vendedor',
+            endpoint: '/dashboard/sales-by-employee',
+            labelField: 'userName',
+            valueField: 'total',
+            format: 'eur',
+          },
+          p,
+        ),
+      ],
+    }),
+  },
+
+  // Mix de ventas: donut hero del reparto por familia + KPIs de cabecera al lado (composición
+  // protagonista). Estrena la receta heroChart+sideStats como bloque (gráfica grande 2fr + stats 1fr).
+  'sales-mix': {
+    label: 'Mix de ventas',
+    recipe: 'heroChart+sideStats',
+    build: (p) => ({
+      kpis: [
+        withParams(
+          {
+            piece: 'kpiTile',
+            title: 'Facturación',
+            endpoint: '/dashboard/sales-kpis',
+            valueField: 'revenue',
+            format: 'eur',
+          },
+          p,
+        ),
+        withParams(
+          {
+            piece: 'kpiTile',
+            title: 'Ticket medio',
+            endpoint: '/dashboard/sales-kpis',
+            valueField: 'avgTicket',
+            format: 'eur',
+          },
+          p,
+        ),
+      ],
+      charts: [
+        withParams(
+          {
+            piece: 'shareDonut',
+            title: 'Ventas por familia',
+            endpoint: '/dashboard/sales-by-family',
+            labelField: 'familyName',
+            valueField: 'total',
+            format: 'eur',
+          },
+          p,
+        ),
+      ],
+    }),
+  },
+
+  // Comparativa entre tiendas (#224): ranking de facturación por tienda (rezagado visible) +
+  // margen por tienda. Responde la pregunta diaria del gestor de cadena con UNA gráfica.
   'store-comparison': {
     label: 'Comparativa entre tiendas',
     recipe: 'kpiRow+twoCharts',

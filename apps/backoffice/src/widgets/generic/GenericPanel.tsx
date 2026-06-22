@@ -3,6 +3,7 @@ import {
   ComparisonBars,
   DataGrid,
   type DataGridColumn,
+  HeroSplit,
   KpiRow,
   KpiTile,
   PanelShell,
@@ -12,6 +13,8 @@ import {
   SegmentBar,
   type SeriesItem,
   ShareDonut,
+  type StockAlertItem,
+  StockAlertList,
   TrendArea,
   TrendLine,
 } from '@simpletpv/ui';
@@ -22,6 +25,7 @@ import {
   type GenericDataSource,
   numField,
   textField,
+  toRecord,
   toRecords,
   useGenericData,
 } from './useGenericData.js';
@@ -39,24 +43,38 @@ export function GenericPanel({ spec }: { spec: GenericSpec }) {
   const charts = spec.slots?.charts ?? [];
   const kpiColumns = Math.min(Math.max(kpis.length, 1), MAX_KPI_COLUMNS) as 1 | 2 | 3 | 4;
   const emphasis = recipe === 'heroChart+sideStats' ? 'hero' : 'normal';
+  // heroChart+sideStats con KPIs + gráfica → composición side-by-side real (hero 2fr + stats 1fr,
+  // #212). Sin KPIs cae al apilado normal (la gráfica hero sola gana alto vía emphasis).
+  const isHeroSplit = recipe === 'heroChart+sideStats' && charts.length > 0 && kpis.length > 0;
 
   return (
     <div className="dash-generic dash-generic--panel" data-testid="dash-generic-panel">
       <PanelShell title={spec.title} density={density}>
-        {kpis.length > 0 ? (
-          <KpiRow columns={kpiColumns}>
-            {kpis.map((piece, i) => (
+        {isHeroSplit ? (
+          <HeroSplit
+            hero={<PieceWidget piece={charts[0]!} />}
+            side={kpis.map((piece, i) => (
               <PieceWidget key={`${piece.piece}-${i}`} piece={piece} />
             ))}
-          </KpiRow>
-        ) : null}
-        {charts.length > 0 ? (
-          <ChartGrid columns={recipeChartColumns(recipe)} emphasis={emphasis}>
-            {charts.map((piece, i) => (
-              <PieceWidget key={`${piece.piece}-${i}`} piece={piece} />
-            ))}
-          </ChartGrid>
-        ) : null}
+          />
+        ) : (
+          <>
+            {kpis.length > 0 ? (
+              <KpiRow columns={kpiColumns}>
+                {kpis.map((piece, i) => (
+                  <PieceWidget key={`${piece.piece}-${i}`} piece={piece} />
+                ))}
+              </KpiRow>
+            ) : null}
+            {charts.length > 0 ? (
+              <ChartGrid columns={recipeChartColumns(recipe)} emphasis={emphasis}>
+                {charts.map((piece, i) => (
+                  <PieceWidget key={`${piece.piece}-${i}`} piece={piece} />
+                ))}
+              </ChartGrid>
+            ) : null}
+          </>
+        )}
       </PanelShell>
     </div>
   );
@@ -91,7 +109,10 @@ function PieceWidget({ piece }: { piece: PieceSpec }) {
 
   switch (piece.piece) {
     case 'kpiTile': {
-      const row = records[0];
+      // Registro ESCALAR (el objeto del endpoint), no `records[0]`: endpoints de KPI como
+      // margin-kpis traen `series:number[]` que `toRecords` tomaba como filas → el tile leía un
+      // número del sparkline y mostraba "—" (Beneficio). Con `toRecord` lee el objeto.
+      const row = toRecord(data);
       // Distingue "ausente/null" (→ estado vacío '—') de un 0 real: numField devuelve 0 para null,
       // así que se comprueba la presencia de la clave antes de leerla.
       const value =
@@ -186,7 +207,7 @@ function PieceWidget({ piece }: { piece: PieceSpec }) {
         </figure>
       );
     case 'progressMeter': {
-      const row = records[0];
+      const row = toRecord(data);
       const value = row && piece.valueField ? numField(row, piece.valueField) : null;
       const target =
         piece.target ?? (row && piece.targetField ? numField(row, piece.targetField) : undefined);
@@ -201,6 +222,17 @@ function PieceWidget({ piece }: { piece: PieceSpec }) {
         />
       );
     }
+    case 'stockAlertList':
+      return (
+        <figure className="dv-chart">
+          {title ? <SectionHeader title={title} /> : null}
+          <StockAlertList
+            items={stockAlertItems(piece, records)}
+            isLoading={isLoading}
+            isError={isError}
+          />
+        </figure>
+      );
     case 'dataGrid': {
       const columns = dataGridColumns(piece, records);
       return (
@@ -216,6 +248,45 @@ function PieceWidget({ piece }: { piece: PieceSpec }) {
     default:
       return null;
   }
+}
+
+// Mapea los registros de /stock/alerts (AlertView) o /stock/expiring (ExpiringBatch) a los ítems
+// de StockAlertList (#209). Detecta la forma por las claves presentes: las roturas traen
+// `alertType`/`severity` (sin cantidad); las caducidades traen `daysToExpiry`/`status`/`quantity`.
+function stockAlertItems(
+  piece: PieceSpec,
+  records: Array<Record<string, unknown>>,
+): StockAlertItem[] {
+  const nameField = piece.labelField ?? 'productName';
+  return records.map((row) => {
+    const name = textField(row, nameField);
+    // Rotura de stock: alertType (LOW_STOCK | OUT_OF_STOCK) + severity (critical | soft).
+    if (row.alertType != null || row.severity != null) {
+      const isOut = String(row.alertType) === 'OUT_OF_STOCK';
+      const tone: StockAlertItem['tone'] =
+        isOut || String(row.severity) === 'critical' ? 'danger' : 'warn';
+      const store = textField(row, 'storeName');
+      return {
+        name,
+        ...(store ? { detail: store } : {}),
+        tone,
+        status: isOut ? 'Sin stock' : 'Stock bajo',
+      };
+    }
+    // Lote por caducar: daysToExpiry + status (expired | expiring | ok) + quantity.
+    const days = numField(row, 'daysToExpiry');
+    const st = String(row.status ?? '');
+    const tone: StockAlertItem['tone'] =
+      st === 'expired' ? 'danger' : st === 'expiring' ? 'warn' : 'ok';
+    const detail = textField(row, 'lotCode') || textField(row, 'expiryDate');
+    return {
+      name,
+      ...(detail ? { detail } : {}),
+      quantity: numField(row, piece.valueField ?? 'quantity'),
+      tone,
+      status: st === 'expired' ? 'Caducado' : `Caduca en ${days} d`,
+    };
+  });
 }
 
 // Columnas de un dataGrid: las explícitas de la pieza, o inferidas de las claves del primer registro.

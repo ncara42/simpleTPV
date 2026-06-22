@@ -19,6 +19,7 @@ import {
   Handshake,
   LayoutDashboard,
   LifeBuoy,
+  Monitor,
   Package,
   Palette,
   Percent,
@@ -33,6 +34,7 @@ import { useState } from 'react';
 import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
 import { AssistantDock } from './components/chat/AssistantDock.js';
+import { viewContextFor } from './components/chat/view-context.js';
 import { FloatingActions } from './components/FloatingActions.js';
 import { DashboardPage } from './DashboardPage.js';
 import { FamiliesPage } from './FamiliesPage.js';
@@ -42,7 +44,8 @@ import { useBranding } from './lib/branding.js';
 import { listPendingCashMovements } from './lib/cash.js';
 import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
-import type { Tab } from './lib/nav.js';
+import { switchApp, type Tab } from './lib/nav.js';
+import { PageActionsProvider } from './lib/pageActions.js';
 import { listAlerts } from './lib/stock.js';
 import { NotificationsPage } from './NotificationsPage.js';
 import { PromotionsPage } from './PromotionsPage.js';
@@ -173,76 +176,87 @@ function Home() {
   const isCanvas = tab === 'dashboard';
 
   return (
-    <div className="app-shell">
-      <Sidebar
-        items={navItems}
-        groups={NAV_GROUPS}
-        groupsAsDropdowns
-        floating
-        logo={
-          branding?.logoUrl ? (
-            <img className="sidebar-logo-img" src={branding.logoUrl} alt="Logo" />
-          ) : undefined
-        }
-        activeItem={tab}
-        onSelect={(id) => navigateTo(id as Tab)}
-        account={{ name: 'Administrador', subtitle: 'Central · Admin' }}
-        onLogout={logout}
-        onNotifications={toggleNotifications}
-        notificationCount={notificationCount}
-        // Clúster de acciones flotante sobre el sidebar (sustituye al header): lupa ⌘K + home +
-        // campana + conmutador Backoffice↔TPV.
-        floatingActions={
-          <FloatingActions
-            onNavigate={navigateTo}
-            onHome={() => navigateTo('dashboard')}
-            onNotifications={toggleNotifications}
-            notificationCount={notificationCount}
-            notificationsActive={tab === 'notifications'}
-          />
-        }
-      />
-      {/* En views NO-lienzo anulamos la columna reservada del sidebar flotante: el lienzo de
+    <PageActionsProvider>
+      <div className="app-shell">
+        <Sidebar
+          items={navItems}
+          groups={NAV_GROUPS}
+          groupsAsDropdowns
+          floating
+          logo={
+            branding?.logoUrl ? (
+              <img className="sidebar-logo-img" src={branding.logoUrl} alt="Logo" />
+            ) : undefined
+          }
+          activeItem={tab}
+          onSelect={(id) => navigateTo(id as Tab)}
+          account={{ name: 'Administrador', subtitle: 'Central · Admin' }}
+          onLogout={logout}
+          onNotifications={toggleNotifications}
+          notificationCount={notificationCount}
+          // El TPV ya no es un toggle en el clúster: es la última entrada del sidebar, separada por
+          // una línea y en azul (appSwitch). Navega al subdominio/URL hermana del TPV.
+          appSwitch={{
+            label: 'TPV',
+            icon: <Monitor size={19} aria-hidden="true" />,
+            onClick: () => switchApp('tpv'),
+            testId: 'switch-tpv',
+          }}
+          // Clúster de acciones flotante sobre el sidebar (sustituye al header): lupa ⌘K + home +
+          // campana + acciones de la vista activa.
+          floatingActions={
+            <FloatingActions
+              onNavigate={navigateTo}
+              onHome={() => navigateTo('dashboard')}
+              onNotifications={toggleNotifications}
+              notificationCount={notificationCount}
+              notificationsActive={tab === 'notifications'}
+            />
+          }
+        />
+        {/* En views NO-lienzo anulamos la columna reservada del sidebar flotante: el lienzo de
           puntitos va full-bleed y el sidebar flota por encima (como en el Dashboard). */}
-      <div className={`app-content${isCanvas ? '' : ' app-content--surface'}`}>
-        <PageHeaderProvider>
-          {/* Nombre de la view activa, flotando arriba del contenido (reemplaza el header). */}
-          {activeLabel && (
-            <span className="view-title-float" data-testid="page-heading">
-              {activeLabel}
-            </span>
-          )}
-          <div className="app-main-row">
-            <main className={`bo-main${isCanvas ? ' bo-main--canvas' : ' bo-main--surface'}`}>
-              {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
+        <div className={`app-content${isCanvas ? '' : ' app-content--surface'}`}>
+          <PageHeaderProvider>
+            {/* Nombre de la view activa, flotando arriba del contenido (reemplaza el header). */}
+            {activeLabel && (
+              <span className="view-title-float" data-testid="page-heading">
+                {activeLabel}
+              </span>
+            )}
+            <div className="app-main-row">
+              <main className={`bo-main${isCanvas ? ' bo-main--canvas' : ' bo-main--surface'}`}>
+                {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
                   embebe la tabla — enlaza con "Ver todas las ventas →". */}
-              {tab === 'dashboard' && <DashboardPage onNavigate={(t) => setTab(t)} />}
-              {tab === 'sales' && <SalesHistoryPage initialStoreId={navStoreId} />}
-              {tab === 'notifications' && <NotificationsPage onResolve={{ resolveStock }} />}
-              {tab === 'catalog' && <CatalogPage initialFamilyId={navFamilyId} />}
-              {tab === 'families' && <FamiliesPage onOpenCatalogFamily={openCatalogFamily} />}
-              {tab === 'stock' && (
-                <StockPage initialStoreId={navStoreId} initialSearch={navSearch} />
-              )}
-              {tab === 'transfers' && <TransfersPage />}
-              {tab === 'promotions' && <PromotionsPage />}
-              {tab === 'users' && <UsersPage />}
-              {tab === 'timeclock' && <TimeClockPage />}
-              {tab === 'stores' && <StoresPage onOpenStoreView={openStoreView} />}
-              {tab === 'suppliers' && <SuppliersPage />}
-              {tab === 'verifactu' && <VerifactuPage />}
-              {tab === 'b2b' && <B2bPage />}
-              {tab === 'settings' && <SettingsPage />}
-              {tab === 'help' && <HelpPage />}
-            </main>
-          </div>
-          {/* Asistente unificado a nivel de shell: input + (en el Dashboard) menú «+» de
+                {tab === 'dashboard' && <DashboardPage onNavigate={(t) => setTab(t)} />}
+                {tab === 'sales' && <SalesHistoryPage initialStoreId={navStoreId} />}
+                {tab === 'notifications' && <NotificationsPage onResolve={{ resolveStock }} />}
+                {tab === 'catalog' && <CatalogPage initialFamilyId={navFamilyId} />}
+                {tab === 'families' && <FamiliesPage onOpenCatalogFamily={openCatalogFamily} />}
+                {tab === 'stock' && (
+                  <StockPage initialStoreId={navStoreId} initialSearch={navSearch} />
+                )}
+                {tab === 'transfers' && <TransfersPage />}
+                {tab === 'promotions' && <PromotionsPage />}
+                {tab === 'users' && <UsersPage />}
+                {tab === 'timeclock' && <TimeClockPage />}
+                {tab === 'stores' && <StoresPage onOpenStoreView={openStoreView} />}
+                {tab === 'suppliers' && <SuppliersPage />}
+                {tab === 'verifactu' && <VerifactuPage />}
+                {tab === 'b2b' && <B2bPage />}
+                {tab === 'settings' && <SettingsPage />}
+                {tab === 'help' && <HelpPage />}
+              </main>
+            </div>
+            {/* Asistente unificado a nivel de shell: input + (en el Dashboard) menú «+» de
               herramientas del lienzo. Presente en TODAS las views; el binding del lienzo lo
-              registra DashboardPage vía canvas-bridge. */}
-          <AssistantDock />
-        </PageHeaderProvider>
+              registra DashboardPage vía canvas-bridge. La vista activa define su saludo,
+              sugerencias y el contexto que viaja al backend. */}
+            <AssistantDock view={viewContextFor(tab)} />
+          </PageHeaderProvider>
+        </div>
       </div>
-    </div>
+    </PageActionsProvider>
   );
 }
 

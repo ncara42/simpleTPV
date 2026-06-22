@@ -2,6 +2,9 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
+  // La regresión visual (#211) vive en su propio config (playwright.visual.config.ts): no usa
+  // backend ni login, así que se excluye del e2e funcional.
+  testIgnore: /visual\.spec\.ts/,
   fullyParallel: false,
   retries: 0,
   workers: 1,
@@ -10,6 +13,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4174',
     trace: 'on-first-retry',
+    // Desactiva animaciones CSS (activa los guards `prefers-reduced-motion`): paneles/menús
+    // animados que, si no, no llegan a estado «stable» y hacen expirar los clics (flaky en CI).
+    reducedMotion: 'reduce',
   },
   // 'setup' hace login una vez y guarda storageState; el proyecto principal lo
   // reutiliza para no repetir login (rate limit de /auth/login 5/min/IP).

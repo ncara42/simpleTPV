@@ -45,7 +45,13 @@ export interface DataTableProps<Row> {
   sort?: DataTableSort;
   /** Se invoca con la key de la columna al pulsar una cabecera ordenable. */
   onSortChange?: (key: string) => void;
-  /** Slot de cabecera (filtros/acciones). */
+  /**
+   * Slot de cabecera del panel, POR ENCIMA del toolbar (p. ej. las pestañas de
+   * sección, que viven dentro de la card como cabecera en vez de flotar sobre el
+   * lienzo). Se recorta al radio de la card por el `overflow: hidden` de `.ui-dt`.
+   */
+  header?: React.ReactNode;
+  /** Slot de toolbar (filtros/acciones), bajo el header. */
   toolbar?: React.ReactNode;
   /** Slot de pie (totales/agregados), a la izquierda del paginador. */
   footer?: React.ReactNode;
@@ -127,6 +133,7 @@ export function DataTable<Row>({
   loading = false,
   sort,
   onSortChange,
+  header,
   toolbar,
   footer,
   pagination,
@@ -145,6 +152,7 @@ export function DataTable<Row>({
 
   return (
     <div className={cn('ui-dt', className)} data-testid={testid}>
+      {header != null && <div className="ui-dt-header">{header}</div>}
       {toolbar != null && <div className="ui-dt-toolbar">{toolbar}</div>}
 
       <div className="ui-dt-scroll">

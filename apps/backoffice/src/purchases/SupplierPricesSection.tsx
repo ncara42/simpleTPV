@@ -1,7 +1,7 @@
 import { Button, Chart, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Upload } from 'lucide-react';
-import { useState } from 'react';
+import { Plus, SlidersHorizontal, Upload } from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
@@ -10,6 +10,7 @@ import { listFamilies } from '../lib/families.js';
 import { flattenTree } from '../lib/family-tree.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { fmtEur } from '../lib/format.js';
+import { usePageActions } from '../lib/pageActions.js';
 import { readPref, usePreferences } from '../lib/preferences.js';
 import { listProducts } from '../lib/products.js';
 import { listSuppliers } from '../lib/purchases.js';
@@ -25,7 +26,10 @@ import {
 // import CSV por SKU y comparativa de precios entre proveedores por arquetipo.
 // Con `fixedSupplierId` (vista detalle de proveedor, I-18/D-07) se fija el
 // proveedor y se ocultan el selector y la comparativa (que es cross-proveedor).
-export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: string } = {}) {
+export function SupplierPricesSection({
+  fixedSupplierId,
+  tabs,
+}: { fixedSupplierId?: string; tabs?: ReactNode } = {}) {
   const qc = useQueryClient();
   const [view, setView] = useState<'tarifas' | 'comparativa'>('tarifas');
   const [supplierId, setSupplierId] = useState(fixedSupplierId ?? '');
@@ -168,56 +172,70 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
     mediana: median(e.prices),
   }));
 
+  usePageActions(
+    view === 'tarifas' ? (
+      <>
+        <button
+          type="button"
+          className="float-action-btn"
+          disabled={!supplierId}
+          onClick={() => setImporting(true)}
+          aria-label={supplierId ? 'Importar CSV' : 'Elige un proveedor para importar su tarifa'}
+          title={supplierId ? 'Importar CSV' : 'Elige un proveedor para importar su tarifa'}
+          data-testid="sp-import"
+        >
+          <Upload size={17} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className={`float-action-btn${columnsEditorOpen ? ' is-active' : ''}`}
+          onClick={toggleColumnsEditor}
+          aria-label="Ajustar columnas"
+          title="Columnas"
+          aria-expanded={columnsEditorOpen}
+          data-testid="sp-columns-toggle"
+        >
+          <SlidersHorizontal size={17} aria-hidden="true" />
+        </button>
+      </>
+    ) : null,
+  );
+
+  // Cabecera de la card: pestañas de página (Proveedores/Tarifas/…) + las sub-vistas
+  // de tarifas (por proveedor / comparativa), apiladas DENTRO del panel en vez de
+  // flotar sobre el lienzo. En la vista detalle de proveedor (fixedSupplierId) no hay
+  // ni pestañas de página ni sub-vistas → null (sin cabecera).
+  const cardHeader = fixedSupplierId ? null : (
+    <>
+      {tabs}
+      <nav className="bo-tabs" data-testid="sp-view-tabs">
+        <button
+          className={`bo-tab ${view === 'tarifas' ? 'active' : ''}`}
+          onClick={() => setView('tarifas')}
+          data-testid="sp-view-tarifas"
+        >
+          Tarifas por proveedor
+        </button>
+        <button
+          className={`bo-tab ${view === 'comparativa' ? 'active' : ''}`}
+          onClick={() => setView('comparativa')}
+          data-testid="sp-view-comparativa"
+        >
+          Comparativa
+        </button>
+      </nav>
+    </>
+  );
+
   return (
     <section className="catalog">
-      {!fixedSupplierId && (
-        <nav className="bo-tabs" data-testid="sp-view-tabs">
-          <button
-            className={`bo-tab ${view === 'tarifas' ? 'active' : ''}`}
-            onClick={() => setView('tarifas')}
-            data-testid="sp-view-tarifas"
-          >
-            Tarifas por proveedor
-          </button>
-          <button
-            className={`bo-tab ${view === 'comparativa' ? 'active' : ''}`}
-            onClick={() => setView('comparativa')}
-            data-testid="sp-view-comparativa"
-          >
-            Comparativa
-          </button>
-        </nav>
-      )}
-
       {view === 'tarifas' ? (
         <>
           {columnsEditor}
 
-          <div className="table-actions">
-            <button
-              type="button"
-              className="icon-btn"
-              disabled={!supplierId}
-              title={supplierId ? 'Importar CSV' : 'Elige un proveedor para importar su tarifa'}
-              aria-label="Importar CSV"
-              onClick={() => setImporting(true)}
-              data-testid="sp-import"
-            >
-              <Upload size={18} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="ui-dt-cols-trigger"
-              onClick={toggleColumnsEditor}
-              data-testid="sp-columns-toggle"
-              aria-expanded={columnsEditorOpen}
-            >
-              Columnas
-            </button>
-          </div>
-
           <div className="table-panel">
             <DataTable
+              header={cardHeader}
               columns={[...effectiveColumns, deleteColumn]}
               rows={priceSorted}
               rowKey={(r) => r.id}
@@ -271,6 +289,7 @@ export function SupplierPricesSection({ fixedSupplierId }: { fixedSupplierId?: s
       ) : (
         <>
           <div className="table-panel">
+            {cardHeader}
             <div className="table-toolbar">
               <div className="sales-filters">
                 <Select

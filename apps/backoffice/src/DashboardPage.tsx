@@ -1058,8 +1058,11 @@ export function DashboardPage({
       {/* D-20: el dashboard es siempre un lienzo libre (edgeless). Sus propias herramientas
           (paleta de widgets, dibujo, deshacer, minimapa…) viven dentro de FreeBoard. El nombre de
           la view y el dock del asistente los pone el shell (ver App.tsx / AssistantDock). */}
+      {/* `FreeBoard` siembra su estado interno desde `elements` SOLO al montar. Si monta antes de
+          que el store hidrate las preferencias, arranca vacío y no se re-sincroniza. Incluir
+          `hydrated` en la key lo re-monta una vez al hidratar, ya con el lienzo guardado. */}
       <FreeBoard
-        key={preset.id}
+        key={`${preset.id}:${hydrated}`}
         ref={freeBoardRef}
         elements={savedFree}
         renderItem={renderItem}
@@ -1195,7 +1198,7 @@ function ChartKindToggle({
 }) {
   return (
     <div
-      className="dash-preset-switch dash-chart-kind"
+      className="dash-chart-kind"
       role="tablist"
       aria-label="Tipo de gráfico"
       data-testid="dash-chart-kind"

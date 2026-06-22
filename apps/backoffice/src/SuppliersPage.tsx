@@ -13,42 +13,47 @@ type Section = 'suppliers' | 'prices' | 'orders' | 'suggest';
 export function SuppliersPage() {
   const [section, setSection] = useState<Section>('suppliers');
   usePageHeader('Proveedores', 'Proveedores, tarifas de compra, pedidos de compra y propuesta');
+  // Las pestañas viven DENTRO de la card de la sección activa (cabecera del panel),
+  // no flotando sobre el lienzo. El estado sigue aquí; cada sección las pinta en su
+  // card (slot `header` del DataTable o primer hijo de su `.table-panel`).
+  const tabs = (
+    <nav className="bo-tabs" data-testid="suppliers-subtabs">
+      <button
+        className={`bo-tab ${section === 'suppliers' ? 'active' : ''}`}
+        onClick={() => setSection('suppliers')}
+        data-testid="suppliers-tab-suppliers"
+      >
+        Proveedores
+      </button>
+      <button
+        className={`bo-tab ${section === 'prices' ? 'active' : ''}`}
+        onClick={() => setSection('prices')}
+        data-testid="suppliers-tab-prices"
+      >
+        Tarifas de compra
+      </button>
+      <button
+        className={`bo-tab ${section === 'orders' ? 'active' : ''}`}
+        onClick={() => setSection('orders')}
+        data-testid="suppliers-tab-orders"
+      >
+        Pedidos de compra
+      </button>
+      <button
+        className={`bo-tab ${section === 'suggest' ? 'active' : ''}`}
+        onClick={() => setSection('suggest')}
+        data-testid="suppliers-tab-suggest"
+      >
+        Propuesta
+      </button>
+    </nav>
+  );
   return (
     <section className="catalog" data-testid="suppliers-page">
-      <nav className="bo-tabs" data-testid="suppliers-subtabs">
-        <button
-          className={`bo-tab ${section === 'suppliers' ? 'active' : ''}`}
-          onClick={() => setSection('suppliers')}
-          data-testid="suppliers-tab-suppliers"
-        >
-          Proveedores
-        </button>
-        <button
-          className={`bo-tab ${section === 'prices' ? 'active' : ''}`}
-          onClick={() => setSection('prices')}
-          data-testid="suppliers-tab-prices"
-        >
-          Tarifas de compra
-        </button>
-        <button
-          className={`bo-tab ${section === 'orders' ? 'active' : ''}`}
-          onClick={() => setSection('orders')}
-          data-testid="suppliers-tab-orders"
-        >
-          Pedidos de compra
-        </button>
-        <button
-          className={`bo-tab ${section === 'suggest' ? 'active' : ''}`}
-          onClick={() => setSection('suggest')}
-          data-testid="suppliers-tab-suggest"
-        >
-          Propuesta
-        </button>
-      </nav>
-      {section === 'suppliers' && <SuppliersSection />}
-      {section === 'prices' && <SupplierPricesSection />}
-      {section === 'orders' && <PurchaseOrdersSection />}
-      {section === 'suggest' && <SuggestSection />}
+      {section === 'suppliers' && <SuppliersSection tabs={tabs} />}
+      {section === 'prices' && <SupplierPricesSection tabs={tabs} />}
+      {section === 'orders' && <PurchaseOrdersSection tabs={tabs} />}
+      {section === 'suggest' && <SuggestSection tabs={tabs} />}
     </section>
   );
 }

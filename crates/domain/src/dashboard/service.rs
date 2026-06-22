@@ -583,9 +583,10 @@ pub async fn sales_by_employee(
     .await
 }
 
-/// Ventas por tienda (#224): facturación, ticket medio, margen real (€) y nº de ventas, por
-/// tienda. Incluye TODAS las tiendas de la org (LEFT JOIN → cero ventas en 0) para identificar
-/// al rezagado. RLS via `with_tenant_tx`; `$4` acota opcionalmente a una sola tienda.
+/// Desglose por tienda (#224): facturación, nº de tickets, ticket medio y margen real
+/// por tienda, de mayor a menor facturación. Incluye tiendas SIN ventas (LEFT JOIN desde
+/// `Store`) para que el rezagado aparezca. El margen se agrega aparte (JOIN con `SaleLine`)
+/// para no inflar la facturación por el fan-out de líneas, igual que en `sales_kpis`.
 pub async fn sales_by_store(
     pool: &PgPool,
     org: Uuid,
@@ -593,28 +594,18 @@ pub async fn sales_by_store(
     store_id: Option<Uuid>,
 ) -> Result<Vec<SalesByStoreItem>, AppError> {
     with_tenant_tx(pool, org, async move |tx, _after| {
-        let rows: Vec<(Uuid, String, Decimal, i64, Decimal)> = sqlx::query_as(
+        // A) Facturación + nº de tickets por tienda (sin SaleLine → sin fan-out).
+        let sales_rows: Vec<(Uuid, String, i64, Decimal)> = sqlx::query_as(
             r#"SELECT s.id AS store_id, s.name AS store_name,
-                 COALESCE(sa.revenue, 0) AS revenue,
-                 COALESCE(sa.cnt, 0) AS cnt,
-                 COALESCE(ml.margin, 0) AS margin
+                 COUNT(sa.id) AS sales_count,
+                 COALESCE(SUM(sa.total), 0) AS revenue
                FROM "Store" s
-               LEFT JOIN (
-                 SELECT "storeId", SUM(total) AS revenue, COUNT(*) AS cnt
-                   FROM "Sale"
-                   WHERE "organizationId" = $1 AND status = 'COMPLETED'::"SaleStatus"
-                     AND "createdAt" >= $2 AND "createdAt" < $3
-                   GROUP BY "storeId"
-               ) sa ON sa."storeId" = s.id
-               LEFT JOIN (
-                 SELECT sa2."storeId",
-                     SUM(sl."lineTotal" - sl."costPrice" * sl.qty) AS margin
-                   FROM "SaleLine" sl JOIN "Sale" sa2 ON sa2.id = sl."saleId"
-                   WHERE sa2."organizationId" = $1 AND sa2.status = 'COMPLETED'::"SaleStatus"
-                     AND sa2."createdAt" >= $2 AND sa2."createdAt" < $3
-                   GROUP BY sa2."storeId"
-               ) ml ON ml."storeId" = s.id
-               WHERE s."organizationId" = $1 AND ($4::uuid IS NULL OR s.id = $4)
+               LEFT JOIN "Sale" sa ON sa."storeId" = s.id AND sa."organizationId" = $1
+                 AND sa.status = 'COMPLETED'::"SaleStatus"
+                 AND sa."createdAt" >= $2 AND sa."createdAt" < $3
+               WHERE s."organizationId" = $1 AND s.active = true
+                 AND ($4::uuid IS NULL OR s.id = $4)
+               GROUP BY s.id, s.name
                ORDER BY revenue DESC, s.name ASC"#,
         )
         .bind(org)
@@ -623,17 +614,50 @@ pub async fn sales_by_store(
         .bind(store_id)
         .fetch_all(&mut **tx)
         .await?;
-        Ok(rows
+
+        // B) Margen real por tienda (ΣlineTotal − costPrice·qty) y base de margen (ΣlineTotal).
+        let margin_rows: Vec<(Uuid, Decimal, Decimal)> = sqlx::query_as(
+            r#"SELECT sa."storeId" AS store_id,
+                 COALESCE(SUM(sl."lineTotal" - sl."costPrice" * sl.qty), 0) AS margin,
+                 COALESCE(SUM(sl."lineTotal"), 0) AS margin_base
+               FROM "SaleLine" sl JOIN "Sale" sa ON sa.id = sl."saleId"
+               WHERE sa."organizationId" = $1 AND sa.status = 'COMPLETED'::"SaleStatus"
+                 AND sa."createdAt" >= $2 AND sa."createdAt" < $3
+                 AND ($4::uuid IS NULL OR sa."storeId" = $4)
+               GROUP BY sa."storeId""#,
+        )
+        .bind(org)
+        .bind(range.from)
+        .bind(range.to)
+        .bind(store_id)
+        .fetch_all(&mut **tx)
+        .await?;
+        let margin_by: std::collections::HashMap<Uuid, (f64, f64)> = margin_rows
             .into_iter()
-            .map(|(store_id, store_name, revenue, cnt, margin)| {
+            .map(|(sid, margin, base)| (sid, (f(margin), f(base))))
+            .collect();
+
+        Ok(sales_rows
+            .into_iter()
+            .map(|(store_id, store_name, sales_count, revenue)| {
                 let revenue = f(revenue);
+                let (margin, margin_base) = margin_by.get(&store_id).copied().unwrap_or((0.0, 0.0));
                 SalesByStoreItem {
                     store_id,
                     store_name,
                     revenue,
-                    avg_ticket: if cnt > 0 { revenue / cnt as f64 } else { 0.0 },
-                    margin: f(margin),
-                    sales_count: cnt,
+                    sales_count,
+                    avg_ticket: if sales_count > 0 {
+                        revenue / sales_count as f64
+                    } else {
+                        0.0
+                    },
+                    margin,
+                    margin_pct: if margin_base > 0.0 {
+                        margin / margin_base
+                    } else {
+                        0.0
+                    },
                 }
             })
             .collect())

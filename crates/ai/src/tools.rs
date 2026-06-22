@@ -18,6 +18,7 @@ pub const PIECES: &[&str] = &[
     "rankBarList",
     "segmentBar",
     "progressMeter",
+    "stockAlertList",
     "dataGrid",
 ];
 const KPI_PIECES: &[&str] = &["kpiTile"];
@@ -29,6 +30,7 @@ const CHART_PIECES: &[&str] = &[
     "rankBarList",
     "segmentBar",
     "progressMeter",
+    "stockAlertList",
     "dataGrid",
 ];
 pub const RECIPES: &[&str] = &[
@@ -38,7 +40,14 @@ pub const RECIPES: &[&str] = &[
     "heroChart+sideStats",
     "tableFull",
 ];
-pub const FORMATS: &[&str] = &["eur", "percent", "decimal", "units", "integer"];
+pub const FORMATS: &[&str] = &[
+    "eur",
+    "percent",
+    "percentRatio",
+    "decimal",
+    "units",
+    "integer",
+];
 pub const WIDGETABLE_ENDPOINTS: &[&str] = &[
     "/dashboard/sales-by-family",
     "/dashboard/sales-by-hour",
@@ -62,6 +71,9 @@ pub const BLOCK_IDS: &[&str] = &[
     "block:product-ranking",
     "block:top-margin",
     "block:dead-stock",
+    "block:profitability",
+    "block:discount-control",
+    "block:sales-mix",
     "block:store-comparison",
 ];
 
@@ -96,7 +108,7 @@ pub fn canvas_tools() -> Vec<Value> {
                     "properties": {
                         "widget_id": {
                             "type": "string",
-                            "description": "ID del widget. Bloques: 'block:sales-overview', 'block:stock-risk', 'block:staff-performance', 'block:product-ranking', 'block:top-margin', 'block:dead-stock', 'block:store-comparison'. Catálogo: 'kpi-today', 'dash-bars', etc. Panel a medida: 'gen:panel'."
+                            "description": "ID del widget. Bloques (un panel entero ya diseñado, PREFIÉRELOS): 'block:sales-overview', 'block:stock-risk', 'block:staff-performance', 'block:product-ranking', 'block:top-margin', 'block:dead-stock', 'block:profitability', 'block:discount-control', 'block:sales-mix', 'block:store-comparison'. Catálogo (1 métrica): 'kpi-today', 'dash-bars', etc. Panel a medida (si ningún bloque encaja): 'gen:panel'."
                         },
                         "position": {
                             "type": "string",
@@ -114,7 +126,7 @@ pub fn canvas_tools() -> Vec<Value> {
                         },
                         "element_id": {
                             "type": "string",
-                            "description": "ID único del elemento en el lienzo (UUID generado por el agente). Requerido para que el frontend pueda deshacer la operación."
+                            "description": "Identificador único del elemento en el lienzo (cualquier cadena única basta, p. ej. 'kpi-rev-1'; no hace falta un UUID real). Requerido para que el frontend pueda deshacer la operación."
                         },
                         "generic_spec": {
                             "type": "object",
@@ -411,6 +423,42 @@ pub fn admin_only_tools() -> Vec<Value> {
                         "product_id": { "type": "string" }
                     },
                     "required": ["product_id"]
+                }
+            }
+        }),
+    ]
+}
+
+// Tools de pantalla: NO modifican datos ni el lienzo. El backend las reenvía al frontend como
+// evento `view_action` (igual que las canvas ops) para que actúe sobre la vista actual del
+// backoffice (scroll + resaltado, o filtrar el listado). Solo se ofrecen fuera del dashboard.
+pub fn view_action_tools() -> Vec<Value> {
+    vec![
+        json!({
+            "type": "function",
+            "function": {
+                "name": "highlight_on_view",
+                "description": "Localiza en la pantalla actual el elemento, sección, columna o dato cuyo texto o rótulo coincide con `target`, hace scroll hasta él y lo resalta unos segundos. Úsalo cuando el usuario pregunte dónde está algo o te pida que se lo señales (p. ej. «¿dónde veo el SKU?», «enséñame el botón de exportar»).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "target": { "type": "string", "description": "Texto o rótulo visible a localizar (nombre de columna, botón, sección, KPI, etc.). Usa las mismas palabras que aparecen en pantalla." }
+                    },
+                    "required": ["target"]
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "filter_view",
+                "description": "Escribe `query` en el buscador de la vista actual para filtrar el listado (por nombre, SKU, código, etc.). Úsalo cuando el usuario pida ver u ocultar filas según un texto. No sirve para cambiar de vista ni para filtros que no sean el buscador de texto.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": { "type": "string", "description": "Texto a escribir en el buscador. Cadena vacía para limpiar el filtro." }
+                    },
+                    "required": ["query"]
                 }
             }
         }),

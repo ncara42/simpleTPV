@@ -1,11 +1,13 @@
 import { useCanvasBridge } from '../../lib/canvas-bridge.js';
-import type { CanvasOp } from '../../lib/chat.js';
+import type { CanvasOp, ViewActionName } from '../../lib/chat.js';
 import {
   buildCanvasSnapshot,
   genericElementId,
   useDashboardStore,
 } from '../../lib/dashboard-store.js';
 import { ChatDock } from './ChatDock.js';
+import { executeViewAction } from './view-actions.js';
+import type { ViewContext } from './view-context.js';
 
 // Dock del asistente a nivel de shell: visible en TODAS las views. Las canvas_ops del agente se
 // aplican SIEMPRE sobre el dashboard-store (no dependen de tener el FreeBoard montado), así el
@@ -27,7 +29,7 @@ const undoCanvasOps = (ops: CanvasOp[]): void => {
   }
 };
 
-export function AssistantDock() {
+export function AssistantDock({ view }: { view: ViewContext }) {
   const binding = useCanvasBridge((s) => s.binding);
   return (
     <ChatDock
@@ -35,6 +37,8 @@ export function AssistantDock() {
       onCanvasOp={applyCanvasOp}
       onUndoCanvasOps={undoCanvasOps}
       getCanvasState={buildCanvasSnapshot}
+      onViewAction={(action, args) => executeViewAction(action as ViewActionName, args)}
+      view={view}
     />
   );
 }

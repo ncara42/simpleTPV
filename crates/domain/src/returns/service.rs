@@ -15,6 +15,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::feature_flags::assert_flag_enabled;
+use crate::sales::{build_tax_breakdown, TaxLine};
 use crate::stock::service::apply_batched_return;
 use crate::store_access::has_store_access;
 use crate::verifactu::record_rectification;
@@ -36,6 +37,8 @@ struct SaleLineRow {
     qty: Decimal,
     line_total: Decimal,
     product_id: Uuid,
+    /// IVA congelado de la línea original (para la cuota del rectificativo).
+    tax_rate: Decimal,
 }
 
 /// `POST /returns` — devolución parcial/total contra un ticket de venta.
@@ -75,7 +78,8 @@ pub async fn create(
 
         // Líneas de la venta (por id) y lo ya devuelto por línea.
         let sale_lines: Vec<SaleLineRow> = sqlx::query_as(
-            r#"SELECT id, qty, "lineTotal" AS line_total, "productId" AS product_id
+            r#"SELECT id, qty, "lineTotal" AS line_total, "productId" AS product_id,
+                      "taxRate" AS tax_rate
                FROM "SaleLine" WHERE "saleId" = $1"#,
         )
         .bind(input.sale_id)
@@ -101,6 +105,7 @@ pub async fn create(
             product_id: Uuid,
             qty: Decimal,
             line_total: Decimal,
+            tax_rate: Decimal,
         }
         let mut resolved = Vec::with_capacity(input.lines.len());
         for l in &input.lines {
@@ -121,6 +126,7 @@ pub async fn create(
                 product_id: sale_line.product_id,
                 qty: l.qty,
                 line_total,
+                tax_rate: sale_line.tax_rate,
             });
         }
         let total: Decimal = resolved
@@ -178,9 +184,19 @@ pub async fn create(
             .await?;
         }
 
+        // Desglose de IVA de lo devuelto (sin descuento de ticket: el `line_total`
+        // ya es el neto proporcional) → cuota del abono que entra en la huella.
+        let tax_lines: Vec<TaxLine> = resolved
+            .iter()
+            .map(|r| TaxLine {
+                tax_rate: r.tax_rate,
+                line_total: r.line_total,
+            })
+            .collect();
+        let tax_breakdown = build_tax_breakdown(&tax_lines, Decimal::ZERO);
         // Registro VeriFactu rectificativo (SEC-07): referencia el ticket de la
         // venta original. En la misma tx → atómico con la devolución.
-        record_rectification(tx, org, return_id, &ticket_number, total).await?;
+        record_rectification(tx, org, return_id, &ticket_number, total, &tax_breakdown).await?;
 
         Ok(Ok(ReturnWithLines { return_: return_row, lines }))
     })
@@ -336,28 +352,33 @@ pub async fn create_blind(
     with_tenant_tx(pool, org, async move |tx, _after| {
         // Precios actuales (fuente del importe en devoluciones ciegas).
         let product_ids: Vec<Uuid> = input.lines.iter().map(|l| l.product_id).collect();
-        let prices: Vec<(Uuid, Decimal)> = sqlx::query_as(
-            r#"SELECT id, "salePrice" FROM "Product" WHERE id = ANY($1)"#,
+        let prices: Vec<(Uuid, Decimal, Decimal)> = sqlx::query_as(
+            r#"SELECT id, "salePrice", "taxRate" FROM "Product" WHERE id = ANY($1)"#,
         )
         .bind(&product_ids)
         .fetch_all(&mut **tx)
         .await?;
-        let price_by: HashMap<Uuid, Decimal> = prices.into_iter().collect();
+        let price_by: HashMap<Uuid, (Decimal, Decimal)> = prices
+            .into_iter()
+            .map(|(id, price, tax)| (id, (price, tax)))
+            .collect();
 
         struct Resolved {
             product_id: Uuid,
             qty: Decimal,
             line_total: Decimal,
+            tax_rate: Decimal,
         }
         let mut resolved = Vec::with_capacity(input.lines.len());
         for l in &input.lines {
-            let Some(price) = price_by.get(&l.product_id) else {
+            let Some(&(price, tax_rate)) = price_by.get(&l.product_id) else {
                 return Ok(Err(AppError::BadRequest)); // producto inexistente
             };
             resolved.push(Resolved {
                 product_id: l.product_id,
                 qty: l.qty,
                 line_total: (price * l.qty).round_dp(2),
+                tax_rate,
             });
         }
         let total: Decimal = resolved.iter().map(|r| r.line_total).sum::<Decimal>().round_dp(2);
@@ -409,10 +430,19 @@ pub async fn create_blind(
             .await?;
         }
 
+        // Desglose de IVA de lo devuelto (tipos de los productos) → cuota del abono.
+        let tax_lines: Vec<TaxLine> = resolved
+            .iter()
+            .map(|r| TaxLine {
+                tax_rate: r.tax_rate,
+                line_total: r.line_total,
+            })
+            .collect();
+        let tax_breakdown = build_tax_breakdown(&tax_lines, Decimal::ZERO);
         // Registro VeriFactu rectificativo (SEC-07): sin factura original (ciega),
         // referencia el id de la devolución. Atómico con la devolución.
         let invoice = format!("BLIND-{return_id}");
-        record_rectification(tx, org, return_id, &invoice, total).await?;
+        record_rectification(tx, org, return_id, &invoice, total, &tax_breakdown).await?;
 
         Ok(Ok(ReturnWithLines { return_: return_row, lines }))
     })

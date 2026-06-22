@@ -1,0 +1,30 @@
+{
+  "name": "@simpletpv/mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage --coverage.reporter=json-summary --coverage.reporter=text"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
+    "jose": "^6.1.3",
+    "redis": "^4.7.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^4.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.0"
+  }
+}

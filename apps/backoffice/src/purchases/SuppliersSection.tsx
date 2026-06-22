@@ -1,20 +1,20 @@
 import type { Supplier } from '@simpletpv/auth';
 import { Button, DataTable, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
-import { useState } from 'react';
+import { Download, Plus, Upload } from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 
-import { CsvActionButton } from '../components/CsvActionButton.js';
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
 import { exportRowsToCsv, importRowsViaCreate } from '../lib/csv.js';
 import { formErrorMessage } from '../lib/form-error.js';
+import { usePageActions } from '../lib/pageActions.js';
 import { createSupplier, deleteSupplier, listSuppliers, updateSupplier } from '../lib/purchases.js';
 import { OrdersSection } from './OrdersSection.js';
 import { SupplierFormModal } from './SupplierFormModal.js';
 import { SupplierPricesSection } from './SupplierPricesSection.js';
 
-export function SuppliersSection() {
+export function SuppliersSection({ tabs }: { tabs?: ReactNode }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
@@ -40,9 +40,6 @@ export function SuppliersSection() {
   });
 
   const detail = detailId ? suppliers.find((s) => s.id === detailId) : null;
-  if (detail) {
-    return <SupplierDetail supplier={detail} onBack={() => setDetailId(null)} />;
-  }
 
   const term = search.trim().toLowerCase();
   const filtered = term ? suppliers.filter((s) => s.name.toLowerCase().includes(term)) : suppliers;
@@ -70,16 +67,41 @@ export function SuppliersSection() {
       createSupplier,
     );
 
+  // Regla de hooks: usePageActions debe llamarse SIEMPRE, no tras el return de la vista detalle.
+  // Las acciones (export/import) son del listado; en detalle se registra `null` (sin acciones).
+  usePageActions(
+    detail ? null : (
+      <>
+        <button
+          type="button"
+          className="float-action-btn"
+          onClick={handleExport}
+          aria-label="Exportar CSV"
+          title="Exportar CSV"
+          data-testid="suppliers-export"
+        >
+          <Download size={17} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="float-action-btn"
+          onClick={() => setImporting(true)}
+          aria-label="Importar CSV"
+          title="Importar CSV"
+          data-testid="suppliers-import"
+        >
+          <Upload size={17} aria-hidden="true" />
+        </button>
+      </>
+    ),
+  );
+
+  if (detail) {
+    return <SupplierDetail supplier={detail} onBack={() => setDetailId(null)} />;
+  }
+
   return (
     <>
-      <div className="table-actions">
-        <CsvActionButton kind="export" onClick={handleExport} testId="suppliers-export" />
-        <CsvActionButton
-          kind="import"
-          onClick={() => setImporting(true)}
-          testId="suppliers-import"
-        />
-      </div>
       {/* Fila clicable → vista detalle (I-18); las acciones no propagan (stopPropagation). */}
       <DataTable
         data-testid="suppliers-table"
@@ -89,6 +111,7 @@ export function SuppliersSection() {
         loading={isLoading}
         rowClassName={() => 'row-clickable'}
         onRowClick={(s) => setDetailId(s.id)}
+        header={tabs}
         toolbar={
           <div className="users-toolbar">
             <div className="sales-filters">

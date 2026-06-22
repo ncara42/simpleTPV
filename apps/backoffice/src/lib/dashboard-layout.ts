@@ -248,6 +248,7 @@ export type PieceId =
   | 'rankBarList'
   | 'segmentBar'
   | 'progressMeter'
+  | 'stockAlertList'
   | 'dataGrid';
 
 // Receta cerrada: dicta el grid-template (ancho/alto/gutter), no el agente.
@@ -264,7 +265,8 @@ export type SlotName = 'kpis' | 'charts';
 export type PanelDensity = 'compact' | 'comfortable';
 
 // Formato es-ES de una cifra (enum; el agente nunca toca el formateo, lo hornea la pieza).
-export type PieceFormat = 'eur' | 'percent' | 'decimal' | 'units' | 'integer';
+// `percentRatio` = fracción 0..1 que se multiplica ×100 (las tasas del dashboard llegan así, #208).
+export type PieceFormat = 'eur' | 'percent' | 'percentRatio' | 'decimal' | 'units' | 'integer';
 
 // Columna de un dataGrid: campo + etiqueta legible + formato/alineación opcionales.
 export interface DataGridColumnSpec {

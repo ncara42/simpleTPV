@@ -1,7 +1,7 @@
 import { Badge, Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowUpRight } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { sileo } from 'sileo';
 
 import { Modal } from '../components/Modal.js';
@@ -279,7 +279,7 @@ function OrderDetailModal({ orderId, onClose }: { orderId: string; onClose: () =
   );
 }
 
-export function OrdersSection() {
+export function OrdersSection({ tabs }: { tabs?: ReactNode }) {
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
   const [creating, setCreating] = useState(false);
@@ -295,6 +295,7 @@ export function OrdersSection() {
 
   return (
     <div className="table-panel" data-testid="b2b-orders">
+      {tabs}
       <SectionToolbar
         actionLabel="Nuevo pedido"
         onAction={() => setCreating(true)}

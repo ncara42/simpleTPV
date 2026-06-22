@@ -13,6 +13,7 @@ import { Context } from './Context.js';
 import { ModelEffortMenu } from './ModelEffortMenu.js';
 import { PromptComposer } from './PromptComposer.js';
 import { type CanvasApplyResult, useChat } from './useChat.js';
+import type { ViewContext } from './view-context.js';
 
 export interface ChatDockProps {
   /**
@@ -27,6 +28,10 @@ export interface ChatDockProps {
   onUndoCanvasOps?: (ops: CanvasOp[]) => void;
   /** Snapshot fresco del lienzo para el system prompt del agente. */
   getCanvasState?: () => unknown;
+  /** Ejecuta una acción de pantalla del agente fuera del dashboard (scroll/resaltar/filtrar). */
+  onViewAction?: (action: string, args: unknown) => void;
+  /** Vista activa del backoffice: define saludo, sugerencias y el contexto enviado al backend. */
+  view: ViewContext;
 }
 
 /**
@@ -41,12 +46,21 @@ export function ChatDock({
   onCanvasOp,
   onUndoCanvasOps,
   getCanvasState,
+  onViewAction,
+  view,
 }: ChatDockProps) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const dockRef = useRef<HTMLDivElement>(null);
 
-  const chat = useChat({ enabled: true, onCanvasOp, onUndoCanvasOps, getCanvasState });
+  const chat = useChat({
+    enabled: true,
+    onCanvasOp,
+    onUndoCanvasOps,
+    getCanvasState,
+    onViewAction,
+    view: { id: view.id, label: view.label },
+  });
 
   // Cierra el popover de conversación al pulsar Escape o al hacer clic FUERA del dock (panel +
   // input). El dock (la barra inferior) es permanente: clicar el input no lo cierra; clicar el
@@ -153,6 +167,8 @@ export function ChatDock({
               onRegenerate={chat.regenerate}
               onEditAndResend={chat.editAndResend}
               onSuggest={handleSend}
+              greeting={view.greeting}
+              suggestions={view.suggestions}
             />
           )}
 

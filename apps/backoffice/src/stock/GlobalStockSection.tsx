@@ -8,15 +8,16 @@ import {
   Select,
 } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Download, SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
 
-import { CsvActionButton } from '../components/CsvActionButton.js';
 import { Modal } from '../components/Modal.js';
 import { useTableColumns } from '../components/useTableColumns.js';
 import { listStores } from '../lib/admin.js';
 import { exportRowsToCsv } from '../lib/csv.js';
 import { listFamilies } from '../lib/families.js';
 import { formErrorMessage } from '../lib/form-error.js';
+import { usePageActions } from '../lib/pageActions.js';
 import { adjustStock, getGlobalStock, listAlerts, setMinStock } from '../lib/stock.js';
 import { ALERT_LABEL, LEVEL_LABEL, ROTATION_LABEL } from './labels.js';
 
@@ -261,6 +262,34 @@ export function GlobalStockSection({
     exportRowsToCsv('stock.csv', headers, rows);
   };
 
+  // Export + toggle de columnas en el clúster flotante (junto al conmutador
+  // Backoffice↔TPV), no en una banda propia sobre la tabla.
+  usePageActions(
+    <>
+      <button
+        type="button"
+        className="float-action-btn"
+        onClick={handleExport}
+        aria-label="Exportar stock"
+        title="Exportar stock"
+        data-testid="stock-export"
+      >
+        <Download size={17} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className={`float-action-btn${columnsEditorOpen ? ' is-active' : ''}`}
+        onClick={toggleColumnsEditor}
+        aria-label="Ajustar columnas"
+        title="Columnas"
+        aria-expanded={columnsEditorOpen}
+        data-testid="stock-columns-toggle"
+      >
+        <SlidersHorizontal size={17} aria-hidden="true" />
+      </button>
+    </>,
+  );
+
   return (
     <>
       {/* U-10: los avisos de roturas viven en su PROPIO panel, encima de la tabla
@@ -295,19 +324,6 @@ export function GlobalStockSection({
       )}
 
       {columnsEditor}
-
-      <div className="table-actions">
-        <CsvActionButton kind="export" onClick={handleExport} testId="stock-export" />
-        <button
-          type="button"
-          className="ui-dt-cols-trigger"
-          onClick={toggleColumnsEditor}
-          data-testid="stock-columns-toggle"
-          aria-expanded={columnsEditorOpen}
-        >
-          Columnas
-        </button>
-      </div>
 
       <div className="table-panel">
         <DataTable

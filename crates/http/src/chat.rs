@@ -22,7 +22,34 @@ use crate::state::AppState;
 
 const MGMT_ROLES: [Role; 2] = [Role::Admin, Role::Manager];
 
+/// Nombres de las herramientas de lienzo: el backend las reenvía al frontend como `canvas_op`
+/// (no las ejecuta) y, fuera del dashboard, las retira de la lista que ve el LLM.
+const CANVAS_OP_NAMES: [&str; 8] = [
+    "add_widget",
+    "add_shape",
+    "add_text",
+    "add_note",
+    "add_insight",
+    "remove_element",
+    "arrange",
+    "clear_canvas",
+];
+
+/// Nombres de las herramientas de pantalla: el backend las reenvía al frontend como `view_action`
+/// (no las ejecuta) para actuar sobre la vista actual. Solo se ofrecen fuera del dashboard.
+const VIEW_ACTION_NAMES: [&str; 2] = ["highlight_on_view", "filter_view"];
+
 // ── Tipos de request / response ───────────────────────────────────────────────
+
+/// Vista del backoffice donde está el usuario (id + etiqueta del sidebar). Acota el system
+/// prompt y, fuera del dashboard, hace que el agente no reciba las herramientas de lienzo.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewContext {
+    pub id: String,
+    #[serde(default)]
+    pub label: String,
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -38,6 +65,10 @@ pub struct StreamChatBody {
     /// stale. Forma libre: `{ mode, elements: [{ id, label, x?, y? }], totalElements }`.
     #[serde(default)]
     pub canvas_state: Option<serde_json::Value>,
+    /// Vista activa del backoffice. Ausente ⇒ se asume dashboard (compatibilidad). Fuera del
+    /// dashboard el agente solo informa: se le retiran las herramientas de lienzo.
+    #[serde(default)]
+    pub view_context: Option<ViewContext>,
 }
 
 fn default_effort() -> String {
@@ -134,18 +165,47 @@ pub async fn stream(
 
     // Construir ChatRequest
     let effort = parse_effort(&body.effort);
-    let tools = if is_admin {
+    // Solo el Dashboard compone el tablero. Fuera de él (ausencia de vista ⇒ dashboard por
+    // compat) el agente solo informa: se le retiran las herramientas de lienzo.
+    let is_dashboard = body
+        .view_context
+        .as_ref()
+        .is_none_or(|v| v.id == "dashboard");
+    let mut tools = if is_admin {
         simpletpv_ai::tools::all_tools_for_admin()
     } else {
         simpletpv_ai::tools::all_tools_for_manager()
     };
+    if !is_dashboard {
+        // Fuera del dashboard: el agente no compone el tablero (se retiran las canvas ops) pero sí
+        // puede actuar sobre la pantalla actual (scroll/resaltar/filtrar).
+        tools.retain(|t| {
+            let name = t
+                .get("function")
+                .and_then(|f| f.get("name"))
+                .and_then(|n| n.as_str());
+            name.is_none_or(|n| !CANVAS_OP_NAMES.contains(&n))
+        });
+        tools.extend(simpletpv_ai::tools::view_action_tools());
+    }
 
     // System prompt dinámico (F5): contexto de la organización + catálogo de widgets + tools
-    // por rol + allowlist de endpoints + estado actual del lienzo (fresco, del body).
+    // por rol + allowlist de endpoints + estado actual del lienzo (fresco, del body). Fuera del
+    // dashboard se acota a un prompt informativo de la vista activa.
     let org_ctx = chat::load_org_context(pool, org)
         .await
         .map_err(ApiError::from)?;
-    let system = chat::build_system_prompt(&org_ctx, is_admin, body.canvas_state.as_ref());
+    let (view_id, view_label) = match body.view_context.as_ref() {
+        Some(v) => (Some(v.id.as_str()), Some(v.label.as_str())),
+        None => (None, None),
+    };
+    let system = chat::build_system_prompt(
+        &org_ctx,
+        is_admin,
+        body.canvas_state.as_ref(),
+        view_id,
+        view_label,
+    );
 
     let messages = build_chat_messages(&history);
     let req = simpletpv_ai::event::ChatRequest {
@@ -194,6 +254,13 @@ fn run_agent_stream(
         let mut total_input = 0u32;
         let mut total_output = 0u32;
         let mut tool_rounds = 0usize;
+        // Métrica de calidad del agente v2 (#210): nº de tool-calls e iteraciones por turno, por
+        // categoría. Se emiten al cerrar el turno (target `chat_metrics`) para medir sobre sesiones
+        // reales el coste de tool-calling de la superficie v2 (block:/gen:panel).
+        let mut total_tool_calls = 0usize;
+        let mut total_canvas_ops = 0usize;
+        let mut total_view_actions = 0usize;
+        let mut total_data_tools = 0usize;
 
         loop {
             let llm_stream = match stream_chat(&ai_config, req.clone()) {
@@ -247,6 +314,8 @@ fn run_agent_stream(
                     }
                 }
             }
+
+            total_tool_calls += tool_calls.len();
 
             // Guardar mensaje del asistente
             let assistant_msg_id = Uuid::new_v4();
@@ -304,6 +373,22 @@ fn run_agent_stream(
 
                 let _ = chat::touch_conversation(&pool, org, conv_id).await;
 
+                // Métrica de calidad del agente v2 (#210): resumen del turno (iteraciones + nº de
+                // tool-calls por categoría). Permite medir sobre sesiones reales el coste de
+                // tool-calling antes/después de la superficie v2.
+                tracing::info!(
+                    target: "chat_metrics",
+                    event = "turn",
+                    conversation = %conv_id,
+                    tool_rounds,
+                    tool_calls = total_tool_calls,
+                    canvas_ops = total_canvas_ops,
+                    view_actions = total_view_actions,
+                    data_tools = total_data_tools,
+                    hit_round_limit = tool_rounds >= MAX_TOOL_ROUNDS,
+                    "agent turn finished",
+                );
+
                 let usage_summary = serde_json::json!({
                     "inputTokens": total_input,
                     "outputTokens": total_output,
@@ -327,12 +412,30 @@ fn run_agent_stream(
             let mut tool_result_msgs: Vec<simpletpv_ai::event::ChatMessage> = Vec::new();
 
             for tc in &tool_calls {
+                // View actions → reenviar al frontend como view_action (scroll/resaltar/filtrar),
+                // NO ejecutar en backend. ACK inmediato: son fire-and-forget sobre la vista.
+                if VIEW_ACTION_NAMES.contains(&tc.name.as_str()) {
+                    total_view_actions += 1;
+                    yield Ok(Event::default()
+                        .event("view_action")
+                        .data(
+                            serde_json::json!({
+                                "toolCallId": tc.id,
+                                "action": tc.name,
+                                "args": tc.args,
+                            })
+                            .to_string(),
+                        ));
+                    tool_result_msgs.push(simpletpv_ai::event::ChatMessage::Tool {
+                        tool_call_id: tc.id.clone(),
+                        content: "view_action_dispatched".to_owned(),
+                    });
+                    continue;
+                }
+
                 // Canvas ops → reenviar al frontend como canvas_op, NO ejecutar en backend
-                let canvas_ops = [
-                    "add_widget", "add_shape", "add_text", "add_note", "add_insight",
-                    "remove_element", "arrange", "clear_canvas",
-                ];
-                if canvas_ops.contains(&tc.name.as_str()) {
+                if CANVAS_OP_NAMES.contains(&tc.name.as_str()) {
+                    total_canvas_ops += 1;
                     let op = CanvasOp::from_tool_call(&tc.name, &tc.args);
                     yield Ok(Event::default()
                         .event("canvas_op")
@@ -352,6 +455,7 @@ fn run_agent_stream(
                 }
 
                 // Data tools → ejecutar en backend
+                total_data_tools += 1;
                 match simpletpv_domain::chat::dispatch_tool(
                     &pool,
                     org,
@@ -491,6 +595,21 @@ pub async fn canvas_result(
     let pool = state.db();
     let org = user.organization_id;
 
+    // Métrica de calidad del agente v2 (#210): cada resultado de canvas op vuelve aquí. Un
+    // rechazo = panel que no se renderizó (respuesta vacía); aceptado-con-reason = la validación
+    // REPARÓ la spec del agente (la hipótesis: las reparaciones reducen las respuestas vacías).
+    // Target dedicado `chat_metrics` para filtrar/agregar sobre sesiones reales sin ruido.
+    tracing::info!(
+        target: "chat_metrics",
+        event = "canvas_result",
+        conversation = %conv_id,
+        accepted = body.accepted,
+        rejected = !body.accepted,
+        repaired = body.accepted && body.reason.is_some(),
+        reason = body.reason.as_deref().unwrap_or(""),
+        "canvas op result",
+    );
+
     // El canvas_result se registra como un tool_result en el último mensaje de tool
     // del assistant. En esta implementación simplificada lo guardamos como mensaje
     // separado de tipo "tool" para que el próximo turno del LLM lo vea en el historial.
@@ -601,26 +720,26 @@ pub async fn list_models(
     let mut models: Vec<simpletpv_ai::ModelInfo> = Vec::new();
 
     if let Some(cfg) = ai {
-        // OpenAI / gateway. Con base_url custom se descubre la lista en vivo del gateway
-        // (todos sus modelos); en fallo de red se cae al catálogo estático.
+        // OpenAI / gateway. Con base_url custom se descubre la lista EN VIVO del gateway
+        // (todos sus modelos); si la llamada falla O devuelve una lista vacía se cae al
+        // catálogo estático.
         if let Some(key) = &cfg.openai_key {
             match &cfg.openai_base_url {
                 Some(base) => match simpletpv_ai::fetch_openai_models(base, key).await {
-                    Ok(m) => models.extend(m),
+                    // Lista viva no vacía: la del gateway manda.
+                    Ok(m) if !m.is_empty() => models.extend(m),
+                    // 200 con `data` vacío o de formato inesperado: NO dejar el chat
+                    // deshabilitado en silencio teniendo IA configurada — fallback.
+                    Ok(_) => {
+                        tracing::warn!("el gateway no devolvió modelos; uso catálogo estático");
+                        models.extend(simpletpv_ai::static_openai_models());
+                    }
                     Err(e) => {
                         tracing::warn!(error = %e, "no se pudieron listar los modelos del gateway; uso catálogo estático");
-                        models.extend(
-                            simpletpv_ai::available_models()
-                                .into_iter()
-                                .filter(|m| m.provider == "openai"),
-                        );
+                        models.extend(simpletpv_ai::static_openai_models());
                     }
                 },
-                None => models.extend(
-                    simpletpv_ai::available_models()
-                        .into_iter()
-                        .filter(|m| m.provider == "openai"),
-                ),
+                None => models.extend(simpletpv_ai::static_openai_models()),
             }
         }
         // Anthropic directo solo cuando NO hay gateway (con gateway, sus claude-* ya vienen arriba).

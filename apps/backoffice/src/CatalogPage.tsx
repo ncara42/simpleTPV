@@ -8,10 +8,9 @@ import {
 } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Download, Plus, SlidersHorizontal, Upload } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
-import { CsvActionButton } from './components/CsvActionButton.js';
 import { CsvDropzone } from './components/CsvDropzone.js';
 import { Modal } from './components/Modal.js';
 import {
@@ -26,6 +25,7 @@ import { type FamilyNode, listFamilies } from './lib/families.js';
 import { findNodePath, flattenTree, isDescendantOf } from './lib/family-tree.js';
 import { formErrorMessage } from './lib/form-error.js';
 import { fmtEur } from './lib/format.js';
+import { usePageActions } from './lib/pageActions.js';
 import {
   createProduct,
   deleteProduct,
@@ -466,23 +466,45 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
     </div>
   );
 
+  usePageActions(
+    <>
+      <button
+        type="button"
+        className="float-action-btn"
+        onClick={handleExport}
+        aria-label="Exportar CSV"
+        title="Exportar CSV"
+        data-testid="catalog-export"
+      >
+        <Download size={17} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className="float-action-btn"
+        onClick={() => setImporting(true)}
+        aria-label="Importar CSV"
+        title="Importar CSV"
+        data-testid="catalog-import"
+      >
+        <Upload size={17} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className={`float-action-btn${columnsEditorOpen ? ' is-active' : ''}`}
+        onClick={toggleColumnsEditor}
+        aria-label="Ajustar columnas"
+        title="Columnas"
+        aria-expanded={columnsEditorOpen}
+        data-testid="catalog-columns-toggle"
+      >
+        <SlidersHorizontal size={17} aria-hidden="true" />
+      </button>
+    </>,
+  );
+
   return (
     <section className="catalog">
       {columnsEditor}
-
-      <div className="table-actions">
-        <CsvActionButton kind="export" onClick={handleExport} testId="catalog-export" />
-        <CsvActionButton kind="import" onClick={() => setImporting(true)} testId="catalog-import" />
-        <button
-          type="button"
-          className="ui-dt-cols-trigger"
-          onClick={toggleColumnsEditor}
-          data-testid="catalog-columns-toggle"
-          aria-expanded={columnsEditorOpen}
-        >
-          Columnas
-        </button>
-      </div>
 
       <div className="table-panel">
         <DataTable

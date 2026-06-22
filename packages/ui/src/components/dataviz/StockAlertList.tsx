@@ -7,7 +7,8 @@ export interface StockAlertItem {
   name: string;
   /** Tienda, lote o fecha de caducidad. */
   detail?: string;
-  quantity: number;
+  /** Unidades (caducidades). Las alertas de rotura no traen cantidad → se omite la columna. */
+  quantity?: number;
   threshold?: number;
   tone: 'ok' | 'warn' | 'danger';
   status: string;
@@ -39,15 +40,17 @@ export function StockAlertList({
               {it.detail ? <span className="dv-stock-detail">{it.detail}</span> : null}
             </div>
             <StatusPill label={it.status} tone={it.tone} />
-            <span className="dv-stock-qty">
-              {formatValue(it.quantity, 'integer')}
-              {it.threshold != null ? (
-                <span className="dv-stock-threshold">
-                  {' '}
-                  / {formatValue(it.threshold, 'integer')}
-                </span>
-              ) : null}
-            </span>
+            {it.quantity != null ? (
+              <span className="dv-stock-qty">
+                {formatValue(it.quantity, 'integer')}
+                {it.threshold != null ? (
+                  <span className="dv-stock-threshold">
+                    {' '}
+                    / {formatValue(it.threshold, 'integer')}
+                  </span>
+                ) : null}
+              </span>
+            ) : null}
           </li>
         ))}
       </ul>

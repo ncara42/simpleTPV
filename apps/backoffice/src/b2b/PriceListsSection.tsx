@@ -1,6 +1,6 @@
 import { Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { sileo } from 'sileo';
 
 import { useConfirm } from '../components/ConfirmProvider.js';
@@ -153,7 +153,7 @@ function PriceListDetail({
   );
 }
 
-export function PriceListsSection() {
+export function PriceListsSection({ tabs }: { tabs?: ReactNode }) {
   const qc = useQueryClient();
   const confirm = useConfirm();
   const [creating, setCreating] = useState(false);
@@ -187,6 +187,7 @@ export function PriceListsSection() {
 
   return (
     <div className="table-panel" data-testid="b2b-pricelists">
+      {tabs}
       <SectionToolbar
         actionLabel="Nueva tarifa"
         onAction={() => setCreating(true)}

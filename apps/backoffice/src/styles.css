@@ -83,7 +83,10 @@
    izquierda para el sidebar flotante, abajo para el dock del asistente. */
 .bo-main--surface {
   margin: 0;
-  padding: 3.4rem 1.5rem 6rem
+  /* El borde superior del contenido se alinea con el del cuerpo flotante del sidebar
+     (--sidebar-float-top, heredado de .app-shell): mismo margen superior a ambos lados,
+     en vez de un valor mágico que dejaba el widget un pelín más alto que el sidebar. */
+  padding: var(--sidebar-float-top, 3.6rem) 1.5rem 6rem
     calc(var(--sidebar-width-expanded) + var(--sidebar-float-gap) * 2 + 0.5rem);
   min-height: 100vh;
   background: none;
@@ -117,9 +120,21 @@
   gap: var(--sidebar-top-gap, 8px);
 }
 
-/* La lupa deja de ocupar el ancho completo del sidebar: en el clúster es una pill compacta. */
-.sidebar-search-float .float-actions .topbar-search-launcher {
-  width: clamp(150px, 16vw, 220px);
+/* La lupa es un botón icono; el clúster se ancla al borde derecho (.sidebar-search-float).
+   El conmutador Backoffice↔TPV se retiró: el TPV vive ahora como última entrada del sidebar. */
+@media (min-width: 768px) {
+  .sidebar-search-float {
+    right: var(--sidebar-float-gap);
+  }
+}
+
+/* Acciones de la vista activa: ancladas al borde derecho del clúster (donde estaba el
+   conmutador). Vacío no ocupa ni rompe el layout; con botones, fila a la derecha. */
+.float-page-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sidebar-top-gap, 8px);
 }
 
 /* Botones redondos del clúster (home, campana): mismo tamaño que el logo del sidebar. */
@@ -168,36 +183,6 @@
   line-height: 16px;
   text-align: center;
   font-variant-numeric: tabular-nums;
-}
-
-/* Conmutador Backoffice↔TPV (mismo patrón que la antigua .topbar-switch). */
-.float-switch {
-  display: inline-flex;
-  flex: none;
-  padding: 0.18rem;
-  border-radius: 9999px;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  box-shadow:
-    0 1px 2px rgb(0 0 0 / 0.04),
-    0 10px 24px -14px rgb(0 0 0 / 0.22);
-}
-.float-switch-btn {
-  height: 28px;
-  padding: 0 0.8rem;
-  border-radius: 9999px;
-  border: none;
-  background: none;
-  font-size: 0.78rem;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  color: var(--ui-text-muted);
-  cursor: pointer;
-}
-.float-switch-btn.is-active {
-  background: var(--ui-brand-soft, var(--ui-surface-subtle));
-  color: var(--ui-brand-ink, var(--ui-text));
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
 }
 
 /* Eyebrow del topbar (específico del backoffice). */
@@ -753,5 +738,37 @@
   .command-palette.modal,
   .command-palette.modal.is-closing {
     animation: none;
+  }
+}
+
+/* Resaltado temporal cuando el asistente señala un elemento de la vista (highlight_on_view):
+   un destello de marca que se desvanece. El scroll-margin evita que el título flotante o el dock
+   inferior tapen el objetivo al hacer scroll hasta él. */
+.view-action-highlight {
+  scroll-margin-top: 6rem;
+  scroll-margin-bottom: 8rem;
+  border-radius: var(--ui-radius-md, 12px);
+  animation: view-action-pulse 2.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes view-action-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--ui-brand, #4f46e5) 70%, transparent);
+    background-color: color-mix(in oklab, var(--ui-brand, #4f46e5) 16%, transparent);
+  }
+  35% {
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--ui-brand, #4f46e5) 55%, transparent);
+    background-color: color-mix(in oklab, var(--ui-brand, #4f46e5) 10%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    background-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view-action-highlight {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--ui-brand, #4f46e5);
   }
 }

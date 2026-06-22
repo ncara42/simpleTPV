@@ -9,10 +9,11 @@
     "rankBarList",
     "segmentBar",
     "progressMeter",
+    "stockAlertList",
     "dataGrid"
   ],
   "recipes": ["kpiRow", "kpiRow+oneChart", "kpiRow+twoCharts", "heroChart+sideStats", "tableFull"],
-  "formats": ["eur", "percent", "decimal", "units", "integer"],
+  "formats": ["eur", "percent", "percentRatio", "decimal", "units", "integer"],
   "endpoints": [
     "/dashboard/sales-by-family",
     "/dashboard/sales-by-hour",
@@ -36,6 +37,9 @@
     "product-ranking",
     "top-margin",
     "dead-stock",
+    "profitability",
+    "discount-control",
+    "sales-mix",
     "store-comparison"
   ]
 }

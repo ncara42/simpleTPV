@@ -194,7 +194,7 @@ pub async fn sales_by_employee(
     ))
 }
 
-/// `GET /dashboard/sales-by-store` — desglose por tienda (#224).
+/// `GET /dashboard/sales-by-store` — desglose multitienda (facturación, ticket medio, margen).
 pub async fn sales_by_store(
     State(state): State<AppState>,
     user: AuthUser,

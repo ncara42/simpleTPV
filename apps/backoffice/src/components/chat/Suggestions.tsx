@@ -19,20 +19,27 @@ export function Suggestions({ children }: SuggestionsProps) {
     const el = ref.current;
     if (!el) return;
     drag.current = { active: true, startX: e.clientX, startLeft: el.scrollLeft, moved: false };
-    el.setPointerCapture(e.pointerId);
+    // No capturamos aquí: capturar el puntero en pointerdown redirige el `click` sintético al
+    // contenedor y el chip (<button> hijo) nunca recibe su onClick. Se captura solo al confirmar
+    // el arrastre (ver onPointerMove).
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>): void => {
     const el = ref.current;
     if (!el || !drag.current.active) return;
     const dx = e.clientX - drag.current.startX;
-    if (Math.abs(dx) > DRAG_THRESHOLD) drag.current.moved = true;
-    el.scrollLeft = drag.current.startLeft - dx;
+    if (!drag.current.moved && Math.abs(dx) > DRAG_THRESHOLD) {
+      drag.current.moved = true;
+      el.setPointerCapture(e.pointerId); // ahora sí es un arrastre real
+    }
+    if (drag.current.moved) el.scrollLeft = drag.current.startLeft - dx;
   };
 
   const endDrag = (e: ReactPointerEvent<HTMLDivElement>): void => {
     drag.current.active = false;
-    ref.current?.releasePointerCapture?.(e.pointerId);
+    if (ref.current?.hasPointerCapture?.(e.pointerId)) {
+      ref.current.releasePointerCapture(e.pointerId);
+    }
   };
 
   // Tras un arrastre, anula el click que dispararía el chip.
