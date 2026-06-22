@@ -46,7 +46,7 @@ export function registerSalesTools(server: McpServer): void {
         .string()
         .uuid()
         .describe('UUID de tienda (obligatorio; el cierre Z es por tienda)'),
-      date: z.string().optional().describe('Fecha YYYY-MM-DD (default: hoy)'),
+      date: z.string().describe('Fecha del cierre YYYY-MM-DD (obligatorio)'),
     },
     (params) => apiGet('/z-report', params),
   );
@@ -54,13 +54,13 @@ export function registerSalesTools(server: McpServer): void {
   readTool(
     server,
     'list_returns',
-    'Devoluciones registradas con motivo, importe, tienda y empleado que la tramitó. Incluye devoluciones ciegas (sin ticket original).',
+    'Devoluciones de una venta concreta: motivo, importe, líneas y empleado que la tramitó. Requiere el ID de la venta (obtén el saleId con list_sales).',
     {
-      storeId: z.string().uuid().optional(),
-      from: z.string().optional().describe('Fecha inicio YYYY-MM-DD'),
-      to: z.string().optional().describe('Fecha fin YYYY-MM-DD'),
-      limit: z.number().int().min(1).max(200).optional(),
+      saleId: z
+        .string()
+        .uuid()
+        .describe('UUID de la venta cuyas devoluciones quieres (obligatorio)'),
     },
-    (params) => apiGet('/returns', { limit: 50, ...params }),
+    (params) => apiGet('/returns', params),
   );
 }
