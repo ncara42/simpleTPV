@@ -4,7 +4,7 @@ import { BLOCK_CATALOG, BLOCK_IDS, buildBlockSpec } from './dashboard-blocks.js'
 import { PIECE_ALLOWLIST, RECIPE_ALLOWLIST } from './dashboard-pieces.js';
 
 describe('dashboard-blocks — bloques pre-cableados (#205)', () => {
-  it('el catálogo expone 6 bloques con prefijo block: y tamaño', () => {
+  it('el catálogo expone 7 bloques con prefijo block: y tamaño', () => {
     expect(BLOCK_IDS).toEqual([
       'block:sales-overview',
       'block:stock-risk',
@@ -12,6 +12,7 @@ describe('dashboard-blocks — bloques pre-cableados (#205)', () => {
       'block:product-ranking',
       'block:top-margin',
       'block:dead-stock',
+      'block:store-comparison',
     ]);
     for (const id of BLOCK_IDS) {
       expect(BLOCK_CATALOG[id]?.label).toBeTruthy();
@@ -68,6 +69,18 @@ describe('dashboard-blocks — bloques pre-cableados (#205)', () => {
         expect(leaf.endpoint).toBeTruthy();
       }
     }
+  });
+
+  it('store-comparison cablea facturación + margen por tienda (#224)', () => {
+    const charts = buildBlockSpec('block:store-comparison', { period: 'week' })?.slots?.charts;
+    expect(charts).toHaveLength(2);
+    for (const leaf of charts!) {
+      expect(leaf.endpoint).toBe('/dashboard/sales-by-store');
+      expect(leaf.labelField).toBe('storeName');
+      expect(leaf.period).toBe('week');
+    }
+    expect(charts![0]!.valueField).toBe('revenue');
+    expect(charts![1]!.valueField).toBe('margin');
   });
 
   it('acepta el id con o sin prefijo block:', () => {

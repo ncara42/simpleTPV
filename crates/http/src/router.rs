@@ -422,6 +422,7 @@ pub fn build_router(state: AppState) -> Router {
             "/dashboard/sales-by-employee",
             get(dashboard::sales_by_employee),
         )
+        .route("/dashboard/sales-by-store", get(dashboard::sales_by_store))
         .route("/dashboard/margin-kpis", get(dashboard::margin_kpis))
         .route("/dashboard/stockout-kpis", get(dashboard::stockout_kpis))
         .route(

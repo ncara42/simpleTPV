@@ -35,6 +35,7 @@ export const WIDGETABLE_ENDPOINTS: ReadonlySet<string> = new Set<string>([
   '/dashboard/sales-by-family',
   '/dashboard/sales-by-hour',
   '/dashboard/sales-by-employee',
+  '/dashboard/sales-by-store',
   '/dashboard/discount-by-employee',
   '/dashboard/product-rankings',
   '/dashboard/sales-kpis',

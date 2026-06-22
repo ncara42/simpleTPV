@@ -18,8 +18,8 @@ use crate::store_access::has_store_access;
 use super::model::{
     ArchetypeRotationItem, DiscountByEmployeeItem, MarginKpis, PeriodTotals, ProductRankings,
     ProductRotationItem, RankByMargin, RankBySales, RankByUnits, SalesByEmployeeItem,
-    SalesByFamilyItem, SalesByHourItem, SalesKpiSeries, SalesKpis, SalesToday, StockoutKpis,
-    StoreSales,
+    SalesByFamilyItem, SalesByHourItem, SalesByStoreItem, SalesKpiSeries, SalesKpis, SalesToday,
+    StockoutKpis, StoreSales,
 };
 use super::period::{comparison_starts, delta_pct, CompareMode, DateRange};
 
@@ -577,6 +577,64 @@ pub async fn sales_by_employee(
                 user_name,
                 sales_count: count,
                 total: f(total),
+            })
+            .collect())
+    })
+    .await
+}
+
+/// Ventas por tienda (#224): facturación, ticket medio, margen real (€) y nº de ventas, por
+/// tienda. Incluye TODAS las tiendas de la org (LEFT JOIN → cero ventas en 0) para identificar
+/// al rezagado. RLS via `with_tenant_tx`; `$4` acota opcionalmente a una sola tienda.
+pub async fn sales_by_store(
+    pool: &PgPool,
+    org: Uuid,
+    range: DateRange,
+    store_id: Option<Uuid>,
+) -> Result<Vec<SalesByStoreItem>, AppError> {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        let rows: Vec<(Uuid, String, Decimal, i64, Decimal)> = sqlx::query_as(
+            r#"SELECT s.id AS store_id, s.name AS store_name,
+                 COALESCE(sa.revenue, 0) AS revenue,
+                 COALESCE(sa.cnt, 0) AS cnt,
+                 COALESCE(ml.margin, 0) AS margin
+               FROM "Store" s
+               LEFT JOIN (
+                 SELECT "storeId", SUM(total) AS revenue, COUNT(*) AS cnt
+                   FROM "Sale"
+                   WHERE "organizationId" = $1 AND status = 'COMPLETED'::"SaleStatus"
+                     AND "createdAt" >= $2 AND "createdAt" < $3
+                   GROUP BY "storeId"
+               ) sa ON sa."storeId" = s.id
+               LEFT JOIN (
+                 SELECT sa2."storeId",
+                     SUM(sl."lineTotal" - sl."costPrice" * sl.qty) AS margin
+                   FROM "SaleLine" sl JOIN "Sale" sa2 ON sa2.id = sl."saleId"
+                   WHERE sa2."organizationId" = $1 AND sa2.status = 'COMPLETED'::"SaleStatus"
+                     AND sa2."createdAt" >= $2 AND sa2."createdAt" < $3
+                   GROUP BY sa2."storeId"
+               ) ml ON ml."storeId" = s.id
+               WHERE s."organizationId" = $1 AND ($4::uuid IS NULL OR s.id = $4)
+               ORDER BY revenue DESC, s.name ASC"#,
+        )
+        .bind(org)
+        .bind(range.from)
+        .bind(range.to)
+        .bind(store_id)
+        .fetch_all(&mut **tx)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(store_id, store_name, revenue, cnt, margin)| {
+                let revenue = f(revenue);
+                SalesByStoreItem {
+                    store_id,
+                    store_name,
+                    revenue,
+                    avg_ticket: if cnt > 0 { revenue / cnt as f64 } else { 0.0 },
+                    margin: f(margin),
+                    sales_count: cnt,
+                }
             })
             .collect())
     })

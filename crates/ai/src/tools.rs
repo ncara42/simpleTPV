@@ -43,6 +43,7 @@ pub const WIDGETABLE_ENDPOINTS: &[&str] = &[
     "/dashboard/sales-by-family",
     "/dashboard/sales-by-hour",
     "/dashboard/sales-by-employee",
+    "/dashboard/sales-by-store",
     "/dashboard/discount-by-employee",
     "/dashboard/product-rankings",
     "/dashboard/sales-kpis",
@@ -61,6 +62,7 @@ pub const BLOCK_IDS: &[&str] = &[
     "block:product-ranking",
     "block:top-margin",
     "block:dead-stock",
+    "block:store-comparison",
 ];
 
 // Esquema de una hoja-pieza para un slot. `pieces` acota el enum admitido (kpis vs charts).
@@ -94,7 +96,7 @@ pub fn canvas_tools() -> Vec<Value> {
                     "properties": {
                         "widget_id": {
                             "type": "string",
-                            "description": "ID del widget. Bloques: 'block:sales-overview', 'block:stock-risk', 'block:staff-performance', 'block:product-ranking', 'block:top-margin', 'block:dead-stock'. Catálogo: 'kpi-today', 'dash-bars', etc. Panel a medida: 'gen:panel'."
+                            "description": "ID del widget. Bloques: 'block:sales-overview', 'block:stock-risk', 'block:staff-performance', 'block:product-ranking', 'block:top-margin', 'block:dead-stock', 'block:store-comparison'. Catálogo: 'kpi-today', 'dash-bars', etc. Panel a medida: 'gen:panel'."
                         },
                         "position": {
                             "type": "string",

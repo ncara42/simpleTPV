@@ -71,6 +71,10 @@ const WIDGET_CATALOG: &[(&str, &str)] = &[
     ("block:top-margin", "BLOQUE — Top de productos por margen"),
     ("block:dead-stock", "BLOQUE — Peor rotación (stock muerto)"),
     (
+        "block:store-comparison",
+        "BLOQUE — Comparativa entre tiendas (facturación + margen por tienda)",
+    ),
+    (
         "gen:panel",
         "Panel a medida por receta + piezas (combina varias métricas en una tarjeta)",
     ),
@@ -95,6 +99,12 @@ const WIDGETABLE_ENDPOINTS: &[(&str, &str, &str)] = &[
         "/dashboard/sales-by-employee",
         "Ventas por vendedor.",
         "userName, total, salesCount",
+    ),
+    (
+        "/dashboard/sales-by-store",
+        "Ventas por tienda: facturación, ticket medio, margen real (€) y nº de ventas. \
+         Incluye todas las tiendas (cero ventas en 0) → ideal para comparar y hallar al rezagado.",
+        "storeName, revenue, avgTicket, margin, salesCount",
     ),
     (
         "/dashboard/discount-by-employee",
@@ -182,7 +192,12 @@ NUNCA emitas geometría (w/h/span/gap): la receta y las piezas ya tienen su dise
 - `block:product-ranking` — top de productos por ventas.
 - `block:top-margin` — top de productos por margen.
 - `block:dead-stock` — productos de peor rotación (stock muerto, unidades del periodo).
+- `block:store-comparison` — comparativa entre tiendas: facturación + margen por tienda (cadena multitienda).
 `period` y `store_id` (de la propia llamada) se heredan por todas las piezas. No construyas slots.
+
+Few-shot — «¿qué tienda sube/baja esta semana, quién es el rezagado?» → un solo `add_widget` con
+`widget_id` "block:store-comparison" y `period` "week" (compara facturación + margen por tienda; luego
+narra el rezagado sin inventar cifras). NO enumeres tiendas a mano si el bloque ya responde.
 
 ### B) Panel a medida por receta + piezas (si ningún bloque encaja)
 `add_widget` con `widget_id` "gen:panel" y `generic_spec`:

@@ -8,7 +8,8 @@ pub mod service;
 pub use model::{
     ArchetypeRotationItem, DiscountByEmployeeItem, MarginKpis, ProductRankings,
     ProductRotationItem, RankByMargin, RankBySales, RankByUnits, RankedProduct, RankedProducts,
-    SalesByEmployeeItem, SalesByFamilyItem, SalesByHourItem, SalesKpis, SalesToday, StockoutKpis,
+    SalesByEmployeeItem, SalesByFamilyItem, SalesByHourItem, SalesByStoreItem, SalesKpis,
+    SalesToday, StockoutKpis,
 };
 pub use period::{
     comparison_starts, delta_pct, previous_range, resolve_period, CompareMode, ComparisonStarts,

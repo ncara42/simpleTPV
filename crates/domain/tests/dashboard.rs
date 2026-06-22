@@ -467,3 +467,45 @@ async fn stockout_kpis_cuenta_abiertas_y_resueltas() {
 
     teardown(&c).await;
 }
+
+#[tokio::test]
+async fn sales_by_store_desglosa_facturacion_y_margen() {
+    let c = setup().await;
+
+    // Dos ventas de hoy en nuestra tienda: 10 + 30 = 40 facturado, 2 tickets.
+    // costPrice por defecto 0 → margen real = ΣlineTotal = 40. Ticket medio = 40/2 = 20.
+    let pfx = &c.store.simple().to_string()[..8];
+    let t1 = now_utc() - time::Duration::minutes(10);
+    let t2 = now_utc() - time::Duration::minutes(5);
+    insert_sale(&c, &format!("S{pfx}-1"), "10.00", t1).await;
+    insert_sale(&c, &format!("S{pfx}-2"), "30.00", t2).await;
+
+    let range = resolve_period(DashboardPeriod::Today, now_utc(), None, None).unwrap();
+
+    // Acotado a nuestra tienda → exactamente una fila con los agregados esperados.
+    let scoped = service::sales_by_store(&c.app, c.org, range, Some(c.store))
+        .await
+        .unwrap();
+    assert_eq!(scoped.len(), 1, "acotado a una tienda → una fila");
+    let row = &scoped[0];
+    assert_eq!(row.store_id, c.store);
+    assert_eq!(row.sales_count, 2, "dos ventas");
+    assert!((row.revenue - 40.0).abs() < 1e-9, "facturación = 40");
+    assert!((row.avg_ticket - 20.0).abs() < 1e-9, "ticket medio = 40/2");
+    assert!(
+        (row.margin - 40.0).abs() < 1e-9,
+        "margen real = ΣlineTotal (coste 0)"
+    );
+
+    // Sin acotar: nuestra tienda aparece en el agregado de la org (entre todas las tiendas).
+    let all = service::sales_by_store(&c.app, c.org, range, None)
+        .await
+        .unwrap();
+    let mine = all
+        .iter()
+        .find(|s| s.store_id == c.store)
+        .expect("nuestra tienda está en el desglose de la org");
+    assert!((mine.revenue - 40.0).abs() < 1e-9);
+
+    teardown(&c).await;
+}

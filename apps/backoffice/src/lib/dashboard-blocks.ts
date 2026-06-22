@@ -241,6 +241,39 @@ const BLOCKS: Record<string, BlockDef> = {
       ],
     }),
   },
+
+  // Comparativa entre tiendas (#224): facturación por tienda + margen por tienda. Responde la
+  // pregunta multitienda («¿qué tienda sube/baja, quién es el rezagado?») con una sola tarjeta.
+  'store-comparison': {
+    label: 'Comparativa entre tiendas',
+    recipe: 'kpiRow+twoCharts',
+    build: (p) => ({
+      charts: [
+        withParams(
+          {
+            piece: 'rankBarList',
+            title: 'Facturación por tienda',
+            endpoint: '/dashboard/sales-by-store',
+            labelField: 'storeName',
+            valueField: 'revenue',
+            format: 'eur',
+          },
+          p,
+        ),
+        withParams(
+          {
+            piece: 'comparisonBars',
+            title: 'Margen por tienda',
+            endpoint: '/dashboard/sales-by-store',
+            labelField: 'storeName',
+            valueField: 'margin',
+            format: 'eur',
+          },
+          p,
+        ),
+      ],
+    }),
+  },
 };
 
 // Metadatos de catálogo de los bloques (paleta/snapshot/etiquetas). El render lo produce la
