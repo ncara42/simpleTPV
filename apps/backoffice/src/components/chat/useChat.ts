@@ -98,6 +98,8 @@ export interface UseChat {
   streamingToolCalls: { id: string; name: string; args: unknown }[];
   usage: ConversationUsage | null;
   error: string | null;
+  /** Mensajes del usuario en cola (se envían en orden al terminar el stream en curso). */
+  queue: string[];
   queueLength: number;
   models: ModelInfo[];
   /** True una vez resuelta la carga inicial de modelos (con o sin resultados). */
@@ -501,6 +503,7 @@ export function useChat(options: UseChatOptions = {}): UseChat {
     streamingToolCalls,
     usage,
     error,
+    queue,
     queueLength: queue.length,
     models,
     modelsLoaded,

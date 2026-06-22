@@ -24,6 +24,9 @@ const TOOL_LABELS: Record<string, string> = {
   remove_element: 'Eliminó un elemento',
   arrange: 'Reordenó el lienzo',
   clear_canvas: 'Vació el lienzo',
+  // Acciones de pantalla (fuera del dashboard)
+  highlight_on_view: 'Resaltó un elemento en pantalla',
+  filter_view: 'Filtró el listado',
 };
 
 export function toolLabel(name: string): string {

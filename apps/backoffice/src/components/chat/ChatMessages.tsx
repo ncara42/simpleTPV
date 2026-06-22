@@ -1,9 +1,31 @@
-import { ArrowDown, Check, ChevronDown, Copy, Pencil, RefreshCw } from 'lucide-react';
+import { ArrowDown, Check, Copy, Pencil, RefreshCw, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ChatMessage, ToolResult } from '../../lib/chat.js';
-import { ChatMarkdown } from './ChatMarkdown.js';
-import { Reasoning } from './Reasoning.js';
+import {
+  ChainOfThought,
+  ChainOfThoughtContent,
+  ChainOfThoughtHeader,
+  ChainOfThoughtStep,
+} from '../ai-elements/chain-of-thought.js';
+import {
+  Message,
+  MessageAction,
+  MessageActions,
+  MessageContent,
+  MessageResponse,
+} from '../ai-elements/message.js';
+import {
+  Plan,
+  PlanAction,
+  PlanContent,
+  PlanDescription,
+  PlanHeader,
+  PlanTitle,
+  PlanTrigger,
+} from '../ai-elements/plan.js';
+import { Reasoning, ReasoningContent, ReasoningTrigger } from '../ai-elements/reasoning.js';
+import { Task, TaskContent, TaskItem, TaskTrigger } from '../ai-elements/task.js';
 import { Shimmer } from './Shimmer.js';
 import { Suggestion, Suggestions } from './Suggestions.js';
 import { toolLabel } from './toolLabels.js';
@@ -42,11 +64,17 @@ function messageThinking(message: ChatMessage): string {
     .trim();
 }
 
-// ── Traza de actividad del agente (línea de tiempo de pasos) ───────────────────────
-// Sustituye los chips de tool por una timeline elegante: cada tool-call es un paso con su nodo
-// de estado sobre una línea conectora. Color semántico por tipo: CONSULTAS de datos (acento
-// índigo) vs ACCIONES sobre el lienzo/pantalla (marca teal). Espejo de CANVAS_OP_NAMES /
-// VIEW_ACTION_NAMES del backend (crates/http/src/chat.rs).
+// ── Actividad del agente (consultas + acciones) ───────────────────────────────────
+// Sustituye el ToolChip casero por componentes de AI Elements: las CONSULTAS de datos se muestran
+// como cadena de razonamiento (ChainOfThought) y las ACCIONES sobre el lienzo o la pantalla como un
+// plan con tareas (Plan › Task). La partición es por nombre de tool (espejo de
+// CANVAS_OP_NAMES/VIEW_ACTION_NAMES del backend, crates/http/src/chat.rs).
+
+interface ActivityCall {
+  id?: string;
+  name: string;
+  args: unknown;
+}
 
 const CANVAS_OP_NAMES: ReadonlySet<string> = new Set([
   'add_widget',
@@ -59,71 +87,118 @@ const CANVAS_OP_NAMES: ReadonlySet<string> = new Set([
   'clear_canvas',
 ]);
 const VIEW_ACTION_NAMES: ReadonlySet<string> = new Set(['highlight_on_view', 'filter_view']);
-const isActionTool = (name: string): boolean =>
-  CANVAS_OP_NAMES.has(name) || VIEW_ACTION_NAMES.has(name);
 
-// ¿La canvas op fue rechazada? El resultado vuelve como tool_result {accepted, reason}.
+function isActionTool(name: string): boolean {
+  return CANVAS_OP_NAMES.has(name) || VIEW_ACTION_NAMES.has(name);
+}
+
+// Lee el primer campo string presente (tolerante a snake_case del LLM y camelCase del op).
+function argString(args: unknown, ...keys: string[]): string | undefined {
+  if (args == null || typeof args !== 'object') return undefined;
+  const obj = args as Record<string, unknown>;
+  for (const key of keys) {
+    const value = obj[key];
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return undefined;
+}
+
+// Título de un panel a medida dentro de generic_spec/genericSpec (si lo hay).
+function genericTitle(args: unknown): string | undefined {
+  if (args == null || typeof args !== 'object') return undefined;
+  const spec =
+    (args as Record<string, unknown>).generic_spec ?? (args as Record<string, unknown>).genericSpec;
+  if (spec == null || typeof spec !== 'object') return undefined;
+  const title = (spec as Record<string, unknown>).title;
+  return typeof title === 'string' && title.trim() ? title : undefined;
+}
+
+// Frase de una acción del agente, con detalle cuando es útil.
+function actionLabel(call: ActivityCall): string {
+  const base = toolLabel(call.name);
+  switch (call.name) {
+    case 'add_widget': {
+      const detail = genericTitle(call.args) ?? argString(call.args, 'widget_id', 'widgetId');
+      return detail ? `${base}: ${detail}` : base;
+    }
+    case 'highlight_on_view': {
+      const target = argString(call.args, 'target');
+      return target ? `Resaltó «${target}»` : base;
+    }
+    case 'filter_view': {
+      const query = argString(call.args, 'query');
+      return query ? `Filtró por «${query}»` : base;
+    }
+    default:
+      return base;
+  }
+}
+
+// ¿La canvas op fue rechazada? El resultado llega como tool_result {accepted, reason} (/canvas-result).
 function canvasRejected(result: ToolResult | undefined): boolean {
   if (!result || result.content == null || typeof result.content !== 'object') return false;
   return (result.content as { accepted?: boolean }).accepted === false;
 }
 
-interface TraceCall {
-  id?: string;
-  name: string;
-}
-
-interface AgentTraceProps {
-  calls: TraceCall[];
+interface AgentActivityProps {
+  calls: ActivityCall[];
   resultsByCall?: Map<string, ToolResult> | undefined;
-  /** Turno en curso: pasos «en marcha» y traza abierta por defecto. */
+  /** Turno en curso: pasos en estado activo y secciones abiertas. */
   streaming: boolean;
 }
 
-function AgentTrace({ calls, resultsByCall, streaming }: AgentTraceProps) {
-  // Abierta mientras el agente trabaja; plegada al persistirse (igual que el razonamiento).
-  const [open, setOpen] = useState(streaming);
-  if (calls.length === 0) return null;
+function AgentActivity({ calls, resultsByCall, streaming }: AgentActivityProps) {
+  const queries = calls.filter((c) => !isActionTool(c.name));
+  const actions = calls.filter((c) => isActionTool(c.name));
+  if (queries.length === 0 && actions.length === 0) return null;
 
   return (
-    <div className={`agent-trace${open ? ' is-open' : ''}`}>
-      <button
-        type="button"
-        className="agent-trace__head"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        data-testid="chat-agent-trace"
-      >
-        <span className="agent-trace__spark" aria-hidden="true" />
-        <span className="agent-trace__title">
-          {streaming ? (
-            <Shimmer>Trabajando…</Shimmer>
-          ) : (
-            `Proceso · ${calls.length} ${calls.length === 1 ? 'paso' : 'pasos'}`
-          )}
-        </span>
-        <ChevronDown size={13} className="agent-trace__caret" aria-hidden="true" />
-      </button>
-      {open && (
-        <ol className="agent-trace__steps">
-          {calls.map((call, i) => {
-            const action = isActionTool(call.name);
-            const rejected =
-              action && call.id ? canvasRejected(resultsByCall?.get(call.id)) : false;
-            const status = streaming ? 'running' : rejected ? 'rejected' : 'done';
-            return (
-              <li
-                key={call.id ?? `${call.name}-${i}`}
-                className={`agent-step agent-step--${action ? 'action' : 'query'} is-${status}`}
-              >
-                <span className="agent-step__node" aria-hidden="true">
-                  {status === 'done' ? <Check size={9} strokeWidth={3} /> : null}
-                </span>
-                <span className="agent-step__label">{toolLabel(call.name)}</span>
-              </li>
-            );
-          })}
-        </ol>
+    <div className="chat-activity">
+      {queries.length > 0 && (
+        <ChainOfThought defaultOpen={streaming}>
+          <ChainOfThoughtHeader>{streaming ? 'Analizando…' : 'Análisis'}</ChainOfThoughtHeader>
+          <ChainOfThoughtContent>
+            {queries.map((call, i) => (
+              <ChainOfThoughtStep
+                key={call.id ?? `q-${i}`}
+                icon={Search}
+                label={toolLabel(call.name)}
+                status={streaming ? 'active' : 'complete'}
+              />
+            ))}
+          </ChainOfThoughtContent>
+        </ChainOfThought>
+      )}
+      {actions.length > 0 && (
+        <Plan defaultOpen isStreaming={streaming}>
+          <PlanHeader>
+            <PlanTitle>
+              {streaming ? 'Componiendo el dashboard…' : 'Cambios en el dashboard'}
+            </PlanTitle>
+            <PlanDescription>
+              {actions.length === 1 ? '1 acción' : `${actions.length} acciones`}
+            </PlanDescription>
+            <PlanAction>
+              <PlanTrigger />
+            </PlanAction>
+          </PlanHeader>
+          <PlanContent>
+            <Task defaultOpen>
+              <TaskTrigger title={streaming ? 'Acciones en curso' : 'Acciones realizadas'} />
+              <TaskContent>
+                {actions.map((call, i) => {
+                  const rejected = call.id ? canvasRejected(resultsByCall?.get(call.id)) : false;
+                  return (
+                    <TaskItem key={call.id ?? `a-${i}`}>
+                      {actionLabel(call)}
+                      {rejected ? ' — no aplicado' : ''}
+                    </TaskItem>
+                  );
+                })}
+              </TaskContent>
+            </Task>
+          </PlanContent>
+        </Plan>
       )}
     </div>
   );
@@ -144,65 +219,66 @@ function UserBubble({ message, disabled, onEditAndResend }: UserBubbleProps) {
   const isOptimistic = message.id.startsWith('optimistic-');
 
   return (
-    <div className="chat-msg chat-msg--user">
+    <Message from="user">
       {editing ? (
-        <div className="chat-msg__edit">
-          <textarea
-            className="chat-msg__edit-area"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={Math.min(8, Math.max(2, draft.split('\n').length))}
-            autoFocus
-          />
-          <div className="chat-msg__edit-actions">
-            <button
-              type="button"
-              className="chat-icon-btn chat-icon-btn--text"
-              onClick={() => {
-                setDraft(original);
-                setEditing(false);
-              }}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              className="chat-icon-btn chat-icon-btn--primary"
-              disabled={!draft.trim() || draft.trim() === original}
-              onClick={() => {
-                setEditing(false);
-                onEditAndResend(message.id, draft);
-              }}
-            >
-              Reenviar
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="chat-bubble chat-bubble--user">{original}</div>
-          {!isOptimistic && (
-            <div className="chat-msg__toolbar">
+        <MessageContent>
+          <div className="chat-msg__edit">
+            <textarea
+              className="chat-msg__edit-area"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={Math.min(8, Math.max(2, draft.split('\n').length))}
+              autoFocus
+            />
+            <div className="chat-msg__edit-actions">
               <button
                 type="button"
-                className="chat-msg__action"
+                className="chat-icon-btn chat-icon-btn--text"
+                onClick={() => {
+                  setDraft(original);
+                  setEditing(false);
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="chat-icon-btn chat-icon-btn--primary"
+                disabled={!draft.trim() || draft.trim() === original}
+                onClick={() => {
+                  setEditing(false);
+                  onEditAndResend(message.id, draft);
+                }}
+              >
+                Reenviar
+              </button>
+            </div>
+          </div>
+        </MessageContent>
+      ) : (
+        <>
+          <MessageContent>{original}</MessageContent>
+          {!isOptimistic && (
+            <MessageActions>
+              <MessageAction
+                label="Editar y reenviar"
                 disabled={disabled}
                 onClick={() => {
                   setDraft(original);
                   setEditing(true);
                 }}
               >
-                <Pencil size={12} aria-hidden="true" /> Editar y reenviar
-              </button>
-            </div>
+                <Pencil size={12} aria-hidden="true" />
+              </MessageAction>
+            </MessageActions>
           )}
         </>
       )}
-    </div>
+    </Message>
   );
 }
 
-// ── Mensaje del asistente (texto a todo el ancho + traza + acciones) ───────────────
+// ── Mensaje del asistente ─────────────────────────────────────────────────────────
 
 interface AssistantMessageProps {
   message: ChatMessage;
@@ -235,42 +311,77 @@ function AssistantMessage({
   };
 
   return (
-    <div className="chat-msg chat-msg--assistant">
-      {thinking && <Reasoning isStreaming={false}>{thinking}</Reasoning>}
-      <AgentTrace calls={calls} resultsByCall={resultsByCall} streaming={false} />
+    <Message from="assistant">
+      <MessageContent>
+        {thinking && (
+          <Reasoning isStreaming={false} defaultOpen={false}>
+            <ReasoningTrigger />
+            <ReasoningContent>{thinking}</ReasoningContent>
+          </Reasoning>
+        )}
+        <AgentActivity calls={calls} resultsByCall={resultsByCall} streaming={false} />
+        {text && <MessageResponse>{text}</MessageResponse>}
+      </MessageContent>
       {text && (
-        <div className="chat-response chat-markdown">
-          <ChatMarkdown>{text}</ChatMarkdown>
-        </div>
-      )}
-      {text && (
-        <div className="chat-actions">
-          <button
-            type="button"
-            className="chat-action"
+        <MessageActions>
+          <MessageAction
             onClick={copy}
-            aria-label={copied ? 'Copiado' : 'Copiar'}
-            title={copied ? 'Copiado' : 'Copiar'}
+            label={copied ? 'Copiado' : 'Copiar'}
+            tooltip={copied ? 'Copiado' : 'Copiar'}
           >
             {copied ? (
               <Check size={14} aria-hidden="true" />
             ) : (
               <Copy size={14} aria-hidden="true" />
             )}
-          </button>
-          <button
-            type="button"
-            className="chat-action"
+          </MessageAction>
+          <MessageAction
             disabled={disabled}
             onClick={() => onRegenerate(message.id)}
-            aria-label="Regenerar"
-            title="Regenerar"
+            label="Regenerar"
+            tooltip="Regenerar"
           >
             <RefreshCw size={14} aria-hidden="true" />
-          </button>
-        </div>
+          </MessageAction>
+        </MessageActions>
       )}
-    </div>
+    </Message>
+  );
+}
+
+// ── Mensaje del asistente en streaming ───────────────────────────────────────────
+
+interface StreamingMessageProps {
+  streamingText: string;
+  streamingReasoning: string;
+  streamingToolCalls: { id: string; name: string; args: unknown }[];
+}
+
+function StreamingMessage({
+  streamingText,
+  streamingReasoning,
+  streamingToolCalls,
+}: StreamingMessageProps) {
+  return (
+    <Message from="assistant">
+      <MessageContent>
+        {streamingReasoning && (
+          <Reasoning isStreaming={!streamingText}>
+            <ReasoningTrigger />
+            <ReasoningContent>{streamingReasoning}</ReasoningContent>
+          </Reasoning>
+        )}
+        <AgentActivity calls={streamingToolCalls} streaming={true} />
+        {streamingText ? (
+          <>
+            <MessageResponse>{streamingText}</MessageResponse>
+            <span className="chat-cursor" aria-hidden="true" />
+          </>
+        ) : (
+          !streamingReasoning && <Shimmer className="chat-messages__hint">Pensando</Shimmer>
+        )}
+      </MessageContent>
+    </Message>
   );
 }
 
@@ -368,26 +479,11 @@ export function ChatMessages({
         })}
 
         {streaming && (
-          <div className="chat-msg chat-msg--assistant">
-            {streamingReasoning && (
-              <Reasoning isStreaming={!streamingText}>{streamingReasoning}</Reasoning>
-            )}
-            <AgentTrace calls={streamingToolCalls} streaming={true} />
-            {streamingText ? (
-              <div className="chat-response chat-markdown">
-                <ChatMarkdown>{streamingText}</ChatMarkdown>
-                <span className="chat-cursor" aria-hidden="true" />
-              </div>
-            ) : (
-              !streamingReasoning &&
-              streamingToolCalls.length === 0 && (
-                <div className="chat-thinking">
-                  <span className="agent-orb agent-orb--sm is-active" aria-hidden="true" />
-                  <Shimmer className="chat-messages__hint">Pensando</Shimmer>
-                </div>
-              )
-            )}
-          </div>
+          <StreamingMessage
+            streamingText={streamingText}
+            streamingReasoning={streamingReasoning}
+            streamingToolCalls={streamingToolCalls}
+          />
         )}
       </div>
       {!atBottom && (

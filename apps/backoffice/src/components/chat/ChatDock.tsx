@@ -1,9 +1,21 @@
 import './chat.css';
 
 import { MessageSquare } from 'lucide-react';
-import { type RefObject, useEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { CanvasOp } from '../../lib/chat.js';
+import { Persona, type PersonaState } from '../ai-elements/persona.js';
+import {
+  Queue,
+  QueueItem,
+  QueueItemContent,
+  QueueItemIndicator,
+  QueueList,
+  QueueSection,
+  QueueSectionContent,
+  QueueSectionLabel,
+  QueueSectionTrigger,
+} from '../ai-elements/queue.js';
 import type { CanvasMeta, FreeBoardHandle } from '../FreeBoard.js';
 import { CanvasToolsMenu } from './CanvasToolsMenu.js';
 import { ChatConversationList } from './ChatConversationList.js';
@@ -98,6 +110,14 @@ export function ChatDock({
   };
 
   const noAi = chat.modelsLoaded && chat.models.length === 0;
+
+  // Estado de la Persona: refleja la fase del turno del asistente.
+  const personaState = useMemo<PersonaState>(() => {
+    if (!chat.streaming) return 'idle';
+    if (chat.streamingReasoning && !chat.streamingText) return 'thinking';
+    if (chat.streamingText) return 'speaking';
+    return 'thinking'; // submitted pero sin tokens aún
+  }, [chat.streaming, chat.streamingReasoning, chat.streamingText]);
 
   const leading = (
     <>
@@ -195,6 +215,31 @@ export function ChatDock({
         </aside>
       )}
 
+      {chat.queue.length > 0 && (
+        <div className="chat-dock__queue">
+          <Queue>
+            <QueueSection defaultOpen>
+              <QueueSectionTrigger>
+                <QueueSectionLabel
+                  label={chat.queue.length === 1 ? 'mensaje en cola' : 'mensajes en cola'}
+                  count={chat.queue.length}
+                />
+              </QueueSectionTrigger>
+              <QueueSectionContent>
+                <QueueList>
+                  {chat.queue.map((text, i) => (
+                    <QueueItem key={`${i}-${text.slice(0, 24)}`}>
+                      <QueueItemIndicator completed={false} />
+                      <QueueItemContent>{text}</QueueItemContent>
+                    </QueueItem>
+                  ))}
+                </QueueList>
+              </QueueSectionContent>
+            </QueueSection>
+          </Queue>
+        </div>
+      )}
+
       <div className="chat-dock__bar">
         <PromptComposer
           status={
@@ -205,7 +250,6 @@ export function ChatDock({
                 : 'submitted'
           }
           disabled={noAi || !chat.model}
-          queueLength={chat.queueLength}
           onSend={handleSend}
           onStop={chat.stop}
           onFocus={() => setPanelOpen(true)}
@@ -222,6 +266,11 @@ export function ChatDock({
             ) : undefined
           }
         />
+      </div>
+
+      {/* Persona animada en esquina inferior izquierda (AI Elements) */}
+      <div className="chat-persona-corner" aria-hidden="true">
+        <Persona state={personaState} variant="glint" className="size-10" />
       </div>
     </div>
   );

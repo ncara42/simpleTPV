@@ -256,19 +256,11 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 }
 
 .chat-messages__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   width: 100%;
   margin-block: auto;
   color: var(--ui-text-muted);
   font-size: var(--ui-text-sm);
   text-align: center;
-}
-
-/* Las sugerencias mantienen su slider a todo el ancho dentro del estado vacío centrado. */
-.chat-messages__empty .suggestions {
-  align-self: stretch;
 }
 
 .chat-messages__hint {
@@ -280,20 +272,6 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-1);
-  animation: chat-msg-in 0.32s var(--ui-ease) both;
-}
-
-@keyframes chat-msg-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .chat-msg {
-    animation: none;
-  }
 }
 
 .chat-msg--user {
@@ -328,12 +306,11 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 /* Cursor de streaming */
 .chat-cursor {
   display: inline-block;
-  width: 6px;
-  height: 1.05em;
+  width: 7px;
+  height: 1em;
   margin-left: 2px;
-  border-radius: 1px;
   vertical-align: text-bottom;
-  background: var(--ui-brand);
+  background: var(--ui-text-muted);
   animation: chat-blink 1s steps(2, start) infinite;
 }
 
@@ -546,215 +523,21 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   gap: var(--ui-space-2);
 }
 
-/* ── Traza de actividad del agente (timeline de pasos del turno) ─────────────────── */
-
-.agent-trace {
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  background: var(--ui-surface-subtle);
-  overflow: hidden;
-}
-
-.agent-trace__head {
+/* Actividad del agente (AI Elements): ChainOfThought + Plan/Task apilados con ritmo propio.
+   El estilo interno lo traen los componentes (Tailwind + tokens shadcn); aquí solo el layout. */
+.chat-activity {
   display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  width: 100%;
-  padding: 0.4rem 0.55rem;
-  border: none;
-  background: transparent;
-  color: var(--ui-text-muted);
-  font: inherit;
-  font-size: var(--ui-text-xs);
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-  transition: color var(--ui-motion-fast) var(--ui-ease);
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  margin-bottom: var(--ui-space-2);
+}
+.chat-activity:empty {
+  display: none;
 }
 
-.agent-trace__head:hover {
-  color: var(--ui-text);
-}
-
-.agent-trace__head:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus);
-}
-
-.agent-trace__title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-trace__caret {
-  flex: none;
-  color: var(--ui-text-muted);
-  transition: transform var(--ui-motion-fast) var(--ui-ease);
-}
-
-.agent-trace.is-open .agent-trace__caret {
-  transform: rotate(180deg);
-}
-
-/* Mini-orbe de la cabecera (misma identidad visual que el orbe grande). */
-.agent-trace__spark {
-  flex: none;
-  width: 13px;
-  height: 13px;
-  border-radius: var(--ui-radius-pill);
-  background: radial-gradient(
-    circle at 32% 28%,
-    color-mix(in srgb, var(--ui-brand) 72%, white) 0%,
-    var(--ui-brand) 42%,
-    var(--ui-chart-accent) 100%
-  );
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-brand) 12%, transparent);
-}
-
-.agent-trace__steps {
-  position: relative;
-  list-style: none;
-  margin: 0;
-  padding: 0.35rem 0.6rem 0.5rem;
-  border-top: 1px solid var(--ui-border);
-}
-
-/* Línea conectora vertical que enhebra los nodos de la timeline. */
-.agent-trace__steps::before {
-  content: '';
-  position: absolute;
-  left: calc(0.6rem + 5px);
-  top: 0.85rem;
-  bottom: 0.85rem;
-  width: 1.5px;
-  background: var(--ui-border-strong);
-}
-
-.agent-step {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.2rem 0;
-  font-size: var(--ui-text-xs);
-  color: var(--ui-text);
-}
-
-.agent-step__node {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 11px;
-  height: 11px;
-  border-radius: var(--ui-radius-pill);
-  background: var(--ui-surface);
-  border: 1.5px solid var(--ui-border-strong);
-  color: #fff;
-}
-
-/* Color semántico del nodo: consultas (acento índigo) vs acciones de lienzo (marca teal). */
-.agent-step--query.is-done .agent-step__node {
-  background: var(--ui-chart-accent);
-  border-color: var(--ui-chart-accent);
-}
-
-.agent-step--action.is-done .agent-step__node {
-  background: var(--ui-brand);
-  border-color: var(--ui-brand);
-}
-
-.agent-step.is-running .agent-step__node {
-  background: transparent;
-  border-color: var(--ui-brand);
-  border-top-color: transparent;
-  animation: chat-spin 0.7s linear infinite;
-}
-
-.agent-step.is-rejected .agent-step__node {
-  background: var(--ui-danger);
-  border-color: var(--ui-danger);
-}
-
-.agent-step.is-rejected .agent-step__label {
-  color: var(--ui-text-muted);
-  text-decoration: line-through;
-}
-
-.agent-step__label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@keyframes chat-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .agent-step.is-running .agent-step__node {
-    animation: none;
-  }
-}
-
-/* ── Orbe del agente (presencia IA — solo CSS, sin canvas ni WebGL) ───────────────── */
-
-.agent-orb {
-  display: inline-block;
-  flex: none;
-  border-radius: var(--ui-radius-pill);
-  background: radial-gradient(
-    circle at 33% 28%,
-    color-mix(in srgb, var(--ui-brand) 70%, white) 0%,
-    var(--ui-brand) 38%,
-    var(--ui-chart-accent) 100%
-  );
-  box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--ui-brand) 9%, transparent),
-    0 8px 22px -6px color-mix(in srgb, var(--ui-chart-accent) 50%, transparent);
-  animation: agent-orb-breathe 4s var(--ui-ease) infinite;
-}
-
-.agent-orb--sm {
-  width: 16px;
-  height: 16px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-brand) 12%, transparent);
-}
-
-.agent-orb.is-active {
-  animation-duration: 1.6s;
-}
-
-@keyframes agent-orb-breathe {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.9;
-  }
-  50% {
-    transform: scale(1.07);
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .agent-orb {
-    animation: none;
-  }
-}
-
-/* Indicador "pensando" (orbe + shimmer) mientras no hay tokens ni pasos todavía. */
-.chat-thinking {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+/* Cola de mensajes (Queue de AI Elements) encima de la barra del dock. */
+.chat-dock__queue {
+  margin-bottom: var(--ui-space-2);
 }
 
 /* ── Markdown del asistente ────────────────────────────────────────────────────── */
@@ -1107,13 +890,6 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 
 .prompt-input.is-disabled {
   opacity: 0.75;
-}
-
-.prompt-input__queue {
-  margin: 0;
-  padding: 0 0.35rem;
-  color: var(--ui-text-muted);
-  font-size: var(--ui-text-2xs);
 }
 
 .prompt-input__textarea {
@@ -1641,14 +1417,12 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   cursor: pointer;
   transition:
     background var(--ui-motion-fast) var(--ui-ease),
-    border-color var(--ui-motion-fast) var(--ui-ease),
-    transform var(--ui-motion-fast) var(--ui-ease);
+    border-color var(--ui-motion-fast) var(--ui-ease);
 }
 
 .suggestion:hover {
   background: var(--ui-surface-subtle);
-  border-color: color-mix(in srgb, var(--ui-brand) 40%, var(--ui-border));
-  transform: translateY(-1px);
+  border-color: var(--ui-border-strong, var(--ui-border));
 }
 
 .suggestion:focus-visible {
@@ -1721,46 +1495,6 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   box-shadow: var(--ui-focus);
 }
 
-/* Tool: badge de estado + secciones del cuerpo. */
-.chat-tool-chip__badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-left: auto;
-  padding: 1px 7px;
-  border-radius: var(--ui-radius-pill);
-  background: var(--ui-surface-subtle);
-  font-size: var(--ui-text-2xs);
-  font-weight: 600;
-  color: var(--ui-text-muted);
-}
-
-.chat-tool-chip--done .chat-tool-chip__badge {
-  background: var(--ui-success-soft);
-  color: var(--ui-success);
-}
-
-.chat-tool-chip--pending .chat-tool-chip__badge {
-  background: var(--ui-warning-soft);
-  color: var(--ui-warning);
-}
-
-.chat-tool-chip__badge svg {
-  flex: none;
-}
-
-.chat-tool-chip__section {
-  margin: var(--ui-space-2) 0 2px;
-  font-size: var(--ui-text-2xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--ui-text-muted);
-}
-
-.chat-tool-chip__section:first-child {
-  margin-top: 0;
-}
 
 /* Context: trigger de uso + popover con desglose. */
 .ctx {
@@ -1841,4 +1575,40 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   .ctx__panel {
     animation: none;
   }
+}
+
+/* ── Persona animada (AI Elements) ────────────────────────────────────────────── */
+
+/* Esquina inferior izquierda, por encima del dock pero por debajo de los modales. */
+.chat-persona-corner {
+  position: fixed;
+  left: 12px;
+  bottom: 72px; /* encima del dock (~56px) con algo de margen */
+  z-index: 44;
+  width: 40px;
+  height: 40px;
+  overflow: hidden; /* recorta cualquier canvas que Rive intente agrandar */
+  opacity: 0.85;
+  transition: opacity var(--ui-motion-fast) var(--ui-ease);
+}
+
+/* La Persona es DECORATIVA (aria-hidden): nunca debe capturar el puntero. El runtime WebGL2 de
+   Rive fija `pointer-events:auto` en su <canvas>, lo que RE-HABILITA el hit-testing aunque el
+   contenedor tenga pe:none (un descendiente con pe!=none vuelve a ser objetivo de eventos); si
+   además agranda el canvas, taparía todo el viewport y bloquearía TODOS los clics. Forzamos
+   pe:none en todo el subárbol (gana a los estilos inline de Rive) y acotamos el canvas. */
+.chat-persona-corner,
+.chat-persona-corner * {
+  pointer-events: none !important;
+}
+.chat-persona-corner canvas {
+  width: 40px !important;
+  height: 40px !important;
+  display: block;
+}
+
+/* Defensa adicional: si algún runtime inyecta un <canvas> suelto a nivel de <body> (overlay a
+   pantalla completa), que tampoco intercepte clics. Los canvas legítimos del app van anidados. */
+body > canvas {
+  pointer-events: none !important;
 }

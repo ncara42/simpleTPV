@@ -1,6 +1,8 @@
 import { ArrowUp, Loader2, Square } from 'lucide-react';
 import { type KeyboardEvent, type ReactNode, useState } from 'react';
 
+import { SpeechInput } from '../ai-elements/speech-input.js';
+
 /** Estado del turno (espejo del `status` del PromptInput de ai-elements). */
 export type ComposerStatus = 'ready' | 'submitted' | 'streaming';
 
@@ -8,7 +10,6 @@ interface PromptComposerProps {
   /** ready = listo para enviar; submitted = enviado, esperando; streaming = recibiendo. */
   status: ComposerStatus;
   disabled: boolean;
-  queueLength: number;
   onSend: (text: string) => void;
   onStop: () => void;
   /** Controles a la izquierda del pie (el menú «+» de herramientas del lienzo). */
@@ -25,11 +26,12 @@ interface PromptComposerProps {
  * una superficie redondeada con el textarea autoexpandible arriba y un pie con las acciones
  * — el slot `leading` («+») a la izquierda y el botón de enviar/parar a la derecha. Réplica
  * visual con los tokens del design system (sin shadcn); cableada al store propio del chat.
+ *
+ * Incluye SpeechInput de AI Elements para entrada por voz (Web Speech API / MediaRecorder).
  */
 export function PromptComposer({
   status,
   disabled,
-  queueLength,
   onSend,
   onStop,
   leading,
@@ -56,13 +58,14 @@ export function PromptComposer({
     }
   };
 
+  // Cuando el SpeechInput transcribe, añade el texto al campo y abre el panel.
+  const handleTranscription = (text: string): void => {
+    setValue((prev) => (prev ? `${prev} ${text}` : text));
+    onFocus?.();
+  };
+
   return (
     <div className={`prompt-input${disabled ? ' is-disabled' : ''}`} data-testid="chat-composer">
-      {queueLength > 0 && (
-        <p className="prompt-input__queue" role="status">
-          {queueLength === 1 ? '1 mensaje en cola' : `${queueLength} mensajes en cola`}
-        </p>
-      )}
       <textarea
         className="prompt-input__textarea"
         value={value}
@@ -78,6 +81,17 @@ export function PromptComposer({
         <div className="prompt-input__tools">{leading}</div>
         <div className="prompt-input__actions">
           {trailing}
+          {/* Botón de entrada por voz (AI Elements SpeechInput) */}
+          <SpeechInput
+            lang="es-ES"
+            size="icon-sm"
+            variant="ghost"
+            className="prompt-input__speech"
+            onTranscriptionChange={handleTranscription}
+            disabled={disabled}
+            aria-label="Entrada por voz"
+            title="Entrada por voz"
+          />
           {busy ? (
             <button
               type="button"
