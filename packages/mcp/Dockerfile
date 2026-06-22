@@ -22,6 +22,8 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 # ─── Build (vite build:ui → dist/ui + tsc → dist) ─────────────────────────────
 FROM deps AS builder
 COPY tsconfig.base.json ./
+# web-config: @simpletpv/ui extiende su tsconfig.frontend.json; Vite lo necesita al bundlear la UI.
+COPY packages/web-config packages/web-config
 COPY packages/ui packages/ui
 COPY packages/mcp packages/mcp
 RUN pnpm --filter @simpletpv/mcp run build
@@ -40,6 +42,10 @@ WORKDIR /repo
 ENV NODE_ENV=production
 ENV MCP_TRANSPORT=http
 ENV MCP_BIND=0.0.0.0
+# La imagen SIEMPRE corre tras un proxy inverso (Traefik/Cloudflare) → confía en 1
+# salto para que el rate-limiter lea bien X-Forwarded-For. El código deja default
+# `false` (seguro); aquí se opta explícitamente. Dokploy puede sobreescribirlo.
+ENV MCP_TRUST_PROXY=1
 COPY --from=prod-deps /repo/node_modules ./node_modules
 COPY --from=prod-deps /repo/packages/mcp/node_modules ./packages/mcp/node_modules
 COPY --from=builder /repo/packages/mcp/dist ./packages/mcp/dist
