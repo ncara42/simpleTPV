@@ -23,14 +23,16 @@
  *                        multi-instancia). Si no, almacén en memoria.
  *  - MCP_ALLOWED_ORIGINS Orígenes CORS permitidos (CSV). Ej: https://claude.ai
  *  - MCP_TRUST_PROXY     Saltos de proxy de confianza para Express (`trust proxy`).
- *                        OBLIGATORIO tras un proxy inverso (Traefik/Cloudflare):
- *                        si llega `X-Forwarded-For` y esto vale `false`, el
- *                        rate-limiter del SDK lanza ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
- *                        (500 en /register, /token, /authorize). Acepta un número
- *                        de saltos (ej. `1` para un único proxy inverso delante),
- *                        `true`/`false`, o un valor de subred/`loopback`. Default
- *                        `false` (local sin proxy). NO uses `true` en producción:
- *                        es permisivo y permite spoofing del IP de cliente.
+ *                        El modo HTTP SIEMPRE va tras un proxy inverso
+ *                        (Traefik/Cloudflare): si llega `X-Forwarded-For` y esto
+ *                        vale `false`, el rate-limiter del SDK lanza
+ *                        ERR_ERL_UNEXPECTED_X_FORWARDED_FOR (500 en /register,
+ *                        /token, /authorize). Por eso el **default en modo HTTP es
+ *                        `1`** (confía en 1 salto: el proxy inverso de delante).
+ *                        Acepta un número de saltos, `true`/`false`, o subred/
+ *                        `loopback`. Para local SIN proxy, pon `MCP_TRUST_PROXY=false`
+ *                        explícito. NO uses `true` en producción: es permisivo y
+ *                        permite spoofing del IP de cliente.
  */
 
 export interface HttpConfig {
@@ -92,7 +94,9 @@ export function getHttpConfig(): HttpConfig {
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
-    trustProxy: parseTrustProxy(process.env['MCP_TRUST_PROXY']),
+    // Modo HTTP = siempre tras proxy inverso → default `1` si no se configura
+    // (evita ERR_ERL_UNEXPECTED_X_FORWARDED_FOR). Para local sin proxy: =false.
+    trustProxy: parseTrustProxy(process.env['MCP_TRUST_PROXY'] ?? '1'),
   };
   return _config;
 }
