@@ -6,6 +6,7 @@
     "target": "ES2022",
     "lib": ["ES2022"],
     "types": ["node"],
+    "exactOptionalPropertyTypes": false,
     "outDir": "./dist",
     "rootDir": "./src",
     "composite": false,
