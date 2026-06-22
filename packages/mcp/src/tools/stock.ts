@@ -21,7 +21,7 @@ export function registerStockTools(server: McpServer): void {
         apiGet('/stock/alerts', params),
         apiGet('/stock/to-reorder', params),
         apiGet('/stock/expiring', params),
-        apiGet('/dashboard/stockout-kpis', { period: 'this_month', ...params }),
+        apiGet('/dashboard/stockout-kpis', { period: 'month', ...params }),
       ]);
       return { alerts, toReorder, expiring, stockoutKpis };
     },
