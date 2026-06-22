@@ -6,6 +6,8 @@ pub mod hash;
 pub mod queue;
 pub mod record;
 
-pub use hash::{build_qr_data, compute_hash, VerifactuPayload};
+pub use hash::{
+    build_qr_data, compute_alta_hash, compute_anulacion_hash, AltaHashInput, AnulacionHashInput,
+};
 pub use queue::{process_pending_batch, SandboxProvider, VerifactuProvider};
 pub use record::{record_invoice, record_rectification};
