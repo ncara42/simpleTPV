@@ -100,8 +100,8 @@ async fn encadena_huellas_previous_hash() {
 
     // Dos facturas encadenadas en la misma tx (el advisory lock serializa).
     with_tenant_tx(&admin, org, async move |tx, _| {
-        record_invoice(tx, org, sale1, "INV-1", Decimal::from(100)).await?;
-        record_invoice(tx, org, sale2, "INV-2", Decimal::from(50)).await?;
+        record_invoice(tx, org, sale1, "INV-1", Decimal::from(100), &[]).await?;
+        record_invoice(tx, org, sale2, "INV-2", Decimal::from(50), &[]).await?;
         Ok(())
     })
     .await
