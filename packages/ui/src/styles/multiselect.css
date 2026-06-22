@@ -1,0 +1,207 @@
+/* ─── MultiSelect (S-14) ──────────────────────────────────────
+   Selección múltiple con checkboxes + chips. Mismo lenguaje visual
+   que el Select (tokens --ui-*), pero CSS INDEPENDIENTE y namespaced
+   (`ui-multiselect-*`): no toca .ui-select ni el Select del TPV.
+   ──────────────────────────────────────────────────────────── */
+.ui-multiselect {
+  position: relative;
+  display: inline-block;
+}
+
+.ui-multiselect-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.25rem 0.9rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 10px;
+  background: var(--ui-surface);
+  font-size: 0.86rem;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s,
+    background 0.12s;
+}
+
+.ui-multiselect-trigger:hover {
+  background: var(--ui-surface-subtle);
+}
+
+.ui-multiselect-trigger:focus-visible,
+.ui-multiselect-trigger[aria-expanded='true'] {
+  outline: none;
+  border-color: var(--ui-primary, #0071e3);
+  box-shadow: var(--ui-focus, 0 0 0 4px rgba(0, 113, 227, 0.32));
+}
+
+.ui-multiselect-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ui-multiselect-value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-multiselect-value.is-placeholder {
+  color: var(--ui-text-soft);
+}
+
+/* ─── Chips de las tiendas seleccionadas ─── */
+.ui-multiselect-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.ui-multiselect-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 12rem;
+  padding: 0.1rem 0.2rem 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border-strong);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.ui-multiselect-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-multiselect-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  color: var(--ui-text-soft);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ui-multiselect-chip-remove:hover {
+  background: var(--ui-border-strong);
+  color: var(--ui-text);
+}
+
+.ui-multiselect-chevron {
+  flex-shrink: 0;
+  color: var(--ui-text-soft);
+  transition: transform 0.15s ease;
+}
+
+.ui-multiselect-trigger[aria-expanded='true'] .ui-multiselect-chevron {
+  transform: rotate(180deg);
+}
+
+/* ─── Menú flotante (misma piel de popover que .ui-select-menu) ─── */
+.ui-multiselect-menu {
+  z-index: 60;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  overflow-y: auto;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 12px;
+  box-shadow: var(--ui-shadow-md, 0 12px 32px rgba(0, 0, 0, 0.16));
+  animation: ui-multiselect-pop 0.12s ease;
+}
+
+@keyframes ui-multiselect-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ui-multiselect-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  color: var(--ui-text);
+  cursor: pointer;
+}
+
+.ui-multiselect-option.is-active {
+  background: var(--ui-surface-subtle);
+}
+
+.ui-multiselect-option.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-multiselect-option-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-multiselect-option-count {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ui-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Casilla cuadrada con check cuando está marcada. */
+.ui-multiselect-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 1.5px solid var(--ui-border-strong);
+  border-radius: 5px;
+  color: #fff;
+}
+
+.ui-multiselect-option.is-selected .ui-multiselect-checkbox {
+  background: var(--ui-primary, #0071e3);
+  border-color: var(--ui-primary, #0071e3);
+}
+
+/* Acción "Todas" (limpiar): separada del resto con una hairline. */
+.ui-multiselect-clear {
+  margin-bottom: 0.2rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--ui-border-strong);
+  border-radius: 8px 8px 0 0;
+  font-weight: 600;
+  color: var(--ui-text-soft);
+}
+
+.ui-multiselect-clear.is-selected {
+  color: var(--ui-text);
+}
