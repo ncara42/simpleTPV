@@ -24,6 +24,30 @@ const storeId = z.string().uuid().optional().describe('UUID de tienda para filtr
 const dateFrom = z.string().optional().describe('Fecha inicio YYYY-MM-DD (solo si period=custom)');
 const dateTo = z.string().optional().describe('Fecha fin YYYY-MM-DD (solo si period=custom)');
 
+/** Mapa dimensión → endpoint del desglose de ventas (consolidado en get_sales_by_dimension). */
+const SALES_DIMENSION_ENDPOINT = {
+  store: '/dashboard/sales-by-store',
+  family: '/dashboard/sales-by-family',
+  hour: '/dashboard/sales-by-hour',
+  employee: '/dashboard/sales-by-employee',
+  discount_by_employee: '/dashboard/discount-by-employee',
+} as const;
+/** Dimensiones cuyo endpoint admite filtrar por tienda (las demás solo por período). */
+const SALES_DIMENSION_STORE_SCOPED = new Set(['family', 'hour', 'employee']);
+
+/** Mapa grupo → endpoint de KPIs (consolidado en get_kpis). */
+const KPI_ENDPOINT = {
+  sales: '/dashboard/sales-kpis',
+  margin: '/dashboard/margin-kpis',
+  stockout: '/dashboard/stockout-kpis',
+} as const;
+
+/** Mapa nivel → endpoint de rotación (consolidado en get_rotation). */
+const ROTATION_ENDPOINT = {
+  product: '/dashboard/product-rotation',
+  archetype: '/dashboard/archetype-rotation',
+} as const;
+
 export function registerDashboardTools(server: McpServer): void {
   readTool(
     server,
@@ -61,10 +85,24 @@ export function registerDashboardTools(server: McpServer): void {
 
   readTool(
     server,
-    'get_sales_kpis',
-    'KPIs agregados de ventas: importe total vendido, ticket medio, número de tickets, margen bruto (%) y tasa de descuento (%). Acepta filtro de período y tienda concreta.',
-    { period, from: dateFrom, to: dateTo, storeId },
-    (params) => apiGet('/dashboard/sales-kpis', params),
+    'get_kpis',
+    'KPIs agregados según el grupo solicitado: "sales" (importe total, ticket medio, nº de tickets, margen bruto %, tasa de descuento %), "margin" (margen bruto, % de margen, COGS) o "stockout" (alertas totales, productos agotados, stock crítico). Para un único grupo concreto; si necesitas el cuadro completo de ventas usa get_sales_breakdown.',
+    {
+      group: z
+        .enum(['sales', 'margin', 'stockout'])
+        .describe(
+          'Grupo de KPIs: sales = ventas, margin = rentabilidad, stockout = rotura de stock',
+        ),
+      period,
+      from: dateFrom,
+      to: dateTo,
+      storeId,
+    },
+    ({ group, period, from, to, storeId }) =>
+      apiGet(
+        KPI_ENDPOINT[group],
+        group === 'sales' ? { period, from, to, storeId } : { period, storeId },
+      ),
   );
 
   readTool(
@@ -83,58 +121,20 @@ export function registerDashboardTools(server: McpServer): void {
 
   readTool(
     server,
-    'get_sales_by_store',
-    'Desglose de ventas por tienda: importe y número de tickets de cada local. Ideal para comparar rendimiento entre tiendas.',
-    { period },
-    ({ period }) => apiGet('/dashboard/sales-by-store', { period }),
-  );
-
-  readTool(
-    server,
-    'get_sales_by_product_family',
-    'Ventas desglosadas por familia de producto: importe, unidades vendidas y margen por categoría. Análisis de mix de producto.',
-    { period, storeId },
-    (params) => apiGet('/dashboard/sales-by-family', params),
-  );
-
-  readTool(
-    server,
-    'get_sales_by_hour',
-    'Distribución horaria de ventas: importe y nº de transacciones por franja horaria. Sirve para identificar picos de demanda y optimizar turnos.',
-    { period, storeId },
-    (params) => apiGet('/dashboard/sales-by-hour', params),
-  );
-
-  readTool(
-    server,
-    'get_sales_by_employee',
-    'Rendimiento de ventas por empleado: importe total generado y número de tickets. Permite comparar productividad del equipo.',
-    { period, storeId },
-    (params) => apiGet('/dashboard/sales-by-employee', params),
-  );
-
-  readTool(
-    server,
-    'get_discount_by_employee',
-    'Análisis de descuentos por empleado: importe total descontado y tasa de descuento sobre ventas. Útil para detectar abuso de descuentos o premiar disciplina comercial.',
-    { period },
-    ({ period }) => apiGet('/dashboard/discount-by-employee', { period }),
-  );
-
-  readTool(
-    server,
-    'get_margin_kpis',
-    'KPIs de rentabilidad: importe de margen bruto, porcentaje de margen y coste de las mercancías vendidas (COGS). Fundamental para análisis de rentabilidad.',
-    { period, storeId },
-    (params) => apiGet('/dashboard/margin-kpis', params),
-  );
-
-  readTool(
-    server,
-    'get_stockout_kpis',
-    'Métricas de rotura de stock: alertas totales, productos agotados y stock crítico. Mide el riesgo operativo del inventario.',
-    { period, storeId },
-    (params) => apiGet('/dashboard/stockout-kpis', params),
+    'get_sales_by_dimension',
+    'Desglose de ventas según la dimensión indicada: "store" (importe y tickets por tienda), "family" (importe, unidades y margen por familia de producto), "hour" (distribución horaria para detectar picos), "employee" (rendimiento por empleado) o "discount_by_employee" (descuentos aplicados por cada empleado, para detectar abuso). Para el cuadro completo de una vez usa get_sales_breakdown.',
+    {
+      dimension: z
+        .enum(['store', 'family', 'hour', 'employee', 'discount_by_employee'])
+        .describe('Dimensión del desglose de ventas'),
+      period,
+      storeId,
+    },
+    ({ dimension, period, storeId }) =>
+      apiGet(
+        SALES_DIMENSION_ENDPOINT[dimension],
+        SALES_DIMENSION_STORE_SCOPED.has(dimension) ? { period, storeId } : { period },
+      ),
   );
 
   readTool(
@@ -157,17 +157,16 @@ export function registerDashboardTools(server: McpServer): void {
 
   readTool(
     server,
-    'get_product_rotation',
-    'Análisis de rotación de inventario por producto: días en stock y tasa de turnover. Identifica exceso de stock o alta rotación.',
-    { period, storeId },
-    (params) => apiGet('/dashboard/product-rotation', params),
-  );
-
-  readTool(
-    server,
-    'get_archetype_rotation',
-    'Rotación a nivel de arquetipo/categoría hoja: turnover y margen por familia de productos. Vista estratégica del portfolio.',
-    { period },
-    ({ period }) => apiGet('/dashboard/archetype-rotation', { period }),
+    'get_rotation',
+    'Análisis de rotación de inventario al nivel indicado: "product" (días en stock y turnover por producto, identifica exceso o alta rotación) o "archetype" (turnover y margen por arquetipo/categoría hoja, vista estratégica del portfolio).',
+    {
+      level: z
+        .enum(['product', 'archetype'])
+        .describe('Nivel de análisis: product = por producto, archetype = por categoría hoja'),
+      period,
+      storeId,
+    },
+    ({ level, period, storeId }) =>
+      apiGet(ROTATION_ENDPOINT[level], level === 'product' ? { period, storeId } : { period }),
   );
 }

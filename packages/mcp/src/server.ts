@@ -7,7 +7,7 @@ import { registerSalesTools } from './tools/sales.js';
 import { registerStockTools } from './tools/stock.js';
 
 export function createMcpServer(): McpServer {
-  const server = new McpServer({ name: 'simpletpv', version: '1.0.0' });
+  const server = new McpServer({ name: 'simpletpv', version: '1.1.0' });
   registerDashboardTools(server);
   registerSalesTools(server);
   registerStockTools(server);
