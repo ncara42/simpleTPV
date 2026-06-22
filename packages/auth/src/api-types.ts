@@ -729,7 +729,7 @@ export interface VerifactuRecord {
   id: string;
   saleId: string | null;
   returnId: string | null;
-  type: 'INVOICE' | 'RECTIFICATION';
+  type: 'INVOICE' | 'RECTIFICATION' | 'ANULACION';
   status: VerifactuStatus;
   hash: string;
   previousHash: string | null;

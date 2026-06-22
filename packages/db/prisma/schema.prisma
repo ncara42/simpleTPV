@@ -900,6 +900,7 @@ enum PurchaseOrderStatus {
 enum VerifactuType {
   INVOICE
   RECTIFICATION
+  ANULACION
 }
 
 enum VerifactuStatus {
