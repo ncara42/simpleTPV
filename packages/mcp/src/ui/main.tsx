@@ -9,6 +9,7 @@ import { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import type { DashboardData } from './types';
+import { Breakdown } from './views/Breakdown';
 import { Overview } from './views/Overview';
 
 /**
@@ -35,14 +36,11 @@ function App() {
   if (error) return <div className="mcp-state">No se pudo conectar con el panel.</div>;
   if (!data)
     return <div className="mcp-state">{isConnected ? 'Cargando datos…' : 'Conectando…'}</div>;
-  if (data.kind === 'overview') {
-    return (
-      <div className="mcp-app">
-        <Overview data={data} />
-      </div>
-    );
-  }
-  return <div className="mcp-state">Vista no disponible.</div>;
+  return (
+    <div className="mcp-app">
+      {data.kind === 'overview' ? <Overview data={data} /> : <Breakdown data={data} />}
+    </div>
+  );
 }
 
 const root = document.getElementById('root');
