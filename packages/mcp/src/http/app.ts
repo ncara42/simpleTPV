@@ -9,9 +9,10 @@
  *  - StreamableHTTP       → transporte MCP con sesiones, detrás de la auth.
  */
 
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import http from 'node:http';
 
+import { redirectUriMatches } from '@modelcontextprotocol/sdk/server/auth/handlers/authorize.js';
 import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
 import {
   getOAuthProtectedResourceMetadataUrl,
@@ -23,6 +24,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import cors from 'cors';
 import express, { type Request, type Response } from 'express';
 
+import { backendLogin, BackendLoginError } from '../backend/login.js';
 import { getHttpConfig } from '../oauth/config.js';
 import { SimpleTpvOAuthProvider } from '../oauth/provider.js';
 import { InMemoryOAuthStore } from '../oauth/store.js';
@@ -32,6 +34,8 @@ import { createMcpServer } from '../server.js';
 const MAX_BODY = '1mb';
 const MAX_SESSIONS = 200;
 const SESSION_TTL_MS = 30 * 60 * 1000;
+/** TTL del código de autorización: corto y single-use. */
+const CODE_TTL_MS = 60 * 1000;
 /** Scopes que ofrece el servidor; least-privilege se refina en Fase 3. */
 const SCOPES_SUPPORTED = ['tpv:read'];
 
@@ -83,6 +87,93 @@ export function startHttpServer(): void {
       resourceName: 'SimpleTpv',
     }),
   );
+
+  // ─── Login delegado al backend (sin pantalla propia: HTTP Basic) ─────────────
+  // `authorize` redirige aquí con los parámetros OAuth. Hacemos el challenge
+  // Basic nativo del navegador, validamos contra /auth/login y creamos el código.
+  const handleLogin = async (req: Request, res: Response): Promise<void> => {
+    const clientId = typeof req.query['client_id'] === 'string' ? req.query['client_id'] : '';
+    const redirectUri =
+      typeof req.query['redirect_uri'] === 'string' ? req.query['redirect_uri'] : '';
+    const codeChallenge =
+      typeof req.query['code_challenge'] === 'string' ? req.query['code_challenge'] : '';
+    const state = typeof req.query['state'] === 'string' ? req.query['state'] : undefined;
+    const scopeParam = typeof req.query['scope'] === 'string' ? req.query['scope'] : '';
+    const resource = typeof req.query['resource'] === 'string' ? req.query['resource'] : undefined;
+
+    // Validar cliente y redirect_uri ANTES de pedir credenciales (anti open-redirect).
+    const client = await store.getClient(clientId);
+    if (!client || !codeChallenge || !redirectUri) {
+      res.status(400).send('Solicitud de autorización inválida.');
+      return;
+    }
+    if (!client.redirect_uris.some((r) => redirectUriMatches(redirectUri, r))) {
+      res.status(400).send('redirect_uri no registrada para este cliente.');
+      return;
+    }
+
+    // Challenge HTTP Basic: el navegador pide email+contraseña en su diálogo nativo.
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Basic ')) {
+      res.set('WWW-Authenticate', 'Basic realm="SimpleTpv", charset="UTF-8"');
+      res.status(401).send('Introduce tu email y contraseña de SimpleTpv.');
+      return;
+    }
+    const decoded = Buffer.from(authHeader.slice('Basic '.length), 'base64').toString('utf8');
+    const sep = decoded.indexOf(':');
+    const email = sep >= 0 ? decoded.slice(0, sep) : decoded;
+    const password = sep >= 0 ? decoded.slice(sep + 1) : '';
+
+    let login;
+    try {
+      login = await backendLogin(email, password);
+    } catch (err) {
+      if (err instanceof BackendLoginError) {
+        res.set('WWW-Authenticate', 'Basic realm="SimpleTpv", charset="UTF-8"');
+        res.status(401).send('Credenciales no válidas.');
+        return;
+      }
+      res.status(502).send('No se pudo contactar con el backend de SimpleTpv.');
+      return;
+    }
+
+    // Sesión de backend (sin passthrough): ligada al grant, para los saltos MCP→backend.
+    const grantId = randomUUID();
+    await store.saveBackendSession(grantId, {
+      refreshCookieEnc: login.refreshCookie,
+      organizationId: login.organizationId,
+      sub: login.sub,
+      role: login.role,
+    });
+
+    const requested = scopeParam
+      ? scopeParam.split(' ').filter((s) => SCOPES_SUPPORTED.includes(s))
+      : [];
+    const scopes = requested.length > 0 ? requested : [...SCOPES_SUPPORTED];
+
+    const code = randomBytes(32).toString('base64url');
+    await store.saveCode(code, {
+      clientId,
+      redirectUri,
+      codeChallenge,
+      scopes,
+      resource,
+      sub: login.sub,
+      organizationId: login.organizationId,
+      role: login.role,
+      grantId,
+      expiresAt: Date.now() + CODE_TTL_MS,
+    });
+
+    const redirect = new URL(redirectUri);
+    redirect.searchParams.set('code', code);
+    if (state) redirect.searchParams.set('state', state);
+    res.redirect(302, redirect.href);
+  };
+
+  app.get('/mcp-login', (req, res) => {
+    void handleLogin(req, res);
+  });
 
   const requireAuth = requireBearerAuth({
     verifier: tokenVerifier,

@@ -23,6 +23,7 @@ export const tokenVerifier: OAuthTokenVerifier = {
         token,
         clientId: claims.clientId,
         scopes: claims.scopes,
+        expiresAt: claims.expiresAt,
         resource: resourceUrl,
         extra: {
           sub: claims.sub,

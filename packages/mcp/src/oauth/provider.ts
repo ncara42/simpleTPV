@@ -2,17 +2,18 @@
  * OAuthServerProvider: la lógica del Authorization Server. El SDK
  * (`mcpAuthRouter`) monta los endpoints HTTP (/authorize, /token, /register,
  * /revoke), valida PKCE y parsea las peticiones; este provider aporta la lógica:
- * registro de clientes (DCR), login delegado al backend, y emisión/rotación de
- * tokens.
+ * registro de clientes (DCR), redirección al login delegado al backend, y
+ * emisión/rotación de tokens.
  *
- * Fase 0: DCR + verificación de tokens operativos. `authorize`,
- * `exchangeAuthorizationCode` y `exchangeRefreshToken` se implementan en Fase 2.
+ * El paso de credenciales NO ocurre aquí: `authorize` redirige a /mcp-login
+ * (ver http/app.ts), que hace el challenge HTTP Basic, valida contra el backend
+ * y crea el código de autorización. Aquí solo se canjea ese código por tokens.
  */
 
 import { randomBytes, randomUUID } from 'node:crypto';
 
 import type { OAuthRegisteredClientsStore } from '@modelcontextprotocol/sdk/server/auth/clients.js';
-import { ServerError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
+import { InvalidGrantError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import type {
   AuthorizationParams,
   OAuthServerProvider,
@@ -25,10 +26,25 @@ import type {
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import type { Response } from 'express';
 
+import { getHttpConfig } from './config.js';
 import type { OAuthStore } from './store.js';
+import { mintAccessToken } from './tokens.js';
 import { tokenVerifier } from './verifier.js';
 
 const CLIENT_SECRET_BYTES = 32;
+const REFRESH_TOKEN_BYTES = 32;
+/** Vida del refresh token del MCP (alineada con el refresh del backend). */
+const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Datos de un grant suficientes para emitir tokens. */
+interface GrantClaims {
+  clientId: string;
+  scopes: string[];
+  sub: string;
+  organizationId: string;
+  role: string;
+  grantId: string;
+}
 
 export class SimpleTpvOAuthProvider implements OAuthServerProvider {
   constructor(private readonly store: OAuthStore) {}
@@ -57,39 +73,105 @@ export class SimpleTpvOAuthProvider implements OAuthServerProvider {
     };
   }
 
-  // ─── Flujo de autorización (Fase 2) ──────────────────────────────────────────
+  // ─── Flujo de autorización ───────────────────────────────────────────────────
+  /**
+   * Redirige el navegador a /mcp-login con los parámetros OAuth. Allí se hace el
+   * challenge HTTP Basic (sin pantalla propia), se valida contra el backend y se
+   * crea el código de autorización ligado a este `code_challenge`.
+   */
   async authorize(
-    _client: OAuthClientInformationFull,
-    _params: AuthorizationParams,
-    _res: Response,
+    client: OAuthClientInformationFull,
+    params: AuthorizationParams,
+    res: Response,
   ): Promise<void> {
-    throw new ServerError('authorize: pendiente de la Fase 2 (login delegado al backend)');
+    const { issuerUrl } = getHttpConfig();
+    const loginUrl = new URL('/mcp-login', issuerUrl);
+    loginUrl.searchParams.set('client_id', client.client_id);
+    loginUrl.searchParams.set('redirect_uri', params.redirectUri);
+    loginUrl.searchParams.set('code_challenge', params.codeChallenge);
+    if (params.state) loginUrl.searchParams.set('state', params.state);
+    if (params.scopes && params.scopes.length > 0) {
+      loginUrl.searchParams.set('scope', params.scopes.join(' '));
+    }
+    if (params.resource) loginUrl.searchParams.set('resource', params.resource.href);
+    res.redirect(302, loginUrl.href);
   }
 
+  /** El SDK pide el challenge para validar PKCE antes de canjear (lectura no destructiva). */
   async challengeForAuthorizationCode(
-    _client: OAuthClientInformationFull,
-    _authorizationCode: string,
+    client: OAuthClientInformationFull,
+    authorizationCode: string,
   ): Promise<string> {
-    throw new ServerError('challengeForAuthorizationCode: pendiente de la Fase 2');
+    const rec = await this.store.peekCode(authorizationCode);
+    if (!rec || rec.clientId !== client.client_id) {
+      throw new InvalidGrantError('código de autorización inválido');
+    }
+    return rec.codeChallenge;
   }
 
   async exchangeAuthorizationCode(
-    _client: OAuthClientInformationFull,
-    _authorizationCode: string,
+    client: OAuthClientInformationFull,
+    authorizationCode: string,
     _codeVerifier?: string,
-    _redirectUri?: string,
+    redirectUri?: string,
     _resource?: URL,
   ): Promise<OAuthTokens> {
-    throw new ServerError('exchangeAuthorizationCode: pendiente de la Fase 2');
+    const rec = await this.store.takeCode(authorizationCode);
+    if (!rec || rec.clientId !== client.client_id) {
+      throw new InvalidGrantError('código de autorización inválido o expirado');
+    }
+    if (redirectUri !== undefined && redirectUri !== rec.redirectUri) {
+      throw new InvalidGrantError('redirect_uri no coincide con el de la autorización');
+    }
+    return this.issueTokens(rec);
   }
 
   async exchangeRefreshToken(
-    _client: OAuthClientInformationFull,
-    _refreshToken: string,
-    _scopes?: string[],
+    client: OAuthClientInformationFull,
+    refreshToken: string,
+    scopes?: string[],
     _resource?: URL,
   ): Promise<OAuthTokens> {
-    throw new ServerError('exchangeRefreshToken: pendiente de la Fase 2');
+    // Rotación: el refresh usado se invalida (takeRefresh lo borra).
+    const rec = await this.store.takeRefresh(refreshToken);
+    if (!rec || rec.clientId !== client.client_id) {
+      throw new InvalidGrantError('refresh token inválido o expirado');
+    }
+    // Un refresh solo puede estrechar scopes, nunca ampliarlos.
+    const grantedScopes =
+      scopes && scopes.length > 0 ? rec.scopes.filter((s) => scopes.includes(s)) : rec.scopes;
+    return this.issueTokens({ ...rec, scopes: grantedScopes });
+  }
+
+  /** Emite un access token (JWT) + un refresh token nuevo (rotación). */
+  private async issueTokens(grant: GrantClaims): Promise<OAuthTokens> {
+    const { token, expiresInSecs } = await mintAccessToken({
+      sub: grant.sub,
+      organizationId: grant.organizationId,
+      role: grant.role,
+      clientId: grant.clientId,
+      scopes: grant.scopes,
+      grantId: grant.grantId,
+    });
+
+    const refreshToken = randomBytes(REFRESH_TOKEN_BYTES).toString('base64url');
+    await this.store.saveRefresh(refreshToken, {
+      clientId: grant.clientId,
+      scopes: grant.scopes,
+      sub: grant.sub,
+      organizationId: grant.organizationId,
+      role: grant.role,
+      grantId: grant.grantId,
+      expiresAt: Date.now() + REFRESH_TTL_MS,
+    });
+
+    return {
+      access_token: token,
+      token_type: 'bearer',
+      expires_in: expiresInSecs,
+      refresh_token: refreshToken,
+      scope: grant.scopes.join(' '),
+    };
   }
 
   // ─── Resource Server ─────────────────────────────────────────────────────────

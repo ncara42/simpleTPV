@@ -58,7 +58,10 @@ export async function mintAccessToken(claims: AccessTokenClaims): Promise<Minted
   return { token, expiresInSecs: ACCESS_TOKEN_TTL_SECS };
 }
 
-export async function verifyAccessToken(token: string): Promise<AccessTokenClaims> {
+/** Claims verificadas + el `exp` (que el RS del SDK exige en AuthInfo.expiresAt). */
+export type VerifiedToken = AccessTokenClaims & { expiresAt: number };
+
+export async function verifyAccessToken(token: string): Promise<VerifiedToken> {
   const { issuerUrl, resourceUrl } = getHttpConfig();
   const { publicKey } = await getSigningKeys();
 
@@ -78,5 +81,6 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenClaim
     clientId: String(payload['cid'] ?? ''),
     scopes: scope ? scope.split(' ') : [],
     grantId: String(payload['gid'] ?? ''),
+    expiresAt: typeof payload.exp === 'number' ? payload.exp : 0,
   };
 }

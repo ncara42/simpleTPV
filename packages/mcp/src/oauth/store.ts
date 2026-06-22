@@ -57,6 +57,8 @@ export interface OAuthStore {
 
   // Códigos de autorización (single-use)
   saveCode(code: string, record: AuthorizationCodeRecord): Promise<void>;
+  /** Lectura no destructiva: el SDK valida PKCE antes de canjear. */
+  peekCode(code: string): Promise<AuthorizationCodeRecord | undefined>;
   takeCode(code: string): Promise<AuthorizationCodeRecord | undefined>;
 
   // Refresh tokens (rotatorios)
@@ -87,6 +89,13 @@ export class InMemoryOAuthStore implements OAuthStore {
 
   async saveCode(code: string, record: AuthorizationCodeRecord): Promise<void> {
     this.codes.set(code, record);
+  }
+
+  async peekCode(code: string): Promise<AuthorizationCodeRecord | undefined> {
+    const rec = this.codes.get(code);
+    if (!rec) return undefined;
+    if (Date.now() > rec.expiresAt) return undefined;
+    return rec;
   }
 
   async takeCode(code: string): Promise<AuthorizationCodeRecord | undefined> {
