@@ -68,6 +68,8 @@ const WIDGET_CATALOG: &[(&str, &str)] = &[
         "block:product-ranking",
         "BLOQUE — Ranking de productos por ventas",
     ),
+    ("block:top-margin", "BLOQUE — Top de productos por margen"),
+    ("block:dead-stock", "BLOQUE — Peor rotación (stock muerto)"),
     (
         "block:profitability",
         "BLOQUE — Rentabilidad (facturación + beneficio + % margen + ventas por familia)",
@@ -112,7 +114,8 @@ const WIDGETABLE_ENDPOINTS: &[(&str, &str, &str)] = &[
     ),
     (
         "/dashboard/sales-by-store",
-        "Desglose por tienda: facturación, ticket medio y margen (compara tiendas).",
+        "Desglose por tienda: facturación, ticket medio y margen. Incluye todas las tiendas \
+         (cero ventas en 0) → ideal para comparar y hallar al rezagado.",
         "storeName, revenue, avgTicket, margin, marginPct, salesCount",
     ),
     (
@@ -122,8 +125,9 @@ const WIDGETABLE_ENDPOINTS: &[(&str, &str, &str)] = &[
     ),
     (
         "/dashboard/product-rankings",
-        "Ranking de productos por ventas, margen o rotación (param: rankBy).",
-        "name, total, units",
+        "Ranking de productos por ventas, margen o rotación (param: rankBy=sales|margin|rotation \
+         → lista única items con value).",
+        "name, total, units (o name, value con rankBy)",
     ),
     (
         "/dashboard/sales-kpis",
@@ -206,8 +210,14 @@ Para combinar varias métricas en UNA tarjeta tienes DOS caminos. NUNCA emitas g
 - `block:staff-performance` — ranking de ventas por vendedor + nº de ventas por vendedor.
 - `block:store-comparison` — ranking de facturación por tienda + margen por tienda (compara tiendas).
 - `block:product-ranking` — top de productos por ventas.
+- `block:top-margin` — top de productos por margen.
+- `block:dead-stock` — productos de peor rotación (stock muerto, unidades del periodo).
 - `block:stock-risk` — venta perdida estimada + roturas abiertas + alertas y caducidades.
 `period` y `store_id` (de la propia llamada) se heredan por todas las piezas. No construyas slots.
+
+Few-shot — «¿qué tienda sube/baja esta semana, quién es el rezagado?» → un solo `add_widget` con
+`widget_id` "block:store-comparison" y `period` "week" (compara facturación + margen por tienda; luego
+lee `sales_by_store` y narra el rezagado citando su cifra real). NO enumeres tiendas a mano.
 
 ### B) Panel a medida (`gen:panel`) — solo si ningún bloque encaja
 `add_widget` con `widget_id` "gen:panel" y `generic_spec`: `kind`:"panel"; `recipe` (DICTA el layout);
@@ -384,8 +394,9 @@ activos: {}\n- Empleados: {}\n\n",
 fn push_data_tools(p: &mut String, is_admin: bool) {
     p.push_str(
         "## Herramientas de datos\n\nConsulta los datos reales con estas herramientas: \
-`sales_kpis`, `sales_by_hour`, `sales_by_family`, `product_rankings`, `stock_alerts`, \
-`purchase_orders`, `sales_by_employee`, `time_clock_today`.\n",
+`sales_kpis`, `margin_kpis`, `sales_by_hour`, `sales_by_family`, `sales_by_store`, \
+`product_rankings`, `stock_alerts`, `stockout_kpis`, `purchase_orders`, `sales_by_employee`, \
+`discount_by_employee`, `time_clock_today`.\n",
     );
     if is_admin {
         p.push_str(
@@ -400,7 +411,8 @@ están reservadas a administradores y no están disponibles para ti.\n",
     }
     p.push_str(
         "Periodos válidos (mismos en las tools de datos y en `period` de `add_widget`/piezas): \
-today, yesterday, week, month, quarter, year.\n\n",
+today, yesterday, week, month, quarter, year (acumulado del periodo en curso) y last_week, \
+last_month, last_quarter, last_year (periodo cerrado anterior, para comparar).\n\n",
     );
 }
 
@@ -700,13 +712,14 @@ mod tests {
     #[test]
     fn el_prompt_no_se_dispara_en_tamano() {
         // El playbook de diseño (#201: planificación + tabla intención→pieza + principios +
-        // few-shots) sube el prompt de ~8,5k a ~12k chars (~3k tokens). Es una inversión deliberada:
-        // el system prompt es la palanca de calidad del agente. Cota a 14k = guardia anti-runaway
-        // (que el prompt no se duplique por accidente), no una restricción de coste.
+        // few-shots) + el catálogo de 10 bloques (#224/#225) suben el prompt a ~14k chars
+        // (~3,5k tokens). Es una inversión deliberada: el system prompt es la palanca de calidad
+        // del agente. Cota a 15k = guardia anti-runaway (que no se duplique por accidente), no una
+        // restricción de coste.
         let p = build_system_prompt(&sample_org(), true, None, None, None);
         eprintln!("system_prompt chars = {}", p.len());
         assert!(
-            p.len() < 14_000,
+            p.len() < 15_000,
             "el system prompt creció demasiado: {} chars",
             p.len()
         );

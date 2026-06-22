@@ -652,23 +652,16 @@ test('API Keys (en Ayuda → Integraciones): lista, alta y banner de un solo uso
   await expect(page.getByTestId('apikeys-table')).toContainText(keyName);
 });
 
-test('U-04: sidebar contraído a rail — flyout lateral con anclaje y navegación', async ({
-  page,
-}) => {
-  await page.getByTestId('sidebar-collapse').click();
-  await expect(page.locator('aside.sidebar.collapsed')).toBeVisible();
-  // Contraído no se ven las labels del rail (solo iconos).
-  await expect(page.getByTestId('nav-group-inventory').locator('.sidebar-item-label')).toBeHidden();
-  // Clic en el grupo ancla el flyout lateral con sus opciones (labels visibles).
+test('U-04: shell flotante — grupos desplegables abren su flyout y navegan', async ({ page }) => {
+  // El shell flotante (sin header) presenta los grupos del sidebar como desplegables; el
+  // rail contraíble se retiró en este diseño (`collapsible && !floating` en el componente).
+  // Clic en el grupo abre el flyout con sus opciones.
   await page.getByTestId('nav-group-inventory').click();
   await expect(page.getByTestId('nav-stock')).toBeVisible();
   await page.getByTestId('nav-stock').click();
-  // Navega a Stock y el flyout se cierra.
+  // Navega a Stock y el desplegable se cierra al elegir destino.
   await expect(page.getByTestId('stock-page')).toBeVisible();
   await expect(page.getByTestId('nav-stock')).toBeHidden();
-  // Vuelta a expandido.
-  await page.getByTestId('sidebar-collapse').click();
-  await expect(page.locator('aside.sidebar.collapsed')).toHaveCount(0);
 });
 
 test('U-06: la búsqueda de funciones del header navega por nombre y sinónimo', async ({ page }) => {

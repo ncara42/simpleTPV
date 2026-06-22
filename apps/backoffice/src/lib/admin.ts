@@ -101,14 +101,24 @@ export async function listSales(params: SalesQueryInput): Promise<SalesView> {
     pageSize: res.pageSize,
     totalItems: res.totalItems,
     totals: res.totals,
-    items: res.items.map((it) => ({
-      ...it,
-      storeName: (it as unknown as { store?: { name?: string } }).store?.name ?? '',
-      sellerId: '',
-      sellerName: (it as unknown as { user?: { name?: string } }).user?.name ?? '',
-      familyId: '',
-      familyName: '',
-      lines: 0,
-    })),
+    items: res.items.map((it) => {
+      const row = it as unknown as {
+        storeName?: string;
+        sellerName?: string;
+        store?: { name?: string };
+        user?: { name?: string };
+      };
+      return {
+        ...it,
+        // El backend Rust sirve los nombres planos (storeName/sellerName); se conserva el
+        // fallback a las relaciones anidadas (forma legacy NestJS) por compatibilidad.
+        storeName: row.storeName ?? row.store?.name ?? '',
+        sellerId: '',
+        sellerName: row.sellerName ?? row.user?.name ?? '',
+        familyId: '',
+        familyName: '',
+        lines: 0,
+      };
+    }),
   };
 }

@@ -26,8 +26,8 @@ use super::domain::{
 };
 use super::input::CreateSale;
 use super::model::{
-    OrgInfo, Sale, SaleLine, SaleStatus, SaleWithLines, SalesPage, SalesTotals, StoreInfo,
-    TicketBlock, TicketData, TicketLine,
+    OrgInfo, Sale, SaleLine, SaleListItem, SaleStatus, SaleWithLines, SalesPage, SalesTotals,
+    StoreInfo, TicketBlock, TicketData, TicketLine,
 };
 
 const MAX_SALES_PAGE_SIZE: i64 = 100;
@@ -539,7 +539,36 @@ pub async fn list(
             .push_bind(page_size)
             .push(" OFFSET ")
             .push_bind((page - 1) * page_size);
-        let items: Vec<Sale> = qb.build_query_as::<Sale>().fetch_all(&mut **tx).await?;
+        let sales: Vec<Sale> = qb.build_query_as::<Sale>().fetch_all(&mut **tx).await?;
+
+        // Nombres denormalizados (tienda/vendedor) para las columnas del historial. Una sola
+        // query por id (página ≤100); evita ambigüedad de columnas en el JOIN del listado.
+        let ids: Vec<Uuid> = sales.iter().map(|s| s.id).collect();
+        let name_rows: Vec<(Uuid, String, String)> = sqlx::query_as(
+            r#"SELECT s.id, st.name AS store_name, u.name AS seller_name
+               FROM "Sale" s
+               JOIN "Store" st ON st.id = s."storeId"
+               JOIN "User" u ON u.id = s."userId"
+               WHERE s.id = ANY($1)"#,
+        )
+        .bind(&ids)
+        .fetch_all(&mut **tx)
+        .await?;
+        let mut names: std::collections::HashMap<Uuid, (String, String)> = name_rows
+            .into_iter()
+            .map(|(id, store_name, seller_name)| (id, (store_name, seller_name)))
+            .collect();
+        let items: Vec<SaleListItem> = sales
+            .into_iter()
+            .map(|sale| {
+                let (store_name, seller_name) = names.remove(&sale.id).unwrap_or_default();
+                SaleListItem {
+                    sale,
+                    store_name,
+                    seller_name,
+                }
+            })
+            .collect();
 
         // Totales: SOLO ventas COMPLETED del filtro (las VOIDED se listan pero no
         // suman). count + importe + ratios de descuento y margen.

@@ -69,6 +69,8 @@ pub const BLOCK_IDS: &[&str] = &[
     "block:stock-risk",
     "block:staff-performance",
     "block:product-ranking",
+    "block:top-margin",
+    "block:dead-stock",
     "block:profitability",
     "block:discount-control",
     "block:sales-mix",
@@ -106,7 +108,7 @@ pub fn canvas_tools() -> Vec<Value> {
                     "properties": {
                         "widget_id": {
                             "type": "string",
-                            "description": "ID del widget. Bloques (un panel entero ya diseñado, PREFIÉRELOS): 'block:sales-overview', 'block:stock-risk', 'block:staff-performance', 'block:product-ranking', 'block:profitability', 'block:discount-control', 'block:sales-mix', 'block:store-comparison'. Catálogo (1 métrica): 'kpi-today', 'dash-bars', etc. Panel a medida (si ningún bloque encaja): 'gen:panel'."
+                            "description": "ID del widget. Bloques (un panel entero ya diseñado, PREFIÉRELOS): 'block:sales-overview', 'block:stock-risk', 'block:staff-performance', 'block:product-ranking', 'block:top-margin', 'block:dead-stock', 'block:profitability', 'block:discount-control', 'block:sales-mix', 'block:store-comparison'. Catálogo (1 métrica): 'kpi-today', 'dash-bars', etc. Panel a medida (si ningún bloque encaja): 'gen:panel'."
                         },
                         "position": {
                             "type": "string",
@@ -115,7 +117,7 @@ pub fn canvas_tools() -> Vec<Value> {
                         },
                         "period": {
                             "type": "string",
-                            "enum": ["today", "yesterday", "week", "month", "quarter", "year"],
+                            "enum": ["today", "yesterday", "week", "month", "quarter", "year", "last_week", "last_month", "last_quarter", "last_year"],
                             "description": "Periodo de datos. Por defecto 'today'. En bloques/paneles se hereda por todas las piezas."
                         },
                         "store_id": {
@@ -267,7 +269,7 @@ pub fn data_tools() -> Vec<Value> {
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "period": { "type": "string", "enum": ["today", "yesterday", "week", "month", "quarter", "year"] },
+                        "period": { "type": "string", "enum": ["today", "yesterday", "week", "month", "quarter", "year", "last_week", "last_month", "last_quarter", "last_year"] },
                         "store_id": { "type": "string" }
                     },
                     "required": ["period"]
@@ -296,7 +298,7 @@ pub fn data_tools() -> Vec<Value> {
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "period": { "type": "string", "enum": ["today", "yesterday", "week", "month", "quarter", "year"] },
+                        "period": { "type": "string", "enum": ["today", "yesterday", "week", "month", "quarter", "year", "last_week", "last_month", "last_quarter", "last_year"] },
                         "store_id": { "type": "string" }
                     },
                     "required": ["period"]
@@ -312,7 +314,7 @@ pub fn data_tools() -> Vec<Value> {
                     "type": "object",
                     "properties": {
                         "rank_by": { "type": "string", "enum": ["sales", "margin", "rotation"] },
-                        "period": { "type": "string", "enum": ["today", "yesterday", "week", "month", "quarter", "year"] },
+                        "period": { "type": "string", "enum": ["today", "yesterday", "week", "month", "quarter", "year", "last_week", "last_month", "last_quarter", "last_year"] },
                         "store_id": { "type": "string" },
                         "limit": { "type": "integer", "default": 10, "maximum": 50 }
                     },
@@ -356,7 +358,66 @@ pub fn data_tools() -> Vec<Value> {
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "period": { "type": "string", "enum": ["today", "yesterday", "week", "month", "quarter", "year"] },
+                        "period": { "type": "string", "enum": ["today", "yesterday", "week", "month", "quarter", "year", "last_week", "last_month", "last_quarter", "last_year"] },
+                        "store_id": { "type": "string" }
+                    },
+                    "required": ["period"]
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "sales_by_store",
+                "description": "Ventas por tienda: facturación, ticket medio, margen real (€) y % margen. Incluye todas las tiendas (cero ventas en 0) → ideal para comparar y hallar al rezagado.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "period": { "type": "string", "enum": ["today", "yesterday", "week", "month", "quarter", "year", "last_week", "last_month", "last_quarter", "last_year"] }
+                    },
+                    "required": ["period"]
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "margin_kpis",
+                "description": "KPIs de margen del periodo: margen bruto, real (beneficio) y % margen sobre la facturación.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "period": { "type": "string", "enum": ["today", "yesterday", "week", "month", "quarter", "year", "last_week", "last_month", "last_quarter", "last_year"] },
+                        "store_id": { "type": "string" }
+                    },
+                    "required": ["period"]
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "stockout_kpis",
+                "description": "KPIs de roturas de stock del periodo: eventos, abiertas, resueltas y venta perdida estimada.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "period": { "type": "string", "enum": ["today", "yesterday", "week", "month", "quarter", "year", "last_week", "last_month", "last_quarter", "last_year"] },
+                        "store_id": { "type": "string" }
+                    },
+                    "required": ["period"]
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "discount_by_employee",
+                "description": "Descuento medio aplicado por empleado en el periodo (fuga de margen por vendedor).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "period": { "type": "string", "enum": ["today", "yesterday", "week", "month", "quarter", "year", "last_week", "last_month", "last_quarter", "last_year"] },
                         "store_id": { "type": "string" }
                     },
                     "required": ["period"]

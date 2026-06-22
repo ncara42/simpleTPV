@@ -361,7 +361,7 @@ async fn filtro_q_y_family_id_acotan_listado_y_totales() {
     .await
     .unwrap();
     assert_eq!(page.total_items, 1, "q por nombre casa solo la venta A");
-    assert_eq!(page.items[0].id, sale_a);
+    assert_eq!(page.items[0].sale.id, sale_a);
     assert_eq!(page.totals.count, 1, "los totales también se acotan por q");
 
     // q que no casa nada → 0 items y totales a cero.
@@ -395,11 +395,11 @@ async fn filtro_q_y_family_id_acotan_listado_y_totales() {
     .await
     .unwrap();
     assert!(
-        page.items.iter().any(|s| s.id == sale_b),
+        page.items.iter().any(|s| s.sale.id == sale_b),
         "q numérico casa el total de B"
     );
     assert!(
-        !page.items.iter().any(|s| s.id == sale_a),
+        !page.items.iter().any(|s| s.sale.id == sale_a),
         "no casa A (total distinto)"
     );
 
@@ -420,7 +420,7 @@ async fn filtro_q_y_family_id_acotan_listado_y_totales() {
         page.total_items, 1,
         "familyId acota a la venta del producto en F"
     );
-    assert_eq!(page.items[0].id, sale_b);
+    assert_eq!(page.items[0].sale.id, sale_b);
 
     // familyId desconocida → 0.
     let page = service::list(

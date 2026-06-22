@@ -94,8 +94,9 @@ pub struct SalesByEmployeeItem {
     pub total: f64,
 }
 
-// ── sales-by-store (desglose multitienda: facturación + ticket medio + margen) ─
-
+// ── sales-by-store (#224): desglose multitienda (facturación + ticket medio + margen) ─
+/// Incluye TODAS las tiendas de la org (las de cero ventas en 0) para que el agente
+/// identifique al rezagado.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SalesByStoreItem {
@@ -165,6 +166,24 @@ pub struct ProductRankings {
     pub top_sales: Vec<RankBySales>,
     pub top_margin: Vec<RankByMargin>,
     pub worst_rotation: Vec<RankByUnits>,
+}
+
+/// Una fila de ranking proyectada a una forma uniforme (`value`) para que las piezas
+/// de gráfica la rendericen vía `valueField:'value'`. Ver #225: el endpoint completo
+/// devuelve tres listas y `toRecords` solo alcanza la primera; con `?rankBy=` se
+/// devuelve una única lista `items` con esta forma común.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RankedProduct {
+    pub product_id: Uuid,
+    pub name: String,
+    pub value: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RankedProducts {
+    pub items: Vec<RankedProduct>,
 }
 
 // ── product-rotation / archetype-rotation ────────────────────────────────────

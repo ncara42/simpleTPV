@@ -8,9 +8,13 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('./lib/stock.js', () => ({
   getGlobalStock: vi.fn(() => Promise.resolve([])),
   listMovements: vi.fn(() => Promise.resolve({ items: [] })),
+  listAlerts: vi.fn(() => Promise.resolve([])),
+  adjustStock: vi.fn(),
   setMinStock: vi.fn(),
 }));
 vi.mock('./lib/auth.js', () => ({ api: { subscribeEvents: vi.fn(() => () => {}) } }));
+
+import { MemoryRouter } from 'react-router-dom';
 
 import { StockPage } from './StockPage.js';
 
@@ -18,7 +22,9 @@ function renderPage(): void {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <StockPage />
+      <MemoryRouter>
+        <StockPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }

@@ -69,7 +69,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 secrecy = "0.10"
 # Auth (Fase 1, doc 06). jsonwebtoken HS256 (interop con el backend NestJS
 # durante el corte); bcrypt para verificar los hashes existentes (cost 10).
-jsonwebtoken = "9"
+# v10 exige elegir CryptoProvider: fijamos `rust_crypto` (puro Rust, sin C ni
+# provider global de rustls) para que HMAC funcione siempre — si no, jsonwebtoken
+# entra en pánico «Could not automatically determine the CryptoProvider».
+jsonwebtoken = { version = "10", default-features = false, features = ["rust_crypto"] }
 bcrypt = "0.15"
 # Hash encadenado de los registros VeriFactu (#152/#155): SHA-256.
 sha2 = "0.10"
