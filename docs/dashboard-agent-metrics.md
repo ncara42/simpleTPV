@@ -36,12 +36,29 @@ ruido), en `crates/http/src/chat.rs`:
 
 ## Cómo producir el informe antes/después
 
-1. Filtrar los logs de producción por `target=chat_metrics` sobre una muestra de sesiones.
-2. Agregar por turno: media de `tool_rounds` y `tool_calls`; tasa de `rejected` y `hit_round_limit`.
-3. Comparar la ventana **pre-v2** (composite v1) contra **post-v2**. Hipótesis: menos `rejected`
-   (la reparación convierte specs imperfectas en aceptadas-con-`repaired`) y menos `tool_rounds`
-   (el constrained decoding evita reintentos por schema inválido).
-4. Documentar el delta aquí.
+El agregador [`apps/backoffice/src/lib/agent-metrics-report.ts`](../apps/backoffice/src/lib/agent-metrics-report.ts)
+convierte una muestra de logs `chat_metrics` (formato JSON `.json()` **o** el `fmt::layer()` por
+defecto) en el informe: medias de `tool_rounds`/`tool_calls`, tasa de `hit_round_limit` y, lo central
+de #200, la **tasa de respuestas vacías** (`rejected`) y de `repaired`. Soporta comparar dos ventanas.
 
-> Estado: instrumentación entregada (#210). El informe queda pendiente de una muestra de sesiones
-> reales de producción.
+```bash
+# 1. Reunir la muestra: filtrar los logs por el target chat_metrics.
+grep chat_metrics produccion.log > muestra.log          # o dos ventanas: v1.log y v2.log
+
+# 2a. Informe de una muestra:
+METRICS_LOG=muestra.log pnpm --filter @simpletpv/backoffice metrics:report
+
+# 2b. Comparativa pre-v2 vs post-v2 (escribe el markdown a un fichero):
+METRICS_LOG_BEFORE=v1.log METRICS_LOG_AFTER=v2.log METRICS_OUT=docs/informe-agente.md \
+  pnpm --filter @simpletpv/backoffice metrics:report
+```
+
+Sin esas variables el runner se **salta** (no corre en CI). La lógica de parseo/agregación está
+cubierta por Vitest (`agent-metrics-report.test.ts`). Hipótesis a confirmar con el delta: menos
+`rejected` (la reparación convierte specs imperfectas en aceptadas-con-`repaired`) y menos
+`tool_rounds` (el constrained decoding del schema evita reintentos).
+
+> Estado: instrumentación entregada (#210) y **agregador del informe entregado (#200)**. El delta
+> numérico antes/después queda pendiente de una muestra de logs de sesiones reales (pre-v2 vs post-v2):
+> ejecutar el comando 2b sobre esa muestra y pegar aquí la tabla resultante. La superficie v1 ya no se
+> emite, así que la ventana «antes» debe provenir de logs históricos archivados.
