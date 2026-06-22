@@ -35,7 +35,7 @@ function getKey(): Buffer {
 /** Cifra texto plano → base64(iv | tag | ciphertext). */
 export function encryptSecret(plain: string): string {
   const iv = randomBytes(IV_BYTES);
-  const cipher = createCipheriv(ALG, getKey(), iv);
+  const cipher = createCipheriv(ALG, getKey(), iv, { authTagLength: TAG_BYTES });
   const ct = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
   return Buffer.concat([iv, tag, ct]).toString('base64');
@@ -47,7 +47,9 @@ export function decryptSecret(enc: string): string {
   const iv = buf.subarray(0, IV_BYTES);
   const tag = buf.subarray(IV_BYTES, IV_BYTES + TAG_BYTES);
   const ct = buf.subarray(IV_BYTES + TAG_BYTES);
-  const decipher = createDecipheriv(ALG, getKey(), iv);
+  // authTagLength explícito (= default GCM de 16 B): evita que un tag truncado
+  // pase la verificación (semgrep gcm-no-tag-length). Retrocompatible.
+  const decipher = createDecipheriv(ALG, getKey(), iv, { authTagLength: TAG_BYTES });
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8');
 }
