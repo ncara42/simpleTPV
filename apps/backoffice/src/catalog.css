@@ -2866,6 +2866,51 @@
   max-height: 22rem;
   overflow-y: auto;
 }
+/* S-14/P079: estado vacío positivo cuando no hay roturas. */
+.stock-alerts-ok {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  margin-bottom: var(--ui-space-5);
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.stock-alerts-ok-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  background: var(--ui-success);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+/* S-16: traspasar desde la rotura (empuja el botón al extremo del item). */
+.stock-alert-transfer {
+  margin-left: auto;
+}
+/* S-16: avisos de traspaso (post-creación y sin-excedente) sobre la tabla. */
+.stock-transfer-done,
+.stock-no-surplus {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  flex-wrap: wrap;
+  padding: var(--ui-space-3) var(--ui-space-4);
+  margin-bottom: var(--ui-space-4);
+}
+.stock-transfer-done {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.stock-no-surplus-actions {
+  display: flex;
+  gap: var(--ui-space-3);
+  margin-left: auto;
+}
 .stock-alerts-head {
   display: flex;
   align-items: baseline;

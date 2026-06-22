@@ -5,11 +5,13 @@ import {
   type DataTableColumn,
   type DataTableSort,
   Input,
+  MultiSelect,
   Select,
 } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { Modal } from '../components/Modal.js';
 import { useTableColumns } from '../components/useTableColumns.js';
@@ -19,6 +21,7 @@ import { listFamilies } from '../lib/families.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { usePageActions } from '../lib/pageActions.js';
 import { adjustStock, getGlobalStock, listAlerts, setMinStock } from '../lib/stock.js';
+import { CreateTransferModal, type CreateTransferPrefill } from './CreateTransferModal.js';
 import { ALERT_LABEL, LEVEL_LABEL, ROTATION_LABEL } from './labels.js';
 
 interface AdjustState {
@@ -40,9 +43,23 @@ export function GlobalStockSection({
   initialSearch?: string | null;
 }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [search, setSearch] = useState(initialSearch ?? '');
   const [familyId, setFamilyId] = useState('');
-  const [storeId, setStoreId] = useState(initialStoreId ?? '');
+  // S-16: traspaso desde una rotura. `transferPrefill` abre el modal (sendNow) con
+  // destino+producto prefijados; `noSurplus` muestra la CTA de compra cuando ninguna
+  // tienda tiene excedente; `transferDone` el aviso post-creación con "Ver en Traspasos".
+  const [transferPrefill, setTransferPrefill] = useState<CreateTransferPrefill | null>(null);
+  const [noSurplus, setNoSurplus] = useState<{
+    productName: string;
+    prefill: CreateTransferPrefill;
+  } | null>(null);
+  const [transferDone, setTransferDone] = useState(false);
+  // S-14: filtro multi-tienda. `initialStoreId` (deep-link single de "Ver stock")
+  // se convierte a un Set de un elemento (P084); la selección vive en memoria (P086).
+  const [storeIds, setStoreIds] = useState<Set<string>>(
+    () => new Set(initialStoreId ? [initialStoreId] : []),
+  );
   const [rotation, setRotation] = useState('');
   const [adjusting, setAdjusting] = useState<AdjustState | null>(null);
   const [sort, setSort] = useState<DataTableSort | undefined>(undefined);
@@ -62,11 +79,12 @@ export function GlobalStockSection({
     queryFn: getGlobalStock,
   });
 
-  // Roturas centralizadas: GET /stock/alerts (filtrado por la tienda activa). Es el
-  // panel único de consulta de roturas (antes dispersas en Notificaciones/Dashboard).
+  // Roturas centralizadas y SIEMPRE globales (P082): el panel de roturas no depende
+  // del filtro de tiendas. Key fija `['stock-alerts']` (misma que la campana y
+  // Notificaciones), para no romper el badge ni el "origen sugerido" que consume S-16.
   const { data: alerts = [] } = useQuery({
-    queryKey: ['stock-alerts', storeId || null],
-    queryFn: () => listAlerts(storeId || undefined),
+    queryKey: ['stock-alerts'],
+    queryFn: () => listAlerts(),
   });
 
   const { data: families = [] } = useQuery({
@@ -109,9 +127,53 @@ export function GlobalStockSection({
 
   const storeOptions = stores.map((s) => ({ id: s.id, name: s.name }));
 
+  // S-16/P093: tiendas con excedente (quantity - minStock > 0) del producto en rotura,
+  // distintas del destino, ordenadas por mayor excedente. El cálculo es 100% cliente
+  // sobre el stock global ya cargado; `StockAlert` no trae stock de otras tiendas.
+  const surplusOriginsFor = (productId: string, destStoreId: string): string[] =>
+    (rawRows.find((r) => r.productId === productId)?.stores ?? [])
+      .filter((s) => s.storeId !== destStoreId && s.quantity - s.minStock > 0)
+      .sort((a, b) => b.quantity - b.minStock - (a.quantity - a.minStock))
+      .map((s) => s.storeId);
+
+  // Abre el flujo de traspaso desde una rotura: prefija destino+producto y sugiere el
+  // origen de mayor excedente. Sin excedente (P097): CTA "Crear pedido de compra",
+  // permitiendo aun así traspasar a mano (origen vacío).
+  const openTransferFromAlert = (
+    productId: string,
+    productName: string,
+    destStoreId: string,
+  ): void => {
+    setTransferDone(false);
+    const origins = surplusOriginsFor(productId, destStoreId);
+    const prefill: CreateTransferPrefill = {
+      destStoreId,
+      productId,
+      qty: 1,
+      ...(origins[0] ? { suggestedOriginStoreId: origins[0] } : {}),
+    };
+    if (origins.length > 0) {
+      setNoSurplus(null);
+      setTransferPrefill(prefill);
+    } else {
+      setNoSurplus({ productName, prefill });
+    }
+  };
+
+  const onTransferCreated = (): void => {
+    setTransferPrefill(null);
+    setNoSurplus(null);
+    setTransferDone(true);
+    void qc.invalidateQueries({ queryKey: ['transfers'] });
+    void qc.invalidateQueries({ queryKey: ['stock-global'] });
+    void qc.invalidateQueries({ queryKey: ['stock-alerts'] });
+  };
+
   const filtered = rows.filter((row) => {
     if (search && !row.productName.toLowerCase().includes(search.toLowerCase())) return false;
-    if (storeId && !row.stores.some((s) => s.storeId === storeId)) return false;
+    // Multi-tienda: sin selección = todas; con selección = filas con stock en alguna
+    // de las tiendas elegidas.
+    if (storeIds.size > 0 && !row.stores.some((s) => storeIds.has(s.storeId))) return false;
     if (rotation && row.rotation !== rotation) return false;
     return true;
   });
@@ -122,9 +184,12 @@ export function GlobalStockSection({
 
   // Fila enriquecida para el DataTable: tiendas visibles según el filtro.
   type StockRow = (typeof rows)[number];
-  const singleStore = Boolean(storeId);
+  // S-14 (dueño de la definición canónica del bloque stock): tienda única =
+  // exactamente una seleccionada. S-15/S-16/S-20 rebasan sobre esto (no `Boolean`).
+  const singleStore = storeIds.size === 1;
+  const onlyStoreId = singleStore ? [...storeIds][0] : undefined;
   const visibleStoresOf = (row: StockRow) =>
-    storeId ? row.stores.filter((s) => s.storeId === storeId) : row.stores;
+    storeIds.size > 0 ? row.stores.filter((s) => storeIds.has(s.storeId)) : row.stores;
   const openAdjust = (row: StockRow, st: StockGlobalRow['stores'][number]): void =>
     setAdjusting({
       productId: row.productId,
@@ -166,7 +231,7 @@ export function GlobalStockSection({
     {
       key: 'stores',
       header: singleStore
-        ? (storeOptions.find((s) => s.id === storeId)?.name ?? 'Tienda')
+        ? (storeOptions.find((s) => s.id === onlyStoreId)?.name ?? 'Tienda')
         : 'Por tienda',
       render: (row) => {
         const visibleStores = visibleStoresOf(row);
@@ -220,9 +285,9 @@ export function GlobalStockSection({
       header: 'Total',
       align: 'right',
       sortable: true,
-      render: (row) => (
-        <strong>{singleStore ? (visibleStoresOf(row)[0]?.quantity ?? 0) : row.total}</strong>
-      ),
+      // P080: el Total es SIEMPRE el global del producto (todas las tiendas),
+      // con 0, 1 o N tiendas seleccionadas.
+      render: (row) => <strong>{row.total}</strong>,
     },
   ];
   const {
@@ -245,17 +310,17 @@ export function GlobalStockSection({
       })
     : filtered;
 
-  // Exporta las filas ACTUALMENTE filtradas/ordenadas. En modo tienda única el total
-  // es el stock de esa tienda (espejo de la columna Total) y se añade la columna con
-  // el stock por tienda agregado.
+  // Exporta las filas ACTUALMENTE filtradas/ordenadas. P090: el CSV mantiene SIEMPRE
+  // la columna 'Total' con el total global del producto (espejo de la columna). Si hay
+  // tiendas seleccionadas, añade el stock agregado de esas tiendas como columna extra.
   const handleExport = (): void => {
-    const headers: string[] = singleStore
-      ? ['Producto', 'Total', 'Rotación', 'Stock por tienda']
-      : ['Producto', 'Total', 'Rotación'];
+    const headers: string[] =
+      storeIds.size > 0
+        ? ['Producto', 'Total', 'Rotación', 'Stock en tiendas seleccionadas']
+        : ['Producto', 'Total', 'Rotación'];
     const rows: string[][] = sortedRows.map((row) => {
-      const total = singleStore ? (visibleStoresOf(row)[0]?.quantity ?? 0) : row.total;
-      const base = [row.productName, String(total), ROTATION_LABEL[row.rotation]];
-      return singleStore
+      const base = [row.productName, String(row.total), ROTATION_LABEL[row.rotation]];
+      return storeIds.size > 0
         ? [...base, String(visibleStoresOf(row).reduce((sum, st) => sum + st.quantity, 0))]
         : base;
     });
@@ -292,8 +357,65 @@ export function GlobalStockSection({
 
   return (
     <>
+      {/* S-16/P095: aviso post-creación con acceso a la página de Traspasos. */}
+      {transferDone && (
+        <div className="table-panel stock-transfer-done" data-testid="stock-transfer-done">
+          <strong>Traspaso enviado.</strong>
+          <button
+            type="button"
+            className="link-btn"
+            data-testid="stock-transfer-link"
+            onClick={() => navigate('/transfers')}
+          >
+            Ver en Traspasos →
+          </button>
+          <button type="button" className="link-btn muted" onClick={() => setTransferDone(false)}>
+            Descartar
+          </button>
+        </div>
+      )}
+
+      {/* S-16/P097: ninguna tienda con excedente → sugerir pedido de compra, sin
+          bloquear el traspaso manual (origen vacío). */}
+      {noSurplus && (
+        <div className="table-panel stock-no-surplus" data-testid="stock-no-surplus">
+          <span>
+            Ninguna tienda tiene excedente de <strong>{noSurplus.productName}</strong>.
+          </span>
+          <div className="stock-no-surplus-actions">
+            <button
+              type="button"
+              className="link-btn"
+              data-testid="stock-create-purchase"
+              onClick={() => navigate('/suppliers')}
+            >
+              Crear pedido de compra
+            </button>
+            <button
+              type="button"
+              className="link-btn muted"
+              onClick={() => {
+                setTransferPrefill(noSurplus.prefill);
+                setNoSurplus(null);
+              }}
+            >
+              Traspasar igualmente
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* U-10: los avisos de roturas viven en su PROPIO panel, encima de la tabla
-          (antes anidados dentro del table-panel de la tabla). Reusa GET /stock/alerts. */}
+          (antes anidados dentro del table-panel de la tabla). Reusa GET /stock/alerts.
+          P079: sin roturas, aviso positivo verde en vez de panel vacío. */}
+      {alerts.length === 0 && (
+        <div className="table-panel stock-alerts-ok" data-testid="stock-alerts-ok">
+          <span className="stock-alerts-ok-icon" aria-hidden="true">
+            ✓
+          </span>
+          <strong>Stock al día, sin roturas</strong>
+        </div>
+      )}
       {alerts.length > 0 && (
         <div className="table-panel stock-alerts-panel" data-testid="stock-alerts-panel">
           <div className="stock-alerts-head">
@@ -314,6 +436,15 @@ export function GlobalStockSection({
                 <span className="stock-alert-name">{a.productName}</span>
                 <span className="stock-alert-store muted">{a.storeName}</span>
                 <span className="stock-alert-tag">{ALERT_LABEL[a.alertType]}</span>
+                {/* S-16/P092: traspasar desde la rotura, sin salir de Inventario. */}
+                <button
+                  type="button"
+                  className="link-btn stock-alert-transfer"
+                  data-testid="stock-alert-transfer"
+                  onClick={() => openTransferFromAlert(a.productId, a.productName, a.storeId)}
+                >
+                  Traspasar
+                </button>
               </li>
             ))}
           </ul>
@@ -367,16 +498,15 @@ export function GlobalStockSection({
                     { value: 'baja', label: 'Rotación baja' },
                   ]}
                 />
-                <Select
+                <MultiSelect
                   className="catalog-search"
-                  value={storeId}
-                  onChange={(value) => setStoreId(value)}
-                  ariaLabel="Filtrar por tienda"
+                  values={[...storeIds]}
+                  onChange={(values) => setStoreIds(new Set(values))}
+                  ariaLabel="Filtrar por tiendas"
                   data-testid="stock-store"
-                  options={[
-                    { value: '', label: 'Todas las tiendas' },
-                    ...storeOptions.map((s) => ({ value: s.id, label: s.name })),
-                  ]}
+                  placeholder="Todas las tiendas"
+                  clearLabel="Todas las tiendas"
+                  options={storeOptions.map((s) => ({ value: s.id, label: s.name }))}
                 />
               </div>
             </div>
@@ -478,6 +608,16 @@ export function GlobalStockSection({
             </Button>
           </div>
         </Modal>
+      )}
+
+      {/* S-16: modal de traspaso abierto desde una rotura (crear + enviar en un paso). */}
+      {transferPrefill && (
+        <CreateTransferModal
+          mode="sendNow"
+          prefill={transferPrefill}
+          onClose={() => setTransferPrefill(null)}
+          onCreated={onTransferCreated}
+        />
       )}
     </>
   );

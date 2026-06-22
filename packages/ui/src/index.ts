@@ -15,6 +15,7 @@ export * from './components/dataviz/index.js';
 export { ErrorScreen } from './components/ErrorScreen.js';
 export { Input } from './components/Input.js';
 export { LoginForm, type LoginFormProps } from './components/LoginForm.js';
+export { MultiSelect, type MultiSelectProps } from './components/MultiSelect.js';
 export { PieChart, type PieChartProps, type PieSlice } from './components/PieChart.js';
 export { Select, type SelectOption, type SelectProps } from './components/Select.js';
 export { type NavGroup, type NavItem, Sidebar, type SidebarProps } from './components/Sidebar.js';

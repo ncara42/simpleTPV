@@ -12,6 +12,7 @@
     "./dataviz.css": "./src/styles/dataviz.css",
     "./login.css": "./src/styles/login.css",
     "./select.css": "./src/styles/select.css",
+    "./multiselect.css": "./src/styles/multiselect.css",
     "./sidebar.css": "./src/styles/sidebar.css",
     "./theme.css": "./src/styles/theme.css",
     "./theme-apple.css": "./src/styles/theme-apple.css",
