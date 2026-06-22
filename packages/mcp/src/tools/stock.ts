@@ -1,7 +1,7 @@
 import { type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { apiGet } from '../api.js';
+import { apiGet, safe } from '../api.js';
 import { readTool } from './register.js';
 
 export function registerStockTools(server: McpServer): void {
@@ -20,14 +20,14 @@ export function registerStockTools(server: McpServer): void {
     },
     async (params) => {
       const [alerts, expiring, stockoutKpis] = await Promise.all([
-        apiGet('/stock/alerts', params),
-        apiGet('/stock/expiring', params),
-        apiGet('/dashboard/stockout-kpis', { period: 'month', ...params }),
+        safe(apiGet('/stock/alerts', params)),
+        safe(apiGet('/stock/expiring', params)),
+        safe(apiGet('/dashboard/stockout-kpis', { period: 'month', ...params })),
       ]);
       // /stock/to-reorder es POR TIENDA (el backend exige storeId): solo se pide
       // si se indica tienda; si no, se omite con una nota en lugar de fallar.
       const toReorder = params.storeId
-        ? await apiGet('/stock/to-reorder', { storeId: params.storeId })
+        ? await safe(apiGet('/stock/to-reorder', { storeId: params.storeId }))
         : { nota: 'La reposición sugerida es por tienda: vuelve a llamar indicando storeId.' };
       return { alerts, expiring, stockoutKpis, toReorder };
     },

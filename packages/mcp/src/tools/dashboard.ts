@@ -1,7 +1,7 @@
 import { type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { apiGet } from '../api.js';
+import { apiGet, safe } from '../api.js';
 import { readTool } from './register.js';
 
 const period = z
@@ -58,10 +58,10 @@ export function registerDashboardTools(server: McpServer): void {
     {},
     async () => {
       const [salesDay, kpis, stockoutKpis, alerts] = await Promise.all([
-        apiGet('/dashboard/sales-today', { compare: 'day' }),
-        apiGet('/dashboard/sales-kpis', { period: 'today' }),
-        apiGet('/dashboard/stockout-kpis', { period: 'month' }),
-        apiGet('/stock/alerts'),
+        safe(apiGet('/dashboard/sales-today', { compare: 'day' })),
+        safe(apiGet('/dashboard/sales-kpis', { period: 'today' })),
+        safe(apiGet('/dashboard/stockout-kpis', { period: 'month' })),
+        safe(apiGet('/stock/alerts')),
       ]);
       return { salesDay, kpis, stockoutKpis, alerts };
     },
@@ -74,12 +74,12 @@ export function registerDashboardTools(server: McpServer): void {
     { period, storeId },
     async (params) => {
       const [kpis, margin, byStore, byFamily, byHour, byEmployee] = await Promise.all([
-        apiGet('/dashboard/sales-kpis', params),
-        apiGet('/dashboard/margin-kpis', params),
-        apiGet('/dashboard/sales-by-store', { period: params.period }),
-        apiGet('/dashboard/sales-by-family', params),
-        apiGet('/dashboard/sales-by-hour', params),
-        apiGet('/dashboard/sales-by-employee', params),
+        safe(apiGet('/dashboard/sales-kpis', params)),
+        safe(apiGet('/dashboard/margin-kpis', params)),
+        safe(apiGet('/dashboard/sales-by-store', { period: params.period })),
+        safe(apiGet('/dashboard/sales-by-family', params)),
+        safe(apiGet('/dashboard/sales-by-hour', params)),
+        safe(apiGet('/dashboard/sales-by-employee', params)),
       ]);
       return { kpis, margin, byStore, byFamily, byHour, byEmployee };
     },
