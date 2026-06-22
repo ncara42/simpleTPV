@@ -1,7 +1,8 @@
-//! Integración del registro VeriFactu de FACTURA (#155): cada venta COMPLETED
-//! crea, en la MISMA tx (atómico, SEC-02), un `VerifactuRecord` tipo INVOICE en
-//! estado PENDING con huella encadenada y QR. Complementa el test de
-//! rectificativos (devoluciones) de `verifactu_rectification.rs`.
+//! Integración de la **factura completa F1** (#230): una venta con NIF + razón
+//! social del destinatario registra un `RegistroAlta` con `TipoFactura = F1` y
+//! bloque Destinatario en el payload; una venta normal (ticket) sigue siendo `F2`
+//! simplificada sin destinatario. La huella oficial difiere (F1 ≠ F2) porque
+//! `TipoFactura` entra en la cadena.
 
 use std::time::Duration;
 
@@ -50,7 +51,7 @@ async fn setup() -> Ctx {
     .await
     .unwrap();
     let store = Uuid::new_v4();
-    let code = format!("F{}", &store.simple().to_string()[..8]);
+    let code = format!("G{}", &store.simple().to_string()[..8]);
     sqlx::query(
         r#"INSERT INTO "Store" (id, "organizationId", name, code) VALUES ($1, $2, $3, $4)"#,
     )
@@ -86,7 +87,7 @@ async fn make_product(c: &Ctx) -> Uuid {
         &c.app,
         c.org,
         NewProduct {
-            name: format!("VFI-{}", Uuid::new_v4()),
+            name: format!("VF1-{}", Uuid::new_v4()),
             sale_price: Decimal::from(100),
             description: None,
             barcode: None,
@@ -118,7 +119,12 @@ async fn make_product(c: &Ctx) -> Uuid {
     id
 }
 
-async fn sell(c: &Ctx, product: Uuid, qty: i64) -> SaleWithLines {
+/// Vende `qty` con un destinatario fiscal opcional (NIF, razón social).
+async fn sell(c: &Ctx, product: Uuid, qty: i64, recipient: Option<(&str, &str)>) -> SaleWithLines {
+    let (customer_tax_id, customer_name) = match recipient {
+        Some((tax, name)) => (Some(tax.to_owned()), Some(name.to_owned())),
+        None => (None, None),
+    };
     service::create(
         &c.app,
         c.org,
@@ -138,18 +144,22 @@ async fn sell(c: &Ctx, product: Uuid, qty: i64) -> SaleWithLines {
             cash_given: None,
             ticket_discount_pct: None,
             ticket_discount_amt: None,
-            customer_tax_id: None,
-            customer_name: None,
+            customer_tax_id,
+            customer_name,
         },
     )
     .await
     .unwrap()
 }
 
-/// El único registro INVOICE de una venta: (status, qrData, hash, importeTotal).
-async fn invoice_record(c: &Ctx, sale_id: Uuid) -> (String, Option<String>, String, String) {
+/// (tipoFactura, destinatario.nif, destinatario.nombreRazon, hash) del INVOICE.
+async fn invoice_record(
+    c: &Ctx,
+    sale_id: Uuid,
+) -> (String, Option<String>, Option<String>, String) {
     sqlx::query_as(
-        r#"SELECT status::text, "qrData", hash, payload->>'importeTotal'
+        r#"SELECT payload->>'tipoFactura', payload->'destinatario'->>'nif',
+             payload->'destinatario'->>'nombreRazon', hash
            FROM "VerifactuRecord"
            WHERE "saleId" = $1 AND type = 'INVOICE'::"VerifactuType""#,
     )
@@ -186,35 +196,33 @@ async fn teardown(c: &Ctx, product: Uuid) {
 }
 
 #[tokio::test]
-async fn cada_venta_crea_registro_verifactu_invoice() {
+async fn factura_con_nif_es_f1_con_destinatario_y_ticket_es_f2() {
     let c = setup().await;
     let product = make_product(&c).await;
 
-    // Dos ventas: 200 y 100. Cada una debe dejar su registro INVOICE/PENDING.
-    let s1 = sell(&c, product, 2).await;
-    let s2 = sell(&c, product, 1).await;
+    // Venta CON NIF → factura completa F1 con bloque Destinatario.
+    let f1 = sell(&c, product, 2, Some(("B11111111", "Cliente Empresa SL"))).await;
+    let (tipo1, nif1, nombre1, hash1) = invoice_record(&c, f1.sale.id).await;
+    assert_eq!(tipo1, "F1", "venta con NIF → factura completa F1");
+    assert_eq!(nif1.as_deref(), Some("B11111111"), "Destinatario.NIF");
+    assert_eq!(
+        nombre1.as_deref(),
+        Some("Cliente Empresa SL"),
+        "Destinatario.NombreRazon"
+    );
+    // El snapshot fiscal queda también en la propia venta.
+    assert_eq!(f1.sale.customer_tax_id.as_deref(), Some("B11111111"));
+    assert_eq!(f1.sale.customer_name.as_deref(), Some("Cliente Empresa SL"));
 
-    let (st1, qr1, hash1, total1) = invoice_record(&c, s1.sale.id).await;
-    let (st2, qr2, hash2, total2) = invoice_record(&c, s2.sale.id).await;
+    // Venta normal (sin NIF) → ticket = factura simplificada F2, sin destinatario.
+    let f2 = sell(&c, product, 1, None).await;
+    let (tipo2, nif2, _nombre2, hash2) = invoice_record(&c, f2.sale.id).await;
+    assert_eq!(tipo2, "F2", "ticket sin NIF → factura simplificada F2");
+    assert!(nif2.is_none(), "F2 no lleva bloque Destinatario");
+    assert!(f2.sale.customer_tax_id.is_none(), "F2 sin NIF en la venta");
 
-    for (st, qr, hash, total, sale) in [
-        (&st1, &qr1, &hash1, &total1, &s1.sale),
-        (&st2, &qr2, &hash2, &total2, &s2.sale),
-    ] {
-        assert_eq!(st, "PENDING", "el registro nace PENDING (envío diferido)");
-        assert!(qr.is_some(), "qrData de cotejo presente");
-        assert_eq!(hash.len(), 64, "huella SHA-256 en hex");
-        // payload->>'importeTotal' = total de la venta con 2 decimales, positivo.
-        let parsed: Decimal = total.parse().expect("importeTotal numérico en el payload");
-        assert!(parsed > Decimal::ZERO, "factura: importe positivo");
-        assert_eq!(
-            parsed, sale.total,
-            "el importe del registro = total de la venta"
-        );
-    }
-
-    // Dos facturas distintas → huellas distintas (encadenamiento real).
-    assert_ne!(hash1, hash2, "cada factura encadena con huella propia");
+    // `TipoFactura` entra en la huella → F1 y F2 producen huellas distintas.
+    assert_ne!(hash1, hash2, "F1 y F2 encadenan huellas distintas");
 
     teardown(&c, product).await;
 }

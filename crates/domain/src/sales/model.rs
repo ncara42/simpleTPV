@@ -67,6 +67,9 @@ pub struct Sale {
     pub voided_at: Option<PrimitiveDateTime>,
     pub voided_by: Option<Uuid>,
     pub client_id: Option<Uuid>,
+    /// Factura completa F1: NIF y razón social del destinatario (NULL en F2).
+    pub customer_tax_id: Option<String>,
+    pub customer_name: Option<String>,
     #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
     pub created_at: PrimitiveDateTime,
 }

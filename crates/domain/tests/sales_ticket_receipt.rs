@@ -167,6 +167,8 @@ fn body(store: Uuid, product: Uuid, qty: i64, ticket_pct: Option<Decimal>) -> Cr
         cash_given: Some(Decimal::from(1000)),
         ticket_discount_pct: ticket_pct,
         ticket_discount_amt: None,
+        customer_tax_id: None,
+        customer_name: None,
     }
 }
 

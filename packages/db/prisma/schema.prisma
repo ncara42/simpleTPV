@@ -270,6 +270,11 @@ model Sale {
   status         SaleStatus    @default(COMPLETED)
   voidedAt       DateTime?
   voidedBy       String?       @db.Uuid
+  // Factura completa F1 (#230): NIF y razón social del destinatario, capturados
+  // cuando el cliente pide factura completa. NULL en tickets F2 (simplificada). Su
+  // presencia hace que el RegistroAlta VeriFactu sea F1 (con Destinatario).
+  customerTaxId  String?
+  customerName   String?
   // Idempotencia de ventas offline (offline slice 2): UUID generado por el
   // cliente al encolar la venta. Al sincronizar, si ya existe una venta con este
   // clientId en la org se devuelve la existente en vez de duplicarla. NULL en las

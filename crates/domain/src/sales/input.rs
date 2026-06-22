@@ -11,6 +11,20 @@ use super::model::PaymentMethod;
 
 const MAX_LINES: usize = 200;
 const HUNDRED: i64 = 100;
+/// Cotas del destinatario de factura completa F1 (holgadas; el NIF/NIE/CIF español
+/// cabe de sobra en 20 y la razón social en 120, alineado con el XSD de la AEAT).
+const MAX_TAX_ID_LEN: usize = 20;
+const MAX_CUSTOMER_NAME_LEN: usize = 120;
+
+/// Normaliza un campo opcional de texto: `None`/vacío/solo-espacios → `None`;
+/// si no, el valor trimmed. Unifica el trato de strings de la frontera (un `""`
+/// del cliente no debe contar como destinatario presente).
+fn normalize_opt(v: &Option<String>) -> Option<String> {
+    v.as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+}
 
 /// Línea de venta.
 #[derive(Debug, Clone, Deserialize)]
@@ -42,11 +56,43 @@ pub struct CreateSale {
     pub ticket_discount_pct: Option<Decimal>,
     #[serde(default, with = "rust_decimal::serde::float_option")]
     pub ticket_discount_amt: Option<Decimal>,
+    /// Factura completa F1: NIF del destinatario. Si va presente, `customer_name`
+    /// también debe ir (van juntos o ninguno). Ausente → ticket simplificado F2.
+    #[serde(default)]
+    pub customer_tax_id: Option<String>,
+    /// Factura completa F1: razón social / nombre del destinatario.
+    #[serde(default)]
+    pub customer_name: Option<String>,
 }
 
 impl CreateSale {
+    /// Destinatario fiscal normalizado `(NIF, razón social)` cuando la venta pide
+    /// **factura completa F1**: ambos presentes y no vacíos (ya trimmed). `None` →
+    /// factura simplificada (ticket `F2`). Coherencia garantizada por `validate`.
+    pub fn fiscal_recipient(&self) -> Option<(String, String)> {
+        Some((
+            normalize_opt(&self.customer_tax_id)?,
+            normalize_opt(&self.customer_name)?,
+        ))
+    }
+
     pub fn validate(&self) -> Result<(), AppError> {
         if self.lines.is_empty() || self.lines.len() > MAX_LINES {
+            return Err(AppError::BadRequest);
+        }
+        // Factura completa F1: NIF y razón social van juntos o ninguno, con cotas.
+        let tax = normalize_opt(&self.customer_tax_id);
+        let name = normalize_opt(&self.customer_name);
+        if tax.is_some() != name.is_some() {
+            return Err(AppError::BadRequest);
+        }
+        if tax
+            .as_deref()
+            .is_some_and(|t| t.chars().count() > MAX_TAX_ID_LEN)
+            || name
+                .as_deref()
+                .is_some_and(|n| n.chars().count() > MAX_CUSTOMER_NAME_LEN)
+        {
             return Err(AppError::BadRequest);
         }
         if let Some(tn) = &self.ticket_number {
@@ -120,5 +166,72 @@ fn check_amt(v: Option<Decimal>) -> Result<(), AppError> {
             Err(AppError::BadRequest)
         }
         _ => Ok(()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Venta mínima válida (un producto), parametrizable en los campos fiscales F1.
+    fn sale(tax: Option<&str>, name: Option<&str>) -> CreateSale {
+        CreateSale {
+            store_id: Uuid::nil(),
+            client_id: None,
+            ticket_number: None,
+            lines: vec![CreateSaleLine {
+                product_id: Uuid::nil(),
+                qty: Decimal::ONE,
+                discount_pct: None,
+                discount_amt: None,
+            }],
+            payment_method: PaymentMethod::Card,
+            cash_given: None,
+            ticket_discount_pct: None,
+            ticket_discount_amt: None,
+            customer_tax_id: tax.map(str::to_owned),
+            customer_name: name.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn sin_datos_fiscales_es_f2_valida() {
+        let s = sale(None, None);
+        assert!(s.validate().is_ok());
+        assert_eq!(s.fiscal_recipient(), None);
+    }
+
+    #[test]
+    fn nif_y_razon_social_juntos_es_f1() {
+        let s = sale(Some("  B11111111 "), Some(" Cliente SL "));
+        assert!(s.validate().is_ok());
+        // Normaliza (trim) ambos campos.
+        assert_eq!(
+            s.fiscal_recipient(),
+            Some(("B11111111".to_owned(), "Cliente SL".to_owned()))
+        );
+    }
+
+    #[test]
+    fn solo_nif_sin_nombre_es_invalida() {
+        assert!(sale(Some("B11111111"), None).validate().is_err());
+        // Un nombre solo (sin NIF) también se rechaza.
+        assert!(sale(None, Some("Cliente SL")).validate().is_err());
+    }
+
+    #[test]
+    fn cadena_vacia_no_cuenta_como_destinatario() {
+        // "" / espacios → como ausente: válida (F2) y sin destinatario.
+        let s = sale(Some("   "), Some(""));
+        assert!(s.validate().is_ok());
+        assert_eq!(s.fiscal_recipient(), None);
+    }
+
+    #[test]
+    fn nif_o_nombre_demasiado_largos_es_invalida() {
+        assert!(sale(Some(&"X".repeat(21)), Some("Cliente"))
+            .validate()
+            .is_err());
+        assert!(sale(Some("B1"), Some(&"N".repeat(121))).validate().is_err());
     }
 }
