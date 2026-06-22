@@ -14,16 +14,22 @@ export function registerStockTools(server: McpServer): void {
         .string()
         .uuid()
         .optional()
-        .describe('UUID de tienda (omitir = toda la organización)'),
+        .describe(
+          'UUID de tienda (omitir = toda la organización; la reposición sugerida solo se incluye si indicas tienda)',
+        ),
     },
     async (params) => {
-      const [alerts, toReorder, expiring, stockoutKpis] = await Promise.all([
+      const [alerts, expiring, stockoutKpis] = await Promise.all([
         apiGet('/stock/alerts', params),
-        apiGet('/stock/to-reorder', params),
         apiGet('/stock/expiring', params),
         apiGet('/dashboard/stockout-kpis', { period: 'month', ...params }),
       ]);
-      return { alerts, toReorder, expiring, stockoutKpis };
+      // /stock/to-reorder es POR TIENDA (el backend exige storeId): solo se pide
+      // si se indica tienda; si no, se omite con una nota en lugar de fallar.
+      const toReorder = params.storeId
+        ? await apiGet('/stock/to-reorder', { storeId: params.storeId })
+        : { nota: 'La reposición sugerida es por tienda: vuelve a llamar indicando storeId.' };
+      return { alerts, expiring, stockoutKpis, toReorder };
     },
   );
 
@@ -38,9 +44,9 @@ export function registerStockTools(server: McpServer): void {
   readTool(
     server,
     'get_stock_by_store',
-    'Inventario de una tienda concreta: unidades disponibles por producto. Si no se indica tienda, devuelve el stock del almacén del usuario autenticado.',
+    'Inventario de una tienda concreta: unidades disponibles por producto. Requiere indicar la tienda; para el inventario agregado de toda la organización usa get_stock_global.',
     {
-      storeId: z.string().uuid().optional().describe('UUID de tienda'),
+      storeId: z.string().uuid().describe('UUID de tienda (obligatorio)'),
     },
     (params) => apiGet('/stock', params),
   );
@@ -84,9 +90,12 @@ export function registerStockTools(server: McpServer): void {
   readTool(
     server,
     'get_products_to_reorder',
-    'Lista de productos que necesitan reposición según stock mínimo configurado. Incluye el déficit calculado y el proveedor habitual para facilitar la generación de pedidos.',
+    'Lista de productos que necesitan reposición en una tienda según su stock mínimo. Incluye el déficit calculado y el proveedor habitual para facilitar la generación de pedidos. Es por tienda: requiere storeId.',
     {
-      storeId: z.string().uuid().optional(),
+      storeId: z
+        .string()
+        .uuid()
+        .describe('UUID de tienda (obligatorio; la reposición es por tienda)'),
     },
     (params) => apiGet('/stock/to-reorder', params),
   );
