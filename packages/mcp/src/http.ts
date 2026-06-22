@@ -6,9 +6,14 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
 import { createMcpServer } from './server.js';
 
-// Orígenes permitidos: lista blanca configurable vía MCP_ALLOWED_ORIGINS (CSV).
-// Si no se define, se devuelve '*' solo cuando no hay API key — en ese caso
-// el origen no aporta seguridad adicional. Con API key sin allowlist se advierte.
+// ─── Límites de recursos ─────────────────────────────────────────────────────
+const MAX_BODY_BYTES = 1024 * 1024; // 1 MiB — evita DoS por body gigante
+const MAX_SESSIONS = 100; // cap de sesiones simultáneas
+const SESSION_TTL_MS = 30 * 60 * 1000; // 30 min de inactividad → evict
+
+// ─── CORS ─────────────────────────────────────────────────────────────────────
+// Lista blanca configurable vía MCP_ALLOWED_ORIGINS (CSV).
+// Sin lista: wildcard '*' (solo aceptable si no hay API key).
 const ALLOWED_ORIGINS: string[] = (process.env['MCP_ALLOWED_ORIGINS'] ?? '')
   .split(',')
   .map((s) => s.trim())
@@ -20,13 +25,10 @@ function corsHeaders(origin: string | undefined): Record<string, string> {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, mcp-session-id',
     'Access-Control-Expose-Headers': 'mcp-session-id',
   };
-
   if (ALLOWED_ORIGINS.length === 0) {
     base['Access-Control-Allow-Origin'] = '*';
     return base;
   }
-
-  // Reflect origin only if it is in the allowlist; otherwise deny cross-origin.
   if (origin && ALLOWED_ORIGINS.includes(origin)) {
     base['Access-Control-Allow-Origin'] = origin;
   }
@@ -34,7 +36,8 @@ function corsHeaders(origin: string | undefined): Record<string, string> {
   return base;
 }
 
-// Constant-time bearer token comparison to mitigate timing attacks.
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+// Comparación constant-time para evitar timing attacks.
 function verifyApiKey(authHeader: string | undefined, apiKey: string): boolean {
   const expected = Buffer.from(`Bearer ${apiKey}`);
   const provided = Buffer.from(String(authHeader ?? ''));
@@ -42,19 +45,71 @@ function verifyApiKey(authHeader: string | undefined, apiKey: string): boolean {
   return timingSafeEqual(provided, expected);
 }
 
-const sessions = new Map<string, StreamableHTTPServerTransport>();
+// ─── Host validation (DNS rebinding) ─────────────────────────────────────────
+const BIND_HOST = process.env['MCP_BIND'] ?? '127.0.0.1';
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '::1']);
 
+function isValidHost(host: string | undefined): boolean {
+  if (!host) return false;
+  const hostname = (host.split(':')[0] ?? '').toLowerCase();
+  if (LOOPBACK.has(BIND_HOST)) {
+    return LOOPBACK.has(hostname);
+  }
+  const publicHost = process.env['MCP_PUBLIC_HOST'];
+  if (publicHost) return hostname === publicHost.toLowerCase();
+  return true; // bind público sin MCP_PUBLIC_HOST → no se puede validar
+}
+
+// ─── Sesiones con estado ──────────────────────────────────────────────────────
+interface SessionEntry {
+  transport: StreamableHTTPServerTransport;
+  lastUsed: number;
+}
+
+const sessions = new Map<string, SessionEntry>();
+
+// Evicta sesiones inactivas cada 5 min; .unref() no bloquea el cierre del proceso.
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [id, entry] of sessions) {
+      if (now - entry.lastUsed > SESSION_TTL_MS) {
+        void entry.transport.close();
+        sessions.delete(id);
+      }
+    }
+  },
+  5 * 60 * 1000,
+).unref();
+
+// ─── Arranque ─────────────────────────────────────────────────────────────────
 export function startHttpServer(): void {
   const port = parseInt(process.env['MCP_PORT'] ?? '8766', 10);
   const apiKey = process.env['MCP_API_KEY'];
 
+  // Fail-fast: igual que TPV_EMAIL/TPV_PASSWORD en config.ts.
+  // El servidor HTTP expone datos de empresa — la clave no es opcional.
   if (!apiKey) {
-    console.error('WARN: MCP_API_KEY is not set — endpoint is unauthenticated');
-  }
-  if (apiKey && ALLOWED_ORIGINS.length === 0) {
-    console.error(
-      'WARN: MCP_API_KEY is set but MCP_ALLOWED_ORIGINS is not — browser clients from any origin can use the key; set MCP_ALLOWED_ORIGINS to restrict',
+    throw new Error(
+      'MCP_API_KEY env var is required for HTTP transport. ' +
+        'Generate one with: openssl rand -hex 32',
     );
+  }
+
+  if (ALLOWED_ORIGINS.length === 0) {
+    console.error(
+      'WARN: MCP_ALLOWED_ORIGINS not set — any browser origin can use the API key. ' +
+        'Recommended: MCP_ALLOWED_ORIGINS=https://claude.ai',
+    );
+  }
+  if (!LOOPBACK.has(BIND_HOST)) {
+    console.error(
+      'WARN: bound to non-loopback interface — ensure TLS is terminated by a ' +
+        'reverse proxy (nginx/caddy) before exposing to the internet.',
+    );
+    if (!process.env['MCP_PUBLIC_HOST']) {
+      console.error('WARN: set MCP_PUBLIC_HOST=<tu-dominio> to enable Host header validation.');
+    }
   }
 
   const server = http.createServer((req, res) => {
@@ -73,21 +128,22 @@ export function startHttpServer(): void {
     });
   });
 
-  server.listen(port, () => {
-    console.error(`SimpleTpv MCP → http://0.0.0.0:${port}/mcp`);
-    if (apiKey) {
-      console.error('Auth: Bearer token required (MCP_API_KEY is set)');
-    }
+  server.requestTimeout = 30_000; // 30 s — evita conexiones zombie
+
+  server.listen(port, BIND_HOST, () => {
+    console.error(`SimpleTpv MCP → http://${BIND_HOST}:${port}/mcp`);
+    console.error('Auth: Bearer token required');
     if (ALLOWED_ORIGINS.length > 0) {
       console.error(`CORS: allowed origins → ${ALLOWED_ORIGINS.join(', ')}`);
     }
   });
 }
 
+// ─── Handler ──────────────────────────────────────────────────────────────────
 async function handle(
   req: http.IncomingMessage,
   res: http.ServerResponse,
-  apiKey: string | undefined,
+  apiKey: string,
 ): Promise<void> {
   const cors = corsHeaders(req.headers['origin']);
 
@@ -95,6 +151,13 @@ async function handle(
   if (req.method === 'OPTIONS') {
     res.writeHead(204, cors);
     res.end();
+    return;
+  }
+
+  // Host header validation — mitigación de DNS rebinding
+  if (!isValidHost(req.headers['host'])) {
+    res.writeHead(400, { 'Content-Type': 'application/json', ...cors });
+    res.end(JSON.stringify({ error: 'Bad Request: invalid Host header' }));
     return;
   }
 
@@ -107,7 +170,7 @@ async function handle(
   }
 
   // Constant-time API key check
-  if (apiKey && !verifyApiKey(req.headers['authorization'], apiKey)) {
+  if (!verifyApiKey(req.headers['authorization'], apiKey)) {
     res.writeHead(401, { 'Content-Type': 'application/json', ...cors });
     res.end(
       JSON.stringify({ error: 'Unauthorized — include Authorization: Bearer <MCP_API_KEY>' }),
@@ -115,10 +178,25 @@ async function handle(
     return;
   }
 
-  // Parse JSON body for POST requests
+  // Rechazar cuerpos excesivos antes de leer (Content-Length conocido)
+  const contentLength = parseInt(req.headers['content-length'] ?? '0', 10);
+  if (contentLength > MAX_BODY_BYTES) {
+    res.writeHead(413, { 'Content-Type': 'application/json', ...cors });
+    res.end(JSON.stringify({ error: 'Request body too large (max 1 MiB)' }));
+    return;
+  }
+
+  // Leer y parsear body con límite estricto
   let body: unknown;
   if (req.method === 'POST') {
-    const raw = await readBody(req);
+    let raw: string;
+    try {
+      raw = await readBody(req);
+    } catch {
+      res.writeHead(413, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: 'Request body too large (max 1 MiB)' }));
+      return;
+    }
     try {
       body = JSON.parse(raw);
     } catch {
@@ -128,11 +206,11 @@ async function handle(
     }
   }
 
-  // Route to existing session or start a new one
+  // Reutilizar sesión existente
   const sessionId = req.headers['mcp-session-id'];
   if (typeof sessionId === 'string') {
-    const transport = sessions.get(sessionId);
-    if (!transport) {
+    const entry = sessions.get(sessionId);
+    if (!entry) {
       res.writeHead(404, { 'Content-Type': 'application/json', ...cors });
       res.end(
         JSON.stringify({
@@ -143,11 +221,12 @@ async function handle(
       );
       return;
     }
-    await transport.handleRequest(req, res, body);
+    entry.lastUsed = Date.now(); // actualizar TTL
+    await entry.transport.handleRequest(req, res, body);
     return;
   }
 
-  // No session ID: must be an initialize request to start a new session
+  // Sin session ID: debe ser un initialize request
   if (req.method !== 'POST' || !isInitializeRequest(body)) {
     res.writeHead(400, { 'Content-Type': 'application/json', ...cors });
     res.end(
@@ -160,11 +239,24 @@ async function handle(
     return;
   }
 
-  // New session
+  // Cap de sesiones — evita agotamiento de memoria
+  if (sessions.size >= MAX_SESSIONS) {
+    res.writeHead(503, { 'Content-Type': 'application/json', ...cors });
+    res.end(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        error: { code: -32000, message: 'Server at session capacity — try again later' },
+        id: null,
+      }),
+    );
+    return;
+  }
+
+  // Nueva sesión
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => randomUUID(),
     onsessioninitialized: (id) => {
-      sessions.set(id, transport);
+      sessions.set(id, { transport, lastUsed: Date.now() });
     },
   });
   transport.onclose = () => {
@@ -176,10 +268,18 @@ async function handle(
   await transport.handleRequest(req, res, body);
 }
 
+// ─── Utilidades ───────────────────────────────────────────────────────────────
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     let data = '';
+    let size = 0;
     req.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        req.destroy();
+        reject(new Error('body too large'));
+        return;
+      }
       data += chunk.toString();
     });
     req.on('end', () => resolve(data));
