@@ -22,8 +22,9 @@ use super::hash::{
     format_fecha_hora_huso, AltaHashInput, AnulacionHashInput,
 };
 
-/// Operación que origina el registro. Determina el tipo de registro, la clave
-/// oficial `TipoFactura`, el signo del importe y la columna a la que se ancla.
+/// Operación que origina el registro: determina el tipo de registro (INVOICE /
+/// RECTIFICATION), el signo del importe y la columna a la que se ancla. La clave
+/// `TipoFactura` (`F1`/`F2`/`R5`) la pasa el llamante (depende del destinatario).
 #[derive(Debug, Clone, Copy)]
 enum RecordRef {
     /// Venta → factura (INVOICE).
@@ -38,16 +39,6 @@ impl RecordRef {
         match self {
             RecordRef::Sale(_) => "INVOICE",
             RecordRef::Return(_) => "RECTIFICATION",
-        }
-    }
-
-    /// Clave oficial `TipoFactura` (`ClaveTipoFacturaType` del XSD). Nuestras ventas
-    /// son tickets = **factura simplificada (`F2`)**; su rectificativa (devolución /
-    /// abono) es **`R5`** (rectificativa en facturas simplificadas).
-    fn tipo_factura(self) -> &'static str {
-        match self {
-            RecordRef::Sale(_) => "F2",
-            RecordRef::Return(_) => "R5",
         }
     }
 
@@ -98,9 +89,18 @@ async fn lock_chain_and_previous_hash(
     .await
 }
 
+/// Clave `TipoFactura` + Destinatario del `RegistroAlta`. `tipo_factura` es la clave
+/// oficial (`F1`/`F2`/`R5`); `destinatario` = `Some((NIF, razón social))` en la
+/// factura completa `F1` (añade el bloque Destinatario al payload), `None` en `F2`/`R5`.
+struct AltaKind<'a> {
+    tipo_factura: &'a str,
+    destinatario: Option<(&'a str, &'a str)>,
+}
+
 /// Crea un `VerifactuRecord` (PENDING) con huella oficial encadenada dentro de `tx`.
 /// `importe_abs` y `breakdown` vienen en POSITIVO; el signo (negativo en
-/// rectificativos) se aplica aquí según `reference`.
+/// rectificativos) se aplica aquí según `reference`. `kind` lleva la clave
+/// `TipoFactura` y el destinatario opcional (F1).
 async fn create_record_in_tx(
     tx: &mut Transaction<'_, Postgres>,
     org: Uuid,
@@ -108,6 +108,7 @@ async fn create_record_in_tx(
     invoice_number: &str,
     importe_abs: Decimal,
     breakdown: &[TaxBreakdownItem],
+    kind: AltaKind<'_>,
 ) -> Result<(), sqlx::Error> {
     let previous_hash = lock_chain_and_previous_hash(tx, org).await?;
 
@@ -134,7 +135,7 @@ async fn create_record_in_tx(
         id_emisor: nif_str,
         num_serie: invoice_number,
         fecha_expedicion: &fecha_expedicion,
-        tipo_factura: reference.tipo_factura(),
+        tipo_factura: kind.tipo_factura,
         cuota_total,
         importe_total,
         fecha_hora_huso_gen: &fecha_hora_huso,
@@ -156,19 +157,27 @@ async fn create_record_in_tx(
         })
         .collect();
 
-    let payload_json = serde_json::json!({
+    let mut payload = serde_json::json!({
         "idEmisorFactura": nif.as_deref(),
         "numSerieFactura": invoice_number,
         "fechaExpedicionFactura": fecha_expedicion,
-        "tipoFactura": reference.tipo_factura(),
+        "tipoFactura": kind.tipo_factura,
         "cuotaTotal": format!("{cuota_total:.2}"),
         "importeTotal": format!("{importe_total:.2}"),
         "fechaHoraHusoGenRegistro": fecha_hora_huso,
         "huellaAnterior": previous_hash.as_deref(),
         "huella": &hash,
         "desglose": desglose,
-    })
-    .to_string();
+    });
+    // Factura completa F1: bloque Destinatario (XSD `IDDestinatario`) con NIF y
+    // razón social. La factura simplificada F2 no lo lleva.
+    if let Some((tax_id, name)) = kind.destinatario {
+        payload["destinatario"] = serde_json::json!({
+            "nif": tax_id,
+            "nombreRazon": name,
+        });
+    }
+    let payload_json = payload.to_string();
 
     sqlx::query(
         r#"INSERT INTO "VerifactuRecord"
@@ -193,7 +202,9 @@ async fn create_record_in_tx(
 
 /// Registra la factura (INVOICE) de una venta dentro de `tx`. `invoice_number` es
 /// el número de ticket; `total` es el importe total de la venta (positivo) y
-/// `breakdown` su desglose de IVA por tipo (cuota positiva).
+/// `breakdown` su desglose de IVA por tipo (cuota positiva). `recipient` =
+/// `Some((NIF, razón social))` → **factura completa `F1`** (con Destinatario);
+/// `None` → ticket = **factura simplificada `F2`**.
 pub async fn record_invoice(
     tx: &mut Transaction<'_, Postgres>,
     org: Uuid,
@@ -201,7 +212,9 @@ pub async fn record_invoice(
     invoice_number: &str,
     total: Decimal,
     breakdown: &[TaxBreakdownItem],
+    recipient: Option<(&str, &str)>,
 ) -> Result<(), sqlx::Error> {
+    let tipo_factura = if recipient.is_some() { "F1" } else { "F2" };
     create_record_in_tx(
         tx,
         org,
@@ -209,6 +222,10 @@ pub async fn record_invoice(
         invoice_number,
         total,
         breakdown,
+        AltaKind {
+            tipo_factura,
+            destinatario: recipient,
+        },
     )
     .await
 }
@@ -232,6 +249,10 @@ pub async fn record_rectification(
         invoice_number,
         total,
         breakdown,
+        AltaKind {
+            tipo_factura: "R5",
+            destinatario: None,
+        },
     )
     .await
 }

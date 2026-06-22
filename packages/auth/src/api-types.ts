@@ -172,6 +172,10 @@ export interface Sale {
   status: string;
   voidedAt: string | null;
   voidedBy: string | null;
+  // Factura completa F1 (#230): NIF y razón social del destinatario; null en
+  // tickets F2 (factura simplificada).
+  customerTaxId: string | null;
+  customerName: string | null;
   createdAt: string;
   lines: SaleLine[];
 }
@@ -263,6 +267,10 @@ export interface CreateSaleInput {
   // (clientId puede enviarse igualmente como salvaguarda de reintentos).
   clientId?: string;
   ticketNumber?: string;
+  // Factura completa F1 (#230): NIF + razón social del destinatario. Van juntos o
+  // ninguno (el backend rechaza solo uno). Ausentes → ticket simplificado F2.
+  customerTaxId?: string;
+  customerName?: string;
 }
 
 // Sesión de caja (apertura/cierre con cuadre). Los Decimal de Prisma viajan

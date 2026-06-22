@@ -68,6 +68,10 @@ export function CartPanel({
       ...(payment.cashGiven !== undefined ? { cashGiven: payment.cashGiven } : {}),
       ...(ticketDiscountAmt > 0 ? { ticketDiscountAmt } : {}),
       ...(ticketDiscountAmt === 0 && ticketDiscountPct > 0 ? { ticketDiscountPct } : {}),
+      // Factura completa F1: NIF + razón social del destinatario (si se pidió).
+      ...(payment.customerTaxId && payment.customerName
+        ? { customerTaxId: payment.customerTaxId, customerName: payment.customerName }
+        : {}),
     };
     try {
       // Sin conexión: encola la venta con un nº del bloque reservado y confirma en
