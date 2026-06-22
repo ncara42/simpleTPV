@@ -277,6 +277,20 @@ test('Inventario: el filtro de tiendas es multi-selección (S-14)', async ({ pag
   await expect(page.getByTestId('stock-table')).toBeVisible();
 });
 
+test('Inventario: traspasar desde una rotura sin salir de la vista (S-16)', async ({ page }) => {
+  await navTo(page, 'stock');
+  await expect(page.getByTestId('stock-table')).toBeVisible();
+  const transferBtn = page.getByTestId('stock-alert-transfer').first();
+  // El seed puede no tener roturas; en ese caso el flujo no aplica.
+  if (await transferBtn.isVisible().catch(() => false)) {
+    await transferBtn.click();
+    // Con excedente abre el modal prefijado; sin excedente, la CTA de pedido de compra.
+    await expect(
+      page.getByTestId('transfer-form').or(page.getByTestId('stock-no-surplus')),
+    ).toBeVisible();
+  }
+});
+
 test('Movimientos de stock viven en el detalle del producto (I-12, D-05)', async ({ page }) => {
   // La tabla de Stock ya no tiene el botón repetido por fila.
   await navTo(page, 'stock');

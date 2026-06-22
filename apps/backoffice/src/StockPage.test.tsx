@@ -14,13 +14,17 @@ vi.mock('./lib/stock.js', () => ({
 }));
 vi.mock('./lib/auth.js', () => ({ api: { subscribeEvents: vi.fn(() => () => {}) } }));
 
+import { MemoryRouter } from 'react-router-dom';
+
 import { StockPage } from './StockPage.js';
 
 function renderPage(): void {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <StockPage />
+      <MemoryRouter>
+        <StockPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }

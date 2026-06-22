@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Una fila con stock en dos tiendas; el TOTAL global (30) es independiente de la
@@ -15,27 +15,35 @@ const ROW = {
   ],
 };
 
-// `vi.hoisted` para poder referenciar el mock dentro de la factory de `vi.mock`
+// `vi.hoisted` para poder referenciar los mocks dentro de la factory de `vi.mock`
 // (que se eleva al inicio del módulo, antes de las consts normales).
-const { listAlertsMock } = vi.hoisted(() => ({
+const { listAlertsMock, getGlobalStockMock } = vi.hoisted(() => ({
   listAlertsMock: vi.fn((..._args: unknown[]): Promise<unknown[]> => Promise.resolve([])),
+  getGlobalStockMock: vi.fn((): Promise<unknown[]> => Promise.resolve([])),
 }));
 
 vi.mock('../lib/stock.js', () => ({
-  getGlobalStock: vi.fn(() => Promise.resolve([ROW])),
+  getGlobalStock: getGlobalStockMock,
   listAlerts: listAlertsMock,
   adjustStock: vi.fn(),
   setMinStock: vi.fn(),
+  createTransfer: vi.fn(() => Promise.resolve({ id: 't1' })),
+  sendTransfer: vi.fn(() => Promise.resolve({ id: 't1' })),
 }));
 vi.mock('../lib/admin.js', () => ({
   listStores: vi.fn(() =>
     Promise.resolve([
-      { id: 'a', name: 'Norte' },
-      { id: 'b', name: 'Sur' },
+      { id: 'a', name: 'Norte', code: 'NOR' },
+      { id: 'b', name: 'Sur', code: 'SUR' },
     ]),
   ),
 }));
 vi.mock('../lib/families.js', () => ({ listFamilies: vi.fn(() => Promise.resolve([])) }));
+vi.mock('../lib/products.js', () => ({
+  listProducts: vi.fn(() => Promise.resolve([{ id: 'p1', name: 'Leche entera', sku: null }])),
+}));
+
+import { MemoryRouter } from 'react-router-dom';
 
 import { GlobalStockSection } from './GlobalStockSection.js';
 
@@ -43,7 +51,9 @@ function renderSection(): void {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <GlobalStockSection />
+      <MemoryRouter>
+        <GlobalStockSection />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -53,6 +63,8 @@ describe('GlobalStockSection (S-14)', () => {
     window.localStorage.clear();
     listAlertsMock.mockReset();
     listAlertsMock.mockResolvedValue([]);
+    getGlobalStockMock.mockReset();
+    getGlobalStockMock.mockResolvedValue([ROW]);
   });
 
   it('la columna Total muestra el total GLOBAL del producto (P080)', async () => {
@@ -92,5 +104,62 @@ describe('GlobalStockSection (S-14)', () => {
     expect(screen.queryByTestId('stock-alerts-ok')).not.toBeInTheDocument();
     // La query de roturas es global: se llama sin argumento de tienda (P082).
     expect(listAlertsMock).toHaveBeenCalledWith();
+  });
+});
+
+describe('GlobalStockSection — traspaso desde rotura (S-16)', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    getGlobalStockMock.mockReset();
+    getGlobalStockMock.mockResolvedValue([ROW]);
+    listAlertsMock.mockReset();
+  });
+
+  const ALERT = {
+    id: 'al1',
+    productId: 'p1',
+    productName: 'Leche entera',
+    storeId: 'a', // destino: tienda con la rotura
+    storeName: 'Norte',
+    alertType: 'out_of_stock',
+    severity: 'critical',
+    hasSubstituteStock: false,
+    resolved: false,
+    createdAt: '2026-06-22T00:00:00Z',
+  };
+
+  it('el botón "Traspasar" abre el modal con destino y producto prefijados (P092/P093)', async () => {
+    // ROW tiene excedente en la tienda 'b' (20-5) → hay origen sugerido.
+    listAlertsMock.mockResolvedValue([ALERT]);
+    renderSection();
+    await waitFor(() => expect(screen.getByTestId('stock-alert-transfer')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('stock-alert-transfer'));
+    // Se abre el modal de traspaso con el producto prefijado como línea.
+    expect(await screen.findByTestId('transfer-form')).toBeVisible();
+    expect(screen.getByTestId('transfer-line-row')).toBeInTheDocument();
+  });
+
+  it('sin tienda con excedente muestra la CTA de pedido de compra (P097)', async () => {
+    // Stock sin excedente en ninguna tienda (todas por debajo del mínimo).
+    getGlobalStockMock.mockResolvedValue([
+      {
+        productId: 'p1',
+        productName: 'Leche entera',
+        total: 5,
+        rotation: 'alta',
+        stores: [
+          { storeId: 'a', storeName: 'Norte', quantity: 3, minStock: 5 },
+          { storeId: 'b', storeName: 'Sur', quantity: 2, minStock: 5 },
+        ],
+      },
+    ]);
+    listAlertsMock.mockResolvedValue([ALERT]);
+    renderSection();
+    await waitFor(() => expect(screen.getByTestId('stock-alert-transfer')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('stock-alert-transfer'));
+    expect(await screen.findByTestId('stock-no-surplus')).toBeVisible();
+    expect(screen.getByTestId('stock-create-purchase')).toBeVisible();
+    // No abre el modal directamente en este caso.
+    expect(screen.queryByTestId('transfer-form')).not.toBeInTheDocument();
   });
 });
