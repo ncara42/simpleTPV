@@ -35,9 +35,9 @@ export function registerOperationsTools(server: McpServer): void {
   readTool(
     server,
     'list_cash_sessions',
-    'Sesiones de caja cerradas: empleado, tienda, hora de apertura y cierre, efectivo inicial/final y movimientos. Útil para conciliación y auditoría de caja.',
+    'Sesiones de caja cerradas de una tienda: empleado, hora de apertura y cierre, efectivo inicial/final y movimientos. Útil para conciliación y auditoría de caja. Requiere indicar la tienda.',
     {
-      storeId: z.string().uuid().optional(),
+      storeId: z.string().uuid().describe('UUID de tienda (obligatorio)'),
       from: z.string().optional().describe('Fecha inicio YYYY-MM-DD'),
       to: z.string().optional().describe('Fecha fin YYYY-MM-DD'),
     },
@@ -59,9 +59,11 @@ export function registerOperationsTools(server: McpServer): void {
   readTool(
     server,
     'list_wholesale_orders',
-    'Pedidos mayoristas B2B: cliente, estado, líneas de producto y totales. Para gestión de clientes con tarifa especial.',
+    'Pedidos mayoristas B2B filtrados por estado: cliente, líneas de producto y totales. El estado es obligatorio (lista un estado cada vez).',
     {
-      status: z.enum(['DRAFT', 'SENT', 'RECEIVED']).optional(),
+      status: z
+        .enum(['DRAFT', 'SENT', 'RECEIVED'])
+        .describe('Estado a listar (obligatorio): DRAFT, SENT o RECEIVED'),
       customerId: z.string().uuid().optional(),
     },
     (params) => apiGet('/wholesale-orders', params),
