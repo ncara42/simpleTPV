@@ -1,5 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
+import { type CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+
 import { getToken, invalidate } from './auth.js';
 import { getConfig } from './config.js';
 
@@ -69,13 +71,13 @@ export async function apiGet<T = unknown>(
   return res.json() as Promise<T>;
 }
 
-type TextContent = { type: 'text'; text: string };
-
-export function ok(data: unknown): { content: TextContent[] } {
-  return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+export function ok(data: unknown): CallToolResult {
+  // JSON compacto (sin indentación): recorta ~25-40% de tokens en respuestas
+  // grandes que el modelo tiene que re-ingerir, sin perder información.
+  return { content: [{ type: 'text', text: JSON.stringify(data) }] };
 }
 
-export function fail(e: unknown): { content: TextContent[]; isError: true } {
+export function fail(e: unknown): CallToolResult {
   const msg = e instanceof Error ? e.message : String(e);
   return { content: [{ type: 'text', text: `Error: ${msg}` }], isError: true };
 }
