@@ -729,6 +729,12 @@ pub async fn void(
             .await?;
         }
 
+        // Registro VeriFactu de la anulación (RegistroAnulacion) DENTRO de la tx
+        // (#230, SEC-02): la factura anulada deja constancia fiscal encadenada,
+        // atómica con la anulación. No-op si la venta no tenía RegistroAlta (venta
+        // anterior a VeriFactu).
+        crate::verifactu::record_anulacion(tx, org, sale_id).await?;
+
         let voided = load_sale_by_id(tx, sale_id)
             .await?
             .expect("la venta existe; se acaba de anular en esta tx");

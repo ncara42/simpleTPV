@@ -18,8 +18,8 @@ use uuid::Uuid;
 use crate::sales::TaxBreakdownItem;
 
 use super::hash::{
-    build_qr_data, compute_alta_hash, format_fecha_expedicion, format_fecha_hora_huso,
-    AltaHashInput,
+    build_qr_data, compute_alta_hash, compute_anulacion_hash, format_fecha_expedicion,
+    format_fecha_hora_huso, AltaHashInput, AnulacionHashInput,
 };
 
 /// Operación que origina el registro. Determina el tipo de registro, la clave
@@ -74,9 +74,31 @@ impl RecordRef {
     }
 }
 
-/// Crea un `VerifactuRecord` (PENDING) con huella oficial encadenada dentro de `tx`.
 /// Serializa el encadenamiento de huellas del tenant con `pg_advisory_xact_lock`
-/// para que dos registros concurrentes no tomen el mismo `previousHash`.
+/// (dos registros concurrentes nunca toman el mismo `previousHash`) y devuelve la
+/// huella del último registro de la organización (la `huellaAnterior` del nuevo;
+/// `None` en el primer registro de la cadena). Lo comparten alta y anulación para
+/// que ambos extiendan la MISMA cadena bajo el mismo lock.
+async fn lock_chain_and_previous_hash(
+    tx: &mut Transaction<'_, Postgres>,
+    org: Uuid,
+) -> Result<Option<String>, sqlx::Error> {
+    // `hashtextextended(...,0)` da 64 bits (como en time_clock): evita colisiones
+    // de lock entre tenants distintos que sí tendría `hashtext` (32 bits) — M-02.
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))")
+        .bind(org.to_string())
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query_scalar(
+        r#"SELECT hash FROM "VerifactuRecord" WHERE "organizationId" = $1
+           ORDER BY "createdAt" DESC LIMIT 1"#,
+    )
+    .bind(org)
+    .fetch_optional(&mut **tx)
+    .await
+}
+
+/// Crea un `VerifactuRecord` (PENDING) con huella oficial encadenada dentro de `tx`.
 /// `importe_abs` y `breakdown` vienen en POSITIVO; el signo (negativo en
 /// rectificativos) se aplica aquí según `reference`.
 async fn create_record_in_tx(
@@ -87,24 +109,12 @@ async fn create_record_in_tx(
     importe_abs: Decimal,
     breakdown: &[TaxBreakdownItem],
 ) -> Result<(), sqlx::Error> {
-    // `hashtextextended(...,0)` da 64 bits (como en time_clock): evita colisiones
-    // de lock entre tenants distintos que sí tendría `hashtext` (32 bits) — M-02.
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))")
-        .bind(org.to_string())
-        .execute(&mut **tx)
-        .await?;
+    let previous_hash = lock_chain_and_previous_hash(tx, org).await?;
 
     let nif: Option<String> = sqlx::query_scalar(r#"SELECT nif FROM "Organization" WHERE id = $1"#)
         .bind(org)
         .fetch_one(&mut **tx)
         .await?;
-    let previous_hash: Option<String> = sqlx::query_scalar(
-        r#"SELECT hash FROM "VerifactuRecord" WHERE "organizationId" = $1
-           ORDER BY "createdAt" DESC LIMIT 1"#,
-    )
-    .bind(org)
-    .fetch_optional(&mut **tx)
-    .await?;
 
     // Fechas en hora local española (Europe/Madrid, DST correcto): la
     // `FechaExpedicionFactura` es la fecha fiscal del negocio, no UTC (una venta de
@@ -224,4 +234,86 @@ pub async fn record_rectification(
         breakdown,
     )
     .await
+}
+
+/// Registra la **anulación** (`RegistroAnulacion`) de una venta anulada (VOIDED)
+/// dentro de `tx` (#230). La anulación CANCELA una factura previamente emitida —
+/// es otro flujo distinto de la rectificativa/abono (`R5`) de una devolución— y se
+/// encadena en la misma cadena de huellas del tenant.
+///
+/// Referencia la factura anulada EXACTAMENTE como se registró en su `RegistroAlta`:
+/// lee el `VerifactuRecord` INVOICE de la venta y reutiliza su `IDEmisorFactura`,
+/// `NumSerieFactura` y `FechaExpedicionFactura` (no se recalculan a partir de la
+/// fecha actual, que sería otra). Si la venta no tiene `RegistroAlta` (venta
+/// anterior a VeriFactu) no hay factura que anular → no-op.
+pub async fn record_anulacion(
+    tx: &mut Transaction<'_, Postgres>,
+    org: Uuid,
+    sale_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    // Datos de la factura anulada, tal cual se registraron en su RegistroAlta. La
+    // venta nunca tiene una RECTIFICATION (void rechaza ventas con devoluciones),
+    // así que el INVOICE es inequívoco.
+    let original: Option<serde_json::Value> = sqlx::query_scalar(
+        r#"SELECT payload FROM "VerifactuRecord"
+           WHERE "saleId" = $1 AND type = 'INVOICE'::"VerifactuType"
+           ORDER BY "createdAt" LIMIT 1"#,
+    )
+    .bind(sale_id)
+    .fetch_optional(&mut **tx)
+    .await?;
+    let Some(original) = original else {
+        tracing::warn!(
+            %sale_id,
+            "venta anulada sin RegistroAlta VeriFactu (anterior a la feature); no se emite RegistroAnulacion"
+        );
+        return Ok(());
+    };
+    let str_field = |key: &str| original.get(key).and_then(|v| v.as_str()).unwrap_or("");
+    let id_emisor = str_field("idEmisorFactura");
+    let num_serie = str_field("numSerieFactura");
+    let fecha_expedicion = str_field("fechaExpedicionFactura");
+
+    let previous_hash = lock_chain_and_previous_hash(tx, org).await?;
+
+    // El registro de anulación se genera AHORA (hora local española con su huso),
+    // aunque referencie la fecha de expedición original de la factura anulada.
+    let now = OffsetDateTime::now_utc().to_timezone(timezones::db::europe::MADRID);
+    let fecha_hora_huso = format_fecha_hora_huso(now);
+
+    let input = AnulacionHashInput {
+        id_emisor,
+        num_serie,
+        fecha_expedicion,
+        fecha_hora_huso_gen: &fecha_hora_huso,
+    };
+    let hash = compute_anulacion_hash(&input, previous_hash.as_deref());
+
+    let payload_json = serde_json::json!({
+        "idEmisorFacturaAnulada": id_emisor,
+        "numSerieFacturaAnulada": num_serie,
+        "fechaExpedicionFacturaAnulada": fecha_expedicion,
+        "fechaHoraHusoGenRegistro": fecha_hora_huso,
+        "huellaAnterior": previous_hash.as_deref(),
+        "huella": &hash,
+    })
+    .to_string();
+
+    // Sin `qrData`: el QR de cotejo es de la factura (ticket), no de la anulación.
+    sqlx::query(
+        r#"INSERT INTO "VerifactuRecord"
+             (id, "organizationId", "saleId", "returnId", type, status, hash, "previousHash",
+              "qrData", payload)
+           VALUES ($1, $2, $3, NULL, 'ANULACION'::"VerifactuType", 'PENDING'::"VerifactuStatus",
+             $4, $5, NULL, $6::jsonb)"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(org)
+    .bind(sale_id)
+    .bind(&hash)
+    .bind(previous_hash)
+    .bind(&payload_json)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
 }
