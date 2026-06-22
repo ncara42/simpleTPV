@@ -8,12 +8,14 @@ const period = z
   .enum([
     'today',
     'yesterday',
-    'this_week',
+    'week',
     'last_week',
-    'this_month',
+    'month',
     'last_month',
-    'this_quarter',
-    'this_year',
+    'quarter',
+    'last_quarter',
+    'year',
+    'last_year',
     'custom',
   ])
   .optional()
@@ -58,7 +60,7 @@ export function registerDashboardTools(server: McpServer): void {
       const [salesDay, kpis, stockoutKpis, alerts] = await Promise.all([
         apiGet('/dashboard/sales-today', { compare: 'day' }),
         apiGet('/dashboard/sales-kpis', { period: 'today' }),
-        apiGet('/dashboard/stockout-kpis', { period: 'this_month' }),
+        apiGet('/dashboard/stockout-kpis', { period: 'month' }),
         apiGet('/stock/alerts'),
       ]);
       return { salesDay, kpis, stockoutKpis, alerts };
@@ -111,9 +113,11 @@ export function registerDashboardTools(server: McpServer): void {
     'Ventas del día en curso: importe total, nº de líneas y variación porcentual respecto al período anterior.',
     {
       compare: z
-        .enum(['day', 'week'])
+        .enum(['day', 'month', 'year'])
         .optional()
-        .describe('"day" compara con el día anterior, "week" con el mismo día de la semana pasada'),
+        .describe(
+          'Comparativa: "day" vs día anterior, "month" vs mes anterior, "year" vs año anterior',
+        ),
       storeId,
     },
     (params) => apiGet('/dashboard/sales-today', params),
