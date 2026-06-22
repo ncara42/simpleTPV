@@ -51,22 +51,7 @@ const ROTATION_ENDPOINT = {
 } as const;
 
 export function registerDashboardTools(server: McpServer): void {
-  readTool(
-    server,
-    'get_company_overview',
-    'Resumen ejecutivo del estado actual del negocio en UNA sola llamada: ventas de hoy con comparativa, KPIs de ventas, alertas de rotura de stock y métricas de stockout del mes. Úsalo como punto de partida para cualquier análisis o cuando el usuario pregunte por el estado general de la empresa; prefiérelo a pedir esas métricas con tools sueltas.',
-    {},
-    async () => {
-      const [salesDay, kpis, stockoutKpis, alerts] = await Promise.all([
-        safe(apiGet('/dashboard/sales-today', { compare: 'day' })),
-        safe(apiGet('/dashboard/sales-kpis', { period: 'today' })),
-        safe(apiGet('/dashboard/stockout-kpis', { period: 'month' })),
-        safe(apiGet('/stock/alerts')),
-      ]);
-      return { salesDay, kpis, stockoutKpis, alerts };
-    },
-  );
-
+  // get_company_overview se registra como MCP App (UI) en tools/ui-dashboard.ts.
   readTool(
     server,
     'get_sales_breakdown',

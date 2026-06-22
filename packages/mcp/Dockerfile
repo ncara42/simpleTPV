@@ -2,7 +2,8 @@
 # Servidor MCP SimpleTpv (OAuth 2.1, remoto multi-tenant).
 # Build desde la raíz del monorepo:
 #   docker build -f packages/mcp/Dockerfile -t simpletpv-mcp .
-# El paquete no depende de otros workspaces internos, así que el grafo es mínimo.
+# Depende de @simpletpv/ui (solo en build: se bundlea en la UI de MCP Apps con
+# Vite; en runtime el HTML ya va dentro de dist/ui).
 
 FROM node:22-slim AS base
 ENV PNPM_HOME=/pnpm
@@ -10,23 +11,26 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 WORKDIR /repo
 
-# ─── Dependencias ────────────────────────────────────────────────────────────
+# ─── Dependencias (incluye dev: Vite/React/@simpletpv/ui para el bundle) ───────
 FROM base AS deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/mcp/package.json packages/mcp/
+COPY packages/ui/package.json packages/ui/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --ignore-scripts --filter @simpletpv/mcp...
 
-# ─── Build (tsc → dist) ──────────────────────────────────────────────────────
+# ─── Build (vite build:ui → dist/ui + tsc → dist) ─────────────────────────────
 FROM deps AS builder
 COPY tsconfig.base.json ./
+COPY packages/ui packages/ui
 COPY packages/mcp packages/mcp
 RUN pnpm --filter @simpletpv/mcp run build
 
-# ─── Solo dependencias de producción ─────────────────────────────────────────
+# ─── Solo dependencias de producción (sin Vite/React/@simpletpv/ui devDeps) ────
 FROM base AS prod-deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/mcp/package.json packages/mcp/
+COPY packages/ui/package.json packages/ui/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --prod --ignore-scripts --filter @simpletpv/mcp...
 

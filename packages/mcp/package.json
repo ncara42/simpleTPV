@@ -1,16 +1,18 @@
 {
   "name": "@simpletpv/mcp",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build:ui": "vite build --config vite.ui.config.ts",
+    "build": "pnpm run build:ui && tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.ui.json",
     "test": "vitest run --coverage --coverage.reporter=json-summary --coverage.reporter=text"
   },
   "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.1.2",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "cors": "^2.8.5",
     "express": "^5.2.1",
@@ -19,12 +21,20 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@simpletpv/ui": "workspace:*",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react-swc": "^4.3.1",
     "@vitest/coverage-v8": "^4.0.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
+    "vite": "^8.0.16",
+    "vite-plugin-singlefile": "^2.3.0",
     "vitest": "^4.0.0"
   }
 }
