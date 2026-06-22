@@ -440,6 +440,11 @@ async fn run_migrations(pool: &sqlx::PgPool) -> anyhow::Result<()> {
             20260623120000,
             "verifactu_anulacion"
         ),
+        m!(
+            "../migrations/20260623130000_sale_customer_fiscal.sql",
+            20260623130000,
+            "sale_customer_fiscal"
+        ),
     ];
 
     for m in migrations {

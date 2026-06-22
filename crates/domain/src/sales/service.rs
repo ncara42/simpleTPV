@@ -38,6 +38,7 @@ const SALE_COLS: &str = r#"id, "organizationId" AS organization_id, "storeId" AS
     "discountTotal" AS discount_total, total, "paymentMethod"::text AS payment_method,
     "cashGiven" AS cash_given, "cashChange" AS cash_change, status::text AS status,
     "voidedAt" AS voided_at, "voidedBy" AS voided_by, "clientId" AS client_id,
+    "customerTaxId" AS customer_tax_id, "customerName" AS customer_name,
     "createdAt" AS created_at"#;
 
 const LINE_COLS: &str = r#"id, "organizationId" AS organization_id, "saleId" AS sale_id,
@@ -176,14 +177,20 @@ pub async fn create(
             format_ticket(&code, counter)
         };
 
-        // 8. INSERT de la venta.
+        // 8. INSERT de la venta. `fiscal_recipient` = Some((NIF, razón social)) si el
+        // cliente pidió factura completa F1; None → ticket simplificado F2.
         let sale_id = Uuid::new_v4();
+        let recipient = input.fiscal_recipient();
+        let (customer_tax_id, customer_name) = match &recipient {
+            Some((tax, name)) => (Some(tax.as_str()), Some(name.as_str())),
+            None => (None, None),
+        };
         let sale: Sale = sqlx::query_as(&format!(
             r#"INSERT INTO "Sale" (id, "organizationId", "storeId", "userId", "ticketNumber",
                  subtotal, "discountTotal", total, "paymentMethod", "cashGiven", "cashChange",
-                 status, "clientId", "createdAt")
+                 status, "clientId", "customerTaxId", "customerName", "createdAt")
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::"PaymentMethod", $10, $11,
-                 'COMPLETED'::"SaleStatus", $12, now())
+                 'COMPLETED'::"SaleStatus", $12, $13, $14, now())
                RETURNING {SALE_COLS}"#,
         ))
         .bind(sale_id)
@@ -198,6 +205,8 @@ pub async fn create(
         .bind(cash_given)
         .bind(cash_change)
         .bind(input.client_id)
+        .bind(customer_tax_id)
+        .bind(customer_name)
         .fetch_one(&mut **tx)
         .await?;
 
@@ -285,6 +294,7 @@ pub async fn create(
             &ticket_number,
             totals.total,
             &tax_breakdown,
+            recipient.as_ref().map(|(t, n)| (t.as_str(), n.as_str())),
         )
         .await?;
 

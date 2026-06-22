@@ -5,7 +5,14 @@ import { eur } from './lib/format';
 export interface PaymentData {
   paymentMethod: 'CASH' | 'CARD';
   cashGiven?: number;
+  // Factura completa F1: NIF + razón social del destinatario. Van juntos o ninguno
+  // (si se omiten, la venta es un ticket = factura simplificada F2).
+  customerTaxId?: string;
+  customerName?: string;
 }
+
+const MAX_TAX_ID = 20;
+const MAX_NAME = 120;
 
 interface PaymentModalProps {
   total: number;
@@ -47,14 +54,25 @@ const chipClass = (active: boolean) =>
       : 'border-[var(--ui-border)] bg-[var(--ui-surface)] text-[var(--ui-text)] hover:bg-[var(--ui-surface-subtle)]',
   ].join(' ');
 
+const fieldClass =
+  'h-12 w-full rounded-full border border-[var(--ui-border)] bg-[var(--ui-surface)] px-4 text-base text-[var(--ui-text)] outline-none transition-[border-color,box-shadow] placeholder:text-[var(--ui-text-muted)] focus:border-[var(--ui-brand)] focus:shadow-[var(--ui-focus)]';
+
 export function PaymentModal({ total, onConfirm, onCancel, busy }: PaymentModalProps) {
   const [method, setMethod] = useState<'CASH' | 'CARD'>('CASH');
   const [given, setGiven] = useState('');
+  const [wantsInvoice, setWantsInvoice] = useState(false);
+  const [taxId, setTaxId] = useState('');
+  const [customerName, setCustomerName] = useState('');
 
   const givenNum = Number(given.replace(',', '.'));
   const givenValid = given !== '' && !Number.isNaN(givenNum) && givenNum >= total;
   const change = givenValid ? givenNum - total : 0;
-  const canConfirm = !busy && (method === 'CARD' || givenValid);
+  // Factura completa F1: si se pide, NIF y razón social son obligatorios (van
+  // juntos o ninguno; así el backend nunca recibe solo uno).
+  const taxIdTrim = taxId.trim();
+  const nameTrim = customerName.trim();
+  const invoiceReady = !wantsInvoice || (taxIdTrim !== '' && nameTrim !== '');
+  const canConfirm = !busy && (method === 'CARD' || givenValid) && invoiceReady;
 
   const quick = quickAmounts(total);
   const isAmount = (amount: number) =>
@@ -62,10 +80,14 @@ export function PaymentModal({ total, onConfirm, onCancel, busy }: PaymentModalP
 
   function handleConfirm() {
     if (!canConfirm) return;
+    const fiscal =
+      wantsInvoice && taxIdTrim !== '' && nameTrim !== ''
+        ? { customerTaxId: taxIdTrim, customerName: nameTrim }
+        : {};
     if (method === 'CASH') {
-      onConfirm({ paymentMethod: 'CASH', cashGiven: givenNum });
+      onConfirm({ paymentMethod: 'CASH', cashGiven: givenNum, ...fiscal });
     } else {
-      onConfirm({ paymentMethod: 'CARD' });
+      onConfirm({ paymentMethod: 'CARD', ...fiscal });
     }
   }
 
@@ -161,6 +183,47 @@ export function PaymentModal({ total, onConfirm, onCancel, busy }: PaymentModalP
               </div>
             </div>
           )}
+
+          {/* Factura completa F1: NIF + razón social del destinatario (opcional;
+              sin esto el cobro emite un ticket = factura simplificada F2). */}
+          <div className="space-y-3 border-t border-[var(--ui-border)] pt-4">
+            <button
+              type="button"
+              onClick={() => setWantsInvoice((v) => !v)}
+              aria-pressed={wantsInvoice}
+              data-testid="pay-invoice-toggle"
+              className={`${methodClass(wantsInvoice)} w-full px-4`}
+            >
+              {wantsInvoice ? 'Factura con NIF' : 'Añadir NIF para factura'}
+            </button>
+            {wantsInvoice && (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={taxId}
+                  onChange={(e) => setTaxId(e.target.value)}
+                  maxLength={MAX_TAX_ID}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  data-testid="invoice-tax-id"
+                  placeholder="NIF / CIF"
+                  aria-label="NIF del cliente"
+                  className={fieldClass}
+                />
+                <input
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  maxLength={MAX_NAME}
+                  autoComplete="off"
+                  data-testid="invoice-name"
+                  placeholder="Razón social / Nombre"
+                  aria-label="Razón social o nombre del cliente"
+                  className={fieldClass}
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex gap-2 border-t border-[var(--ui-border)] p-5">

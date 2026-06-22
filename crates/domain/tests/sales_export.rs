@@ -135,6 +135,8 @@ async fn make_sale(c: &Ctx) -> Uuid {
             cash_given: Some(Decimal::from(1000)),
             ticket_discount_pct: None,
             ticket_discount_amt: None,
+            customer_tax_id: None,
+            customer_name: None,
         },
     )
     .await
