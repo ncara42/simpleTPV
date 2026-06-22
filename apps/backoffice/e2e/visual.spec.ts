@@ -1,9 +1,10 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// Regresión visual de los paneles v2 (#211): cada RECETA y cada BLOQUE, a 4 breakpoints, con datos
-// mock (stub de red). Además los estados loading/error/empty de un panel representativo. Corre con
-// `playwright.visual.config.ts` (sin backend). Baselines por plataforma → generados/validados en el
-// contenedor oficial de Playwright (job `visual` de CI) para que casen pixel a pixel.
+// Regresión visual de los paneles v2 (#211): cada RECETA y cada BLOQUE (descubiertos del DOM del
+// harness, no de una lista fija), a 4 breakpoints, con datos mock (stub de red). Además los estados
+// loading/error/empty de un panel representativo. Corre con `playwright.visual.config.ts` (sin
+// backend). Baselines por plataforma → generados/validados en el contenedor oficial de Playwright
+// (job `visual` de CI) para que casen pixel a pixel.
 
 // Datos mock por endpoint (allowlist real). Cubren todos los campos que tocan recetas y bloques.
 const MOCK: Record<string, unknown> = {
@@ -45,13 +46,42 @@ const MOCK: Record<string, unknown> = {
     { familyName: 'Cremas', total: 2100, color: '#22c55e' },
     { familyName: 'Flores', total: 1400, color: '#f59e0b' },
   ],
+  // Con rankBy (sales|margin|rotation) el endpoint proyecta un único array `items` con `value`
+  // (#225). Los bloques product-ranking/top-margin/dead-stock lo consumen vía valueField:'value'.
   '/dashboard/product-rankings': {
-    topSales: [
-      { name: 'Aceite CBD 10%', total: 1200, units: 45 },
-      { name: 'Crema relax', total: 980, units: 38 },
-      { name: 'Flores premium', total: 760, units: 22 },
+    items: [
+      { name: 'Aceite CBD 10%', value: 1200 },
+      { name: 'Crema relax', value: 980 },
+      { name: 'Flores premium', value: 760 },
+      { name: 'Bálsamo labial', value: 540 },
     ],
   },
+  '/dashboard/sales-by-store': [
+    {
+      storeName: 'Centro',
+      revenue: 32000,
+      avgTicket: 24.1,
+      margin: 9800,
+      marginPct: 0.31,
+      salesCount: 1320,
+    },
+    {
+      storeName: 'Sur',
+      revenue: 21000,
+      avgTicket: 21.7,
+      margin: 6100,
+      marginPct: 0.29,
+      salesCount: 980,
+    },
+    {
+      storeName: 'Norte',
+      revenue: 15400,
+      avgTicket: 19.9,
+      margin: 4200,
+      marginPct: 0.27,
+      salesCount: 760,
+    },
+  ],
   '/dashboard/discount-by-employee': [
     { userName: 'Ana', avgDiscountPct: 0.14, salesCount: 34 },
     { userName: 'Luis', avgDiscountPct: 0.09, salesCount: 28 },
@@ -106,19 +136,22 @@ async function stubApi(page: Page, mode: Mode): Promise<void> {
   });
 }
 
-const PANELS = [
-  'recipe-kpiRow',
-  'recipe-kpiRow-oneChart',
-  'recipe-kpiRow-twoCharts',
-  'recipe-heroChart-sideStats',
-  'recipe-tableFull',
-  'block-sales-overview',
-  'block-stock-risk',
-  'block-staff-performance',
-  'block-product-ranking',
-] as const;
-
 const BREAKPOINTS = [320, 768, 1024, 1440] as const;
+
+// Los paneles se DESCUBREN del DOM del harness (cada frame lleva `data-vis`), no de una lista
+// hardcodeada: así el spec captura toda RECETA y todo BLOQUE que VisualHarness renderiza (itera
+// BLOCK_IDS) sin poder quedarse atrás cuando se añade un bloque nuevo (#211).
+async function discoverPanelIds(page: Page): Promise<string[]> {
+  const ids = await page
+    .locator('[data-vis]')
+    .evaluateAll((els) =>
+      els.map((el) => el.getAttribute('data-vis')).filter((id): id is string => !!id),
+    );
+  expect(ids.length, 'el harness debe renderizar al menos una receta y un bloque').toBeGreaterThan(
+    0,
+  );
+  return ids;
+}
 
 for (const width of BREAKPOINTS) {
   test.describe(`paneles v2 @${width}px`, () => {
@@ -126,7 +159,7 @@ for (const width of BREAKPOINTS) {
       await stubApi(page, 'loaded');
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/visual.html');
-      for (const id of PANELS) {
+      for (const id of await discoverPanelIds(page)) {
         const panel = page.locator(`[data-vis="${id}"]`);
         await expect(panel).toBeVisible();
         await expect(panel).toHaveScreenshot(`${id}-${width}.png`);
