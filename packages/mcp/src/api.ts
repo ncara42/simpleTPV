@@ -1,5 +1,25 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import { getToken, invalidate } from './auth.js';
 import { getConfig } from './config.js';
+
+/**
+ * Contexto de autenticación por petición (modo http/OAuth). Lo establece el
+ * handler de /mcp con el grant del usuario; las tools lo leen de forma
+ * transparente vía AsyncLocalStorage, sin recibir parámetros extra.
+ */
+export interface BackendAuthContext {
+  apiUrl: string;
+  /** Resuelve un access token de backend del usuario (sin passthrough). */
+  getBackendToken(forceRefresh?: boolean): Promise<string>;
+}
+
+const authContext = new AsyncLocalStorage<BackendAuthContext>();
+
+/** Ejecuta `fn` con el contexto de backend del usuario activo. */
+export function runWithBackendAuth<T>(ctx: BackendAuthContext, fn: () => Promise<T>): Promise<T> {
+  return authContext.run(ctx, fn);
+}
 
 function buildQs(params: Record<string, unknown>): string {
   const p = new URLSearchParams();
@@ -18,22 +38,34 @@ export async function apiGet<T = unknown>(
   path: string,
   params: Record<string, unknown> = {},
 ): Promise<T> {
+  const ctx = authContext.getStore();
+
+  // Modo http/OAuth: token de backend DEL USUARIO (sin passthrough del token MCP).
+  if (ctx) {
+    const url = `${ctx.apiUrl}${path}${buildQs(params)}`;
+    let res = await doFetch(url, await ctx.getBackendToken());
+    if (res.status === 401) {
+      res = await doFetch(url, await ctx.getBackendToken(true));
+    }
+    if (!res.ok) {
+      throw new Error(`GET ${path} → ${res.status}: ${await res.text()}`);
+    }
+    return res.json() as Promise<T>;
+  }
+
+  // Modo stdio: credenciales del entorno (login global de admin/manager).
   const { apiUrl } = getConfig();
   const url = `${apiUrl}${path}${buildQs(params)}`;
-
   let token = await getToken();
   let res = await doFetch(url, token);
-
   if (res.status === 401) {
     invalidate();
     token = await getToken();
     res = await doFetch(url, token);
   }
-
   if (!res.ok) {
     throw new Error(`GET ${path} → ${res.status}: ${await res.text()}`);
   }
-
   return res.json() as Promise<T>;
 }
 
