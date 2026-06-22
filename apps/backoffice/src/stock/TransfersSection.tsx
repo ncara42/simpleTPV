@@ -14,11 +14,6 @@ import { createTransfer, listTransfers, sendTransfer } from '../lib/stock.js';
 import { CreateTransferModal } from './CreateTransferModal.js';
 import { dt, STATUS_LABEL } from './labels.js';
 
-interface DraftLine {
-  productId: string;
-  qty: number;
-}
-
 export function TransfersSection() {
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
