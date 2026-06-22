@@ -40,5 +40,45 @@ export interface OverviewData {
   alerts?: StockAlert[];
 }
 
-/** Discriminada por `kind`; el breakdown se añadirá en el siguiente incremento. */
-export type DashboardData = OverviewData;
+export interface MarginKpis {
+  grossMargin?: number;
+  marginPct?: number;
+  revenue?: number;
+}
+
+// Items de los desgloses (campos camelCase del backend).
+export interface SalesByFamilyItem {
+  familyName?: string;
+  total?: number;
+}
+export interface SalesByEmployeeItem {
+  userName?: string;
+  total?: number;
+  salesCount?: number;
+}
+export interface SalesByHourItem {
+  hour?: number;
+  revenue?: number;
+  count?: number;
+}
+export interface SalesByStoreItem {
+  storeName?: string;
+  revenue?: number;
+}
+
+/**
+ * Cada rama del breakdown puede llegar como su array de datos o como `{ error }`
+ * (las compuestas son resilientes vía `safe()`), de ahí `unknown` + narrowing en la vista.
+ */
+export interface BreakdownData {
+  kind: 'breakdown';
+  kpis?: unknown;
+  margin?: unknown;
+  byStore?: unknown;
+  byFamily?: unknown;
+  byHour?: unknown;
+  byEmployee?: unknown;
+}
+
+/** Discriminada por `kind`. */
+export type DashboardData = OverviewData | BreakdownData;

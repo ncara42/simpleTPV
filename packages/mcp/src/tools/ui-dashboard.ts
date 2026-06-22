@@ -7,8 +7,27 @@ import {
   RESOURCE_MIME_TYPE,
 } from '@modelcontextprotocol/ext-apps/server';
 import { type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 
 import { apiGet, safe } from '../api.js';
+
+const period = z
+  .enum([
+    'today',
+    'yesterday',
+    'week',
+    'last_week',
+    'month',
+    'last_month',
+    'quarter',
+    'last_quarter',
+    'year',
+    'last_year',
+    'custom',
+  ])
+  .optional()
+  .describe('Período de análisis. Usa "custom" junto con from y to para rangos personalizados');
+const storeId = z.string().uuid().optional().describe('UUID de tienda para filtrar resultados');
 
 /**
  * Tools con UI (MCP Apps): además de devolver datos, declaran un recurso `ui://`
@@ -61,6 +80,19 @@ function overviewSummary(d: Record<string, unknown>): string {
   return `Resumen del negocio — ${detail}. El panel visual con el detalle se muestra al usuario.`;
 }
 
+/** Resumen breve del análisis de ventas (los datos completos van en structuredContent). */
+function breakdownSummary(d: Record<string, unknown>): string {
+  const revenue = asNumber(getPath(d, ['kpis', 'revenue']));
+  const tickets = asNumber(getPath(d, ['kpis', 'salesCount']));
+  const marginPct = asNumber(getPath(d, ['margin', 'marginPct']));
+  const parts: string[] = [];
+  if (revenue != null) parts.push(`facturación ${revenue} €`);
+  if (tickets != null) parts.push(`${tickets} tickets`);
+  if (marginPct != null) parts.push(`margen ${(marginPct * 100).toFixed(1)} %`);
+  const detail = parts.length > 0 ? parts.join(' · ') : 'sin ventas en el período';
+  return `Análisis de ventas — ${detail}. Desglose por tienda/familia/empleado/hora en el panel.`;
+}
+
 export function registerUiDashboardTools(server: McpServer): void {
   registerAppResource(
     server,
@@ -93,6 +125,42 @@ export function registerUiDashboardTools(server: McpServer): void {
       const structuredContent = { kind: 'overview', salesDay, kpis, stockoutKpis, alerts };
       return {
         content: [{ type: 'text', text: overviewSummary(structuredContent) }],
+        structuredContent,
+      };
+    },
+  );
+
+  registerAppTool(
+    server,
+    'get_sales_breakdown',
+    {
+      title: 'Análisis de ventas',
+      description:
+        'Análisis de ventas COMPLETO en una sola llamada: KPIs, margen y desglose por tienda, familia, franja horaria y empleado para el período indicado. Se muestra como panel visual con gráficos. Úsalo cuando el usuario pida "analizar las ventas" o un informe global en lugar de encadenar tools de desglose sueltas.',
+      inputSchema: { period, storeId },
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+      _meta: { ui: { resourceUri: RESOURCE_URI } },
+    },
+    async (params) => {
+      const [kpis, margin, byStore, byFamily, byHour, byEmployee] = await Promise.all([
+        safe(apiGet('/dashboard/sales-kpis', params)),
+        safe(apiGet('/dashboard/margin-kpis', params)),
+        safe(apiGet('/dashboard/sales-by-store', { period: params.period })),
+        safe(apiGet('/dashboard/sales-by-family', params)),
+        safe(apiGet('/dashboard/sales-by-hour', params)),
+        safe(apiGet('/dashboard/sales-by-employee', params)),
+      ]);
+      const structuredContent = {
+        kind: 'breakdown',
+        kpis,
+        margin,
+        byStore,
+        byFamily,
+        byHour,
+        byEmployee,
+      };
+      return {
+        content: [{ type: 'text', text: breakdownSummary(structuredContent) }],
         structuredContent,
       };
     },

@@ -1,7 +1,7 @@
 import { type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { apiGet, safe } from '../api.js';
+import { apiGet } from '../api.js';
 import { readTool } from './register.js';
 
 const period = z
@@ -51,25 +51,8 @@ const ROTATION_ENDPOINT = {
 } as const;
 
 export function registerDashboardTools(server: McpServer): void {
-  // get_company_overview se registra como MCP App (UI) en tools/ui-dashboard.ts.
-  readTool(
-    server,
-    'get_sales_breakdown',
-    'Análisis de ventas COMPLETO en una sola llamada: KPIs, margen y desglose por tienda, familia, franja horaria y empleado para el período indicado. Úsalo cuando el usuario pida "analizar las ventas" o un informe global en lugar de encadenar varias tools de desglose por separado.',
-    { period, storeId },
-    async (params) => {
-      const [kpis, margin, byStore, byFamily, byHour, byEmployee] = await Promise.all([
-        safe(apiGet('/dashboard/sales-kpis', params)),
-        safe(apiGet('/dashboard/margin-kpis', params)),
-        safe(apiGet('/dashboard/sales-by-store', { period: params.period })),
-        safe(apiGet('/dashboard/sales-by-family', params)),
-        safe(apiGet('/dashboard/sales-by-hour', params)),
-        safe(apiGet('/dashboard/sales-by-employee', params)),
-      ]);
-      return { kpis, margin, byStore, byFamily, byHour, byEmployee };
-    },
-  );
-
+  // get_company_overview y get_sales_breakdown se registran como MCP Apps (UI)
+  // en tools/ui-dashboard.ts (devuelven structuredContent + panel visual).
   readTool(
     server,
     'get_kpis',
