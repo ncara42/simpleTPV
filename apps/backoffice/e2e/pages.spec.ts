@@ -260,6 +260,23 @@ test('Stock: filtro por rotación re-renderiza la tabla (#96)', async ({ page })
   expect(await page.getByTestId('stock-row').count()).toBeLessThanOrEqual(total);
 });
 
+test('Inventario: el filtro de tiendas es multi-selección (S-14)', async ({ page }) => {
+  await navTo(page, 'stock');
+  await expect(page.getByTestId('stock-table')).toBeVisible();
+  // Arranca sin filtro: el disparador muestra "Todas las tiendas".
+  await expect(page.getByTestId('stock-store')).toContainText('Todas las tiendas');
+  // Abre el MultiSelect (por click) y marca una tienda.
+  await page.getByTestId('stock-store').click();
+  await expect(page.getByTestId('stock-store-clear')).toBeVisible(); // acción "Todas"
+  await page.locator('.ui-multiselect-menu [role="option"][data-value]').first().click();
+  // Selección múltiple: el menú NO se cierra al marcar y aparece un chip en el disparador.
+  await expect(
+    page.getByTestId('stock-store').locator('.ui-multiselect-chip').first(),
+  ).toBeVisible();
+  // El heatmap/tabla sigue presente con la selección aplicada.
+  await expect(page.getByTestId('stock-table')).toBeVisible();
+});
+
 test('Movimientos de stock viven en el detalle del producto (I-12, D-05)', async ({ page }) => {
   // La tabla de Stock ya no tiene el botón repetido por fila.
   await navTo(page, 'stock');

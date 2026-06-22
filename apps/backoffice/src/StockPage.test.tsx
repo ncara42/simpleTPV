@@ -8,6 +8,8 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('./lib/stock.js', () => ({
   getGlobalStock: vi.fn(() => Promise.resolve([])),
   listMovements: vi.fn(() => Promise.resolve({ items: [] })),
+  listAlerts: vi.fn(() => Promise.resolve([])),
+  adjustStock: vi.fn(),
   setMinStock: vi.fn(),
 }));
 vi.mock('./lib/auth.js', () => ({ api: { subscribeEvents: vi.fn(() => () => {}) } }));

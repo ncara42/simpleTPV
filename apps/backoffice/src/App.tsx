@@ -2,6 +2,7 @@ import '@simpletpv/ui/chart.css';
 import '@simpletpv/ui/datatable.css';
 import '@simpletpv/ui/dataviz.css';
 import '@simpletpv/ui/login.css';
+import '@simpletpv/ui/multiselect.css';
 import '@simpletpv/ui/select.css';
 import '@simpletpv/ui/topbar.css';
 import './catalog.css';
