@@ -208,6 +208,32 @@ export interface SalesPage {
   };
 }
 
+// KPIs de un periodo para las estadísticas embebidas de Ventas (S-10): total
+// facturado (string, como en SalesPage.totals) y nº de tickets. El ticket medio se
+// deriva en el cliente (totalAmount / count). Solo ventas COMPLETED.
+export interface SalesStatsTotals {
+  count: number;
+  totalAmount: string;
+}
+
+// Punto de la serie temporal diaria (S-10): bucket = fecha ISO 'YYYY-MM-DD', con su
+// nº de tickets e importe. Solo días con ventas COMPLETED (la BD no rellena huecos).
+export interface SalesSeriesPoint {
+  bucket: string;
+  count: number;
+  total: string;
+}
+
+// Estadísticas de ventas embebidas (S-10): serie temporal + KPIs del periodo actual
+// + KPIs del periodo anterior equivalente. La sirve GET /sales/stats con los MISMOS
+// filtros que GET /sales. `previous` es null cuando el filtro no acota un rango de
+// fechas (sin from/to/date): sin rango no hay periodo anterior bien definido.
+export interface SalesStats {
+  series: SalesSeriesPoint[];
+  current: SalesStatsTotals;
+  previous: SalesStatsTotals | null;
+}
+
 // Filtros del historial (#14 + IT-04). Todos opcionales. `userId` filtra por
 // vendedor; `from`/`to` (YYYY-MM-DD) acotan por rango; `status` por estado.
 export interface SalesQueryInput {
