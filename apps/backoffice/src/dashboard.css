@@ -1765,6 +1765,16 @@
 }
 .dash-generic--insight {
   overflow: auto;
+  /* Callout de insight (NO texto suelto): el texto vive DENTRO de una tarjeta-nota. Anatomía
+     estilo GitHub alerts → UN SOLO tono coherente por tipo: borde, raya de acento y tinte derivan
+     todos del MISMO color (`--ui-chart-accent`) vía color-mix (MDN), sin hex sueltos ni tokens sin
+     definir. Distinto del amarillo de la nota adhesiva del usuario (`--ui-note-bg`). */
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--ui-chart-accent) 22%, var(--ui-border));
+  border-left: 3px solid var(--ui-chart-accent);
+  border-radius: var(--ui-radius-lg, 16px);
+  background: color-mix(in srgb, var(--ui-chart-accent) 7%, var(--ui-surface));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
 }
 
 /* ── Glue: las moléculas de dataviz (#203 F2) llenan la celda del widget ──────────────
@@ -1804,7 +1814,9 @@
   flex: 1 1 auto;
   min-height: 0;
 }
-/* La gráfica/lista de cada pieza llena su celda del ChartGrid. */
+/* La gráfica/lista de cada pieza llena su celda del ChartGrid (norma Tremor/Recharts: el gráfico
+   ocupa el 100% del ancho de la tarjeta CON su padding; el sangrado real a borde, si se desea, lo
+   da el mecanismo medido `edgeBleed` de <Chart>, NO un margin negativo mágico en CSS). */
 .dash-generic--panel .dv-chart .ui-chart {
   flex: 1 1 auto;
   min-height: 0;

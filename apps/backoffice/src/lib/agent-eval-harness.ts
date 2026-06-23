@@ -58,6 +58,10 @@ export interface EvalRequest {
   prompt: string;
   intent: string;
   expectsAnyOf: readonly string[];
+  // Solución de referencia (Anthropic, *Demystifying evals*: "create a reference solution: a known
+  // working output that passes all graders"). Ancla el grader: una composición conocida-buena para
+  // esta petición que `validateComposition` debe aceptar (test determinista). Opcional.
+  reference?: readonly CanvasOp[];
 }
 
 export const EVAL_REQUESTS: readonly EvalRequest[] = [
@@ -66,6 +70,9 @@ export const EVAL_REQUESTS: readonly EvalRequest[] = [
     prompt: '¿Cómo va la mañana? Dame un resumen rápido de ventas de hoy.',
     intent: 'Resumen de ventas del día (KPIs + tendencia).',
     expectsAnyOf: ['block:sales-overview', '/dashboard/sales-kpis', '/dashboard/sales-by-hour'],
+    reference: [
+      { op: 'add_widget', widgetId: 'block:sales-overview', position: 'top-left', period: 'today' },
+    ],
   },
   {
     id: 'rentabilidad',
@@ -90,6 +97,14 @@ export const EVAL_REQUESTS: readonly EvalRequest[] = [
     prompt: '¿Qué tienda sube y cuál baja esta semana? ¿Quién es el rezagado?',
     intent: 'Comparativa entre tiendas (multitienda).',
     expectsAnyOf: ['block:store-comparison', '/dashboard/sales-by-store'],
+    reference: [
+      {
+        op: 'add_widget',
+        widgetId: 'block:store-comparison',
+        position: 'top-left',
+        period: 'week',
+      },
+    ],
   },
   {
     id: 'cierre-de-mes',
@@ -100,12 +115,84 @@ export const EVAL_REQUESTS: readonly EvalRequest[] = [
       '/dashboard/margin-kpis',
       '/dashboard/product-rankings',
     ],
+    // Referencia gen:panel (ejercita la validación de hojas: slot-fit, endpoints, campos, formato).
+    reference: [
+      {
+        op: 'add_widget',
+        widgetId: 'gen:panel',
+        position: 'top-left',
+        genericSpec: {
+          kind: 'panel',
+          recipe: 'kpiRow+oneChart',
+          title: 'Cierre de mes',
+          slots: {
+            kpis: [
+              {
+                piece: 'kpiTile',
+                title: 'Facturación',
+                endpoint: '/dashboard/sales-kpis',
+                valueField: 'revenue',
+                format: 'eur',
+                params: { period: 'month' },
+              },
+              {
+                piece: 'kpiTile',
+                title: '% margen',
+                endpoint: '/dashboard/margin-kpis',
+                valueField: 'marginPct',
+                format: 'percentRatio',
+                params: { period: 'month' },
+              },
+            ],
+            charts: [
+              {
+                piece: 'rankBarList',
+                title: 'Top productos por ventas',
+                endpoint: '/dashboard/product-rankings',
+                labelField: 'name',
+                valueField: 'value',
+                format: 'eur',
+                params: { rankBy: 'sales', period: 'month' },
+              },
+            ],
+          },
+        },
+      },
+    ],
   },
   {
     id: 'peor-rotacion',
     prompt: '¿Qué productos no se mueven? Enséñame el stock muerto.',
     intent: 'Productos de peor rotación.',
     expectsAnyOf: ['block:dead-stock', '/dashboard/product-rankings'],
+  },
+];
+
+// Petición NEGATIVA: el agente NO debe componer un widget de datos (Anthropic, *Demystifying
+// evals*: "Test both the cases where a behavior should occur and where it shouldn't. One-sided
+// evals create one-sided optimization."). El gate en vivo (`runNegativeSuite`) exige
+// `hasDataComposition(ops) === false` y que el agente responda en el chat.
+export interface NegativeEvalRequest {
+  id: string;
+  prompt: string;
+  intent: string;
+}
+
+export const EVAL_NEGATIVE_REQUESTS: readonly NegativeEvalRequest[] = [
+  {
+    id: 'fuera-de-tema',
+    prompt: '¿Qué tiempo hará mañana en Madrid?',
+    intent: 'Ajeno al negocio → no compone; dice que está fuera de alcance.',
+  },
+  {
+    id: 'metrica-inexistente',
+    prompt: 'Enséñame el NPS y la satisfacción del cliente de este mes.',
+    intent: 'Métrica sin endpoint en el dominio → no inventa un panel.',
+  },
+  {
+    id: 'charla',
+    prompt: 'Gracias, muy buen trabajo 🙂',
+    intent: 'Cortesía → responde en el chat, sin tocar el lienzo.',
   },
 ];
 
@@ -256,4 +343,11 @@ export function validateComposition(ops: readonly CanvasOp[]): CompositionReport
   });
 
   return { valid: violations.length === 0, violations, widgetCount };
+}
+
+// ¿La composición incluye al menos un widget de DATOS (bloque/panel/catálogo)? Grader de los casos
+// negativos: en ellos debe ser `false` (el agente no debe montar un panel para una petición que no
+// lo amerita). Formas/texto/notas NO cuentan como composición de datos.
+export function hasDataComposition(ops: readonly CanvasOp[]): boolean {
+  return ops.some((op) => op.op === 'add_widget' && isKnownWidgetId(op.widgetId ?? ''));
 }

@@ -355,9 +355,13 @@ export function Chart({
                 {inner}
               </button>
             ) : (
+              // No seleccionable: dato gráfico con etiqueta textual → role="img" + aria-label da un
+              // anuncio CONSISTENTE en lectores de pantalla (un div focusable sin role se anuncia de
+              // forma errática). Mantiene el foco para abrir el tooltip por teclado. [WCAG/Carbon]
               <div
                 key={bar.label}
                 className="ui-chart-group"
+                role="img"
                 tabIndex={0}
                 aria-label={`${bar.label}: ${aria}`}
                 {...shared}
@@ -543,6 +547,7 @@ function ChartLine({
                 <div
                   className="ui-chart-hotzone"
                   style={{ left: `${zoneLeft}%`, width: `${zoneRight - zoneLeft}%` }}
+                  role="img"
                   tabIndex={0}
                   aria-label={`${bar.label}: ${aria}`}
                   onMouseEnter={() => setTipFor(i)}
