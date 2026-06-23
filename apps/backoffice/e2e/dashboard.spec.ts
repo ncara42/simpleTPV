@@ -152,7 +152,7 @@ test('lienzo libre: añadir un widget desde la paleta y quitarlo', async ({ page
   await expect(widgets).toHaveCount(0);
 });
 
-test('lienzo libre: añadir nota y widget, quitar, deshacer y ordenar; minimapa visible', async ({
+test('lienzo libre: añadir nota y widget, quitar, deshacer/rehacer y ordenar; minimapa visible', async ({
   page,
 }) => {
   await expect(page.getByTestId('dash-free')).toBeVisible();
@@ -174,7 +174,21 @@ test('lienzo libre: añadir nota y widget, quitar, deshacer y ordenar; minimapa 
   // Con contenido en el lienzo, el minimapa se pinta en la esquina.
   await expect(page.getByTestId('dash-free-minimap')).toBeVisible();
 
+  // Sin pasos para rehacer todavía: «Rehacer» está deshabilitado.
+  const redo = page.getByTestId('dash-free-redo');
+  await expect(redo).toBeDisabled();
+
   // Deshacer (botón suelto junto a la goma) quita la nota recién creada.
+  await page.getByTestId('dash-free-undo').click();
+  await expect(notes).toHaveCount(0);
+
+  // Rehacer la repone y agota su pila (vuelve a deshabilitarse).
+  await expect(redo).toBeEnabled();
+  await redo.click();
+  await expect(notes).toHaveCount(1);
+  await expect(redo).toBeDisabled();
+
+  // Deja el lienzo sin nota para la parte de widget/ordenar (estado base).
   await page.getByTestId('dash-free-undo').click();
   await expect(notes).toHaveCount(0);
 

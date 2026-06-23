@@ -2,6 +2,7 @@ import {
   Eraser,
   Hand,
   LayoutDashboard,
+  Redo2,
   Shapes,
   SquarePen,
   StickyNote,
@@ -19,6 +20,8 @@ interface CanvasToolsMenuProps {
   canvasRef: RefObject<FreeBoardHandle | null>;
   /** Hay pasos para deshacer (deshabilita «Deshacer»). */
   canUndo: boolean;
+  /** Hay pasos para rehacer (deshabilita «Rehacer»). */
+  canRedo: boolean;
   /** El pill de dibujo está abierto (marca «Dibujar» como activo). */
   drawActive: boolean;
   /** Modo de interacción activo (resalta Mover/Goma). */
@@ -38,7 +41,13 @@ interface CanvasToolsMenuProps {
  * `backdrop-filter` desenfoca el fondo real igual que el input, y al estar anidado queda anclado a
  * «Editar» por CSS (sin posicionar por JS), así no se desalinea al hacer zoom del navegador.
  */
-export function CanvasToolsMenu({ canvasRef, canUndo, drawActive, mode }: CanvasToolsMenuProps) {
+export function CanvasToolsMenu({
+  canvasRef,
+  canUndo,
+  canRedo,
+  drawActive,
+  mode,
+}: CanvasToolsMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -172,7 +181,8 @@ export function CanvasToolsMenu({ canvasRef, canUndo, drawActive, mode }: Canvas
       >
         <Eraser size={16} aria-hidden="true" />
       </button>
-      {/* «Deshacer» vive JUNTO a la goma (acción suelta, no un modo): se deshabilita sin pasos. */}
+      {/* «Deshacer» / «Rehacer» viven JUNTO a la goma (acciones sueltas, no modos): cada una se
+          deshabilita cuando su pila está vacía. */}
       <button
         type="button"
         className="canvas-tools__mode"
@@ -183,6 +193,17 @@ export function CanvasToolsMenu({ canvasRef, canUndo, drawActive, mode }: Canvas
         onClick={() => canvasRef.current?.undo()}
       >
         <Undo2 size={16} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className="canvas-tools__mode"
+        data-testid="dash-free-redo"
+        aria-label="Rehacer"
+        title="Rehacer"
+        disabled={!canRedo}
+        onClick={() => canvasRef.current?.redo()}
+      >
+        <Redo2 size={16} aria-hidden="true" />
       </button>
 
       {paletteOpen && (

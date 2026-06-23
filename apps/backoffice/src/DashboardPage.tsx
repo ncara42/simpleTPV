@@ -198,6 +198,7 @@ export function DashboardPage({
   const freeBoardRef = useRef<FreeBoardHandle>(null);
   const [canvasMeta, setCanvasMeta] = useState<CanvasMeta>({
     canUndo: false,
+    canRedo: false,
     drawOpen: false,
     mode: 'select',
   });
