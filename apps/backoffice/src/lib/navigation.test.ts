@@ -20,7 +20,7 @@ const EXPECTED: ReadonlyArray<[Tab, string, string]> = [
   ['notifications', '/notifications', 'Notificaciones'],
   ['catalog', '/catalog', 'Catálogo'],
   ['families', '/families', 'Familias'],
-  ['stock', '/stock', 'Stock'],
+  ['stock', '/stock', 'Inventario'],
   ['transfers', '/transfers', 'Traspasos'],
   ['suppliers', '/suppliers', 'Proveedores'],
   ['sales', '/sales', 'Ventas'],

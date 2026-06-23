@@ -50,7 +50,7 @@ export const NAV_NODES: readonly NavNode[] = [
   // Catálogo e inventario
   { id: 'catalog', path: '/catalog', label: 'Catálogo', group: 'inventory' },
   { id: 'families', path: '/families', label: 'Familias', group: 'inventory' },
-  { id: 'stock', path: '/stock', label: 'Stock', group: 'inventory' },
+  { id: 'stock', path: '/stock', label: 'Inventario', group: 'inventory' }, // S-12: término único "Inventario"
   { id: 'transfers', path: '/transfers', label: 'Traspasos', group: 'inventory' },
   { id: 'suppliers', path: '/suppliers', label: 'Proveedores', group: 'inventory' },
   // Ventas y clientes

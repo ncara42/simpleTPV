@@ -73,10 +73,11 @@ const NAV_GROUPS: NavGroup[] = [
 const ALL_NAV: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
   { id: 'notifications', label: 'Notificaciones', icon: <Bell size={18} />, group: 'inventory' },
-  // Catálogo e inventario (D-09): Catálogo · Familias · Stock · Traspasos · Proveedores
+  // Catálogo e inventario (D-09): Catálogo · Familias · Inventario · Traspasos · Proveedores
   { id: 'catalog', label: 'Catálogo', icon: <Package size={18} />, group: 'inventory' },
   { id: 'families', label: 'Familias', icon: <Tag size={18} />, group: 'inventory' },
-  { id: 'stock', label: 'Stock', icon: <BarChart2 size={18} />, group: 'inventory' },
+  // S-12: término único "Inventario" para el dominio de existencias (id interno 'stock' intacto).
+  { id: 'stock', label: 'Inventario', icon: <BarChart2 size={18} />, group: 'inventory' },
   { id: 'transfers', label: 'Traspasos', icon: <ArrowLeftRight size={18} />, group: 'inventory' },
   { id: 'suppliers', label: 'Proveedores', icon: <ShoppingCart size={18} />, group: 'inventory' },
   // Ventas y clientes (D-09): Ventas · Clientes B2B · Promociones
