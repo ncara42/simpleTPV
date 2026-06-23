@@ -290,6 +290,7 @@ function Home() {
                 <CanvasToolsMenu
                   canvasRef={canvasBinding.canvasRef}
                   canUndo={canvasBinding.canvasMeta.canUndo}
+                  canRedo={canvasBinding.canvasMeta.canRedo}
                   drawActive={canvasBinding.canvasMeta.drawOpen}
                   mode={canvasBinding.canvasMeta.mode}
                 />

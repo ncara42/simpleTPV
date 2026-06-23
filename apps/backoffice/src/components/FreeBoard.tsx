@@ -100,6 +100,8 @@ const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.m
 export interface CanvasMeta {
   /** Hay pasos en la pila de deshacer. */
   canUndo: boolean;
+  /** Hay pasos en la pila de rehacer. */
+  canRedo: boolean;
   /** El pill de dibujo está abierto. */
   drawOpen: boolean;
   /** Modo de interacción activo (select/pan/erase) → la barra resalta el botón. */
@@ -115,6 +117,7 @@ export interface FreeBoardHandle {
   addText: () => void;
   toggleDraw: () => void;
   undo: () => void;
+  redo: () => void;
   arrange: () => void;
   /** Fija el modo de interacción (MOVER/GOMA/normal). Al salir de 'select' cierra el dibujo. */
   setMode: (mode: InteractionMode) => void;
@@ -166,6 +169,10 @@ export function FreeBoard({
   const viewportRef = useRef<HTMLDivElement>(null);
   const [els, setEls] = useState<FreeElement[]>(elements);
   const [past, setPast] = useState<FreeElement[][]>([]);
+  // Pila de REHACER: estados retirados por «Deshacer», listos para reponerse. Una acción nueva
+  // (mutate/commitMove/onTextBlur → pushHistory) la vacía, porque rehacer un futuro ya divergente
+  // no tendría sentido.
+  const [future, setFuture] = useState<FreeElement[][]>([]);
   // Captura el valor en el primer render (antes de cualquier efecto); con key={preset.id}
   // el componente remonta en cada cambio de preset, así que este ref es siempre fresco.
   const initialViewRef = useRef(initialView);
@@ -227,6 +234,7 @@ export function FreeBoard({
   // ── Historial / persistencia ──
   const pushHistory = useCallback((snapshot: FreeElement[]): void => {
     setPast((p) => [...p.slice(-(HISTORY_MAX - 1)), snapshot]);
+    setFuture([]); // una acción nueva invalida la pila de rehacer
   }, []);
 
   const mutate = useCallback(
@@ -242,9 +250,23 @@ export function FreeBoard({
     setPast((p) => {
       if (p.length === 0) return p;
       const prev = p[p.length - 1]!;
+      // El estado ACTUAL pasa a la pila de rehacer antes de retroceder.
+      setFuture((f) => [...f.slice(-(HISTORY_MAX - 1)), elsRef.current]);
       setEls(prev);
       onChangeRef.current(prev);
       return p.slice(0, -1);
+    });
+  }, []);
+
+  const redo = useCallback((): void => {
+    setFuture((f) => {
+      if (f.length === 0) return f;
+      const next = f[f.length - 1]!;
+      // Simétrico a undo: el estado ACTUAL vuelve a la pila de deshacer antes de avanzar.
+      setPast((p) => [...p.slice(-(HISTORY_MAX - 1)), elsRef.current]);
+      setEls(next);
+      onChangeRef.current(next);
+      return f.slice(0, -1);
     });
   }, []);
 
@@ -702,16 +724,22 @@ export function FreeBoard({
       addText: onAddText,
       toggleDraw,
       undo,
+      redo,
       arrange: onArrange,
       setMode: onSetMode,
       listWidgets: () =>
         availableWidgets(elsRef.current).map((id) => ({ id, label: itemLabel(id) })),
     }),
-    [onAddWidget, onAddNote, onAddText, toggleDraw, undo, onArrange, onSetMode, itemLabel],
+    [onAddWidget, onAddNote, onAddText, toggleDraw, undo, redo, onArrange, onSetMode, itemLabel],
   );
   useEffect(() => {
-    onCanvasMeta?.({ canUndo: past.length > 0, drawOpen, mode: interactionMode });
-  }, [past.length, drawOpen, interactionMode, onCanvasMeta]);
+    onCanvasMeta?.({
+      canUndo: past.length > 0,
+      canRedo: future.length > 0,
+      drawOpen,
+      mode: interactionMode,
+    });
+  }, [past.length, future.length, drawOpen, interactionMode, onCanvasMeta]);
 
   // Minimapa + flecha de orientación (solo con viewport medido y algún elemento).
   const hasViewport = viewportSize.width > 0 && viewportSize.height > 0;
