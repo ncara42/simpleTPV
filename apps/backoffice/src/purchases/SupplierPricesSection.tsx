@@ -11,7 +11,6 @@ import { flattenTree } from '../lib/family-tree.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { fmtEur } from '../lib/format.js';
 import { usePageActions } from '../lib/pageActions.js';
-import { readPref, usePreferences } from '../lib/preferences.js';
 import { listProducts } from '../lib/products.js';
 import { listSuppliers } from '../lib/purchases.js';
 import {
@@ -26,12 +25,20 @@ import {
 // import CSV por SKU y comparativa de precios entre proveedores por arquetipo.
 // Con `fixedSupplierId` (vista detalle de proveedor, I-18/D-07) se fija el
 // proveedor y se ocultan el selector y la comparativa (que es cross-proveedor).
+// `initialView` (S-25): permite arrancar directamente en la sub-vista comparativa
+// vía deep-link (?vista=comparativa); por defecto sigue 'tarifas'. No tiene efecto
+// con `fixedSupplierId` (en ese modo no hay sub-vistas: la comparativa es cross-proveedor).
 export function SupplierPricesSection({
   fixedSupplierId,
+  initialView,
   tabs,
-}: { fixedSupplierId?: string; tabs?: ReactNode } = {}) {
+}: {
+  fixedSupplierId?: string;
+  initialView?: 'tarifas' | 'comparativa';
+  tabs?: ReactNode;
+} = {}) {
   const qc = useQueryClient();
-  const [view, setView] = useState<'tarifas' | 'comparativa'>('tarifas');
+  const [view, setView] = useState<'tarifas' | 'comparativa'>(initialView ?? 'tarifas');
   const [supplierId, setSupplierId] = useState(fixedSupplierId ?? '');
   const [familyId, setFamilyId] = useState('');
   const [importing, setImporting] = useState(false);
@@ -127,13 +134,12 @@ export function SupplierPricesSection({
     : prices;
 
   // ── Comparativa gráfica ──
-  // El tipo de gráfico (barras/línea) sigue la MISMA preferencia que el
-  // dashboard (dashboard.layout.chartKind): un solo toggle para toda la app.
-  const { prefs } = usePreferences();
-  const chartKind: 'bars' | 'line' =
-    readPref<{ chartKind?: 'bars' | 'line' }>(prefs, 'dashboard.layout', {}).chartKind === 'line'
-      ? 'line'
-      : 'bars';
+  // S-25 (DR-06/P154): la comparativa de precios entre proveedores SIEMPRE se
+  // dibuja en barras, IGNORANDO la preferencia global `dashboard.layout.chartKind`.
+  // Es una excepción INTENCIONAL al toggle único barras↔línea del dashboard: la
+  // comparación de precios se lee mejor en barras. No "arreglar" esto leyendo la
+  // pref del dashboard — el comportamiento es deliberado.
+  const chartKind = 'bars' as const;
   // Búsqueda de producto/arquetipo (encima de la tabla) + selección por clic.
   const [cmpSearch, setCmpSearch] = useState('');
   const [cmpProductId, setCmpProductId] = useState<string | null>(null);
@@ -313,8 +319,8 @@ export function SupplierPricesSection({
           </div>
           {/* Comparativa gráfica: media/mediana por proveedor + producto concreto.
               Apilados para que cada gráfico respire; con ≤3 proveedores las barras
-              caben de sobra y los dos paneles van en línea. Responden al toggle
-              barras↔línea del dashboard. */}
+              caben de sobra y los dos paneles van en línea. S-25/DR-06: SIEMPRE en
+              barras (kind="bars" fijo), al margen del toggle del dashboard. */}
           <div
             className={`sp-cmp-charts${cmpStats.length > 0 && cmpStats.length <= 3 ? ' is-inline' : ''}`}
           >

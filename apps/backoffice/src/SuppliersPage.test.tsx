@@ -28,13 +28,25 @@ vi.mock('./lib/supplier-prices.js', () => ({
 }));
 
 import { listSuppliers } from './lib/purchases.js';
+import { compareSupplierPrices } from './lib/supplier-prices.js';
 import { SuppliersPage } from './SuppliersPage.js';
 
-function renderPage(): void {
+type RenderOpts = {
+  initialSection?: 'suppliers' | 'prices' | 'orders' | 'suggest' | null;
+  initialPricesView?: 'tarifas' | 'comparativa' | null;
+  /** Siembra el caché de preferencias para verificar que la comparativa las IGNORA. */
+  prefs?: Record<string, unknown>;
+};
+
+function renderPage(opts: RenderOpts = {}): void {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  if (opts.prefs) qc.setQueryData(['preferences'], opts.prefs);
   render(
     <QueryClientProvider client={qc}>
-      <SuppliersPage />
+      <SuppliersPage
+        initialSection={opts.initialSection ?? null}
+        initialPricesView={opts.initialPricesView ?? null}
+      />
     </QueryClientProvider>,
   );
 }
@@ -91,5 +103,49 @@ describe('SuppliersPage', () => {
 
     fireEvent.click(screen.getByTestId('suppliers-tab-suggest'));
     await waitFor(() => expect(screen.getByTestId('suggest-empty')).toBeInTheDocument());
+  });
+
+  // ── S-25: deep-link a la comparativa + barras forzadas ──────────────────────
+  it('S-25: con initialSection="prices" + initialPricesView="comparativa" arranca en la comparativa', async () => {
+    renderPage({ initialSection: 'prices', initialPricesView: 'comparativa' });
+    // Monta directamente la sección Tarifas en su sub-vista Comparativa (1 clic).
+    await waitFor(() => expect(screen.getByTestId('sp-view-tabs')).toBeInTheDocument());
+    const cmpTab = screen.getByTestId('sp-view-comparativa');
+    expect(cmpTab).toHaveClass('active');
+    expect(screen.getByTestId('sp-view-tarifas')).not.toHaveClass('active');
+    // Los dos paneles de la comparativa son visibles.
+    expect(screen.getByTestId('sp-cmp-avg')).toBeInTheDocument();
+    expect(screen.getByTestId('sp-cmp-product')).toBeInTheDocument();
+  });
+
+  it('S-25/DR-06: los gráficos de la comparativa SIEMPRE van en barras, aunque la pref global sea "line"', async () => {
+    vi.mocked(compareSupplierPrices).mockResolvedValue([
+      {
+        productId: 'p1',
+        productName: 'Aceite CBD 10%',
+        sku: 'CBD-10',
+        prices: [
+          { supplierId: 's1', supplierName: 'Norte', price: 10 },
+          { supplierId: 's2', supplierName: 'Sur', price: 12 },
+        ],
+        best: { supplierId: 's1', supplierName: 'Norte', price: 10 },
+      },
+    ]);
+    // Preferencia global de gráfico en LÍNEA: la comparativa debe ignorarla.
+    renderPage({
+      initialSection: 'prices',
+      initialPricesView: 'comparativa',
+      prefs: { 'dashboard.layout': { chartKind: 'line' } },
+    });
+    // El gráfico de media/mediana por proveedor renderiza en barras (ui-chart-bars),
+    // no en línea (ui-chart-line), pese a la preferencia global 'line'.
+    const avgChart = await waitFor(() => {
+      const chart = screen.getByTestId('sp-cmp-avg').querySelector('.ui-chart');
+      expect(chart).not.toBeNull();
+      return chart as HTMLElement;
+    });
+    expect(avgChart).toHaveClass('ui-chart-bars');
+    expect(avgChart).not.toHaveClass('ui-chart-line');
+    vi.mocked(compareSupplierPrices).mockResolvedValue([]);
   });
 });

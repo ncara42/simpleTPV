@@ -95,13 +95,9 @@ const SEARCH_INDEX: SearchEntry[] = [
     hint: 'Compras y tarifas',
     synonyms: ['proveedores', 'tarifas', 'compras', 'reponer'],
   },
-  {
-    label: 'Comparativa de proveedores',
-    tab: 'suppliers',
-    group: 'Catálogo e inventario',
-    hint: 'Compras',
-    synonyms: ['comparativa', 'comparar precios', 'mejor precio', 'media', 'mediana'],
-  },
+  // S-25/P157: la "Comparativa de proveedores" se RETIRÓ del buscador a propósito.
+  // Pasa a ser un acceso directo (widget del dashboard + deep-link
+  // `/suppliers?vista=comparativa`), no una entrada del palette. No volver a añadirla.
   {
     label: 'Pedidos de compra',
     tab: 'suppliers',

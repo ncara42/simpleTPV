@@ -125,9 +125,15 @@ const toSparkTone = (tone: 'up' | 'down' | 'flat'): SparkTone => (tone === 'flat
 
 export function DashboardPage({
   onNavigate,
+  onOpenSupplierComparison,
 }: {
   // Links a otras pages (I-16/I-17): paneles → Proveedores/Stock; pie → Ventas.
   onNavigate?: ((tab: 'suppliers' | 'stock' | 'sales') => void) | undefined;
+  // S-25: el widget de comparativa abre el deep-link a la comparativa de precios
+  // (`/suppliers?vista=comparativa`), no la página Proveedores genérica. Va como
+  // callback propio para no generalizar `onNavigate` a destinos arbitrarios antes
+  // de F0/S-06 (esa migración pertenece a esas fases).
+  onOpenSupplierComparison?: (() => void) | undefined;
 } = {}) {
   // El periodo vive en la URL (?period=) para sobrevivir al reload y ser compartible (F0c),
   // con fallback a 'today' si falta o es inválido. `setPeriod` conserva la firma anterior
@@ -892,10 +898,10 @@ export function DashboardPage({
                 <button
                   type="button"
                   className="link-btn"
-                  onClick={() => onNavigate?.('suppliers')}
+                  onClick={() => onOpenSupplierComparison?.()}
                   data-testid="dash-suppliers-link"
                 >
-                  Ver proveedores →
+                  Ver comparativa →
                 </button>
               </header>
               <p className="dash-panel-sub">Precios de compra por proveedor · mejor marcado</p>
