@@ -137,6 +137,7 @@ async fn make_sale(c: &Ctx) -> Uuid {
             ticket_discount_amt: None,
             customer_tax_id: None,
             customer_name: None,
+            skipped_promotions: vec![],
         },
     )
     .await

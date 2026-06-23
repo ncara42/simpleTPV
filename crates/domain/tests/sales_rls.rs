@@ -193,6 +193,7 @@ async fn venta_feliz_calcula_totales_cambio_y_decrementa_stock() {
             ticket_discount_amt: None,
             customer_tax_id: None,
             customer_name: None,
+            skipped_promotions: vec![],
         },
     )
     .await
@@ -228,6 +229,7 @@ async fn idempotencia_por_client_id_devuelve_la_misma_venta() {
         ticket_discount_amt: None,
         customer_tax_id: None,
         customer_name: None,
+        skipped_promotions: vec![],
     };
 
     let first = service::create(&c.app, c.org, c.user, Role::Admin, body())
@@ -271,6 +273,7 @@ async fn sin_caja_abierta_rechaza_con_conflict() {
             ticket_discount_amt: None,
             customer_tax_id: None,
             customer_name: None,
+            skipped_promotions: vec![],
         },
     )
     .await;
@@ -334,6 +337,7 @@ async fn clerk_supera_el_limite_de_descuento() {
             ticket_discount_amt: None,
             customer_tax_id: None,
             customer_name: None,
+            skipped_promotions: vec![],
         },
     )
     .await;
@@ -423,6 +427,7 @@ async fn void_repone_stock_marca_voided_y_rechaza_doble() {
             ticket_discount_amt: None,
             customer_tax_id: None,
             customer_name: None,
+            skipped_promotions: vec![],
         },
     )
     .await
@@ -476,6 +481,7 @@ async fn void_repone_al_lote_original_en_producto_con_lote() {
             ticket_discount_amt: None,
             customer_tax_id: None,
             customer_name: None,
+            skipped_promotions: vec![],
         },
     )
     .await

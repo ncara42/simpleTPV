@@ -63,6 +63,12 @@ pub struct CreateSale {
     /// Factura completa F1: razón social / nombre del destinatario.
     #[serde(default)]
     pub customer_name: Option<String>,
+    /// S-22: ids de promociones automáticas que el cajero ha quitado en caja. El
+    /// matching las ignora (decisión de producto: el vendedor puede saltarlas si
+    /// `clerkCanSkip`). El TPV poblará este campo en una fase posterior; hoy el
+    /// hook ya está listo y por defecto vacío (ninguna promo se salta).
+    #[serde(default)]
+    pub skipped_promotions: Vec<Uuid>,
 }
 
 impl CreateSale {
@@ -191,6 +197,7 @@ mod tests {
             ticket_discount_amt: None,
             customer_tax_id: tax.map(str::to_owned),
             customer_name: name.map(str::to_owned),
+            skipped_promotions: vec![],
         }
     }
 

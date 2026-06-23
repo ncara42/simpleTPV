@@ -53,6 +53,9 @@ model Organization {
   apiKeys             ApiKey[]
   featureFlags        FeatureFlag[]
   promotions          Promotion[]
+  promotionProducts   PromotionProduct[]
+  promotionFamilies   PromotionFamily[]
+  promotionStores     PromotionStore[]
   supplierPrices      SupplierPrice[]
 }
 
@@ -113,6 +116,7 @@ model Store {
   transfersIn      Transfer[]       @relation("TransferDest")
   purchaseOrders   PurchaseOrder[]
   featureFlags     FeatureFlag[]
+  promotionStores  PromotionStore[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -212,6 +216,7 @@ model Product {
   purchaseOrderLines  PurchaseOrderLine[]
   priceListItems      PriceListItem[]
   wholesaleOrderLines WholesaleOrderLine[]
+  promotionProducts   PromotionProduct[]
 
   @@index([organizationId, active])
   @@index([organizationId, barcode])
@@ -233,10 +238,11 @@ model ProductFamily {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization    @relation(fields: [organizationId], references: [id])
-  parent       ProductFamily?  @relation("FamilyHierarchy", fields: [parentId], references: [id])
-  children     ProductFamily[] @relation("FamilyHierarchy")
-  products     Product[]
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  parent           ProductFamily?    @relation("FamilyHierarchy", fields: [parentId], references: [id])
+  children         ProductFamily[]   @relation("FamilyHierarchy")
+  products         Product[]
+  promotionFamilies PromotionFamily[]
 
   @@index([organizationId, parentId])
 }
@@ -446,6 +452,7 @@ model FeatureFlag {
 enum PromoConditionType {
   min_qty // nº mínimo de productos en el ticket
   min_ticket // importe mínimo del ticket (€)
+  qty_xy // lleva X paga Y / 2x1 (por cantidad, S-22)
 }
 
 enum PromoDiscountType {
@@ -453,24 +460,97 @@ enum PromoDiscountType {
   amount // descuento en € sobre el ticket
 }
 
+// A qué se aplica la promo (S-22): TICKET (umbral global), PRODUCT o FAMILY
+// (scope N:M en PromotionProduct/PromotionFamily).
+enum PromoAppliesTo {
+  TICKET
+  PRODUCT
+  FAMILY
+}
+
+// Si el descuento se calcula sobre el ticket completo o por línea (S-22).
+enum PromoAmountScope {
+  TICKET
+  LINE
+}
+
 model Promotion {
   id             String             @id @default(uuid()) @db.Uuid
   organizationId String             @db.Uuid
   name           String
   conditionType  PromoConditionType
-  threshold      Int // nº de productos (min_qty) o € de ticket (min_ticket)
+  threshold      Int // nº de productos (min_qty) o € de ticket (min_ticket); ignorado en qty_xy
   discountType   PromoDiscountType
   discountValue  Decimal            @db.Decimal(10, 4) // % o € según discountType
   startDate      DateTime           @db.Date
   endDate        DateTime           @db.Date
   active         Boolean            @default(true)
+  // S-22: alcance y franja horaria/días.
+  appliesTo      PromoAppliesTo     @default(TICKET)
+  amountScope    PromoAmountScope   @default(TICKET)
+  startTime      DateTime?          @db.Time // happy hour: inicio (nullable = todo el día)
+  endTime        DateTime?          @db.Time // happy hour: fin
+  weekdays       Int[] // días de la semana 0=Dom..6=Sáb (vacío = todos)
+  stackable      Boolean            @default(false) // reservado; hoy gana-la-mejor
+  clerkCanSkip   Boolean            @default(false) // el cajero puede quitarla en caja
+  buyQty         Int? // qty_xy: lleva X
+  payQty         Int? // qty_xy: paga Y
+  priority       Int                @default(0) // desempate determinista (mayor gana)
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
+  organization Organization       @relation(fields: [organizationId], references: [id])
+  products     PromotionProduct[]
+  families     PromotionFamily[]
+  stores       PromotionStore[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
+}
+
+// Scope N:M promo → producto (S-22, appliesTo = PRODUCT). RLS por tenant.
+model PromotionProduct {
+  promotionId    String @db.Uuid
+  productId      String @db.Uuid
+  organizationId String @db.Uuid
+
+  promotion    Promotion    @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@id([promotionId, productId])
+  @@index([organizationId])
+  @@index([productId])
+}
+
+// Scope N:M promo → familia (S-22, appliesTo = FAMILY). RLS por tenant.
+model PromotionFamily {
+  promotionId    String @db.Uuid
+  familyId       String @db.Uuid
+  organizationId String @db.Uuid
+
+  promotion    Promotion     @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  family       ProductFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  organization Organization  @relation(fields: [organizationId], references: [id])
+
+  @@id([promotionId, familyId])
+  @@index([organizationId])
+  @@index([familyId])
+}
+
+// Scope N:M promo → tienda (S-22, vacío = todas las tiendas). RLS por tenant.
+model PromotionStore {
+  promotionId    String @db.Uuid
+  storeId        String @db.Uuid
+  organizationId String @db.Uuid
+
+  promotion    Promotion    @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  store        Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@id([promotionId, storeId])
+  @@index([organizationId])
+  @@index([storeId])
 }
 
 // Movimiento de stock: cada entrada/salida deja rastro auditado. quantity es

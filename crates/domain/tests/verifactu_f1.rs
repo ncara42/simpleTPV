@@ -146,6 +146,7 @@ async fn sell(c: &Ctx, product: Uuid, qty: i64, recipient: Option<(&str, &str)>)
             ticket_discount_amt: None,
             customer_tax_id,
             customer_name,
+            skipped_promotions: vec![],
         },
     )
     .await

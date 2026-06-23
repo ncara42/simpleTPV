@@ -6,11 +6,134 @@ use rust_decimal::Decimal;
 use serde::Serialize;
 use simpletpv_shared::AppError;
 
-use super::model::PaymentMethod;
+use super::model::{DiscountSource, PaymentMethod};
+use crate::promotions::apply::PromoOutcome;
 
 /// Redondeo a 2 decimales (céntimos) para casar con `Decimal(12,2)`.
 fn round2(n: Decimal) -> Decimal {
     n.round_dp(2)
+}
+
+/// Descuento manual efectivo de una línea, con la MISMA precedencia que
+/// `compute_totals`: importe fijo (>0) capado al bruto tiene prioridad sobre el %.
+fn manual_line_discount(
+    gross: Decimal,
+    discount_pct: Option<Decimal>,
+    discount_amt: Option<Decimal>,
+) -> Decimal {
+    match discount_amt {
+        Some(amt) if amt > Decimal::ZERO => round2(amt.min(gross)),
+        _ => round2(gross * discount_pct.unwrap_or(Decimal::ZERO) / Decimal::from(100)),
+    }
+}
+
+/// Resultado de fusionar las promos automáticas con el descuento manual del
+/// vendedor (S-22, regla GANA LA MEJOR exclusiva por dimensión):
+///  - `lines`: las líneas con el descuento EFECTIVO ya bajado a `discount_amt`
+///    (override del pct cuando aplica) — listas para `compute_totals`.
+///  - `line_sources`: origen de cada línea (`PROMOTION` si ganó la promo).
+///  - `ticket`: descuento de ticket efectivo (manual vs mejor promo de ticket).
+///  - `ticket_source`: origen del descuento de ticket.
+///  - `manual_discount_total`: SOLO la parte de descuento MANUAL (líneas + ticket
+///    donde NO ganó una promo automática) — es lo único que cuenta contra el
+///    límite de descuento del rol. Las promos automáticas no penalizan al rol.
+#[derive(Debug, Clone)]
+pub struct MergedDiscounts {
+    pub lines: Vec<PricedLine>,
+    pub line_sources: Vec<DiscountSource>,
+    pub ticket: TicketDiscount,
+    pub ticket_source: DiscountSource,
+    pub manual_discount_total: Decimal,
+}
+
+/// Fusiona el descuento manual del ticket con las promos automáticas casadas
+/// (`PromoOutcome`). Para cada línea elige el MAYOR descuento (manual vs promo);
+/// si gana la promo, baja el importe a `discount_amt` (anula el pct manual para
+/// no doblar) y marca el origen `PROMOTION`. Igual para el descuento de ticket.
+///
+/// `manual_discount_total` acumula SOLO la parte que sigue siendo voluntaria, de
+/// modo que el límite del rol no se dispare por una promo automática (decisión de
+/// producto: las promos automáticas no cuentan contra el límite del vendedor).
+pub fn merge_promotions(
+    priced: Vec<PricedLine>,
+    manual_ticket: TicketDiscount,
+    outcome: &PromoOutcome,
+) -> MergedDiscounts {
+    let n = priced.len();
+    let mut lines = priced;
+    let mut line_sources = vec![DiscountSource::Voluntary; n];
+    let mut manual_discount_total = Decimal::ZERO;
+
+    // Indexa el descuento de promo por índice de línea.
+    let mut promo_by_line: std::collections::HashMap<usize, Decimal> =
+        std::collections::HashMap::with_capacity(outcome.lines.len());
+    for ld in &outcome.lines {
+        promo_by_line.insert(ld.line_index, ld.discount_amt);
+    }
+
+    for (i, line) in lines.iter_mut().enumerate() {
+        let gross = round2(line.unit_price * line.qty);
+        let manual = manual_line_discount(gross, line.discount_pct, line.discount_amt);
+        let promo = promo_by_line.get(&i).copied().unwrap_or(Decimal::ZERO);
+        // GANA LA MEJOR: si la promo supera estrictamente al manual, la promo
+        // sustituye el descuento de la línea; en empate, conserva el manual
+        // (evita reclasificar un descuento del vendedor como promo sin ventaja).
+        if promo > manual {
+            line.discount_amt = Some(round2(promo.min(gross)));
+            line.discount_pct = None;
+            line_sources[i] = DiscountSource::Promotion;
+            // La promo NO cuenta contra el límite del rol → no suma a manual_total.
+        } else {
+            // Gana (o iguala) el manual: cuenta contra el límite del rol.
+            manual_discount_total = round2(manual_discount_total + manual);
+        }
+    }
+
+    // Descuento de ticket: el manual efectivo vs la mejor promo de ticket.
+    let subtotal_after_lines: Decimal = round2(
+        lines
+            .iter()
+            .map(|l| {
+                let gross = round2(l.unit_price * l.qty);
+                let d = manual_line_discount(gross, l.discount_pct, l.discount_amt);
+                round2(gross - d)
+            })
+            .sum(),
+    );
+    let manual_ticket_amt = if let Some(amt) = manual_ticket.amt {
+        round2(amt.min(subtotal_after_lines))
+    } else if let Some(pct) = manual_ticket.pct {
+        round2(subtotal_after_lines * pct / Decimal::from(100))
+    } else {
+        Decimal::ZERO
+    };
+    let promo_ticket_amt = outcome
+        .ticket
+        .as_ref()
+        .map(|t| round2(t.discount_amt.min(subtotal_after_lines)))
+        .unwrap_or(Decimal::ZERO);
+
+    let (ticket, ticket_source) = if promo_ticket_amt > manual_ticket_amt {
+        // La promo de ticket gana: se expresa como importe fijo (override del pct).
+        (
+            TicketDiscount {
+                pct: None,
+                amt: Some(promo_ticket_amt),
+            },
+            DiscountSource::Promotion,
+        )
+    } else {
+        manual_discount_total = round2(manual_discount_total + manual_ticket_amt);
+        (manual_ticket, DiscountSource::Voluntary)
+    };
+
+    MergedDiscounts {
+        lines,
+        line_sources,
+        ticket,
+        ticket_source,
+        manual_discount_total,
+    }
 }
 
 /// Línea con su precio ya resuelto (antes de calcular totales).

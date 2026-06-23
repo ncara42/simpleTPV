@@ -22,12 +22,16 @@ use crate::store_access::has_store_access;
 
 use super::domain::{
     assert_discount_within_limit, build_tax_breakdown, compute_change, compute_totals,
-    format_ticket, PricedLine, TaxLine, TicketDiscount,
+    format_ticket, merge_promotions, PricedLine, TaxLine, TicketDiscount,
 };
 use super::input::CreateSale;
+use crate::promotions::apply::{best_promotions, MatchInput, MatchNow, PromoLine};
+use crate::promotions::service::load_active_for_matching;
+use std::collections::HashSet;
 use super::model::{
-    OrgInfo, Sale, SaleLine, SaleListItem, SaleStatus, SaleWithLines, SalesPage, SalesSeriesPoint,
-    SalesStats, SalesStatsTotals, SalesTotals, StoreInfo, TicketBlock, TicketData, TicketLine,
+    DiscountSource, OrgInfo, Sale, SaleLine, SaleListItem, SaleStatus, SaleWithLines, SalesPage,
+    SalesSeriesPoint, SalesStats, SalesStatsTotals, SalesTotals, StoreInfo, TicketBlock,
+    TicketData, TicketLine,
 };
 
 const MAX_SALES_PAGE_SIZE: i64 = 100;
@@ -55,6 +59,8 @@ struct ProductRow {
     tax_rate: Decimal,
     cost_price: Decimal,
     tracks_batch: bool,
+    // S-22: familia del producto para el matching de promos de familia.
+    family_id: Option<Uuid>,
 }
 
 /// Límite de % de descuento efectivo por rol (paridad NestJS): ADMIN sin límite,
@@ -105,7 +111,8 @@ pub async fn create(
         let product_ids: Vec<Uuid> = input.lines.iter().map(|l| l.product_id).collect();
         let products: Vec<ProductRow> = sqlx::query_as(
             r#"SELECT id, name, "salePrice" AS sale_price, "taxRate" AS tax_rate,
-                 "costPrice" AS cost_price, "tracksBatch" AS tracks_batch
+                 "costPrice" AS cost_price, "tracksBatch" AS tracks_batch,
+                 "familyId" AS family_id
                FROM "Product" WHERE id = ANY($1)"#,
         )
         .bind(&product_ids)
@@ -143,15 +150,59 @@ pub async fn create(
             });
         }
 
-        // 6. Totales + límite de descuento por rol + cambio.
-        let totals = compute_totals(
+        // 6. Matching de promociones automáticas (S-22, #275). Carga las promos
+        // vigentes por fecha de la org y elige, por línea y por ticket, la MEJOR
+        // (exclusiva, no acumula). El "ahora" es el del SERVIDOR (weekday + hora),
+        // pasado explícito al dominio puro `best_promotions` (testeable).
+        let now = time::OffsetDateTime::now_utc();
+        let today = now.date().to_string(); // YYYY-MM-DD
+        let active_promos = load_active_for_matching(tx, org, &today).await?;
+        // Líneas para el matching: bruto y familia resuelta desde el catálogo.
+        let promo_lines: Vec<PromoLine> = priced
+            .iter()
+            .map(|l| PromoLine {
+                product_id: l.product_id,
+                family_id: pmap.get(&l.product_id).and_then(|p| p.family_id),
+                qty: l.qty,
+                unit_price: l.unit_price,
+                gross: (l.unit_price * l.qty).round_dp(2),
+            })
+            .collect();
+        let skipped: HashSet<Uuid> = input.skipped_promotions.iter().copied().collect();
+        let outcome = best_promotions(
+            &active_promos,
+            &MatchInput {
+                lines: &promo_lines,
+                store_id: input.store_id,
+                now: MatchNow {
+                    // `weekday()` de `time` da Mon..Sun; lo mapeamos a 0=Dom..6=Sáb
+                    // (criterio de la columna `weekdays` y de Postgres `DOW`).
+                    weekday: (now.weekday().number_days_from_sunday() as i16),
+                    time: now.time(),
+                },
+                skipped: &skipped,
+            },
+        );
+
+        // 6b. Fusiona con el descuento manual (GANA LA MEJOR por dimensión) y marca
+        // el origen por línea. El descuento de las promos automáticas NO cuenta
+        // contra el límite del rol → se comprueba SOLO el manual efectivo.
+        let merged = merge_promotions(
             priced,
             TicketDiscount {
                 pct: input.ticket_discount_pct,
                 amt: input.ticket_discount_amt,
             },
+            &outcome,
         );
-        if let Err(e) = assert_discount_within_limit(limit, totals.discount_total, totals.gross_total) {
+        let line_sources = merged.line_sources.clone();
+
+        // 7. Totales sobre las líneas YA fusionadas + cambio. El límite de rol se
+        // valida con el descuento MANUAL (las promos automáticas no penalizan).
+        let totals = compute_totals(merged.lines, merged.ticket);
+        if let Err(e) =
+            assert_discount_within_limit(limit, merged.manual_discount_total, totals.gross_total)
+        {
             return Ok(Err(e));
         }
         let (cash_given, cash_change) =
@@ -210,14 +261,18 @@ pub async fn create(
         .fetch_one(&mut **tx)
         .await?;
 
-        // 9. INSERT de las líneas.
+        // 9. INSERT de las líneas. `discountSource` REAL por línea (S-22): PROMOTION
+        // si la línea lleva una promo automática ganadora, VOLUNTARY si el descuento
+        // es manual (o no hay descuento). El orden de `totals.lines` coincide con el
+        // de `line_sources` (compute_totals preserva el orden de entrada).
         let mut lines = Vec::with_capacity(totals.lines.len());
-        for cl in &totals.lines {
+        for (i, cl) in totals.lines.iter().enumerate() {
+            let source = line_sources.get(i).copied().unwrap_or(DiscountSource::Voluntary);
             let line: SaleLine = sqlx::query_as(&format!(
                 r#"INSERT INTO "SaleLine" (id, "organizationId", "saleId", "productId", name,
                      "unitPrice", qty, "discountPct", "discountAmt", "taxRate", "costPrice",
                      "discountSource", "lineTotal")
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'VOLUNTARY'::"DiscountSource", $12)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::"DiscountSource", $13)
                    RETURNING {LINE_COLS}"#,
             ))
             .bind(Uuid::new_v4())
@@ -231,6 +286,7 @@ pub async fn create(
             .bind(cl.discount_amt)
             .bind(cl.priced.tax_rate)
             .bind(cl.priced.cost_price)
+            .bind(source)
             .bind(cl.line_total)
             .fetch_one(&mut **tx)
             .await?;
