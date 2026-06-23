@@ -516,7 +516,7 @@ test('Familias: añadir productos existentes a un nodo desde el picker (S-18)', 
   const movableName = await page
     .getByTestId('fam-product-item')
     .first()
-    .getByTestId('fam-product-name')
+    .locator('.fam-product-name')
     .innerText();
 
   // Destino: arquetipo "Aceite CBD 10%". Abrimos el picker desde su panel.
