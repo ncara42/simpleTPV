@@ -17,9 +17,9 @@ use crate::store_access::has_store_access;
 
 use super::model::{
     ArchetypeRotationItem, DiscountByEmployeeItem, MarginKpis, PeriodTotals, ProductRankings,
-    ProductRotationItem, RankByMargin, RankBySales, RankByUnits, SalesByEmployeeItem,
-    SalesByFamilyItem, SalesByHourItem, SalesByStoreItem, SalesKpiSeries, SalesKpis, SalesToday,
-    StockoutKpis, StoreSales,
+    ProductRotationItem, RankByMargin, RankBySales, RankByUnits, SalesByDayItem,
+    SalesByEmployeeItem, SalesByFamilyItem, SalesByHourItem, SalesByStoreItem, SalesKpiSeries,
+    SalesKpis, SalesToday, StockoutKpis, StoreSales,
 };
 use super::period::{comparison_starts, delta_pct, CompareMode, DateRange};
 
@@ -481,6 +481,43 @@ pub async fn sales_by_hour(
             .into_iter()
             .map(|(hour, count, revenue)| SalesByHourItem {
                 hour,
+                count,
+                revenue: f(revenue),
+            })
+            .collect())
+    })
+    .await
+}
+
+/// Ventas por día natural (nº de tickets e importe), solo días con ventas. Base del
+/// acumulado diario del informe de ventas: el cliente alinea por día-del-mes y
+/// acumula para comparar el periodo en curso contra el anterior.
+pub async fn sales_by_day(
+    pool: &PgPool,
+    org: Uuid,
+    range: DateRange,
+    store_id: Option<Uuid>,
+) -> Result<Vec<SalesByDayItem>, AppError> {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        let rows: Vec<(String, i64, Decimal)> = sqlx::query_as(
+            r#"SELECT DATE("createdAt")::text AS day, COUNT(*) AS count,
+                 COALESCE(SUM(total), 0) AS revenue
+               FROM "Sale"
+               WHERE "organizationId" = $1 AND status = 'COMPLETED'::"SaleStatus"
+                 AND "createdAt" >= $2 AND "createdAt" < $3
+                 AND ($4::uuid IS NULL OR "storeId" = $4)
+               GROUP BY day ORDER BY day"#,
+        )
+        .bind(org)
+        .bind(range.from)
+        .bind(range.to)
+        .bind(store_id)
+        .fetch_all(&mut **tx)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(day, count, revenue)| SalesByDayItem {
+                day,
                 count,
                 revenue: f(revenue),
             })

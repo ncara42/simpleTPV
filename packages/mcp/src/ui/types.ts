@@ -66,18 +66,44 @@ export interface SalesByStoreItem {
   revenue?: number;
 }
 
+/** Resumen de un periodo para la comparativa del informe mensual. */
+export interface ReportPeriodSummary {
+  label: string;
+  revenue: number;
+  salesCount: number;
+  marginPct: number;
+  daysInMonth: number;
+}
+
+/**
+ * Informe mensual (mes en curso vs mes anterior): lo calcula la tool en `report-math.ts`
+ * y la vista lo pinta como tarjetas de comparativa + acumulado diario. Presente solo
+ * cuando el periodo es el mes en curso.
+ */
+export interface BreakdownReport {
+  current: ReportPeriodSummary & { daysElapsed: number };
+  previous: ReportPeriodSummary;
+  dailyAvg: {
+    revenue: { current: number; previous: number; projection: number };
+    tickets: { current: number; previous: number; projection: number };
+  };
+  cumulative: { current: number[]; previous: number[] };
+}
+
 /**
  * Cada rama del breakdown puede llegar como su array de datos o como `{ error }`
  * (las compuestas son resilientes vía `safe()`), de ahí `unknown` + narrowing en la vista.
  */
 export interface BreakdownData {
   kind: 'breakdown';
+  period?: string;
   kpis?: unknown;
   margin?: unknown;
   byStore?: unknown;
   byFamily?: unknown;
   byHour?: unknown;
   byEmployee?: unknown;
+  report?: BreakdownReport;
 }
 
 /** Discriminada por `kind`. */

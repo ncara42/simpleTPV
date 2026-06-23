@@ -1,5 +1,6 @@
-import { InsightCard, KpiRow, KpiTile, PanelShell, StatusPill } from '@simpletpv/ui';
+import { SectionHeader, type StockAlertItem, StockAlertList } from '@simpletpv/ui';
 
+import { DeltaPill, ReportStatCard } from '../components/report-bits';
 import type { OverviewData, StockAlert } from '../types';
 
 function alertTone(severity?: string): 'ok' | 'warn' | 'danger' {
@@ -17,44 +18,69 @@ export function Overview({ data }: { data: OverviewData }) {
   const { salesDay, kpis, stockoutKpis } = data;
   const alerts: StockAlert[] = Array.isArray(data.alerts) ? data.alerts : [];
 
+  const alertItems: StockAlertItem[] = alerts.slice(0, 12).map((a) => {
+    const item: StockAlertItem = {
+      name: a.productName ?? '—',
+      tone: alertTone(a.severity),
+      status: alertLabel(a.alertType),
+    };
+    if (a.storeName) item.detail = a.storeName;
+    return item;
+  });
+
   return (
-    <PanelShell title="Resumen del negocio">
-      <KpiRow columns={4}>
-        <KpiTile
-          label="Ventas hoy"
-          value={salesDay?.today?.total}
-          format="eur"
-          delta={salesDay?.deltaPct ?? null}
-          deltaFormat="percent"
-        />
-        <KpiTile label="Tickets hoy" value={salesDay?.today?.count} format="integer" />
-        <KpiTile label="Ticket medio" value={kpis?.avgTicket} format="eur" />
-        <KpiTile label="Roturas abiertas" value={stockoutKpis?.open} format="integer" />
-      </KpiRow>
+    <div className="mcp-report">
+      <section className="mcp-section">
+        <SectionHeader title="Resumen de hoy" />
+        <div className="mcp-cards mcp-cards--4">
+          <ReportStatCard
+            label="Ventas hoy"
+            value={salesDay?.today?.total ?? null}
+            format="eur"
+            caption="vs ayer"
+            pill={salesDay?.deltaPct != null ? <DeltaPill delta={salesDay.deltaPct} /> : undefined}
+          />
+          <ReportStatCard
+            label="Tickets hoy"
+            value={salesDay?.today?.count ?? null}
+            format="integer"
+          />
+          <ReportStatCard label="Ticket medio" value={kpis?.avgTicket ?? null} format="eur" />
+          <ReportStatCard
+            label="Roturas abiertas"
+            value={stockoutKpis?.open ?? null}
+            format="integer"
+          />
+        </div>
+      </section>
 
-      <InsightCard title={`Alertas de stock (${alerts.length})`}>
-        {alerts.length === 0 ? (
-          <p className="mcp-state">Sin alertas activas.</p>
-        ) : (
-          alerts.slice(0, 12).map((a, i) => (
-            <div className="mcp-alert-row" key={a.id ?? i}>
-              <span>
-                <span className="mcp-alert-row__name">{a.productName ?? '—'}</span>{' '}
-                <span className="mcp-alert-row__store">· {a.storeName ?? ''}</span>
-              </span>
-              <StatusPill label={alertLabel(a.alertType)} tone={alertTone(a.severity)} />
-            </div>
-          ))
-        )}
-      </InsightCard>
+      <section className="mcp-section">
+        <SectionHeader title={`Alertas de stock (${alerts.length})`} />
+        <div className="mcp-card mcp-card--chart">
+          {alertItems.length === 0 ? (
+            <p className="mcp-state">Sin alertas activas.</p>
+          ) : (
+            <StockAlertList items={alertItems} />
+          )}
+        </div>
+      </section>
 
-      <InsightCard title="Rotura de stock (mes)">
-        <KpiRow columns={3}>
-          <KpiTile label="Eventos" value={stockoutKpis?.events} format="integer" />
-          <KpiTile label="Sin resolver" value={stockoutKpis?.open} format="integer" />
-          <KpiTile label="Venta perdida" value={stockoutKpis?.estimatedLostSales} format="eur" />
-        </KpiRow>
-      </InsightCard>
-    </PanelShell>
+      <section className="mcp-section">
+        <SectionHeader title="Rotura de stock (mes)" />
+        <div className="mcp-cards mcp-cards--3">
+          <ReportStatCard label="Eventos" value={stockoutKpis?.events ?? null} format="integer" />
+          <ReportStatCard
+            label="Sin resolver"
+            value={stockoutKpis?.open ?? null}
+            format="integer"
+          />
+          <ReportStatCard
+            label="Venta perdida"
+            value={stockoutKpis?.estimatedLostSales ?? null}
+            format="eur"
+          />
+        </div>
+      </section>
+    </div>
   );
 }
