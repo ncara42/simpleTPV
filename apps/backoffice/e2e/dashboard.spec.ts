@@ -105,11 +105,37 @@ test('la etiqueta flotante muestra la view activa y el dashboard es un lienzo li
   await expect(page.getByTestId('dash-free-toolbar')).toBeVisible();
   await expect(page.getByTestId('dash-mode')).toHaveCount(0);
   await expect(page.getByTestId('dash-board')).toHaveCount(0);
-  // No existen los selectores de preset antiguo, periodo ni tienda.
+  // No existen el chip de preset antiguo, el viejo <Select> de periodo (data-testid
+  // "dash-period") ni el selector de tienda. El nuevo control de periodo es el segmentado
+  // S-11 (data-testid "period-seg"), que se verifica en su propio test más abajo.
   await expect(page.getByTestId('dash-preset-ventas')).toHaveCount(0);
   await expect(page.getByTestId('dash-preset-beneficio')).toHaveCount(0);
   await expect(page.getByTestId('dash-period')).toHaveCount(0);
   await expect(page.getByTestId('dash-store')).toHaveCount(0);
+});
+
+test('S-11: el selector de periodo segmentado es visible, operable y persiste en la URL', async ({
+  page,
+}) => {
+  // El control flota SIEMPRE sobre el lienzo (sin abrir submenús): segmentado con un botón
+  // por periodo (Hoy/Ayer/Semana/Mes/Año). Resuelve P62 (el desplegable «no se encontraba»).
+  const seg = page.getByTestId('period-seg');
+  await expect(seg).toBeVisible();
+  await expect(page.getByTestId('period-opt-today')).toBeVisible();
+  await expect(page.getByTestId('period-opt-year')).toBeVisible();
+
+  // Por defecto (sin ?period=) el periodo activo es "Hoy".
+  await expect(page.getByTestId('period-opt-today')).toHaveAttribute('aria-pressed', 'true');
+
+  // Pulsar "Mes" lo marca como activo y escribe ?period=month en la URL (compartible).
+  await page.getByTestId('period-opt-month').click();
+  await expect(page.getByTestId('period-opt-month')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('period-opt-today')).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(() => new URL(page.url()).searchParams.get('period')).toBe('month');
+
+  // Recargar conserva el periodo desde la URL (sobrevive al reload).
+  await page.reload();
+  await expect(page.getByTestId('period-opt-month')).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('el dashboard no embebe la tabla de ventas (I-17, D-06)', async ({ page }) => {

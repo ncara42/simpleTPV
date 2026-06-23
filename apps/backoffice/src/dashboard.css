@@ -2037,3 +2037,35 @@
   margin-left: auto;
   white-space: nowrap;
 }
+
+/* ════════════════════════════════════════════════════════════
+   S-11 — Selector de periodo del dashboard (PeriodSegmented).
+   El lienzo libre es position:fixed/inset:0, así que el control flota como píldora de
+   cristal arriba-CENTRO (slot del antiguo .catalog-head, ya retirado), separado de la franja
+   de stock (arriba-izq) y del toolbar del lienzo (abajo-centro). El segmentado interno usa
+   .bo-tabs/.bo-tab (el mismo de Inventario/Personal); aquí solo lo elevamos sobre el lienzo.
+   ════════════════════════════════════════════════════════════ */
+.dashboard--free .dash-period-float {
+  position: absolute;
+  top: 0.85rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  max-width: calc(100vw - 1.5rem);
+}
+/* La píldora de cristal compartida (mismo tratamiento que .dash-stock-summary): el .bo-tabs
+   interno ya trae su propio fondo sutil + borde; aquí reforzamos el efecto flotante. */
+.dashboard--free .dash-period-float .period-seg {
+  background: color-mix(in srgb, var(--ui-surface) 84%, transparent);
+  box-shadow: 0 8px 26px rgb(0 0 0 / 0.14);
+  backdrop-filter: blur(12px);
+  flex-wrap: nowrap;
+}
+/* En viewports estrechos el segmentado puede no caber en una línea: permite scroll horizontal
+   discreto dentro de la píldora antes que desbordar el viewport. */
+@media (max-width: 30rem) {
+  .dashboard--free .dash-period-float {
+    max-width: calc(100vw - 1rem);
+    overflow-x: auto;
+  }
+}

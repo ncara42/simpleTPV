@@ -332,6 +332,41 @@ test('Ventas: DataTable con filtros, paginación y agregados (#95 / IT-06)', asy
   await expect(page.getByTestId('ui-dt-row').filter({ hasText: 'Completada' })).toHaveCount(0);
 });
 
+test('S-11: el filtro de periodo de Ventas filtra la tabla y persiste en la URL', async ({
+  page,
+}) => {
+  await navTo(page, 'sales');
+  await expect(page.getByTestId('sales-table')).toBeVisible();
+
+  // El filtro "Periodo" está en la toolbar (segmentado visible, sin submenús).
+  const periodFilter = page.getByTestId('sales-period');
+  await expect(periodFilter).toBeVisible();
+  await expect(periodFilter).toContainText('Periodo');
+  // Por defecto no hay periodo activo: el histórico completo (20 filas en la primera página).
+  await expect(page.getByTestId('ui-dt-row')).toHaveCount(20);
+
+  // Elegir "Hoy" filtra la tabla por el día actual y escribe ?period=today en la URL.
+  await periodFilter.getByTestId('period-opt-today').click();
+  await expect(periodFilter.getByTestId('period-opt-today')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect.poll(() => new URL(page.url()).searchParams.get('period')).toBe('today');
+
+  // Recargar conserva el periodo desde la URL.
+  await page.reload();
+  await expect(page.getByTestId('sales-table')).toBeVisible();
+  await expect(page.getByTestId('sales-period').getByTestId('period-opt-today')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+
+  // "Limpiar" resetea el periodo (y quita ?period= de la URL) → vuelve el histórico completo.
+  await page.getByTestId('sales-clear').click();
+  await expect.poll(() => new URL(page.url()).searchParams.get('period')).toBeNull();
+  await expect(page.getByTestId('ui-dt-row')).toHaveCount(20);
+});
+
 test('Ventas: columnas configurables ocultan una columna y persiste (IT-16)', async ({ page }) => {
   await navTo(page, 'sales');
   await expect(page.getByRole('columnheader', { name: 'Vendedor' })).toBeVisible();

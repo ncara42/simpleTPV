@@ -5,9 +5,11 @@ import { usePageHeader } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { BarChart2, ChevronDown, LineChart, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { DaySelector } from './components/DaySelector.js';
 import { type CanvasMeta, FreeBoard, type FreeBoardHandle } from './components/FreeBoard.js';
+import { PeriodSegmented } from './components/PeriodSegmented.js';
 import { StockSummaryStrip } from './dashboard/StockSummaryStrip.js';
 import { useCanvasBridge } from './lib/canvas-bridge.js';
 import {
@@ -46,6 +48,7 @@ import {
   invertTone,
   seriesTrend,
 } from './lib/format.js';
+import { parsePeriod } from './lib/period.js';
 import { readPref, usePreferences } from './lib/preferences.js';
 import { listPurchaseOrders } from './lib/purchases.js';
 import { listAlerts, listExpiringBatches } from './lib/stock.js';
@@ -126,7 +129,27 @@ export function DashboardPage({
   // Links a otras pages (I-16/I-17): paneles → Proveedores/Stock; pie → Ventas.
   onNavigate?: ((tab: 'suppliers' | 'stock' | 'sales') => void) | undefined;
 } = {}) {
-  const [period, setPeriod] = useState<DashboardPeriod>('today');
+  // El periodo vive en la URL (?period=) para sobrevivir al reload y ser compartible (F0c),
+  // con fallback a 'today' si falta o es inválido. `setPeriod` conserva la firma anterior
+  // (DashboardPeriod) para que todos los consumidores (queries/getters) sigan igual: además
+  // de fijar el estado local, sincroniza ?period= preservando el resto de search params.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [period, setPeriodState] = useState<DashboardPeriod>(() =>
+    parsePeriod(searchParams.get('period'), 'today'),
+  );
+  const setPeriod = (next: DashboardPeriod): void => {
+    setPeriodState(next);
+    setSearchParams(
+      (prev) => {
+        const updated = new URLSearchParams(prev);
+        // 'today' es el valor por defecto: no ensuciamos la URL con ?period=today.
+        if (next === 'today') updated.delete('period');
+        else updated.set('period', next);
+        return updated;
+      },
+      { replace: true },
+    );
+  };
   const [storeId, setStoreId] = useState('');
   // Modo de comparación del panel "Ventas" (desplegable dentro de la card).
   const [compare, setCompare] = useState<SalesCompareMode>('day');
@@ -1062,6 +1085,14 @@ export function DashboardPage({
           del lienzo full-bleed ni tocar sus testids (dashboard/dash-free/page-heading). Réplica de
           Notificaciones/Inventario (P075): usa su PROPIA queryKey ['dash-stock-summary']. */}
       <StockSummaryStrip onNavigate={onNavigate} />
+      {/* S-11: selector de periodo segmentado, SIEMPRE visible sobre el lienzo (resuelve P62:
+          el desplegable Año·Mes·Semana «no se encontraba nunca»). Flota como píldora arriba-centro
+          (CSS .dashboard--free .dash-period-float) sin entrar en el flujo del lienzo. Mantiene el
+          `period`/`setPeriod` que alimenta todas las queries del dashboard; `setPeriod` además
+          persiste ?period= en la URL. */}
+      <div className="dash-period-float" aria-label="Periodo del dashboard">
+        <PeriodSegmented value={period} onChange={setPeriod} />
+      </div>
       {/* D-20: el dashboard es siempre un lienzo libre (edgeless). Sus propias herramientas
           (paleta de widgets, dibujo, deshacer, minimapa…) viven dentro de FreeBoard. El nombre de
           la view y el dock del asistente los pone el shell (ver App.tsx / AssistantDock). */}

@@ -1578,6 +1578,19 @@
   height: 2.5rem;
   font-size: 0.86rem;
 }
+/* S-11: filtro de periodo (segmentado .bo-tabs) como un filtro más de la barra de Ventas.
+   La etiqueta visible "Periodo" (P066) precede al segmentado; ambos se alinean con el resto
+   de pills <Select> contiguas. */
+.sales-period-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.sales-period-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ui-text-muted);
+}
 /* Usuarios: barra de filtros (espejo de stock) con la acción "Nuevo usuario"
    a la derecha del todo (mismo gesto que la toolbar de Tiendas). */
 .users-toolbar {
