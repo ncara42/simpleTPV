@@ -180,26 +180,27 @@ describe('formas / texto / notas', () => {
 });
 
 describe('insight / widgets genéricos', () => {
-  it('addInsight registra el genérico, lo persiste en genericWidgets y lo coloca', () => {
+  it('addInsight crea una NOTA editable con el texto del agente embebido (no un genérico)', () => {
+    store().hydrate({});
     const r = store().addInsight('**Ventas al alza**', 'Resumen');
     expect(r.accepted).toBe(true);
-    const ids = Object.keys(store().layout.genericWidgets ?? {});
-    expect(ids).toHaveLength(1);
-    const id = ids[0]!;
-    expect(id.startsWith('gen:')).toBe(true);
-    const spec = store().layout.genericWidgets![id]!;
-    expect(spec.type).toBe('insight');
-    expect(spec.params?.markdown).toBe('**Ventas al alza**');
-    expect(getWidgetSpec(id)).toBeDefined();
-    expect(freeOf().some((e) => e.id === id)).toBe(true);
+    // No registra genérico: el insight es ahora una nota del lienzo.
+    expect(Object.keys(store().layout.genericWidgets ?? {})).toHaveLength(0);
+    const notes = freeOf().filter((e) => e.kind === 'note');
+    expect(notes).toHaveLength(1);
+    // El doc TipTap embebe el texto (título en negrita + contenido).
+    expect(JSON.stringify(notes[0])).toContain('Ventas al alza');
+    expect(JSON.stringify(notes[0])).toContain('Resumen');
   });
 
-  it('add_insight con elementId del agente coloca bajo id determinista (undo posible)', () => {
+  it('add_insight con elementId del agente crea la nota bajo ese id (undo posible)', () => {
+    store().hydrate({});
     const r = store().applyCanvasOp({ op: 'add_insight', content: '**x**', elementId: 'ins-1' });
     expect(r.accepted).toBe(true);
-    expect(store().layout.genericWidgets?.['gen:ins-1']).toBeDefined();
-    expect(store().removeElement(genericElementId('ins-1')).accepted).toBe(true);
-    expect(store().layout.genericWidgets?.['gen:ins-1']).toBeUndefined();
+    expect(freeOf().some((e) => e.id === 'ins-1' && e.kind === 'note')).toBe(true);
+    // Undo: removeElement por elementId directo (la nota no lleva prefijo `gen:`).
+    expect(store().removeElement('ins-1').accepted).toBe(true);
+    expect(freeOf().some((e) => e.id === 'ins-1')).toBe(false);
   });
 
   it('applyCanvasOp add_widget con genericSpec normaliza y coloca', () => {

@@ -95,9 +95,11 @@ test('la etiqueta flotante muestra la view activa y el dashboard es un lienzo li
   page,
 }) => {
   await expect(page.getByTestId('dashboard')).toBeVisible();
-  // Sin header: el nombre de la view activa flota arriba (sustituye al chip de preset).
-  await expect(page.getByTestId('page-heading')).toBeVisible();
-  await expect(page.getByTestId('page-heading')).toContainText('Dashboard');
+  // En el Dashboard el título flotante de la view se OCULTA: la barra de herramientas del lienzo
+  // (Editar→despliega + Mover + Goma) ocupa su sitio (arriba-centro). En el resto de views el
+  // título flotante sigue (page-heading) — esto solo cambia en Dashboard.
+  await expect(page.getByTestId('page-heading')).toHaveCount(0);
+  await expect(page.getByTestId('dash-free-toolbar')).toBeVisible();
   // El chip de preset antiguo ya no existe (lo sustituye la etiqueta flotante de view).
   await expect(page.getByTestId('dash-preset-personalizado')).toHaveCount(0);
   // El lienzo libre es la única vista (el modo Cuadrícula y su toggle se eliminaron).
@@ -105,37 +107,14 @@ test('la etiqueta flotante muestra la view activa y el dashboard es un lienzo li
   await expect(page.getByTestId('dash-free-toolbar')).toBeVisible();
   await expect(page.getByTestId('dash-mode')).toHaveCount(0);
   await expect(page.getByTestId('dash-board')).toHaveCount(0);
-  // No existen el chip de preset antiguo, el viejo <Select> de periodo (data-testid
-  // "dash-period") ni el selector de tienda. El nuevo control de periodo es el segmentado
-  // S-11 (data-testid "period-seg"), que se verifica en su propio test más abajo.
+  // No existen: chip de preset antiguo, viejo <Select> de periodo (dash-period), selector de
+  // tienda, NI el segmentado de periodo S-11 (period-seg) — el filtro de tiempo se retiró del
+  // dashboard por preferencia del usuario.
   await expect(page.getByTestId('dash-preset-ventas')).toHaveCount(0);
   await expect(page.getByTestId('dash-preset-beneficio')).toHaveCount(0);
   await expect(page.getByTestId('dash-period')).toHaveCount(0);
   await expect(page.getByTestId('dash-store')).toHaveCount(0);
-});
-
-test('S-11: el selector de periodo segmentado es visible, operable y persiste en la URL', async ({
-  page,
-}) => {
-  // El control flota SIEMPRE sobre el lienzo (sin abrir submenús): segmentado con un botón
-  // por periodo (Hoy/Ayer/Semana/Mes/Año). Resuelve P62 (el desplegable «no se encontraba»).
-  const seg = page.getByTestId('period-seg');
-  await expect(seg).toBeVisible();
-  await expect(page.getByTestId('period-opt-today')).toBeVisible();
-  await expect(page.getByTestId('period-opt-year')).toBeVisible();
-
-  // Por defecto (sin ?period=) el periodo activo es "Hoy".
-  await expect(page.getByTestId('period-opt-today')).toHaveAttribute('aria-pressed', 'true');
-
-  // Pulsar "Mes" lo marca como activo y escribe ?period=month en la URL (compartible).
-  await page.getByTestId('period-opt-month').click();
-  await expect(page.getByTestId('period-opt-month')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByTestId('period-opt-today')).toHaveAttribute('aria-pressed', 'false');
-  await expect.poll(() => new URL(page.url()).searchParams.get('period')).toBe('month');
-
-  // Recargar conserva el periodo desde la URL (sobrevive al reload).
-  await page.reload();
-  await expect(page.getByTestId('period-opt-month')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('period-seg')).toHaveCount(0);
 });
 
 test('el dashboard no embebe la tabla de ventas (I-17, D-06)', async ({ page }) => {

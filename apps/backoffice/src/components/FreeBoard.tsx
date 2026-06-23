@@ -83,6 +83,9 @@ const TOOLS: Array<{ id: ToolId; label: string; Icon: typeof MousePointer2 }> = 
   { id: 'arrow', label: 'Flecha', Icon: ArrowUpRight },
 ];
 
+// Modo de interacción del lienzo (separado de la herramienta de dibujo). Lo refleja el dock.
+export type InteractionMode = 'select' | 'pan' | 'erase';
+
 interface View {
   panX: number;
   panY: number;
@@ -97,6 +100,8 @@ export interface CanvasMeta {
   canUndo: boolean;
   /** El pill de dibujo está abierto. */
   drawOpen: boolean;
+  /** Modo de interacción activo (select/pan/erase) → la barra resalta el botón. */
+  mode: InteractionMode;
 }
 
 /** API imperativa del lienzo expuesta a la barra inferior (el dock del dashboard). Las
@@ -109,6 +114,8 @@ export interface FreeBoardHandle {
   toggleDraw: () => void;
   undo: () => void;
   arrange: () => void;
+  /** Fija el modo de interacción (MOVER/GOMA/normal). Al salir de 'select' cierra el dibujo. */
+  setMode: (mode: InteractionMode) => void;
   /** Snapshot de los widgets de catálogo disponibles para añadir (no presentes). */
   listWidgets: () => { id: string; label: string }[];
 }
@@ -165,6 +172,12 @@ export function FreeBoard({
   );
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [tool, setTool] = useState<ToolId>('select');
+  // Modo de interacción del lienzo, SEPARADO de la herramienta de dibujo (`tool`):
+  //  - 'select': comportamiento normal (arrastrar widgets; pan al arrastrar el fondo).
+  //  - 'pan'  : MOVER explícito → arrastrar EN CUALQUIER SITIO hace pan; los widgets no se mueven
+  //             (evita la confusión de mover lienzo y widget a la vez).
+  //  - 'erase': GOMA → un clic en un elemento lo borra.
+  const [interactionMode, setInteractionMode] = useState<'select' | 'pan' | 'erase'>('select');
   const [drawOpen, setDrawOpen] = useState(false);
   const [drawColor, setDrawColor] = useState<string>(DRAW_COLORS[0]!);
   const [draft, setDraft] = useState<FreeShape | FreeDraw | null>(null);
@@ -191,6 +204,8 @@ export function FreeBoard({
 
   const toolRef = useRef(tool);
   toolRef.current = tool;
+  const interactionModeRef = useRef(interactionMode);
+  interactionModeRef.current = interactionMode;
   const colorRef = useRef(drawColor);
   colorRef.current = drawColor;
   const dragSnapshot = useRef<FreeElement[] | null>(null);
@@ -377,6 +392,16 @@ export function FreeBoard({
 
   const onPointerDown = (e: React.PointerEvent): void => {
     if (e.button !== 0) return;
+    // MOVER (pan explícito): arrastrar en CUALQUIER sitio hace pan, aunque el gesto venga de un
+    // widget (su startDrag retorna en modo pan y el evento burbujea hasta aquí). Así no se confunde
+    // mover el lienzo con mover un widget. GOMA: no arranca gesto de fondo (borra al clic del elem).
+    if (interactionModeRef.current === 'pan') {
+      viewportRef.current?.setPointerCapture(e.pointerId);
+      const { panX, panY } = viewRef.current;
+      panState.current = { x: e.clientX, y: e.clientY, panX, panY, moved: false };
+      return;
+    }
+    if (interactionModeRef.current === 'erase') return;
     // Solo gestos que empiezan en el FONDO (los elementos paran la propagación; en modo dibujo
     // están además inertes por CSS para que el gesto llegue siempre aquí).
     if (e.target !== e.currentTarget) return;
@@ -552,6 +577,8 @@ export function FreeBoard({
     setDrawOpen((open) => {
       const next = !open;
       setTool(next ? 'pen' : 'select');
+      // Dibujar es excluyente con MOVER/GOMA: al abrir el dibujo, sal de esos modos.
+      if (next) setInteractionMode('select');
       return next;
     });
   }, []);
@@ -604,6 +631,14 @@ export function FreeBoard({
   const drawing = tool !== 'select';
 
   // ── Puente con la barra inferior externa (dock): handle imperativo + meta reactiva. ──
+  const onSetMode = useCallback((m: InteractionMode): void => {
+    setInteractionMode(m);
+    // MOVER/GOMA y dibujo son excluyentes: al activar un modo, cierra el dibujo y vuelve a 'select'.
+    if (m !== 'select') {
+      setTool('select');
+      setDrawOpen(false);
+    }
+  }, []);
   useImperativeHandle(
     ref,
     (): FreeBoardHandle => ({
@@ -613,14 +648,15 @@ export function FreeBoard({
       toggleDraw,
       undo,
       arrange: onArrange,
+      setMode: onSetMode,
       listWidgets: () =>
         availableWidgets(elsRef.current).map((id) => ({ id, label: itemLabel(id) })),
     }),
-    [onAddWidget, onAddNote, onAddText, toggleDraw, undo, onArrange, itemLabel],
+    [onAddWidget, onAddNote, onAddText, toggleDraw, undo, onArrange, onSetMode, itemLabel],
   );
   useEffect(() => {
-    onCanvasMeta?.({ canUndo: past.length > 0, drawOpen });
-  }, [past.length, drawOpen, onCanvasMeta]);
+    onCanvasMeta?.({ canUndo: past.length > 0, drawOpen, mode: interactionMode });
+  }, [past.length, drawOpen, interactionMode, onCanvasMeta]);
 
   // Minimapa + flecha de orientación (solo con viewport medido y algún elemento).
   const hasViewport = viewportSize.width > 0 && viewportSize.height > 0;
@@ -697,7 +733,9 @@ export function FreeBoard({
 
       <div
         ref={viewportRef}
-        className={`dash-free${drawing ? ' dash-free--drawing' : ''}`}
+        className={`dash-free${drawing ? ' dash-free--drawing' : ''}${
+          interactionMode === 'pan' ? ' dash-free--panning' : ''
+        }${interactionMode === 'erase' ? ' dash-free--erasing' : ''}`}
         data-testid="dash-free"
         tabIndex={0}
         role="application"
@@ -721,6 +759,7 @@ export function FreeBoard({
               key={el.id}
               el={el}
               zoomRef={zoomRef}
+              interactionMode={interactionMode}
               label={labelFor(el)}
               onDragStart={onDragStart}
               onMove={moveEl}
@@ -837,6 +876,7 @@ export function FreeBoard({
 interface ElementViewProps {
   el: FreeElement;
   zoomRef: RefObject<number>;
+  interactionMode: InteractionMode;
   label: string;
   onDragStart: () => void;
   onMove: (id: string, dx: number, dy: number) => void;
@@ -855,6 +895,7 @@ interface ElementViewProps {
 const ElementView = memo(function ElementView({
   el,
   zoomRef,
+  interactionMode,
   label,
   onDragStart,
   onMove,
@@ -882,6 +923,15 @@ const ElementView = memo(function ElementView({
   }, []);
 
   const startDrag = (e: React.PointerEvent): void => {
+    // MOVER (pan): NO arranques el drag del elemento ni pares la propagación → el evento burbujea
+    // al fondo y hace pan. Así arrastrar sobre un widget mueve el LIENZO, no el widget.
+    if (interactionMode === 'pan') return;
+    // GOMA: un clic izquierdo borra el elemento.
+    if (interactionMode === 'erase') {
+      e.stopPropagation();
+      if (e.button === 0) onRemove(el.id);
+      return;
+    }
     e.stopPropagation(); // no arranques el pan del fondo
     if (e.button !== 0) return;
     onFocus(el.id);
