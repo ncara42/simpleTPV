@@ -151,6 +151,12 @@ function Home() {
   const openCatalogFamily = (familyId: string): void => {
     navigate(`/inventario?vista=catalogo&family=${encodeURIComponent(familyId)}`);
   };
+  // S-25: acceso directo (≤1 clic) a la comparativa de precios entre proveedores.
+  // Deep-link por query a Proveedores con la sub-vista comparativa preseleccionada
+  // (`?vista=comparativa`), reutilizando la Tab 'suppliers' (sin nuevo id de Tab).
+  const openSupplierComparison = (): void => {
+    navigate('/suppliers?vista=comparativa');
+  };
   // U-12: "Resolver" una notificación → Inventario (vista Existencias) filtrado por
   // tienda y producto.
   const resolveStock = (storeId: string, productName: string): void => {
@@ -293,7 +299,12 @@ function Home() {
               <main className={`bo-main${isCanvas ? ' bo-main--canvas' : ' bo-main--surface'}`}>
                 {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
                   embebe la tabla — enlaza con "Ver todas las ventas →". */}
-                {tab === 'dashboard' && <DashboardPage onNavigate={navigateTo} />}
+                {tab === 'dashboard' && (
+                  <DashboardPage
+                    onNavigate={navigateTo}
+                    onOpenSupplierComparison={openSupplierComparison}
+                  />
+                )}
                 {tab === 'sales' && <SalesHistoryPage initialStoreId={searchParams.get('store')} />}
                 {tab === 'notifications' && <NotificationsPage onResolve={{ resolveStock }} />}
                 {/* S-02 fase A: shell unificado de Inventario (Catálogo · Familias ·
@@ -314,9 +325,22 @@ function Home() {
                   (UsersPage / TimeClockPage) tal cual. */}
                 {tab === 'personal' && <PersonalPage />}
                 {tab === 'stores' && <StoresPage onOpenStoreView={openStoreView} />}
-                {tab === 'suppliers' && <SuppliersPage />}
+                {/* S-25: la comparativa de precios es accesible en ≤1 clic vía
+                  deep-link `?vista=comparativa`. Reutiliza la Tab 'suppliers': la
+                  query fija la sección 'prices' en su sub-vista 'comparativa'. */}
+                {tab === 'suppliers' && (
+                  <SuppliersPage
+                    initialSection={searchParams.get('vista') === 'comparativa' ? 'prices' : null}
+                    initialPricesView={
+                      searchParams.get('vista') === 'comparativa' ? 'comparativa' : null
+                    }
+                  />
+                )}
                 {tab === 'verifactu' && <VerifactuPage />}
-                {tab === 'b2b' && <B2bPage />}
+                {/* S-21: deep-link a la subsección Tarifas (`/b2b?section=pricelists`)
+                  desde el buscador. `B2bPage` valida el valor; uno inválido cae a la
+                  subtab Clientes por defecto. */}
+                {tab === 'b2b' && <B2bPage initialSection={searchParams.get('section')} />}
                 {tab === 'settings' && <SettingsPage />}
                 {tab === 'help' && <HelpPage />}
               </main>

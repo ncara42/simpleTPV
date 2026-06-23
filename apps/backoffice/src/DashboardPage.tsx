@@ -5,6 +5,7 @@ import { usePageHeader } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { BarChart2, ChevronDown, LineChart, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { DaySelector } from './components/DaySelector.js';
 import { type CanvasMeta, FreeBoard, type FreeBoardHandle } from './components/FreeBoard.js';
@@ -45,6 +46,7 @@ import {
   invertTone,
   seriesTrend,
 } from './lib/format.js';
+import { parsePeriod } from './lib/period.js';
 import { readPref, usePreferences } from './lib/preferences.js';
 import { listPurchaseOrders } from './lib/purchases.js';
 import { listAlerts, listExpiringBatches } from './lib/stock.js';
@@ -121,11 +123,23 @@ const toSparkTone = (tone: 'up' | 'down' | 'flat'): SparkTone => (tone === 'flat
 
 export function DashboardPage({
   onNavigate,
+  onOpenSupplierComparison,
 }: {
   // Links a otras pages (I-16/I-17): paneles → Proveedores/Stock; pie → Ventas.
   onNavigate?: ((tab: 'suppliers' | 'stock' | 'sales') => void) | undefined;
+  // S-25: el widget de comparativa abre el deep-link a la comparativa de precios
+  // (`/suppliers?vista=comparativa`), no la página Proveedores genérica. Va como
+  // callback propio para no generalizar `onNavigate` a destinos arbitrarios antes
+  // de F0/S-06 (esa migración pertenece a esas fases).
+  onOpenSupplierComparison?: (() => void) | undefined;
 } = {}) {
-  const [period, setPeriod] = useState<DashboardPeriod>('today');
+  // El periodo se fija al cargar (desde ?period= si está; fallback 'today') y NO se cambia desde la
+  // UI: el filtro de tiempo (selector de periodo S-11) se retiró del dashboard por preferencia del
+  // usuario. `period` sigue alimentando todas las queries/getters; solo desaparece su control.
+  const [searchParams] = useSearchParams();
+  const [period] = useState<DashboardPeriod>(() =>
+    parsePeriod(searchParams.get('period'), 'today'),
+  );
   const [storeId, setStoreId] = useState('');
   // Modo de comparación del panel "Ventas" (desplegable dentro de la card).
   const [compare, setCompare] = useState<SalesCompareMode>('day');
@@ -872,10 +886,10 @@ export function DashboardPage({
                 <button
                   type="button"
                   className="link-btn"
-                  onClick={() => onNavigate?.('suppliers')}
+                  onClick={() => onOpenSupplierComparison?.()}
                   data-testid="dash-suppliers-link"
                 >
-                  Ver proveedores →
+                  Ver comparativa →
                 </button>
               </header>
               <p className="dash-panel-sub">Precios de compra por proveedor · mejor marcado</p>

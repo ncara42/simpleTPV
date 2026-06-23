@@ -1578,6 +1578,19 @@
   height: 2.5rem;
   font-size: 0.86rem;
 }
+/* S-11: filtro de periodo (segmentado .bo-tabs) como un filtro más de la barra de Ventas.
+   La etiqueta visible "Periodo" (P066) precede al segmentado; ambos se alinean con el resto
+   de pills <Select> contiguas. */
+.sales-period-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.sales-period-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ui-text-muted);
+}
 /* Usuarios: barra de filtros (espejo de stock) con la acción "Nuevo usuario"
    a la derecha del todo (mismo gesto que la toolbar de Tiendas). */
 .users-toolbar {
@@ -1833,6 +1846,67 @@
 .sales-totals strong {
   color: var(--ui-text);
   font-weight: 600;
+}
+
+/* S-10: bloque de estadísticas embebido encima de la tabla de Ventas (KPIs +
+   serie temporal). Tarjetas con jerarquía clara (cifra grande, etiqueta tenue,
+   delta coloreado por signo) y una gráfica de línea a ancho completo. */
+.sales-stats {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.sales-stats-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+}
+.sales-stats-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface);
+}
+.sales-stats-kpi-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ui-text-muted);
+}
+.sales-stats-kpi-value {
+  font-size: 1.5rem;
+  font-weight: 650;
+  line-height: 1.1;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.sales-stats-kpi-delta {
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sales-stats-kpi-delta.is-up {
+  color: var(--ui-success);
+}
+.sales-stats-kpi-delta.is-down {
+  color: var(--ui-danger);
+}
+.sales-stats-kpi-delta.is-neutral {
+  color: var(--ui-text-muted);
+}
+.sales-stats-chart {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface);
+}
+.sales-stats-loading,
+.sales-stats-empty {
+  font-size: 0.85rem;
+  color: var(--ui-text-muted);
 }
 
 .modal select {

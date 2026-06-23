@@ -332,6 +332,41 @@ test('Ventas: DataTable con filtros, paginación y agregados (#95 / IT-06)', asy
   await expect(page.getByTestId('ui-dt-row').filter({ hasText: 'Completada' })).toHaveCount(0);
 });
 
+test('S-11: el filtro de periodo de Ventas filtra la tabla y persiste en la URL', async ({
+  page,
+}) => {
+  await navTo(page, 'sales');
+  await expect(page.getByTestId('sales-table')).toBeVisible();
+
+  // El filtro "Periodo" está en la toolbar (segmentado visible, sin submenús).
+  const periodFilter = page.getByTestId('sales-period');
+  await expect(periodFilter).toBeVisible();
+  await expect(periodFilter).toContainText('Periodo');
+  // Por defecto no hay periodo activo: el histórico completo (20 filas en la primera página).
+  await expect(page.getByTestId('ui-dt-row')).toHaveCount(20);
+
+  // Elegir "Hoy" filtra la tabla por el día actual y escribe ?period=today en la URL.
+  await periodFilter.getByTestId('period-opt-today').click();
+  await expect(periodFilter.getByTestId('period-opt-today')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect.poll(() => new URL(page.url()).searchParams.get('period')).toBe('today');
+
+  // Recargar conserva el periodo desde la URL.
+  await page.reload();
+  await expect(page.getByTestId('sales-table')).toBeVisible();
+  await expect(page.getByTestId('sales-period').getByTestId('period-opt-today')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+
+  // "Limpiar" resetea el periodo (y quita ?period= de la URL) → vuelve el histórico completo.
+  await page.getByTestId('sales-clear').click();
+  await expect.poll(() => new URL(page.url()).searchParams.get('period')).toBeNull();
+  await expect(page.getByTestId('ui-dt-row')).toHaveCount(20);
+});
+
 test('Ventas: columnas configurables ocultan una columna y persiste (IT-16)', async ({ page }) => {
   await navTo(page, 'sales');
   await expect(page.getByRole('columnheader', { name: 'Vendedor' })).toBeVisible();
@@ -460,8 +495,10 @@ test('Familias: panel de productos del nodo — ver, añadir aquí y mover (I-13
   await expect(page.getByTestId('catalog-table')).toBeVisible();
   await expect(page.getByTestId('catalog-table')).toContainText(name);
 
-  // Limpieza: borrar el producto creado para no contaminar el seed.
-  await page.getByTestId('catalog-search').fill(name);
+  // Limpieza: borrar el producto creado para no contaminar el seed. S-02 fases B-E:
+  // el Catálogo ya no tiene caja propia (`catalog-search`); la búsqueda es el filtro
+  // COMPARTIDO del shell de Inventario (`inventory-search`).
+  await page.getByTestId('inventory-search').fill(name);
   await expect(page.getByTestId('product-select')).toHaveCount(1);
   await page.getByTestId('product-select').check();
   await page.getByTestId('products-delete').click();
@@ -703,6 +740,27 @@ test('U-06: la búsqueda de funciones del header navega por nombre y sinónimo',
   await expect(page.getByTestId('page-heading')).toContainText('Personal');
 });
 
+test('S-21: el buscador "tarifas b2b" aterriza en la subsección Tarifas (no en Clientes)', async ({
+  page,
+}) => {
+  // P127: la vía a las Tarifas B2B mayoristas debe ser descubrible. El resultado del
+  // buscador navega por deep-link a `/b2b?section=pricelists`, de modo que `B2bPage`
+  // arranca con la subtab Tarifas activa (antes caía en la subtab Clientes por defecto).
+  await expect(page.getByTestId('page-heading')).toBeVisible();
+  await page.getByTestId('function-search-launcher').click();
+  await page.getByTestId('function-search-input').fill('tarifas b2b');
+  // La entrada "Tarifas B2B" comparte la Tab 'b2b' con Clientes/Pedidos; al traer
+  // params { section: 'pricelists' } su resultado abre la subsección Tarifas.
+  await page.getByTestId('function-search-result-b2b').first().click();
+  // Aterriza en la page B2B con la subtab Tarifas ACTIVA y su tabla de tarifas visible.
+  await expect(page.getByTestId('b2b-page')).toBeVisible();
+  await expect(page.getByTestId('b2b-tab-pricelists')).toHaveClass(/active/);
+  await expect(page.getByTestId('b2b-tab-customers')).not.toHaveClass(/active/);
+  await expect(page.getByTestId('b2b-pricelists-table')).toBeVisible();
+  // El deep-link queda reflejado en la URL (compartible / sobrevive al reload).
+  await expect(page).toHaveURL(/\/b2b\?section=pricelists/);
+});
+
 test('U-08: la marca corporativa se aplica como tema en vivo y persiste', async ({ page }) => {
   const brandVar = () =>
     page.evaluate(() =>
@@ -761,7 +819,9 @@ test('U-11/U-12: la campana abre Notificaciones y "Resolver" lleva a Stock del p
   const productName = (await firstAlert.locator('td').first().textContent())?.trim() ?? '';
   await firstAlert.getByTestId('alert-resolve').click();
   await expect(page.getByTestId('stock-page')).toBeVisible();
-  await expect(page.getByTestId('stock-search')).toHaveValue(productName);
+  // S-02 fases B-E: Existencias ya no tiene caja propia (`stock-search`); la búsqueda
+  // es el filtro COMPARTIDO del shell de Inventario, poblado desde el deep-link `?q=`.
+  await expect(page.getByTestId('inventory-search')).toHaveValue(productName);
 });
 
 test('La campana togglea Notificaciones y vuelve a la página anterior', async ({ page }) => {

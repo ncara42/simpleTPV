@@ -288,16 +288,32 @@ function FamilyRow({
 
 export function FamiliesPage({
   onOpenCatalogFamily,
+  search: searchProp,
+  onSearchChange,
+  familyId: familyIdProp,
 }: {
   // Atajo del contador "X productos": navega a Catálogo filtrado por el nodo.
   onOpenCatalogFamily?: (familyId: string) => void;
+  // S-02 fase D — Filtro COMPARTIDO de Inventario. Cuando el shell pasa `search`
+  // (controlado), la búsqueda la gobierna `InventoryFilters` arriba y la página deja
+  // de pintar su propia caja `fam-search`. `familyId` (un nodo cualquiera del filtro
+  // compartido) acota el árbol a la raíz que contiene ese nodo. El drag&drop, el
+  // import/export y el panel de productos siguen intactos.
+  search?: string;
+  onSearchChange?: (value: string) => void;
+  familyId?: string;
 } = {}) {
   const qc = useQueryClient();
   const confirm = useConfirm();
   const [form, setForm] = useState<FormState | null>(null);
+  // Modo controlado: si el shell de Inventario provee `search`, manda esa prop y los
+  // filtros propios (fam-search / fam-filter) no se pintan.
+  const controlled = searchProp !== undefined;
   // Toolbar de la tabla: búsqueda por nombre + filtro por familia raíz.
-  const [search, setSearch] = useState('');
-  const [rootFilter, setRootFilter] = useState('');
+  const [searchInner, setSearchInner] = useState('');
+  const [rootFilterInner, setRootFilter] = useState('');
+  const search = controlled ? searchProp : searchInner;
+  const setSearch = controlled ? (onSearchChange ?? (() => {})) : setSearchInner;
   // Fila activa: solo esa muestra sus botones (Mover / Editar / Borrar / + Hija).
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const toggleSelected = (id: string): void => setSelectedId((cur) => (cur === id ? null : id));
@@ -324,6 +340,14 @@ export function FamiliesPage({
     }
   }, [serverTree, tree]);
   const view = tree ?? serverTree;
+
+  // En modo controlado, el filtro de familia COMPARTIDO trae un nodo cualquiera del
+  // árbol; lo resolvemos a la raíz que lo contiene (Familias filtra por raíz). Sin
+  // selección o nodo desconocido → '' (todas). En modo autónomo manda el `fam-filter`
+  // propio.
+  const rootFilter = controlled
+    ? (view.find((root) => familyIdProp && isDescendantOf(view, root.id, familyIdProp))?.id ?? '')
+    : rootFilterInner;
 
   // Productos completos: alimentan el panel del nodo (I-13) y el contador REAL
   // por subárbol de cada fila (E-16), coherente con el filtro de Catálogo.
@@ -724,28 +748,32 @@ export function FamiliesPage({
     <section className="catalog">
       <div className="table-panel">
         <div className="table-toolbar">
-          <div className="sales-filters">
-            <span className="search-field">
-              <Input
+          {/* En modo controlado (shell de Inventario) la búsqueda y la familia las
+              pinta `InventoryFilters` arriba; aquí solo queda «Nueva familia». */}
+          {!controlled && (
+            <div className="sales-filters">
+              <span className="search-field">
+                <Input
+                  className="catalog-search"
+                  placeholder="Buscar familia…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  data-testid="fam-search"
+                />
+              </span>
+              <Select
                 className="catalog-search"
-                placeholder="Buscar familia…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                data-testid="fam-search"
+                value={rootFilter}
+                onChange={setRootFilter}
+                ariaLabel="Filtrar por familia"
+                data-testid="fam-filter"
+                options={[
+                  { value: '', label: 'Todas las familias' },
+                  ...view.map((r) => ({ value: r.id, label: r.name })),
+                ]}
               />
-            </span>
-            <Select
-              className="catalog-search"
-              value={rootFilter}
-              onChange={setRootFilter}
-              ariaLabel="Filtrar por familia"
-              data-testid="fam-filter"
-              options={[
-                { value: '', label: 'Todas las familias' },
-                ...view.map((r) => ({ value: r.id, label: r.name })),
-              ]}
-            />
-          </div>
+            </div>
+          )}
           <Button
             onClick={() =>
               setForm({

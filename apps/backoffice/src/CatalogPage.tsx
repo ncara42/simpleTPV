@@ -88,10 +88,36 @@ function toPayload(f: FormState): ProductInput {
   };
 }
 
-export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | null } = {}) {
+interface CatalogPageProps {
+  initialFamilyId?: string | null;
+  // S-02 fase C — Filtro COMPARTIDO de Inventario. Cuando el shell pasa estos
+  // valores (controlados), la búsqueda y la familia las gobierna `InventoryFilters`
+  // arriba del control de vistas; el Catálogo deja de pintar su propia caja
+  // (`catalog-search`/`catalog-family-filter`) y consume las props. Sin estas props
+  // (uso autónomo / tests), conserva su estado interno y su toolbar de filtros.
+  search?: string;
+  onSearchChange?: (value: string) => void;
+  familyFilter?: string;
+  onFamilyFilterChange?: (value: string) => void;
+}
+
+export function CatalogPage({
+  initialFamilyId,
+  search: searchProp,
+  onSearchChange,
+  familyFilter: familyFilterProp,
+  onFamilyFilterChange,
+}: CatalogPageProps = {}) {
   const qc = useQueryClient();
-  const [search, setSearch] = useState('');
-  const [familyFilter, setFamilyFilter] = useState(initialFamilyId ?? '');
+  // Modo controlado: si el shell de Inventario provee `search`/`familyFilter`, esos
+  // valores mandan y los inputs propios no se pintan (los pone `InventoryFilters`).
+  const controlled = searchProp !== undefined;
+  const [searchInner, setSearchInner] = useState('');
+  const [familyFilterInner, setFamilyFilterInner] = useState(initialFamilyId ?? '');
+  const search = controlled ? searchProp : searchInner;
+  const setSearch = controlled ? (onSearchChange ?? (() => {})) : setSearchInner;
+  const familyFilter = controlled ? (familyFilterProp ?? '') : familyFilterInner;
+  const setFamilyFilter = controlled ? (onFamilyFilterChange ?? (() => {})) : setFamilyFilterInner;
   const [form, setForm] = useState<FormState | null>(null);
   const [wizard, setWizard] = useState<EditWizard | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -254,6 +280,14 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
     setForm({ ...EMPTY });
   };
 
+  // P124 — El clic de FILA abre el detalle/edición del producto (la selección
+  // queda en el checkbox). Reusa el ProductFormModal en modo edición única (sin
+  // wizard): `form.id` presente → `submitForm` hace UPDATE, no create.
+  const openEdit = (p: Product): void => {
+    setWizard(null);
+    setForm(toForm(p));
+  };
+
   const openBulkEdit = (): void => {
     const queue = selectedProducts;
     if (queue.length === 0) return;
@@ -274,20 +308,27 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
         clearSelection();
       }
       invalidate();
+    } else if (form.id) {
+      // Edición única (clic de fila, P124): persiste el cambio y cierra.
+      applyEdit(form);
+      closeModal();
     } else {
       createMut.mutate(form);
     }
   };
 
   // Etiqueta del botón primario: "Siguiente (n / total)" mientras quedan productos
-  // en la cola; "Guardar" en el último paso (o en alta/edición única).
+  // en la cola; "Guardar" en el último paso (o en edición única, P124); "Crear" en
+  // alta nueva.
   const total = wizard?.queue.length ?? 0;
   const step = wizard?.step ?? 0;
   const isLastStep = !wizard || step + 1 >= total;
   const primaryLabel = !wizard
-    ? createMut.isPending
-      ? 'Guardando…'
-      : 'Crear'
+    ? form?.id
+      ? 'Guardar'
+      : createMut.isPending
+        ? 'Guardando…'
+        : 'Crear'
     : total > 1 && !isLastStep
       ? `Siguiente (${step + 1} / ${total})`
       : total > 1
@@ -393,23 +434,29 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
   const toolbar = (
     <div className="users-toolbar">
       <div className="sales-filters">
-        <span className="search-field">
-          <Input
-            className="catalog-search"
-            placeholder="Buscar por nombre, SKU o código…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            data-testid="catalog-search"
-          />
-        </span>
-        <Select
-          className="catalog-search"
-          value={familyFilter}
-          onChange={setFamilyFilter}
-          ariaLabel="Filtrar por familia"
-          data-testid="catalog-family-filter"
-          options={[{ value: '', label: 'Todos los arquetipos' }, ...archetypeOptions]}
-        />
+        {/* En modo controlado (shell de Inventario) la búsqueda y la familia las
+            pinta `InventoryFilters` arriba; aquí solo quedan las acciones de selección. */}
+        {!controlled && (
+          <>
+            <span className="search-field">
+              <Input
+                className="catalog-search"
+                placeholder="Buscar por nombre, SKU o código…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                data-testid="catalog-search"
+              />
+            </span>
+            <Select
+              className="catalog-search"
+              value={familyFilter}
+              onChange={setFamilyFilter}
+              ariaLabel="Filtrar por familia"
+              data-testid="catalog-family-filter"
+              options={[{ value: '', label: 'Todos los arquetipos' }, ...archetypeOptions]}
+            />
+          </>
+        )}
         {selected.length > 0 && (
           <>
             {!allFilteredSelected && (
@@ -515,7 +562,7 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
           toolbar={toolbar}
           {...(sort ? { sort } : {})}
           onSortChange={onSortChange}
-          onRowClick={(p) => toggleSelect(p.id)}
+          onRowClick={(p) => openEdit(p)}
           rowClassName={(p) => (selectedSet.has(p.id) ? 'is-selected' : undefined)}
           rowAriaSelected={(p) => selectedSet.has(p.id)}
           pagination={{
@@ -546,7 +593,7 @@ export function CatalogPage({ initialFamilyId }: { initialFamilyId?: string | nu
           errorMessage={
             createMut.isError ? formErrorMessage(createMut.error, 'No se pudo guardar.') : null
           }
-          title={wizard ? 'Editar producto' : 'Nuevo producto'}
+          title={wizard || form.id ? 'Editar producto' : 'Nuevo producto'}
           primaryLabel={primaryLabel}
           extraSection={form.id ? <ProductMovements productId={form.id} /> : undefined}
         />

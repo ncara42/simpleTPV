@@ -283,6 +283,9 @@ pub fn build_router(state: AppState) -> Router {
         .route("/stock/product/{product_id}", get(stock::by_product))
         // Ventas (Fase 2, slice 1): crear, reservar bloque, listar, consultar.
         .route("/sales", post(sales::create).get(sales::list))
+        // Estadísticas embebidas de Ventas (S-10): serie temporal + comparativa.
+        // Ruta estática antes de `/sales/{id}`; mismo guard de sesión que `/sales`.
+        .route("/sales/stats", get(sales::stats))
         .route("/sales/ticket-block", post(sales::ticket_block))
         // Export (#152): rutas estáticas `/sales/export*` antes que `/sales/{id}`.
         .route("/sales/export", post(sales_export::request_export))

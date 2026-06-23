@@ -14,7 +14,9 @@ use axum::Json;
 use serde::Deserialize;
 use simpletpv_auth::Role;
 use simpletpv_domain::receipt::render_receipt_html;
-use simpletpv_domain::sales::model::{Sale, SaleWithLines, SalesPage, TicketBlock, TicketData};
+use simpletpv_domain::sales::model::{
+    Sale, SaleWithLines, SalesPage, SalesStats, TicketBlock, TicketData,
+};
 use simpletpv_domain::sales::service::{self, SalesFilter};
 use simpletpv_domain::sales::{CreateSale, ReserveTicketBlock};
 use simpletpv_shared::AppError;
@@ -162,12 +164,10 @@ pub struct ListQuery {
     page_size: Option<i64>,
 }
 
-/// `GET /sales` — historial paginado. CLERK acotado a sus tiendas (SEC-01).
-pub async fn list(
-    State(state): State<AppState>,
-    user: AuthUser,
-    Query(q): Query<ListQuery>,
-) -> Result<Json<SalesPage>, ApiError> {
+/// Construye el `SalesFilter` a partir del `ListQuery` (mismo mapeo para `/sales` y
+/// `/sales/stats`): valida `status`, resuelve el rango de fechas (`date` = un día;
+/// si no, `from`/`to` inclusive por día) y traslada los filtros tal cual.
+fn build_filter(q: ListQuery) -> Result<SalesFilter, ApiError> {
     if let Some(s) = &q.status {
         if s != "COMPLETED" && s != "VOIDED" {
             return Err(AppError::BadRequest.into());
@@ -187,7 +187,7 @@ pub async fn list(
         (from, to)
     };
 
-    let filter = SalesFilter {
+    Ok(SalesFilter {
         store_id: q.store_id,
         user_id: q.user_id,
         status: q.status,
@@ -197,7 +197,16 @@ pub async fn list(
         to,
         page: q.page.unwrap_or(1),
         page_size: q.page_size.unwrap_or(DEFAULT_SALES_PAGE_SIZE),
-    };
+    })
+}
+
+/// `GET /sales` — historial paginado. CLERK acotado a sus tiendas (SEC-01).
+pub async fn list(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<ListQuery>,
+) -> Result<Json<SalesPage>, ApiError> {
+    let filter = build_filter(q)?;
     let page = service::list(
         state.db(),
         user.organization_id,
@@ -207,6 +216,27 @@ pub async fn list(
     )
     .await?;
     Ok(Json(page))
+}
+
+/// `GET /sales/stats` (S-10) — estadísticas embebidas de la page Ventas: serie
+/// temporal diaria + KPIs del periodo + comparativa con el periodo anterior. Mismo
+/// `ListQuery`, mismo scope (RLS + CLERK acotado a sus tiendas) y mismos filtros que
+/// `GET /sales`. ADITIVO: no altera el comportamiento de `/sales`.
+pub async fn stats(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<ListQuery>,
+) -> Result<Json<SalesStats>, ApiError> {
+    let filter = build_filter(q)?;
+    let stats = service::sales_stats(
+        state.db(),
+        user.organization_id,
+        user.user_id,
+        user.role.is_org_wide(),
+        filter,
+    )
+    .await?;
+    Ok(Json(stats))
 }
 
 /// Parsea `YYYY-MM-DD`. Entrada inválida → 400.

@@ -47,14 +47,14 @@ export interface SidebarProps {
   account?: SidebarAccount;
   /**
    * Modo dropdown (D-02): los grupos se pliegan a una sola entrada y su contenido
-   * se despliega inline al mantener el hover >200ms (preview) o al hacer CLIC,
-   * que lo deja ANCLADO hasta clic-fuera/Escape. Solo un grupo abierto a la vez.
+   * se despliega inline al hacer CLIC (toggle); otro clic, clic-fuera o Escape lo
+   * cierran. Solo un grupo abierto a la vez. No se abre por hover (S-05).
    * Los items sin grupo se renderizan como entradas directas en su posición.
    */
   groupsAsDropdowns?: boolean;
   /**
-   * U-04: permite contraer el sidebar a un rail de iconos. Contraído, el hover
-   * (o clic, que ancla) sobre un grupo abre un flyout lateral con sus opciones;
+   * U-04: permite contraer el sidebar a un rail de iconos. Contraído, el clic
+   * sobre un grupo abre un flyout lateral con sus opciones (toggle, S-05);
    * los items directos enseñan su nombre vía `title`. Persistido en localStorage.
    */
   collapsible?: boolean;
@@ -252,25 +252,11 @@ export function Sidebar({
     itemsEls[next]?.focus();
   }, []);
 
-  // ─── Modo dropdown (D-02): un grupo abierto, preview por hover, anclaje por clic ──
+  // ─── Modo dropdown (D-02): un grupo abierto a la vez, solo por clic (S-05) ──
   const [openGroup, setOpenGroup] = useState<string | null>(null);
-  const [anchored, setAnchored] = useState(false);
-  const hoverTimer = useRef<number | null>(null);
-  const leaveTimer = useRef<number | null>(null);
   const navRef = useRef<HTMLElement>(null);
 
-  const clearTimers = useCallback(() => {
-    if (hoverTimer.current != null) window.clearTimeout(hoverTimer.current);
-    if (leaveTimer.current != null) window.clearTimeout(leaveTimer.current);
-    hoverTimer.current = null;
-    leaveTimer.current = null;
-  }, []);
-
-  const closeDropdown = useCallback(() => {
-    clearTimers();
-    setOpenGroup(null);
-    setAnchored(false);
-  }, [clearTimers]);
+  const closeDropdown = useCallback(() => setOpenGroup(null), []);
 
   // Los dos paneles colgantes del clúster flotante (cuerpo del sidebar bajo el logo, panel de
   // cuenta bajo el avatar) son mutuamente excluyentes: abrir el de cuenta eclipsa el cuerpo y
@@ -293,44 +279,12 @@ export function Sidebar({
     toggleHidden();
   }, [menuOpen, toggleHidden]);
 
-  // Hover sostenido >200ms abre el preview (sin anclar). El anclado no se pisa.
-  const onGroupEnter = useCallback(
-    (groupId: string) => {
-      if (!groupsAsDropdowns) return;
-      clearTimers();
-      if (anchored) return;
-      hoverTimer.current = window.setTimeout(() => {
-        setOpenGroup(groupId);
-        setAnchored(false);
-      }, 200);
-    },
-    [groupsAsDropdowns, anchored, clearTimers],
-  );
+  // Clic: togglea el grupo. Al ser `openGroup` un único estado, abrir B cierra A.
+  const onGroupClick = useCallback((groupId: string) => {
+    setOpenGroup((prev) => (prev === groupId ? null : groupId));
+  }, []);
 
-  // Al salir del grupo (cabecera + contenido), el preview se cierra con un
-  // pequeño margen de gracia; el anclado permanece.
-  const onGroupLeave = useCallback(() => {
-    if (!groupsAsDropdowns) return;
-    if (hoverTimer.current != null) window.clearTimeout(hoverTimer.current);
-    if (anchored) return;
-    leaveTimer.current = window.setTimeout(() => setOpenGroup(null), 150);
-  }, [groupsAsDropdowns, anchored]);
-
-  // Clic: ancla el dropdown; si ya estaba anclado en ese grupo, lo cierra.
-  const onGroupClick = useCallback(
-    (groupId: string) => {
-      clearTimers();
-      if (openGroup === groupId && anchored) {
-        closeDropdown();
-        return;
-      }
-      setOpenGroup(groupId);
-      setAnchored(true);
-    },
-    [openGroup, anchored, clearTimers, closeDropdown],
-  );
-
-  // Clic fuera del nav o Escape cierran el dropdown (anclado incluido).
+  // Clic fuera del nav o Escape cierran el dropdown abierto.
   useEffect(() => {
     if (!groupsAsDropdowns || openGroup === null) return;
     const onPointerDown = (e: PointerEvent) => {
@@ -494,14 +448,10 @@ export function Sidebar({
                   <div
                     key={group.id}
                     className={`sidebar-group sidebar-group--dd${isOpen ? ' open' : ''}`}
-                    onMouseEnter={() => onGroupEnter(group.id)}
-                    onMouseLeave={onGroupLeave}
                   >
                     <button
                       type="button"
-                      className={`sidebar-item sidebar-group-entry${groupActive ? ' active' : ''}${
-                        isOpen && anchored ? ' anchored' : ''
-                      }`}
+                      className={`sidebar-item sidebar-group-entry${groupActive ? ' active' : ''}`}
                       onClick={() => onGroupClick(group.id)}
                       title={group.label}
                       aria-expanded={isOpen}

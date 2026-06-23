@@ -2,7 +2,9 @@ import { Badge, DataTable, type DataTableColumn, Select, usePageHeader } from '@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Download, SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
+import { PeriodSegmented } from './components/PeriodSegmented.js';
 import { useTableColumns } from './components/useTableColumns.js';
 import {
   listSales,
@@ -12,10 +14,13 @@ import {
   type SalesViewRow,
 } from './lib/admin.js';
 import { exportRowsToCsv } from './lib/csv.js';
+import type { DashboardPeriod } from './lib/dashboard.js';
 import { type FamilyNode, listFamilies } from './lib/families.js';
 import { useFeatures } from './lib/features.js';
 import { fmtEur, fmtRate } from './lib/format.js';
 import { usePageActions } from './lib/pageActions.js';
+import { isDashboardPeriod, PERIOD_OPTIONS, periodToRange } from './lib/period.js';
+import { SalesStats } from './sales/SalesStats.js';
 
 const hour = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
 const PAYMENT_LABEL: Record<string, string> = { CASH: 'Efectivo', CARD: 'Tarjeta' };
@@ -27,8 +32,11 @@ interface Filters {
   sellerId: string;
   familyId: string;
   status: string;
+  // S-11: periodo relativo (Hoy/Ayer/Semana/Mes/Año). '' = sin filtro (todo el histórico).
+  // Comparte el tipo `DashboardPeriod` con el Dashboard para una semántica idéntica.
+  period: DashboardPeriod | '';
 }
-const NO_FILTERS: Filters = { storeId: '', sellerId: '', familyId: '', status: '' };
+const NO_FILTERS: Filters = { storeId: '', sellerId: '', familyId: '', status: '', period: '' };
 
 interface SavedView extends Filters {
   name: string;
@@ -38,7 +46,18 @@ const VIEWS_KEY = 'bo.sales.views';
 function loadViews(): SavedView[] {
   try {
     const raw = localStorage.getItem(VIEWS_KEY);
-    return raw ? (JSON.parse(raw) as SavedView[]) : [];
+    if (!raw) return [];
+    // Tolerancia (S-11): las vistas guardadas ANTES de añadir `period` no traen el campo;
+    // degradan a '' (sin periodo) sin romper. Se normaliza al cargar.
+    const parsed = JSON.parse(raw) as Array<Partial<SavedView> & { name: string }>;
+    return parsed.map((v) => ({
+      name: v.name,
+      storeId: v.storeId ?? '',
+      sellerId: v.sellerId ?? '',
+      familyId: v.familyId ?? '',
+      status: v.status ?? '',
+      period: isDashboardPeriod(v.period) ? v.period : '',
+    }));
   } catch {
     return [];
   }
@@ -54,13 +73,15 @@ function flattenFamilies(nodes: FamilyNode[], depth = 0): { id: string; name: st
 }
 
 // Mapea los filtros de la UI a la query de listSales (sellerId → userId, igual que
-// findSales): solo se incluyen los activos.
+// findSales): solo se incluyen los activos. El periodo se traduce a date|from|to vía
+// `periodToRange` (S-11): Hoy/Ayer → un día (`date`); Semana/Mes/Año → rango (`from`/`to`).
 function toQuery(filters: Filters): SalesQueryInput {
   return {
     ...(filters.storeId ? { storeId: filters.storeId } : {}),
     ...(filters.sellerId ? { userId: filters.sellerId } : {}),
     ...(filters.familyId ? { familyId: filters.familyId } : {}),
     ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.period ? periodToRange(filters.period) : {}),
   };
 }
 
@@ -110,9 +131,17 @@ const columns: DataTableColumn<SalesViewRow>[] = [
 ];
 
 export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string | null }) {
-  const [filters, setFilters] = useState<Filters>(
-    initialStoreId ? { ...NO_FILTERS, storeId: initialStoreId } : NO_FILTERS,
-  );
+  // El periodo es URL-state (F0c): ?period= sobrevive al reload y es compartible/back-navegable.
+  // El resto de filtros sigue siendo estado local (no había deep-link previo para ellos).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlPeriod: DashboardPeriod | '' = isDashboardPeriod(searchParams.get('period'))
+    ? (searchParams.get('period') as DashboardPeriod)
+    : '';
+  const [filters, setFilters] = useState<Filters>({
+    ...NO_FILTERS,
+    ...(initialStoreId ? { storeId: initialStoreId } : {}),
+    period: urlPeriod,
+  });
   const [page, setPage] = useState(1);
   const [views, setViews] = useState<SavedView[]>(() => loadViews());
   // Feature flag (#127 B): oculta el export si el módulo está apagado a nivel org.
@@ -122,6 +151,20 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
   const setFilter = (patch: Partial<Filters>): void => {
     setFilters((f) => ({ ...f, ...patch }));
     setPage(1);
+  };
+
+  // El periodo, además de filtro, persiste en ?period= (preservando el resto de params).
+  const setPeriod = (next: DashboardPeriod | ''): void => {
+    setFilter({ period: next });
+    setSearchParams(
+      (prev) => {
+        const updated = new URLSearchParams(prev);
+        if (next) updated.set('period', next);
+        else updated.delete('period');
+        return updated;
+      },
+      { replace: true },
+    );
   };
 
   const query = useQuery({
@@ -153,8 +196,10 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
   });
 
   const hasFilters = Boolean(
-    filters.storeId || filters.sellerId || filters.familyId || filters.status,
+    filters.storeId || filters.sellerId || filters.familyId || filters.status || filters.period,
   );
+  const periodLabel = (p: DashboardPeriod | ''): string | undefined =>
+    PERIOD_OPTIONS.find((o) => o.value === p)?.label;
 
   const persistViews = (next: SavedView[]): void => {
     setViews(next);
@@ -172,6 +217,7 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
         sellers.find((s) => s.id === filters.sellerId)?.name,
         familyOptions.find((f) => f.id === filters.familyId)?.name.trim(),
         STATUS_LABEL[filters.status],
+        periodLabel(filters.period),
       ]
         .filter(Boolean)
         .join(' · ') || 'Todas';
@@ -185,7 +231,32 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
       sellerId: v.sellerId,
       familyId: v.familyId,
       status: v.status,
+      period: v.period,
     });
+    // El periodo es URL-state: aplicar una vista guardada también lo refleja en ?period=.
+    setSearchParams(
+      (prev) => {
+        const updated = new URLSearchParams(prev);
+        if (v.period) updated.set('period', v.period);
+        else updated.delete('period');
+        return updated;
+      },
+      { replace: true },
+    );
+    setPage(1);
+  };
+
+  // "Limpiar" resetea todos los filtros, incluido el periodo y su ?period= en la URL.
+  const clearFilters = (): void => {
+    setFilters(NO_FILTERS);
+    setSearchParams(
+      (prev) => {
+        const updated = new URLSearchParams(prev);
+        updated.delete('period');
+        return updated;
+      },
+      { replace: true },
+    );
     setPage(1);
   };
 
@@ -198,6 +269,19 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
   const toolbar = (
     <>
       <div className="sales-filters">
+        {/* S-11: filtro de periodo como un filtro más de la tabla (P063), etiqueta visible
+            "Periodo" (P066). Alimenta `from`/`to`/`date` de listSales vía periodToRange y vive
+            en ?period= (URL-state). El periodo activo se quita con "Limpiar". */}
+        <div className="sales-period-filter" data-testid="sales-period">
+          <span className="sales-period-label">Periodo</span>
+          {/* `filters.period` puede ser '' (sin periodo): el cast es inocuo porque ningún
+              segmento iguala '' → ninguno queda activo (aria-pressed=false en todos). */}
+          <PeriodSegmented
+            value={filters.period as DashboardPeriod}
+            onChange={setPeriod}
+            label="Periodo"
+          />
+        </div>
         <Select
           className="catalog-search"
           value={filters.storeId}
@@ -248,10 +332,7 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
             <button
               type="button"
               className="users-sel-btn"
-              onClick={() => {
-                setFilters(NO_FILTERS);
-                setPage(1);
-              }}
+              onClick={clearFilters}
               data-testid="sales-clear"
             >
               Limpiar
@@ -335,6 +416,11 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
       )}
 
       {columnsEditor}
+
+      {/* S-10: estadísticas embebidas (KPIs + serie temporal) con los MISMOS filtros
+          que la tabla (incluido el periodo de S-11). Misma `toQuery(filters)` que
+          alimenta `listSales`, así KPIs/gráfica y tabla se recalculan a la vez. */}
+      <SalesStats query={toQuery(filters)} />
 
       <DataTable
         columns={effectiveColumns}

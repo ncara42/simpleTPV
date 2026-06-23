@@ -2,8 +2,10 @@ import { Input } from '@simpletpv/ui';
 import { Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 
 import type { Tab } from '../lib/nav.js';
+import { tabToPath } from '../lib/navigation.js';
 import { type SearchEntry, searchFunctions } from '../lib/searchIndex.js';
 import { Modal } from './Modal.js';
 
@@ -20,6 +22,10 @@ export function CommandPalette({
 }) {
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
+  // S-21: el palette vive DENTRO del Router, así que puede navegar a un deep-link de
+  // subsección (`/b2b?section=pricelists`). Las entradas SIN `params` siguen usando
+  // `onNavigate(tab)` (sin tocar su firma); solo las que traen `params` enriquecen el destino.
+  const navigate = useNavigate();
   // `closing` dispara la animación de salida antes de desmontar (el padre quita el
   // palette al resolver onClose). Sin esto, React desmontaría al instante y no se
   // vería el fundido de cierre.
@@ -62,8 +68,16 @@ export function CommandPalette({
     closeTimer.current = setTimeout(onClose, CLOSE_MS);
   };
 
-  const go = (tab: Tab): void => {
-    onNavigate(tab);
+  // Navega al destino de una entrada: deep-link enriquecido (`tabToPath + ?params`)
+  // cuando la entrada trae `params` (S-21, p. ej. la subsección Tarifas B2B); en otro
+  // caso, la navegación clásica por Tab (`onNavigate`) intacta para el resto del índice.
+  const go = (entry: SearchEntry): void => {
+    if (entry.params) {
+      const qs = new URLSearchParams(entry.params).toString();
+      navigate(`${tabToPath(entry.tab)}?${qs}`);
+    } else {
+      onNavigate(entry.tab);
+    }
     requestClose();
   };
 
@@ -78,7 +92,7 @@ export function CommandPalette({
     if (e.key === 'Enter') {
       e.preventDefault();
       const hit = flat[cursor] ?? flat[0];
-      if (hit) go(hit.tab);
+      if (hit) go(hit);
     }
   };
 
@@ -141,7 +155,7 @@ export function CommandPalette({
                     aria-selected={index === cursor}
                     className={`cmdk-item${index === cursor ? ' is-active' : ''}`}
                     onMouseEnter={() => setCursor(index)}
-                    onClick={() => go(entry.tab)}
+                    onClick={() => go(entry)}
                     data-testid={`function-search-result-${entry.tab}`}
                   >
                     <span className="cmdk-item-label">{entry.label}</span>

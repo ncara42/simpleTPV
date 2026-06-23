@@ -18,8 +18,10 @@ import { useTableColumns } from '../components/useTableColumns.js';
 import { listStores } from '../lib/admin.js';
 import { exportRowsToCsv } from '../lib/csv.js';
 import { listFamilies } from '../lib/families.js';
+import { isDescendantOf } from '../lib/family-tree.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { usePageActions } from '../lib/pageActions.js';
+import { listProducts } from '../lib/products.js';
 import { adjustStock, getGlobalStock, listAlerts, setMinStock } from '../lib/stock.js';
 import { CreateTransferModal, type CreateTransferPrefill } from './CreateTransferModal.js';
 import { ALERT_LABEL, LEVEL_LABEL, ROTATION_LABEL } from './labels.js';
@@ -38,14 +40,31 @@ interface AdjustState {
 export function GlobalStockSection({
   initialStoreId,
   initialSearch,
+  search: searchProp,
+  onSearchChange,
+  familyId: familyIdProp,
+  onFamilyChange,
 }: {
   initialStoreId?: string | null;
   initialSearch?: string | null;
+  // S-02 fase E — Filtro COMPARTIDO de Inventario. Cuando el shell pasa `search`
+  // (controlado), la búsqueda y la familia las gobierna `InventoryFilters` arriba y
+  // la sección deja de pintar sus inputs `stock-search`/`stock-family`. El resto de
+  // filtros (rotación, multi-tienda) y el panel de roturas siguen intactos.
+  search?: string;
+  onSearchChange?: (value: string) => void;
+  familyId?: string;
+  onFamilyChange?: (value: string) => void;
 }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [search, setSearch] = useState(initialSearch ?? '');
-  const [familyId, setFamilyId] = useState('');
+  const controlled = searchProp !== undefined;
+  const [searchInner, setSearchInner] = useState(initialSearch ?? '');
+  const [familyIdInner, setFamilyIdInner] = useState('');
+  const search = controlled ? searchProp : searchInner;
+  const setSearch = controlled ? (onSearchChange ?? (() => {})) : setSearchInner;
+  const familyId = controlled ? (familyIdProp ?? '') : familyIdInner;
+  const setFamilyId = controlled ? (onFamilyChange ?? (() => {})) : setFamilyIdInner;
   // S-16: traspaso desde una rotura. `transferPrefill` abre el modal (sendNow) con
   // destino+producto prefijados; `noSurplus` muestra la CTA de compra cuando ninguna
   // tienda tiene excedente; `transferDone` el aviso post-creación con "Ver en Traspasos".
@@ -91,6 +110,15 @@ export function GlobalStockSection({
     queryKey: ['families'],
     queryFn: listFamilies,
   });
+
+  // Mapa productId → familyId para FILTRAR las filas por familia (S-02): la fila de
+  // stock global no trae familyId, así que se cruza con el catálogo. Solo se consulta
+  // cuando el filtro de familia está activo (clave compartida con el resto de la app).
+  const { data: products = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => listProducts(),
+  });
+  const familyByProduct = new Map(products.map((p) => [p.id, p.familyId]));
 
   // Las opciones del filtro de tienda salen de TODAS las tiendas (no solo de las que
   // tienen stock del primer producto): así el filtro preseleccionado al llegar desde
@@ -171,6 +199,13 @@ export function GlobalStockSection({
 
   const filtered = rows.filter((row) => {
     if (search && !row.productName.toLowerCase().includes(search.toLowerCase())) return false;
+    // Filtro por familia COMPARTIDO (S-02): incluye el nodo elegido y todo su subárbol.
+    // La fila de stock no trae familyId → se resuelve por el mapa del catálogo. Filtra
+    // FILAS, no añade columna (la columna Familia se eliminó por D-12).
+    if (familyId) {
+      const productFamily = familyByProduct.get(row.productId);
+      if (productFamily == null || !isDescendantOf(families, familyId, productFamily)) return false;
+    }
     // Multi-tienda: sin selección = todas; con selección = filas con stock en alguna
     // de las tiendas elegidas.
     if (storeIds.size > 0 && !row.stores.some((s) => storeIds.has(s.storeId))) return false;
@@ -471,26 +506,32 @@ export function GlobalStockSection({
           toolbar={
             <div className="users-toolbar">
               <div className="sales-filters">
-                <span className="search-field">
-                  <Input
-                    className="catalog-search"
-                    placeholder="Buscar producto…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    data-testid="stock-search"
-                  />
-                </span>
-                <Select
-                  className="catalog-search"
-                  value={familyId}
-                  onChange={(value) => setFamilyId(value)}
-                  ariaLabel="Filtrar por familia"
-                  data-testid="stock-family"
-                  options={[
-                    { value: '', label: 'Todas las familias' },
-                    ...families.map((f) => ({ value: f.id, label: f.name })),
-                  ]}
-                />
+                {/* En modo controlado (shell de Inventario) la búsqueda y la familia
+                    las pinta `InventoryFilters` arriba; aquí quedan rotación y tiendas. */}
+                {!controlled && (
+                  <>
+                    <span className="search-field">
+                      <Input
+                        className="catalog-search"
+                        placeholder="Buscar producto…"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        data-testid="stock-search"
+                      />
+                    </span>
+                    <Select
+                      className="catalog-search"
+                      value={familyId}
+                      onChange={(value) => setFamilyId(value)}
+                      ariaLabel="Filtrar por familia"
+                      data-testid="stock-family"
+                      options={[
+                        { value: '', label: 'Todas las familias' },
+                        ...families.map((f) => ({ value: f.id, label: f.name })),
+                      ]}
+                    />
+                  </>
+                )}
                 <Select
                   className="catalog-search"
                   value={rotation}
