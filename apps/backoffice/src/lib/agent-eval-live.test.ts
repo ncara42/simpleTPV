@@ -8,9 +8,11 @@ import {
   evalConfigFromEnv,
   type EvalResult,
   extractAgentTurn,
+  isRateLimited,
   meanOfScores,
   parseJudgeScores,
   parseSse,
+  retryAfterMs,
   RUBRIC_KEYS,
 } from './agent-eval-live.js';
 import type { CanvasOp } from './chat.js';
@@ -157,6 +159,19 @@ describe('aggregate', () => {
       { id: 'a', ...base, valid: true, scores: { x: 7 }, meanScore: 7 },
     ];
     expect(aggregate(results).pass).toBe(false);
+  });
+});
+
+describe('rate-limit helpers', () => {
+  it('isRateLimited detecta 429 / TPM y sobrecarga 503', () => {
+    expect(isRateLimited('Provider error 429: rate_limit_exceeded')).toBe(true);
+    expect(isRateLimited('tokens per minute (TPM): Limit 12000')).toBe(true);
+    expect(isRateLimited('Provider error 503: ResourceExhausted: All workers are busy')).toBe(true);
+    expect(isRateLimited('Error 500 interno')).toBe(false);
+  });
+  it('retryAfterMs lee "try again in Xs" (+margen) o usa fallback', () => {
+    expect(retryAfterMs('Please try again in 20.5s.')).toBe(21_500);
+    expect(retryAfterMs('sin pista', 60_000)).toBe(60_000);
   });
 });
 

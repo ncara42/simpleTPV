@@ -26,5 +26,5 @@ describe('arnés vivo del agente compositor (#226)', () => {
     }
     expect(summary.validPct).toBeGreaterThanOrEqual(EVAL_THRESHOLD.minValidPct);
     expect(summary.meanScore).toBeGreaterThanOrEqual(EVAL_THRESHOLD.minMeanScore);
-  }, 600_000);
+  }, 900_000);
 });
