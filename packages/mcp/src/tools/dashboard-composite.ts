@@ -56,15 +56,18 @@ const PREVIOUS_PERIOD: Record<string, string | undefined> = {
 
 /**
  * Tools compuestas del dashboard (fan-out server-side con `Promise.all` → 1 round-trip).
- * Devuelven SOLO datos (JSON); el cliente decide cómo presentarlos. Antes declaraban
+ * Devuelven SOLO datos (JSON); el modelo decide cómo presentarlos. Antes declaraban
  * un panel `ui://` (MCP Apps) que renderizaba un iframe con el design system del
  * backoffice; se retiró por preferencia del usuario (que la UI la componga el modelo).
+ * La identidad visual (tokens, color, radios, tipografía) ya no viaja en un iframe:
+ * viaja en el campo `instructions` del servidor (ver design-system.ts), de modo que
+ * el modelo conserva su forma de montar pero la viste con la piel de SimpleTPV.
  */
 export function registerDashboardComposites(server: McpServer): void {
   readTool(
     server,
     'get_company_overview',
-    'Resumen ejecutivo del estado actual del negocio en UNA sola llamada: ventas de hoy con comparativa, KPIs de ventas, alertas de rotura de stock y métricas de stockout del mes. Úsalo como punto de partida o cuando el usuario pregunte por el estado general; prefiérelo a pedir esas métricas con tools sueltas. Devuelve los datos para que los presentes de forma visual y clara.',
+    'Resumen ejecutivo del estado actual del negocio en UNA sola llamada: ventas de hoy con comparativa, KPIs de ventas, alertas de rotura de stock y métricas de stockout del mes. Úsalo como punto de partida o cuando el usuario pregunte por el estado general; prefiérelo a pedir esas métricas con tools sueltas. Devuelve los datos para que los presentes de forma visual y clara, montándolos a tu manera pero con la identidad visual de SimpleTPV de las instrucciones del servidor.',
     {},
     async () => {
       const [salesDay, kpis, stockoutKpis, alerts] = await Promise.all([
@@ -80,7 +83,7 @@ export function registerDashboardComposites(server: McpServer): void {
   readTool(
     server,
     'get_sales_breakdown',
-    'Informe de ventas COMPLETO en una sola llamada: para el mes en curso incluye comparativa con el mes anterior (en bruto y en media diaria comparable), proyección a fin de mes, acumulado diario y desglose por tienda, familia, franja horaria y empleado. Por defecto el período es el mes en curso. Úsalo cuando el usuario pida "analizar las ventas", "cómo va el mes" o un informe global en lugar de encadenar tools de desglose sueltas. Devuelve los datos para que los presentes de forma visual y clara.',
+    'Informe de ventas COMPLETO en una sola llamada: para el mes en curso incluye comparativa con el mes anterior (en bruto y en media diaria comparable), proyección a fin de mes, acumulado diario y desglose por tienda, familia, franja horaria y empleado. Por defecto el período es el mes en curso. Úsalo cuando el usuario pida "analizar las ventas", "cómo va el mes" o un informe global en lugar de encadenar tools de desglose sueltas. Devuelve los datos para que los presentes de forma visual y clara, montándolos a tu manera pero con la identidad visual de SimpleTPV de las instrucciones del servidor.',
     { period, storeId },
     async (params) => {
       // El informe es mensual por defecto: sin period explícito, mes en curso.
