@@ -1,10 +1,11 @@
-import { Button, DataTable, Input, Select } from '@simpletpv/ui';
+import { Button, DataTable, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
 import { sileo } from 'sileo';
 
 import { useConfirm } from '../components/ConfirmProvider.js';
 import { Modal } from '../components/Modal.js';
+import { ProductPicker } from '../components/ProductPicker.js';
 import { SectionToolbar } from '../components/SectionToolbar.js';
 import {
   createPriceList,
@@ -16,7 +17,6 @@ import {
   setPriceListItem,
 } from '../lib/b2b.js';
 import { formErrorMessage } from '../lib/form-error.js';
-import { listProducts } from '../lib/products.js';
 
 function eur(n: number | string): string {
   return `${Number(n).toFixed(2)} €`;
@@ -31,16 +31,12 @@ function PriceListDetail({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
-  const [productId, setProductId] = useState('');
+  const [productId, setProductId] = useState<string | null>(null);
   const [price, setPrice] = useState('');
 
   const { data: detail } = useQuery({
     queryKey: ['b2b-pricelist', priceList.id],
     queryFn: () => getPriceList(priceList.id),
-  });
-  const { data: products = [] } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => listProducts(),
   });
 
   const invalidate = () => {
@@ -53,7 +49,7 @@ function PriceListDetail({
       setPriceListItem(priceList.id, v.productId, v.price),
     onSuccess: () => {
       invalidate();
-      setProductId('');
+      setProductId(null);
       setPrice('');
     },
   });
@@ -65,12 +61,9 @@ function PriceListDetail({
   const items = detail?.items ?? [];
   // Solo productos que aún no están en la tarifa.
   const inList = new Set(items.map((it) => it.productId));
-  const productOptions = [
-    { value: '', label: 'Selecciona un producto…' },
-    ...products.filter((p) => !inList.has(p.id)).map((p) => ({ value: p.id, label: p.name })),
-  ];
+  const excludeIds = Array.from(inList);
 
-  const canAdd = productId !== '' && price !== '' && Number(price) >= 0;
+  const canAdd = productId !== null && productId !== '' && price !== '' && Number(price) >= 0;
 
   return (
     <Modal onClose={onClose} className="modal--form" testId="b2b-pricelist-detail">
@@ -117,13 +110,14 @@ function PriceListDetail({
         <section className="form-section">
           <span className="form-section-title">Añadir / actualizar precio</span>
           <div className="b2b-item-form">
-            <Select
-              value={productId}
-              onChange={setProductId}
-              ariaLabel="Producto"
-              options={productOptions}
-              data-testid="b2b-item-product"
-            />
+            <div data-testid="b2b-item-product">
+              <ProductPicker
+                value={productId}
+                onChange={setProductId}
+                excludeIds={excludeIds}
+                placeholder="Selecciona un producto…"
+              />
+            </div>
             <Input
               type="number"
               min="0"
@@ -136,7 +130,7 @@ function PriceListDetail({
             <Button
               type="button"
               disabled={!canAdd || setItemMut.isPending}
-              onClick={() => setItemMut.mutate({ productId, price: Number(price) })}
+              onClick={() => setItemMut.mutate({ productId: productId!, price: Number(price) })}
               data-testid="b2b-item-add"
             >
               Añadir

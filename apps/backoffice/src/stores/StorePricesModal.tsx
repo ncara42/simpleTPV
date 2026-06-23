@@ -1,12 +1,12 @@
-import { Button, DataTable, Input, Select } from '@simpletpv/ui';
+import { Button, DataTable, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
+import { ProductPicker } from '../components/ProductPicker.js';
 import type { Store } from '../lib/admin.js';
 import { fmtEur } from '../lib/format.js';
-import { listProducts } from '../lib/products.js';
 import {
   importStorePricesCsv,
   listStorePrices,
@@ -20,17 +20,13 @@ import {
 // PVP; quitar un override lo devuelve al PVP. El precio es ABSOLUTO (no porcentaje).
 export function StorePricesModal({ store, onClose }: { store: Store; onClose: () => void }) {
   const qc = useQueryClient();
-  const [productId, setProductId] = useState('');
+  const [productId, setProductId] = useState<string | null>(null);
   const [price, setPrice] = useState('');
   const [importOpen, setImportOpen] = useState(false);
 
   const { data: overrides = [] } = useQuery({
     queryKey: ['store-prices', store.id],
     queryFn: () => listStorePrices(store.id),
-  });
-  const { data: products = [] } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => listProducts(),
   });
 
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['store-prices', store.id] });
@@ -40,7 +36,7 @@ export function StorePricesModal({ store, onClose }: { store: Store; onClose: ()
       setStorePrice(store.id, v.productId, v.price),
     onSuccess: () => {
       invalidate();
-      setProductId('');
+      setProductId(null);
       setPrice('');
     },
   });
@@ -52,12 +48,9 @@ export function StorePricesModal({ store, onClose }: { store: Store; onClose: ()
   // Solo productos que aún no tienen override en esta tienda (para actualizar uno
   // existente se quita y se vuelve a añadir, igual que el editor de tarifas B2B).
   const overridden = new Set(overrides.map((o) => o.productId));
-  const productOptions = [
-    { value: '', label: 'Selecciona un producto…' },
-    ...products.filter((p) => !overridden.has(p.id)).map((p) => ({ value: p.id, label: p.name })),
-  ];
+  const excludeIds = Array.from(overridden);
 
-  const canAdd = productId !== '' && price !== '' && Number(price) >= 0;
+  const canAdd = productId !== null && productId !== '' && price !== '' && Number(price) >= 0;
 
   return (
     <Modal onClose={onClose} className="modal--form" testId="store-prices-detail">
@@ -106,13 +99,14 @@ export function StorePricesModal({ store, onClose }: { store: Store; onClose: ()
         <section className="form-section">
           <span className="form-section-title">Añadir / actualizar precio</span>
           <div className="b2b-item-form">
-            <Select
-              value={productId}
-              onChange={setProductId}
-              ariaLabel="Producto"
-              options={productOptions}
-              data-testid="store-price-product"
-            />
+            <div data-testid="store-price-product">
+              <ProductPicker
+                value={productId}
+                onChange={setProductId}
+                excludeIds={excludeIds}
+                placeholder="Selecciona un producto…"
+              />
+            </div>
             <Input
               type="number"
               min="0"
@@ -125,7 +119,7 @@ export function StorePricesModal({ store, onClose }: { store: Store; onClose: ()
             <Button
               type="button"
               disabled={!canAdd || setMut.isPending}
-              onClick={() => setMut.mutate({ productId, price: Number(price) })}
+              onClick={() => setMut.mutate({ productId: productId!, price: Number(price) })}
               data-testid="store-price-add"
             >
               Añadir
