@@ -17,6 +17,13 @@ export interface SearchEntry {
   hint?: string;
   /** Sinónimos y términos del negocio que deben encontrarla. */
   synonyms: string[];
+  /**
+   * S-21: query params del deep-link a una SUBSECCIÓN de la page destino (p. ej.
+   * `{ section: 'pricelists' }` → `/b2b?section=pricelists`). Cuando está presente,
+   * el palette navega a `tabToPath(tab) + '?…'` en lugar de `onNavigate(tab)`, para
+   * aterrizar directamente en la sub-pestaña correcta sin tocar la firma `onNavigate`.
+   */
+  params?: Record<string, string>;
 }
 
 const SEARCH_INDEX: SearchEntry[] = [
@@ -136,11 +143,15 @@ const SEARCH_INDEX: SearchEntry[] = [
     synonyms: ['mayorista', 'b2b', 'clientes'],
   },
   {
+    // S-21/P127: la entrada navega a la SUBSECCIÓN Tarifas (no a la subtab Clientes
+    // por defecto) vía deep-link `/b2b?section=pricelists`. Sinónimos ampliados con
+    // 'lista de precios' y 'tarifa mayorista' para hacerla descubrible (P127).
     label: 'Tarifas B2B',
     tab: 'b2b',
     group: 'Ventas y clientes',
     hint: 'Mayorista',
-    synonyms: ['tarifas b2b', 'precios mayorista'],
+    synonyms: ['tarifas b2b', 'precios mayorista', 'lista de precios', 'tarifa mayorista'],
+    params: { section: 'pricelists' },
   },
   {
     label: 'Pedidos B2B',

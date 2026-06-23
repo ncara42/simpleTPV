@@ -7,10 +7,26 @@ import { PriceListsSection } from './b2b/PriceListsSection.js';
 
 type Section = 'customers' | 'pricelists' | 'orders';
 
+const SECTIONS: readonly Section[] = ['customers', 'pricelists', 'orders'] as const;
+
+/** Valida un valor de URL contra el tipo `Section`; si no casa, cae a 'customers'. */
+function resolveInitialSection(value: string | null | undefined): Section {
+  return SECTIONS.includes(value as Section) ? (value as Section) : 'customers';
+}
+
+interface B2bPageProps {
+  /** S-21: sección inicial (deep-link `/b2b?section=pricelists`). Por defecto
+   *  'customers'; un valor inválido también cae a 'customers'. */
+  initialSection?: string | null;
+}
+
 // Clientes B2B (P1-B): lado VENTA del mayorista (clientes, tarifas de venta y
 // pedidos salientes), separado de Proveedores (lado compra).
-export function B2bPage() {
-  const [section, setSection] = useState<Section>('customers');
+// S-21: `initialSection` permite un deep-link de descubribilidad a la subsección
+// Tarifas (`pricelists`) desde el buscador / sidebar, en vez de aterrizar siempre
+// en la subtab Clientes por defecto.
+export function B2bPage({ initialSection }: B2bPageProps = {}) {
+  const [section, setSection] = useState<Section>(() => resolveInitialSection(initialSection));
   usePageHeader('Clientes B2B', 'Clientes, tarifas de venta y pedidos salientes');
   // Las pestañas viven DENTRO de la card de la sección activa (como cabecera del
   // panel), no flotando sobre el lienzo: cada sección las pinta como primer hijo

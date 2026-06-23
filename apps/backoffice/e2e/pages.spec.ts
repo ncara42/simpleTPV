@@ -738,6 +738,27 @@ test('U-06: la búsqueda de funciones del header navega por nombre y sinónimo',
   await expect(page.getByTestId('page-heading')).toContainText('Personal');
 });
 
+test('S-21: el buscador "tarifas b2b" aterriza en la subsección Tarifas (no en Clientes)', async ({
+  page,
+}) => {
+  // P127: la vía a las Tarifas B2B mayoristas debe ser descubrible. El resultado del
+  // buscador navega por deep-link a `/b2b?section=pricelists`, de modo que `B2bPage`
+  // arranca con la subtab Tarifas activa (antes caía en la subtab Clientes por defecto).
+  await expect(page.getByTestId('page-heading')).toBeVisible();
+  await page.getByTestId('function-search-launcher').click();
+  await page.getByTestId('function-search-input').fill('tarifas b2b');
+  // La entrada "Tarifas B2B" comparte la Tab 'b2b' con Clientes/Pedidos; al traer
+  // params { section: 'pricelists' } su resultado abre la subsección Tarifas.
+  await page.getByTestId('function-search-result-b2b').first().click();
+  // Aterriza en la page B2B con la subtab Tarifas ACTIVA y su tabla de tarifas visible.
+  await expect(page.getByTestId('b2b-page')).toBeVisible();
+  await expect(page.getByTestId('b2b-tab-pricelists')).toHaveClass(/active/);
+  await expect(page.getByTestId('b2b-tab-customers')).not.toHaveClass(/active/);
+  await expect(page.getByTestId('b2b-pricelists-table')).toBeVisible();
+  // El deep-link queda reflejado en la URL (compartible / sobrevive al reload).
+  await expect(page).toHaveURL(/\/b2b\?section=pricelists/);
+});
+
 test('U-08: la marca corporativa se aplica como tema en vivo y persiste', async ({ page }) => {
   const brandVar = () =>
     page.evaluate(() =>

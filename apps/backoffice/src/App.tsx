@@ -316,7 +316,10 @@ function Home() {
                   />
                 )}
                 {tab === 'verifactu' && <VerifactuPage />}
-                {tab === 'b2b' && <B2bPage />}
+                {/* S-21: deep-link a la subsección Tarifas (`/b2b?section=pricelists`)
+                  desde el buscador. `B2bPage` valida el valor; uno inválido cae a la
+                  subtab Clientes por defecto. */}
+                {tab === 'b2b' && <B2bPage initialSection={searchParams.get('section')} />}
                 {tab === 'settings' && <SettingsPage />}
                 {tab === 'help' && <HelpPage />}
               </main>
