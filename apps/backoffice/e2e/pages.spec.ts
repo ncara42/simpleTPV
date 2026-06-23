@@ -660,11 +660,15 @@ test('U-04: shell flotante — grupos desplegables abren su flyout y navegan', a
   // rail contraíble se retiró en este diseño (`collapsible && !floating` en el componente).
   // Clic en el grupo abre el flyout con sus opciones.
   await page.getByTestId('nav-group-inventory').click();
-  await expect(page.getByTestId('nav-stock')).toBeVisible();
-  await page.getByTestId('nav-stock').click();
-  // Navega a Stock y el desplegable se cierra al elegir destino.
+  // S-02 fase A: Catálogo/Familias/Existencias se unifican en la entrada "Inventario".
+  await expect(page.getByTestId('nav-inventory')).toBeVisible();
+  await page.getByTestId('nav-inventory').click();
+  // Navega al shell de Inventario (vista Catálogo por defecto) y el desplegable se cierra.
+  await expect(page.getByTestId('inventory-page')).toBeVisible();
+  await expect(page.getByTestId('nav-inventory')).toBeHidden();
+  // El control segmentado conmuta a Existencias dentro del mismo shell.
+  await page.getByTestId('inventory-view-existencias').click();
   await expect(page.getByTestId('stock-page')).toBeVisible();
-  await expect(page.getByTestId('nav-stock')).toBeHidden();
 });
 
 test('S-03: el botón atrás del clúster flotante vuelve a la vista anterior', async ({ page }) => {

@@ -105,17 +105,16 @@ function Home() {
   // conservan la vista (antes useState reseteaba a dashboard al recargar). Ruta desconocida
   // → dashboard. Cambiar de vista = navigate(path); todo el DOM observable se mantiene igual.
   const tab = pathToTab(location.pathname) ?? 'dashboard';
-  // Tab al que volver cuando se cierra Notificaciones desde la campana. El "volver" de la
-  // campana sigue siendo explícito vía prevTab (no se migra a history en F0b). Fallback dashboard.
-  const [prevTab, setPrevTab] = useState<Tab>('dashboard');
-  // La campana togglea Notificaciones: si está abierta, vuelve a la página previa;
-  // si no, recuerda la actual y abre Notificaciones. Lee tab/prevTab del render
-  // actual (sin updater anidado) para no chocar con la regla de hooks/setState.
+  // URL COMPLETA previa (path + search), no solo el Tab: así volver de Notificaciones
+  // conserva la vista/filtros de Inventario (?vista=, ?store=, ?q=) y de cualquier page.
+  const [prevLocation, setPrevLocation] = useState<string>('/');
+  // La campana togglea Notificaciones: si está abierta, vuelve a la URL previa; si no,
+  // recuerda la actual y abre Notificaciones. Lee tab/location del render actual.
   const toggleNotifications = (): void => {
     if (tab === 'notifications') {
-      navigate(tabToPath(prevTab === 'notifications' ? 'dashboard' : prevTab));
+      navigate(prevLocation === '/notifications' ? '/' : prevLocation);
     } else {
-      setPrevTab(tab);
+      setPrevLocation(location.pathname + location.search);
       navigate(tabToPath('notifications'));
     }
   };
