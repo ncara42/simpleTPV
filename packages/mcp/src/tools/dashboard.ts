@@ -51,8 +51,8 @@ const ROTATION_ENDPOINT = {
 } as const;
 
 export function registerDashboardTools(server: McpServer): void {
-  // get_company_overview y get_sales_breakdown se registran como MCP Apps (UI)
-  // en tools/ui-dashboard.ts (devuelven structuredContent + panel visual).
+  // get_company_overview y get_sales_breakdown (compuestas) se registran en
+  // tools/dashboard-composite.ts; devuelven solo datos.
   readTool(
     server,
     'get_kpis',
