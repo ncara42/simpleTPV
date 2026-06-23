@@ -1,9 +1,10 @@
 import { Badge, DataTable, type DataTableColumn, Select, usePageHeader } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Download, SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
+import { CsvActionButton } from './components/CsvActionButton.js';
 import { PeriodSegmented } from './components/PeriodSegmented.js';
 import { useTableColumns } from './components/useTableColumns.js';
 import {
@@ -365,16 +366,12 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
   usePageActions(
     <>
       {features.data_export && (
-        <button
-          type="button"
-          className="float-action-btn"
+        <CsvActionButton
+          kind="export"
+          label="Exportar CSV"
           onClick={() => void exportCsv()}
-          aria-label="Exportar CSV"
-          title="Exportar CSV"
-          data-testid="sales-export"
-        >
-          <Download size={17} aria-hidden="true" />
-        </button>
+          testId="sales-export"
+        />
       )}
       <button
         type="button"

@@ -8,9 +8,10 @@ import {
 } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Plus, SlidersHorizontal, Upload } from 'lucide-react';
+import { Plus, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
+import { CsvActionButton } from './components/CsvActionButton.js';
 import { CsvDropzone } from './components/CsvDropzone.js';
 import { Modal } from './components/Modal.js';
 import {
@@ -515,26 +516,18 @@ export function CatalogPage({
 
   usePageActions(
     <>
-      <button
-        type="button"
-        className="float-action-btn"
+      <CsvActionButton
+        kind="export"
+        label="Exportar CSV"
         onClick={handleExport}
-        aria-label="Exportar CSV"
-        title="Exportar CSV"
-        data-testid="catalog-export"
-      >
-        <Download size={17} aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        className="float-action-btn"
+        testId="catalog-export"
+      />
+      <CsvActionButton
+        kind="import"
+        label="Importar CSV"
         onClick={() => setImporting(true)}
-        aria-label="Importar CSV"
-        title="Importar CSV"
-        data-testid="catalog-import"
-      >
-        <Upload size={17} aria-hidden="true" />
-      </button>
+        testId="catalog-import"
+      />
       <button
         type="button"
         className={`float-action-btn${columnsEditorOpen ? ' is-active' : ''}`}

@@ -1,9 +1,10 @@
 import { Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Download, Plus } from 'lucide-react';
+import { Check, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { CsvActionButton } from './components/CsvActionButton.js';
 import { Modal } from './components/Modal.js';
 import { exportRowsToCsv } from './lib/csv.js';
 import { usePageActions } from './lib/pageActions.js';
@@ -210,16 +211,12 @@ export function PromotionsPage() {
 
   // Export en el clúster flotante (junto al conmutador Backoffice↔TPV).
   usePageActions(
-    <button
-      type="button"
-      className="float-action-btn"
+    <CsvActionButton
+      kind="export"
+      label="Exportar promociones"
       onClick={handleExport}
-      aria-label="Exportar promociones"
-      title="Exportar promociones"
-      data-testid="promotions-export"
-    >
-      <Download size={17} aria-hidden="true" />
-    </button>,
+      testId="promotions-export"
+    />,
   );
 
   return (

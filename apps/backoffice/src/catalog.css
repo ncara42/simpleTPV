@@ -1860,6 +1860,9 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   gap: 0.75rem;
+  /* B-01: como item del grid `.sales-stats`, sin min-width:0 podía estirarse si
+     el gráfico hermano forzaba la pista. */
+  min-width: 0;
 }
 .sales-stats-kpi {
   display: flex;
@@ -1902,6 +1905,14 @@
   border: 1px solid var(--ui-border);
   border-radius: 12px;
   background: var(--ui-surface);
+  /* B-01: el gráfico de serie temporal crecía sin límite con el nº de buckets
+     (~30 etiquetas diarias = ~2977px) y, al ser item del grid `.sales-stats` sin
+     min-width:0, reventaba la pista y arrastraba los KPIs (página a 3267px).
+     min-width:0 deja que la pista quede al ancho del contenedor; overflow-x:auto
+     contiene el gráfico ancho con scroll interno en vez de empujar la página. */
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 .sales-stats-loading,
 .sales-stats-empty {
@@ -2438,6 +2449,25 @@
 .link-btn:hover {
   background: var(--ui-surface-subtle);
   text-decoration: none;
+}
+
+/* B-08: separa botones de acción contiguos dentro de una celda de la tabla
+   (p. ej. Editar/Borrar en Clientes B2B), que sin gap quedaban pegados. */
+.ui-dt-table td .link-btn + .link-btn,
+.ui-dt-table td .float-action-btn + .float-action-btn {
+  margin-left: var(--ui-space-2, 0.5rem);
+}
+
+/* B-09: trunca contenido largo de una celda (p. ej. la lista de tiendas de un
+   usuario) para que no envuelva e infle el alto de fila; el valor completo queda
+   accesible en el tooltip (atributo title). */
+.dt-cell-truncate {
+  display: inline-block;
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
 /* ── B2B mayorista (IT-17) ──────────────────────────────────────────────────
@@ -3148,6 +3178,14 @@
   color: var(--ui-brand);
 }
 
+/* B-05: el detalle de tienda trae un bento de 2 columnas que NO cabía en el ancho
+   base del modal (30rem) → la columna derecha se cortaba con scroll horizontal
+   (.store-detail-bento medía 610px en 421px disponibles). Se ensancha para que las
+   2 columnas quepan en desktop; en ≤768px el bento ya pasa a 1 columna. */
+.modal.store-detail-modal {
+  max-width: 50rem;
+}
+
 /* Cuerpo bento: 2 columnas en desktop, 1 en móvil. Cada sección es una superficie
    con borde y relleno para dar profundidad y separar la operativa. */
 .store-detail-modal .store-detail-bento {
@@ -3161,6 +3199,9 @@
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg);
   background: var(--ui-surface-subtle);
+  /* B-05: que cada columna pueda encoger por debajo de su contenido intrínseco
+     evita que el bento desborde el ancho del modal (scroll horizontal). */
+  min-width: 0;
 }
 @media (max-width: 768px) {
   .store-detail-modal .store-detail-bento {
@@ -3599,6 +3640,19 @@
   border-radius: var(--ui-radius-md, 12px);
   background: var(--ui-surface);
   padding: var(--ui-space-5) var(--ui-space-6);
+  /* B-13: como item del grid `.sp-cmp-charts`, sin min-width:0 el gráfico de barras
+     intrínseco forzaba el ancho del panel y desbordaba el viewport en móvil (panel a
+     415px en 375). Junto al max-width:100% del .ui-chart, contiene la comparativa. */
+  min-width: 0;
+}
+/* B-13: en móvil, márgenes/padding más ajustados para no comerse el ancho útil. */
+@media (max-width: 640px) {
+  .sp-cmp-charts {
+    margin: var(--ui-space-3);
+  }
+  .sp-cmp-panel {
+    padding: var(--ui-space-4);
+  }
 }
 .sp-cmp-panel h3 {
   margin: 0 0 var(--ui-space-4);

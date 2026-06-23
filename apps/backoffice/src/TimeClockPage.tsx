@@ -1,9 +1,9 @@
 import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
-import { Download } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { CsvActionButton } from './components/CsvActionButton.js';
 import { exportRowsToCsv } from './lib/csv.js';
 import { usePageActions } from './lib/pageActions.js';
 import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
@@ -110,16 +110,12 @@ export function TimeClockPage() {
   };
 
   usePageActions(
-    <button
-      type="button"
-      className="float-action-btn"
+    <CsvActionButton
+      kind="export"
+      label="Exportar CSV"
       onClick={handleExport}
-      aria-label="Exportar CSV"
-      title="Exportar CSV"
-      data-testid="timeclock-export"
-    >
-      <Download size={17} aria-hidden="true" />
-    </button>,
+      testId="timeclock-export"
+    />,
   );
 
   return (

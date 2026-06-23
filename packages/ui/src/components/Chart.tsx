@@ -204,20 +204,32 @@ export function Chart({
   const tagFitsInside = (value: number, text: string): boolean =>
     (value / max) * plotPx >= text.length * TAG_CHAR_PX + TAG_PAD_PX;
 
+  // B-01: con muchos buckets las etiquetas se amontonan al comprimirse el gráfico;
+  // mostramos 1 de cada N (manteniendo siempre la última) para que sigan legibles.
+  // No-op para series cortas (≤30 → step 1), p. ej. los widgets del dashboard.
+  const labelStep = data.length > 60 ? 3 : data.length > 30 ? 2 : 1;
+
   const names = (
     <div className="ui-chart-names" aria-hidden="true">
-      {data.map((bar) => (
-        <span key={bar.label} className="ui-chart-name-cell">
-          <span className="ui-chart-name" title={bar.label}>
-            {bar.label}
+      {data.map((bar, idx) => {
+        const showLabel = labelStep === 1 || idx % labelStep === 0 || idx === data.length - 1;
+        return (
+          <span key={bar.label} className="ui-chart-name-cell">
+            {showLabel && (
+              <>
+                <span className="ui-chart-name" title={bar.label}>
+                  {bar.label}
+                </span>
+                {bar.subValue != null && (
+                  <span className={cn('ui-chart-sub', `ui-chart-sub-${bar.subTone ?? 'neutral'}`)}>
+                    {bar.subValue}
+                  </span>
+                )}
+              </>
+            )}
           </span>
-          {bar.subValue != null && (
-            <span className={cn('ui-chart-sub', `ui-chart-sub-${bar.subTone ?? 'neutral'}`)}>
-              {bar.subValue}
-            </span>
-          )}
-        </span>
-      ))}
+        );
+      })}
     </div>
   );
 

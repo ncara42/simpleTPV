@@ -1,9 +1,10 @@
 import type { Supplier } from '@simpletpv/auth';
 import { Button, DataTable, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Plus, Upload } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
+import { CsvActionButton } from '../components/CsvActionButton.js';
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
 import { exportRowsToCsv, importRowsViaCreate } from '../lib/csv.js';
@@ -72,26 +73,18 @@ export function SuppliersSection({ tabs }: { tabs?: ReactNode }) {
   usePageActions(
     detail ? null : (
       <>
-        <button
-          type="button"
-          className="float-action-btn"
+        <CsvActionButton
+          kind="export"
+          label="Exportar CSV"
           onClick={handleExport}
-          aria-label="Exportar CSV"
-          title="Exportar CSV"
-          data-testid="suppliers-export"
-        >
-          <Download size={17} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className="float-action-btn"
+          testId="suppliers-export"
+        />
+        <CsvActionButton
+          kind="import"
+          label="Importar CSV"
           onClick={() => setImporting(true)}
-          aria-label="Importar CSV"
-          title="Importar CSV"
-          data-testid="suppliers-import"
-        >
-          <Upload size={17} aria-hidden="true" />
-        </button>
+          testId="suppliers-import"
+        />
       </>
     ),
   );

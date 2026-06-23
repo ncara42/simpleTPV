@@ -283,7 +283,18 @@ export function UsersPage() {
     {
       key: 'stores',
       header: 'Tiendas',
-      render: (u) => <span className="muted">{storesLabel(u.role, u.storeIds ?? [])}</span>,
+      // B-09: la lista de tiendas puede ser larga y, sin acotar, envolvía e inflaba
+      // el alto de fila (Personal en tablet). Se trunca con elipsis + tooltip y se
+      // oculta en pantallas estrechas (la columna menos crítica en móvil).
+      hideOnNarrow: true,
+      render: (u) => {
+        const label = storesLabel(u.role, u.storeIds ?? []);
+        return (
+          <span className="muted dt-cell-truncate" title={label}>
+            {label}
+          </span>
+        );
+      },
     },
     {
       key: 'active',
