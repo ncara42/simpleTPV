@@ -1,8 +1,8 @@
 import { WidgetStates } from './atoms.js';
 import { formatValue, type StatFormat } from './format.js';
 
-// Ranking horizontal: cada fila es una barra de ancho proporcional al valor con la etiqueta
-// dentro y el valor a la derecha. NUEVA desde cero (equiv. BarList de Tremor). Para top de
+// Ranking horizontal: cada fila lleva el nombre a la IZQUIERDA, una pista con relleno
+// proporcional al valor y el valor a la derecha (look de artefacto). Para top de
 // productos/vendedores/familias. Presentacional: ordena, acota filas y formatea por construcción.
 export interface RankBarItem {
   label: string;
@@ -13,8 +13,8 @@ export interface RankBarListProps {
   format?: StatFormat;
   /** Máximo de filas (clamp a 10). El resto se descarta tras ordenar por valor desc. */
   maxRows?: number;
-  /** Token de color (tinte) de la barra (--ui-*). Tinte suave para que la etiqueta oscura
-   * dentro de la barra siga siendo legible (look BarList de Tremor). */
+  /** Token de color del relleno de la barra (--ui-*). Relleno SÓLIDO con el acento dataviz por
+   * defecto; el nombre va fuera de la barra, así que no necesita tinte legible. */
   colorVar?: string;
   isLoading?: boolean;
   isError?: boolean;
@@ -26,7 +26,7 @@ export function RankBarList({
   items,
   format = 'integer',
   maxRows = MAX_ROWS,
-  colorVar = '--ui-chart-accent-soft',
+  colorVar = '--ui-chart-accent',
   isLoading = false,
   isError = false,
 }: RankBarListProps) {
@@ -44,9 +44,10 @@ export function RankBarList({
     <ul className="dv-rank">
       {rows.map((r, i) => (
         <li key={`${r.label}-${i}`} className="dv-rank-row">
-          {/* Dos pistas (estilo Tremor BarList): la barra ocupa un % de su PISTA (flex:1), no de la
-              fila entera, así la columna de valor (flex:none) queda siempre reservada y el valor
-              nunca colisiona con una barra al 100%. */}
+          {/* Nombre a la izquierda + pista con fondo + relleno proporcional + valor a la derecha
+              (look de artefacto). La columna de valor (flex:none) queda reservada y el valor nunca
+              colisiona con una barra al 100%. */}
+          <span className="dv-rank-label">{r.label}</span>
           <div className="dv-rank-track">
             <div
               className="dv-rank-bar"
@@ -54,9 +55,7 @@ export function RankBarList({
                 width: `${Math.max((r.value / max) * 100, 2)}%`,
                 backgroundColor: `var(${colorVar})`,
               }}
-            >
-              <span className="dv-rank-label">{r.label}</span>
-            </div>
+            />
           </div>
           <span className="dv-rank-value">{formatValue(r.value, format)}</span>
         </li>

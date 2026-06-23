@@ -1,4 +1,3 @@
-import { useCanvasBridge } from '../../lib/canvas-bridge.js';
 import type { CanvasOp, ViewActionName } from '../../lib/chat.js';
 import {
   buildCanvasSnapshot,
@@ -17,12 +16,12 @@ import type { ViewContext } from './view-context.js';
 const applyCanvasOp = (op: CanvasOp) => useDashboardStore.getState().applyCanvasOp(op);
 
 // Deshacer canvas_ops tras editar/regenerar: solo las add_* son inversibles. Los genéricos
-// (genericSpec, incl. composite, e insight) se colocan bajo un id derivado del element_id del
-// agente, así que el undo lo deriva IGUAL; el resto usa elementId (shapes/notas) o widgetId.
+// (genericSpec, incl. composite) se colocan bajo un id derivado del element_id del agente, así que
+// el undo lo deriva IGUAL; el resto (shapes, notas, e insight→nota) usa elementId; o widgetId.
 const undoCanvasOps = (ops: CanvasOp[]): void => {
   const store = useDashboardStore.getState();
   for (const op of ops) {
-    const isGeneric = Boolean(op.genericSpec) || op.op === 'add_insight';
+    const isGeneric = Boolean(op.genericSpec);
     const id =
       isGeneric && op.elementId ? genericElementId(op.elementId) : (op.elementId ?? op.widgetId);
     if (id) store.removeElement(id);
@@ -30,10 +29,10 @@ const undoCanvasOps = (ops: CanvasOp[]): void => {
 };
 
 export function AssistantDock({ view }: { view: ViewContext }) {
-  const binding = useCanvasBridge((s) => s.binding);
+  // La barra de herramientas del lienzo vive ahora ARRIBA en el DashboardPage (no en el dock); el
+  // dock es chat puro en todas las views. Por eso ya no consume el canvas-bridge.
   return (
     <ChatDock
-      {...(binding ? { canvasRef: binding.canvasRef, canvasMeta: binding.canvasMeta } : {})}
       onCanvasOp={applyCanvasOp}
       onUndoCanvasOps={undoCanvasOps}
       getCanvasState={buildCanvasSnapshot}

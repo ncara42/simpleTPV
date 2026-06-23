@@ -1208,18 +1208,27 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 .canvas-tools {
   position: relative;
   display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.canvas-tools__trigger-label {
+  line-height: 1;
 }
 
 .canvas-tools__trigger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
+  gap: 0.4rem;
   height: 34px;
+  padding: 0 0.8rem;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-pill);
   background: var(--ui-surface);
-  color: var(--ui-text-muted);
+  color: var(--ui-text);
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
   cursor: pointer;
   transition:
     background var(--ui-motion-fast) var(--ui-ease),
@@ -1256,6 +1265,73 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   box-shadow: var(--ui-shadow-lg);
   transform-origin: bottom left;
   animation: chat-panel-in var(--ui-motion-medium) var(--ui-ease);
+}
+
+/* Variante DESPLEGAR A LA DERECHA: la barra está ARRIBA, así que el menú es una fila horizontal
+   que se abre hacia la derecha justo debajo del botón «Editar» (animación de expansión a la dcha.). */
+.canvas-tools__menu--row {
+  bottom: auto;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  flex-direction: row;
+  align-items: center;
+  min-width: 0;
+  width: max-content;
+  transform-origin: left center;
+  animation: canvas-tools-expand-right var(--ui-motion-medium) var(--ui-ease);
+}
+@keyframes canvas-tools-expand-right {
+  from {
+    opacity: 0;
+    transform: scaleX(0.55);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+.canvas-tools__menu--row .canvas-tools__item {
+  white-space: nowrap;
+}
+.canvas-tools__menu--row .canvas-tools__sep {
+  width: 1px;
+  height: 1.4rem;
+  margin: 0 0.15rem;
+  background: var(--ui-border);
+  flex: none;
+}
+
+/* Botones de MODO (Mover/Goma): fuera del menú, siempre visibles; píldora como el trigger.
+   Activo = relleno índigo (acento) para indicar el modo en curso. */
+.canvas-tools__mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease),
+    border-color var(--ui-motion-fast) var(--ui-ease);
+}
+.canvas-tools__mode:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong, var(--ui-border));
+}
+.canvas-tools__mode.is-active {
+  background: var(--ui-chart-accent);
+  border-color: var(--ui-chart-accent);
+  color: #fff;
+}
+.canvas-tools__mode:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
 }
 
 .canvas-tools__item {

@@ -75,8 +75,10 @@ export const SLOT_PIECES: Record<SlotName, ReadonlySet<PieceId>> = {
 export const RECIPE_SIZE: Record<RecipeId, { w: number; h: number }> = {
   kpiRow: { w: 6, h: 1 }, // banda de KPIs (1-4 tiles) → media anchura
   'kpiRow+oneChart': { w: 6, h: 3 }, // KPIs + 1 gráfica → tarjeta media (2-up)
-  'kpiRow+twoCharts': { w: 12, h: 5 }, // 2 gráficas en paralelo → ancho completo
-  'heroChart+sideStats': { w: 12, h: 5 }, // gráfica hero + stats (split 2fr/1fr) → ancho completo
+  // Gráficas COMPACTAS (estilo widget "Ventas", h:2): banda KPI (~1 fila) + ~2 filas de gráfica.
+  // Antes h:5 → las gráficas se estiraban demasiado a lo alto (feedback del usuario).
+  'kpiRow+twoCharts': { w: 12, h: 3 }, // 2 gráficas en paralelo → ancho completo
+  'heroChart+sideStats': { w: 12, h: 3 }, // gráfica hero + stats (split 2fr/1fr) → ancho completo
   tableFull: { w: 6, h: 4 }, // ranking/tabla → media anchura (BarList se lee bien medio)
 };
 

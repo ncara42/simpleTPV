@@ -34,7 +34,7 @@ export function StockAlertList({
     body = (
       <ul className="dv-stock">
         {items.map((it, i) => (
-          <li key={`${it.name}-${i}`} className="dv-stock-row">
+          <li key={`${it.name}-${i}`} className={`dv-stock-row dv-stock-row--${it.tone}`}>
             <div className="dv-stock-main">
               <span className="dv-stock-name">{it.name}</span>
               {it.detail ? <span className="dv-stock-detail">{it.detail}</span> : null}

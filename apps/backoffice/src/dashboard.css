@@ -1511,6 +1511,36 @@
   pointer-events: none;
 }
 
+/* MOVER (pan explícito): cursor de mano; elementos inertes → el arrastre mueve el LIENZO, nunca un
+   widget (separa pan de drag-widget). */
+.dash-free--panning {
+  cursor: grab;
+}
+.dash-free--panning:active {
+  cursor: grabbing;
+}
+.dash-free--panning .dash-free-item {
+  pointer-events: none;
+}
+
+/* GOMA: un clic en un elemento lo borra. El wrapper recibe el clic (su contenido va inerte) y se
+   resalta en rojo al pasar por encima para indicar que se eliminará. */
+.dash-free--erasing {
+  cursor: pointer;
+}
+.dash-free--erasing .dash-free-item {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.dash-free--erasing .dash-free-item * {
+  pointer-events: none;
+}
+.dash-free--erasing .dash-free-item:hover {
+  outline: 2px solid var(--ui-danger);
+  outline-offset: 2px;
+  border-radius: var(--ui-radius-md);
+}
+
 /* SVG de formas/dibujos: ocupa la caja sin recortar puntas de flecha/strokes al borde. */
 .dash-free-shape-svg {
   display: block;
@@ -1636,6 +1666,27 @@
   top: auto;
   bottom: calc(100% + 0.5rem);
   left: 0;
+}
+
+/* Barra de herramientas del lienzo del Dashboard (Editar→despliega + Mover + Goma), flotando en la
+   MISMA fila de la topbar (a la altura de logo/avatar/búsqueda, top:12px), EN LUGAR del título de la
+   view (.view-title-float, oculto en Dashboard). Se renderiza a nivel de shell (App.tsx), por eso el
+   selector NO va scopeado a .dashboard--free; z por encima del clúster de búsqueda full-width (z42)
+   para quedar alineada y clicable en el centro de la fila. Píldora de cristal. */
+.dash-canvas-toolbar {
+  position: fixed;
+  top: var(--sidebar-float-gap, 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 43;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--ui-surface) 84%, transparent);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 8px 26px rgb(0 0 0 / 0.14);
+  backdrop-filter: blur(12px);
 }
 
 /* Pill de dibujo flotando justo encima del dock inferior (centrado). El dock (input del
@@ -1774,7 +1825,6 @@
   border-left: 3px solid var(--ui-chart-accent);
   border-radius: var(--ui-radius-lg, 16px);
   background: color-mix(in srgb, var(--ui-chart-accent) 7%, var(--ui-surface));
-  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
 }
 
 /* ── Glue: las moléculas de dataviz (#203 F2) llenan la celda del widget ──────────────
@@ -1798,17 +1848,44 @@
 
 /* ── Panel v2 (#204): tarjeta a medida (receta + slots). Misma chrome que el composite. ── */
 .dash-generic--panel {
+  /* Sin "folio": el contenedor del panel es transparente y sus piezas (tiles KPI + paneles de
+     gráfica) flotan sobre el lienzo con sus propias superficies + hairline (look de artefacto). */
   gap: 0;
-  padding: 16px;
-  border: 1px solid var(--ui-border, #e5e7eb);
-  border-radius: var(--ui-radius-lg, 16px);
-  background: var(--ui-surface, #fff);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
-  overflow: hidden;
-  transition: box-shadow 150ms ease;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
 }
-.dash-generic--panel:hover {
-  box-shadow: 0 4px 14px rgb(0 0 0 / 8%);
+/* Cada gráfica/tabla/lista del panel es su propia tarjeta hairline (paneles titulados sobre el
+   lienzo, no todo dentro de un folio blanco). */
+.dash-generic--panel .dv-chart,
+.dash-generic--panel .dv-grid,
+.dash-generic--panel .dv-stock-wrap {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+}
+/* La GRÁFICA va A SANGRE (como el widget "Ventas"): la tarjeta solo pone padding vertical y el
+   título indentado; el lienzo del gráfico llega a los filos laterales (sin márgenes laterales).
+   overflow:hidden recorta el sangrado a los radios. */
+.dash-generic--panel .dv-chart {
+  padding: 0.75rem 0;
+  overflow: hidden;
+}
+.dash-generic--panel .dv-chart > .dv-section-header {
+  padding-inline: 1.25rem;
+}
+/* Tablas y listas de alerta NO son lienzos a sangre → mantienen padding lateral. */
+.dash-generic--panel .dv-grid,
+.dash-generic--panel .dv-stock-wrap {
+  padding: 1rem 1.25rem;
+}
+/* Los KPIs son tiles de superficie (no texto suelto): superficie blanca + hairline + radio. */
+.dash-generic--panel .dv-kpi-tile {
+  padding: var(--ui-space-4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
 }
 .dash-generic--panel > .dv-panel {
   flex: 1 1 auto;
@@ -1848,17 +1925,13 @@
    Debe parecerse a las tarjetas del catálogo (misma superficie, borde y radio), no a un
    contenedor genérico. Solo se transicionan propiedades compositor-friendly (box-shadow). */
 .generic-composite {
+  /* Igual que gen:panel: contenedor transparente; las hojas (.generic-composite-leaf) son las
+     tarjetas hairline que flotan sobre el lienzo. */
   gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--ui-border, #e5e7eb);
-  border-radius: var(--ui-radius-lg, 16px);
-  background: var(--ui-surface, #fff);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
-  overflow: hidden;
-  transition: box-shadow 150ms ease;
-}
-.generic-composite:hover {
-  box-shadow: 0 4px 14px rgb(0 0 0 / 8%);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
 }
 /* Cada nodo (stack) llena el alto disponible para que el cuerpo no deje hueco vacío. */
 .generic-composite-node {
@@ -1905,10 +1978,10 @@
   gap: 6px;
   min-width: 0;
   min-height: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--ui-border-subtle, #eef0f2);
-  border-radius: 10px;
-  background: var(--ui-surface, #fff);
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
 }
 /* La visualización llena la celda de su hoja (la gráfica crece con el contenedor). */
 .generic-composite-leaf > .dash-generic {
@@ -1928,144 +2001,4 @@
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--ui-text-muted, #6b7280);
-}
-
-/* ════════════════════════════════════════════════════════════
-   S-13 · FRANJA DE RESUMEN DE INVENTARIO (sobre el lienzo)
-   Réplica compacta del panel de roturas, SIEMPRE visible. En el dashboard full-bleed
-   (.dashboard--free es position:fixed/inset:0 y FreeBoard lo rellena al 100%) la franja
-   NO puede ir en flujo normal —quedaría tapada—: flota como píldora de cristal arriba-izq,
-   fuera del page-heading (arriba-centro) y del toolbar (abajo-centro), sin tocar el lienzo.
-   ════════════════════════════════════════════════════════════ */
-.dashboard--free .dash-stock-summary {
-  position: absolute;
-  top: 0.85rem;
-  left: 0.85rem;
-  z-index: 8;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.55rem 0.85rem;
-  max-width: min(38rem, calc(100vw - 1.7rem));
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--ui-border);
-  border-radius: 9999px;
-  background: color-mix(in srgb, var(--ui-surface) 84%, transparent);
-  box-shadow: 0 8px 26px rgb(0 0 0 / 0.14);
-  backdrop-filter: blur(12px);
-  font-size: 0.85rem;
-  color: var(--ui-text);
-}
-/* Contador de roturas + desglose crítica/sustituto. */
-.dash-stock-summary-count {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--ui-danger);
-  white-space: nowrap;
-}
-.dash-stock-summary-count strong {
-  font-variant-numeric: tabular-nums;
-}
-.dash-stock-summary-breakdown {
-  color: var(--ui-text-muted);
-  font-size: 0.8rem;
-}
-/* Top 5 de roturas inline (chips compactas), con acento por severidad. */
-.dash-stock-summary-list {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  min-width: 0;
-}
-.dash-stock-summary-item {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.3rem;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  background: var(--ss-soft);
-  color: var(--ss-ink);
-  max-width: 14rem;
-}
-.dash-stock-summary-item.lvl-red {
-  --ss-ink: var(--ui-danger);
-  --ss-soft: var(--ui-danger-soft);
-}
-.dash-stock-summary-item.lvl-yellow {
-  --ss-ink: var(--ui-warning);
-  --ss-soft: var(--ui-warning-soft);
-}
-.dash-stock-summary-name {
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.dash-stock-summary-store {
-  font-size: 0.74rem;
-  opacity: 0.75;
-  white-space: nowrap;
-}
-.dash-stock-summary-more {
-  color: var(--ui-text-muted);
-  font-size: 0.78rem;
-}
-/* Bloque pequeño de caducidad (P076). */
-.dash-stock-summary-expiry {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  color: var(--ui-warning);
-  font-size: 0.8rem;
-  white-space: nowrap;
-}
-/* Estado vacío positivo verde (P079). */
-.dash-stock-summary-ok {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--ui-success);
-  font-weight: 500;
-  white-space: nowrap;
-}
-.dash-stock-summary-link {
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-/* ════════════════════════════════════════════════════════════
-   S-11 — Selector de periodo del dashboard (PeriodSegmented).
-   El lienzo libre es position:fixed/inset:0, así que el control flota como píldora de
-   cristal arriba-CENTRO (slot del antiguo .catalog-head, ya retirado), separado de la franja
-   de stock (arriba-izq) y del toolbar del lienzo (abajo-centro). El segmentado interno usa
-   .bo-tabs/.bo-tab (el mismo de Inventario/Personal); aquí solo lo elevamos sobre el lienzo.
-   ════════════════════════════════════════════════════════════ */
-.dashboard--free .dash-period-float {
-  position: absolute;
-  top: 0.85rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 8;
-  max-width: calc(100vw - 1.5rem);
-}
-/* La píldora de cristal compartida (mismo tratamiento que .dash-stock-summary): el .bo-tabs
-   interno ya trae su propio fondo sutil + borde; aquí reforzamos el efecto flotante. */
-.dashboard--free .dash-period-float .period-seg {
-  background: color-mix(in srgb, var(--ui-surface) 84%, transparent);
-  box-shadow: 0 8px 26px rgb(0 0 0 / 0.14);
-  backdrop-filter: blur(12px);
-  flex-wrap: nowrap;
-}
-/* En viewports estrechos el segmentado puede no caber en una línea: permite scroll horizontal
-   discreto dentro de la píldora antes que desbordar el viewport. */
-@media (max-width: 30rem) {
-  .dashboard--free .dash-period-float {
-    max-width: calc(100vw - 1rem);
-    overflow-x: auto;
-  }
 }

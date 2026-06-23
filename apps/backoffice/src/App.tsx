@@ -32,6 +32,7 @@ import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-route
 
 import { B2bPage } from './B2bPage.js';
 import { AssistantDock } from './components/chat/AssistantDock.js';
+import { CanvasToolsMenu } from './components/chat/CanvasToolsMenu.js';
 import { viewContextFor } from './components/chat/view-context.js';
 import { FloatingActions } from './components/FloatingActions.js';
 import { DashboardPage } from './DashboardPage.js';
@@ -39,6 +40,7 @@ import { HelpPage } from './HelpPage.js';
 import { InventoryPage } from './InventoryPage.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { useBranding } from './lib/branding.js';
+import { useCanvasBridge } from './lib/canvas-bridge.js';
 import { listPendingCashMovements } from './lib/cash.js';
 import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
@@ -209,6 +211,9 @@ function Home() {
   // El Dashboard es el único lienzo libre full-bleed; el resto de views flotan como una
   // superficie sobre el fondo (se reutiliza su contenido actual, sin rediseñar cards).
   const isCanvas = tab === 'dashboard';
+  // Lienzo del Dashboard: handle imperativo + meta reactiva (lo registra DashboardPage en el
+  // canvas-bridge). Lo usa la barra de herramientas flotante de la topbar (Editar/Mover/Goma).
+  const canvasBinding = useCanvasBridge((s) => s.binding);
 
   if (legacyVista) {
     const extra = location.search ? `&${location.search.slice(1)}` : '';
@@ -268,11 +273,27 @@ function Home() {
           puntitos va full-bleed y el sidebar flota por encima (como en el Dashboard). */}
         <div className={`app-content${isCanvas ? '' : ' app-content--surface'}`}>
           <PageHeaderProvider>
-            {/* Nombre de la view activa, flotando arriba del contenido (reemplaza el header). */}
-            {activeLabel && (
+            {/* Nombre de la view activa, flotando arriba del contenido (reemplaza el header). En el
+              Dashboard se OCULTA: la barra de herramientas del lienzo ocupa ese sitio (arriba-centro)
+              en su lugar (ver DashboardPage .dash-canvas-toolbar). */}
+            {activeLabel && tab !== 'dashboard' && (
               <span className="view-title-float" data-testid="page-heading">
                 {activeLabel}
               </span>
+            )}
+            {/* En el Dashboard, EN LUGAR del título: la barra de herramientas del lienzo, alineada en
+              la MISMA fila de la topbar (Editar→despliega + Mover + Goma). Va a nivel de shell (peer
+              de los floats de la topbar) con z por encima del clúster de búsqueda full-width, para
+              quedar alineada y clicable. */}
+            {tab === 'dashboard' && canvasBinding && (
+              <div className="dash-canvas-toolbar">
+                <CanvasToolsMenu
+                  canvasRef={canvasBinding.canvasRef}
+                  canUndo={canvasBinding.canvasMeta.canUndo}
+                  drawActive={canvasBinding.canvasMeta.drawOpen}
+                  mode={canvasBinding.canvasMeta.mode}
+                />
+              </div>
             )}
             <div className="app-main-row">
               <main className={`bo-main${isCanvas ? ' bo-main--canvas' : ' bo-main--surface'}`}>

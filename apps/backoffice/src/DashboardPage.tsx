@@ -9,8 +9,6 @@ import { useSearchParams } from 'react-router-dom';
 
 import { DaySelector } from './components/DaySelector.js';
 import { type CanvasMeta, FreeBoard, type FreeBoardHandle } from './components/FreeBoard.js';
-import { PeriodSegmented } from './components/PeriodSegmented.js';
-import { StockSummaryStrip } from './dashboard/StockSummaryStrip.js';
 import { useCanvasBridge } from './lib/canvas-bridge.js';
 import {
   type DashboardPeriod,
@@ -135,27 +133,13 @@ export function DashboardPage({
   // de F0/S-06 (esa migración pertenece a esas fases).
   onOpenSupplierComparison?: (() => void) | undefined;
 } = {}) {
-  // El periodo vive en la URL (?period=) para sobrevivir al reload y ser compartible (F0c),
-  // con fallback a 'today' si falta o es inválido. `setPeriod` conserva la firma anterior
-  // (DashboardPeriod) para que todos los consumidores (queries/getters) sigan igual: además
-  // de fijar el estado local, sincroniza ?period= preservando el resto de search params.
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [period, setPeriodState] = useState<DashboardPeriod>(() =>
+  // El periodo se fija al cargar (desde ?period= si está; fallback 'today') y NO se cambia desde la
+  // UI: el filtro de tiempo (selector de periodo S-11) se retiró del dashboard por preferencia del
+  // usuario. `period` sigue alimentando todas las queries/getters; solo desaparece su control.
+  const [searchParams] = useSearchParams();
+  const [period] = useState<DashboardPeriod>(() =>
     parsePeriod(searchParams.get('period'), 'today'),
   );
-  const setPeriod = (next: DashboardPeriod): void => {
-    setPeriodState(next);
-    setSearchParams(
-      (prev) => {
-        const updated = new URLSearchParams(prev);
-        // 'today' es el valor por defecto: no ensuciamos la URL con ?period=today.
-        if (next === 'today') updated.delete('period');
-        else updated.set('period', next);
-        return updated;
-      },
-      { replace: true },
-    );
-  };
   const [storeId, setStoreId] = useState('');
   // Modo de comparación del panel "Ventas" (desplegable dentro de la card).
   const [compare, setCompare] = useState<SalesCompareMode>('day');
@@ -212,7 +196,11 @@ export function DashboardPage({
   // el canvas-bridge mientras esta página está montada y se limpian al desmontar. Las canvas_ops
   // del agente van directas al dashboard-store (ver AssistantDock), no por aquí.
   const freeBoardRef = useRef<FreeBoardHandle>(null);
-  const [canvasMeta, setCanvasMeta] = useState<CanvasMeta>({ canUndo: false, drawOpen: false });
+  const [canvasMeta, setCanvasMeta] = useState<CanvasMeta>({
+    canUndo: false,
+    drawOpen: false,
+    mode: 'select',
+  });
   // Registra/actualiza el binding al montar y cuando cambia `canvasMeta` (deshacer/dibujo).
   useEffect(() => {
     useCanvasBridge.getState().setBinding({ canvasRef: freeBoardRef, canvasMeta });
@@ -1085,20 +1073,6 @@ export function DashboardPage({
 
   return (
     <section className="catalog dashboard--free" data-testid="dashboard">
-      {/* S-13: franja de resumen de inventario, SIEMPRE visible sobre el lienzo (hallazgo T2: las
-          roturas se buscan en el dashboard, no en la campana). Es ADITIVA y flota como píldora de
-          cristal (CSS .dashboard--free .dash-stock-summary) en una esquina, sin entrar en el flujo
-          del lienzo full-bleed ni tocar sus testids (dashboard/dash-free/page-heading). Réplica de
-          Notificaciones/Inventario (P075): usa su PROPIA queryKey ['dash-stock-summary']. */}
-      <StockSummaryStrip onNavigate={onNavigate} />
-      {/* S-11: selector de periodo segmentado, SIEMPRE visible sobre el lienzo (resuelve P62:
-          el desplegable Año·Mes·Semana «no se encontraba nunca»). Flota como píldora arriba-centro
-          (CSS .dashboard--free .dash-period-float) sin entrar en el flujo del lienzo. Mantiene el
-          `period`/`setPeriod` que alimenta todas las queries del dashboard; `setPeriod` además
-          persiste ?period= en la URL. */}
-      <div className="dash-period-float" aria-label="Periodo del dashboard">
-        <PeriodSegmented value={period} onChange={setPeriod} />
-      </div>
       {/* D-20: el dashboard es siempre un lienzo libre (edgeless). Sus propias herramientas
           (paleta de widgets, dibujo, deshacer, minimapa…) viven dentro de FreeBoard. El nombre de
           la view y el dock del asistente los pone el shell (ver App.tsx / AssistantDock). */}

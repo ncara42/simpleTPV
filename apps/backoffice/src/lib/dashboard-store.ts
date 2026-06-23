@@ -63,6 +63,7 @@ import {
   slotForPiece,
   WIDGETABLE_ENDPOINTS,
 } from './dashboard-pieces.js';
+import { markdownToTiptapDoc } from './tiptap-md.js';
 
 // Único preset activo tras la migración F0 (#174). Todas las operaciones de lienzo escriben
 // en este preset; los presets antiguos quedan en `layout` por legacy pero no se editan.
@@ -737,26 +738,33 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   addNote: (text, position) => {
     const { layout } = get();
     const free = freeOf(layout);
-    const next = addNoteEl(free, crypto.randomUUID(), freeSlot(free, freeAnchor(position)));
-    // NOTA(F4.2): el `text` del agente se vuelca a un doc TipTap; aquí se crea la nota vacía.
-    void text;
+    // El `text` del agente (markdown) se vuelca a un doc TipTap editable; sin texto, nota vacía.
+    const doc = text ? markdownToTiptapDoc(text) : null;
+    const next = addNoteEl(
+      free,
+      crypto.randomUUID(),
+      freeSlot(free, freeAnchor(position)),
+      undefined,
+      doc,
+    );
     get().setLayout(withFree(layout, next));
     return ACCEPTED;
   },
 
+  // Insight del agente: una NOTA editable (fondo crema, toolbar TipTap) con el texto embebido, en
+  // vez del antiguo callout. Id directo (sin prefijo `gen:`) → el undo la borra por elementId.
   addInsight: (content, title, position, elementId) => {
     const { layout } = get();
-    // Id determinista desde el element_id del agente para que el undo lo encuentre (#189).
-    const id = elementId ? genericElementId(elementId) : `gen:${crypto.randomUUID()}`;
-    const spec: GenericSpec = {
-      type: 'insight',
-      endpoint: '',
-      title: title ?? 'Insight',
-      defaultSize: GENERIC_DEFAULT_SIZE.insight,
-      params: { markdown: content },
-    };
-    registerGenericWidget(id, spec);
-    get().setLayout(placeGeneric(layout, id, spec, position));
+    const free = freeOf(layout);
+    const id = elementId ?? crypto.randomUUID();
+    // El título del agente (si lo hay) encabeza la nota como primera línea en negrita.
+    const md = title ? `**${title}**\n\n${content}` : content;
+    const doc = markdownToTiptapDoc(md);
+    const next = addNoteEl(free, id, freeSlot(free, freeAnchor(position)), undefined, doc, {
+      w: 320,
+      h: 220,
+    });
+    get().setLayout(withFree(layout, next));
     return ACCEPTED;
   },
 

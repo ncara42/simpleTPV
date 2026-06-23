@@ -1,11 +1,9 @@
 import './chat.css';
 
 import { MessageSquare } from 'lucide-react';
-import { type RefObject, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { CanvasOp } from '../../lib/chat.js';
-import type { CanvasMeta, FreeBoardHandle } from '../FreeBoard.js';
-import { CanvasToolsMenu } from './CanvasToolsMenu.js';
 import { ChatConversationList } from './ChatConversationList.js';
 import { ChatHeader } from './ChatHeader.js';
 import { ChatMessages } from './ChatMessages.js';
@@ -16,13 +14,6 @@ import { type CanvasApplyResult, useChat } from './useChat.js';
 import type { ViewContext } from './view-context.js';
 
 export interface ChatDockProps {
-  /**
-   * Handle imperativo del lienzo para el menú «+» de herramientas. Opcional: el dock vive en el
-   * shell y aparece en TODAS las views; solo el Dashboard tiene lienzo. Sin él se oculta el «+».
-   */
-  canvasRef?: RefObject<FreeBoardHandle | null>;
-  /** Estado reactivo del lienzo (deshacer / dibujo). Opcional (ver `canvasRef`). */
-  canvasMeta?: CanvasMeta;
   /** Aplica un canvas_op en el lienzo y devuelve el resultado para el feedback loop. */
   onCanvasOp?: (op: CanvasOp) => CanvasApplyResult | void;
   onUndoCanvasOps?: (ops: CanvasOp[]) => void;
@@ -41,8 +32,6 @@ export interface ChatDockProps {
  * migración progresiva del chatbot a la barra inferior.
  */
 export function ChatDock({
-  canvasRef,
-  canvasMeta,
   onCanvasOp,
   onUndoCanvasOps,
   getCanvasState,
@@ -101,13 +90,6 @@ export function ChatDock({
 
   const leading = (
     <>
-      {canvasRef && canvasMeta && (
-        <CanvasToolsMenu
-          canvasRef={canvasRef}
-          canUndo={canvasMeta.canUndo}
-          drawActive={canvasMeta.drawOpen}
-        />
-      )}
       <button
         type="button"
         className={`chat-dock__history-toggle${panelOpen ? ' is-active' : ''}`}
