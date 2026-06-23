@@ -112,23 +112,45 @@ fn default_openai_models() -> Vec<ModelInfo> {
     .collect()
 }
 
-/// Lista los modelos OpenAI a exponer. Si `OPENAI_MODELS` (CSV de ids) está definida, sustituye
-/// al catálogo por defecto — útil para apuntar a un gateway OpenAI-compatible (OpenCode Zen) cuyos
-/// ids no son los de OpenAI. El label se deriva del id.
-fn openai_models() -> Vec<ModelInfo> {
-    match std::env::var("OPENAI_MODELS") {
-        Ok(csv) if !csv.trim().is_empty() => csv
-            .split(',')
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(|id| ModelInfo {
+/// Parsea el CSV de `OPENAI_MODELS`. Cada entrada es `id` o `id=Etiqueta` (la etiqueta es el nombre
+/// que se muestra en el selector de la UI; si se omite, se usa el id). Ej.:
+/// `deepseek-v4-flash-free=DeepSeek V4 Free, gpt-4.1`.
+fn parse_models_csv(csv: &str) -> Vec<ModelInfo> {
+    csv.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|entry| {
+            let (id, label) = entry
+                .split_once('=')
+                .map(|(i, l)| (i.trim(), l.trim()))
+                .unwrap_or((entry, entry));
+            ModelInfo {
                 id: id.to_string(),
                 provider: "openai".to_string(),
-                label: id.to_string(),
+                label: label.to_string(),
                 supports_thinking: false,
-            })
-            .collect(),
+            }
+        })
+        .collect()
+}
+
+/// Lista los modelos OpenAI a exponer. Si `OPENAI_MODELS` (CSV de `id` o `id=Etiqueta`) está
+/// definida, sustituye al catálogo por defecto — útil para apuntar a un gateway OpenAI-compatible
+/// (OpenCode Zen) cuyos ids no son los de OpenAI, o para fijar un único modelo.
+fn openai_models() -> Vec<ModelInfo> {
+    match std::env::var("OPENAI_MODELS") {
+        Ok(csv) if !csv.trim().is_empty() => parse_models_csv(&csv),
         _ => default_openai_models(),
+    }
+}
+
+/// Si `OPENAI_MODELS` está definida, devuelve la lista FIJADA (ids + etiquetas) que el selector debe
+/// exponer EXACTAMENTE, ignorando el descubrimiento en vivo del gateway. `None` = sin fijar (se usa
+/// el descubrimiento en vivo / catálogo). Permite limitar el chat a un subconjunto sin tocar código.
+pub fn pinned_models() -> Option<Vec<ModelInfo>> {
+    match std::env::var("OPENAI_MODELS") {
+        Ok(csv) if !csv.trim().is_empty() => Some(parse_models_csv(&csv)),
+        _ => None,
     }
 }
 
@@ -197,6 +219,17 @@ pub async fn fetch_openai_models(base_url: &str, api_key: &str) -> Result<Vec<Mo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_models_csv_admite_id_y_id_etiqueta() {
+        let m = parse_models_csv("deepseek-v4-flash-free=DeepSeek V4 Free, gpt-4.1");
+        assert_eq!(m.len(), 2);
+        assert_eq!(m[0].id, "deepseek-v4-flash-free");
+        assert_eq!(m[0].label, "DeepSeek V4 Free"); // etiqueta para la UI
+        assert_eq!(m[0].provider, "openai");
+        assert_eq!(m[1].id, "gpt-4.1");
+        assert_eq!(m[1].label, "gpt-4.1"); // sin `=` → label = id
+    }
 
     #[test]
     fn static_openai_models_nunca_es_vacio() {
