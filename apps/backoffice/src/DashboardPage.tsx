@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { DaySelector } from './components/DaySelector.js';
 import { type CanvasMeta, FreeBoard, type FreeBoardHandle } from './components/FreeBoard.js';
+import { StockSummaryStrip } from './dashboard/StockSummaryStrip.js';
 import { useCanvasBridge } from './lib/canvas-bridge.js';
 import {
   type DashboardPeriod,
@@ -1055,6 +1056,12 @@ export function DashboardPage({
 
   return (
     <section className="catalog dashboard--free" data-testid="dashboard">
+      {/* S-13: franja de resumen de inventario, SIEMPRE visible sobre el lienzo (hallazgo T2: las
+          roturas se buscan en el dashboard, no en la campana). Es ADITIVA y flota como píldora de
+          cristal (CSS .dashboard--free .dash-stock-summary) en una esquina, sin entrar en el flujo
+          del lienzo full-bleed ni tocar sus testids (dashboard/dash-free/page-heading). Réplica de
+          Notificaciones/Inventario (P075): usa su PROPIA queryKey ['dash-stock-summary']. */}
+      <StockSummaryStrip onNavigate={onNavigate} />
       {/* D-20: el dashboard es siempre un lienzo libre (edgeless). Sus propias herramientas
           (paleta de widgets, dibujo, deshacer, minimapa…) viven dentro de FreeBoard. El nombre de
           la view y el dock del asistente los pone el shell (ver App.tsx / AssistantDock). */}
