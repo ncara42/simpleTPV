@@ -26,11 +26,17 @@ interface CanvasToolsMenuProps {
 }
 
 /**
- * Barra de herramientas del lienzo: un botón «Editar» que DESPLIEGA a la derecha (con animación)
- * las opciones de composición (widget, nota, texto, dibujar, deshacer, ordenar), y —FUERA de ese
- * menú— dos modos explícitos: «Mover» (pan del lienzo, para no confundirlo con arrastrar un widget)
- * y «Goma» (borrar un elemento de un clic). Dispara las acciones por el handle imperativo de
- * FreeBoard. Conserva los `data-testid` originales para los e2e.
+ * Barra de herramientas del lienzo: un botón «Editar» que DESPLIEGA hacia abajo (con animación)
+ * las opciones de composición (widget, nota, texto, dibujar, ordenar) en un menú que cuelga de
+ * «Editar» conectado por un cuello CÓNCAVO (esquina sup-izq recta + filete cóncavo a la derecha),
+ * igual que el cuerpo del sidebar cuelga de su pestaña. Y —FUERA de ese menú— tres acciones
+ * siempre visibles: «Mover» (pan del lienzo, para no confundirlo con arrastrar un widget), «Goma»
+ * (borrar un elemento de un clic) y, junto a ella, «Deshacer». Dispara las acciones por el handle
+ * imperativo de FreeBoard. Conserva los `data-testid` originales para los e2e.
+ *
+ * El menú va ANIDADO (no portaleado): al colgar por debajo de la píldora —fuera de su caja— su
+ * `backdrop-filter` desenfoca el fondo real igual que el input, y al estar anidado queda anclado a
+ * «Editar» por CSS (sin posicionar por JS), así no se desalinea al hacer zoom del navegador.
  */
 export function CanvasToolsMenu({ canvasRef, canUndo, drawActive, mode }: CanvasToolsMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -92,11 +98,7 @@ export function CanvasToolsMenu({ canvasRef, canUndo, drawActive, mode }: Canvas
       </button>
 
       {open && (
-        <div
-          className="canvas-tools__menu canvas-tools__menu--row"
-          role="menu"
-          aria-label="Herramientas del lienzo"
-        >
+        <div className="canvas-tools__menu" role="menu" aria-label="Herramientas del lienzo">
           <button
             type="button"
             role="menuitem"
@@ -139,16 +141,6 @@ export function CanvasToolsMenu({ canvasRef, canUndo, drawActive, mode }: Canvas
             type="button"
             role="menuitem"
             className="canvas-tools__item"
-            data-testid="dash-free-undo"
-            disabled={!canUndo}
-            onClick={() => run((h) => h.undo())}
-          >
-            <Undo2 size={16} aria-hidden="true" /> Deshacer
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="canvas-tools__item"
             data-testid="dash-free-arrange"
             onClick={() => run((h) => h.arrange())}
           >
@@ -179,6 +171,18 @@ export function CanvasToolsMenu({ canvasRef, canUndo, drawActive, mode }: Canvas
         onClick={() => toggleMode('erase')}
       >
         <Eraser size={16} aria-hidden="true" />
+      </button>
+      {/* «Deshacer» vive JUNTO a la goma (acción suelta, no un modo): se deshabilita sin pasos. */}
+      <button
+        type="button"
+        className="canvas-tools__mode"
+        data-testid="dash-free-undo"
+        aria-label="Deshacer"
+        title="Deshacer"
+        disabled={!canUndo}
+        onClick={() => canvasRef.current?.undo()}
+      >
+        <Undo2 size={16} aria-hidden="true" />
       </button>
 
       {paletteOpen && (

@@ -23,22 +23,33 @@ async function clearFreeWidgets(page: Page): Promise<void> {
   }
 }
 
-// Las herramientas del lienzo (widget/nota/texto/dibujar/deshacer/ordenar) viven ahora dentro
-// del menú «+» del dock inferior: hay que abrirlo antes de pulsar cada acción (al pulsar una, el
-// menú se cierra). Cada acción dispara el handle imperativo de FreeBoard.
+// Limpia las notas con la GOMA: las notas ya no llevan «×», se borran con un clic en modo borrar.
+// Activa el modo, hace clic en cada nota (sus hijos van inertes, el clic lo recibe la tarjeta) y sale.
+async function clearNotes(page: Page): Promise<void> {
+  const notes = page.locator('.dash-free-item--note');
+  if ((await notes.count()) === 0) return;
+  await page.getByTestId('dash-free-mode-erase').click();
+  for (let n = await notes.count(); n > 0; n = await notes.count()) {
+    await notes.first().click();
+    await expect(notes).toHaveCount(n - 1);
+  }
+  await page.getByTestId('dash-free-mode-erase').click(); // volver a seleccionar
+}
+
+// Las acciones de composición del lienzo (widget/nota/texto/dibujar/ordenar) viven dentro del menú
+// «Editar»: hay que abrirlo antes de pulsar cada una (al pulsar una, el menú se cierra). Cada acción
+// dispara el handle imperativo de FreeBoard. «Deshacer» NO vive aquí: es un botón suelto junto a la
+// goma, siempre visible (ver undoOnce).
 async function clickTool(page: Page, testId: string): Promise<void> {
   await page.getByTestId('dash-free-tools').click();
   await page.getByTestId(testId).click();
 }
 
-// «Deshacer» con comprobación de disabled: abre el menú, deshace si puede; devuelve si actuó.
+// «Deshacer» es un botón suelto junto a la goma (fuera del menú): comprueba disabled y, si puede,
+// deshace. Devuelve si actuó.
 async function undoOnce(page: Page): Promise<boolean> {
-  await page.getByTestId('dash-free-tools').click();
   const undo = page.getByTestId('dash-free-undo');
-  if (await undo.isDisabled()) {
-    await page.keyboard.press('Escape');
-    return false;
-  }
+  if (await undo.isDisabled()) return false;
   await undo.click();
   return true;
 }
@@ -148,12 +159,9 @@ test('lienzo libre: añadir nota y widget, quitar, deshacer y ordenar; minimapa 
   await expect(page.getByTestId('dash-free-toolbar')).toBeVisible();
 
   // El preset «personalizado» nace VACÍO (se compone con el agente): sin contenido no hay
-  // minimapa. Limpia notas y widgets de ejecuciones previas para partir de un lienzo vacío.
+  // minimapa. Limpia notas (con la goma: ya no llevan «×») y widgets de ejecuciones previas.
   const notes = page.locator('.dash-free-item--note');
-  for (let n = await notes.count(); n > 0; n = await notes.count()) {
-    await notes.first().locator('.dash-free-remove').dispatchEvent('click');
-    await expect(notes).toHaveCount(n - 1);
-  }
+  await clearNotes(page);
   await clearFreeWidgets(page);
 
   const items = page.locator('.dash-free-item');
@@ -166,8 +174,8 @@ test('lienzo libre: añadir nota y widget, quitar, deshacer y ordenar; minimapa 
   // Con contenido en el lienzo, el minimapa se pinta en la esquina.
   await expect(page.getByTestId('dash-free-minimap')).toBeVisible();
 
-  // Deshacer ("botón volver") quita la nota recién creada.
-  await clickTool(page, 'dash-free-undo');
+  // Deshacer (botón suelto junto a la goma) quita la nota recién creada.
+  await page.getByTestId('dash-free-undo').click();
   await expect(notes).toHaveCount(0);
 
   // Añadir un WIDGET desde la paleta.
@@ -196,6 +204,63 @@ test('lienzo libre: añadir nota y widget, quitar, deshacer y ordenar; minimapa 
   // Limpieza: quita el widget añadido para no contaminar el lienzo entre runs.
   await clearFreeWidgets(page);
   await expect(items).toHaveCount(baseCount);
+});
+
+test('lienzo libre: la vista solo se mueve con la mano o la barra espaciadora, no al arrastrar el fondo ni con la rueda', async ({
+  page,
+}) => {
+  const canvas = page.getByTestId('dash-free');
+  await expect(canvas).toBeVisible();
+
+  // Estado conocido: lienzo vacío. El estado vacío («+») es pointer-events:none salvo su botón
+  // central, así que casi todo el lienzo es fondo puro; sin elementos tampoco hay minimapa ni
+  // flecha en las esquinas. Agarramos en el borde izquierdo-medio: lejos del «+» central, del dock
+  // inferior, de los controles de zoom (abajo-dcha) y de los controles flotantes superiores.
+  await clearDrawElements(page);
+  await clearNotes(page);
+  await clearFreeWidgets(page);
+
+  const world = page.locator('.dash-free-world');
+  const transformOf = (): Promise<string> =>
+    world.evaluate((el) => (el as HTMLElement).style.transform);
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('sin viewport del lienzo');
+  const gx = box.x + box.width * 0.2;
+  const gy = box.y + box.height * 0.5;
+
+  const initial = await transformOf();
+
+  // 1) Arrastrar el FONDO en modo normal NO mueve la vista (el pan ya no vive en el fondo).
+  await page.mouse.move(gx, gy);
+  await page.mouse.down();
+  await page.mouse.move(gx + 170, gy + 90, { steps: 10 });
+  await page.mouse.up();
+  expect(await transformOf()).toBe(initial);
+
+  // 2) La rueda / dos dedos del trackpad SIN ⌘/Ctrl tampoco mueve la vista.
+  await page.mouse.move(gx, gy);
+  await page.mouse.wheel(0, 240);
+  await page.mouse.wheel(160, 0);
+  expect(await transformOf()).toBe(initial);
+
+  // 3) Con el botón de la MANO activo, arrastrar SÍ mueve la vista.
+  await page.getByTestId('dash-free-mode-pan').click();
+  await page.mouse.move(gx, gy);
+  await page.mouse.down();
+  await page.mouse.move(gx + 170, gy + 90, { steps: 10 });
+  await page.mouse.up();
+  const afterHand = await transformOf();
+  expect(afterHand).not.toBe(initial);
+  await page.getByTestId('dash-free-mode-pan').click(); // volver a modo normal
+
+  // 4) La barra espaciadora (mano temporal) también mueve la vista.
+  await page.mouse.move(gx, gy); // hover → el lienzo empieza a escuchar el espacio
+  await page.keyboard.down('Space');
+  await page.mouse.down();
+  await page.mouse.move(gx + 120, gy + 70, { steps: 8 });
+  await page.mouse.up();
+  await page.keyboard.up('Space');
+  expect(await transformOf()).not.toBe(afterHand);
 });
 
 test('lienzo libre: la flecha de orientación aparece al alejarse y encuadra al pulsarla', async ({

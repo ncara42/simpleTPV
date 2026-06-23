@@ -1216,6 +1216,7 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 }
 
 .canvas-tools__trigger {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1236,11 +1237,62 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
     border-color var(--ui-motion-fast) var(--ui-ease);
 }
 
-.canvas-tools__trigger:hover,
-.canvas-tools__trigger.is-open {
+.canvas-tools__trigger:hover {
   background: var(--ui-surface-subtle);
   color: var(--ui-text);
   border-color: var(--ui-border-strong, var(--ui-border));
+}
+
+/* «Editar» ABIERTO = pestaña que corona el menú colgante: arriba redondeado, abajo RECTO, misma
+   superficie, sin borde (la forma la definen superficie + sombra, como el sidebar) y por encima
+   del panel (z) para coronarlo. El filete cóncavo (::after) une su lado derecho con el menú. */
+.canvas-tools__trigger.is-open {
+  z-index: 32;
+  /* Mismo cristal que la tarjeta para que pestaña + cuello + tarjeta lean como UNA superficie. */
+  background: var(--ct-glass);
+  -webkit-backdrop-filter: var(--ct-blur);
+  backdrop-filter: var(--ct-blur);
+  color: var(--ui-text);
+  /* SIN borde (no "transparent"): con box-sizing:border-box, 1px de borde mete la superficie 1px
+     hacia dentro y, como la tarjeta y el cuello NO llevan borde, la tarjeta quedaba 1px a la izq y
+     1px abajo. Se quita el borde y se compensa el ancho con +1px de padding para que la pestaña no
+     encoja 2px al abrir (sin salto de los botones). */
+  border: 0;
+  padding: 0 calc(0.8rem + 1px);
+  /* Top redondeado tipo Sileo (rounded-rect, no semicírculo) que fluye con la tarjeta; abajo recto. */
+  border-top-left-radius: 14px;
+  border-top-right-radius: 14px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  /* Sin sombra propia: la pestaña forma UNA silueta con la tarjeta; la sombra la pone la tarjeta. */
+  box-shadow: none;
+}
+/* Cuello CÓNCAVO derecho: lengüeta de superficie que cae bajo «Editar» (--ct-drop) y, con una
+   máscara radial anclada en su esquina sup-derecha, "abraza" el borde derecho de la pestaña y flarea
+   hacia el menú —tangente con su borde superior—. La izquierda va a hueso (flush). Como el menú
+   cuelga POR DEBAJO de la píldora, su backdrop-filter (y el de este filete, en su tramo bajo la
+   barra) desenfocan el fondo real, sin necesitar portal. */
+.canvas-tools__trigger.is-open::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 100%;
+  width: calc(100% + var(--ct-neck));
+  height: calc(var(--ct-drop) + 1px);
+  background: var(--ct-glass);
+  -webkit-backdrop-filter: var(--ct-blur);
+  backdrop-filter: var(--ct-blur);
+  -webkit-mask: radial-gradient(
+    var(--ct-neck) at 100% 0,
+    #0000 0 calc(var(--ct-neck) - 0.5px),
+    #000 var(--ct-neck)
+  );
+  mask: radial-gradient(
+    var(--ct-neck) at 100% 0,
+    #0000 0 calc(var(--ct-neck) - 0.5px),
+    #000 var(--ct-neck)
+  );
+  pointer-events: none;
 }
 
 .canvas-tools__trigger:focus-visible {
@@ -1248,57 +1300,64 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   box-shadow: var(--ui-focus);
 }
 
-/* El desplegable abre HACIA ARRIBA (la barra está abajo). */
-.canvas-tools__menu {
-  position: absolute;
-  bottom: calc(100% + 0.5rem);
-  left: 0;
-  z-index: 31;
-  min-width: 12rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0.35rem;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-lg);
-  transform-origin: bottom left;
-  animation: chat-panel-in var(--ui-motion-medium) var(--ui-ease);
+/* Geometría del cuello que une «Editar» con su menú colgante. La caída (--ct-drop) es el hueco
+   bajo la pestaña; el radio del filete (--ct-neck) la iguala para que el arco quede tangente al
+   borde superior del menú (sin recta ni pico). Generoso y suave, al gusto de Sileo (squircle amplio,
+   nada de nub tímido). */
+.canvas-tools {
+  /* La tarjeta FLOTA ~10px por debajo de la barra (margen real), igual que el cuerpo del sidebar
+     cuelga del logo: padding inferior de la píldora (0.35rem) + 10px de aire. El radio del filete
+     iguala la caída → el arco cóncavo queda tangente al borde superior de la tarjeta (sin pico). */
+  --ct-drop: calc(0.35rem + 10px);
+  --ct-neck: var(--ct-drop);
+  /* Cristal IDÉNTICO al del input (.prompt-input): superficie al 94% (recupera opacidad, se lee
+     nítido) + desenfoque de 12px. Mismo lenguaje glass que el composer del chat. */
+  --ct-glass: color-mix(in srgb, var(--ui-surface) 94%, transparent);
+  --ct-blur: blur(12px);
 }
 
-/* Variante DESPLEGAR A LA DERECHA: la barra está ARRIBA, así que el menú es una fila horizontal
-   que se abre hacia la derecha justo debajo del botón «Editar» (animación de expansión a la dcha.). */
-.canvas-tools__menu--row {
+/* El desplegable CUELGA de «Editar» (la barra vive ARRIBA): columna vertical que cae --ct-drop por
+   debajo —despejando la fila de la píldora—, con la esquina sup-izq RECTA (flush con la pestaña) y
+   el resto redondeado. Sin borde: superficie + sombra (como el cuerpo flotante del sidebar). */
+.canvas-tools__menu {
+  /* ANIDADO (no portal): cuelga --ct-drop por debajo de «Editar», fuera de la caja de la píldora,
+     así su backdrop-filter desenfoca el FONDO REAL (como el input) y queda anclado por CSS (sin JS),
+     sin desalinearse al hacer zoom. Glass IDÉNTICO al input vía vars: superficie 94% + blur 12px. */
+  position: absolute;
+  top: calc(100% + var(--ct-drop));
   bottom: auto;
-  top: calc(100% + 0.5rem);
   left: 0;
-  flex-direction: row;
-  align-items: center;
-  min-width: 0;
-  width: max-content;
-  transform-origin: left center;
-  animation: canvas-tools-expand-right var(--ui-motion-medium) var(--ui-ease);
+  z-index: 31;
+  min-width: 11rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  /* Sangrado del contenido bajo «Editar»: los items quedan "dentro". */
+  padding: 0.4rem 0.4rem 0.45rem 0.5rem;
+  border: none;
+  /* Caja FLOTANTE como el cuerpo del sidebar: esquina sup-izq RECTA (la corona el cuello), resto
+     redondeado amplio. */
+  border-radius: 0 16px 16px 16px;
+  background: var(--ct-glass);
+  -webkit-backdrop-filter: var(--ct-blur);
+  backdrop-filter: var(--ct-blur);
+  /* Sombra del cuerpo flotante del sidebar (suave, en dos capas). */
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 18px 40px -12px rgb(0 0 0 / 0.22);
+  transform-origin: top left;
+  /* Cae y crece desde «Editar» con el ease del sidebar (cubic-bezier(0.16,1,0.3,1), sin rebote). */
+  animation: canvas-tools-drop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
-@keyframes canvas-tools-expand-right {
+@keyframes canvas-tools-drop {
   from {
     opacity: 0;
-    transform: scaleX(0.55);
+    transform: translateY(-6px) scale(0.97);
   }
   to {
     opacity: 1;
-    transform: scaleX(1);
+    transform: translateY(0) scale(1);
   }
-}
-.canvas-tools__menu--row .canvas-tools__item {
-  white-space: nowrap;
-}
-.canvas-tools__menu--row .canvas-tools__sep {
-  width: 1px;
-  height: 1.4rem;
-  margin: 0 0.15rem;
-  background: var(--ui-border);
-  flex: none;
 }
 
 /* Botones de MODO (Mover/Goma): fuera del menú, siempre visibles; píldora como el trigger.
@@ -1319,7 +1378,7 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
     color var(--ui-motion-fast) var(--ui-ease),
     border-color var(--ui-motion-fast) var(--ui-ease);
 }
-.canvas-tools__mode:hover {
+.canvas-tools__mode:hover:not(:disabled) {
   background: var(--ui-surface-subtle);
   color: var(--ui-text);
   border-color: var(--ui-border-strong, var(--ui-border));
@@ -1328,6 +1387,11 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   background: var(--ui-chart-accent);
   border-color: var(--ui-chart-accent);
   color: #fff;
+}
+/* «Deshacer» sin pasos disponibles: atenuado y sin interacción (acción suelta, no un modo). */
+.canvas-tools__mode:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 .canvas-tools__mode:focus-visible {
   outline: none;
@@ -1377,10 +1441,10 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   background: var(--ui-border);
 }
 
-/* La paleta de widgets, abierta desde el menú, también abre hacia arriba. */
+/* La paleta de widgets, abierta desde «Editar», cuelga hacia ABAJO igual que el menú. */
 .canvas-tools .dash-free-palette {
-  top: auto;
-  bottom: calc(100% + 0.5rem);
+  top: calc(100% + var(--ct-drop, 9px));
+  bottom: auto;
   left: 0;
 }
 

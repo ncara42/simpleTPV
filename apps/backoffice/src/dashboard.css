@@ -1055,7 +1055,10 @@
   --dot: color-mix(in srgb, var(--ui-text-muted) 38%, transparent);
   background-image: radial-gradient(var(--dot) 1.5px, transparent 1.6px);
   touch-action: none;
-  cursor: grab;
+  /* En modo normal el fondo NO se arrastra para mover la vista (el pan vive en el botón de la mano
+     o en la barra espaciadora), así que el cursor por defecto no debe insinuar "agarrable". El
+     cursor grab/grabbing lo aporta `.dash-free--panning` solo cuando el pan está activo. */
+  cursor: default;
   overscroll-behavior: contain;
 }
 .dash-free:focus-visible {
@@ -1294,7 +1297,8 @@
 .dash-free-note-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* Solo el grip (la «×» se retiró: las notas se borran con la goma): centrado. */
+  justify-content: center;
   height: 1.5rem;
   padding: 0 0.4rem;
   background: rgb(0 0 0 / 0.05);
@@ -1377,6 +1381,37 @@
   padding: 0.6rem;
   font-size: 0.8rem;
   color: var(--ui-text-muted);
+}
+
+/* Tirador de redimensión de la nota: esquina inf-derecha. La marca (esquina ⌐) aparece al pasar el
+   ratón por la nota; el contenido del editor ya hace scroll cuando el texto no cabe. En los modos
+   pan/goma/dibujo el tirador queda inerte por las reglas de .dash-free-item (hijos sin puntero). */
+.dash-free-note-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  z-index: 3;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+.dash-free-note-resize::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid color-mix(in srgb, var(--ui-text-muted) 55%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--ui-text-muted) 55%, transparent);
+  border-bottom-right-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.dash-free-item--note:hover .dash-free-note-resize::after,
+.dash-free-note-resize:hover::after {
+  opacity: 1;
 }
 
 /* Minimapa (esquina superior derecha del lienzo). */
