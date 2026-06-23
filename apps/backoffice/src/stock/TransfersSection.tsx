@@ -1,5 +1,5 @@
 import type { ImportResult } from '@simpletpv/auth';
-import { Badge, Button, DataTable, type DataTableColumn } from '@simpletpv/ui';
+import { Badge, Button, DataTable, type DataTableColumn, Input } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, Plus, Upload } from 'lucide-react';
 import { useState } from 'react';
@@ -13,12 +13,15 @@ import { listProducts } from '../lib/products.js';
 import { createTransfer, listTransfers, sendTransfer } from '../lib/stock.js';
 import { CreateTransferModal } from './CreateTransferModal.js';
 import { dt, STATUS_LABEL } from './labels.js';
+import { fallbackTransferName, transferDisplayName } from './transfer-name.js';
 
 export function TransfersSection() {
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
   // Modal de importación de traspasos en lote por CSV.
   const [importing, setImporting] = useState(false);
+  // Buscador en cliente sobre la lista ya cargada (P102), sin llamada extra a la API.
+  const [search, setSearch] = useState('');
 
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ['transfers'],
@@ -41,7 +44,28 @@ export function TransfersSection() {
   });
 
   type TransferRow = (typeof transfers)[number];
+
+  const storeName = (id: string): string | undefined => stores.find((s) => s.id === id)?.name;
+  // Nombre mostrado: notes si existe, o el fallback "Origen → Destino" (P105).
+  const displayName = (t: TransferRow): string =>
+    transferDisplayName(t.notes, storeName(t.originStoreId), storeName(t.destStoreId));
+
+  // Filtro en cliente por nombre mostrado y por tiendas (P102), case-insensitive.
+  const query = search.trim().toLowerCase();
+  const filtered = query
+    ? transfers.filter((t) =>
+        [displayName(t), storeName(t.originStoreId) ?? '', storeName(t.destStoreId) ?? '']
+          .join(' ')
+          .toLowerCase()
+          .includes(query),
+      )
+    : transfers;
   const transferColumns: DataTableColumn<TransferRow>[] = [
+    {
+      key: 'name',
+      header: 'Nombre',
+      render: (t) => <span data-testid="transfer-name-cell">{displayName(t)}</span>,
+    },
     {
       key: 'date',
       header: 'Fecha',
@@ -79,8 +103,9 @@ export function TransfersSection() {
   const handleExport = (): void => {
     exportRowsToCsv(
       'traspasos.csv',
-      ['Fecha', 'Líneas', 'Estado'],
+      ['Nombre', 'Fecha', 'Líneas', 'Estado'],
       transfers.map((t) => [
+        displayName(t),
         dt.format(new Date(t.createdAt)),
         String(t.lines.length),
         STATUS_LABEL[t.status] ?? t.status,
@@ -133,7 +158,12 @@ export function TransfersSection() {
     let inserted = 0;
     for (const group of groups.values()) {
       try {
-        await createTransfer(group);
+        // P104: cada traspaso importado recibe el auto-nombre "Origen → Destino".
+        const notes = fallbackTransferName(
+          storeName(group.originStoreId),
+          storeName(group.destStoreId),
+        );
+        await createTransfer({ ...group, notes });
         inserted += group.lines.length;
       } catch (e) {
         errors.push({
@@ -176,12 +206,23 @@ export function TransfersSection() {
       <div className="table-panel">
         <DataTable
           columns={transferColumns}
-          rows={transfers}
+          rows={filtered}
           rowKey={(t) => t.id}
           loading={isLoading}
           toolbar={
             <div className="users-toolbar">
-              <div className="sales-filters" />
+              <div className="sales-filters">
+                <span className="search-field">
+                  <Input
+                    className="catalog-search"
+                    placeholder="Buscar traspaso"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    aria-label="Buscar traspaso"
+                    data-testid="transfers-search"
+                  />
+                </span>
+              </div>
               <div className="ui-dt-toolbar-actions">
                 <Button
                   type="button"

@@ -10,6 +10,7 @@ import { parseCsvRows } from '../lib/csv.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { listProducts } from '../lib/products.js';
 import { createTransfer, sendTransfer } from '../lib/stock.js';
+import { fallbackTransferName, TRANSFER_NAME_MAX_LENGTH } from './transfer-name.js';
 
 interface DraftLine {
   productId: string;
@@ -52,6 +53,7 @@ export function CreateTransferModal({
     queryFn: () => listProducts(),
   });
 
+  const [name, setName] = useState('');
   const [originStoreId, setOriginStoreId] = useState(prefill?.suggestedOriginStoreId ?? '');
   const [destStoreId, setDestStoreId] = useState(prefill?.destStoreId ?? '');
   const [productId, setProductId] = useState('');
@@ -127,9 +129,16 @@ export function CreateTransferModal({
       onSubmit={(e) => {
         e.preventDefault();
         if (canSubmit && !mutation.isPending) {
+          // P101: nombre opcional; si está vacío se auto-asigna "Origen → Destino"
+          // (P105) usando los nombres de tienda ya cargados. Trim en cliente (P106).
+          const storeName = (id: string): string | undefined =>
+            stores.find((s) => s.id === id)?.name;
+          const notes =
+            name.trim() || fallbackTransferName(storeName(originStoreId), storeName(destStoreId));
           mutation.mutate({
             originStoreId,
             destStoreId,
+            notes,
             lines: lines.map((l) => ({ productId: l.productId, quantitySent: l.qty })),
           });
         }
@@ -139,6 +148,21 @@ export function CreateTransferModal({
         <h3>{sendNow ? 'Traspasar y enviar' : 'Nuevo traspaso'}</h3>
       </header>
       <div className="modal-body">
+        <section className="form-section">
+          <label className="form-section-title" htmlFor="transfer-name-input">
+            Nombre
+          </label>
+          <Input
+            id="transfer-name-input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={TRANSFER_NAME_MAX_LENGTH}
+            placeholder="Opcional · si lo dejas vacío se nombra «Origen → Destino»"
+            aria-label="Nombre del traspaso"
+            data-testid="transfer-name"
+          />
+        </section>
+
         <section className="form-section">
           <span className="form-section-title">Origen y destino</span>
           <div className="modal-row">
