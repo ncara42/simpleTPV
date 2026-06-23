@@ -30,7 +30,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
@@ -132,26 +132,23 @@ function Home() {
     if (item.id === 'timeclock') return features.time_clock;
     return true;
   });
-  // Filtro de tienda preseleccionado al usar un acceso directo desde Tiendas
-  // ("Ver stock"/"Ver ventas"). Se aplica al montar Stock/Ventas; la navegación
-  // manual por el sidebar lo limpia para no arrastrar el filtro.
-  const [navStoreId, setNavStoreId] = useState<string | null>(null);
+  // Filtros «de paso» (tienda/familia/búsqueda) en la URL como search params (F0c): el
+  // deep-link es compartible, sobrevive al reload y NO deja estado residual al volver con el
+  // botón atrás. Las pages los leen al montar vía sus props initial* (sin cambiar su lógica).
+  const [searchParams] = useSearchParams();
+  // Acceso directo desde Tiendas ("Ver stock"/"Ver ventas"): preselecciona la tienda.
   const openStoreView = (view: 'stock' | 'sales', storeId: string): void => {
-    setNavStoreId(storeId);
-    navigate(tabToPath(view));
+    navigate(`${tabToPath(view)}?store=${encodeURIComponent(storeId)}`);
   };
   // Atajo del panel de Familias (I-13): el contador navega a Catálogo filtrado.
-  const [navFamilyId, setNavFamilyId] = useState<string | null>(null);
   const openCatalogFamily = (familyId: string): void => {
-    setNavFamilyId(familyId);
-    navigate(tabToPath('catalog'));
+    navigate(`${tabToPath('catalog')}?family=${encodeURIComponent(familyId)}`);
   };
   // U-12: "Resolver" una notificación → Stock filtrado por tienda y producto.
-  const [navSearch, setNavSearch] = useState<string | null>(null);
   const resolveStock = (storeId: string, productName: string): void => {
-    setNavStoreId(storeId);
-    setNavSearch(productName);
-    navigate(tabToPath('stock'));
+    navigate(
+      `${tabToPath('stock')}?store=${encodeURIComponent(storeId)}&q=${encodeURIComponent(productName)}`,
+    );
   };
   // U-11/D-17: badge de la campana = roturas de stock activas + solicitudes de
   // caja pendientes (#146). Mismas queryKeys que Notificaciones (refresca con el
@@ -166,12 +163,9 @@ function Home() {
   });
   const notificationCount = alerts.length + pendingCash.length;
 
-  // Navegación entre pages: limpia los filtros «de paso» (tienda/familia/búsqueda) y cambia
-  // de tab. La comparten el sidebar, la TopBar y el buscador de funciones (flotante o en barra).
+  // Navegación entre pages (sidebar / home / buscador): va a la ruta SIN query, lo que
+  // limpia los filtros de paso (ya no son estado del shell; viven en la URL).
   const navigateTo = (t: Tab): void => {
-    setNavStoreId(null);
-    setNavFamilyId(null);
-    setNavSearch(null);
     navigate(tabToPath(t));
   };
 
@@ -214,9 +208,11 @@ function Home() {
           floatingActions={
             <FloatingActions
               onNavigate={navigateTo}
-              // Atrás (S-03): retrocede en el historial del router; si no hay historial
-              // (deep-link directo), cae al Dashboard. NO sustituye al toggle de la campana.
-              onBack={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
+              // Atrás (S-03): retrocede en el historial del ROUTER. `location.key === 'default'`
+              // marca la entrada inicial sin historial previo del router (deep-link directo) →
+              // cae al Dashboard sin riesgo de salir del SPA (a diferencia de window.history.length,
+              // que cuenta entradas de otros orígenes). NO sustituye al toggle de la campana.
+              onBack={() => (location.key !== 'default' ? navigate(-1) : navigate('/'))}
               onHome={() => navigateTo('dashboard')}
               onNotifications={toggleNotifications}
               notificationCount={notificationCount}
@@ -239,12 +235,19 @@ function Home() {
                 {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
                   embebe la tabla — enlaza con "Ver todas las ventas →". */}
                 {tab === 'dashboard' && <DashboardPage onNavigate={navigateTo} />}
-                {tab === 'sales' && <SalesHistoryPage initialStoreId={navStoreId} />}
+                {tab === 'sales' && (
+                  <SalesHistoryPage initialStoreId={searchParams.get('store')} />
+                )}
                 {tab === 'notifications' && <NotificationsPage onResolve={{ resolveStock }} />}
-                {tab === 'catalog' && <CatalogPage initialFamilyId={navFamilyId} />}
+                {tab === 'catalog' && (
+                  <CatalogPage initialFamilyId={searchParams.get('family')} />
+                )}
                 {tab === 'families' && <FamiliesPage onOpenCatalogFamily={openCatalogFamily} />}
                 {tab === 'stock' && (
-                  <StockPage initialStoreId={navStoreId} initialSearch={navSearch} />
+                  <StockPage
+                    initialStoreId={searchParams.get('store')}
+                    initialSearch={searchParams.get('q')}
+                  />
                 )}
                 {tab === 'transfers' && <TransfersPage />}
                 {tab === 'promotions' && <PromotionsPage />}
