@@ -206,6 +206,12 @@
   gap: var(--ui-space-2);
   min-width: 0;
 }
+/* Pista de la barra (Tremor two-track): la barra mide su % respecto a ESTA pista, no a la fila,
+   dejando la columna de valor (.dv-rank-value, flex:none) siempre reservada a la derecha. */
+.dv-rank-track {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .dv-rank-bar {
   display: flex;
   align-items: center;

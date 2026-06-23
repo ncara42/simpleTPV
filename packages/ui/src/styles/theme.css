@@ -31,6 +31,12 @@
   --ui-success: #16734f;
   --ui-success-soft: #e8f3ec;
 
+  /* ─── Nota adhesiva (anotación libre del usuario en el lienzo) ─────────────
+     Tono "papel" cálido; token real para no depender de un hex de fallback. El
+     insight del agente NO usa este tono: tiene su propio tono de acento (un solo
+     color coherente por tipo, estilo GitHub alerts), ver `.dash-generic--insight`. */
+  --ui-note-bg: #fdf6d8;
+
   /* ─── Data-viz (estilo "Stripe": acento índigo dedicado) ────────────────────
      Los gráficos usan un acento PROPIO (--ui-chart-accent), independiente del
      --ui-brand de la app, para un lenguaje de datos premium y consistente sin

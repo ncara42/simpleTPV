@@ -169,7 +169,7 @@ pub fn canvas_tools() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "add_shape",
-                "description": "Añade una forma geométrica al lienzo libre. Solo disponible en modo libre.",
+                "description": "Añade una forma geométrica (rect/elipse/línea/flecha) al lienzo.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -185,7 +185,7 @@ pub fn canvas_tools() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "add_text",
-                "description": "Añade un texto libre al lienzo libre. Solo disponible en modo libre.",
+                "description": "Añade un texto libre al lienzo.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -201,7 +201,7 @@ pub fn canvas_tools() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "add_note",
-                "description": "Añade una nota TipTap al lienzo libre. Solo disponible en modo libre.",
+                "description": "Añade una nota TipTap (editable por el usuario) al lienzo.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -234,7 +234,7 @@ pub fn canvas_tools() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "arrange",
-                "description": "Reordena o distribuye los elementos del lienzo.",
+                "description": "Reordena los elementos del lienzo: 'compact' los agrupa sin huecos (lo habitual cuando quedan desordenados), 'spread' los reparte con más separación, 'sort_by_type' los agrupa por tipo de widget.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -326,7 +326,7 @@ pub fn data_tools() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "stock_alerts",
-                "description": "Alertas de stock: productos agotados o con stock bajo.",
+                "description": "Lista de alertas de stock activas (productos agotados o por debajo del mínimo): productName, storeName, alertType. Con include_expiring=true añade además los lotes próximos a caducar.",
                 "parameters": {
                     "type": "object",
                     "properties": {

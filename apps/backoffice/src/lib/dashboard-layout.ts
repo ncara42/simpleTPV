@@ -308,7 +308,7 @@ export const GENERIC_DEFAULT_SIZE: Record<GenericWidgetType, { w: number; h: num
   pie: { w: 4, h: 3 },
   donut: { w: 4, h: 3 },
   kpi: { w: 2, h: 1 },
-  insight: { w: 4, h: 2 },
+  insight: { w: 5, h: 2 },
   composite: { w: 8, h: 5 },
 };
 

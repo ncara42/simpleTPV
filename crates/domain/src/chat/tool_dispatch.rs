@@ -11,6 +11,7 @@ use crate::dashboard::{
     },
 };
 use crate::purchases::service as purchases_service;
+use crate::stock::service as stock_service;
 use crate::time_clock::service as time_clock_service;
 
 // Despacha una herramienta invocada por el LLM y devuelve el resultado como JSON.
@@ -67,10 +68,17 @@ pub async fn dispatch_tool(
         }
 
         "stock_alerts" => {
-            let range = resolve_period(DashboardPeriod::Today, now, None, None)?;
+            // Devuelve la LISTA real de alertas activas (productName/storeName/alertType…), no los
+            // KPIs de rotura (esos tienen su propia tool `stockout_kpis`). Con include_expiring
+            // añade los lotes próximos a caducar. La descripción del schema debe coincidir.
             let store_id = parse_uuid_opt(&args["store_id"]);
-            let kpis = stockout_kpis(pool, org, range, store_id).await?;
-            Ok(serde_json::to_value(kpis).unwrap_or(serde_json::Value::Null))
+            let alerts = stock_service::alerts(pool, org, store_id, false).await?;
+            if args["include_expiring"].as_bool().unwrap_or(false) {
+                let expiring = stock_service::expiring_batches(pool, org, store_id, None).await?;
+                Ok(serde_json::json!({ "alerts": alerts, "expiring": expiring }))
+            } else {
+                Ok(serde_json::to_value(alerts).unwrap_or(serde_json::Value::Null))
+            }
         }
 
         "purchase_orders" => {
@@ -81,7 +89,11 @@ pub async fn dispatch_tool(
                     Some(s.to_uppercase())
                 }
             });
-            let result = purchases_service::list(pool, org, status, None).await?;
+            // Aplica el `limit` que declara el schema (antes se ignoraba): acota la lista para que
+            // el modelo no narre «top N» sobre el conjunto completo. Clamp defensivo [1,100].
+            let limit = args["limit"].as_i64().unwrap_or(20).clamp(1, 100) as usize;
+            let mut result = purchases_service::list(pool, org, status, None).await?;
+            result.truncate(limit);
             Ok(serde_json::to_value(result).unwrap_or(serde_json::Value::Null))
         }
 
