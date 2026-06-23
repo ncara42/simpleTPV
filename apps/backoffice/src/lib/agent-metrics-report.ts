@@ -46,9 +46,12 @@ function bool(v: Field | undefined): boolean {
   return v === true || v === 'true';
 }
 
+// Quita los códigos de color ANSI que `fmt::layer()` inserta entre clave y `=` (rompen el regex).
+const ANSI = new RegExp(String.fromCharCode(27) + '[[][0-9;]*m', 'g');
+
 // Extrae los campos de una línea de log (JSON o logfmt). Aplana el objeto `fields` del formato JSON.
 function fieldsFromLine(line: string): Record<string, Field> | null {
-  const trimmed = line.trim();
+  const trimmed = line.replace(ANSI, '').trim();
   if (!trimmed) return null;
 
   if (trimmed.startsWith('{')) {

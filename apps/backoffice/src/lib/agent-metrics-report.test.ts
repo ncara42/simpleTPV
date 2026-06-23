@@ -37,7 +37,30 @@ const JSONL = [
   }),
 ].join('\n');
 
+// Formato real de fmt::layer() con colores ANSI (ESC[..m entre clave y `=`), tal cual lo escribe el
+// API a fichero. El parser debe quitar los códigos ANSI antes de extraer los campos.
+const E = String.fromCharCode(27);
+const ANSI_LINE =
+  `2026-06-23T00:46:12Z ${E}[32m INFO${E}[0m ${E}[2mchat_metrics${E}[0m${E}[2m:${E}[0m ` +
+  `agent turn finished ${E}[3mevent${E}[0m${E}[2m=${E}[0m"turn" ` +
+  `${E}[3mtool_rounds${E}[0m${E}[2m=${E}[0m1 ${E}[3mtool_calls${E}[0m${E}[2m=${E}[0m2 ` +
+  `${E}[3mcanvas_ops${E}[0m${E}[2m=${E}[0m1 ${E}[3mview_actions${E}[0m${E}[2m=${E}[0m0 ` +
+  `${E}[3mdata_tools${E}[0m${E}[2m=${E}[0m0 ${E}[3mhit_round_limit${E}[0m${E}[2m=${E}[0mfalse`;
+
 describe('parseMetricsLog', () => {
+  it('parsea el formato fmt::layer() con colores ANSI', () => {
+    const log = parseMetricsLog(ANSI_LINE);
+    expect(log.turns).toHaveLength(1);
+    expect(log.turns[0]).toEqual({
+      toolRounds: 1,
+      toolCalls: 2,
+      canvasOps: 1,
+      viewActions: 0,
+      dataTools: 0,
+      hitRoundLimit: false,
+    });
+  });
+
   it('parsea logfmt e ignora otros targets', () => {
     const log = parseMetricsLog(LOGFMT);
     expect(log.turns).toHaveLength(2);
