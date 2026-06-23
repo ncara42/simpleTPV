@@ -1,4 +1,4 @@
-import { Bell, Home } from 'lucide-react';
+import { ArrowLeft, Bell, Home } from 'lucide-react';
 
 import type { Tab } from '../lib/nav.js';
 import { usePageActionsValue } from '../lib/pageActions.js';
@@ -7,6 +7,8 @@ import { FunctionSearch } from './FunctionSearch.js';
 interface FloatingActionsProps {
   /** Navega a una view del backoffice (lo usa el buscador de funciones). */
   onNavigate: (tab: Tab) => void;
+  /** Botón atrás → vuelve a la vista anterior del historial del router (S-03). */
+  onBack: () => void;
   /** Botón home → Dashboard. */
   onHome: () => void;
   /** Campana de notificaciones (togglea la view de Notificaciones). */
@@ -21,6 +23,7 @@ interface FloatingActionsProps {
 // de pills/botones redondos a la altura del logo del sidebar flotante.
 export function FloatingActions({
   onNavigate,
+  onBack,
   onHome,
   onNotifications,
   notificationCount,
@@ -31,6 +34,18 @@ export function FloatingActions({
   return (
     <div className="float-actions" data-testid="float-actions">
       <FunctionSearch onNavigate={onNavigate} />
+      {/* Botón atrás (S-03): vuelve en el historial del router. Sustituye a la banda de
+          breadcrumbs del plan original (jerarquía plana sin TopBar → migas de bajo valor). */}
+      <button
+        type="button"
+        className="float-action-btn"
+        onClick={onBack}
+        aria-label="Volver"
+        title="Volver"
+        data-testid="float-back"
+      >
+        <ArrowLeft size={17} aria-hidden="true" />
+      </button>
       <button
         type="button"
         className="float-action-btn"

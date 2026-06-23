@@ -214,6 +214,9 @@ function Home() {
           floatingActions={
             <FloatingActions
               onNavigate={navigateTo}
+              // Atrás (S-03): retrocede en el historial del router; si no hay historial
+              // (deep-link directo), cae al Dashboard. NO sustituye al toggle de la campana.
+              onBack={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
               onHome={() => navigateTo('dashboard')}
               onNotifications={toggleNotifications}
               notificationCount={notificationCount}

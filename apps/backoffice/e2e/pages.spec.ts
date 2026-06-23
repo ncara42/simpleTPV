@@ -667,6 +667,17 @@ test('U-04: shell flotante — grupos desplegables abren su flyout y navegan', a
   await expect(page.getByTestId('nav-stock')).toBeHidden();
 });
 
+test('S-03: el botón atrás del clúster flotante vuelve a la vista anterior', async ({ page }) => {
+  // react-router (F0) + botón atrás (S-03): navegar a una vista y volver con float-back.
+  await navTo(page, 'stores');
+  await expect(page.getByTestId('page-heading')).toContainText('Tiendas');
+  await navTo(page, 'suppliers');
+  await expect(page.getByTestId('page-heading')).toContainText('Proveedores');
+  // Atrás → vuelve a Tiendas (historial del router), no al Dashboard.
+  await page.getByTestId('float-back').click();
+  await expect(page.getByTestId('page-heading')).toContainText('Tiendas');
+});
+
 test('U-06: la búsqueda de funciones del header navega por nombre y sinónimo', async ({ page }) => {
   // El título de la vista vive en la zona izquierda de la TopBar; la búsqueda es
   // un lanzador a la derecha (entre la campana y el conmutador) que abre el
