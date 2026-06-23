@@ -220,6 +220,48 @@ test('lienzo libre: añadir nota y widget, quitar, deshacer/rehacer y ordenar; m
   await expect(items).toHaveCount(baseCount);
 });
 
+test('lienzo libre: la nota hace scroll vertical aunque sea pequeña', async ({ page }) => {
+  await expect(page.getByTestId('dash-free')).toBeVisible();
+  await clearNotes(page);
+  await clearFreeWidgets(page);
+
+  // Añadir una nota (nace pequeña, tamaño por defecto).
+  await clickTool(page, 'dash-free-add-note');
+  const note = page.locator('.dash-free-item--note').first();
+  await expect(note).toBeVisible();
+  const editable = note.locator('.dash-free-note-content');
+  await expect(editable).toBeVisible();
+
+  // Escribir bastante texto: en una nota estrecha se envuelve en muchas líneas y desborda el alto.
+  await editable.click();
+  await page.keyboard.type(
+    'Línea de prueba para forzar el desbordamiento vertical de la nota. '.repeat(10),
+  );
+
+  // El contenedor de scroll (.dash-free-note-scroll) tiene alto ACOTADO y su contenido desborda
+  // → es scrollable, sin importar el tamaño pequeño de la nota.
+  const scroll = note.locator('.dash-free-note-scroll');
+  const m = await scroll.evaluate((el) => ({
+    scrollH: el.scrollHeight,
+    clientH: el.clientHeight,
+    overflowY: getComputedStyle(el).overflowY,
+  }));
+  expect(m.overflowY).toBe('auto');
+  expect(m.scrollH).toBeGreaterThan(m.clientH); // hay contenido oculto → se puede hacer scroll
+
+  // Y la RUEDA del ratón sobre la nota la desplaza (el lienzo ya no le roba el evento de rueda).
+  const box = await scroll.boundingBox();
+  if (!box) throw new Error('sin caja del área de scroll de la nota');
+  await scroll.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, 220);
+  await expect.poll(() => scroll.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+
+  await clearNotes(page);
+});
+
 test('lienzo libre: la vista solo se mueve con la mano o la barra espaciadora, no al arrastrar el fondo ni con la rueda', async ({
   page,
 }) => {
