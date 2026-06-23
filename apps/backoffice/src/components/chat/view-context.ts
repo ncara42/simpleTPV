@@ -110,6 +110,19 @@ const VIEW_META: Record<Tab, ViewMeta> = {
       '¿Qué veo en esta pantalla?',
     ],
   },
+  // S-01: 'personal' es la Tab activa del shell unificado (Equipo · Fichajes). Es la
+  // que ve el asistente; users/timeclock se conservan como claves válidas del Record
+  // (deep-link/redirección) aunque ya no sean la Tab activa.
+  personal: {
+    label: 'Personal',
+    greeting: '¿En qué te ayudo con el personal?',
+    suggestions: [
+      '¿Cuántos usuarios hay?',
+      'Usuarios por rol',
+      'Fichajes de hoy',
+      '¿Qué puedo hacer en esta pantalla?',
+    ],
+  },
   users: {
     label: 'Usuarios',
     greeting: '¿En qué te ayudo con los usuarios?',

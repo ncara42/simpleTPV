@@ -12,7 +12,7 @@ import {
   tabToPath,
 } from './navigation.js';
 
-// Los 17 ids del tipo `Tab` con su slug y label esperados — ESPEJO de ALL_NAV en
+// Los 18 ids del tipo `Tab` con su slug y label esperados — ESPEJO de ALL_NAV en
 // App.tsx. Si App.tsx y navigation.ts se desincronizan (id/label/grupo), este test
 // y el page-heading derivado de la URL fallan: es la red de seguridad de la fuente única.
 const EXPECTED: ReadonlyArray<[Tab, string, string]> = [
@@ -30,6 +30,9 @@ const EXPECTED: ReadonlyArray<[Tab, string, string]> = [
   ['b2b', '/b2b', 'Clientes B2B'],
   ['promotions', '/promotions', 'Promociones'],
   ['stores', '/stores', 'Tiendas'],
+  // S-01: 'personal' es la entrada visible; users/timeclock pasan a ocultas
+  // (mantienen ruta para deep-link y redirección al shell de Personal).
+  ['personal', '/personal', 'Personal'],
   ['users', '/users', 'Usuarios'],
   ['timeclock', '/timeclock', 'Control horario'],
   ['settings', '/settings', 'Ajustes'],
@@ -38,7 +41,7 @@ const EXPECTED: ReadonlyArray<[Tab, string, string]> = [
 ];
 
 describe('navigation — fuente única id↔path↔label (F0)', () => {
-  it('cubre exactamente los 17 ids de Tab, en orden', () => {
+  it('cubre exactamente los 18 ids de Tab, en orden', () => {
     expect(NAV_NODES.map((n) => n.id)).toEqual(EXPECTED.map(([id]) => id));
   });
 
@@ -49,7 +52,7 @@ describe('navigation — fuente única id↔path↔label (F0)', () => {
     }
   });
 
-  it('pathToTab es la inversa de tabToPath (roundtrip de los 16)', () => {
+  it('pathToTab es la inversa de tabToPath (roundtrip de todos)', () => {
     for (const [id, path] of EXPECTED) {
       expect(pathToTab(path)).toBe(id);
     }
@@ -67,15 +70,26 @@ describe('navigation — fuente única id↔path↔label (F0)', () => {
     expect(pathToTab('/stock/extra')).toBeNull();
   });
 
-  it('notifications, catalog/families/stock y verifactu existen como rutas pero están ocultas del menú', () => {
+  it('notifications, catalog/families/stock, users/timeclock y verifactu existen como rutas pero están ocultas del menú', () => {
     // S-02 fase A: catalog/families/stock salen del menú (los monta la entrada
-    // única 'inventory'), pero conservan su ruta para deep-link y la redirección a
-    // /inventario. notifications (campana) y verifactu (backend sin UI) siguen ocultas.
+    // única 'inventory'). S-01: users/timeclock salen del menú (los monta la entrada
+    // única 'personal'). Todas conservan su ruta para deep-link y redirección al shell.
+    // notifications (campana) y verifactu (backend sin UI) siguen ocultas.
     const hidden = NAV_NODES.filter((n: NavNode) => n.hidden).map((n) => n.id);
-    expect(hidden).toEqual(['notifications', 'catalog', 'families', 'stock', 'verifactu']);
+    expect(hidden).toEqual([
+      'notifications',
+      'catalog',
+      'families',
+      'stock',
+      'users',
+      'timeclock',
+      'verifactu',
+    ]);
     // siguen siendo navegables por URL:
     expect(tabToPath('notifications')).toBe('/notifications');
     expect(tabToPath('catalog')).toBe('/catalog');
+    expect(tabToPath('users')).toBe('/users');
+    expect(pathToTab('/timeclock')).toBe('timeclock');
     expect(pathToTab('/verifactu')).toBe('verifactu');
   });
 

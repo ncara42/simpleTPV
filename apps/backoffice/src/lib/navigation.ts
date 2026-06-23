@@ -69,13 +69,19 @@ export const NAV_NODES: readonly NavNode[] = [
   { id: 'promotions', path: '/promotions', label: 'Promociones', group: 'commercial' },
   // Organización
   { id: 'stores', path: '/stores', label: 'Tiendas', group: 'org' },
-  { id: 'users', path: '/users', label: 'Usuarios', group: 'org' },
+  // S-01: una sola entrada de menú "Personal" monta el shell con vistas segmentadas
+  // (Equipo/Fichajes). users/timeclock conservan su ruta (deep-link + redirección a
+  // /personal) pero salen del menú (hidden). timeclock conserva su flag time_clock,
+  // que ahora condiciona el segmento Fichajes (P003), no la entrada de menú.
+  { id: 'personal', path: '/personal', label: 'Personal', group: 'org' },
+  { id: 'users', path: '/users', label: 'Usuarios', group: 'org', hidden: true },
   {
     id: 'timeclock',
     path: '/timeclock',
     label: 'Control horario',
     group: 'org',
     flag: 'time_clock',
+    hidden: true,
   },
   { id: 'settings', path: '/settings', label: 'Ajustes', group: 'org' },
   { id: 'verifactu', path: '/verifactu', label: 'VeriFactu', group: 'org', hidden: true },

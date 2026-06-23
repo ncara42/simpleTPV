@@ -694,11 +694,13 @@ test('U-06: la búsqueda de funciones del header navega por nombre y sinónimo',
   await expect(page.getByTestId('function-search-result-suppliers').first()).toBeVisible();
   await page.getByTestId('function-search-result-suppliers').first().click();
   await expect(page.getByTestId('page-heading')).toContainText('Proveedores');
-  // Por nombre con teclado: Ctrl+K abre el palette y enfoca el campo.
+  // Por nombre con teclado: Ctrl+K abre el palette y enfoca el campo. S-01: 'usuarios'
+  // resuelve a la Tab oculta 'users', que redirige al shell de Personal (?vista=equipo);
+  // el page-heading deriva del label del sidebar de la Tab activa → 'Personal'.
   await page.keyboard.press('Control+k');
   await page.getByTestId('function-search-input').fill('usuarios');
   await page.keyboard.press('Enter');
-  await expect(page.getByTestId('page-heading')).toContainText('Usuarios');
+  await expect(page.getByTestId('page-heading')).toContainText('Personal');
 });
 
 test('U-08: la marca corporativa se aplica como tema en vivo y persiste', async ({ page }) => {

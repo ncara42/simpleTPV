@@ -15,7 +15,6 @@ import {
   Bell,
   Boxes,
   CheckSquare,
-  Clock,
   Handshake,
   LayoutDashboard,
   LifeBuoy,
@@ -48,14 +47,13 @@ import { pathToTab, tabToPath } from './lib/navigation.js';
 import { PageActionsProvider } from './lib/pageActions.js';
 import { listAlerts } from './lib/stock.js';
 import { NotificationsPage } from './NotificationsPage.js';
+import { PersonalPage } from './PersonalPage.js';
 import { PromotionsPage } from './PromotionsPage.js';
 import { SalesHistoryPage } from './SalesHistoryPage.js';
 import { SettingsPage } from './SettingsPage.js';
 import { StoresPage } from './StoresPage.js';
 import { SuppliersPage } from './SuppliersPage.js';
-import { TimeClockPage } from './TimeClockPage.js';
 import { TransfersPage } from './TransfersPage.js';
-import { UsersPage } from './UsersPage.js';
 import { VerifactuPage } from './VerifactuPage.js';
 
 // Menú de 5 entradas (D-02/D-09): Dashboard y Ayuda son pages directas; los tres
@@ -80,10 +78,13 @@ const ALL_NAV: NavItem[] = [
   { id: 'sales', label: 'Ventas', icon: <Receipt size={18} />, group: 'commercial' },
   { id: 'b2b', label: 'Clientes B2B', icon: <Handshake size={18} />, group: 'commercial' },
   { id: 'promotions', label: 'Promociones', icon: <Percent size={18} />, group: 'commercial' },
-  // Organización (D-09 + U-08): Tiendas · Usuarios · Control horario · Ajustes
+  // Organización (D-09 + U-08): Tiendas · Personal · Ajustes
   { id: 'stores', label: 'Tiendas', icon: <Store size={18} />, group: 'org' },
-  { id: 'users', label: 'Usuarios', icon: <Users size={18} />, group: 'org' },
-  { id: 'timeclock', label: 'Control horario', icon: <Clock size={18} />, group: 'org' },
+  // S-01: una sola entrada "Personal" monta PersonalPage con vistas segmentadas
+  // (Equipo · Fichajes). Las entradas previas Usuarios/Control horario se colapsan
+  // aquí; sus rutas siguen vivas (deep-link/redirección) pero ocultas del menú. El flag
+  // time_clock pasa a condicionar el segmento Fichajes (P003), no la entrada de menú.
+  { id: 'personal', label: 'Personal', icon: <Users size={18} />, group: 'org' },
   { id: 'settings', label: 'Ajustes', icon: <Palette size={18} />, group: 'org' },
   { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'org' },
   { id: 'help', label: 'Ayuda', icon: <LifeBuoy size={18} /> },
@@ -123,9 +124,10 @@ function Home() {
   // Feature flags (#127 B): oculta del menú los módulos apagados a nivel org (el
   // backoffice es central → resolución de org). El backend sigue bloqueando con 403.
   const features = useFeatures();
+  // S-01: el flag time_clock ya no oculta una entrada de menú (Personal es siempre
+  // visible); ahora condiciona el segmento Fichajes dentro de PersonalPage (P003).
   const navItems = NAV.filter((item) => {
     if (item.id === 'b2b') return features.b2b;
-    if (item.id === 'timeclock') return features.time_clock;
     return true;
   });
   // Filtros «de paso» (tienda/familia/búsqueda) en la URL como search params (F0c): el
@@ -185,6 +187,16 @@ function Home() {
   };
   const legacyVista = LEGACY_VISTA[tab];
 
+  // S-01 — Redirección de rutas antiguas: /users · /timeclock siguen resolviendo a su
+  // Tab (oculta) para no romper deep-links, pero ya no tienen página propia; las absorbe
+  // el shell de Personal. Cada una mapea a su vista (Equipo / Fichajes) preservando los
+  // demás search params. `replace` evita dejar la ruta vieja en el historial.
+  const PERSONAL_VISTA: Partial<Record<Tab, string>> = {
+    users: 'equipo',
+    timeclock: 'fichajes',
+  };
+  const personalVista = PERSONAL_VISTA[tab];
+
   // Nombre de la view activa (el mismo label del sidebar): se pinta como etiqueta flotante
   // arriba del lienzo —donde antes vivía el chip del dashboard— sustituyendo al título del header.
   const activeLabel = ALL_NAV.find((item) => item.id === tab)?.label ?? '';
@@ -195,6 +207,11 @@ function Home() {
   if (legacyVista) {
     const extra = location.search ? `&${location.search.slice(1)}` : '';
     return <Navigate to={`/inventario?vista=${legacyVista}${extra}`} replace />;
+  }
+
+  if (personalVista) {
+    const extra = location.search ? `&${location.search.slice(1)}` : '';
+    return <Navigate to={`/personal?vista=${personalVista}${extra}`} replace />;
   }
 
   return (
@@ -271,8 +288,10 @@ function Home() {
                 )}
                 {tab === 'transfers' && <TransfersPage />}
                 {tab === 'promotions' && <PromotionsPage />}
-                {tab === 'users' && <UsersPage />}
-                {tab === 'timeclock' && <TimeClockPage />}
+                {/* S-01: shell unificado de Personal (Equipo · Fichajes). La vista
+                  activa vive en `?vista=`; cada segmento monta la página existente
+                  (UsersPage / TimeClockPage) tal cual. */}
+                {tab === 'personal' && <PersonalPage />}
                 {tab === 'stores' && <StoresPage onOpenStoreView={openStoreView} />}
                 {tab === 'suppliers' && <SuppliersPage />}
                 {tab === 'verifactu' && <VerifactuPage />}

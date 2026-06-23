@@ -52,6 +52,8 @@ export async function selectByLabel(
 // S-02 fase A: catalog/families/stock dejaron de ser entradas de menú — las absorbe la
 // entrada única 'inventory' (shell con vistas segmentadas). navTo las resuelve abriendo
 // Inventario y clicando el segmento correspondiente (ver INVENTORY_VIEW abajo).
+// S-01: users/timeclock dejaron de ser entradas de menú — las absorbe la entrada única
+// 'personal' (mismo patrón; ver PERSONAL_VIEW abajo).
 const NAV_GROUP_OF: Record<string, string> = {
   // Catálogo e inventario
   notifications: 'inventory',
@@ -64,8 +66,7 @@ const NAV_GROUP_OF: Record<string, string> = {
   promotions: 'commercial',
   // Organización
   stores: 'org',
-  users: 'org',
-  timeclock: 'org',
+  personal: 'org',
   settings: 'org',
   verifactu: 'org',
 };
@@ -80,14 +81,30 @@ const INVENTORY_VIEW: Record<string, 'catalogo' | 'familias' | 'existencias'> = 
   stock: 'existencias',
 };
 
+// S-01: las antiguas pages users/timeclock son ahora VISTAS del shell de Personal.
+// navTo(page, 'users'|'timeclock') abre Personal y clica el segmento; el contenido de
+// cada página se monta igual, así que los specs (que asertan users-table, timeclock-row,
+// etc.) siguen funcionando.
+const PERSONAL_VIEW: Record<string, 'equipo' | 'fichajes'> = {
+  users: 'equipo',
+  timeclock: 'fichajes',
+};
+
 // Navega por el menú de grupos: ancla el dropdown del grupo (clic) y elige la
 // page. Las directas (dashboard, help) se clican sin desplegar. Para las vistas de
-// Inventario (catalog/families/stock) abre Inventario y elige el segmento.
+// Inventario (catalog/families/stock) o de Personal (users/timeclock) abre el shell
+// correspondiente y elige el segmento.
 export async function navTo(page: Page, id: string): Promise<void> {
-  const view = INVENTORY_VIEW[id];
-  if (view) {
+  const inventoryView = INVENTORY_VIEW[id];
+  if (inventoryView) {
     await navTo(page, 'inventory');
-    await page.getByTestId(`inventory-view-${view}`).click();
+    await page.getByTestId(`inventory-view-${inventoryView}`).click();
+    return;
+  }
+  const personalView = PERSONAL_VIEW[id];
+  if (personalView) {
+    await navTo(page, 'personal');
+    await page.getByTestId(`personal-view-${personalView}`).click();
     return;
   }
   const group = NAV_GROUP_OF[id];

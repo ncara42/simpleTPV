@@ -11,6 +11,7 @@ export type Tab =
   | 'stock'
   | 'transfers'
   | 'promotions'
+  | 'personal'
   | 'users'
   | 'timeclock'
   | 'stores'
