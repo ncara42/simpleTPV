@@ -724,22 +724,28 @@ pub async fn list_models(
         // (todos sus modelos); si la llamada falla O devuelve una lista vacía se cae al
         // catálogo estático.
         if let Some(key) = &cfg.openai_key {
-            match &cfg.openai_base_url {
-                Some(base) => match simpletpv_ai::fetch_openai_models(base, key).await {
-                    // Lista viva no vacía: la del gateway manda.
-                    Ok(m) if !m.is_empty() => models.extend(m),
-                    // 200 con `data` vacío o de formato inesperado: NO dejar el chat
-                    // deshabilitado en silencio teniendo IA configurada — fallback.
-                    Ok(_) => {
-                        tracing::warn!("el gateway no devolvió modelos; uso catálogo estático");
-                        models.extend(simpletpv_ai::static_openai_models());
-                    }
-                    Err(e) => {
-                        tracing::warn!(error = %e, "no se pudieron listar los modelos del gateway; uso catálogo estático");
-                        models.extend(simpletpv_ai::static_openai_models());
-                    }
-                },
-                None => models.extend(simpletpv_ai::static_openai_models()),
+            // `OPENAI_MODELS` fija la lista EXACTA (ids + etiquetas) → autoridad, sin descubrimiento
+            // en vivo. Sin ella, se descubre la lista viva del gateway (fallback a catálogo estático).
+            if let Some(pinned) = simpletpv_ai::pinned_models() {
+                models.extend(pinned);
+            } else {
+                match &cfg.openai_base_url {
+                    Some(base) => match simpletpv_ai::fetch_openai_models(base, key).await {
+                        // Lista viva no vacía: la del gateway manda.
+                        Ok(m) if !m.is_empty() => models.extend(m),
+                        // 200 con `data` vacío o de formato inesperado: NO dejar el chat
+                        // deshabilitado en silencio teniendo IA configurada — fallback.
+                        Ok(_) => {
+                            tracing::warn!("el gateway no devolvió modelos; uso catálogo estático");
+                            models.extend(simpletpv_ai::static_openai_models());
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, "no se pudieron listar los modelos del gateway; uso catálogo estático");
+                            models.extend(simpletpv_ai::static_openai_models());
+                        }
+                    },
+                    None => models.extend(simpletpv_ai::static_openai_models()),
+                }
             }
         }
         // Anthropic directo solo cuando NO hay gateway (con gateway, sus claude-* ya vienen arriba).
