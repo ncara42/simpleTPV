@@ -414,6 +414,7 @@ pub fn build_router(state: AppState) -> Router {
             get(dashboard::sales_by_family),
         )
         .route("/dashboard/sales-by-hour", get(dashboard::sales_by_hour))
+        .route("/dashboard/sales-by-day", get(dashboard::sales_by_day))
         .route(
             "/dashboard/discount-by-employee",
             get(dashboard::discount_by_employee),

@@ -10,6 +10,7 @@ import { type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { apiGet, safe } from '../api.js';
+import { buildReportMetrics, type DailyPoint, type ReportMetrics } from './report-math.js';
 
 const period = z
   .enum([
@@ -53,6 +54,36 @@ function asNumber(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
 
+/** Lee un campo numérico de una rama `safe()` (puede ser `{ error }`); 0 si falta. */
+function fieldNum(v: unknown, key: string): number {
+  if (v != null && typeof v === 'object' && !('error' in v)) {
+    const n = (v as Record<string, unknown>)[key];
+    if (typeof n === 'number' && Number.isFinite(n)) return n;
+  }
+  return 0;
+}
+
+/** Normaliza la rama `sales-by-day` (array | `{ error }`) a puntos `{ day, revenue }`. */
+function asDaily(v: unknown): DailyPoint[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((d) => {
+    const o = (d ?? {}) as Record<string, unknown>;
+    const revenue = typeof o.revenue === 'number' && Number.isFinite(o.revenue) ? o.revenue : 0;
+    return { day: typeof o.day === 'string' ? o.day : '', revenue };
+  });
+}
+
+/**
+ * Periodo anterior equivalente para la comparativa. Solo los periodos "completos"
+ * tienen un anterior natural; today/yesterday/custom no comparan.
+ */
+const PREVIOUS_PERIOD: Record<string, string | undefined> = {
+  week: 'last_week',
+  month: 'last_month',
+  quarter: 'last_quarter',
+  year: 'last_year',
+};
+
 function getPath(obj: unknown, keys: string[]): unknown {
   let cur: unknown = obj;
   for (const k of keys) {
@@ -81,7 +112,7 @@ function overviewSummary(d: Record<string, unknown>): string {
 }
 
 /** Resumen breve del análisis de ventas (los datos completos van en structuredContent). */
-function breakdownSummary(d: Record<string, unknown>): string {
+function breakdownSummary(d: Record<string, unknown>, report?: ReportMetrics): string {
   const revenue = asNumber(getPath(d, ['kpis', 'revenue']));
   const tickets = asNumber(getPath(d, ['kpis', 'salesCount']));
   const marginPct = asNumber(getPath(d, ['margin', 'marginPct']));
@@ -90,6 +121,14 @@ function breakdownSummary(d: Record<string, unknown>): string {
   if (tickets != null) parts.push(`${tickets} tickets`);
   if (marginPct != null) parts.push(`margen ${(marginPct * 100).toFixed(1)} %`);
   const detail = parts.length > 0 ? parts.join(' · ') : 'sin ventas en el período';
+  if (report) {
+    const proj = Math.round(report.dailyAvg.revenue.projection);
+    return (
+      `Informe de ventas ${report.current.label} (día ${report.current.daysElapsed} de ${report.current.daysInMonth}) — ${detail}. ` +
+      `Media diaria ${Math.round(report.dailyAvg.revenue.current)} €/día (vs ${Math.round(report.dailyAvg.revenue.previous)} €/día en ${report.previous.label}); ` +
+      `proyección a fin de mes ${proj} €. El panel muestra comparativa, acumulado diario y desglose por tienda/familia/empleado/hora.`
+    );
+  }
   return `Análisis de ventas — ${detail}. Desglose por tienda/familia/empleado/hora en el panel.`;
 }
 
@@ -136,31 +175,67 @@ export function registerUiDashboardTools(server: McpServer): void {
     {
       title: 'Análisis de ventas',
       description:
-        'Análisis de ventas COMPLETO en una sola llamada: KPIs, margen y desglose por tienda, familia, franja horaria y empleado para el período indicado. Se muestra como panel visual con gráficos. Úsalo cuando el usuario pida "analizar las ventas" o un informe global en lugar de encadenar tools de desglose sueltas.',
+        'Informe de ventas COMPLETO en una sola llamada: para el mes en curso incluye comparativa con el mes anterior (en bruto y en media diaria comparable), proyección a fin de mes, acumulado diario y desglose por tienda, familia, franja horaria y empleado. Se muestra como panel visual con tarjetas y gráficos. Por defecto el período es el mes en curso. Úsalo cuando el usuario pida "analizar las ventas", "cómo va el mes" o un informe global en lugar de encadenar tools de desglose sueltas.',
       inputSchema: { period, storeId },
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
       _meta: { ui: { resourceUri: RESOURCE_URI } },
     },
     async (params) => {
+      // El informe es mensual por defecto: sin period explícito, mes en curso.
+      const period = params.period ?? 'month';
+      const storeId = params.storeId;
+      const prevPeriod = PREVIOUS_PERIOD[period];
+      // La comparativa rica (media diaria/proyección/acumulado) es específica del
+      // mes; para otros periodos se devuelve solo el desglose dimensional.
+      const wantsReport = period === 'month';
+
       const [kpis, margin, byStore, byFamily, byHour, byEmployee] = await Promise.all([
-        safe(apiGet('/dashboard/sales-kpis', params)),
-        safe(apiGet('/dashboard/margin-kpis', params)),
-        safe(apiGet('/dashboard/sales-by-store', { period: params.period })),
-        safe(apiGet('/dashboard/sales-by-family', params)),
-        safe(apiGet('/dashboard/sales-by-hour', params)),
-        safe(apiGet('/dashboard/sales-by-employee', params)),
+        safe(apiGet('/dashboard/sales-kpis', { period, storeId })),
+        safe(apiGet('/dashboard/margin-kpis', { period, storeId })),
+        safe(apiGet('/dashboard/sales-by-store', { period })),
+        safe(apiGet('/dashboard/sales-by-family', { period, storeId })),
+        safe(apiGet('/dashboard/sales-by-hour', { period, storeId })),
+        safe(apiGet('/dashboard/sales-by-employee', { period, storeId })),
       ]);
+
+      let report: ReportMetrics | undefined;
+      if (wantsReport && prevPeriod) {
+        const [prevKpis, prevMargin, dailyCur, dailyPrev] = await Promise.all([
+          safe(apiGet('/dashboard/sales-kpis', { period: prevPeriod, storeId })),
+          safe(apiGet('/dashboard/margin-kpis', { period: prevPeriod, storeId })),
+          safe(apiGet('/dashboard/sales-by-day', { period, storeId })),
+          safe(apiGet('/dashboard/sales-by-day', { period: prevPeriod, storeId })),
+        ]);
+        report = buildReportMetrics({
+          now: new Date(),
+          current: {
+            revenue: fieldNum(kpis, 'revenue'),
+            salesCount: fieldNum(kpis, 'salesCount'),
+            marginPct: fieldNum(margin, 'marginPct'),
+          },
+          previous: {
+            revenue: fieldNum(prevKpis, 'revenue'),
+            salesCount: fieldNum(prevKpis, 'salesCount'),
+            marginPct: fieldNum(prevMargin, 'marginPct'),
+          },
+          dailyCurrent: asDaily(dailyCur),
+          dailyPrevious: asDaily(dailyPrev),
+        });
+      }
+
       const structuredContent = {
         kind: 'breakdown',
+        period,
         kpis,
         margin,
         byStore,
         byFamily,
         byHour,
         byEmployee,
+        report,
       };
       return {
-        content: [{ type: 'text', text: breakdownSummary(structuredContent) }],
+        content: [{ type: 'text', text: breakdownSummary(structuredContent, report) }],
         structuredContent,
       };
     },

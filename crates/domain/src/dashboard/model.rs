@@ -76,6 +76,17 @@ pub struct SalesByHourItem {
     pub revenue: f64,
 }
 
+// ── sales-by-day: serie diaria (base del acumulado del informe de ventas) ─────
+/// Una fila por día natural CON ventas (`day` = fecha ISO `YYYY-MM-DD`). El cliente
+/// rellena los días sin ventas y acumula; aquí solo se emiten los días con datos.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SalesByDayItem {
+    pub day: String,
+    pub count: i64,
+    pub revenue: f64,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiscountByEmployeeItem {
