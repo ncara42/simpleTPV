@@ -236,6 +236,20 @@ export function GlobalStockSection({
       reason: '',
     });
 
+  // S-20/P124: toda la fila es clicable. Tienda única → abre el ajuste de esa tienda
+  // (la única visible); multi-tienda → despliega el desglose por tienda (mismo efecto
+  // que pulsar el heatmap). Los controles internos (chip inline, heatmap, chips del
+  // detalle) detienen la propagación para no disparar dos acciones. Si no hay tienda
+  // visible (caso degenerado), no hace nada.
+  const onCardClick = (row: StockRow): void => {
+    if (singleStore) {
+      const st = visibleStoresOf(row)[0];
+      if (st) openAdjust(row, st);
+      return;
+    }
+    toggleExpanded(row.productId);
+  };
+
   const saveAdjust = (): void => {
     if (!adjusting || adjustMutation.isPending) return;
     adjustMutation.mutate(adjusting);
@@ -276,7 +290,12 @@ export function GlobalStockSection({
               type="button"
               key={st.storeId}
               className="stock-store-inline"
-              onClick={() => openAdjust(row, st)}
+              onClick={(e) => {
+                // S-20: detener la propagación para no disparar también el clic de
+                // fila (que abriría el mismo ajuste por segunda vez).
+                e.stopPropagation();
+                openAdjust(row, st);
+              }}
               data-testid="stock-store-cell"
               title={`${LEVEL_LABEL[st.level]} · mín ${st.minStock} · clic para ajustar`}
             >
@@ -291,7 +310,12 @@ export function GlobalStockSection({
           <button
             type="button"
             className="stock-heatmap"
-            onClick={() => toggleExpanded(row.productId)}
+            onClick={(e) => {
+              // S-20: detener la propagación para que el clic de fila no togglee
+              // por segunda vez (doble toggle = sin efecto neto).
+              e.stopPropagation();
+              toggleExpanded(row.productId);
+            }}
             aria-expanded={isExpanded}
             data-testid="stock-heatmap"
           >
@@ -566,6 +590,12 @@ export function GlobalStockSection({
                 : { key, dir: 'asc' },
             )
           }
+          // S-20/P124: toda la fila es clicable. El handler no recibe el evento (el
+          // doble disparo se evita con stopPropagation en los controles internos).
+          // `.row-clickable` (catalog.css) marca el cursor; `.stock-row-clickable`
+          // añade el hover/focus específico de la vista Existencias.
+          onRowClick={onCardClick}
+          rowClassName={() => 'row-clickable stock-row-clickable'}
           rowTestId="stock-row"
           renderDetail={(row) => {
             if (singleStore || !expanded.has(row.productId)) return null;
@@ -576,7 +606,12 @@ export function GlobalStockSection({
                     type="button"
                     key={st.storeId}
                     className="stock-store-item"
-                    onClick={() => openAdjust(row, st)}
+                    onClick={(e) => {
+                      // S-20: el detalle ya está expandido; detener la propagación
+                      // evita que el clic de fila lo vuelva a plegar.
+                      e.stopPropagation();
+                      openAdjust(row, st);
+                    }}
                     data-testid="stock-store-cell"
                     title={`${LEVEL_LABEL[st.level]} · mín ${st.minStock} · clic para ajustar`}
                   >

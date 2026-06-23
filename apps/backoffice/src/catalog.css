@@ -3452,6 +3452,21 @@
 .row-clickable {
   cursor: pointer;
 }
+
+/* S-20/P124: fila clicable en la vista Existencias. Toda la fila abre el ajuste
+   (tienda única) o despliega el desglose (multi). Hover/focus con los tokens del
+   sistema; los controles internos conservan su propio estado y detienen la
+   propagación, por lo que su hover prevalece sobre el de la fila. */
+.stock-row-clickable {
+  transition: background 0.1s var(--ui-ease);
+}
+.stock-row-clickable:hover {
+  background: var(--ui-surface-subtle);
+}
+.stock-row-clickable:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--ui-primary);
+}
 .supplier-detail-title {
   display: flex;
   align-items: baseline;

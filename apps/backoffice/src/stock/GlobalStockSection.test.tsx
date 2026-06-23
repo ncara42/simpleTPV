@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Una fila con stock en dos tiendas; el TOTAL global (30) es independiente de la
@@ -175,5 +175,52 @@ describe('GlobalStockSection — traspaso desde rotura (S-16)', () => {
     expect(screen.getByTestId('stock-create-purchase')).toBeVisible();
     // No abre el modal directamente en este caso.
     expect(screen.queryByTestId('transfer-form')).not.toBeInTheDocument();
+  });
+});
+
+describe('GlobalStockSection — clic en la fila (S-20)', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    listAlertsMock.mockReset();
+    listAlertsMock.mockResolvedValue([]);
+    getGlobalStockMock.mockReset();
+    getGlobalStockMock.mockResolvedValue([ROW]);
+  });
+
+  it('tienda única: clic en la fila abre el ajuste de esa tienda (P124)', async () => {
+    renderSection();
+    await waitFor(() => expect(screen.getByText('Leche entera')).toBeInTheDocument());
+    // Seleccionar UNA sola tienda (Norte) → modo tienda única.
+    fireEvent.click(screen.getByTestId('stock-store'));
+    fireEvent.click(screen.getByText('Norte'));
+    // Clic en la fila (no en el chip interno) abre el modal de ajuste de esa tienda.
+    fireEvent.click(screen.getByTestId('stock-row'));
+    const modal = await screen.findByTestId('stock-adjust-form');
+    expect(modal).toBeVisible();
+    // El ajuste apunta a la tienda visible (Norte), con su cantidad (10). "Norte"
+    // también aparece en el chip del MultiSelect, así que se acota al modal.
+    expect(within(modal).getByText(/Norte/)).toBeInTheDocument();
+    expect((screen.getByTestId('stock-adjust-qty') as HTMLInputElement).value).toBe('10');
+  });
+
+  it('multi-tienda: clic en la fila despliega el desglose por tienda (P124)', async () => {
+    renderSection();
+    await waitFor(() => expect(screen.getByText('Leche entera')).toBeInTheDocument());
+    // Sin filtro de tienda = multi-tienda: el detalle arranca plegado.
+    expect(screen.queryByTestId('stock-detail-row')).not.toBeInTheDocument();
+    // Clic en la fila (no en el heatmap) lo expande.
+    fireEvent.click(screen.getByTestId('stock-row'));
+    expect(await screen.findByTestId('stock-detail-row')).toBeVisible();
+  });
+
+  it('clic en un control interno (heatmap) NO produce doble efecto (stopPropagation)', async () => {
+    renderSection();
+    await waitFor(() => expect(screen.getByText('Leche entera')).toBeInTheDocument());
+    expect(screen.queryByTestId('stock-detail-row')).not.toBeInTheDocument();
+    // Pulsar el heatmap UNA vez expande. Sin stopPropagation, el evento burbujearía a
+    // la fila y togglearía dos veces (heatmap + fila) → efecto neto nulo, el detalle
+    // seguiría plegado. Que aparezca demuestra que la propagación se detiene.
+    fireEvent.click(screen.getByTestId('stock-heatmap'));
+    expect(await screen.findByTestId('stock-detail-row')).toBeVisible();
   });
 });
