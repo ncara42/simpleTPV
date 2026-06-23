@@ -16,15 +16,11 @@ import type { CanvasOp } from './chat.js';
 import { BLOCK_IDS } from './dashboard-blocks.js';
 import type { PieceFormat, PieceId, SlotName } from './dashboard-layout.js';
 import { MAX_COMPOSITE_LEAVES } from './dashboard-layout.js';
-import { SLOT_PIECES, WIDGETABLE_ENDPOINTS } from './dashboard-pieces.js';
+import { PIECE_FORMATS, SLOT_PIECES, WIDGETABLE_ENDPOINTS } from './dashboard-pieces.js';
 
-const VALID_FORMATS: ReadonlySet<PieceFormat> = new Set<PieceFormat>([
-  'eur',
-  'percent',
-  'decimal',
-  'units',
-  'integer',
-]);
+// Formatos válidos = los del contrato (PIECE_FORMATS), no una copia que pueda quedar desfasada:
+// omitir `percentRatio` marcaba como inválidas composiciones correctas (detectado en la tanda viva).
+const VALID_FORMATS: ReadonlySet<PieceFormat> = new Set<PieceFormat>(PIECE_FORMATS);
 
 // Campos REALES (camelCase) de cada endpoint widgetable — espejo de `WIDGETABLE_ENDPOINTS` del
 // prompt (crates/domain/src/chat/context.rs). Verdad de tierra para validar que `labelField`/
