@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+import { AddExistingProductsModal } from './components/AddExistingProductsModal.js';
 import { useConfirm } from './components/ConfirmProvider.js';
 import { Modal } from './components/Modal.js';
 import {
@@ -725,6 +726,10 @@ export function FamiliesPage({
       updateProduct(id, { familyId }),
     onSuccess: invalidateProducts,
   });
+  // S-18: picker de productos EXISTENTES para añadirlos al nodo seleccionado.
+  // Aditivo al alta de nuevos (`fam-panel-add-product`); no toca el drag&drop ni
+  // `moveProductMut`. El hook `useAssignProductsToFamily` ya invalida las queries.
+  const [addingExisting, setAddingExisting] = useState(false);
   // Alta de producto con el nodo precargado (reusa el ProductFormModal de I-11).
   const [productForm, setProductForm] = useState<ProductFormState | null>(null);
   const createProductMut = useMutation({
@@ -864,16 +869,27 @@ export function FamiliesPage({
                     ))}
                   </ul>
                 )}
-                <Button
-                  type="button"
-                  className="fam-panel-add"
-                  onClick={() =>
-                    setProductForm({ ...EMPTY_PRODUCT_FORM, familyId: selectedNode.id })
-                  }
-                  data-testid="fam-panel-add-product"
-                >
-                  Añadir producto aquí
-                </Button>
+                <div className="fam-panel-actions">
+                  <Button
+                    type="button"
+                    className="fam-panel-add"
+                    onClick={() =>
+                      setProductForm({ ...EMPTY_PRODUCT_FORM, familyId: selectedNode.id })
+                    }
+                    data-testid="fam-panel-add-product"
+                  >
+                    Añadir producto aquí
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="fam-panel-add-existing"
+                    onClick={() => setAddingExisting(true)}
+                    data-testid="fam-panel-add-existing"
+                  >
+                    Añadir productos existentes
+                  </Button>
+                </div>
               </aside>
             )}
           </div>
@@ -895,6 +911,15 @@ export function FamiliesPage({
           }
           title={`Nuevo producto en ${selectedNode?.name ?? 'el nodo'}`}
           primaryLabel={createProductMut.isPending ? 'Creando…' : 'Crear'}
+        />
+      )}
+
+      {addingExisting && selectedNode && (
+        <AddExistingProductsModal
+          targetFamilyId={selectedNode.id}
+          targetFamilyName={selectedNode.name}
+          families={view}
+          onClose={() => setAddingExisting(false)}
         />
       )}
 

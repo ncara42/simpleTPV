@@ -505,6 +505,51 @@ test('Familias: panel de productos del nodo — ver, añadir aquí y mover (I-13
   await expect(page.getByTestId('catalog-table')).not.toContainText(name);
 });
 
+test('Familias: añadir productos existentes a un nodo desde el picker (S-18)', async ({ page }) => {
+  await navTo(page, 'families');
+  // Origen: arquetipo "Aceite CBD 20%". Tomamos un producto suyo para reasignarlo
+  // a otro nodo desde el picker de "Añadir productos existentes".
+  const origen = page.getByTestId('fam-row').filter({ hasText: 'Aceite CBD 20%' }).first();
+  await origen.click();
+  await expect(page.getByTestId('fam-products-panel')).toBeVisible();
+  await expect(page.getByTestId('fam-product-item').first()).toBeVisible();
+  const movableName = await page
+    .getByTestId('fam-product-item')
+    .first()
+    .getByTestId('fam-product-name')
+    .innerText();
+
+  // Destino: arquetipo "Aceite CBD 10%". Abrimos el picker desde su panel.
+  const destino = page.getByTestId('fam-row').filter({ hasText: 'Aceite CBD 10%' }).first();
+  await destino.click();
+  await expect(page.getByTestId('fam-products-panel')).toBeVisible();
+  const before = await page.getByTestId('fam-product-item').count();
+
+  await page.getByTestId('fam-panel-add-existing').click();
+  await expect(page.getByTestId('fam-add-existing-modal')).toBeVisible();
+
+  // Buscar el producto del otro arquetipo: muestra el badge "ya en otra familia".
+  await page.getByTestId('fam-add-existing-search').fill(movableName);
+  const row = page.getByTestId('fam-add-existing-item').filter({ hasText: movableName }).first();
+  await expect(row).toBeVisible();
+  await expect(row.getByTestId('fam-add-existing-other')).toBeVisible();
+
+  // Seleccionarlo y confirmar: el modal se cierra y el producto aparece en el panel
+  // del destino; el contador del nodo sube.
+  await row.getByTestId('fam-add-existing-check').check();
+  await page.getByTestId('fam-add-existing-confirm').click();
+  await expect(page.getByTestId('fam-add-existing-modal')).toHaveCount(0);
+  await expect(page.getByTestId('fam-product-list')).toContainText(movableName);
+  await expect.poll(() => page.getByTestId('fam-product-item').count()).toBe(before + 1);
+  await expect(destino.getByTestId('fam-count')).toHaveText(`${before + 1} productos`);
+
+  // Limpieza: devolver el producto a su arquetipo de origen vía "Mover" del panel.
+  const moved = page.getByTestId('fam-product-item').filter({ hasText: movableName });
+  await moved.getByTestId('fam-product-move').click();
+  await page.locator('[role="option"]', { hasText: 'Aceite CBD 20%' }).first().click();
+  await expect(page.getByTestId('fam-product-list')).not.toContainText(movableName);
+});
+
 test('Proveedores: vista detalle — datos editables, tarifa con import CSV y pedidos (I-18, D-07)', async ({
   page,
 }) => {

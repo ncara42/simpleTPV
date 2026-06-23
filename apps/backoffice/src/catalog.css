@@ -3439,6 +3439,57 @@
 .fam-panel-add {
   margin-top: var(--ui-space-1);
 }
+/* S-18: las dos acciones del panel (crear nuevo + añadir existentes) apiladas. */
+.fam-panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+  margin-top: var(--ui-space-1);
+}
+.fam-panel-actions .fam-panel-add {
+  margin-top: 0;
+}
+/* S-18: picker de productos existentes (modal con buscador + lista de checkboxes). */
+.fam-add-existing-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+.fam-add-existing-item {
+  border-radius: var(--ui-radius-sm);
+}
+.fam-add-existing-item:hover {
+  background: var(--ui-surface-subtle);
+}
+.fam-add-existing-item.is-disabled {
+  opacity: 0.6;
+}
+.fam-add-existing-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: 0.35rem 0.45rem;
+  cursor: pointer;
+}
+.fam-add-existing-item.is-disabled .fam-add-existing-row {
+  cursor: not-allowed;
+}
+.fam-add-existing-row input[type='checkbox'] {
+  width: auto;
+  margin: 0;
+}
+.fam-badge--soft {
+  color: var(--ui-text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
 @media (max-width: 900px) {
   .fam-layout.has-panel {
     grid-template-columns: 1fr;
