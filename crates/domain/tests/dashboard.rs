@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use simpletpv_domain::dashboard::period::{resolve_period, CompareMode, DashboardPeriod};
+use simpletpv_domain::dashboard::period::{resolve_period, CompareMode, DashboardPeriod, DateRange};
 use simpletpv_domain::dashboard::service;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use time::{OffsetDateTime, PrimitiveDateTime};
@@ -519,6 +519,58 @@ async fn sales_by_store_desglosa_facturacion_ticket_y_margen() {
         all.windows(2).all(|w| w[0].revenue >= w[1].revenue - 1e-9),
         "el desglose va de mayor a menor facturación"
     );
+
+    teardown(&c).await;
+}
+
+/// sales_by_day: agrupa las ventas por día natural (base del acumulado del informe).
+/// Inserta dos ventas en días distintos y comprueba que salen dos filas, ordenadas
+/// ascendentemente por fecha ISO y con la facturación correcta por día.
+#[tokio::test]
+async fn sales_by_day_agrupa_por_dia_natural() {
+    let c = setup().await;
+
+    let pfx = &c.store.simple().to_string()[..8];
+    // Venta de hoy (45) y de hace dos días (20), ancladas dentro del rango de consulta.
+    let hoy = now_utc() - time::Duration::minutes(10);
+    let hace_dos = now_utc() - time::Duration::days(2) - time::Duration::minutes(10);
+    insert_sale(&c, &format!("D{pfx}-1"), "45.00", hoy).await;
+    insert_sale(&c, &format!("D{pfx}-2"), "20.00", hace_dos).await;
+
+    // Rango explícito [hace 3 días 00:00, mañana 00:00) — cubre ambas ventas sin
+    // depender de bordes de semana/mes.
+    let range = DateRange {
+        from: PrimitiveDateTime::new(
+            (now_utc() - time::Duration::days(3)).date(),
+            time::Time::MIDNIGHT,
+        ),
+        to: PrimitiveDateTime::new(
+            (now_utc() + time::Duration::days(1)).date(),
+            time::Time::MIDNIGHT,
+        ),
+    };
+
+    let by_day = service::sales_by_day(&c.app, c.org, range, Some(c.store))
+        .await
+        .unwrap();
+
+    assert_eq!(by_day.len(), 2, "dos días con ventas: {by_day:?}");
+    assert!(
+        by_day.windows(2).all(|w| w[0].day <= w[1].day),
+        "ordenado ascendente por día: {:?}",
+        by_day.iter().map(|d| &d.day).collect::<Vec<_>>()
+    );
+    let total: f64 = by_day.iter().map(|d| d.revenue).sum();
+    assert!((total - 65.0).abs() < 1e-9, "facturación total = 45 + 20");
+    // El día de la venta de hoy factura 45 con un único ticket (fecha derivada del
+    // propio timestamp para no fallar en la ventana tras medianoche UTC).
+    let hoy_iso = hoy.date().to_string();
+    let hoy_row = by_day
+        .iter()
+        .find(|d| d.day == hoy_iso)
+        .expect("aparece el día de la venta reciente");
+    assert!((hoy_row.revenue - 45.0).abs() < 1e-9, "ese día factura 45");
+    assert_eq!(hoy_row.count, 1, "un ticket ese día");
 
     teardown(&c).await;
 }
