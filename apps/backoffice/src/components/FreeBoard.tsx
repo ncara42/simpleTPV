@@ -64,6 +64,9 @@ const ZOOM_STEP = 1.2;
 const PAN_THRESHOLD = 4; // px para distinguir pan de click
 const DRAG_THRESHOLD_PX = 4; // px para distinguir arrastre de un elemento de un click en su contenido
 const FIT_PADDING = 48;
+// Tope de zoom al CENTRAR/AJUSTAR la vista al contenido: nunca acercar más del 85%, aunque el
+// contenido sea pequeño y cupiera más grande (deja aire alrededor). El zoom manual sí llega a ZOOM_MAX.
+const FIT_MAX_ZOOM = 0.85;
 const WHEEL_ZOOM_SENSITIVITY = 0.002;
 const KEY_PAN = 48; // px de pan por flecha en el fondo
 const KEY_MOVE = 10; // px de mundo por flecha al mover un elemento enfocado
@@ -343,10 +346,12 @@ export function FreeBoard({
     if (cw <= 0 || ch <= 0) return;
     const w = el.clientWidth;
     const h = el.clientHeight;
+    // Centrar/ajustar topa en FIT_MAX_ZOOM (85%): con contenido grande sigue alejando para que
+    // quepa, pero con contenido compacto no se acerca más del 85% (antes llegaba hasta ZOOM_MAX).
     const zoom = clamp(
       Math.min((w - 2 * FIT_PADDING) / cw, (h - 2 * FIT_PADDING) / ch),
       ZOOM_MIN,
-      ZOOM_MAX,
+      FIT_MAX_ZOOM,
     );
     setView({
       zoom,
