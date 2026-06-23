@@ -1,16 +1,20 @@
+import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 
 import { CatalogPage } from './CatalogPage.js';
+import { InventoryFilters } from './components/InventoryFilters.js';
 import { FamiliesPage } from './FamiliesPage.js';
+import { listFamilies } from './lib/families.js';
 import { StockPage } from './StockPage.js';
 
-// S-02 fase A — Shell unificado de Inventario. Reúne las tres vistas (Catálogo /
-// Familias / Existencias) bajo una sola entrada de menú y un control segmentado.
-// La vista activa vive en la URL (`?vista=`) para que sea compartible y sobreviva al
-// reload, en línea con el resto de filtros de paso (F0c). En esta fase cada segmento
-// monta la PÁGINA EXISTENTE tal cual: aquí solo va el shell + el selector, sin tocar
-// la lógica interna de las páginas (la extracción de vistas y el filtro compartido
-// son fases posteriores de S-02).
+// S-02 fases B-E — Shell unificado de Inventario. Reúne las tres vistas (Catálogo /
+// Familias / Existencias) bajo una sola entrada de menú, un FILTRO COMPARTIDO
+// (búsqueda + familia) y un control segmentado de vista.
+//
+// El filtro compartido y la vista activa viven en la URL (`?q=`, `?family=`,
+// `?vista=`) para que sean compartibles y sobrevivan al reload (F0c). Los valores se
+// pasan como props CONTROLADAS a cada vista: la búsqueda/familia las gobierna este
+// shell, no la caja propia de cada página (que se oculta en modo controlado).
 
 type Vista = 'catalogo' | 'familias' | 'existencias';
 
@@ -31,26 +35,46 @@ interface InventoryPageProps {
   onOpenCatalogFamily: (id: string) => void;
 }
 
-export function InventoryPage({
-  initialFamilyId,
-  initialStoreId,
-  initialSearch,
-  onOpenCatalogFamily,
-}: InventoryPageProps) {
+export function InventoryPage({ initialStoreId, onOpenCatalogFamily }: InventoryPageProps) {
   const [params, setParams] = useSearchParams();
   const raw = params.get('vista');
   const vista: Vista = raw === 'familias' || raw === 'existencias' ? raw : 'catalogo';
 
-  // Cambiar de vista preserva el resto de search params (deep-links de paso) y solo
-  // fija `vista`. `replace` evita acumular entradas de historial al alternar vistas.
-  const selectVista = (next: Vista): void => {
+  // Filtro COMPARTIDO en URL-state: `?q=` (búsqueda) y `?family=` (nodo de familia).
+  // Fuente única para las tres vistas; los deep-links antiguos (?q=/?family=) ya
+  // llegan en la URL, así que no hay que sincronizar estado aparte.
+  const search = params.get('q') ?? '';
+  const familyId = params.get('family') ?? '';
+
+  // Árbol de familias para el selector jerárquico del filtro compartido.
+  const { data: families = [] } = useQuery({
+    queryKey: ['families'],
+    queryFn: listFamilies,
+  });
+
+  // Escribe un parámetro de la URL preservando el resto (vista, store…). Cadena
+  // vacía → borra el parámetro (URL limpia). `replace` evita acumular historial al
+  // teclear/alternar.
+  const setParam = (key: string, value: string): void => {
     const updated = new URLSearchParams(params);
-    updated.set('vista', next);
+    if (value) updated.set(key, value);
+    else updated.delete(key);
     setParams(updated, { replace: true });
   };
 
+  const setSearch = (value: string): void => setParam('q', value);
+  const setFamily = (value: string): void => setParam('family', value);
+  const selectVista = (next: Vista): void => setParam('vista', next);
+
   return (
     <div className="inventory-page" data-testid="inventory-page">
+      <InventoryFilters
+        families={families}
+        search={search}
+        onSearchChange={setSearch}
+        familyId={familyId}
+        onFamilyChange={setFamily}
+      />
       <div className="inventory-views bo-tabs" role="tablist" aria-label="Vista de inventario">
         {VISTAS.map(({ id, label }) => (
           <button
@@ -66,13 +90,30 @@ export function InventoryPage({
           </button>
         ))}
       </div>
-      {/* `?? null`: con exactOptionalPropertyTypes, las props initial* del shell son
-        `string | null | undefined`; las páginas aceptan `string | null`, así que el
-        `undefined` (prop ausente) se normaliza a `null` (sin filtro). */}
-      {vista === 'catalogo' && <CatalogPage initialFamilyId={initialFamilyId ?? null} />}
-      {vista === 'familias' && <FamiliesPage onOpenCatalogFamily={onOpenCatalogFamily} />}
+      {vista === 'catalogo' && (
+        <CatalogPage
+          search={search}
+          onSearchChange={setSearch}
+          familyFilter={familyId}
+          onFamilyFilterChange={setFamily}
+        />
+      )}
+      {vista === 'familias' && (
+        <FamiliesPage
+          onOpenCatalogFamily={onOpenCatalogFamily}
+          search={search}
+          onSearchChange={setSearch}
+          familyId={familyId}
+        />
+      )}
       {vista === 'existencias' && (
-        <StockPage initialStoreId={initialStoreId ?? null} initialSearch={initialSearch ?? null} />
+        <StockPage
+          initialStoreId={initialStoreId ?? null}
+          search={search}
+          onSearchChange={setSearch}
+          familyId={familyId}
+          onFamilyChange={setFamily}
+        />
       )}
     </div>
   );

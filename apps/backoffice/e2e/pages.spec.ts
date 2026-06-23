@@ -495,8 +495,10 @@ test('Familias: panel de productos del nodo — ver, añadir aquí y mover (I-13
   await expect(page.getByTestId('catalog-table')).toBeVisible();
   await expect(page.getByTestId('catalog-table')).toContainText(name);
 
-  // Limpieza: borrar el producto creado para no contaminar el seed.
-  await page.getByTestId('catalog-search').fill(name);
+  // Limpieza: borrar el producto creado para no contaminar el seed. S-02 fases B-E:
+  // el Catálogo ya no tiene caja propia (`catalog-search`); la búsqueda es el filtro
+  // COMPARTIDO del shell de Inventario (`inventory-search`).
+  await page.getByTestId('inventory-search').fill(name);
   await expect(page.getByTestId('product-select')).toHaveCount(1);
   await page.getByTestId('product-select').check();
   await page.getByTestId('products-delete').click();
@@ -817,7 +819,9 @@ test('U-11/U-12: la campana abre Notificaciones y "Resolver" lleva a Stock del p
   const productName = (await firstAlert.locator('td').first().textContent())?.trim() ?? '';
   await firstAlert.getByTestId('alert-resolve').click();
   await expect(page.getByTestId('stock-page')).toBeVisible();
-  await expect(page.getByTestId('stock-search')).toHaveValue(productName);
+  // S-02 fases B-E: Existencias ya no tiene caja propia (`stock-search`); la búsqueda
+  // es el filtro COMPARTIDO del shell de Inventario, poblado desde el deep-link `?q=`.
+  await expect(page.getByTestId('inventory-search')).toHaveValue(productName);
 });
 
 test('La campana togglea Notificaciones y vuelve a la página anterior', async ({ page }) => {

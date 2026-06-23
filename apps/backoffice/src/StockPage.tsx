@@ -8,9 +8,18 @@ import { GlobalStockSection } from './stock/GlobalStockSection.js';
 export function StockPage({
   initialStoreId,
   initialSearch,
+  search,
+  onSearchChange,
+  familyId,
+  onFamilyChange,
 }: {
   initialStoreId?: string | null;
   initialSearch?: string | null;
+  // S-02 fase E — filtro compartido del shell de Inventario (controlado).
+  search?: string;
+  onSearchChange?: (value: string) => void;
+  familyId?: string;
+  onFamilyChange?: (value: string) => void;
 }) {
   const qc = useQueryClient();
 
@@ -37,6 +46,10 @@ export function StockPage({
       <GlobalStockSection
         initialStoreId={initialStoreId ?? null}
         initialSearch={initialSearch ?? null}
+        {...(search !== undefined ? { search } : {})}
+        {...(onSearchChange ? { onSearchChange } : {})}
+        {...(familyId !== undefined ? { familyId } : {})}
+        {...(onFamilyChange ? { onFamilyChange } : {})}
       />
     </section>
   );
