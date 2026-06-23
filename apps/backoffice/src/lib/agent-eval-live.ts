@@ -34,6 +34,10 @@ export interface EvalLiveConfig {
   effort: 'low' | 'medium' | 'high';
   judge: JudgeConfig;
   timeoutMs: number;
+  // Pausa entre peticiones (ms) y reintentos ante rate-limit (429): necesarios para tiers gratuitos
+  // con límites de tokens/min bajos (p. ej. Groq free). 0 = sin pausa / sin reintento.
+  requestDelayMs: number;
+  maxRetries: number;
 }
 
 // Lee las variables de entorno sin depender de @types/node (el bundle del backoffice es de navegador).
@@ -68,6 +72,8 @@ export function evalConfigFromEnv(
         model: env.EVAL_JUDGE_MODEL!,
       },
       timeoutMs: Number(env.EVAL_TIMEOUT_MS ?? 120_000),
+      requestDelayMs: Number(env.EVAL_REQUEST_DELAY_MS ?? 0),
+      maxRetries: Number(env.EVAL_MAX_RETRIES ?? 0),
     },
   };
 }
@@ -350,22 +356,69 @@ export async function judgeComposition(
   return parseJudgeScores(content);
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// ¿El error es transitorio y conviene reintentar? Cubre rate-limit (429/TPM) y sobrecarga del
+// proveedor (503/overload/«workers busy»/«retry later») — los tiers gratuitos los devuelven a menudo.
+export function isRateLimited(message: string): boolean {
+  return /\b429\b|\b503\b|rate.?limit|tokens per minute|TPM|resourceexhausted|overloaded|service unavailable|workers are busy|retry later/i.test(
+    message,
+  );
+}
+
+// Extrae el «try again in Xs» del mensaje del proveedor (ms); por defecto 20s (sobrecarga 503 sin
+// pista de tiempo; los rate-limit de tokens sí traen el tiempo en el mensaje y se respeta).
+export function retryAfterMs(message: string, fallbackMs = 20_000): number {
+  const m = message.match(/try again in ([\d.]+)\s*s/i);
+  return m ? Math.ceil(parseFloat(m[1]!) * 1000) + 1_000 : fallbackMs;
+}
+
+// Ejecuta `fn` reintentando ante rate-limit: espera lo que pida el proveedor y reintenta hasta
+// `maxRetries`. Cualquier otro error se propaga inmediatamente.
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number,
+  log: (msg: string) => void,
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (attempt >= maxRetries || !isRateLimited(message)) throw err;
+      const wait = retryAfterMs(message);
+      log(
+        `   ⏳ rate-limit; espero ${Math.round(wait / 1000)}s y reintento (${attempt + 1}/${maxRetries})`,
+      );
+      await sleep(wait);
+    }
+  }
+}
+
 // Orquesta el arnés completo sobre `EVAL_REQUESTS`. Una petición que falle (red/juez) entra como
-// resultado inválido con `error`, para no abortar la tanda y que el resumen lo refleje.
+// resultado inválido con `error`, para no abortar la tanda y que el resumen lo refleje. Pausa
+// `requestDelayMs` entre peticiones y reintenta ante rate-limit (`maxRetries`) para tiers gratuitos.
 export async function runEvalSuite(
   config: EvalLiveConfig,
   requests: readonly EvalRequest[] = EVAL_REQUESTS,
   log: (msg: string) => void = () => {},
 ): Promise<EvalSummary> {
   const results: EvalResult[] = [];
+  let first = true;
   for (const req of requests) {
+    if (!first && config.requestDelayMs > 0) await sleep(config.requestDelayMs);
+    first = false;
     log(`▶ ${req.id}: ${req.prompt}`);
     try {
-      const turn = await runAgentTurn(config, req);
+      const turn = await withRetry(() => runAgentTurn(config, req), config.maxRetries, log);
       if (turn.error) throw new Error(turn.error);
       const report = validateComposition(turn.ops);
       const hitsExpected = compositionHits(turn.ops, req.expectsAnyOf);
-      const scores = report.valid ? await judgeComposition(config, req, turn.ops) : {};
+      const scores = report.valid
+        ? await withRetry(() => judgeComposition(config, req, turn.ops), config.maxRetries, log)
+        : {};
       const meanScore = meanOfScores(scores);
       results.push({
         id: req.id,
