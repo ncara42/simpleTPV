@@ -74,6 +74,20 @@ describe('GlobalStockSection (S-14)', () => {
     expect(screen.getByText('30')).toBeInTheDocument();
   });
 
+  it('oculta la columna Total global al seleccionar UNA sola tienda (S-15)', async () => {
+    renderSection();
+    await waitFor(() => expect(screen.getByText('Leche entera')).toBeInTheDocument());
+    // Con todas las tiendas (selección vacía), la columna Total global está presente.
+    expect(screen.getByRole('columnheader', { name: 'Total' })).toBeInTheDocument();
+    // Seleccionar una sola tienda (Norte) en el MultiSelect.
+    fireEvent.click(screen.getByTestId('stock-store'));
+    fireEvent.click(screen.getByText('Norte'));
+    // S-15: con 1 tienda, "Por tienda" ya muestra esa cifra → el Total global se oculta.
+    await waitFor(() =>
+      expect(screen.queryByRole('columnheader', { name: 'Total' })).not.toBeInTheDocument(),
+    );
+  });
+
   it('expone el filtro multi-tienda (MultiSelect) en vez del Select simple', async () => {
     renderSection();
     await waitFor(() => expect(screen.getByTestId('stock-store')).toBeInTheDocument());

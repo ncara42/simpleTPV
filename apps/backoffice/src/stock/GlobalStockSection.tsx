@@ -209,7 +209,7 @@ export function GlobalStockSection({
   // Columnas del DataTable. D-12: Producto · Por tienda · Total · Rotación (la
   // columna Familia anterior siempre pintaba "—": eliminada). La acción
   // Movimientos va fija fuera de la configuración (I-12 la reubicará).
-  const dataColumns: DataTableColumn<StockRow>[] = [
+  const allColumns: DataTableColumn<StockRow>[] = [
     { key: 'product', header: 'Producto', sortable: true, render: (r) => r.productName },
     {
       key: 'rotation',
@@ -290,6 +290,10 @@ export function GlobalStockSection({
       render: (row) => <strong>{row.total}</strong>,
     },
   ];
+  // S-15/P080: con UNA sola tienda seleccionada, la columna "Por tienda" ya muestra esa
+  // cifra; el Total global se oculta de la tabla para no duplicar dos columnas con el
+  // mismo número. El CSV (handleExport) conserva SIEMPRE la columna Total.
+  const dataColumns = allColumns.filter((col) => !(singleStore && col.key === 'total'));
   const {
     effectiveColumns,
     editor: columnsEditor,
@@ -301,11 +305,13 @@ export function GlobalStockSection({
   });
   const tableColumns = effectiveColumns;
 
-  // Orden cliente por producto/total.
-  const sortedRows = sort
+  // Orden cliente por producto/total. S-15: si el Total se ocultó (1 tienda), no se
+  // ordena por una columna inexistente; el orden cae al nombre de producto.
+  const activeSort = sort && !(singleStore && sort.key === 'total') ? sort : null;
+  const sortedRows = activeSort
     ? [...filtered].sort((a, b) => {
-        const dir = sort.dir === 'desc' ? -1 : 1;
-        if (sort.key === 'total') return (a.total - b.total) * dir;
+        const dir = activeSort.dir === 'desc' ? -1 : 1;
+        if (activeSort.key === 'total') return (a.total - b.total) * dir;
         return a.productName.localeCompare(b.productName) * dir;
       })
     : filtered;
