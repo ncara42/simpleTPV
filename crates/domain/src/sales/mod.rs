@@ -15,5 +15,6 @@ pub use export_service::{ExportFormat, SalesExportFilter};
 pub use input::{CreateSale, CreateSaleLine, ReserveTicketBlock};
 pub use model::{
     DiscountSource, OrgInfo, PaymentMethod, Sale, SaleLine, SaleStatus, SaleWithLines,
-    SalesExportMeta, SalesExportStatus, SalesPage, StoreInfo, TicketBlock, TicketData, TicketLine,
+    SalesExportMeta, SalesExportStatus, SalesPage, SalesSeriesPoint, SalesStats, SalesStatsTotals,
+    StoreInfo, TicketBlock, TicketData, TicketLine,
 };

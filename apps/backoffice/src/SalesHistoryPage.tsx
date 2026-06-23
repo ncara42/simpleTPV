@@ -20,6 +20,7 @@ import { useFeatures } from './lib/features.js';
 import { fmtEur, fmtRate } from './lib/format.js';
 import { usePageActions } from './lib/pageActions.js';
 import { isDashboardPeriod, PERIOD_OPTIONS, periodToRange } from './lib/period.js';
+import { SalesStats } from './sales/SalesStats.js';
 
 const hour = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
 const PAYMENT_LABEL: Record<string, string> = { CASH: 'Efectivo', CARD: 'Tarjeta' };
@@ -415,6 +416,11 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
       )}
 
       {columnsEditor}
+
+      {/* S-10: estadísticas embebidas (KPIs + serie temporal) con los MISMOS filtros
+          que la tabla (incluido el periodo de S-11). Misma `toQuery(filters)` que
+          alimenta `listSales`, así KPIs/gráfica y tabla se recalculan a la vez. */}
+      <SalesStats query={toQuery(filters)} />
 
       <DataTable
         columns={effectiveColumns}

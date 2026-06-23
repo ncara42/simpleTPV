@@ -26,8 +26,8 @@ use super::domain::{
 };
 use super::input::CreateSale;
 use super::model::{
-    OrgInfo, Sale, SaleLine, SaleListItem, SaleStatus, SaleWithLines, SalesPage, SalesTotals,
-    StoreInfo, TicketBlock, TicketData, TicketLine,
+    OrgInfo, Sale, SaleLine, SaleListItem, SaleStatus, SaleWithLines, SalesPage, SalesSeriesPoint,
+    SalesStats, SalesStatsTotals, SalesTotals, StoreInfo, TicketBlock, TicketData, TicketLine,
 };
 
 const MAX_SALES_PAGE_SIZE: i64 = 100;
@@ -675,6 +675,101 @@ fn push_completed_where(
         .push_bind(requester)
         .push(")");
     }
+}
+
+/// Agregado de estadística (nº de tickets COMPLETED + importe) de un `filter`, con
+/// el MISMO WHERE estructural que el listado/totales (`push_completed_where`). Una
+/// sola consulta; la división por cero no aplica (solo suma). Se ejecuta dentro de
+/// la tx con contexto de tenant ya abierta.
+async fn stats_totals(
+    tx: &mut Transaction<'_, Postgres>,
+    org: Uuid,
+    requester: Uuid,
+    is_org_wide: bool,
+    f: &SalesFilter,
+) -> Result<SalesStatsTotals, sqlx::Error> {
+    let mut qb: QueryBuilder<Postgres> =
+        QueryBuilder::new(r#"SELECT count(*)::bigint, COALESCE(SUM(total), 0) FROM "Sale""#);
+    push_completed_where(&mut qb, org, requester, is_org_wide, f, "");
+    let (count, total_amount): (i64, Decimal) = qb.build_query_as().fetch_one(&mut **tx).await?;
+    Ok(SalesStatsTotals {
+        count,
+        total_amount,
+    })
+}
+
+/// `GET /sales/stats` (S-10) — estadísticas embebidas en la page Ventas: serie
+/// temporal diaria + KPIs del periodo + comparativa con el periodo anterior, todo
+/// sobre el MISMO `SalesFilter` que `GET /sales` y SOLO ventas COMPLETED (las
+/// VOIDED no suman, igual que en los totales del listado). RLS por tenant; un CLERK
+/// (`!is_org_wide`) queda acotado a sus tiendas vía `push_completed_where`.
+///
+/// `previous`: si el filtro acota un rango `[from, to)`, el periodo anterior es ese
+/// mismo rango desplazado hacia atrás su propia duración (`from' = from − (to −
+/// from)`, `to' = from`), respetando el RESTO de filtros (store/user/family/q). Si
+/// el filtro NO tiene rango de fechas (sin `from`/`to`/`date`), no hay periodo
+/// anterior bien definido → `previous = None` (la UI oculta la comparativa).
+pub async fn sales_stats(
+    pool: &PgPool,
+    org: Uuid,
+    requester: Uuid,
+    is_org_wide: bool,
+    filter: SalesFilter,
+) -> Result<SalesStats, AppError> {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        // 1. Serie temporal: ventas COMPLETED agregadas por día (`date_trunc('day')`).
+        // Mismo WHERE estructural que los totales del listado (familia/q/store/user/
+        // fecha + scope del CLERK). El bucket se emite como fecha ISO `YYYY-MM-DD`.
+        let mut series_qb: QueryBuilder<Postgres> = QueryBuilder::new(
+            r#"SELECT to_char(date_trunc('day', "createdAt"), 'YYYY-MM-DD'),
+                 count(*)::bigint, COALESCE(SUM(total), 0) FROM "Sale""#,
+        );
+        push_completed_where(&mut series_qb, org, requester, is_org_wide, &filter, "");
+        series_qb.push(r#" GROUP BY date_trunc('day', "createdAt") ORDER BY 1"#);
+        let series_rows: Vec<(String, i64, Decimal)> =
+            series_qb.build_query_as().fetch_all(&mut **tx).await?;
+        let series = series_rows
+            .into_iter()
+            .map(|(bucket, count, total)| SalesSeriesPoint {
+                bucket,
+                count,
+                total,
+            })
+            .collect();
+
+        // 2. KPIs del periodo en curso.
+        let current = stats_totals(tx, org, requester, is_org_wide, &filter).await?;
+
+        // 3. Comparativa con el periodo anterior equivalente: solo cuando el filtro
+        // acota un rango `[from, to)`. Se desplaza el rango hacia atrás su propia
+        // duración y se reusa el RESTO de filtros (clonando el filtro y sustituyendo
+        // únicamente `from`/`to`).
+        let previous = match (filter.from, filter.to) {
+            (Some(from), Some(to)) => {
+                let duration = to - from;
+                let prev_filter = SalesFilter {
+                    store_id: filter.store_id,
+                    user_id: filter.user_id,
+                    status: filter.status.clone(),
+                    family_id: filter.family_id,
+                    q: filter.q.clone(),
+                    from: Some(from - duration),
+                    to: Some(from),
+                    page: filter.page,
+                    page_size: filter.page_size,
+                };
+                Some(stats_totals(tx, org, requester, is_org_wide, &prev_filter).await?)
+            }
+            _ => None,
+        };
+
+        Ok(SalesStats {
+            series,
+            current,
+            previous,
+        })
+    })
+    .await
 }
 
 /// `POST /sales/:id/void` — anula una venta (ADMIN/MANAGER) y repone el stock al

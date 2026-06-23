@@ -134,6 +134,45 @@ pub struct SalesTotals {
     pub avg_margin_pct: Decimal,
 }
 
+/// KPIs de un periodo para la comparativa de estadísticas (S-10). Mismos importes
+/// que `SalesTotals` pero sin las tasas de descuento/margen (la comparativa pinta
+/// total facturado, nº de tickets y ticket medio). `total_amount` como string
+/// normalizado (paridad Prisma); `count` como número.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SalesStatsTotals {
+    pub count: i64,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub total_amount: Decimal,
+}
+
+/// Punto de la serie temporal de ventas (S-10): un bucket diario
+/// (`date_trunc('day', createdAt)`) con su nº de tickets e importe. Solo días con
+/// ventas COMPLETED (la BD no rellena los huecos). `bucket` es la fecha ISO
+/// `YYYY-MM-DD` del día.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SalesSeriesPoint {
+    pub bucket: String,
+    pub count: i64,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub total: Decimal,
+}
+
+/// Estadísticas de ventas embebidas en la page Ventas (S-10): serie temporal +
+/// KPIs del periodo actual + KPIs del periodo anterior equivalente (comparativa).
+/// Se calcula sobre el MISMO `SalesFilter` que `GET /sales`, solo ventas COMPLETED.
+/// `previous` es `None` cuando el filtro no acota un rango de fechas (sin
+/// `from`/`to`/`date`): sin rango no hay "periodo anterior" bien definido, así que
+/// la comparativa se omite en lugar de inventar una ventana arbitraria.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SalesStats {
+    pub series: Vec<SalesSeriesPoint>,
+    pub current: SalesStatsTotals,
+    pub previous: Option<SalesStatsTotals>,
+}
+
 /// Fila del historial: venta + nombres denormalizados de tienda y vendedor (el frontend
 /// los pinta como columnas «Tienda»/«Vendedor»). NestJS los servía como relaciones anidadas;
 /// aquí van planos (`storeName`/`sellerName`) para no re-anidar en SQL.
