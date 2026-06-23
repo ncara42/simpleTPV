@@ -427,7 +427,7 @@ describe('normalizeGenericSpec — panel v2 (#204): REPARA en vez de podar', () 
     expect(spec.density).toBe('comfortable');
     expect(spec.slots?.kpis).toHaveLength(1);
     expect(spec.slots?.charts?.[0]?.piece).toBe('comparisonBars');
-    expect(spec.defaultSize).toEqual({ w: 6, h: 4 }); // RECIPE_SIZE
+    expect(spec.defaultSize).toEqual({ w: 6, h: 3 }); // RECIPE_SIZE (kpiRow+oneChart, media anchura)
   });
 
   it('REUBICA una pieza en el slot equivocado (no la descarta) y lo reporta en reason', () => {

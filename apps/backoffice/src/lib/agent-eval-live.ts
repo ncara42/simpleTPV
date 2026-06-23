@@ -9,10 +9,13 @@
 // que se salta si falta configuración (ver `evalConfigFromEnv`).
 
 import {
+  EVAL_NEGATIVE_REQUESTS,
   EVAL_REQUESTS,
   EVAL_RUBRIC,
   EVAL_THRESHOLD,
   type EvalRequest,
+  hasDataComposition,
+  type NegativeEvalRequest,
   validateComposition,
   type Violation,
 } from './agent-eval-harness.js';
@@ -452,4 +455,50 @@ export async function runEvalSuite(
     }
   }
   return aggregate(results);
+}
+
+export interface NegativeResult {
+  id: string;
+  composed: boolean;
+  ok: boolean;
+  toolCalls: number;
+  error?: string;
+}
+export interface NegativeSummary {
+  total: number;
+  passed: number;
+  results: NegativeResult[];
+}
+
+// Gate de casos NEGATIVOS (Anthropic: "test ... where it shouldn't"): ejecuta cada petición que NO
+// debe componer y verifica `hasDataComposition === false`. Reutiliza `runAgentTurn` (solo usa el
+// prompt). Una buena tanda exige passed === total.
+export async function runNegativeSuite(
+  config: EvalLiveConfig,
+  requests: readonly NegativeEvalRequest[] = EVAL_NEGATIVE_REQUESTS,
+  log: (msg: string) => void = () => {},
+): Promise<NegativeSummary> {
+  const results: NegativeResult[] = [];
+  let first = true;
+  for (const neg of requests) {
+    if (!first && config.requestDelayMs > 0) await sleep(config.requestDelayMs);
+    first = false;
+    log(`▷ ${neg.id}: ${neg.prompt}`);
+    try {
+      const turn = await withRetry(
+        () => runAgentTurn(config, { ...neg, expectsAnyOf: [] }),
+        config.maxRetries,
+        log,
+      );
+      if (turn.error) throw new Error(turn.error);
+      const composed = hasDataComposition(turn.ops);
+      results.push({ id: neg.id, composed, ok: !composed, toolCalls: turn.toolCalls });
+      log(`   composed=${composed} ok=${!composed}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      log(`   ✗ ${message}`);
+      results.push({ id: neg.id, composed: false, ok: false, toolCalls: 0, error: message });
+    }
+  }
+  return { total: results.length, passed: results.filter((r) => r.ok).length, results };
 }

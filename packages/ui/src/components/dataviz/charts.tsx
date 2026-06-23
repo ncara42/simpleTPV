@@ -110,6 +110,9 @@ export function ShareDonut({
         <PieChart
           data={clean}
           donut
+          // Misma altura que <Chart> (248) para que en un panel mixto (donut junto a barras/línea)
+          // ambas piezas mantengan el mismo ritmo vertical (consistencia Carbon).
+          height={248}
           formatValue={(v) => formatValue(v, format)}
           ariaLabel={title ?? 'Reparto'}
         />

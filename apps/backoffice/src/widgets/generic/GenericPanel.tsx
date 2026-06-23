@@ -90,10 +90,55 @@ function toDataSource(piece: PieceSpec): GenericDataSource {
   };
 }
 
+// Claves de valor/etiqueta conocidas de los endpoints de la allowlist, en orden de preferencia.
+// RED DE SEGURIDAD: cuando el agente nombra mal value_field/label_field (p. ej. pide "total" pero
+// `/dashboard/product-rankings` con rankBy devuelve "value"), la pieza degeneraba a barras al 2%
+// con la etiqueta recortada y PARECÍA vacía. Solo se usan si el campo pedido NO existe en ningún
+// registro (no se sobrescribe nunca un spec legítimo).
+const VALUE_FALLBACKS = [
+  'value',
+  'total',
+  'revenue',
+  'amount',
+  'salesCount',
+  'count',
+  'units',
+  'quantity',
+] as const;
+const LABEL_FALLBACKS = [
+  'name',
+  'label',
+  'productName',
+  'familyName',
+  'userName',
+  'storeName',
+  'hour',
+  'lotCode',
+] as const;
+
+// ¿La clave está presente en algún registro? Comprueba PRESENCIA (no valor) para distinguir un
+// campo ausente de un 0/"" reales.
+function fieldPresent(records: Array<Record<string, unknown>>, field: string): boolean {
+  return records.some((row) => field in row);
+}
+
+// Resuelve el campo a leer: el pedido si está presente; si no, el primer candidato presente; si
+// ninguno, el pedido (la molécula mostrará su estado vacío). Solo cae a fallback cuando el campo
+// pedido está AUSENTE de todos los registros → no altera specs correctos.
+function resolveField(
+  records: Array<Record<string, unknown>>,
+  requested: string | undefined,
+  fallbacks: readonly string[],
+): string {
+  if (requested && fieldPresent(records, requested)) return requested;
+  const alt = fallbacks.find((f) => fieldPresent(records, f));
+  return alt ?? requested ?? fallbacks[0]!;
+}
+
 // Mapea los registros del endpoint a las series {label,value} que consumen las gráficas.
 function seriesOf(piece: PieceSpec, records: Array<Record<string, unknown>>): SeriesItem[] {
-  const labelField = piece.labelField ?? 'label';
-  const valueField = piece.valueField ?? 'value';
+  const labelField = resolveField(records, piece.labelField, LABEL_FALLBACKS);
+  const valueField = resolveField(records, piece.valueField, VALUE_FALLBACKS);
   return records.map((row) => ({
     label: textField(row, labelField),
     value: numField(row, valueField),

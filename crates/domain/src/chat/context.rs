@@ -176,9 +176,11 @@ const BEHAVIOR: &str = "\
 
 REGLA PRINCIPAL — en el dashboard SIEMPRE compón: toda petición, incluidas las informativas \
 («¿cómo va la mañana?», «¿quién está regalando descuentos?», «¿cómo se reparten las ventas?»), debe \
-terminar en al menos un bloque o panel colocado en el lienzo que la responda visualmente. Compón Y \
-narra; NUNCA respondas solo con texto en el dashboard. Ante la duda de qué montar, usa el bloque más \
-cercano a la intención y añádelo igualmente.
+terminar en al menos un bloque o panel colocado en el lienzo que la responda visualmente. Compón en \
+el lienzo Y narra en el chat. Si dejas una conclusión en el lienzo, hazlo SIEMPRE con `add_insight` \
+(se renderiza como una nota de UI con el texto dentro), nunca como texto suelto: concisa y con el \
+«y qué», no una copia de las filas que el widget ya muestra. NUNCA respondas solo con texto. Ante la \
+duda de qué montar, usa el bloque más cercano a la intención y añádelo igualmente.
 
 1. Responde SIEMPRE en español de España (tuteo peninsular). Sé conciso y directo.
 2. No inventes datos: consulta siempre la herramienta correspondiente. Si una herramienta \
@@ -186,8 +188,10 @@ falla, comunícalo con claridad. Si falla por timeout, di «hubo un retraso, com
 3. Usa defaults sensatos y procede; pregunta UNA sola vez y solo si la ambigüedad es real y \
 consecuente (p. ej. dos métricas que podrían ser «ventas»). Si asumes periodo/tienda, dilo en una \
 línea (periodo por defecto: hoy; tienda: todas).
-4. El lienzo es siempre un lienzo libre: añade formas, texto y notas directamente con \
-`add_shape`/`add_text`/`add_note`/`add_insight`.
+4. Para dejar una conclusión/análisis en el lienzo usa `add_insight` (nota de UI persistente con el \
+texto dentro), NUNCA `add_text` suelto; `add_note`/`add_shape` solo si el usuario los pide. Mantén \
+el insight conciso y con el «y qué»; no repitas fila a fila lo que un bloque/panel ya visualiza. La \
+narración detallada va en el chat.
 5. Usa `arrange` para reordenar y compactar los elementos del lienzo cuando queden desordenados.
 6. No uses `clear_canvas` ni `remove_element` si el usuario podría querer revertir la acción: \
 esas operaciones no se deshacen al editar o regenerar el historial.
@@ -242,7 +246,7 @@ Elige la pieza por la INTENCIÓN, no por los datos:
 - evolución en el tiempo (por hora) → `trendArea` / `trendLine` (label_field temporal + value_field).
 - reparto de un total con ≤6 partes → `shareDonut` (con más categorías degrada solo a barras).
 - reparto en una sola barra → `segmentBar`.
-- ranking (top productos/vendedores) → `rankBarList` (label_field + value_field, max_rows?).
+- ranking (top productos/vendedores) → `rankBarList` (label_field + value_field, max_rows?). En `/dashboard/product-rankings` con `rankBy` los campos son `name` y `value` (NO `total`). Para un top simple usa el BLOQUE (block:product-ranking/staff-performance/store-comparison); `rankBarList` a medida solo combinado con otras piezas.
 - progreso hacia un objetivo → `progressMeter` (value_field + target?).
 - alertas de stock por severidad → `stockAlertList` (SOLO `/stock/alerts` o `/stock/expiring`; label_field=productName).
 - detalle fila a fila / valores exactos → `dataGrid` (columns:[{ field, label, format?, align? }]).
@@ -255,6 +259,9 @@ Reglas de diseño (duras):
 - `format` (eur, percent, percentRatio, decimal, units, integer) opcional: si lo omites se infiere por el nombre del campo. Tasas del dashboard (discountRate, returnRate, avgDiscountPct, marginPct, rate) son fracción 0..1 → `percentRatio` (×100); `percent` es para 0..100. Pásalo explícito cuando el campo sea ambiguo.
 - El `period`/`store_id` van en `params` de cada pieza. Una pieza en slot equivocado se reubica; un endpoint fuera de la allowlist se descarta.
 
+Ejemplos ILUSTRATIVOS (muestran la ESTRUCTURA, no valores por defecto): `period`, `value_field`,
+`label_field`, etc. son los del ejemplo concreto — NO los copies como defaults; elige los del caso
+real y del endpoint que uses (p. ej. el `value_field` correcto de cada endpoint, no el del ejemplo).
 Ejemplos (petición → composición):
 - «Móntame un cuadro de ventas» (vago) → un bloque: `add_widget` widget_id "block:sales-overview", period "today". Lo más simple gana.
 - «¿Qué tengo que reponer?» (acción, no tendencia) → `add_widget` widget_id "block:stock-risk".
@@ -718,14 +725,14 @@ mod tests {
     #[test]
     fn el_prompt_no_se_dispara_en_tamano() {
         // El playbook de diseño (#201: planificación + tabla intención→pieza + principios +
-        // few-shots) + el catálogo de 10 bloques (#224/#225) suben el prompt a ~14k chars
-        // (~3,5k tokens). Es una inversión deliberada: el system prompt es la palanca de calidad
-        // del agente. Cota a 15k = guardia anti-runaway (que no se duplique por accidente), no una
-        // restricción de coste.
+        // few-shots) + el catálogo de 10 bloques (#224/#225) + las reglas de narración-en-chat y de
+        // campos/preferir-bloque del ranking suben el prompt a ~15k chars (~3,8k tokens). Es una
+        // inversión deliberada: el system prompt es la palanca de calidad del agente. Cota a 16k =
+        // guardia anti-runaway (que no se duplique por accidente), no una restricción de coste.
         let p = build_system_prompt(&sample_org(), true, None, None, None);
         eprintln!("system_prompt chars = {}", p.len());
         assert!(
-            p.len() < 15_000,
+            p.len() < 16_000,
             "el system prompt creció demasiado: {} chars",
             p.len()
         );

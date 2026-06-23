@@ -44,14 +44,19 @@ export function RankBarList({
     <ul className="dv-rank">
       {rows.map((r, i) => (
         <li key={`${r.label}-${i}`} className="dv-rank-row">
-          <div
-            className="dv-rank-bar"
-            style={{
-              width: `${Math.max((r.value / max) * 100, 2)}%`,
-              backgroundColor: `var(${colorVar})`,
-            }}
-          >
-            <span className="dv-rank-label">{r.label}</span>
+          {/* Dos pistas (estilo Tremor BarList): la barra ocupa un % de su PISTA (flex:1), no de la
+              fila entera, así la columna de valor (flex:none) queda siempre reservada y el valor
+              nunca colisiona con una barra al 100%. */}
+          <div className="dv-rank-track">
+            <div
+              className="dv-rank-bar"
+              style={{
+                width: `${Math.max((r.value / max) * 100, 2)}%`,
+                backgroundColor: `var(${colorVar})`,
+              }}
+            >
+              <span className="dv-rank-label">{r.label}</span>
+            </div>
           </div>
           <span className="dv-rank-value">{formatValue(r.value, format)}</span>
         </li>

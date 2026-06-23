@@ -456,6 +456,7 @@ fn run_agent_stream(
 
                 // Data tools → ejecutar en backend
                 total_data_tools += 1;
+                let tool_t0 = std::time::Instant::now();
                 match simpletpv_domain::chat::dispatch_tool(
                     &pool,
                     org,
@@ -466,15 +467,37 @@ fn run_agent_stream(
                 .await
                 {
                     Ok(result) => {
+                        // Telemetría por tool-call (observabilidad de fiabilidad: Anthropic
+                        // recomienda monitorización en producción como "ground truth").
+                        tracing::info!(
+                            target: "chat_metrics",
+                            event = "tool_call",
+                            tool = %tc.name,
+                            ok = true,
+                            elapsed_ms = tool_t0.elapsed().as_millis() as u64,
+                            "data tool",
+                        );
                         tool_result_msgs.push(simpletpv_ai::event::ChatMessage::Tool {
                             tool_call_id: tc.id.clone(),
                             content: result.to_string(),
                         });
                     }
                     Err(e) => {
+                        tracing::warn!(
+                            target: "chat_metrics",
+                            event = "tool_call",
+                            tool = %tc.name,
+                            ok = false,
+                            elapsed_ms = tool_t0.elapsed().as_millis() as u64,
+                            error = %e,
+                            "data tool failed",
+                        );
+                        // Devolvemos el error como tool_result para que el modelo lo incorpore y
+                        // se recupere (patrón OpenAI/Anthropic). JSON construido con serde, no a
+                        // mano: `format!` rompía el JSON si el mensaje llevara comillas/saltos.
                         tool_result_msgs.push(simpletpv_ai::event::ChatMessage::Tool {
                             tool_call_id: tc.id.clone(),
-                            content: format!("{{\"error\":\"{e}\"}}"),
+                            content: serde_json::json!({ "error": e.to_string() }).to_string(),
                         });
                     }
                 }
@@ -838,44 +861,163 @@ fn build_chat_messages(
     use simpletpv_ai::event::{ChatMessage, ContentBlock};
 
     // Reconstrucción del historial para el siguiente turno. Se OMITEN los `tool_calls` de los
-    // mensajes assistant y las filas `role:"tool"`: los resultados de tools de datos no se
-    // persisten como filas tool (solo viven en memoria durante su turno) y las ops de canvas se
-    // registran aparte, así que reemitir `tool_calls` históricos dejaría `assistant.tool_calls`
-    // SIN sus mensajes `tool` → 400 en proveedores estrictos (DeepSeek vía OpenCode Zen:
-    // "insufficient tool messages following tool_calls"). El estado del lienzo ya viaja en el
-    // snapshot de cada mensaje y los textos del assistant resumen el resultado, así que basta el
-    // hilo de texto. Los assistant sin texto (portadores de solo-tool_calls) se descartan.
-    rows.iter()
-        .filter_map(|row| match row.role.as_str() {
-            "tool" => None,
+    // mensajes assistant: reemitir `tool_calls` históricos dejaría `assistant.tool_calls` SIN sus
+    // mensajes `tool` → 400 en proveedores estrictos (DeepSeek vía OpenCode Zen: "insufficient tool
+    // messages following tool_calls"). Las filas `role:"tool"` NO se reemiten como mensajes tool
+    // (mismo motivo + alternancia Anthropic), PERO sí se SURFACEA su señal de autocorrección: el
+    // resultado de una canvas-op (rechazo/reparación, persistido por POST /canvas-result) se anexa
+    // como TEXTO al último mensaje del assistant, para que el modelo tenga el "ground truth del
+    // entorno" y corrija en el siguiente turno (Anthropic, *Building effective agents*) sin romper
+    // el emparejamiento tool_call/tool. Los assistant sin texto (solo-tool_calls) se descartan.
+    let mut out: Vec<ChatMessage> = Vec::with_capacity(rows.len());
+    for row in rows {
+        match row.role.as_str() {
+            "tool" => {
+                // Resultados de tools de datos no se persisten como filas tool → solo llegan aquí
+                // las canvas-result. Si aportan señal (rechazo/reparación), se anexan al assistant.
+                if let Some(note) = canvas_result_note(&row.content) {
+                    if let Some(ChatMessage::Assistant { content, .. }) = out.last_mut() {
+                        if let Some(block) = content.first_mut() {
+                            block.text.push_str(&note);
+                        }
+                    }
+                }
+            }
             "assistant" => {
                 let text = row.content[0]["text"].as_str().unwrap_or("").to_owned();
-                if text.trim().is_empty() {
-                    return None;
+                if !text.trim().is_empty() {
+                    out.push(ChatMessage::Assistant {
+                        content: vec![ContentBlock {
+                            kind: "text".to_owned(),
+                            text,
+                        }],
+                        tool_calls: None,
+                    });
                 }
-                Some(ChatMessage::Assistant {
-                    content: vec![ContentBlock {
-                        kind: "text".to_owned(),
-                        text,
-                    }],
-                    tool_calls: None,
-                })
             }
             "user" => {
                 let text = row.content[0]["text"].as_str().unwrap_or("").to_owned();
-                Some(ChatMessage::User {
+                out.push(ChatMessage::User {
                     content: vec![ContentBlock {
                         kind: "text".to_owned(),
                         text,
                     }],
-                })
+                });
             }
-            _ => Some(ChatMessage::User {
+            _ => out.push(ChatMessage::User {
                 content: vec![ContentBlock {
                     kind: "text".to_owned(),
                     text: row.content.to_string(),
                 }],
             }),
-        })
-        .collect()
+        }
+    }
+    out
+}
+
+// Nota de texto del resultado de una canvas-op para ANEXAR al assistant (no es un mensaje `tool`).
+// Solo cuando aporta señal de autocorrección: rechazo, o aceptación CON reparación. `None` si la
+// fila no tiene forma de canvas-result o si fue aceptada sin reparar (nada que corregir). El
+// `reason` viene del repair determinista del store (normalizePanelSpec), no es texto inventado.
+fn canvas_result_note(content: &serde_json::Value) -> Option<String> {
+    let accepted = content.get("accepted")?.as_bool()?;
+    let reason = content
+        .get("reason")
+        .and_then(|r| r.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    match (accepted, reason) {
+        (false, Some(r)) => Some(format!(
+            "\n\n[Lienzo: el panel anterior se RECHAZÓ — {r}. Corrígelo en el siguiente intento.]"
+        )),
+        (false, None) => Some(
+            "\n\n[Lienzo: el panel anterior se RECHAZÓ. Corrígelo en el siguiente intento.]"
+                .to_owned(),
+        ),
+        (true, Some(r)) => Some(format!(
+            "\n\n[Lienzo: el panel anterior se reparó automáticamente — {r}. Tenlo en cuenta.]"
+        )),
+        (true, None) => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use simpletpv_ai::event::ChatMessage;
+
+    fn row(role: &str, content: serde_json::Value) -> simpletpv_domain::chat::ChatMessageRow {
+        simpletpv_domain::chat::ChatMessageRow {
+            id: uuid::Uuid::nil(),
+            conversation_id: uuid::Uuid::nil(),
+            organization_id: uuid::Uuid::nil(),
+            role: role.to_owned(),
+            content,
+            tool_calls: None,
+            tool_results: None,
+            created_at: time::PrimitiveDateTime::new(
+                time::Date::from_calendar_date(2026, time::Month::June, 1).unwrap(),
+                time::Time::MIDNIGHT,
+            ),
+        }
+    }
+
+    fn assistant_text(m: &ChatMessage) -> &str {
+        match m {
+            ChatMessage::Assistant { content, .. } => {
+                content.first().map(|b| b.text.as_str()).unwrap_or("")
+            }
+            _ => "",
+        }
+    }
+
+    #[test]
+    fn canvas_result_note_solo_surfacea_rechazo_o_reparacion() {
+        assert!(canvas_result_note(&serde_json::json!({ "accepted": false, "reason": "endpoint fuera de allowlist" }))
+            .unwrap()
+            .contains("RECHAZÓ"));
+        assert!(canvas_result_note(&serde_json::json!({ "accepted": false, "reason": null }))
+            .unwrap()
+            .contains("RECHAZÓ"));
+        assert!(canvas_result_note(&serde_json::json!({ "accepted": true, "reason": "receta reubicada" }))
+            .unwrap()
+            .contains("reparó"));
+        // Aceptado sin reparar → nada que corregir.
+        assert!(canvas_result_note(&serde_json::json!({ "accepted": true, "reason": null })).is_none());
+        // Fila sin forma de canvas-result → ignorada.
+        assert!(canvas_result_note(&serde_json::json!({ "foo": 1 })).is_none());
+    }
+
+    #[test]
+    fn build_chat_messages_anexa_resultado_del_lienzo_al_assistant_sin_emitir_tool() {
+        let rows = vec![
+            row("user", serde_json::json!([{ "type": "text", "text": "muéstrame ventas" }])),
+            row(
+                "assistant",
+                serde_json::json!([{ "type": "text", "text": "Te he montado el panel." }]),
+            ),
+            row("tool", serde_json::json!({ "accepted": false, "reason": "endpoint no permitido" })),
+        ];
+        let msgs = build_chat_messages(&rows);
+        // No se emite ningún mensaje role:"tool" → emparejamiento estricto del gateway intacto.
+        assert_eq!(msgs.len(), 2);
+        let a = msgs
+            .iter()
+            .find(|m| matches!(m, ChatMessage::Assistant { .. }))
+            .unwrap();
+        // El resultado del lienzo (rechazo) quedó anexado al texto del assistant.
+        assert!(assistant_text(a).contains("RECHAZÓ"));
+        assert!(assistant_text(a).contains("Te he montado el panel."));
+    }
+
+    #[test]
+    fn build_chat_messages_aceptado_limpio_no_modifica_al_assistant() {
+        let rows = vec![
+            row("assistant", serde_json::json!([{ "type": "text", "text": "Listo." }])),
+            row("tool", serde_json::json!({ "accepted": true, "reason": null })),
+        ];
+        let msgs = build_chat_messages(&rows);
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(assistant_text(&msgs[0]), "Listo.");
+    }
 }

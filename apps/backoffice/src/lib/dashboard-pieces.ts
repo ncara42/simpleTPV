@@ -66,14 +66,18 @@ export const SLOT_PIECES: Record<SlotName, ReadonlySet<PieceId>> = {
   ]),
 };
 
-// Tamaño por defecto (unidades de grid) por receta. Sustituye el `default_size` libre del agente:
-// la receta dicta la geometría. El agente nunca emite w/h.
+// Tamaño por defecto (unidades de grid, BOARD_COLS=12) por receta. Sustituye el `default_size` libre
+// del agente: la receta dicta la geometría. El agente nunca emite w/h.
+// Anchos RECIPE-AWARE (grid responsive, no muro de tarjetas idénticas): los paneles compactos van a
+// MEDIA anchura (w:6) → tilean 2-up como el grid de Tremor (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`)
+// y dan jerarquía/ritmo (Carbon: priorizar por importancia + white space); los internamente densos
+// (2 gráficas, hero+stats) ocupan el ANCHO COMPLETO. La mezcla ancho/medio crea composición bento.
 export const RECIPE_SIZE: Record<RecipeId, { w: number; h: number }> = {
-  kpiRow: { w: 8, h: 1 },
-  'kpiRow+oneChart': { w: 6, h: 4 },
-  'kpiRow+twoCharts': { w: 8, h: 5 },
-  'heroChart+sideStats': { w: 8, h: 5 },
-  tableFull: { w: 6, h: 5 },
+  kpiRow: { w: 6, h: 1 }, // banda de KPIs (1-4 tiles) → media anchura
+  'kpiRow+oneChart': { w: 6, h: 3 }, // KPIs + 1 gráfica → tarjeta media (2-up)
+  'kpiRow+twoCharts': { w: 12, h: 5 }, // 2 gráficas en paralelo → ancho completo
+  'heroChart+sideStats': { w: 12, h: 5 }, // gráfica hero + stats (split 2fr/1fr) → ancho completo
+  tableFull: { w: 6, h: 4 }, // ranking/tabla → media anchura (BarList se lee bien medio)
 };
 
 export const PIECE_FORMATS: readonly PieceFormat[] = [
