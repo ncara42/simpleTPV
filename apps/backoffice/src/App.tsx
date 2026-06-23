@@ -30,6 +30,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { B2bPage } from './B2bPage.js';
 import { CatalogPage } from './CatalogPage.js';
@@ -45,6 +46,7 @@ import { listPendingCashMovements } from './lib/cash.js';
 import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { switchApp, type Tab } from './lib/nav.js';
+import { pathToTab, tabToPath } from './lib/navigation.js';
 import { PageActionsProvider } from './lib/pageActions.js';
 import { listAlerts } from './lib/stock.js';
 import { NotificationsPage } from './NotificationsPage.js';
@@ -100,19 +102,24 @@ const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab)
 
 function Home() {
   const logout = useAuthStore((s) => s.clear);
-  const [tab, setTab] = useState<Tab>('dashboard');
-  // Tab al que volver cuando se cierra Notificaciones desde la campana (no hay
-  // router → el "volver" es explícito vía prevTab). Fallback robusto a dashboard.
+  const navigate = useNavigate();
+  const location = useLocation();
+  // La pestaña activa se DERIVA de la URL (react-router, F0): el reload y los deep-links
+  // conservan la vista (antes useState reseteaba a dashboard al recargar). Ruta desconocida
+  // → dashboard. Cambiar de vista = navigate(path); todo el DOM observable se mantiene igual.
+  const tab = pathToTab(location.pathname) ?? 'dashboard';
+  // Tab al que volver cuando se cierra Notificaciones desde la campana. El "volver" de la
+  // campana sigue siendo explícito vía prevTab (no se migra a history en F0b). Fallback dashboard.
   const [prevTab, setPrevTab] = useState<Tab>('dashboard');
   // La campana togglea Notificaciones: si está abierta, vuelve a la página previa;
   // si no, recuerda la actual y abre Notificaciones. Lee tab/prevTab del render
   // actual (sin updater anidado) para no chocar con la regla de hooks/setState.
   const toggleNotifications = (): void => {
     if (tab === 'notifications') {
-      setTab(prevTab === 'notifications' ? 'dashboard' : prevTab);
+      navigate(tabToPath(prevTab === 'notifications' ? 'dashboard' : prevTab));
     } else {
       setPrevTab(tab);
-      setTab('notifications');
+      navigate(tabToPath('notifications'));
     }
   };
   // U-08: tema corporativo (color aplicado como tokens; el logo va al sidebar).
@@ -131,20 +138,20 @@ function Home() {
   const [navStoreId, setNavStoreId] = useState<string | null>(null);
   const openStoreView = (view: 'stock' | 'sales', storeId: string): void => {
     setNavStoreId(storeId);
-    setTab(view);
+    navigate(tabToPath(view));
   };
   // Atajo del panel de Familias (I-13): el contador navega a Catálogo filtrado.
   const [navFamilyId, setNavFamilyId] = useState<string | null>(null);
   const openCatalogFamily = (familyId: string): void => {
     setNavFamilyId(familyId);
-    setTab('catalog');
+    navigate(tabToPath('catalog'));
   };
   // U-12: "Resolver" una notificación → Stock filtrado por tienda y producto.
   const [navSearch, setNavSearch] = useState<string | null>(null);
   const resolveStock = (storeId: string, productName: string): void => {
     setNavStoreId(storeId);
     setNavSearch(productName);
-    setTab('stock');
+    navigate(tabToPath('stock'));
   };
   // U-11/D-17: badge de la campana = roturas de stock activas + solicitudes de
   // caja pendientes (#146). Mismas queryKeys que Notificaciones (refresca con el
@@ -165,7 +172,7 @@ function Home() {
     setNavStoreId(null);
     setNavFamilyId(null);
     setNavSearch(null);
-    setTab(t);
+    navigate(tabToPath(t));
   };
 
   // Nombre de la view activa (el mismo label del sidebar): se pinta como etiqueta flotante
@@ -228,7 +235,7 @@ function Home() {
               <main className={`bo-main${isCanvas ? ' bo-main--canvas' : ' bo-main--surface'}`}>
                 {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
                   embebe la tabla — enlaza con "Ver todas las ventas →". */}
-                {tab === 'dashboard' && <DashboardPage onNavigate={(t) => setTab(t)} />}
+                {tab === 'dashboard' && <DashboardPage onNavigate={navigateTo} />}
                 {tab === 'sales' && <SalesHistoryPage initialStoreId={navStoreId} />}
                 {tab === 'notifications' && <NotificationsPage onResolve={{ resolveStock }} />}
                 {tab === 'catalog' && <CatalogPage initialFamilyId={navFamilyId} />}
