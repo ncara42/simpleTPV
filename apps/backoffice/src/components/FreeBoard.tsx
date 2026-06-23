@@ -70,6 +70,8 @@ const KEY_MOVE = 10; // px de mundo por flecha al mover un elemento enfocado
 const HISTORY_MAX = 50; // tope de la pila de deshacer
 const MINIMAP_SIZE = { width: 180, height: 130 };
 const MIN_SHAPE = 4; // px de mundo mínimos para crear una forma (evita formas de un clic)
+const NOTE_MIN_W = 160; // px de mundo mínimos al redimensionar una nota
+const NOTE_MIN_H = 120;
 
 // Herramienta activa del lienzo. 'select' = navegar/arrastrar; el resto crea elementos al
 // arrastrar sobre el fondo. El texto NO es una herramienta de lienzo: se crea con un botón.
@@ -173,12 +175,17 @@ export function FreeBoard({
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [tool, setTool] = useState<ToolId>('select');
   // Modo de interacción del lienzo, SEPARADO de la herramienta de dibujo (`tool`):
-  //  - 'select': comportamiento normal (arrastrar widgets; pan al arrastrar el fondo).
+  //  - 'select': comportamiento normal (arrastrar widgets). El fondo NO hace pan: mover la vista es
+  //             deliberado (botón de la mano o barra espaciadora).
   //  - 'pan'  : MOVER explícito → arrastrar EN CUALQUIER SITIO hace pan; los widgets no se mueven
   //             (evita la confusión de mover lienzo y widget a la vez).
   //  - 'erase': GOMA → un clic en un elemento lo borra.
   const [interactionMode, setInteractionMode] = useState<'select' | 'pan' | 'erase'>('select');
   const [drawOpen, setDrawOpen] = useState(false);
+  // Barra espaciadora pulsada = pan temporal (navegar sin activar la mano). Refleja la clase para
+  // el cursor; el ref lo lee el gesto sin closures viejos.
+  const [spacePan, setSpacePan] = useState(false);
+  const spaceHeldRef = useRef(false);
   const [drawColor, setDrawColor] = useState<string>(DRAW_COLORS[0]!);
   const [draft, setDraft] = useState<FreeShape | FreeDraw | null>(null);
   const [emptyPaletteOpen, setEmptyPaletteOpen] = useState(false);
@@ -351,32 +358,69 @@ export function FreeBoard({
     return () => ro.disconnect();
   }, []);
 
-  // ── Rueda: ctrl/⌘ (o pellizco de trackpad) = zoom hacia el cursor; resto = pan. ──
+  // ── Rueda: SOLO ⌘/Ctrl (o pellizco de trackpad) = zoom hacia el cursor. El desplazamiento simple
+  //    de rueda o de dos dedos del trackpad ya NO hace pan: mover el lienzo es deliberado (botón de
+  //    la mano o barra espaciadora). Seguimos llamando a preventDefault para que el lienzo posea la
+  //    rueda (evita el scroll de página y el atrás/adelante del navegador por el gesto horizontal). ──
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent): void => {
       e.preventDefault();
+      if (!e.ctrlKey && !e.metaKey) return; // rueda/trackpad sin modificador: no mueve el lienzo
       const rect = el.getBoundingClientRect();
       const sx = e.clientX - rect.left;
       const sy = e.clientY - rect.top;
       const mult = e.deltaMode === 1 ? 16 : 1;
       const { panX, panY, zoom } = viewRef.current;
-      if (e.ctrlKey || e.metaKey) {
-        const factor = Math.exp(-e.deltaY * mult * WHEEL_ZOOM_SENSITIVITY);
-        const nz = clamp(zoom * factor, ZOOM_MIN, ZOOM_MAX);
-        const wx = (sx - panX) / zoom;
-        const wy = (sy - panY) / zoom;
-        setView({ zoom: nz, panX: sx - wx * nz, panY: sy - wy * nz });
-      } else {
-        setView({ zoom, panX: panX - e.deltaX * mult, panY: panY - e.deltaY * mult });
-      }
+      const factor = Math.exp(-e.deltaY * mult * WHEEL_ZOOM_SENSITIVITY);
+      const nz = clamp(zoom * factor, ZOOM_MIN, ZOOM_MAX);
+      const wx = (sx - panX) / zoom;
+      const wy = (sy - panY) / zoom;
+      setView({ zoom: nz, panX: sx - wx * nz, panY: sy - wy * nz });
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
 
-  // ── Gesto sobre el fondo del lienzo: pan (select) o creación (herramienta de dibujo) ──
+  // El puntero está sobre el lienzo: condiciona el pan con barra espaciadora (no secuestrar el
+  // espacio global cuando el lienzo no es el foco/hover).
+  const overRef = useRef(false);
+
+  // ── Barra espaciadora = PAN temporal: navegar el lienzo SIN activar la mano. Mientras se mantiene
+  //    pulsada, arrastrar en cualquier sitio mueve el lienzo (los elementos quedan inertes vía la
+  //    clase .dash-free--panning). No secuestra el espacio al escribir (inputs/editor de notas). ──
+  useEffect(() => {
+    const isEditable = (n: EventTarget | null): boolean => {
+      const el = n as HTMLElement | null;
+      return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+    };
+    const canPan = (): boolean =>
+      overRef.current ||
+      document.activeElement === viewportRef.current ||
+      !!viewportRef.current?.contains(document.activeElement);
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key !== ' ' && e.code !== 'Space') return;
+      if (e.repeat || isEditable(document.activeElement) || !canPan()) return;
+      spaceHeldRef.current = true;
+      setSpacePan(true);
+      e.preventDefault(); // evita el scroll de página mientras se hace pan con espacio
+    };
+    const onKeyUp = (e: KeyboardEvent): void => {
+      if (e.key !== ' ' && e.code !== 'Space') return;
+      spaceHeldRef.current = false;
+      setSpacePan(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, []);
+
+  // ── Gesto sobre el fondo del lienzo: creación (herramienta de dibujo). El pan NO vive aquí: solo
+  //    se mueve la vista con el botón de la mano (modo 'pan') o la barra espaciadora. ──
   const panState = useRef<{
     x: number;
     y: number;
@@ -392,10 +436,11 @@ export function FreeBoard({
 
   const onPointerDown = (e: React.PointerEvent): void => {
     if (e.button !== 0) return;
-    // MOVER (pan explícito): arrastrar en CUALQUIER sitio hace pan, aunque el gesto venga de un
-    // widget (su startDrag retorna en modo pan y el evento burbujea hasta aquí). Así no se confunde
-    // mover el lienzo con mover un widget. GOMA: no arranca gesto de fondo (borra al clic del elem).
-    if (interactionModeRef.current === 'pan') {
+    // PAN deliberado: el lienzo SOLO se mueve con el botón de la mano (modo 'pan') o manteniendo la
+    // barra espaciadora (mano temporal). En ese caso, arrastrar en CUALQUIER sitio hace pan, aunque
+    // el gesto venga de un widget (su startDrag retorna en modo pan y el evento burbujea hasta
+    // aquí), así no se confunde mover el lienzo con mover un widget. GOMA: no arranca gesto de fondo.
+    if (interactionModeRef.current === 'pan' || spaceHeldRef.current) {
       viewportRef.current?.setPointerCapture(e.pointerId);
       const { panX, panY } = viewRef.current;
       panState.current = { x: e.clientX, y: e.clientY, panX, panY, moved: false };
@@ -415,9 +460,8 @@ export function FreeBoard({
           : { kind: 'shape', shape: t, startX: w.x, startY: w.y };
       return;
     }
-    viewportRef.current?.setPointerCapture(e.pointerId);
-    const { panX, panY } = viewRef.current;
-    panState.current = { x: e.clientX, y: e.clientY, panX, panY, moved: false };
+    // Modo normal (select) + clic en el fondo: NO hace nada. Arrastrar el fondo ya no desplaza la
+    // vista; el pan vive en el botón de la mano o en la barra espaciadora (mano temporal).
   };
 
   const onPointerMove = (e: React.PointerEvent): void => {
@@ -494,6 +538,17 @@ export function FreeBoard({
   }, []);
   const moveEl = useCallback((id: string, dx: number, dy: number): void => {
     setEls((prev) => prev.map((e) => (e.id === id ? { ...e, x: e.x + dx, y: e.y + dy } : e)));
+  }, []);
+  // Redimensiona una nota desde su tirador (esquina inf-derecha). Reusa onDragStart/commitMove
+  // para el snapshot de deshacer y la persistencia (mismo ciclo que mover).
+  const resizeEl = useCallback((id: string, dw: number, dh: number): void => {
+    setEls((prev) =>
+      prev.map((e) =>
+        e.id === id
+          ? { ...e, w: Math.max(NOTE_MIN_W, e.w + dw), h: Math.max(NOTE_MIN_H, e.h + dh) }
+          : e,
+      ),
+    );
   }, []);
   const commitMove = useCallback((): void => {
     const snap = dragSnapshot.current ?? elsRef.current;
@@ -734,16 +789,22 @@ export function FreeBoard({
       <div
         ref={viewportRef}
         className={`dash-free${drawing ? ' dash-free--drawing' : ''}${
-          interactionMode === 'pan' ? ' dash-free--panning' : ''
+          interactionMode === 'pan' || spacePan ? ' dash-free--panning' : ''
         }${interactionMode === 'erase' ? ' dash-free--erasing' : ''}`}
         data-testid="dash-free"
         tabIndex={0}
         role="application"
-        aria-label="Lienzo libre · arrastra los elementos, arrastra el fondo para mover la vista, ⌘/Ctrl+rueda para hacer zoom"
+        aria-label="Lienzo libre · usa el botón de la mano o mantén la barra espaciadora y arrastra para mover la vista; ⌘/Ctrl+rueda para hacer zoom"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
+        onPointerEnter={() => {
+          overRef.current = true;
+        }}
+        onPointerLeave={() => {
+          overRef.current = false;
+        }}
         onKeyDown={onViewportKeyDown}
         style={{
           backgroundSize: `${24 * view.zoom}px ${24 * view.zoom}px`,
@@ -763,6 +824,7 @@ export function FreeBoard({
               label={labelFor(el)}
               onDragStart={onDragStart}
               onMove={moveEl}
+              onResize={resizeEl}
               onCommit={commitMove}
               onFocus={focusEl}
               onRemove={removeEl}
@@ -880,6 +942,7 @@ interface ElementViewProps {
   label: string;
   onDragStart: () => void;
   onMove: (id: string, dx: number, dy: number) => void;
+  onResize: (id: string, dw: number, dh: number) => void;
   onCommit: () => void;
   onFocus: (id: string) => void;
   onRemove: (id: string) => void;
@@ -899,6 +962,7 @@ const ElementView = memo(function ElementView({
   label,
   onDragStart,
   onMove,
+  onResize,
   onCommit,
   onFocus,
   onRemove,
@@ -994,6 +1058,44 @@ const ElementView = memo(function ElementView({
     onPointerCancel: endDrag,
   };
 
+  // ── Redimensión (tirador esquina inf-derecha de la nota): mismo ciclo que el arrastre, pero
+  // cambia w/h en vez de x/y. Snapshot/commit reutilizan onDragStart/onCommit. ──
+  const resize = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const startResize = (e: React.PointerEvent): void => {
+    e.stopPropagation(); // no arranques el drag de la cabecera ni el pan del fondo
+    if (e.button !== 0) return;
+    onFocus(el.id);
+    resize.current = { x: e.clientX, y: e.clientY, moved: false };
+  };
+  const moveResize = (e: React.PointerEvent): void => {
+    const r = resize.current;
+    if (!r) return;
+    const z = zoomRef.current || 1;
+    if (!r.moved) {
+      if (Math.hypot(e.clientX - r.x, e.clientY - r.y) < DRAG_THRESHOLD_PX) return;
+      onDragStart();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      r.moved = true;
+    }
+    onResize(el.id, (e.clientX - r.x) / z, (e.clientY - r.y) / z);
+    r.x = e.clientX;
+    r.y = e.clientY;
+  };
+  const endResize = (e: React.PointerEvent): void => {
+    const r = resize.current;
+    if (r?.moved && e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    resize.current = null;
+    if (r?.moved) onCommit();
+  };
+  const resizeHandlers = {
+    onPointerDown: startResize,
+    onPointerMove: moveResize,
+    onPointerUp: endResize,
+    onPointerCancel: endResize,
+  };
+
   const removeBtn = (
     <button
       type="button"
@@ -1026,6 +1128,14 @@ const ElementView = memo(function ElementView({
         role="group"
         aria-label={label}
         onPointerDownCapture={() => onFocus(el.id)}
+        onPointerDown={(e) => {
+          // GOMA: un clic en cualquier parte de la nota la borra. Sus hijos van inertes por CSS
+          // (.dash-free--erasing .dash-free-item *), así que el wrapper recibe el clic; ya no hay «×».
+          if (interactionMode === 'erase' && e.button === 0) {
+            e.stopPropagation();
+            onRemove(el.id);
+          }
+        }}
       >
         <div
           className="dash-free-note-header"
@@ -1036,9 +1146,15 @@ const ElementView = memo(function ElementView({
           aria-label={`${label}. Arrastra para mover; usa las flechas para ajustar.`}
         >
           <span className="dash-free-note-grip" aria-hidden="true" />
-          {removeBtn}
         </div>
         <div className="dash-free-note-body">{children}</div>
+        {/* Tirador de redimensión (esquina inf-derecha). El contenido del editor ya hace scroll. */}
+        <span
+          className="dash-free-note-resize"
+          {...resizeHandlers}
+          aria-hidden="true"
+          title="Redimensionar"
+        />
       </div>
     );
   }
