@@ -47,6 +47,19 @@ const VIEW_META: Record<Tab, ViewMeta> = {
       'Compara las ventas con ayer',
     ],
   },
+  // S-02 fase A: 'inventory' es la Tab activa del shell unificado (Catálogo · Familias ·
+  // Existencias). Es la que ve el asistente; catalog/families/stock se conservan como
+  // claves válidas del Record (deep-link/redirección) aunque ya no sean la Tab activa.
+  inventory: {
+    label: 'Inventario',
+    greeting: '¿En qué te ayudo con el inventario?',
+    suggestions: [
+      '¿Cuántos productos activos tengo?',
+      'Alertas de stock ahora',
+      'Ventas por familia',
+      '¿Qué puedo hacer en esta pantalla?',
+    ],
+  },
   catalog: {
     label: 'Catálogo',
     greeting: '¿En qué te ayudo con el catálogo?',

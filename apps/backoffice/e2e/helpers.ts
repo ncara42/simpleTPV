@@ -49,12 +49,13 @@ export async function selectByLabel(
 // pages salvo dashboard y help viven dentro de un grupo desplegable, así que navTo debe abrir el
 // grupo antes de clicar el item. (Si esto se desincroniza de NAV_GROUPS, los tests de las pages
 // afectadas cuelgan 30s esperando un item oculto.)
+// S-02 fase A: catalog/families/stock dejaron de ser entradas de menú — las absorbe la
+// entrada única 'inventory' (shell con vistas segmentadas). navTo las resuelve abriendo
+// Inventario y clicando el segmento correspondiente (ver INVENTORY_VIEW abajo).
 const NAV_GROUP_OF: Record<string, string> = {
   // Catálogo e inventario
   notifications: 'inventory',
-  catalog: 'inventory',
-  families: 'inventory',
-  stock: 'inventory',
+  inventory: 'inventory',
   transfers: 'inventory',
   suppliers: 'inventory',
   // Ventas y clientes
@@ -69,9 +70,26 @@ const NAV_GROUP_OF: Record<string, string> = {
   verifactu: 'org',
 };
 
+// S-02 fase A: las antiguas pages catalog/families/stock son ahora VISTAS del shell de
+// Inventario. navTo(page, 'catalog'|'families'|'stock') abre Inventario y clica el
+// segmento; el contenido de cada página se monta igual, así que el resto de los specs
+// (que asertan catalog-table, stock-page, families-empty, etc.) sigue funcionando.
+const INVENTORY_VIEW: Record<string, 'catalogo' | 'familias' | 'existencias'> = {
+  catalog: 'catalogo',
+  families: 'familias',
+  stock: 'existencias',
+};
+
 // Navega por el menú de grupos: ancla el dropdown del grupo (clic) y elige la
-// page. Las directas (dashboard, help) se clican sin desplegar.
+// page. Las directas (dashboard, help) se clican sin desplegar. Para las vistas de
+// Inventario (catalog/families/stock) abre Inventario y elige el segmento.
 export async function navTo(page: Page, id: string): Promise<void> {
+  const view = INVENTORY_VIEW[id];
+  if (view) {
+    await navTo(page, 'inventory');
+    await page.getByTestId(`inventory-view-${view}`).click();
+    return;
+  }
   const group = NAV_GROUP_OF[id];
   if (group) {
     const item = page.getByTestId(`nav-${id}`);

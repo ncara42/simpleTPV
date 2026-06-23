@@ -5,6 +5,7 @@ import { siblingAppUrl } from '@simpletpv/ui';
 export type Tab =
   | 'dashboard'
   | 'notifications'
+  | 'inventory'
   | 'catalog'
   | 'families'
   | 'stock'

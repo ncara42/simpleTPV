@@ -46,11 +46,21 @@ export const NAV_GROUPS: readonly NavGroupMeta[] = [
 /** Catálogo único de entradas, en el MISMO orden que `ALL_NAV` de App.tsx. */
 export const NAV_NODES: readonly NavNode[] = [
   { id: 'dashboard', path: '/', label: 'Dashboard' },
-  { id: 'notifications', path: '/notifications', label: 'Notificaciones', group: 'inventory', hidden: true },
+  {
+    id: 'notifications',
+    path: '/notifications',
+    label: 'Notificaciones',
+    group: 'inventory',
+    hidden: true,
+  },
   // Catálogo e inventario
-  { id: 'catalog', path: '/catalog', label: 'Catálogo', group: 'inventory' },
-  { id: 'families', path: '/families', label: 'Familias', group: 'inventory' },
-  { id: 'stock', path: '/stock', label: 'Inventario', group: 'inventory' }, // S-12: término único "Inventario"
+  // S-02 fase A: una sola entrada de menú "Inventario" monta el shell con vistas
+  // segmentadas (Catálogo/Familias/Existencias). Catalog/families/stock conservan su
+  // ruta (deep-link + redirección a /inventario) pero salen del menú (hidden).
+  { id: 'inventory', path: '/inventario', label: 'Inventario', group: 'inventory' },
+  { id: 'catalog', path: '/catalog', label: 'Catálogo', group: 'inventory', hidden: true },
+  { id: 'families', path: '/families', label: 'Familias', group: 'inventory', hidden: true },
+  { id: 'stock', path: '/stock', label: 'Inventario', group: 'inventory', hidden: true }, // S-12: término único "Inventario"
   { id: 'transfers', path: '/transfers', label: 'Traspasos', group: 'inventory' },
   { id: 'suppliers', path: '/suppliers', label: 'Proveedores', group: 'inventory' },
   // Ventas y clientes
@@ -60,7 +70,13 @@ export const NAV_NODES: readonly NavNode[] = [
   // Organización
   { id: 'stores', path: '/stores', label: 'Tiendas', group: 'org' },
   { id: 'users', path: '/users', label: 'Usuarios', group: 'org' },
-  { id: 'timeclock', path: '/timeclock', label: 'Control horario', group: 'org', flag: 'time_clock' },
+  {
+    id: 'timeclock',
+    path: '/timeclock',
+    label: 'Control horario',
+    group: 'org',
+    flag: 'time_clock',
+  },
   { id: 'settings', path: '/settings', label: 'Ajustes', group: 'org' },
   { id: 'verifactu', path: '/verifactu', label: 'VeriFactu', group: 'org', hidden: true },
   // Directa

@@ -12,12 +12,15 @@ import {
   tabToPath,
 } from './navigation.js';
 
-// Los 16 ids del tipo `Tab` con su slug y label esperados — ESPEJO de ALL_NAV en
+// Los 17 ids del tipo `Tab` con su slug y label esperados — ESPEJO de ALL_NAV en
 // App.tsx. Si App.tsx y navigation.ts se desincronizan (id/label/grupo), este test
 // y el page-heading derivado de la URL fallan: es la red de seguridad de la fuente única.
 const EXPECTED: ReadonlyArray<[Tab, string, string]> = [
   ['dashboard', '/', 'Dashboard'],
   ['notifications', '/notifications', 'Notificaciones'],
+  // S-02 fase A: 'inventory' es la entrada visible; catalog/families/stock pasan a
+  // ocultas (mantienen ruta para deep-link y redirección al shell de Inventario).
+  ['inventory', '/inventario', 'Inventario'],
   ['catalog', '/catalog', 'Catálogo'],
   ['families', '/families', 'Familias'],
   ['stock', '/stock', 'Inventario'],
@@ -35,7 +38,7 @@ const EXPECTED: ReadonlyArray<[Tab, string, string]> = [
 ];
 
 describe('navigation — fuente única id↔path↔label (F0)', () => {
-  it('cubre exactamente los 16 ids de Tab, en orden', () => {
+  it('cubre exactamente los 17 ids de Tab, en orden', () => {
     expect(NAV_NODES.map((n) => n.id)).toEqual(EXPECTED.map(([id]) => id));
   });
 
@@ -64,11 +67,15 @@ describe('navigation — fuente única id↔path↔label (F0)', () => {
     expect(pathToTab('/stock/extra')).toBeNull();
   });
 
-  it('notifications y verifactu existen como rutas pero están ocultas del menú', () => {
+  it('notifications, catalog/families/stock y verifactu existen como rutas pero están ocultas del menú', () => {
+    // S-02 fase A: catalog/families/stock salen del menú (los monta la entrada
+    // única 'inventory'), pero conservan su ruta para deep-link y la redirección a
+    // /inventario. notifications (campana) y verifactu (backend sin UI) siguen ocultas.
     const hidden = NAV_NODES.filter((n: NavNode) => n.hidden).map((n) => n.id);
-    expect(hidden).toEqual(['notifications', 'verifactu']);
+    expect(hidden).toEqual(['notifications', 'catalog', 'families', 'stock', 'verifactu']);
     // siguen siendo navegables por URL:
     expect(tabToPath('notifications')).toBe('/notifications');
+    expect(tabToPath('catalog')).toBe('/catalog');
     expect(pathToTab('/verifactu')).toBe('verifactu');
   });
 

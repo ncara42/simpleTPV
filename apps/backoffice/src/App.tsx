@@ -12,8 +12,8 @@ import { PageHeaderProvider } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeftRight,
-  BarChart2,
   Bell,
+  Boxes,
   CheckSquare,
   Clock,
   Handshake,
@@ -26,20 +26,18 @@ import {
   Receipt,
   ShoppingCart,
   Store,
-  Tag,
   Users,
 } from 'lucide-react';
 import { useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { B2bPage } from './B2bPage.js';
-import { CatalogPage } from './CatalogPage.js';
 import { AssistantDock } from './components/chat/AssistantDock.js';
 import { viewContextFor } from './components/chat/view-context.js';
 import { FloatingActions } from './components/FloatingActions.js';
 import { DashboardPage } from './DashboardPage.js';
-import { FamiliesPage } from './FamiliesPage.js';
 import { HelpPage } from './HelpPage.js';
+import { InventoryPage } from './InventoryPage.js';
 import { api, useAuthStore } from './lib/auth.js';
 import { useBranding } from './lib/branding.js';
 import { listPendingCashMovements } from './lib/cash.js';
@@ -53,7 +51,6 @@ import { NotificationsPage } from './NotificationsPage.js';
 import { PromotionsPage } from './PromotionsPage.js';
 import { SalesHistoryPage } from './SalesHistoryPage.js';
 import { SettingsPage } from './SettingsPage.js';
-import { StockPage } from './StockPage.js';
 import { StoresPage } from './StoresPage.js';
 import { SuppliersPage } from './SuppliersPage.js';
 import { TimeClockPage } from './TimeClockPage.js';
@@ -73,11 +70,10 @@ const NAV_GROUPS: NavGroup[] = [
 const ALL_NAV: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
   { id: 'notifications', label: 'Notificaciones', icon: <Bell size={18} />, group: 'inventory' },
-  // Catálogo e inventario (D-09): Catálogo · Familias · Inventario · Traspasos · Proveedores
-  { id: 'catalog', label: 'Catálogo', icon: <Package size={18} />, group: 'inventory' },
-  { id: 'families', label: 'Familias', icon: <Tag size={18} />, group: 'inventory' },
-  // S-12: término único "Inventario" para el dominio de existencias (id interno 'stock' intacto).
-  { id: 'stock', label: 'Inventario', icon: <BarChart2 size={18} />, group: 'inventory' },
+  // S-02 fase A: una sola entrada "Inventario" monta InventoryPage con vistas
+  // segmentadas (Catálogo · Familias · Existencias). Las tres entradas previas se
+  // colapsan aquí; sus rutas siguen vivas (deep-link/redirección) pero ocultas del menú.
+  { id: 'inventory', label: 'Inventario', icon: <Boxes size={18} />, group: 'inventory' },
   { id: 'transfers', label: 'Traspasos', icon: <ArrowLeftRight size={18} />, group: 'inventory' },
   { id: 'suppliers', label: 'Proveedores', icon: <ShoppingCart size={18} />, group: 'inventory' },
   // Ventas y clientes (D-09): Ventas · Clientes B2B · Promociones
@@ -138,17 +134,25 @@ function Home() {
   // botón atrás. Las pages los leen al montar vía sus props initial* (sin cambiar su lógica).
   const [searchParams] = useSearchParams();
   // Acceso directo desde Tiendas ("Ver stock"/"Ver ventas"): preselecciona la tienda.
+  // S-02 fase A: "Ver stock" abre el shell de Inventario en la vista Existencias; "Ver
+  // ventas" sigue yendo a la página de Ventas sin cambios.
   const openStoreView = (view: 'stock' | 'sales', storeId: string): void => {
-    navigate(`${tabToPath(view)}?store=${encodeURIComponent(storeId)}`);
+    if (view === 'stock') {
+      navigate(`/inventario?vista=existencias&store=${encodeURIComponent(storeId)}`);
+      return;
+    }
+    navigate(`${tabToPath('sales')}?store=${encodeURIComponent(storeId)}`);
   };
-  // Atajo del panel de Familias (I-13): el contador navega a Catálogo filtrado.
+  // Atajo del panel de Familias (I-13): el contador navega al Catálogo filtrado dentro
+  // del shell de Inventario (vista Catálogo).
   const openCatalogFamily = (familyId: string): void => {
-    navigate(`${tabToPath('catalog')}?family=${encodeURIComponent(familyId)}`);
+    navigate(`/inventario?vista=catalogo&family=${encodeURIComponent(familyId)}`);
   };
-  // U-12: "Resolver" una notificación → Stock filtrado por tienda y producto.
+  // U-12: "Resolver" una notificación → Inventario (vista Existencias) filtrado por
+  // tienda y producto.
   const resolveStock = (storeId: string, productName: string): void => {
     navigate(
-      `${tabToPath('stock')}?store=${encodeURIComponent(storeId)}&q=${encodeURIComponent(productName)}`,
+      `/inventario?vista=existencias&store=${encodeURIComponent(storeId)}&q=${encodeURIComponent(productName)}`,
     );
   };
   // U-11/D-17: badge de la campana = roturas de stock activas + solicitudes de
@@ -170,12 +174,29 @@ function Home() {
     navigate(tabToPath(t));
   };
 
+  // S-02 fase A — Redirección de rutas antiguas: /catalog · /families · /stock siguen
+  // resolviendo a su Tab (oculta) para no romper deep-links existentes, pero ya no tienen
+  // página propia; las absorbe el shell de Inventario. Mapeamos cada una a su vista y
+  // conservamos los search params (family/store/q) en la URL destino. `replace` evita
+  // dejar la ruta vieja en el historial.
+  const LEGACY_VISTA: Partial<Record<Tab, string>> = {
+    catalog: 'catalogo',
+    families: 'familias',
+    stock: 'existencias',
+  };
+  const legacyVista = LEGACY_VISTA[tab];
+
   // Nombre de la view activa (el mismo label del sidebar): se pinta como etiqueta flotante
   // arriba del lienzo —donde antes vivía el chip del dashboard— sustituyendo al título del header.
   const activeLabel = ALL_NAV.find((item) => item.id === tab)?.label ?? '';
   // El Dashboard es el único lienzo libre full-bleed; el resto de views flotan como una
   // superficie sobre el fondo (se reutiliza su contenido actual, sin rediseñar cards).
   const isCanvas = tab === 'dashboard';
+
+  if (legacyVista) {
+    const extra = location.search ? `&${location.search.slice(1)}` : '';
+    return <Navigate to={`/inventario?vista=${legacyVista}${extra}`} replace />;
+  }
 
   return (
     <PageActionsProvider>
@@ -236,18 +257,17 @@ function Home() {
                 {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
                   embebe la tabla — enlaza con "Ver todas las ventas →". */}
                 {tab === 'dashboard' && <DashboardPage onNavigate={navigateTo} />}
-                {tab === 'sales' && (
-                  <SalesHistoryPage initialStoreId={searchParams.get('store')} />
-                )}
+                {tab === 'sales' && <SalesHistoryPage initialStoreId={searchParams.get('store')} />}
                 {tab === 'notifications' && <NotificationsPage onResolve={{ resolveStock }} />}
-                {tab === 'catalog' && (
-                  <CatalogPage initialFamilyId={searchParams.get('family')} />
-                )}
-                {tab === 'families' && <FamiliesPage onOpenCatalogFamily={openCatalogFamily} />}
-                {tab === 'stock' && (
-                  <StockPage
+                {/* S-02 fase A: shell unificado de Inventario (Catálogo · Familias ·
+                  Existencias). La vista activa vive en `?vista=`; cada segmento monta la
+                  página existente con sus props de deep-link (family/store/q). */}
+                {tab === 'inventory' && (
+                  <InventoryPage
+                    initialFamilyId={searchParams.get('family')}
                     initialStoreId={searchParams.get('store')}
                     initialSearch={searchParams.get('q')}
+                    onOpenCatalogFamily={openCatalogFamily}
                   />
                 )}
                 {tab === 'transfers' && <TransfersPage />}
