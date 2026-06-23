@@ -724,22 +724,28 @@ export function addGenericToFree(
   return [...layout, el];
 }
 
-// Añade una nota vacía centrada en `at`. El `id` lo genera el llamador (crypto.randomUUID).
+// Añade una nota centrada en `at`. El `id` lo genera el llamador (crypto.randomUUID). `doc` es un
+// documento TipTap (ProseMirror) inicial: null = nota vacía; el agente lo prellena (insight→nota).
+// `size` permite una nota más holgada (p. ej. insights con varias frases) sin tocar NOTE_DEFAULT.
 export function addNote(
   layout: FreeLayout,
   id: string,
   at: { x: number; y: number },
   color?: string,
+  doc?: unknown,
+  size?: { w: number; h: number },
 ): FreeLayout {
+  const w = size?.w ?? NOTE_DEFAULT.w;
+  const h = size?.h ?? NOTE_DEFAULT.h;
   const el: FreeNote = {
     kind: 'note',
     id,
-    x: at.x - NOTE_DEFAULT.w / 2,
-    y: at.y - NOTE_DEFAULT.h / 2,
-    w: NOTE_DEFAULT.w,
-    h: NOTE_DEFAULT.h,
+    x: at.x - w / 2,
+    y: at.y - h / 2,
+    w,
+    h,
     z: nextZ(layout),
-    doc: null,
+    doc: doc ?? null,
     ...(color ? { color } : {}),
   };
   return [...layout, el];

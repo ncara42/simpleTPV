@@ -95,9 +95,11 @@ test('la etiqueta flotante muestra la view activa y el dashboard es un lienzo li
   page,
 }) => {
   await expect(page.getByTestId('dashboard')).toBeVisible();
-  // Sin header: el nombre de la view activa flota arriba (sustituye al chip de preset).
-  await expect(page.getByTestId('page-heading')).toBeVisible();
-  await expect(page.getByTestId('page-heading')).toContainText('Dashboard');
+  // En el Dashboard el título flotante de la view se OCULTA: la barra de herramientas del lienzo
+  // (Editar→despliega + Mover + Goma) ocupa su sitio (arriba-centro). En el resto de views el
+  // título flotante sigue (page-heading) — esto solo cambia en Dashboard.
+  await expect(page.getByTestId('page-heading')).toHaveCount(0);
+  await expect(page.getByTestId('dash-free-toolbar')).toBeVisible();
   // El chip de preset antiguo ya no existe (lo sustituye la etiqueta flotante de view).
   await expect(page.getByTestId('dash-preset-personalizado')).toHaveCount(0);
   // El lienzo libre es la única vista (el modo Cuadrícula y su toggle se eliminaron).

@@ -1,7 +1,17 @@
-import { LayoutDashboard, Plus, Shapes, StickyNote, Type, Undo2, Wand2 } from 'lucide-react';
+import {
+  Eraser,
+  Hand,
+  LayoutDashboard,
+  Shapes,
+  SquarePen,
+  StickyNote,
+  Type,
+  Undo2,
+  Wand2,
+} from 'lucide-react';
 import { type RefObject, useEffect, useRef, useState } from 'react';
 
-import type { FreeBoardHandle } from '../FreeBoard.js';
+import type { FreeBoardHandle, InteractionMode } from '../FreeBoard.js';
 import { WidgetPalette } from '../WidgetPalette.js';
 
 interface CanvasToolsMenuProps {
@@ -11,15 +21,18 @@ interface CanvasToolsMenuProps {
   canUndo: boolean;
   /** El pill de dibujo está abierto (marca «Dibujar» como activo). */
   drawActive: boolean;
+  /** Modo de interacción activo (resalta Mover/Goma). */
+  mode: InteractionMode;
 }
 
 /**
- * Botón «+» con desplegable que agrupa las herramientas del lienzo (antes una barra de seis
- * botones). Vive en el dock inferior, junto al input del asistente, y dispara las acciones a
- * través del handle imperativo de FreeBoard. El desplegable abre hacia arriba (la barra está
- * abajo). Conserva los `data-testid` originales para los e2e.
+ * Barra de herramientas del lienzo: un botón «Editar» que DESPLIEGA a la derecha (con animación)
+ * las opciones de composición (widget, nota, texto, dibujar, deshacer, ordenar), y —FUERA de ese
+ * menú— dos modos explícitos: «Mover» (pan del lienzo, para no confundirlo con arrastrar un widget)
+ * y «Goma» (borrar un elemento de un clic). Dispara las acciones por el handle imperativo de
+ * FreeBoard. Conserva los `data-testid` originales para los e2e.
  */
-export function CanvasToolsMenu({ canvasRef, canUndo, drawActive }: CanvasToolsMenuProps) {
+export function CanvasToolsMenu({ canvasRef, canUndo, drawActive, mode }: CanvasToolsMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -48,6 +61,12 @@ export function CanvasToolsMenu({ canvasRef, canUndo, drawActive }: CanvasToolsM
     setOpen(false);
   };
 
+  // Activa/desactiva un modo (Mover/Goma). Pulsar el modo activo vuelve a 'select'. Cierra el menú.
+  const toggleMode = (m: InteractionMode): void => {
+    canvasRef.current?.setMode(mode === m ? 'select' : m);
+    setOpen(false);
+  };
+
   const openPalette = (): void => {
     setWidgets(canvasRef.current?.listWidgets() ?? []);
     setOpen(false);
@@ -64,15 +83,20 @@ export function CanvasToolsMenu({ canvasRef, canUndo, drawActive }: CanvasToolsM
         data-testid="dash-free-tools"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Herramientas del lienzo"
-        title="Herramientas del lienzo"
+        aria-label="Editar lienzo"
+        title="Editar lienzo"
         onClick={() => setOpen((o) => !o)}
       >
-        <Plus size={18} aria-hidden="true" />
+        <SquarePen size={16} aria-hidden="true" />
+        <span className="canvas-tools__trigger-label">Editar</span>
       </button>
 
       {open && (
-        <div className="canvas-tools__menu" role="menu" aria-label="Herramientas del lienzo">
+        <div
+          className="canvas-tools__menu canvas-tools__menu--row"
+          role="menu"
+          aria-label="Herramientas del lienzo"
+        >
           <button
             type="button"
             role="menuitem"
@@ -132,6 +156,30 @@ export function CanvasToolsMenu({ canvasRef, canUndo, drawActive }: CanvasToolsM
           </button>
         </div>
       )}
+
+      {/* Modos explícitos, FUERA del menú desplegable. */}
+      <button
+        type="button"
+        className={`canvas-tools__mode${mode === 'pan' ? ' is-active' : ''}`}
+        data-testid="dash-free-mode-pan"
+        aria-pressed={mode === 'pan'}
+        aria-label="Mover el lienzo"
+        title="Mover el lienzo (arrastra sin mover widgets)"
+        onClick={() => toggleMode('pan')}
+      >
+        <Hand size={16} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className={`canvas-tools__mode${mode === 'erase' ? ' is-active' : ''}`}
+        data-testid="dash-free-mode-erase"
+        aria-pressed={mode === 'erase'}
+        aria-label="Borrar elementos"
+        title="Goma: clic en un elemento para borrarlo"
+        onClick={() => toggleMode('erase')}
+      >
+        <Eraser size={16} aria-hidden="true" />
+      </button>
 
       {paletteOpen && (
         <WidgetPalette

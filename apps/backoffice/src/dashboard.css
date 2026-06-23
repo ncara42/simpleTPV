@@ -1511,6 +1511,36 @@
   pointer-events: none;
 }
 
+/* MOVER (pan explícito): cursor de mano; elementos inertes → el arrastre mueve el LIENZO, nunca un
+   widget (separa pan de drag-widget). */
+.dash-free--panning {
+  cursor: grab;
+}
+.dash-free--panning:active {
+  cursor: grabbing;
+}
+.dash-free--panning .dash-free-item {
+  pointer-events: none;
+}
+
+/* GOMA: un clic en un elemento lo borra. El wrapper recibe el clic (su contenido va inerte) y se
+   resalta en rojo al pasar por encima para indicar que se eliminará. */
+.dash-free--erasing {
+  cursor: pointer;
+}
+.dash-free--erasing .dash-free-item {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.dash-free--erasing .dash-free-item * {
+  pointer-events: none;
+}
+.dash-free--erasing .dash-free-item:hover {
+  outline: 2px solid var(--ui-danger);
+  outline-offset: 2px;
+  border-radius: var(--ui-radius-md);
+}
+
 /* SVG de formas/dibujos: ocupa la caja sin recortar puntas de flecha/strokes al borde. */
 .dash-free-shape-svg {
   display: block;
@@ -1636,6 +1666,27 @@
   top: auto;
   bottom: calc(100% + 0.5rem);
   left: 0;
+}
+
+/* Barra de herramientas del lienzo del Dashboard (Editar→despliega + Mover + Goma), flotando en la
+   MISMA fila de la topbar (a la altura de logo/avatar/búsqueda, top:12px), EN LUGAR del título de la
+   view (.view-title-float, oculto en Dashboard). Se renderiza a nivel de shell (App.tsx), por eso el
+   selector NO va scopeado a .dashboard--free; z por encima del clúster de búsqueda full-width (z42)
+   para quedar alineada y clicable en el centro de la fila. Píldora de cristal. */
+.dash-canvas-toolbar {
+  position: fixed;
+  top: var(--sidebar-float-gap, 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 43;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--ui-surface) 84%, transparent);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 8px 26px rgb(0 0 0 / 0.14);
+  backdrop-filter: blur(12px);
 }
 
 /* Pill de dibujo flotando justo encima del dock inferior (centrado). El dock (input del
@@ -1810,10 +1861,24 @@
 .dash-generic--panel .dv-chart,
 .dash-generic--panel .dv-grid,
 .dash-generic--panel .dv-stock-wrap {
-  padding: 1rem 1.25rem;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
+}
+/* La GRÁFICA va A SANGRE (como el widget "Ventas"): la tarjeta solo pone padding vertical y el
+   título indentado; el lienzo del gráfico llega a los filos laterales (sin márgenes laterales).
+   overflow:hidden recorta el sangrado a los radios. */
+.dash-generic--panel .dv-chart {
+  padding: 0.75rem 0;
+  overflow: hidden;
+}
+.dash-generic--panel .dv-chart > .dv-section-header {
+  padding-inline: 1.25rem;
+}
+/* Tablas y listas de alerta NO son lienzos a sangre → mantienen padding lateral. */
+.dash-generic--panel .dv-grid,
+.dash-generic--panel .dv-stock-wrap {
+  padding: 1rem 1.25rem;
 }
 /* Los KPIs son tiles de superficie (no texto suelto): superficie blanca + hairline + radio. */
 .dash-generic--panel .dv-kpi-tile {
@@ -1936,112 +2001,4 @@
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--ui-text-muted, #6b7280);
-}
-
-/* ════════════════════════════════════════════════════════════
-   S-13 · FRANJA DE RESUMEN DE INVENTARIO (sobre el lienzo)
-   Réplica compacta del panel de roturas, SIEMPRE visible. En el dashboard full-bleed
-   (.dashboard--free es position:fixed/inset:0 y FreeBoard lo rellena al 100%) la franja
-   NO puede ir en flujo normal —quedaría tapada—: flota como píldora de cristal arriba-izq,
-   fuera del page-heading (arriba-centro) y del toolbar (abajo-centro), sin tocar el lienzo.
-   ════════════════════════════════════════════════════════════ */
-.dashboard--free .dash-stock-summary {
-  position: absolute;
-  top: 0.85rem;
-  left: 0.85rem;
-  z-index: 8;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.55rem 0.85rem;
-  max-width: min(38rem, calc(100vw - 1.7rem));
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--ui-border);
-  border-radius: 9999px;
-  background: color-mix(in srgb, var(--ui-surface) 84%, transparent);
-  box-shadow: 0 8px 26px rgb(0 0 0 / 0.14);
-  backdrop-filter: blur(12px);
-  font-size: 0.85rem;
-  color: var(--ui-text);
-}
-/* Contador de roturas + desglose crítica/sustituto. */
-.dash-stock-summary-count {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--ui-danger);
-  white-space: nowrap;
-}
-.dash-stock-summary-count strong {
-  font-variant-numeric: tabular-nums;
-}
-.dash-stock-summary-breakdown {
-  color: var(--ui-text-muted);
-  font-size: 0.8rem;
-}
-/* Top 5 de roturas inline (chips compactas), con acento por severidad. */
-.dash-stock-summary-list {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  min-width: 0;
-}
-.dash-stock-summary-item {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.3rem;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  background: var(--ss-soft);
-  color: var(--ss-ink);
-  max-width: 14rem;
-}
-.dash-stock-summary-item.lvl-red {
-  --ss-ink: var(--ui-danger);
-  --ss-soft: var(--ui-danger-soft);
-}
-.dash-stock-summary-item.lvl-yellow {
-  --ss-ink: var(--ui-warning);
-  --ss-soft: var(--ui-warning-soft);
-}
-.dash-stock-summary-name {
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.dash-stock-summary-store {
-  font-size: 0.74rem;
-  opacity: 0.75;
-  white-space: nowrap;
-}
-.dash-stock-summary-more {
-  color: var(--ui-text-muted);
-  font-size: 0.78rem;
-}
-/* Bloque pequeño de caducidad (P076). */
-.dash-stock-summary-expiry {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  color: var(--ui-warning);
-  font-size: 0.8rem;
-  white-space: nowrap;
-}
-/* Estado vacío positivo verde (P079). */
-.dash-stock-summary-ok {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--ui-success);
-  font-weight: 500;
-  white-space: nowrap;
-}
-.dash-stock-summary-link {
-  margin-left: auto;
-  white-space: nowrap;
 }
