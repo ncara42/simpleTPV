@@ -108,10 +108,10 @@
 }
 .dv-section-title {
   margin: 0;
-  font-size: var(--ui-text-md);
+  font-size: var(--ui-text-sm);
   font-weight: 600;
-  letter-spacing: -0.012em;
-  color: var(--ui-text);
+  letter-spacing: -0.006em;
+  color: var(--ui-text-muted);
 }
 .dv-section-sub {
   margin: 0;
@@ -206,26 +206,31 @@
   gap: var(--ui-space-2);
   min-width: 0;
 }
-/* Pista de la barra (Tremor two-track): la barra mide su % respecto a ESTA pista, no a la fila,
-   dejando la columna de valor (.dv-rank-value, flex:none) siempre reservada a la derecha. */
-.dv-rank-track {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.dv-rank-bar {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  height: 1.55rem;
-  padding: 0 var(--ui-space-2);
-  border-radius: var(--ui-radius-sm);
-}
+/* Nombre a la IZQUIERDA (columna fija), fuera de la pista — look de artefacto: etiqueta + pista
+   con fondo sutil + relleno proporcional coloreado + valor a la derecha. */
 .dv-rank-label {
+  flex: none;
+  min-width: 68px;
+  max-width: 38%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--ui-text-sm);
   color: var(--ui-text);
+}
+/* Pista de fondo sutil; la barra es el relleno. La columna de valor (flex:none) queda reservada
+   a la derecha y el valor nunca colisiona con una barra al 100%. */
+.dv-rank-track {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 18px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--ui-surface-subtle);
+}
+.dv-rank-bar {
+  height: 100%;
+  border-radius: 4px;
 }
 .dv-rank-value {
   flex: none;
@@ -332,26 +337,12 @@
 /* ── KpiRow ── (fila de 1-4 KPIs; wrap responsive) */
 .dv-kpi-row {
   display: grid;
+  /* Rejilla auto-fit (look de artefacto): los tiles se reflujan solos según el ancho disponible,
+     sin columnas fijas por nº de KPIs. minmax(150px,1fr) = tantas columnas como quepan. Las clases
+     --1..4 las sigue emitiendo KpiRow y se conservan como hook semántico, sin plantilla propia. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--ui-space-3);
   flex: 0 0 auto;
-}
-.dv-kpi-row--1 {
-  grid-template-columns: 1fr;
-}
-.dv-kpi-row--2 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.dv-kpi-row--3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.dv-kpi-row--4 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-@media (max-width: 540px) {
-  .dv-kpi-row--3,
-  .dv-kpi-row--4 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 /* ── ChartGrid ── (1-2 gráficas por fila; las gráficas llenan el alto) */
@@ -431,19 +422,35 @@
 .dv-stock {
   display: flex;
   flex-direction: column;
+  gap: var(--ui-space-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
+/* Fila como bloque semántico (look de artefacto): fondo tenue por severidad en vez de un
+   separador hairline. El tono lo decide el componente (it.tone) → clase modificadora. */
 .dv-stock-row {
   display: flex;
   align-items: center;
   gap: var(--ui-space-2);
-  padding: var(--ui-space-2) 0;
-  border-bottom: 1px solid var(--ui-border-subtle, var(--ui-border));
+  padding: 8px 12px;
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-subtle);
 }
-.dv-stock-row:last-child {
-  border-bottom: none;
+.dv-stock-row--danger {
+  background: var(--ui-danger-soft);
+}
+.dv-stock-row--danger .dv-stock-name {
+  color: var(--ui-danger);
+}
+.dv-stock-row--warn {
+  background: var(--ui-warning-soft);
+}
+.dv-stock-row--warn .dv-stock-name {
+  color: var(--ui-warning);
+}
+.dv-stock-row--ok {
+  background: var(--ui-success-soft);
 }
 .dv-stock-main {
   display: flex;
@@ -456,6 +463,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--ui-text-sm);
+  font-weight: 500;
   color: var(--ui-text);
 }
 .dv-stock-detail {

@@ -1774,7 +1774,6 @@
   border-left: 3px solid var(--ui-chart-accent);
   border-radius: var(--ui-radius-lg, 16px);
   background: color-mix(in srgb, var(--ui-chart-accent) 7%, var(--ui-surface));
-  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
 }
 
 /* ── Glue: las moléculas de dataviz (#203 F2) llenan la celda del widget ──────────────
@@ -1798,17 +1797,30 @@
 
 /* ── Panel v2 (#204): tarjeta a medida (receta + slots). Misma chrome que el composite. ── */
 .dash-generic--panel {
+  /* Sin "folio": el contenedor del panel es transparente y sus piezas (tiles KPI + paneles de
+     gráfica) flotan sobre el lienzo con sus propias superficies + hairline (look de artefacto). */
   gap: 0;
-  padding: 16px;
-  border: 1px solid var(--ui-border, #e5e7eb);
-  border-radius: var(--ui-radius-lg, 16px);
-  background: var(--ui-surface, #fff);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
-  overflow: hidden;
-  transition: box-shadow 150ms ease;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
 }
-.dash-generic--panel:hover {
-  box-shadow: 0 4px 14px rgb(0 0 0 / 8%);
+/* Cada gráfica/tabla/lista del panel es su propia tarjeta hairline (paneles titulados sobre el
+   lienzo, no todo dentro de un folio blanco). */
+.dash-generic--panel .dv-chart,
+.dash-generic--panel .dv-grid,
+.dash-generic--panel .dv-stock-wrap {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+}
+/* Los KPIs son tiles de superficie (no texto suelto): superficie blanca + hairline + radio. */
+.dash-generic--panel .dv-kpi-tile {
+  padding: var(--ui-space-4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
 }
 .dash-generic--panel > .dv-panel {
   flex: 1 1 auto;
@@ -1848,17 +1860,13 @@
    Debe parecerse a las tarjetas del catálogo (misma superficie, borde y radio), no a un
    contenedor genérico. Solo se transicionan propiedades compositor-friendly (box-shadow). */
 .generic-composite {
+  /* Igual que gen:panel: contenedor transparente; las hojas (.generic-composite-leaf) son las
+     tarjetas hairline que flotan sobre el lienzo. */
   gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--ui-border, #e5e7eb);
-  border-radius: var(--ui-radius-lg, 16px);
-  background: var(--ui-surface, #fff);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
-  overflow: hidden;
-  transition: box-shadow 150ms ease;
-}
-.generic-composite:hover {
-  box-shadow: 0 4px 14px rgb(0 0 0 / 8%);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
 }
 /* Cada nodo (stack) llena el alto disponible para que el cuerpo no deje hueco vacío. */
 .generic-composite-node {
@@ -1905,10 +1913,10 @@
   gap: 6px;
   min-width: 0;
   min-height: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--ui-border-subtle, #eef0f2);
-  border-radius: 10px;
-  background: var(--ui-surface, #fff);
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
 }
 /* La visualización llena la celda de su hoja (la gráfica crece con el contenedor). */
 .generic-composite-leaf > .dash-generic {
