@@ -54,7 +54,7 @@ describe('Sidebar (U-04 rail)', () => {
     expect(container.querySelector('aside.sidebar.collapsed')).toBeNull();
   });
 
-  it('contraído, el clic en un grupo ancla el flyout y navegar lo cierra', () => {
+  it('contraído, el clic en un grupo abre el flyout y navegar lo cierra', () => {
     const onSelect = vi.fn();
     renderSidebar({ onSelect });
     fireEvent.click(screen.getByTestId('sidebar-collapse'));
@@ -65,6 +65,73 @@ describe('Sidebar (U-04 rail)', () => {
     fireEvent.click(screen.getByTestId('nav-stock'));
     expect(onSelect).toHaveBeenCalledWith('stock');
     expect(screen.queryByTestId('nav-stock')).toBeNull(); // flyout cerrado
+  });
+});
+
+describe('Sidebar (S-05 dropdowns solo por clic)', () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it('el hover sobre un grupo NO abre el flyout (anti-hover)', () => {
+    renderSidebar();
+    const group = screen.getByTestId('nav-group-inv');
+
+    fireEvent.mouseEnter(group.parentElement!);
+    fireEvent.mouseEnter(group);
+
+    // Sin clic, el contenido del grupo permanece oculto y aria-expanded=false.
+    expect(screen.queryByTestId('nav-stock')).toBeNull();
+    expect(group).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('el clic togglea: abre con el primer clic y cierra con el segundo', () => {
+    renderSidebar();
+    const group = screen.getByTestId('nav-group-inv');
+
+    fireEvent.click(group);
+    expect(screen.getByTestId('nav-stock')).toBeVisible();
+    expect(group).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(group);
+    expect(screen.queryByTestId('nav-stock')).toBeNull();
+    expect(group).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('abrir un segundo grupo cierra el primero (solo uno abierto)', () => {
+    const twoGroups: NavGroup[] = [
+      { id: 'inv', label: 'Inventario', icon: <span>I</span> },
+      { id: 'cfg', label: 'Ajustes', icon: <span>A</span> },
+    ];
+    const twoGroupItems: NavItem[] = [
+      { id: 'dashboard', label: 'Dashboard', icon: <span>D</span> },
+      { id: 'stock', label: 'Stock', icon: <span>S</span>, group: 'inv' },
+      { id: 'users', label: 'Usuarios', icon: <span>U</span>, group: 'cfg' },
+    ];
+    renderSidebar({ groups: twoGroups, items: twoGroupItems });
+
+    fireEvent.click(screen.getByTestId('nav-group-inv'));
+    expect(screen.getByTestId('nav-stock')).toBeVisible();
+
+    fireEvent.click(screen.getByTestId('nav-group-cfg'));
+    expect(screen.getByTestId('nav-users')).toBeVisible();
+    expect(screen.queryByTestId('nav-stock')).toBeNull(); // el primero se cerró
+  });
+
+  it('el clic fuera del nav cierra el grupo abierto', () => {
+    renderSidebar();
+    fireEvent.click(screen.getByTestId('nav-group-inv'));
+    expect(screen.getByTestId('nav-stock')).toBeVisible();
+
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByTestId('nav-stock')).toBeNull();
+  });
+
+  it('Escape cierra el grupo abierto', () => {
+    renderSidebar();
+    fireEvent.click(screen.getByTestId('nav-group-inv'));
+    expect(screen.getByTestId('nav-stock')).toBeVisible();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByTestId('nav-stock')).toBeNull();
   });
 });
 
