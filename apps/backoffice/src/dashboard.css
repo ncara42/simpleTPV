@@ -1357,10 +1357,22 @@
   background: var(--ui-primary, #2563eb);
   color: var(--ui-primary-fg, #fff);
 }
-.dash-free-note-content {
+/* Contenedor de SCROLL del editor: es el <div> que monta EditorContent (className reenviado).
+   flex:1 + min-height:0 le da una altura DEFINIDA dentro de la columna (item → body → rte → aquí),
+   y overflow-y:auto hace que el texto largo SIEMPRE haga scroll, sea cual sea el tamaño de la nota
+   (antes el wrapper iba sin estilar, rompía la cadena de alturas y el cuerpo recortaba el texto). */
+.dash-free-note-scroll {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
+}
+.dash-free-note-content {
+  /* Llena el área de scroll cuando hay poco texto (clic = foco en toda la nota) y, al no encoger por
+     debajo de su contenido (shrink 0), desborda y deja que .dash-free-note-scroll haga scroll. */
+  flex: 1 0 auto;
+  box-sizing: border-box;
   padding: 0.45rem 0.6rem;
   font-size: 0.86rem;
   line-height: 1.4;

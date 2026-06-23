@@ -380,26 +380,33 @@ export function FreeBoard({
     return () => ro.disconnect();
   }, []);
 
-  // ── Rueda: SOLO ⌘/Ctrl (o pellizco de trackpad) = zoom hacia el cursor. El desplazamiento simple
-  //    de rueda o de dos dedos del trackpad ya NO hace pan: mover el lienzo es deliberado (botón de
-  //    la mano o barra espaciadora). Seguimos llamando a preventDefault para que el lienzo posea la
-  //    rueda (evita el scroll de página y el atrás/adelante del navegador por el gesto horizontal). ──
+  // ── Rueda: ⌘/Ctrl (o pellizco de trackpad) = zoom hacia el cursor, también con el cursor sobre una
+  //    nota. La rueda simple NO hace pan (mover el lienzo es deliberado: mano o barra espaciadora),
+  //    PERO si el cursor está sobre el área de scroll de una nota se deja pasar para que la nota
+  //    scrollee de forma nativa (si no, el lienzo le robaría la rueda). En el resto del lienzo el
+  //    preventDefault mantiene la rueda «dentro» (evita el scroll de página y el atrás/adelante). ──
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent): void => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const rect = el.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        const mult = e.deltaMode === 1 ? 16 : 1;
+        const { panX, panY, zoom } = viewRef.current;
+        const factor = Math.exp(-e.deltaY * mult * WHEEL_ZOOM_SENSITIVITY);
+        const nz = clamp(zoom * factor, ZOOM_MIN, ZOOM_MAX);
+        const wx = (sx - panX) / zoom;
+        const wy = (sy - panY) / zoom;
+        setView({ zoom: nz, panX: sx - wx * nz, panY: sy - wy * nz });
+        return;
+      }
+      // Rueda simple sobre el contenido de una nota → scroll nativo de la nota (no la secuestres).
+      if ((e.target as HTMLElement | null)?.closest('.dash-free-note-scroll')) return;
+      // Resto del lienzo: la rueda simple no mueve la vista, pero el lienzo se queda el evento.
       e.preventDefault();
-      if (!e.ctrlKey && !e.metaKey) return; // rueda/trackpad sin modificador: no mueve el lienzo
-      const rect = el.getBoundingClientRect();
-      const sx = e.clientX - rect.left;
-      const sy = e.clientY - rect.top;
-      const mult = e.deltaMode === 1 ? 16 : 1;
-      const { panX, panY, zoom } = viewRef.current;
-      const factor = Math.exp(-e.deltaY * mult * WHEEL_ZOOM_SENSITIVITY);
-      const nz = clamp(zoom * factor, ZOOM_MIN, ZOOM_MAX);
-      const wx = (sx - panX) / zoom;
-      const wy = (sy - panY) / zoom;
-      setView({ zoom: nz, panX: sx - wx * nz, panY: sy - wy * nz });
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);

@@ -66,7 +66,10 @@ export default function NoteEditor({ doc, onChange }: NoteEditorProps) {
           <ListOrdered size={14} aria-hidden="true" />
         </button>
       </div>
-      <EditorContent editor={editor} />
+      {/* El className llega al <div> wrapper que monta EditorContent (no al editable): lo usamos
+          como contenedor de scroll para que la nota siempre haga scroll vertical, sea cual sea su
+          tamaño. El editable es `.dash-free-note-content`. */}
+      <EditorContent editor={editor} className="dash-free-note-scroll" />
     </div>
   );
 }
