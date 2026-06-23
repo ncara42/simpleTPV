@@ -2991,6 +2991,119 @@
   gap: var(--ui-space-2);
 }
 
+/* ── Detalle de tienda S-26: chips de estado, accesos como tarjetas, bento ───── */
+/* Todo scopeado a .store-detail-modal para no chocar con las clases base del modal
+   ni con .store-chip(s) de la selección de tiendas del form de usuario. Solo
+   presentación: transform/opacity (compositor-friendly) y prefers-reduced-motion. */
+
+/* Chips de estado bajo el título: lenguaje de "tag" sobrio, no de botón. */
+.store-detail-modal .store-chips-state {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+  margin-top: var(--ui-space-2);
+}
+.store-detail-modal .store-chip-state {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--ui-space-1) var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-soft);
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.store-detail-modal .store-chip-state.is-on {
+  background: var(--ui-brand-soft);
+  border-color: var(--ui-brand);
+  color: var(--ui-brand-ink);
+}
+.store-detail-modal .store-chip-state.is-warn {
+  background: var(--ui-warning-soft);
+  border-color: var(--ui-warning);
+  color: var(--ui-warning);
+}
+
+/* Accesos rápidos como tarjetas (rejilla auto-fit). El contenedor mantiene su
+   data-testid; el grid sustituye al flex base con mayor especificidad. */
+.store-detail-modal .store-detail-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--ui-space-3);
+  margin-top: 0;
+}
+/* La tarjeta es el <Button secondary>: redefinimos su caja a tarjeta vertical sin
+   tocar el componente compartido. .ui-btn da especificidad suficiente. */
+.store-detail-modal .store-detail-actions .store-action-card.ui-btn {
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  height: auto;
+  min-height: 5rem;
+  padding: var(--ui-space-4) var(--ui-space-3);
+  border-radius: var(--ui-radius-lg);
+  font-weight: 600;
+  text-align: center;
+  transition:
+    transform 0.12s var(--ui-ease),
+    border-color 0.12s var(--ui-ease),
+    background 0.12s var(--ui-ease);
+}
+.store-detail-modal .store-detail-actions .store-action-card.ui-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--ui-brand);
+}
+.store-detail-modal .store-detail-actions .store-action-card.ui-btn:active {
+  transform: translateY(0);
+}
+.store-detail-modal .store-action-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  color: var(--ui-brand);
+}
+
+/* Cuerpo bento: 2 columnas en desktop, 1 en móvil. Cada sección es una superficie
+   con borde y relleno para dar profundidad y separar la operativa. */
+.store-detail-modal .store-detail-bento {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--ui-space-4);
+  align-items: start;
+}
+.store-detail-modal .store-detail-bento > .form-section {
+  padding: var(--ui-space-4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-subtle);
+}
+@media (max-width: 768px) {
+  .store-detail-modal .store-detail-bento {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Acción primaria del pie: "Editar" pasa a sólido de marca (sin tocar .modal-foot
+   base, que estiliza los <button> secundarios crudos). */
+.store-detail-modal .modal-foot .store-edit-primary {
+  border-color: var(--ui-primary);
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg);
+}
+.store-detail-modal .modal-foot .store-edit-primary:hover {
+  background: var(--ui-primary-hover);
+  border-color: var(--ui-primary-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .store-detail-modal .store-detail-actions .store-action-card.ui-btn {
+    transition: none;
+  }
+  .store-detail-modal .store-detail-actions .store-action-card.ui-btn:hover {
+    transform: none;
+  }
+}
+
 /* ── Promociones: chips de filtro por grupo (UX) ────────────────────────────── */
 .promo-chips {
   display: inline-flex;

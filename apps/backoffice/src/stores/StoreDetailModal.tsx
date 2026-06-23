@@ -1,5 +1,6 @@
 import { Button, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { BarChart2, Receipt, ScrollText, Tag } from 'lucide-react';
 import { useState } from 'react';
 
 import { useConfirm } from '../components/ConfirmProvider.js';
@@ -107,210 +108,259 @@ export function StoreDetailModal({
           <p className="modal-sub">
             {store.address ?? '—'} · Código {store.code}
           </p>
+          {/* Chips de estado (S-26): resumen puramente presentacional derivado del
+              estado ya disponible (ops + central + dispositivos). No disparan queries
+              ni mutaciones; dan jerarquía de un vistazo bajo el título. */}
+          <div className="store-chips-state">
+            <span className={`store-chip-state${opsVerified ? ' is-on' : ''}`}>
+              {opsVerified ? 'Verificada' : 'Sin verificar'}
+            </span>
+            {opsIncident.trim() !== '' && (
+              <span className="store-chip-state is-warn">Incidencia</span>
+            )}
+            {store.isCentral && <span className="store-chip-state is-on">Central</span>}
+            {/* Tres estados reales del fichaje (no aplanar a sí/no): sin dispositivos vs
+                dispositivos pendientes de emparejar vs alguno emparejado (operativo). */}
+            {devices.length === 0 ? (
+              <span className="store-chip-state is-warn">Sin dispositivos</span>
+            ) : anyPaired ? (
+              <span className="store-chip-state is-on">Fichaje operativo</span>
+            ) : (
+              <span className="store-chip-state">Pendiente de emparejar</span>
+            )}
+          </div>
         </header>
 
         <div className="modal-body">
-          <section className="form-section">
-            <span className="form-section-title">Aperturas y cierres</span>
-            <div className="store-log-summary" data-testid="store-detail-open">
-              <div className="store-log-summary-row">
-                <span className="store-log-tag is-open">Apertura</span>
-                <span className="store-log-summary-who">
-                  {lastOpen ? lastOpen.name : 'Sin registro'}
-                </span>
-                {lastOpen && (
-                  <span className="store-log-summary-when">
-                    {fmtDayMonth(lastOpen.date)} · {lastOpen.time}
-                  </span>
-                )}
-              </div>
-              <div className="store-log-summary-row">
-                <span className="store-log-tag is-close">Cierre</span>
-                <span className="store-log-summary-who">
-                  {lastClose ? lastClose.name : 'Sin registro'}
-                </span>
-                {lastClose && (
-                  <span className="store-log-summary-when">
-                    {fmtDayMonth(lastClose.date)} · {lastClose.time}
-                  </span>
-                )}
-              </div>
-            </div>
-            {/* Acciones de la tienda con el mismo peso visual: registro de fichajes +
-                Stock/Ventas/Precios, todos <Button secondary> en una fila flex uniforme
-                (antes "Ver registros" era un link-btn suelto de tamaño distinto). Se
-                conservan los data-testid en los que se apoyan los E2E. */}
-            <div className="store-detail-actions" data-testid="store-detail-actions">
-              <Button
-                variant="secondary"
-                onClick={() => setLogOpen(true)}
-                data-testid="store-log-open"
-              >
-                Ver registros
-              </Button>
-              <Button variant="secondary" onClick={onOpenStock} data-testid="store-open-stock">
-                Stock
-              </Button>
-              <Button variant="secondary" onClick={onOpenSales} data-testid="store-open-sales">
-                Ventas
-              </Button>
-              <Button variant="secondary" onClick={onOpenPrices} data-testid="store-open-prices">
-                Precios
-              </Button>
-            </div>
-          </section>
-
-          <section className="form-section" data-testid="store-ops">
-            <span className="form-section-title">Estado operativo</span>
-            <label className="switch">
-              <input
-                type="checkbox"
-                checked={opsVerified}
-                onChange={(e) => setOpsVerified(e.target.checked)}
-                data-testid="store-ops-verified"
-              />
-              <span className="switch-track">
-                <span className="switch-thumb" />
-              </span>
-              <span className="switch-text">Tienda verificada</span>
-            </label>
-            <label>
-              Incidencias / notas
-              <Input
-                placeholder="p. ej. persiana rota, obras en la calle…"
-                value={opsIncident}
-                onChange={(e) => setOpsIncident(e.target.value)}
-                data-testid="store-ops-incident"
-              />
-            </label>
-            {opsMut.isError && (
-              <p className="form-error">
-                {formErrorMessage(opsMut.error, 'No se pudo guardar el estado.')}
-              </p>
-            )}
+          {/* Accesos rápidos como tarjetas de acción (S-26): mismas onClick y
+              data-testid que antes; cambia la presentación a tarjeta con icono. */}
+          <div className="store-detail-actions" data-testid="store-detail-actions">
             <Button
-              type="button"
-              className="store-ops-save"
-              disabled={!opsDirty || opsMut.isPending}
-              onClick={() => opsMut.mutate()}
-              data-testid="store-ops-save"
+              variant="secondary"
+              className="store-action-card"
+              onClick={() => setLogOpen(true)}
+              data-testid="store-log-open"
             >
-              {opsMut.isPending
-                ? 'Guardando…'
-                : opsMut.isSuccess && !opsDirty
-                  ? 'Guardado ✓'
-                  : 'Guardar estado'}
+              <ScrollText className="store-action-icon" aria-hidden="true" />
+              <span>Ver registros</span>
             </Button>
-          </section>
+            <Button
+              variant="secondary"
+              className="store-action-card"
+              onClick={onOpenStock}
+              data-testid="store-open-stock"
+            >
+              <BarChart2 className="store-action-icon" aria-hidden="true" />
+              <span>Stock</span>
+            </Button>
+            <Button
+              variant="secondary"
+              className="store-action-card"
+              onClick={onOpenSales}
+              data-testid="store-open-sales"
+            >
+              <Receipt className="store-action-icon" aria-hidden="true" />
+              <span>Ventas</span>
+            </Button>
+            <Button
+              variant="secondary"
+              className="store-action-card"
+              onClick={onOpenPrices}
+              data-testid="store-open-prices"
+            >
+              <Tag className="store-action-icon" aria-hidden="true" />
+              <span>Precios</span>
+            </Button>
+          </div>
 
-          <section className="form-section" data-testid="store-central">
-            <span className="form-section-title">Tienda central</span>
-            <label className="switch">
-              <input
-                type="checkbox"
-                checked={store.isCentral}
-                disabled={centralMut.isPending}
-                onChange={(e) => centralMut.mutate(e.target.checked)}
-                data-testid="store-central-toggle"
-              />
-              <span className="switch-track">
-                <span className="switch-thumb" />
-              </span>
-              <span className="switch-text">
-                Designar como central (destino de los traspasos de efectivo)
-              </span>
-            </label>
-            {centralMut.isError && (
-              <p className="form-error">
-                {formErrorMessage(centralMut.error, 'No se pudo cambiar la central.')}
-              </p>
-            )}
-          </section>
+          {/* Cuerpo bento (S-26): operativa en rejilla 2 col (1 en móvil). Cada
+              sección conserva su data-testid y composición; solo cambia su posición. */}
+          <div className="store-detail-bento">
+            <section className="form-section">
+              <span className="form-section-title">Aperturas y cierres</span>
+              <div className="store-log-summary" data-testid="store-detail-open">
+                <div className="store-log-summary-row">
+                  <span className="store-log-tag is-open">Apertura</span>
+                  <span className="store-log-summary-who">
+                    {lastOpen ? lastOpen.name : 'Sin registro'}
+                  </span>
+                  {lastOpen && (
+                    <span className="store-log-summary-when">
+                      {fmtDayMonth(lastOpen.date)} · {lastOpen.time}
+                    </span>
+                  )}
+                </div>
+                <div className="store-log-summary-row">
+                  <span className="store-log-tag is-close">Cierre</span>
+                  <span className="store-log-summary-who">
+                    {lastClose ? lastClose.name : 'Sin registro'}
+                  </span>
+                  {lastClose && (
+                    <span className="store-log-summary-when">
+                      {fmtDayMonth(lastClose.date)} · {lastClose.time}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </section>
 
-          <section className="form-section" data-testid="store-device">
-            <span className="form-section-title">Dispositivos de fichaje</span>
-            {devices.length === 0 ? (
-              <p className="store-device-note is-warn" data-testid="store-device-warn">
-                <span className="store-device-note-icon" aria-hidden="true">
-                  ⚠
+            <section className="form-section" data-testid="store-ops">
+              <span className="form-section-title">Estado operativo</span>
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={opsVerified}
+                  onChange={(e) => setOpsVerified(e.target.checked)}
+                  data-testid="store-ops-verified"
+                />
+                <span className="switch-track">
+                  <span className="switch-thumb" />
                 </span>
-                Sin dispositivos: el TPV de esta tienda no puede fichar hasta emparejar uno.
-              </p>
-            ) : (
-              <>
-                {anyPaired ? (
-                  <p className="store-device-note is-ok" data-testid="store-device-ok">
-                    <span className="store-device-note-icon" aria-hidden="true">
-                      ✓
-                    </span>
-                    Hay un dispositivo emparejado: el fichaje está operativo.
-                  </p>
-                ) : (
-                  <p className="store-device-note is-warn" data-testid="store-device-warn">
-                    <span className="store-device-note-icon" aria-hidden="true">
-                      ⚠
-                    </span>
-                    Token generado pero ningún dispositivo emparejado todavía.
+                <span className="switch-text">Tienda verificada</span>
+              </label>
+              <label>
+                Incidencias / notas
+                <Input
+                  placeholder="p. ej. persiana rota, obras en la calle…"
+                  value={opsIncident}
+                  onChange={(e) => setOpsIncident(e.target.value)}
+                  data-testid="store-ops-incident"
+                />
+              </label>
+              {opsMut.isError && (
+                <p className="form-error">
+                  {formErrorMessage(opsMut.error, 'No se pudo guardar el estado.')}
+                </p>
+              )}
+              <Button
+                type="button"
+                className="store-ops-save"
+                disabled={!opsDirty || opsMut.isPending}
+                onClick={() => opsMut.mutate()}
+                data-testid="store-ops-save"
+              >
+                {opsMut.isPending
+                  ? 'Guardando…'
+                  : opsMut.isSuccess && !opsDirty
+                    ? 'Guardado ✓'
+                    : 'Guardar estado'}
+              </Button>
+            </section>
+
+            <section className="form-section" data-testid="store-central">
+              <span className="form-section-title">Tienda central</span>
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={store.isCentral}
+                  disabled={centralMut.isPending}
+                  onChange={(e) => centralMut.mutate(e.target.checked)}
+                  data-testid="store-central-toggle"
+                />
+                <span className="switch-track">
+                  <span className="switch-thumb" />
+                </span>
+                <span className="switch-text">
+                  Designar como central (destino de los traspasos de efectivo)
+                </span>
+              </label>
+              {centralMut.isError && (
+                <p className="form-error">
+                  {formErrorMessage(centralMut.error, 'No se pudo cambiar la central.')}
+                </p>
+              )}
+            </section>
+
+            <section className="form-section" data-testid="store-device">
+              <span className="form-section-title">Dispositivos de fichaje</span>
+              {devices.length === 0 ? (
+                <p className="store-device-note is-warn" data-testid="store-device-warn">
+                  <span className="store-device-note-icon" aria-hidden="true">
+                    ⚠
+                  </span>
+                  Sin dispositivos: el TPV de esta tienda no puede fichar hasta emparejar uno.
+                </p>
+              ) : (
+                <>
+                  {anyPaired ? (
+                    <p className="store-device-note is-ok" data-testid="store-device-ok">
+                      <span className="store-device-note-icon" aria-hidden="true">
+                        ✓
+                      </span>
+                      Hay un dispositivo emparejado: el fichaje está operativo.
+                    </p>
+                  ) : (
+                    <p className="store-device-note is-warn" data-testid="store-device-warn">
+                      <span className="store-device-note-icon" aria-hidden="true">
+                        ⚠
+                      </span>
+                      Token generado pero ningún dispositivo emparejado todavía.
+                    </p>
+                  )}
+                  <ul className="store-device-list" data-testid="store-device-list">
+                    {devices.map((d) => (
+                      <li key={d.id} className="store-device-item" data-testid="store-device-item">
+                        <span className="store-device-name">{d.name}</span>
+                        <span className={`store-device-state ${d.authorized ? 'is-ok' : ''}`}>
+                          {d.authorized
+                            ? `Emparejado${d.pairedAt ? ` · ${fmtDayMonth(d.pairedAt)}` : ''}`
+                            : 'Pendiente de emparejar'}
+                        </span>
+                        <button
+                          type="button"
+                          className="link-btn danger"
+                          onClick={() => void askRevoke(d.id, d.name)}
+                          data-testid="store-device-revoke"
+                        >
+                          Revocar
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              <div className="store-device-token">
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => createMut.mutate()}
+                  disabled={createMut.isPending}
+                  data-testid="store-gen-token"
+                >
+                  {createMut.isPending ? 'Generando…' : 'Generar token de fichaje'}
+                </button>
+                {createMut.isError && (
+                  <p className="form-error">
+                    {formErrorMessage(createMut.error, 'No se pudo generar el token.')}
                   </p>
                 )}
-                <ul className="store-device-list" data-testid="store-device-list">
-                  {devices.map((d) => (
-                    <li key={d.id} className="store-device-item" data-testid="store-device-item">
-                      <span className="store-device-name">{d.name}</span>
-                      <span className={`store-device-state ${d.authorized ? 'is-ok' : ''}`}>
-                        {d.authorized
-                          ? `Emparejado${d.pairedAt ? ` · ${fmtDayMonth(d.pairedAt)}` : ''}`
-                          : 'Pendiente de emparejar'}
-                      </span>
-                      <button
-                        type="button"
-                        className="link-btn danger"
-                        onClick={() => void askRevoke(d.id, d.name)}
-                        data-testid="store-device-revoke"
-                      >
-                        Revocar
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            <div className="store-device-token">
-              <button
-                type="button"
-                className="link-btn"
-                onClick={() => createMut.mutate()}
-                disabled={createMut.isPending}
-                data-testid="store-gen-token"
-              >
-                {createMut.isPending ? 'Generando…' : 'Generar token de fichaje'}
-              </button>
-              {createMut.isError && (
-                <p className="form-error">
-                  {formErrorMessage(createMut.error, 'No se pudo generar el token.')}
-                </p>
-              )}
-              {token && (
-                <p className="muted" data-testid="store-token-value">
-                  Token (se muestra una sola vez — introdúcelo en el TPV): <code>{token}</code>{' '}
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => void navigator.clipboard?.writeText(token)}
-                    data-testid="store-token-copy"
-                  >
-                    Copiar
-                  </button>
-                </p>
-              )}
-            </div>
-          </section>
+                {token && (
+                  <p className="muted" data-testid="store-token-value">
+                    Token (se muestra una sola vez — introdúcelo en el TPV): <code>{token}</code>{' '}
+                    <button
+                      type="button"
+                      className="link-btn"
+                      onClick={() => void navigator.clipboard?.writeText(token)}
+                      data-testid="store-token-copy"
+                    >
+                      Copiar
+                    </button>
+                  </p>
+                )}
+              </div>
+            </section>
+          </div>
         </div>
 
         {deleteError && <p className="form-error">{deleteError}</p>}
         <div className="modal-foot modal-foot--split">
           <div className="modal-foot-actions">
-            <button type="button" onClick={onEdit} data-testid="store-edit">
+            <button
+              type="button"
+              className="store-edit-primary"
+              onClick={onEdit}
+              data-testid="store-edit"
+            >
               Editar
             </button>
             <button type="button" className="danger" onClick={onDelete} data-testid="store-delete">
