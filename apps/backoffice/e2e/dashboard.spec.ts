@@ -319,6 +319,26 @@ test('lienzo libre: la vista solo se mueve con la mano o la barra espaciadora, n
   expect(await transformOf()).not.toBe(afterHand);
 });
 
+test('lienzo libre: centrar la vista (Ajustar) topa el zoom en 85%', async ({ page }) => {
+  await expect(page.getByTestId('dash-free')).toBeVisible();
+  await clearDrawElements(page);
+  await clearNotes(page);
+  await clearFreeWidgets(page);
+
+  // Un solo widget = contenido compacto: ajustar querría acercarse mucho (>85%), pero debe topar.
+  await clickTool(page, 'dash-free-add-widget');
+  const palette = page.locator('.dash-free-palette');
+  await expect(palette).toBeVisible();
+  await palette.locator('button[role="menuitem"]').first().click();
+  await expect(page.locator('.dash-free-item--widget')).toHaveCount(1);
+
+  // Centrar/ajustar la vista al contenido → el % de zoom queda topado en 85% (antes, mucho mayor).
+  await page.locator('.dash-free-zoom button[aria-label="Ajustar"]').click();
+  await expect(page.locator('.dash-free-zoom-pct')).toHaveText('85%');
+
+  await clearFreeWidgets(page);
+});
+
 test('lienzo libre: la flecha de orientación aparece al alejarse y encuadra al pulsarla', async ({
   page,
 }) => {
