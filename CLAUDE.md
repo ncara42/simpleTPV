@@ -3,36 +3,35 @@
 ## Idioma
 
 - Español de España (tuteo peninsular, nunca voseo).
-- Términos técnicos y identificadores en su forma original.
+- Términos técnicos e identificadores en su forma original.
 
 ## Stack
 
-- TypeScript end-to-end, Node 22, pnpm 11.
-- Monorepo Turborepo + pnpm workspaces.
-- Backend: NestJS 11 + Prisma 6 + PostgreSQL 16.
-- Frontends: React 19 + Vite 6 (apps/tpv y apps/backoffice).
-- Tests: Vitest (api), Playwright (frontends).
+- Monorepo Turborepo + pnpm workspaces. Node 22, pnpm 11.
+- **Backend: Rust** en `crates/` (Tokio + Axum 0.8 + SQLx 0.8 + PostgreSQL 16). Binario `simpletpv-api`.
+  - `apps/api` es un cascarón legacy NestJS (sin `package.json`) — no usar.
+- Frontends: React 19 + Vite 8 — `apps/tpv` (PWA, punto de venta) y `apps/backoffice` (admin).
+- Tests: `cargo test` (backend), Vitest (unit de packages/frontends), Playwright (e2e frontends).
+- Prisma (`packages/db`) = solo fuente del schema + cliente TS para seeds/tests. Las migraciones reales son SQL en `crates/app/migrations/`, aplicadas por el binario al arrancar (tabla `_sqlx_migrations`).
 
 ## Convenciones
 
 - Conventional Commits.
 - Antes de tocar código, leer el archivo relevante; preferir edits a reescrituras.
 - No mocks de BD en tests de integración — usar Postgres efímero.
-- ESLint flat config raíz aplica a todo el monorepo; cada workspace puede sobreescribir.
-- `tsconfig.base.json` en raíz; cada workspace extiende.
-- `apps/api/tsconfig.json` sobrescribe `module` a `node16` (NestJS 11 más estable en CJS/Node resolution clásica). El resto del monorepo usa `ESNext`/`Bundler`. Override documentado en `docs/superpowers/specs/2026-05-28-f3-api-nestjs-design.md` F3-D2.
-- Multi-tenancy: el `organizationId` viaja DENTRO del JWT (claim del accessToken que firma `AuthService.login` desde `User.organizationId`). El cliente solo envía `Authorization: Bearer <token>`; NO hay header `X-Org-Id` ni `TenantMiddleware`. `AuthGuard` verifica el token y puebla `req.user`; `TenantContextInterceptor` lee `req.user.organizationId` y abre `AsyncLocalStorage`. `PrismaService` con `$extends` ejecuta `set_config('app.current_organization_id', ...)` parametrizado en una `$transaction` y re-emite la operación sobre `tx[model][operation]` → RLS aplicada en DB.
-- Sin contexto → query devuelve 0 filas (fail-safe). Nunca filtra entre tenants. Verificado en `apps/api/test/rls.integration.spec.ts`.
-- Puertos por defecto en local: API `:3001` (no 3000 — evita colisión con otros dev servers). Postgres docker mapeado a `:5434` host (no 5432).
-- Password del rol `app` NO está en migraciones Prisma (se eliminó tras finding de seguridad MEDIUM). Vive en `packages/db/scripts/dev-bootstrap.sql` y se aplica con `pnpm --filter @simpletpv/db db:bootstrap-dev` UNA VEZ tras `prisma migrate deploy`. En producción Dokploy ejecuta `ALTER ROLE app LOGIN PASSWORD '<secret-real>'` manualmente. Ver `packages/db/scripts/README.md`.
+- ESLint flat config raíz aplica a todo el monorepo; `tsconfig.base.json` en raíz (cada workspace extiende).
+- **Multi-tenancy (RLS Postgres):** el `organizationId` viaja DENTRO del JWT; el cliente solo manda `Authorization: Bearer` (no hay header `X-Org-Id`). `crates/db` abre una transacción por tenant con `with_tenant_tx` → `set_config('app.current_organization_id', $1, true)` como primera sentencia, y todas las queries van sobre esa tx → RLS aplicada en BD. Sin contexto → 0 filas (fail-safe, nunca filtra entre tenants; verificado en `crates/db` tests RLS).
+- Dos roles Postgres: `app` (RLS aplicada, runtime) y `app_admin` (BYPASSRLS, solo lookup de login pre-tenant).
+- Password del rol `app` fuera de migraciones: `packages/db/scripts/dev-bootstrap.sql` (dev); en prod se aplica `ALTER ROLE app ... PASSWORD` manualmente.
+- Puertos locales: API `:3001`, Postgres `:5434`, Redis `:6381`. Redis es opcional/degradable.
 
 ## Scripts raíz
 
-- `pnpm lint`, `pnpm format`, `pnpm build`, `pnpm typecheck`, `pnpm test`, `pnpm test:e2e`.
-- Build/test/typecheck van por Turborepo (cache local activado).
+- `pnpm lint | format | build | typecheck | test | test:e2e` (vía Turborepo).
+- Backend Rust: `cd crates && cargo build | clippy | test`.
 
 ## Documentación viva
 
-- Specs en `docs/superpowers/specs/`.
-- Planes de implementación en `docs/superpowers/plans/`.
+- Specs en `docs/superpowers/specs/`; planes en `docs/superpowers/plans/`.
 - PRD y plan MVP en raíz (`PRD_TPV_Multitienda.md`, `Plan_Desarrollo_MVP.md`).
+- Migración a app de escritorio Tauri: `~/ia/docs/planes/plan_migracion_tauri.md`.
