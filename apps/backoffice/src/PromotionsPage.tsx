@@ -1,11 +1,12 @@
 import { Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Download, Plus } from 'lucide-react';
+import { Check, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { CsvActionButton } from './components/CsvActionButton.js';
+import { ImportExportModal } from './components/ImportExportModal.js';
 import { Modal } from './components/Modal.js';
-import { exportRowsToCsv } from './lib/csv.js';
 import { usePageActions } from './lib/pageActions.js';
 import {
   createPromotion,
@@ -122,6 +123,7 @@ export function PromotionsPage() {
     });
   const [form, setForm] = useState<PromoForm | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const [dataModal, setDataModal] = useState<'export' | null>(null);
 
   const visible = useMemo(() => promos.filter((p) => groups.has(promoGroup(p))), [promos, groups]);
 
@@ -192,34 +194,26 @@ export function PromotionsPage() {
     });
   };
 
-  const handleExport = (): void => {
-    exportRowsToCsv(
-      'promociones.csv',
-      ['Promoción', 'Condición', 'Descuento', 'Vigencia', 'Estado'],
-      visible.map((p) => [
-        p.name,
-        conditionShort(p),
-        discountShort(p),
-        dateRange(p.startDate, p.endDate),
-        STATUS_LABEL[promoStatus(p)],
-      ]),
-    );
-  };
+  const exportHeaders = ['Promoción', 'Condición', 'Descuento', 'Vigencia', 'Estado'];
+  const buildExportRows = (): string[][] =>
+    visible.map((p) => [
+      p.name,
+      conditionShort(p),
+      discountShort(p),
+      dateRange(p.startDate, p.endDate),
+      STATUS_LABEL[promoStatus(p)],
+    ]);
 
   usePageHeader('Promociones', 'Descuentos y reglas programables');
 
   // Export en el clúster flotante (junto al conmutador Backoffice↔TPV).
   usePageActions(
-    <button
-      type="button"
-      className="float-action-btn"
-      onClick={handleExport}
-      aria-label="Exportar promociones"
-      title="Exportar promociones"
-      data-testid="promotions-export"
-    >
-      <Download size={17} aria-hidden="true" />
-    </button>,
+    <CsvActionButton
+      kind="export"
+      label="Exportar"
+      onClick={() => setDataModal('export')}
+      testId="promotions-export"
+    />,
   );
 
   return (
@@ -385,6 +379,20 @@ export function PromotionsPage() {
 
       {form && (
         <PromoModal form={form} onChange={setForm} onClose={() => setForm(null)} onSave={save} />
+      )}
+
+      {dataModal && (
+        <ImportExportModal
+          title="Promociones"
+          initialMode={dataModal}
+          onClose={() => setDataModal(null)}
+          testId="promotions-data-modal"
+          exportConfig={{
+            headers: exportHeaders,
+            getRows: buildExportRows,
+            filenameBase: 'promociones',
+          }}
+        />
       )}
     </section>
   );

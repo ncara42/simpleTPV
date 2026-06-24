@@ -109,4 +109,26 @@ describe('Chart', () => {
     expect(screen.getByRole('group', { name: 'Ventas por tienda' })).toBeInTheDocument();
     expect(screen.getByLabelText('Centro: 200 € · 150 € · +33 %')).toBeInTheDocument();
   });
+
+  // B-01: con muchos buckets (serie temporal de Ventas) las etiquetas se amontonaban
+  // y el gráfico crecía sin límite. Se rotula 1 de cada N manteniendo siempre la última;
+  // la contención de ancho es CSS, pero el throttling es lógica DOM verificable aquí.
+  it('B-01: con >30 datos rotula 1 de cada 2 etiquetas y siempre la última', () => {
+    const many: ChartBar[] = Array.from({ length: 40 }, (_, i) => ({ label: `D${i}`, value: 100 }));
+    const { container } = render(
+      <Chart data={many} formatValue={(n) => `${n}`} showGrid={false} />,
+    );
+    // Se mantiene UNA celda por dato (preserva la alineación de columnas)…
+    expect(container.querySelectorAll('.ui-chart-name-cell')).toHaveLength(40);
+    // …pero solo se rotula 1 de cada 2 (20) + la última (idx 39, impar) = 21.
+    expect(container.querySelectorAll('.ui-chart-name')).toHaveLength(21);
+    expect(screen.getByText('D39')).toBeInTheDocument(); // la última SIEMPRE
+    expect(screen.queryByText('D37')).not.toBeInTheDocument(); // una intermedia impar, oculta
+  });
+
+  it('B-01: con ≤30 datos rotula todas las etiquetas (no-op para los widgets del dashboard)', () => {
+    const few: ChartBar[] = Array.from({ length: 12 }, (_, i) => ({ label: `M${i}`, value: 50 }));
+    const { container } = render(<Chart data={few} formatValue={(n) => `${n}`} showGrid={false} />);
+    expect(container.querySelectorAll('.ui-chart-name')).toHaveLength(12);
+  });
 });

@@ -1,6 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { escapeCsvField, exportRowsToCsv, parseCsvRows } from './csv.js';
+import { escapeCsvField, exportRowsToCsv, neutralizeFormula, parseCsvRows } from './csv.js';
+
+describe('neutralizeFormula', () => {
+  it('prefija con comilla simple solo si empieza por un disparador de fórmula', () => {
+    expect(neutralizeFormula('=SUM(A1:A2)')).toBe("'=SUM(A1:A2)");
+    expect(neutralizeFormula('+1')).toBe("'+1");
+    expect(neutralizeFormula('-1')).toBe("'-1");
+    expect(neutralizeFormula('@cmd')).toBe("'@cmd");
+  });
+  it('deja intacto el texto normal (sin entrecomillar, a diferencia de escapeCsvField)', () => {
+    expect(neutralizeFormula('Distribuciones Norte')).toBe('Distribuciones Norte');
+    expect(neutralizeFormula('Juan, S.L.')).toBe('Juan, S.L.');
+    expect(neutralizeFormula('2.50')).toBe('2.50');
+  });
+});
 
 describe('escapeCsvField', () => {
   it('deja intactos los campos simples', () => {

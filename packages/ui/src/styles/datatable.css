@@ -61,6 +61,10 @@
 
 .ui-dt-scroll {
   overflow-x: auto;
+  /* B-09: scrollbar fino siempre visible como pista de que la tabla tiene más
+     columnas a los lados cuando no caben (antes el recorte de la última columna
+     no daba ninguna señal de scroll). */
+  scrollbar-width: thin;
 }
 
 .ui-dt-table {
@@ -87,10 +91,17 @@
   white-space: nowrap;
 }
 
-.ui-dt-col-right {
+/* B-11: la cabecera debe heredar la alineación de la columna. `.ui-dt-table th`
+   fija text-align:left con especificidad (0,1,1), que gana a la clase `.ui-dt-col-*`
+   (0,1,0); por eso las columnas right/center NO ordenables dejaban el header a la
+   izquierda mientras la celda iba a la derecha (Fichajes: Pausas/Horas). Apuntar a
+   `th.ui-dt-col-*` sube la especificidad y alinea cabecera y celda. */
+.ui-dt-col-right,
+.ui-dt-table th.ui-dt-col-right {
   text-align: right;
 }
-.ui-dt-col-center {
+.ui-dt-col-center,
+.ui-dt-table th.ui-dt-col-center {
   text-align: center;
 }
 

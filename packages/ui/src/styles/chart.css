@@ -36,6 +36,9 @@
   flex-direction: column;
   gap: 0.5rem;
   min-width: 0;
+  /* B-01/B-13: nunca desbordar el contenedor; con muchos buckets el gráfico se
+     comprime (o hace scroll en el contenedor padre) en vez de empujar la página. */
+  max-width: 100%;
   /* Canal izquierdo reservado para el eje Y (los números no se montan sobre
      las barras y la rejilla arranca limpia). */
   --ui-chart-gutter: 2.75rem;
@@ -88,6 +91,9 @@
   align-items: stretch;
   gap: 0.5rem;
   height: 100%;
+  /* B-01: permite que las columnas flex se encojan por debajo de su contenido
+     intrínseco en vez de expandir el ancho total del gráfico. */
+  min-width: 0;
 }
 .ui-chart-group {
   position: relative;

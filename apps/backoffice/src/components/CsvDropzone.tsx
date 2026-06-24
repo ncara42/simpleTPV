@@ -3,6 +3,7 @@ import { Download } from 'lucide-react';
 import { type ReactNode, useId, useRef, useState } from 'react';
 
 import { formErrorMessage } from '../lib/form-error.js';
+import { downloadTemplate, fileToCsv } from '../lib/spreadsheet.js';
 
 interface Props {
   // Columnas esperadas en la cabecera (para validar y construir la plantilla).
@@ -43,6 +44,8 @@ export function CsvDropzone({
   const templateHref = `data:text/csv;charset=utf-8,${encodeURIComponent(
     `${columns.join(',')}\n${example.join(',')}`,
   )}`;
+  // Base del nombre de plantilla (sin extensión) para generar también la versión Excel.
+  const templateBase = templateName.replace(/\.(csv|xlsx|xls)$/i, '');
 
   // Valida que la cabecera incluya todas las columnas esperadas (admite extras).
   function missingColumns(csv: string): string[] {
@@ -54,20 +57,22 @@ export function CsvDropzone({
   async function handleFile(file: File): Promise<void> {
     setError(null);
     setResult(null);
-    // Mismo límite que el body JSON de la API (512kb): rechazar aquí da un error
-    // claro en vez del 413 genérico del servidor.
-    if (file.size > 512 * 1024) {
-      setError('El archivo supera 512 KB. Divide el CSV en lotes más pequeños.');
-      return;
-    }
-    const csv = await file.text();
-    const missing = missingColumns(csv);
-    if (missing.length > 0) {
-      setError(`Faltan columnas en la cabecera: ${missing.join(', ')}`);
-      return;
-    }
     setLoading(true);
     try {
+      // B-04: CSV o XLSX/XLS — ambos se normalizan a un string CSV antes de validar,
+      // así el resto del flujo (cabecera + onImport + backend) no cambia.
+      const csv = await fileToCsv(file);
+      // Mismo límite que el body JSON de la API (512kb), aplicado al CSV resultante
+      // (un XLSX pesa distinto que su CSV): error claro en vez del 413 del servidor.
+      if (csv.length > 512 * 1024) {
+        setError('El archivo supera 512 KB una vez convertido. Divídelo en lotes más pequeños.');
+        return;
+      }
+      const missing = missingColumns(csv);
+      if (missing.length > 0) {
+        setError(`Faltan columnas en la cabecera: ${missing.join(', ')}`);
+        return;
+      }
       const res = await onImport(csv);
       setResult(res);
       if (res.inserted > 0) onImported?.();
@@ -86,16 +91,27 @@ export function CsvDropzone({
   return (
     <div className="csv-dropzone" data-testid={testId}>
       {help && <p className="csv-dropzone-help">{help}</p>}
-      <a className="csv-dropzone-template" href={templateHref} download={templateName}>
-        <Download size={15} aria-hidden="true" />
-        Descargar plantilla CSV
-      </a>
+      <div className="csv-dropzone-templates">
+        <a className="csv-dropzone-template" href={templateHref} download={templateName}>
+          <Download size={15} aria-hidden="true" />
+          Plantilla CSV
+        </a>
+        <button
+          type="button"
+          className="csv-dropzone-template"
+          onClick={() => void downloadTemplate('xlsx', templateBase, columns, example)}
+          data-testid="csv-dropzone-template-xlsx"
+        >
+          <Download size={15} aria-hidden="true" />
+          Plantilla Excel
+        </button>
+      </div>
 
       <input
         ref={inputRef}
         id={inputId}
         type="file"
-        accept=".csv,text/csv"
+        accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         className="csv-dropzone-input"
         onChange={(e) => {
           const f = e.target.files?.[0];
@@ -122,7 +138,7 @@ export function CsvDropzone({
           'Importando…'
         ) : (
           <>
-            <strong>Arrastra un CSV aquí</strong>
+            <strong>Arrastra un CSV o Excel aquí</strong>
             <span className="muted">o haz clic para seleccionarlo</span>
           </>
         )}

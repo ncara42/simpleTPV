@@ -1,10 +1,10 @@
 import { DataTable, type DataTableColumn, Select } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
-import { Download } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { exportRowsToCsv } from './lib/csv.js';
+import { CsvActionButton } from './components/CsvActionButton.js';
+import { ImportExportModal } from './components/ImportExportModal.js';
 import { usePageActions } from './lib/pageActions.js';
 import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
 
@@ -19,6 +19,7 @@ export function TimeClockPage() {
   usePageHeader('Control horario', 'Fichajes por empleado y fecha · totales de horas');
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const setFilter = (patch: Partial<Filters>): void => setFilters((f) => ({ ...f, ...patch }));
+  const [dataModal, setDataModal] = useState<'import' | 'export' | null>(null);
 
   // Histórico cross-tienda agregado por jornada (últimos 30 días, todas las tiendas
   // de la organización). El filtrado fino se hace en cliente sobre este conjunto.
@@ -64,6 +65,19 @@ export function TimeClockPage() {
 
   const hasFilters = Boolean(filters.storeId || filters.userId || filters.date);
 
+  // Exportación de fichajes: cabeceras + filas (filtradas en memoria) para el modal.
+  const exportHeaders = ['Empleado', 'Tienda', 'Fecha', 'Entrada', 'Salida', 'Pausas', 'Horas'];
+  const buildExportRows = (): string[][] =>
+    filtered.map((r) => [
+      r.userName,
+      r.storeName,
+      r.date,
+      hhmm(r.firstIn),
+      hhmm(r.lastOut),
+      fmtMinutes(msToMin(r.breakMs)),
+      fmtMinutes(msToMin(r.workedMs)),
+    ]);
+
   type TimeRow = (typeof filtered)[number];
   const timeclockColumns: DataTableColumn<TimeRow>[] = [
     { key: 'user', header: 'Empleado', render: (r) => r.userName },
@@ -93,33 +107,13 @@ export function TimeClockPage() {
     },
   ];
 
-  const handleExport = (): void => {
-    exportRowsToCsv(
-      'control-horario.csv',
-      ['Empleado', 'Tienda', 'Fecha', 'Entrada', 'Salida', 'Pausas', 'Horas'],
-      filtered.map((r) => [
-        r.userName,
-        r.storeName,
-        r.date,
-        hhmm(r.firstIn),
-        hhmm(r.lastOut),
-        fmtMinutes(msToMin(r.breakMs)),
-        fmtMinutes(msToMin(r.workedMs)),
-      ]),
-    );
-  };
-
   usePageActions(
-    <button
-      type="button"
-      className="float-action-btn"
-      onClick={handleExport}
-      aria-label="Exportar CSV"
-      title="Exportar CSV"
-      data-testid="timeclock-export"
-    >
-      <Download size={17} aria-hidden="true" />
-    </button>,
+    <CsvActionButton
+      kind="export"
+      label="Exportar"
+      onClick={() => setDataModal('export')}
+      testId="timeclock-export"
+    />,
   );
 
   return (
@@ -191,6 +185,20 @@ export function TimeClockPage() {
           data-testid="timeclock-table"
         />
       </div>
+
+      {dataModal && (
+        <ImportExportModal
+          title="Fichajes"
+          initialMode={dataModal}
+          onClose={() => setDataModal(null)}
+          testId="timeclock-data-modal"
+          exportConfig={{
+            headers: exportHeaders,
+            getRows: buildExportRows,
+            filenameBase: 'control-horario',
+          }}
+        />
+      )}
     </section>
   );
 }
