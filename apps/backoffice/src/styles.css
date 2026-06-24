@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 @import '@simpletpv/ui/theme.css';
-@import '@simpletpv/ui/theme-apple.css';
+@import '@simpletpv/ui/theme-geist.css';
 @import '@simpletpv/ui/sidebar.css';
 
 /* Tailwind v4 detecta automáticamente el contenido del propio app, pero NO los
@@ -9,8 +9,8 @@
    declarar su código fuente como origen explícito o no se generan sus clases. */
 @source '../../../packages/ui/src/**/*.{ts,tsx}';
 
-/* La Fundación Apple compartida (tokens, body, shell, topbar) vive en
-   @simpletpv/ui/theme-apple.css. Aquí solo lo específico del backoffice. */
+/* La Fundación Geist compartida (tokens, body, shell, topbar) vive en
+   @simpletpv/ui/theme-geist.css. Aquí solo lo específico del backoffice. */
 
 /* ─── Contenido principal ─────────────────────────────────── */
 /* El asistente del dashboard ya NO es una columna en flujo: se monta como overlay flotante
@@ -78,9 +78,8 @@
   margin-left: 0;
 }
 
-/* NO hay card de fondo. El contenido flota directo sobre los puntitos, como si abrir un apartado
-   del sidebar colocase un widget grande en el lienzo. Holgura: arriba para la etiqueta de view,
-   izquierda para el sidebar flotante, abajo para el dock del asistente. */
+/* NO hay card de fondo. El contenido flota directo sobre el fondo plano. Holgura: arriba para
+   la etiqueta de view, izquierda para el sidebar flotante, abajo para el dock del asistente. */
 .bo-main--surface {
   margin: 0;
   /* El borde superior del contenido se alinea con el del cuerpo flotante del sidebar
@@ -93,10 +92,9 @@
   border: none;
   border-radius: 0;
   box-shadow: none;
+  /* Fondo plano y limpio. La rejilla de puntitos se reserva SOLO al lienzo libre
+     del dashboard (.dashboard--free en dashboard.css); en el resto de vistas se retiró. */
   background-color: var(--ui-surface-subtle);
-  --dot: color-mix(in srgb, var(--ui-text-muted) 38%, transparent);
-  background-image: radial-gradient(var(--dot) 1.5px, transparent 1.6px);
-  background-size: 24px 24px;
 }
 
 /* Sidebar oculto: el contenido recupera el sangrado mínimo (ya no hay barra que esquivar). */
@@ -199,10 +197,16 @@
    Las filas de navegación de la sidebar se quedan en rounded-rect salvo la activa.
    ──────────────────────────────────────────────────────────────── */
 .app-shell .ui-select-trigger {
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-sm);
 }
 
 .app-shell button {
+  border-radius: var(--ui-radius-sm);
+}
+
+/* Excepción: los botones-icono del clúster flotante (lupa/atrás/home/tema/campana)
+   siguen siendo CÍRCULOS; la regla con clase gana al de-pill de `.app-shell button`. */
+.app-shell .float-action-btn {
   border-radius: 9999px;
 }
 
@@ -753,12 +757,12 @@
 
 @keyframes view-action-pulse {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in oklab, var(--ui-brand, #4f46e5) 70%, transparent);
-    background-color: color-mix(in oklab, var(--ui-brand, #4f46e5) 16%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--ui-brand, #0070f3) 70%, transparent);
+    background-color: color-mix(in oklab, var(--ui-brand, #0070f3) 16%, transparent);
   }
   35% {
-    box-shadow: 0 0 0 4px color-mix(in oklab, var(--ui-brand, #4f46e5) 55%, transparent);
-    background-color: color-mix(in oklab, var(--ui-brand, #4f46e5) 10%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--ui-brand, #0070f3) 55%, transparent);
+    background-color: color-mix(in oklab, var(--ui-brand, #0070f3) 10%, transparent);
   }
   100% {
     box-shadow: 0 0 0 0 transparent;
@@ -769,6 +773,6 @@
 @media (prefers-reduced-motion: reduce) {
   .view-action-highlight {
     animation: none;
-    box-shadow: 0 0 0 3px var(--ui-brand, #4f46e5);
+    box-shadow: 0 0 0 3px var(--ui-brand, #0070f3);
   }
 }

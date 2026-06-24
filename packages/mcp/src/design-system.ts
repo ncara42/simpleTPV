@@ -41,31 +41,31 @@ Tú eliges layout, agrupación y qué visualización usar; ese esqueleto es tuyo
 - Una tarjeta individual (p. ej. un KPI) puede tener superficie propia, pero defínela con HAIRLINE (borde de 1px), no con sombras. Evita sombras marcadas, degradados llamativos y fondos saturados.
 
 ## Color (usa estos valores exactos)
-- Superficies: lienzo \`#f6f6f4\`; tarjeta/superficie \`#ffffff\`; sutil \`#f4f4f2\`.
-- Líneas (hairline): \`#e6e5e0\`; marcada \`#d8d6cf\`.
-- Texto: principal \`#18181a\`; atenuado \`#6b6b66\`; suave/etiquetas \`#71706c\`.
-- Acento de datos (el color "de marca" en gráficos): ÍNDIGO \`#635bff\` (fuerte \`#4f46e5\`; tinte 8% \`#635bff14\`). Es el color primario de barras y líneas. NO uses verde como color por defecto de los gráficos.
-- Semánticos, SOLO por significado: positivo/sube \`#16734f\`; negativo/baja \`#c0392b\`; aviso \`#b45309\`. Cada uno con su versión tenue para fondos de píldora.
-- Paleta categórica (series múltiples o barras apiladas, en este orden): \`#635bff\`, \`#0ea5e9\`, \`#f59e0b\`, \`#8b5cf6\`, \`#ec4899\`, \`#10b981\`, \`#f43f5e\`, \`#64748b\`.
-- Tooltip: fondo \`#0a2540\`, texto \`#ffffff\`.
+- Superficies: lienzo \`#fafafa\`; tarjeta/superficie \`#ffffff\`; sutil \`#f4f4f5\`.
+- Líneas (hairline): \`#e8e8eb\`; marcada \`#d6d6da\`.
+- Texto: principal \`#18181b\`; atenuado \`#52525b\`; suave/etiquetas \`#71717a\`.
+- Acento de datos (el color "de marca" en gráficos): AZUL \`#0070f3\` (fuerte \`#005bd3\`; tinte 12% \`rgba(0,112,243,.12)\`). Es el color primario de barras y líneas; el resto de series en GRIS (monocromía estilo Vercel Analytics). NO uses verde como color por defecto de los gráficos.
+- Semánticos, SOLO por significado: positivo/sube \`#117a3b\`; negativo/baja \`#d6201f\`; aviso \`#ab5300\`. Cada uno con su versión tenue para fondos de píldora.
+- Series múltiples / barras apiladas: MONOCROMÍA gris+azul, NUNCA arcoíris (en orden): \`#0070f3\`, \`#52525b\`, \`#005bd3\`, \`#a1a1aa\`, \`#3f3f46\`, \`#4aa3ff\`, \`#d6d6da\`, \`#a1a1aa\`.
+- Tooltip: fondo \`#18181b\`, texto \`#ffffff\`.
 
 ## Forma (border-radius)
 - Tarjetas y paneles: \`12px\`. Inputs y botones: \`8px\`. Píldoras y badges: \`999px\` (totalmente redondas).
 
 ## Tipografía
-- Familia: "SF Pro Text", system-ui, sans-serif. Activa números tabulares (\`font-variant-numeric: tabular-nums\`) en TODA cifra.
+- Familia: "Geist", "Geist Sans", Inter, system-ui, sans-serif. Activa números tabulares (\`font-variant-numeric: tabular-nums\`) en TODA cifra.
 - Cifra KPI: grande, peso 600, tracking ligeramente negativo (\`-0.02em\`). Su etiqueta encima: pequeña, en MAYÚSCULAS, peso 600, color suave, \`letter-spacing: 0.04em\`.
 - Título de sección: ~17px, peso 600.
 
 ## Gráficos (recharts, recoloreados a esta paleta)
 - Construye los gráficos con \`recharts\`; aplica los hex de abajo a \`fill\`/\`stroke\`. Nada de imágenes ni iframes externos.
-- Comparar categorías → barras horizontales (máx. ~8). Ranking → barras con dos pistas: relleno índigo sobre una pista tenue de fondo.
+- Comparar categorías → barras horizontales (máx. ~8). Ranking → barras con dos pistas: relleno azul sobre una pista tenue de fondo (estilo "panel" de Vercel Analytics).
 - Proporción de un total → donut SOLO si hay ≤6 partes; con más, usa barras.
-- Evolución temporal → línea o área en índigo.
+- Evolución temporal → línea o área en azul.
 - Variación frente a un periodo anterior → píldora con flecha: ▲ verde si sube, ▼ rojo si baja, ≈ gris si estable; el fondo de la píldora es el tinte tenue de ese mismo color.
 - Un KPI suelto (importe, margen %) va en un tile numérico o un medidor de progreso, nunca como un gráfico.
 
 ## Espaciado
 - Escala base de 4px. Padding cómodo de tarjeta 16–20px; aire entre secciones ~24px. Busca ritmo, no el mismo padding en todo.
 
-En una frase: tu composición + esta piel. Índigo como acento, verde/rojo solo para el signo, hairlines en vez de sombras, sin fondo blanco envolviendo el widget, y tipografía SF con números tabulares.`;
+En una frase: tu composición + esta piel. Azul Geist como ÚNICO acento (resto en gris, monocromía), verde/rojo solo para el signo, hairlines en vez de sombras, sin fondo blanco envolviendo el widget, y tipografía Geist con números tabulares.`;

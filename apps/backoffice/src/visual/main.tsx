@@ -1,5 +1,5 @@
 import '@simpletpv/ui/theme.css';
-import '@simpletpv/ui/theme-apple.css';
+import '@simpletpv/ui/theme-geist.css';
 import '@simpletpv/ui/chart.css';
 import '@simpletpv/ui/datatable.css';
 import '@simpletpv/ui/dataviz.css';

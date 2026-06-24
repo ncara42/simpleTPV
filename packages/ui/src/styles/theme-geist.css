@@ -1,0 +1,363 @@
+/* ════════════════════════════════════════════════════════════════════
+   FUNDACIÓN GEIST — compartida por apps/tpv y apps/backoffice
+   ────────────────────────────────────────────────────────────────────
+   Basada en el lenguaje visual de Geist (design system de Vercel, el look de
+   Vercel Analytics): grises neutros FRÍOS, un único acento azul eléctrico,
+   tipografía aguda y limpia, radios 12px (menos redondeado que Apple),
+   data-viz MONOCROMÁTICA (gris + azul, color solo con significado), modo claro
+   primero. NO es una copia: reproduce el look con tokens propios --ui-*.
+
+   Re-mapea los tokens --ui-* / --ap-* / --tpv-* sobre @simpletpv/ui/theme.css.
+   IMPÓRTESE DESPUÉS de theme.css para que estos valores ganen. Sustituye a
+   theme-apple.css (mismo contrato de tokens + mismas reglas de chrome).
+
+   Lo específico de cada app (escala @theme inline del TPV, .app-main/.bo-main,
+   .topbar-eyebrow del backoffice y el scoping de la forma pill) sigue en el
+   styles.css de cada app, no aquí.
+
+   FUENTE: Geist Sans/Mono vendorizadas en ./fonts/ (subset latin, woff2),
+   autohospedadas — sin dependencia de red ni de @fontsource. La tipografía es
+   la palanca nº1 de identidad; cae a Inter solo si el woff2 fallara.
+   ════════════════════════════════════════════════════════════════════ */
+
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/geist-400.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 500; font-display: swap; src: url('./fonts/geist-500.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 600; font-display: swap; src: url('./fonts/geist-600.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/geist-700.woff2') format('woff2'); }
+@font-face { font-family: 'Geist Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/geist-mono-400.woff2') format('woff2'); }
+@font-face { font-family: 'Geist Mono'; font-style: normal; font-weight: 500; font-display: swap; src: url('./fonts/geist-mono-500.woff2') format('woff2'); }
+
+:root {
+  /* ─── Escala de grises Geist (neutros fríos, tipo zinc) ──────────────────
+     Discreta y ortogonal: cada paso tiene un rol, no es un degradado suave.
+     Contraste verificado para AA sobre lienzo #fafafa y superficie #fff. */
+  --gst-50: #fafafa; /* lienzo */
+  --gst-100: #f4f4f5; /* zebra / hover sutil */
+  --gst-150: #ededef; /* relleno sutil / pista */
+  --gst-200: #e8e8eb; /* hairline suave */
+  --gst-300: #d6d6da; /* hairline marcado */
+  --gst-400: #a1a1aa; /* iconos faint / disabled */
+  --gst-500: #71717a; /* texto terciario (4.6:1) */
+  --gst-600: #52525b; /* texto secundario (7:1) */
+  --gst-700: #3f3f46; /* texto fuerte */
+  --gst-800: #27272a; /* hover oscuro */
+  --gst-900: #18181b; /* tinta / texto principal */
+
+  /* ─── Acento único: azul Vercel ─────────────────────────── */
+  --gst-blue: #0070f3;
+  --gst-blue-hover: #005bd3; /* hover/activo (más oscuro) */
+  --gst-blue-ink: #0061d1; /* azul para TEXTO sobre claro (AA 4.5:1) */
+  --gst-blue-soft: rgba(0, 112, 243, 0.08);
+  --gst-blue-soft-2: rgba(0, 112, 243, 0.16);
+
+  /* ─── Aliases --ap-* (los usan Input.tsx, catalog.css, sale.css, styles.css)
+     Se conservan para no romper esos consumidores directos; ahora apuntan a
+     Geist (el "ap-blue" pasa a ser el azul Vercel). ─────────────────────── */
+  --ap-blue: var(--gst-blue);
+  --ap-blue-focus: var(--gst-blue-hover);
+  --ap-blue-soft: var(--gst-blue-soft);
+  --ap-blue-soft-2: var(--gst-blue-soft-2);
+  --ap-canvas: var(--gst-50);
+  --ap-surface: #ffffff;
+  --ap-pearl: #f6f6f7;
+  --ap-ink: var(--gst-900);
+  --ap-gray-1: var(--gst-600); /* secundario */
+  --ap-gray-2: var(--gst-500); /* terciario */
+  --ap-hairline: var(--gst-200);
+  --ap-hairline-strong: var(--gst-300);
+
+  /* ─── Remapeo de tokens del sistema compartido (--ui-*) ──── */
+  --ui-bg: var(--gst-50);
+  --ui-surface: #ffffff;
+  --ui-surface-subtle: var(--gst-100);
+  --ui-border: var(--gst-200);
+  --ui-border-strong: var(--gst-300);
+
+  --ui-text: var(--gst-900);
+  --ui-text-muted: var(--gst-600); /* secundario, 7:1 */
+  --ui-text-soft: var(--gst-500); /* terciario, 4.6:1 AA */
+
+  --ui-primary: var(--gst-blue);
+  --ui-primary-hover: var(--gst-blue-hover);
+  --ui-primary-fg: #ffffff;
+
+  /* La "marca" es el acento azul (un solo acento: barras, dots, activos). */
+  --ui-brand: var(--gst-blue);
+  --ui-brand-ink: var(--gst-blue-ink); /* versión AA para texto/links */
+  --ui-brand-soft: var(--gst-blue-soft);
+  --ui-brand-soft-2: var(--gst-blue-soft-2);
+
+  /* ─── Semántica Geist (vibrante pero AA para texto sobre claro) ───────── */
+  --ui-danger: #d6201f;
+  --ui-danger-soft: #fdecec;
+  --ui-warning: #ab5300;
+  --ui-warning-soft: #fff3e2;
+  --ui-success: #117a3b;
+  --ui-success-soft: #e8f6ee;
+
+  /* Nota adhesiva (papel cálido, intencionado: contrasta con el lienzo frío). */
+  --ui-note-bg: #fff7d6;
+
+  /* ─── Data-viz: MONOCROMÍA (gris + azul) — look "panel" de Vercel ─────────
+     Un solo acento azul para la serie activa/"hoy"; gris neutro para la base y
+     la comparación. El color semántico (rojo/ámbar/verde) SOLO cuando significa
+     algo (umbral, delta), nunca como categoría decorativa. */
+  --ui-chart-accent: var(--gst-blue); /* serie principal / activo */
+  --ui-chart-accent-strong: var(--gst-blue-hover);
+  --ui-chart-accent-soft: rgba(0, 112, 243, 0.12);
+  --ui-chart-tip-bg: var(--gst-900); /* tooltip oscuro invertido */
+  --ui-chart-tip-fg: #ffffff;
+  --ui-chart-tip-fg-muted: var(--gst-400);
+  --ui-chart-tip-border: var(--gst-900);
+
+  /* Paleta "categórica" reconvertida a una rampa azul+gris (NO arcoíris).
+     Series múltiples siguen siendo legibles: el azul es la principal y el resto
+     son grises de énfasis decreciente. cat-8 = "otros/resto". */
+  --ui-cat-1: var(--gst-blue); /* principal (acento) */
+  --ui-cat-2: var(--gst-600); /* gris fuerte */
+  --ui-cat-3: var(--gst-blue-hover); /* azul oscuro */
+  --ui-cat-4: var(--gst-400); /* gris medio */
+  --ui-cat-5: var(--gst-700); /* gris muy fuerte */
+  --ui-cat-6: #4aa3ff; /* azul claro (3.ª serie azul) */
+  --ui-cat-7: var(--gst-300); /* gris claro */
+  --ui-cat-8: var(--gst-400); /* otros/resto */
+
+  /* ─── Forma / foco / elevación (Geist: 12px, hairline + sombra de whisper) ── */
+  --ui-radius-xs: 6px;
+  --ui-radius-sm: 8px;
+  --ui-radius-md: 12px;
+  --ui-radius-lg: 12px;
+  --ui-radius-xl: 12px;
+  --ui-radius-pill: 999px;
+  --ui-radius: var(--ui-radius-md);
+
+  --ui-focus: 0 0 0 3px rgba(0, 112, 243, 0.32);
+  /* Geist: tarjetas PLANAS (solo hairline); la sombra se reserva a overlays
+     (--ui-shadow-md/lg en modales, menús, toasts). --ui-shadow-sm queda como
+     soplo mínimo para controles pequeños. */
+  --ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
+  --ui-shadow-panel: none;
+
+  /* ─── Fallbacks --tpv-* usados inline en varias páginas ─── */
+  --tpv-line: var(--gst-200);
+  --tpv-teal-500: var(--gst-blue-hover);
+  --tpv-teal-700: var(--gst-blue);
+
+  /* ─── Sidebar ───────────────────────────────────────────── */
+  --sidebar-bg: #ffffff;
+  /* Selección silenciosa estilo ChatGPT: relleno neutro, tinta plena. */
+  --sidebar-item-active-bg: rgba(0, 0, 0, 0.06);
+  --sidebar-item-hover-bg: rgba(0, 0, 0, 0.038);
+  --sidebar-text: var(--gst-600);
+  --sidebar-text-active: var(--gst-900);
+  /* gray-1 (no gray-2) para que las etiquetas de grupo a 11px cumplan AA. */
+  --sidebar-group-label-color: var(--gst-600);
+  --content-bg: var(--gst-50);
+}
+
+/* Geist Sans como voz del panel (Inter como base afinada open-source). */
+body {
+  font-family:
+    'Geist',
+    'Geist Sans',
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Geist Mono para código / numéricos monoespaciados. */
+code,
+pre,
+kbd,
+samp,
+.ui-monospace {
+  font-family: 'Geist Mono', ui-monospace, 'SF Mono', 'Courier New', monospace;
+}
+
+/* ─── Shell ──────────────────────────────────────────────── */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-content {
+  margin-left: var(--sidebar-current-width);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--content-bg);
+  min-width: 0;
+  transition: margin-left 0.15s var(--ui-ease, ease);
+}
+
+/* Al colapsar el sidebar a rail, el contenido se reajusta al ancho del rail. */
+.sidebar.collapsed ~ .app-content {
+  margin-left: var(--sidebar-width-rail);
+}
+
+@media (max-width: 767px) {
+  .app-content,
+  .sidebar.collapsed ~ .app-content {
+    margin-left: 0;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   SIDEBAR — estructura y cápsula de selección en @simpletpv/ui/sidebar.css,
+   guiadas por --sidebar-*. Aquí solo el realce de marca del logo.
+   ════════════════════════════════════════════════════════════ */
+.sidebar-logo {
+  box-shadow: 0 1px 2px rgba(0, 112, 243, 0.25);
+}
+
+/* ════════════════════════════════════════════════════════════
+   TOPBAR — Geist: hairline limpio, blur sutil, pills sobrios, tracking tight
+   ════════════════════════════════════════════════════════════ */
+.topbar {
+  height: 64px;
+  padding: 0 2.5rem;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border-bottom: 1px solid var(--ui-border);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.topbar-title {
+  font-size: 1.32rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ui-text);
+}
+
+.topbar-right {
+  gap: 1rem;
+}
+
+.topbar-switch {
+  padding: 0.18rem;
+  border-radius: 9999px;
+  background: var(--gst-100);
+  border: 1px solid var(--ui-border);
+}
+
+.topbar-switch-btn {
+  height: 28px;
+  padding: 0 0.9rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+}
+
+.topbar-switch-btn.active {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Perfil del usuario en el topbar */
+.topbar-user {
+  padding-left: 1rem;
+  border-left: 1px solid var(--ui-border);
+}
+
+.topbar-avatar {
+  background: var(--gst-100);
+  color: var(--ui-text-muted);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.topbar-user-name {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+}
+
+.topbar-user-sub {
+  color: var(--ui-text-soft);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MODO OSCURO — toggle por atributo data-theme en <html>.
+   El script de arranque (index.html) fija data-theme="light|dark" según
+   localStorage('theme') o el SO ANTES de pintar (sin parpadeo). Casi todo
+   deriva de --gst-* / --gst-blue*, así que al invertir esos se propaga; solo
+   se re-declaran los --ui-* que son literales (superficies, semántica, tooltip,
+   sombras) y el poco chrome con colores claros fijos (.topbar).
+   ════════════════════════════════════════════════════════════════════ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  /* Escala de grises invertida (fríos): bg oscuro → texto claro. */
+  --gst-50: #0a0a0a; /* lienzo (el más oscuro) */
+  --gst-100: #141417; /* surface-subtle: zebra/hover/relleno — más oscuro que la tarjeta, como en claro */
+  --gst-150: #24242a; /* pista/relleno que debe verse SOBRE una tarjeta */
+  --gst-200: #2e2e35; /* hairline (claramente visible sobre surface) */
+  --gst-300: #3d3d45; /* hairline marcado */
+  --gst-400: #54545c; /* icono faint / disabled */
+  --gst-500: #8a8a93; /* texto terciario (AA sobre oscuro) */
+  --gst-600: #b3b3bb; /* texto secundario */
+  --gst-700: #d4d4d8;
+  --gst-800: #ededef;
+  --gst-900: #fafafa; /* texto principal */
+
+  /* Azul un punto más luminoso para legibilidad sobre oscuro. */
+  --gst-blue: #3b9eff;
+  --gst-blue-hover: #5aacff;
+  --gst-blue-ink: #6cb6ff;
+  --gst-blue-soft: rgba(59, 158, 255, 0.14);
+  --gst-blue-soft-2: rgba(59, 158, 255, 0.24);
+
+  /* Superficies (los --ui-* fijados a literal, no derivados de --gst-*).
+     La tarjeta es el nivel más CLARO de las superficies → lift sobre lienzo
+     (#0a0a0a) y sobre subtle (#141417); así zebras/pistas/hover se distinguen
+     de la tarjeta y no se produce la confusión de niveles del primer intento. */
+  --ui-surface: #1e1e22;
+  --ap-surface: #1e1e22;
+  --ap-pearl: #24242a;
+
+  /* Semántica luminosa + soft oscuros translúcidos. */
+  --ui-danger: #ff6166;
+  --ui-danger-soft: rgba(255, 97, 102, 0.14);
+  --ui-warning: #f5a623;
+  --ui-warning-soft: rgba(245, 166, 35, 0.14);
+  --ui-success: #3ecf8e;
+  --ui-success-soft: rgba(62, 207, 142, 0.14);
+
+  --ui-note-bg: #2a2410;
+
+  /* Tooltip de data-viz (no puede heredar --gst-900, que ahora es claro). */
+  --ui-chart-tip-bg: #27272a;
+  --ui-chart-tip-fg: #fafafa;
+  --ui-chart-tip-fg-muted: #a1a1aa;
+  --ui-chart-tip-border: #3f3f46;
+
+  /* Sombras más marcadas sobre oscuro. */
+  --ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.5);
+  --ui-shadow-panel: 0 1px 2px rgb(0 0 0 / 0.5);
+  --ui-shadow-md: 0 4px 16px -6px rgb(0 0 0 / 0.6);
+  --ui-shadow-lg: 0 12px 32px -12px rgb(0 0 0 / 0.7);
+
+  /* Sidebar. */
+  --sidebar-bg: #0e0e10;
+  --sidebar-item-active-bg: rgba(255, 255, 255, 0.1);
+  --sidebar-item-hover-bg: rgba(255, 255, 255, 0.05);
+}
+
+/* Chrome con colores claros fijos: re-piel en oscuro. */
+:root[data-theme='dark'] .topbar {
+  background: rgba(14, 14, 16, 0.8);
+}
+:root[data-theme='dark'] .topbar-switch-btn.active {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+}
