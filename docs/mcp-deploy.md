@@ -41,17 +41,17 @@ dejan de poder descifrarse (los usuarios re-autentican).
 
 ## 2. Variables de entorno
 
-| Variable              | Obligatoria | Ejemplo                        | Notas                                   |
-| --------------------- | :---------: | ------------------------------ | --------------------------------------- |
-| `MCP_TRANSPORT`       |      –      | `http`                         | Es el valor por defecto                 |
-| `MCP_ISSUER_URL`      |     ✅      | `https://mcp.tuempresa.com`    | URL pública (https)                     |
-| `TPV_API_URL`         |     ✅      | `http://simpletpv-api:3001`    | Backend, alcanzable desde el contenedor |
-| `MCP_JWT_PRIVATE_JWK` |     ✅      | `{"kty":"EC",...}`             | Clave de firma (paso 1)                 |
-| `MCP_ENC_KEY`         |     ✅      | `base64…`                      | Clave de cifrado (paso 1)               |
-| `REDIS_URL`           |     ✅      | `redis://simpletpv-redis:6379` | Sin esto, almacén en memoria (solo dev) |
-| `MCP_ALLOWED_ORIGINS` | recomendada | `https://claude.ai`            | CORS                                    |
-| `MCP_PORT`            |      –      | `8766`                         | Puerto interno                          |
-| `MCP_BIND`            |      –      | `0.0.0.0`                      | Ya es el default de la imagen           |
+| Variable              | Obligatoria | Ejemplo                                | Notas                                                                                |
+| --------------------- | :---------: | -------------------------------------- | ------------------------------------------------------------------------------------ |
+| `MCP_TRANSPORT`       |      –      | `http`                                 | Es el valor por defecto                                                              |
+| `MCP_ISSUER_URL`      |     ✅      | `https://mcp.tuempresa.com`            | URL pública (https)                                                                  |
+| `TPV_API_URL`         |     ✅      | `http://simpletpv-api:3001`            | Backend, alcanzable desde el contenedor                                              |
+| `MCP_JWT_PRIVATE_JWK` |     ✅      | `{"kty":"EC",...}`                     | Clave de firma (paso 1)                                                              |
+| `MCP_ENC_KEY`         |     ✅      | `base64…`                              | Clave de cifrado (paso 1)                                                            |
+| `REDIS_URL`           |     ✅      | `redis://simpletpv-redis:6379`         | Sin esto, almacén en memoria (solo dev)                                              |
+| `MCP_ALLOWED_ORIGINS` | recomendada | `https://claude.ai,https://claude.com` | CORS. claude.ai y claude.com se permiten SIEMPRE en código; aquí solo orígenes extra |
+| `MCP_PORT`            |      –      | `8766`                                 | Puerto interno                                                                       |
+| `MCP_BIND`            |      –      | `0.0.0.0`                              | Ya es el default de la imagen                                                        |
 
 `MCP_RESOURCE_URL` se deriva como `${MCP_ISSUER_URL}/mcp`; normalmente no se toca.
 
