@@ -29,7 +29,7 @@ export JWT_REFRESH_SECRET="local-dev-refresh-secret-0123456789abcd"
 export COOKIE_SECURE="false"
 export BIND_ADDR="0.0.0.0:3001"
 export THROTTLE_LIMIT="600"
-export CORS_ORIGINS="http://localhost:5173,http://localhost:4174"
+export CORS_ORIGINS="http://localhost:5174,http://localhost:4174"
 
 if [[ "$FRESH" == "--fresh" ]]; then
   echo "▶ Recreando $DB…"
@@ -57,7 +57,7 @@ fi
 trap 'echo; echo "Parando API (pid $APIPID)…"; kill "$APIPID" 2>/dev/null || true; exit 0' INT TERM
 echo
 echo "════════════════════════════════════════════════════════════════"
-echo "  Abre  http://localhost:5173   ·   login: admin@demo.simpletpv / demo1234"
+echo "  Abre  http://localhost:5174   ·   login: admin@demo.simpletpv / demo1234"
 echo "  (Ctrl-C para parar; la API se detiene también)"
 echo "════════════════════════════════════════════════════════════════"
 echo
