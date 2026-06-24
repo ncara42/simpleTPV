@@ -753,12 +753,12 @@
 
 @keyframes view-action-pulse {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in oklab, var(--ui-brand, #4f46e5) 70%, transparent);
-    background-color: color-mix(in oklab, var(--ui-brand, #4f46e5) 16%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--ui-brand, #0070f3) 70%, transparent);
+    background-color: color-mix(in oklab, var(--ui-brand, #0070f3) 16%, transparent);
   }
   35% {
-    box-shadow: 0 0 0 4px color-mix(in oklab, var(--ui-brand, #4f46e5) 55%, transparent);
-    background-color: color-mix(in oklab, var(--ui-brand, #4f46e5) 10%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--ui-brand, #0070f3) 55%, transparent);
+    background-color: color-mix(in oklab, var(--ui-brand, #0070f3) 10%, transparent);
   }
   100% {
     box-shadow: 0 0 0 0 transparent;
@@ -769,6 +769,6 @@
 @media (prefers-reduced-motion: reduce) {
   .view-action-highlight {
     animation: none;
-    box-shadow: 0 0 0 3px var(--ui-brand, #4f46e5);
+    box-shadow: 0 0 0 3px var(--ui-brand, #0070f3);
   }
 }

@@ -218,8 +218,8 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   vertical-align: middle;
-  background: color-mix(in oklab, var(--ui-accent, #4f46e5) 16%, transparent);
-  color: var(--ui-accent, #4f46e5);
+  background: color-mix(in oklab, var(--ui-brand, #0070f3) 16%, transparent);
+  color: var(--ui-brand, #0070f3);
 }
 /* Botones inline de Aprobar/Denegar en la campana (#146). */
 .notif-actions {
