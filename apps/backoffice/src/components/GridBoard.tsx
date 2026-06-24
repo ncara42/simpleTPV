@@ -97,12 +97,6 @@ export function GridBoard({
           </div>
         ))}
       </div>
-
-      {items.length === 0 && (
-        <p className="dash-grid-hint" data-testid="dash-grid-empty">
-          Rejilla en blanco · añade widgets con «+» (arriba) o pídeselos al asistente
-        </p>
-      )}
     </div>
   );
 }
