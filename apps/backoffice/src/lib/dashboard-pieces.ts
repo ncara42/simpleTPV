@@ -3,7 +3,14 @@
 // (normalizePanelSpec) consume todo esto para REPARAR (clampar enums, inferir formato, reubicar
 // piezas por slot) en vez de podar. El backend (F5) debe mantener PARIDAD con estas listas.
 
-import type { PieceFormat, PieceId, RecipeId, SlotName } from './dashboard-layout.js';
+import type {
+  GenericSpec,
+  PieceFormat,
+  PieceId,
+  PieceSpec,
+  RecipeId,
+  SlotName,
+} from './dashboard-layout.js';
 
 // Piezas válidas que el agente puede colocar en un slot (cada una con diseño horneado).
 export const PIECE_ALLOWLIST: ReadonlySet<PieceId> = new Set<PieceId>([
@@ -151,6 +158,47 @@ export function clampRecipe(raw: unknown, counts: SlotCounts): RecipeId {
 // Nº de columnas de charts que dicta la receta (1 o 2). El layout deriva de aquí, no del agente.
 export function recipeChartColumns(recipe: RecipeId): 1 | 2 {
   return recipe === 'kpiRow+twoCharts' ? 2 : 1;
+}
+
+// Tamaños (grid 12-col) de cada pieza al SEPARAR un panel en widgets sueltos: KPI estrecho como una
+// card de catálogo; listas/tablas algo más altas; gráficas media anchura.
+const PIECE_SOLO_SIZE = {
+  kpi: { w: 2, h: 1 },
+  list: { w: 5, h: 3 },
+  chart: { w: 5, h: 2 },
+} as const;
+const LIST_PIECES: ReadonlySet<PieceId> = new Set<PieceId>([
+  'rankBarList',
+  'stockAlertList',
+  'dataGrid',
+]);
+
+// Descompone un panel v2 multi-pieza en N specs de UNA sola pieza (cada uno un widget INDEPENDIENTE:
+// su propia tarjeta, movible y borrable por separado). Cada pieza conserva su binding (endpoint/campos/
+// formato/título). Receta `kpiRow` para un KPI; `tableFull` para una gráfica/lista (renderiza una
+// pieza a lo ancho, limpio). Devuelve `[spec]` sin tocar si NO es un panel multi-pieza.
+export function decomposePanelSpec(spec: GenericSpec): GenericSpec[] {
+  if (spec.kind !== 'panel' || !spec.slots) return [spec];
+  const flat: { slot: SlotName; piece: PieceSpec }[] = [];
+  for (const slot of ['kpis', 'charts'] as SlotName[]) {
+    for (const piece of spec.slots[slot] ?? []) flat.push({ slot, piece });
+  }
+  if (flat.length <= 1) return [spec];
+  return flat.map(({ slot, piece }) => {
+    const isKpi = slot === 'kpis';
+    const sizeKey = isKpi ? 'kpi' : LIST_PIECES.has(piece.piece) ? 'list' : 'chart';
+    return {
+      type: 'composite',
+      kind: 'panel',
+      version: 2,
+      endpoint: '',
+      title: piece.title ?? '',
+      defaultSize: { ...PIECE_SOLO_SIZE[sizeKey] },
+      recipe: isKpi ? 'kpiRow' : 'tableFull',
+      density: spec.density ?? 'comfortable',
+      slots: { [slot]: [piece] },
+    } satisfies GenericSpec;
+  });
 }
 
 // El slot que admite una pieza dada (kpis o charts), o null si ninguna la admite.

@@ -51,7 +51,8 @@ const WIDGET_CATALOG: &[(&str, &str)] = &[
     ("dash-suppliers", "Comparativa de proveedores"),
     ("dash-rotation", "Rotación de productos"),
     ("dash-timeclock", "Fichajes de hoy"),
-    // Bloques pre-cableados (#205): un panel entero ya diseñado con UNA llamada (lo más fácil).
+    // Bloques pre-cableados (#205): un panel AGRUPADO ya diseñado con UNA llamada. SOLO a petición
+    // explícita («un panel/bloque que junte…»); por defecto se colocan widgets independientes.
     (
         "block:sales-overview",
         "BLOQUE — Resumen de ventas (KPIs + tendencia por hora)",
@@ -174,13 +175,14 @@ const WIDGETABLE_ENDPOINTS: &[(&str, &str, &str)] = &[
 const BEHAVIOR: &str = "\
 ## Comportamiento esperado
 
-REGLA PRINCIPAL — en el dashboard SIEMPRE compón: toda petición, incluidas las informativas \
-(«¿cómo va la mañana?», «¿quién está regalando descuentos?», «¿cómo se reparten las ventas?»), debe \
-terminar en al menos un bloque o panel colocado en el lienzo que la responda visualmente. Compón en \
-el lienzo Y narra en el chat. Si dejas una conclusión en el lienzo, hazlo SIEMPRE con `add_insight` \
-(se renderiza como una nota de UI con el texto dentro), nunca como texto suelto: concisa y con el \
-«y qué», no una copia de las filas que el widget ya muestra. NUNCA respondas solo con texto. Ante la \
-duda de qué montar, usa el bloque más cercano a la intención y añádelo igualmente.
+REGLA PRINCIPAL — en el dashboard SIEMPRE compón, y por DEFECTO con widgets INDEPENDIENTES: cada \
+métrica o gráfica es SU PROPIO widget (su tarjeta, movible y borrable por separado), NUNCA un bloque \
+que agrupe varias. Toda petición, incluidas las informativas («¿cómo va la mañana?»), debe terminar en \
+uno o varios widgets colocados en el lienzo que la respondan (varias `add_widget` en el mismo turno se \
+escalonan solas, sin solaparse). Compón en el lienzo Y narra en el chat. Para una conclusión usa \
+SIEMPRE `add_insight` (nota de UI), nunca texto suelto. NUNCA respondas solo con texto. Agrupa varias \
+métricas en UN bloque/panel SOLO si el usuario lo pide expresamente («un panel que junte…»). Ante la \
+duda, coloca los widgets sueltos.
 
 1. Responde SIEMPRE en español de España (tuteo peninsular). Sé conciso y directo.
 2. No inventes datos: consulta siempre la herramienta correspondiente. Si una herramienta \
@@ -195,8 +197,10 @@ narración detallada va en el chat.
 5. Usa `arrange` para reordenar y compactar los elementos del lienzo cuando queden desordenados.
 6. No uses `clear_canvas` ni `remove_element` si el usuario podría querer revertir la acción: \
 esas operaciones no se deshacen al editar o regenerar el historial.
-7. Para datos a medida usa un bloque (`block:<id>`) o un panel (`gen:panel`); sus piezas solo pueden \
-apuntar a endpoints de la lista permitida.
+7. Por defecto una métrica = un widget independiente: usa varias `add_widget` con ids de catálogo \
+(kpi-*, dash-*, rank-*), o un `gen:panel` de UNA sola pieza por métrica si no hay tile de catálogo. \
+Agrupa en un solo bloque/panel (`block:*` o `gen:panel` multi-pieza) SOLO a petición explícita; sus \
+piezas solo pueden apuntar a endpoints de la lista permitida.
 8. Cuando uses herramientas de canvas, explica brevemente al usuario lo que añades o modificas.
 9. No calcules ni inventes cifras tú: las herramientas ya las computan; tú solo las narras. \
 Si un dato no viene de una herramienta, no lo afirmes.
@@ -208,28 +212,21 @@ Si un dato no viene de una herramienta, no lo afirmes.
 /// en cada receta (ancho/alto/columnas). El agente solo ENSAMBLA. Raw string para el JSON de ejemplo.
 const PANEL_GUIDE: &str = r#"## Paneles a medida y bloques (playbook de composición)
 
-Para combinar varias métricas en UNA tarjeta tienes DOS caminos. NUNCA emitas geometría
-(w/h/span/gap) ni color: la receta y las piezas ya traen su diseño horneado.
+Por DEFECTO compones con WIDGETS INDEPENDIENTES (una métrica = una tarjeta). Solo agrupas en un
+bloque/panel a petición. NUNCA emitas geometría (w/h/span/gap) ni color: cada widget/pieza trae su
+diseño horneado.
 
-### A) Bloques pre-cableados — REGLA 1: si un bloque encaja, ÚSALO (una llamada, panel probado)
-`add_widget` con `widget_id` = uno de:
-- `block:sales-overview` — facturación + ticket medio + uds./ticket + tendencia por hora.
-- `block:profitability` — facturación + beneficio + % margen + ventas por familia.
-- `block:sales-mix` — donut de ventas por familia (protagonista) + facturación y ticket medio.
-- `block:discount-control` — tasas de descuento/devolución + descuento y ventas por empleado.
-- `block:staff-performance` — ranking de ventas por vendedor + nº de ventas por vendedor.
-- `block:store-comparison` — ranking de facturación por tienda + margen por tienda (compara tiendas).
-- `block:product-ranking` — top de productos por ventas.
-- `block:top-margin` — top de productos por margen.
-- `block:dead-stock` — productos de peor rotación (stock muerto, unidades del periodo).
-- `block:stock-risk` — venta perdida estimada + roturas abiertas + alertas y caducidades.
-`period` y `store_id` (de la propia llamada) se heredan por todas las piezas. No construyas slots.
+### A) Por DEFECTO — widgets INDEPENDIENTES (una métrica = una tarjeta movible/borrable por separado)
+Coloca cada métrica/gráfica con su propio `add_widget` usando los ids del catálogo de arriba (kpi-*,
+dash-*, rank-*); varias llamadas en el mismo turno se escalonan solas, sin solaparse. Para una métrica
+SIN tile de catálogo (comparar tiendas, donut de mix, una pieza a medida) usa un `gen:panel` de UNA
+pieza (ver C): también es independiente. `period`/`store_id` van en cada llamada. Ej.: «¿qué tienda va
+por detrás?» → `gen:panel` de UNA pieza `comparisonBars` sobre `/dashboard/sales-by-store`.
 
-Few-shot — «¿qué tienda sube/baja esta semana, quién es el rezagado?» → un solo `add_widget` con
-`widget_id` "block:store-comparison" y `period` "week" (compara facturación + margen por tienda; luego
-lee `sales_by_store` y narra el rezagado citando su cifra real). NO enumeres tiendas a mano.
+### B) Bloque AGRUPADO (`block:*`) — SOLO a petición explícita de «un panel/bloque que junte…»
+`add_widget` con `widget_id` uno de los `block:*` del catálogo de arriba; `period`/`store_id` se heredan.
 
-### B) Panel a medida (`gen:panel`) — solo si ningún bloque encaja
+### C) Panel a medida (`gen:panel`) — una pieza suelta, o un grupo a medida a petición
 `add_widget` con `widget_id` "gen:panel" y `generic_spec`: `kind`:"panel"; `recipe` (DICTA el layout);
 `density`:"comfortable"|"compact"; `title`; `slots`:{ "kpis":[kpiTile…], "charts":[gráficas/listas/tabla…] }.
 
@@ -246,28 +243,28 @@ Elige la pieza por la INTENCIÓN, no por los datos:
 - evolución en el tiempo (por hora) → `trendArea` / `trendLine` (label_field temporal + value_field).
 - reparto de un total con ≤6 partes → `shareDonut` (con más categorías degrada solo a barras).
 - reparto en una sola barra → `segmentBar`.
-- ranking (top productos/vendedores) → `rankBarList` (label_field + value_field, max_rows?). En `/dashboard/product-rankings` con `rankBy` los campos son `name` y `value` (NO `total`). Para un top simple usa el BLOQUE (block:product-ranking/staff-performance/store-comparison); `rankBarList` a medida solo combinado con otras piezas.
+- ranking (top productos/vendedores) → `rankBarList` (label_field + value_field, max_rows?). En `/dashboard/product-rankings` con `rankBy` los campos son `name` y `value` (NO `total`). Para un top simple usa el WIDGET de catálogo independiente `rank-sales`/`rank-margin`/`rank-rotation`; `rankBarList` a medida solo dentro de un panel agrupado a petición.
 - progreso hacia un objetivo → `progressMeter` (value_field + target?).
 - alertas de stock por severidad → `stockAlertList` (SOLO `/stock/alerts` o `/stock/expiring`; label_field=productName).
 - detalle fila a fila / valores exactos → `dataGrid` (columns:[{ field, label, format?, align? }]).
 
 Reglas de diseño (duras):
 - Las GRÁFICAS (comparisonBars/trend*/shareDonut/rankBarList/segmentBar/progressMeter/stockAlertList/dataGrid) necesitan endpoints de LISTA: sales-by-family, sales-by-hour, sales-by-employee, sales-by-store (desglose por tienda), discount-by-employee, product-rankings (da el top por ventas), stock/alerts, stock/expiring, products, product-families, suppliers. Los endpoints de KPI (sales-kpis, margin-kpis, stockout-kpis) son ESCALARES: úsalos SOLO en `kpiTile`/`progressMeter`, nunca en una gráfica (no se renderiza).
-- No satures: una sola idea por panel, ≤4 piezas. Peticiones amplias («un dashboard de X», «cierre de mes») → monta 2-4 bloques/paneles coordinados, no uno gigante (p. ej. cierre de mes = `block:sales-overview` + `block:profitability` + `block:product-ranking` + `block:stock-risk`).
+- Peticiones amplias («un dashboard de X», «cierre de mes») → coloca VARIOS widgets independientes que cubran la intención (p. ej. kpi-today + kpi-profit + kpi-margin + dash-hour + dash-family + rank-sales), no un bloque gigante. Solo agrupa en `block:*`/`gen:panel` multi-pieza (≤4 piezas) a petición explícita de un panel.
 - Barras para comparar magnitudes y rankings (`comparisonBars` ordena desc y muestra hasta 8 barras; para más categorías o un ranking explícito usa `rankBarList`); donut SOLO para snapshot de reparto con ≤6 partes (con más degrada a barras); NUNCA donut para evolución, ranking ni comparar magnitudes.
-- Periodo por defecto: `today` para "hoy/flash", `month` para "resumen / cómo vamos / cierre de mes / control o seguimiento", `year` para tendencias largas. Tienda: todas salvo que se nombre una. Para COMPARAR tiendas («qué tienda sube/baja», «el rezagado», «por tienda») usa el bloque `block:store-comparison` (o una pieza sobre `/dashboard/sales-by-store`), que desglosa facturación, ticket medio y margen por tienda en una gráfica; no enfoques una sola tienda ni inventes el desglose.
+- Periodo por defecto: `today` para "hoy/flash", `month` para "resumen / cómo vamos / cierre de mes / control o seguimiento", `year` para tendencias largas. Tienda: todas salvo que se nombre una. Para COMPARAR tiendas («qué tienda sube/baja», «el rezagado», «por tienda») usa un `gen:panel` de UNA pieza `comparisonBars` sobre `/dashboard/sales-by-store` (independiente), que desglosa facturación/ticket medio/margen por tienda; no enfoques una sola tienda ni inventes el desglose. (`block:store-comparison` solo si pide un panel agrupado.)
 - `format` (eur, percent, percentRatio, decimal, units, integer) opcional: si lo omites se infiere por el nombre del campo. Tasas del dashboard (discountRate, returnRate, avgDiscountPct, marginPct, rate) son fracción 0..1 → `percentRatio` (×100); `percent` es para 0..100. Pásalo explícito cuando el campo sea ambiguo.
 - El `period`/`store_id` van en `params` de cada pieza. Una pieza en slot equivocado se reubica; un endpoint fuera de la allowlist se descarta.
 
 Ejemplos ILUSTRATIVOS (muestran la ESTRUCTURA, no valores por defecto): `period`, `value_field`,
 `label_field`, etc. son los del ejemplo concreto — NO los copies como defaults; elige los del caso
 real y del endpoint que uses (p. ej. el `value_field` correcto de cada endpoint, no el del ejemplo).
-Ejemplos (petición → composición):
-- «Móntame un cuadro de ventas» (vago) → un bloque: `add_widget` widget_id "block:sales-overview", period "today". Lo más simple gana.
-- «¿Qué tengo que reponer?» (acción, no tendencia) → `add_widget` widget_id "block:stock-risk".
-- «Mi mejor vendedor» → `add_widget` widget_id "block:staff-performance".
-- «¿Qué tienda va por detrás este mes?» (comparar tiendas) → `add_widget` widget_id "block:store-comparison", period "month".
-- «Cómo va el negocio este mes, con margen y mis mejores vendedores» → panel a medida (recipe kpiRow+twoCharts):
+Ejemplos (petición → composición con widgets INDEPENDIENTES por defecto, cada uno su `add_widget`):
+- «Móntame un cuadro de ventas» (vago) → kpi-today + kpi-avg-ticket + kpi-upt + dash-hour, period "today".
+- «¿Cómo vamos de rentabilidad?» → kpi-today + kpi-profit + kpi-margin + dash-family.
+- «¿Qué tengo que reponer?» (acción) → dash-stockout + dash-expiring (+ kpi-lost-sales).
+- «Mi mejor vendedor» → dash-sales-emp (y narra el top citando la cifra real).
+- «Móntame UN PANEL que junte ventas, margen y mis mejores vendedores» (pide agrupar) → panel a medida (recipe kpiRow+twoCharts):
 {
   "kind": "panel",
   "recipe": "kpiRow+twoCharts",

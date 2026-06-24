@@ -7,8 +7,10 @@ import { BarChart2, ChevronDown, LineChart, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
+import type { DashboardMode } from './components/DashboardModeToggle.js';
 import { DaySelector } from './components/DaySelector.js';
 import { type CanvasMeta, FreeBoard, type FreeBoardHandle } from './components/FreeBoard.js';
+import { GridBoard } from './components/GridBoard.js';
 import { useCanvasBridge } from './lib/canvas-bridge.js';
 import {
   type DashboardPeriod,
@@ -34,6 +36,7 @@ import {
   migrateLayoutPref,
   PRESETS,
   reconcileFreeLayout,
+  updateElement,
 } from './lib/dashboard-layout.js';
 import { useDashboardStore } from './lib/dashboard-store.js';
 import {
@@ -52,6 +55,7 @@ import { listPurchaseOrders } from './lib/purchases.js';
 import { listAlerts, listExpiringBatches } from './lib/stock.js';
 import { compareSupplierPrices } from './lib/supplier-prices.js';
 import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
+import { useModeTransition } from './lib/use-mode-transition.js';
 import { STATUS_LABEL } from './purchases/labels.js';
 import { ALERT_LABEL, df, EXPIRY_LABEL, expiryDaysText } from './stock/labels.js';
 import { getWidgetLabel, getWidgetSpec } from './widgets/registry.js';
@@ -163,6 +167,10 @@ export function DashboardPage({
   const layout = useDashboardStore((s) => s.layout);
   const hydrated = useDashboardStore((s) => s.hydrated);
   const setStoreLayout = useDashboardStore((s) => s.setLayout);
+  // Acciones del store reusadas por el modo CUADRÍCULA (alta/baja manual de widgets). El agente usa
+  // las mismas vías (applyCanvasOp → addWidget/removeElement), así que el grid y el chat coinciden.
+  const addWidgetToStore = useDashboardStore((s) => s.addWidget);
+  const removeElementFromStore = useDashboardStore((s) => s.removeElement);
   // `setPref` se recrea en cada render (arrow inline en usePreferences); lo leemos vía ref para
   // registrar el persister una sola vez sin re-suscribir.
   const setPrefRef = useRef(setPref);
@@ -189,6 +197,9 @@ export function DashboardPage({
   for (const el of savedFree) {
     if (el.kind === 'widget') vis.add(el.widgetId);
   }
+  // Modo de disposición (rejilla ↔ lienzo libre). Por defecto 'free'. Ambos modos comparten el
+  // MISMO conjunto de widgets (`savedFree`): el grid es otra vista, no otro layout.
+  const mode: DashboardMode = layout.mode === 'grid' ? 'grid' : 'free';
 
   // ── Asistente (dock del shell) ↔ lienzo ─────────────────────────────────────────────
   // El ChatDock vive ahora en el shell (visible en todas las views). El menú «+» de herramientas
@@ -202,10 +213,16 @@ export function DashboardPage({
     drawOpen: false,
     mode: 'select',
   });
-  // Registra/actualiza el binding al montar y cuando cambia `canvasMeta` (deshacer/dibujo).
+  // Registra/actualiza el binding SOLO en modo libre: la barra de herramientas del lienzo (dibujo,
+  // pan, goma, deshacer/rehacer) solo aplica al FreeBoard. En modo rejilla se limpia para que el
+  // dock quede como chat puro (el alta/baja del grid va por sus propios controles).
   useEffect(() => {
-    useCanvasBridge.getState().setBinding({ canvasRef: freeBoardRef, canvasMeta });
-  }, [canvasMeta]);
+    if (mode === 'free') {
+      useCanvasBridge.getState().setBinding({ canvasRef: freeBoardRef, canvasMeta });
+    } else {
+      useCanvasBridge.getState().setBinding(null);
+    }
+  }, [mode, canvasMeta]);
   // Limpia el binding solo al desmontar (al salir del Dashboard → el dock pasa a chat puro).
   useEffect(() => () => useCanvasBridge.getState().setBinding(null), []);
 
@@ -353,7 +370,6 @@ export function DashboardPage({
           key="kpi-today"
           label="Facturación hoy"
           value={fmtEur(salesToday.data?.today.total)}
-          delta={salesToday.data?.deltaPct ?? null}
           series={salesToday.data?.intraday}
           sparkTone={deltaTone(salesToday.data?.deltaPct ?? null) === 'down' ? 'down' : 'up'}
           testid="kpi-today"
@@ -472,6 +488,11 @@ export function DashboardPage({
       ...layout,
       freeViews: { ...layout.freeViews, [preset.id]: v },
     });
+  // El conmutador de modo vive en el shell (App.tsx → DashboardModeToggle), por encima del clúster
+  // de búsqueda; lee/escribe `layout.mode` directamente del store. Aquí solo se LEE `mode`.
+  // Edición de una nota desde la rejilla: mismo ciclo de persistencia que el lienzo.
+  const onGridNoteChange = (id: string, doc: unknown): void =>
+    onFreeChange(updateElement(savedFree, id, { doc }));
   // U-02: toggle barras ↔ línea LOCAL a cada card (persistido por card en el layout).
   // Cambiar el de una card no toca el de la otra.
   const chartKindFor = (card: ChartCard): 'bars' | 'line' =>
@@ -1072,25 +1093,59 @@ export function DashboardPage({
     return card ? card.node : (renderPanel(id)?.node ?? null);
   };
 
+  // Transición fluida entre modos (cuadrícula ↔ lienzo libre): en vez de swap duro, cada bloque
+  // VUELA de su celda a su sitio (magic move) y los puntos del lienzo hacen una ola con rebote. El
+  // hook mantiene AMBOS boards montados durante el morph; `committed` es el modo «real» del render
+  // (va por detrás de `mode` solo mientras dura la animación). Ver use-mode-transition.
+  const transition = useModeTransition(mode);
+  // Qué boards montar: el comprometido siempre; el saliente mientras dura el morph.
+  const showGrid = transition.committed === 'grid' || transition.outgoing === 'grid';
+  const showFree = transition.committed === 'free' || transition.outgoing === 'free';
+
   return (
-    <section className="catalog dashboard--free" data-testid="dashboard">
-      {/* D-20: el dashboard es siempre un lienzo libre (edgeless). Sus propias herramientas
-          (paleta de widgets, dibujo, deshacer, minimapa…) viven dentro de FreeBoard. El nombre de
-          la view y el dock del asistente los pone el shell (ver App.tsx / AssistantDock). */}
-      {/* `FreeBoard` siembra su estado interno desde `elements` SOLO al montar. Si monta antes de
-          que el store hidrate las preferencias, arranca vacío y no se re-sincroniza. Incluir
-          `hydrated` en la key lo re-monta una vez al hidratar, ya con el lienzo guardado. */}
-      <FreeBoard
-        key={`${preset.id}:${hydrated}`}
-        ref={freeBoardRef}
-        elements={savedFree}
-        renderItem={renderItem}
-        itemLabel={boardItemLabel}
-        onChange={onFreeChange}
-        {...(layout.freeViews?.[preset.id] ? { initialView: layout.freeViews[preset.id] } : {})}
-        onViewChange={onFreeViewChange}
-        onCanvasMeta={setCanvasMeta}
-      />
+    <section
+      ref={transition.sectionRef}
+      className={`catalog dashboard--${transition.committed}`}
+      data-testid="dashboard"
+    >
+      {/* Dos modos (toggle arriba-derecha) que comparten el MISMO conjunto de widgets:
+          - REJILLA: los bloques fluyen en una rejilla responsive (scroll solo vertical); el cliente
+            le pide al asistente y el agente coloca los widgets (van al mismo lienzo → se ven aquí).
+          - LIENZO LIBRE: colocación a píxel + dibujo (el de siempre). Sus herramientas (paleta,
+            dibujo, deshacer, minimapa…) viven dentro de FreeBoard; el dock del asistente, en el shell.
+          Cada board vive en su HOST (absoluto, solapados): durante el cambio ambos coexisten para que
+          el morph mida origen y destino; el saliente queda oculto y lo representan los fantasmas.
+          `FreeBoard` siembra su estado desde `elements` SOLO al montar; `hydrated` en la key lo
+          re-monta una vez al hidratar las preferencias, ya con el lienzo guardado. */}
+      {showGrid && (
+        <div className={transition.hostClass('grid')} data-board-host="grid">
+          <GridBoard
+            elements={savedFree}
+            renderItem={renderItem}
+            itemLabel={boardItemLabel}
+            onAddWidget={(id) => addWidgetToStore(id)}
+            onRemoveElement={(id) => removeElementFromStore(id)}
+            onNoteChange={onGridNoteChange}
+          />
+        </div>
+      )}
+      {showFree && (
+        <div className={transition.hostClass('free')} data-board-host="free">
+          <FreeBoard
+            key={`${preset.id}:${hydrated}`}
+            ref={freeBoardRef}
+            elements={savedFree}
+            renderItem={renderItem}
+            itemLabel={boardItemLabel}
+            onChange={onFreeChange}
+            {...(layout.freeViews?.[preset.id] ? { initialView: layout.freeViews[preset.id] } : {})}
+            onViewChange={onFreeViewChange}
+            onCanvasMeta={setCanvasMeta}
+          />
+        </div>
+      )}
+      {/* Capa de fantasmas del morph (clones que vuelan entre modos); vacía en reposo. */}
+      <div ref={transition.ghostLayerRef} className="dash-mode-ghosts" aria-hidden="true" />
     </section>
   );
 }
@@ -1176,17 +1231,12 @@ type SparkTone = 'brand' | 'up' | 'down';
 function KpiCard(props: {
   label: string;
   value: string;
-  delta?: number | null;
   series?: number[] | undefined;
   sparkTone?: SparkTone;
   testid: string;
 }) {
-  const tone = deltaTone(props.delta);
   return (
     <div className="dash-card-wrap">
-      {props.delta !== undefined && (
-        <span className={`dash-card-trend dash-trend-${tone}`}>{fmtDelta(props.delta)}</span>
-      )}
       <div className="dash-card" data-testid={props.testid}>
         <span className="dash-card-label">{props.label}</span>
         <span className="dash-card-value">{props.value}</span>

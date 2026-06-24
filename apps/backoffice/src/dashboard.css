@@ -19,11 +19,9 @@
    TARJETAS KPI (ahora tiles del tablero; la rejilla la gestiona react-grid-layout)
    ════════════════════════════════════════════════════════════ */
 
-/* Wrapper relativo: la card conserva overflow:hidden (recorta la sparkline) y el chip
-   de tendencia se posiciona como overlay a caballo del borde superior sin recortarse.
-   El item de la rejilla pasa a ser el wrapper; la card lo rellena en alto. */
+/* Wrapper de la card: el item del tablero pasa a ser el wrapper y la card lo rellena en alto
+   (alturas iguales en la banda); la card conserva overflow:hidden para recortar la sparkline. */
 .dash-card-wrap {
-  position: relative;
   display: flex;
 }
 .dash-card-wrap > .dash-card {
@@ -36,7 +34,9 @@
   gap: 0.5rem;
   padding: 1.15rem 1.25rem;
   border: 1px solid var(--ui-border);
-  border-radius: 16px;
+  /* Radio único de TODAS las superficies del dashboard (card/panel/tile/nota/skeleton): así un widget
+     se ve idéntico en rejilla y en lienzo, y el skeleton vuela con el MISMO radio (sin cambio de diseño). */
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
   overflow: hidden; /* recorta la sparkline a full-bleed a los radios de la card */
   transition:
@@ -76,38 +76,6 @@
   font-weight: 600;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
-}
-
-/* Tendencia como píldora superpuesta: flota centrada a caballo del borde superior de
-   la card (overlay sobre .dash-card-wrap), con fondo de superficie + hairline que tapa
-   la línea del borde. Flecha + % en color por signo. */
-.dash-card-trend {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  z-index: 2;
-  transform: translate(-50%, -50%);
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.22rem;
-  padding: 0.16rem 0.55rem;
-  border: 1px solid var(--ui-border);
-  border-radius: 9999px;
-  background: var(--ui-surface);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.dash-trend-up {
-  color: var(--ui-success);
-}
-.dash-trend-down {
-  color: var(--ui-danger);
-}
-.dash-trend-flat {
-  color: var(--ui-text-soft);
 }
 
 /* Sparkline al pie de la card: empujada abajo (margin-top:auto) y a full-bleed,
@@ -154,7 +122,7 @@
   position: relative; /* ancla leyendas/controles en la esquina del panel */
   padding: 1.4rem 1.5rem;
   border: 1px solid var(--ui-border);
-  border-radius: 18px;
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
   min-width: 0;
 }
@@ -1052,8 +1020,6 @@
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg, 18px);
   background-color: var(--ui-surface-subtle);
-  --dot: color-mix(in srgb, var(--ui-text-muted) 38%, transparent);
-  background-image: radial-gradient(var(--dot) 1.5px, transparent 1.6px);
   touch-action: none;
   /* En modo normal el fondo NO se arrastra para mover la vista (el pan vive en el botón de la mano
      o en la barra espaciadora), así que el cursor por defecto no debe insinuar "agarrable". El
@@ -1065,12 +1031,91 @@
   outline: none;
   box-shadow: var(--ui-focus);
 }
+/* Rejilla de puntos en su propio plano (detrás del mundo). Sigue al pan/zoom vía
+   background-size/position inline. Se anima al cambiar de modo: una «ola» revela/oculta los puntos
+   desde el toggle (máscara radial cuyo radio crece) con un rebote de escala. En reposo `--dots-reveal`
+   = 1 ⇒ máscara completa ⇒ puntos íntegros (sin efecto). */
+@property --dots-reveal {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 1;
+}
+.dash-free-dots {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  --dot: color-mix(in srgb, var(--ui-text-muted) 38%, transparent);
+  background-image: radial-gradient(var(--dot) 1.5px, transparent 1.6px);
+  --dots-reveal: 1;
+  --dots-origin: 50% 42%;
+  transform-origin: var(--dots-origin);
+  -webkit-mask-image: radial-gradient(
+    circle at var(--dots-origin),
+    #000 calc(var(--dots-reveal) * 150%),
+    transparent calc(var(--dots-reveal) * 150% + 13%)
+  );
+  mask-image: radial-gradient(
+    circle at var(--dots-origin),
+    #000 calc(var(--dots-reveal) * 150%),
+    transparent calc(var(--dots-reveal) * 150% + 13%)
+  );
+}
+/* `will-change` solo mientras dura la ola (la clase se quita al terminar): aísla la capa para que la
+   máscara animada no repinte de más. */
+.dash-free-dots--reveal {
+  animation: dash-dots-reveal 440ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change:
+    transform,
+    opacity,
+    mask-image,
+    -webkit-mask-image;
+}
+.dash-free-dots--conceal {
+  animation: dash-dots-conceal 340ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  will-change:
+    transform,
+    opacity,
+    mask-image,
+    -webkit-mask-image;
+}
+@keyframes dash-dots-reveal {
+  0% {
+    --dots-reveal: 0;
+    transform: scale(0.93);
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+  72% {
+    transform: scale(1.03);
+  }
+  100% {
+    --dots-reveal: 1;
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes dash-dots-conceal {
+  0% {
+    --dots-reveal: 1;
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    --dots-reveal: 0;
+    transform: scale(0.96);
+    opacity: 0;
+  }
+}
 /* Mundo transformable (translate·scale). transform-origin 0 0 es imprescindible para que
    la matemática screen = world·zoom + pan cuadre. */
 .dash-free-world {
   position: absolute;
   top: 0;
   left: 0;
+  z-index: 1;
   transform-origin: 0 0;
   will-change: transform;
 }
@@ -1288,7 +1333,7 @@
   display: flex;
   flex-direction: column;
   border: 1px solid var(--ui-border);
-  border-radius: 12px;
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-note-bg, #fff7d6);
   box-shadow: 0 6px 18px rgb(0 0 0 / 0.1);
   /* SIN overflow:hidden: recortaba el «×» (a -9px, por fuera de la card). El redondeo se
@@ -1302,7 +1347,8 @@
   height: 1.5rem;
   padding: 0 0.4rem;
   background: rgb(0 0 0 / 0.05);
-  border-radius: 11px 11px 0 0;
+  /* 1px más cerrado que el radio exterior para anidar limpio dentro del borde de la nota. */
+  border-radius: calc(var(--ui-radius-lg) - 1px) calc(var(--ui-radius-lg) - 1px) 0 0;
   cursor: grab;
   touch-action: none;
 }
@@ -1323,7 +1369,7 @@
   flex-direction: column;
   /* Recorta el contenido del editor a las esquinas inferiores redondeadas (antes lo hacía
      el overflow:hidden del item, ahora retirado para no recortar el «×»). */
-  border-radius: 0 0 11px 11px;
+  border-radius: 0 0 calc(var(--ui-radius-lg) - 1px) calc(var(--ui-radius-lg) - 1px);
   overflow: hidden;
 }
 .dash-free-note-rte {
@@ -1637,7 +1683,8 @@
    app: sidebar z-30, topbar z-20). Así no colapsa a 0px aunque sus hijos sean overlays. El
    shell la rellena y los controles flotan por encima en píldoras de cristal: dashboard
    arriba-centro, toolbar abajo-centro, herramientas izq-centro, minimapa abajo-izq, zoom abajo-der. */
-.dashboard--free {
+.dashboard--free,
+.dashboard--grid {
   position: fixed;
   inset: 0;
   z-index: 35;
@@ -1648,6 +1695,121 @@
   padding: 0;
   background: var(--ui-surface-subtle);
 }
+
+/* ── Hosts de board + transición «magic move» entre modos ────────────────────────────────────────
+   Cada board (cuadrícula / lienzo) vive en un host absoluto que cubre la sección. Durante el cambio
+   de modo AMBOS coexisten solapados: el saliente queda oculto (lo representan los fantasmas que
+   vuelan de su celda a su sitio) y el entrante se revela al aterrizar. Ver use-mode-transition. */
+.dash-board-host {
+  position: absolute;
+  inset: 0;
+}
+.dash-board-host.is-incoming {
+  z-index: 2;
+}
+.dash-board-host.is-outgoing {
+  z-index: 1;
+}
+/* El board llena su host en CUALQUIER modo. Las reglas .dashboard--free/grid van scopeadas a la
+   clase de la sección, que durante el morph refleja SOLO al entrante; estas evitan que el saliente
+   colapse y mantienen su capa de puntos a pantalla completa para poder concluir la ola. */
+.dash-board-host .dash-free-shell {
+  position: absolute;
+  inset: 0;
+  gap: 0;
+}
+.dash-board-host .dash-free {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+}
+.dash-board-host .dash-grid {
+  position: absolute;
+  inset: 0;
+}
+/* El saliente nunca muestra sus bloques reales (los lleva el fantasma); su superficie y sus puntos
+   sí siguen visibles, para que la ola de puntos pueda terminar de ocultarse. */
+.dash-board-host.is-outgoing .dash-free-world,
+.dash-board-host.is-outgoing .dash-grid-flow {
+  visibility: hidden;
+}
+
+/* Durante el morph: oculta las capas de bloques de AMBOS hosts (las representan los fantasmas) y
+   atenúa el cromo flotante de cada board para que no «salte». */
+.dash--morphing .dash-free-world,
+.dash--morphing .dash-grid-flow {
+  visibility: hidden;
+}
+.dash--morphing .dash-free-zoom,
+.dash--morphing .dash-free-minimap,
+.dash--morphing .dash-free-arrow,
+.dash--morphing .dash-grid-add,
+.dash--morphing .dash-grid-hint,
+.dash--morphing .dash-free-empty {
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+
+/* Capa del morph: contiene los skeletons que vuelan de una posición a otra. Vive dentro de la sección
+   (su contexto de apilado), por encima de los hosts; el toggle/toolbar del shell (z mayor en el
+   contexto raíz) siguen por encima. No intercepta el puntero. */
+.dash-mode-ghosts {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+/* Skeleton de carga: una caja lisa de superficie (sin contenido real) que vuela entre modos. Solo
+   anima transform/opacity → compositor-friendly. Un brillo diagonal la marca como «cargando» hasta
+   que aterriza y se funde con el contenido real. */
+.dash-mode-skeleton {
+  position: fixed;
+  margin: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  /* Fallback; en runtime buildSkeleton copia el radio/fondo REALES del nodo (notas amarillas, etc.). */
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  /* Acota el layout/paint del width/height animado a esta caja (es `fixed` y vacía → no reflota nada). */
+  contain: layout paint;
+  will-change: transform, width, height, opacity;
+  cursor: default;
+}
+.dash-mode-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    color-mix(in srgb, var(--ui-text-muted) 12%, transparent) 50%,
+    transparent 80%
+  );
+  transform: translateX(-100%);
+  animation: dash-skeleton-shimmer 1.15s ease-in-out infinite;
+}
+@keyframes dash-skeleton-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Respeto a reduce-motion: sin ola ni vuelo de skeletons (el hook hace swap directo). */
+@media (prefers-reduced-motion: reduce) {
+  .dash-free-dots--reveal,
+  .dash-free-dots--conceal,
+  .dash-mode-skeleton::after {
+    animation: none;
+  }
+  .dash-mode-ghosts {
+    display: none;
+  }
+}
+
 .dashboard--free .dash-free-shell {
   position: absolute;
   inset: 0;
@@ -1752,6 +1914,210 @@
   bottom: 1rem;
   left: 1rem;
   right: auto;
+}
+
+/* ── Modo CUADRÍCULA ─────────────────────────────────────────────────────────────
+   Vista alternativa del lienzo: los mismos widgets fluyen en una rejilla responsive (3–5 columnas
+   según el ancho) con SOLO scroll vertical. Comparte el contenedor full-bleed con el lienzo. */
+.dashboard--grid .dash-grid {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  /* El dashboard es full-bleed y el sidebar/topbar FLOTAN por encima: se sangra el contenido para
+     que no quede debajo. Izquierda = ancho del sidebar flotante (igual que .bo-main--surface);
+     arriba = fila de acciones + toggle (esquina sup-derecha); abajo = dock del asistente. */
+  padding: 4rem 1.5rem 6rem
+    calc(var(--sidebar-width-expanded) + var(--sidebar-float-gap) * 2 + 0.5rem);
+}
+.dash-grid-flow {
+  display: grid;
+  /* Celda base más pequeña → tablero más denso y compacto (antes 248×172 inflaba cada tile). */
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-auto-rows: 156px;
+  grid-auto-flow: row dense;
+  gap: 0.85rem;
+  align-content: start;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+.dash-grid-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  /* Plano como el lienzo (estética Apple de hairlines, sin sombra): así el widget NO gana/pierde
+     elevación al cambiar de modo. La sombra dura del tile se retiró por coherencia. */
+  overflow: hidden;
+  transition: border-color 0.18s ease;
+}
+.dash-grid-tile:hover {
+  border-color: var(--ui-border-strong);
+}
+.dash-grid-tile--note {
+  background: var(--ui-note-bg, #fff7d6);
+}
+/* El tile ES la superficie en rejilla (igual que la card/panel lo es en el lienzo): la card/panel
+   interior va SIN cromo para no duplicar borde+radio+fondo (antes se veían dos superficies anidadas).
+   Resultado: una sola superficie idéntica a la del lienzo. */
+.dash-grid-tile-body .dash-card,
+.dash-grid-tile-body .dash-panel {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+/* El «lift» de hover de la KPI no aplica dentro del tile (overflow:hidden lo recortaría); el hover
+   lo da el propio tile. */
+.dash-grid-tile .dash-card-wrap:hover .dash-card {
+  transform: none;
+  border-color: transparent;
+}
+/* Widget COMPUESTO/genérico (panel con varias piezas: KPIs + gráfica): trae SUS PROPIAS superficies
+   internas (cada pieza con su hairline). El tile NO debe envolverlo en un marco/folio ni recortar el
+   título contra la esquina redondeada (era el «mal diseñado» en rejilla): se vuelve transparente y sin
+   recorte → el compuesto se ve igual que en el lienzo (image 2), sin caja exterior. */
+.dash-grid-tile:has(.dash-generic--panel) {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+.dash-grid-tile:has(.dash-generic--panel):hover {
+  border-color: transparent;
+}
+.dash-grid-tile-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* El contenido (panel/KPI/nota) llena el tile. */
+.dash-grid-tile-body > * {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+/* Botón quitar: esquina sup-derecha del tile, aparece al pasar el ratón (como en el lienzo). */
+.dash-grid-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--ui-surface) 80%, transparent);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.12s ease,
+    color 0.12s ease,
+    background 0.12s ease;
+}
+.dash-grid-tile:hover .dash-grid-remove,
+.dash-grid-remove:focus-visible {
+  opacity: 1;
+}
+.dash-grid-remove:hover {
+  color: var(--ui-danger);
+  background: var(--ui-surface);
+}
+/* Tira de alta: tile punteado con «+» para añadir un widget de catálogo. */
+.dash-grid-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 156px;
+  border: 1.5px dashed var(--ui-border-strong, var(--ui-border));
+  border-radius: var(--ui-radius-lg);
+  background: transparent;
+  color: var(--ui-text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.dash-grid-add:hover {
+  background: var(--ui-surface-subtle);
+  border-color: var(--ui-text-muted);
+  color: var(--ui-text);
+}
+.dash-grid-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 2.4rem;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ui-text-muted);
+  pointer-events: none;
+}
+
+/* ── Toggle de modo (esquina superior derecha, en ambos modos) ───────────────────
+   Se renderiza en el shell (App.tsx) con `fixed` + z-index alto (como la barra del lienzo) para
+   quedar por ENCIMA del clúster de búsqueda full-width de la topbar. Va a la derecha, justo DEBAJO
+   de la fila de acciones (lupa/home/campana) para no taparlas. */
+.dashboard-mode-toggle {
+  position: fixed;
+  /* Misma fila/altura que el resto de botones de la topbar (la barra del lienzo y las acciones van
+     a `--sidebar-float-gap`), pegado al borde derecho. */
+  top: var(--sidebar-float-gap, 12px);
+  right: var(--sidebar-float-gap, 12px);
+  z-index: 43;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9999px;
+  border: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-surface) 86%, transparent);
+  box-shadow: 0 8px 26px rgb(0 0 0 / 0.14);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.dashboard-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Un poco más anchos que altos (segmentos cómodos); la altura mantiene el toggle en 38px
+     totales, igual que los botones redondos de la topbar. */
+  width: 42px;
+  height: 30px;
+  border: none;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.dashboard-mode-btn:hover {
+  color: var(--ui-text);
+}
+.dashboard-mode-btn.is-active {
+  /* Color primary elegido en Ajustes (marca): mismo token que el resto de estados activos. */
+  background: var(--ui-primary, #2563eb);
+  color: var(--ui-primary-fg, #fff);
+}
+.dashboard-mode-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
 }
 
 /* ── Estado vacío del lienzo (preset «Personalizado» o lienzo vaciado): "+" central que

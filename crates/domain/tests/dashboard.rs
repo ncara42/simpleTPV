@@ -3,7 +3,9 @@
 
 use std::time::Duration;
 
-use simpletpv_domain::dashboard::period::{resolve_period, CompareMode, DashboardPeriod, DateRange};
+use simpletpv_domain::dashboard::period::{
+    resolve_period, CompareMode, DashboardPeriod, DateRange,
+};
 use simpletpv_domain::dashboard::service;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use time::{OffsetDateTime, PrimitiveDateTime};

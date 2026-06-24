@@ -59,6 +59,11 @@ async function undoOnce(page: Page): Promise<boolean> {
 // El dashboard es SIEMPRE un lienzo libre (el modo Cuadrícula se eliminó).
 test.beforeEach(async ({ page }) => {
   await gotoApp(page);
+  // El modo del dashboard persiste por usuario: si quedó en CUADRÍCULA (de un test anterior o de un
+  // uso previo), vuelve a LIENZO LIBRE para partir del estado base que asumen estos tests.
+  if (await page.getByTestId('dash-grid').count()) {
+    await page.getByTestId('dashboard-mode-free').click();
+  }
   await expect(page.getByTestId('dash-free')).toBeVisible();
 });
 
@@ -422,4 +427,45 @@ test('lienzo libre: herramientas de dibujo (forma, lápiz a mano y texto libre)'
   for (let i = 0; i < 8 && (await items.count()) > base; i++) {
     if (!(await undoOnce(page))) break;
   }
+});
+
+test('dashboard: modo cuadrícula — toggle, añadir widget como tile, scroll vertical y volver al lienzo conserva el widget', async ({
+  page,
+}) => {
+  // Arranca en lienzo libre (modo por defecto).
+  await expect(page.getByTestId('dash-free')).toBeVisible();
+  await clearDrawElements(page);
+  await clearNotes(page);
+  await clearFreeWidgets(page);
+
+  // Cambiar a CUADRÍCULA (toggle arriba-derecha): el lienzo se desmonta y aparece la rejilla.
+  await page.getByTestId('dashboard-mode-grid').click();
+  const grid = page.getByTestId('dash-grid');
+  await expect(grid).toBeVisible();
+  await expect(page.getByTestId('dash-free')).toHaveCount(0);
+
+  // Solo scroll vertical (overflow-y auto, overflow-x hidden).
+  const overflow = await grid.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { x: s.overflowX, y: s.overflowY };
+  });
+  expect(overflow.y).toBe('auto');
+  expect(overflow.x).toBe('hidden');
+
+  // Añadir un widget desde el «+» de la rejilla → aparece un tile.
+  const tiles = page.locator('.dash-grid-tile');
+  await expect(tiles).toHaveCount(0);
+  await page.getByTestId('dash-grid-add').click();
+  const palette = page.locator('.dash-free-palette');
+  await expect(palette).toBeVisible();
+  await palette.locator('button[role="menuitem"]').first().click();
+  await expect(tiles).toHaveCount(1);
+
+  // Volver a LIENZO LIBRE: el MISMO widget sigue ahí (mismo set, dos vistas).
+  await page.getByTestId('dashboard-mode-free').click();
+  await expect(page.getByTestId('dash-free')).toBeVisible();
+  await expect(page.locator('.dash-free-item--widget')).toHaveCount(1);
+
+  // Limpieza: deja el dashboard en modo libre y sin widgets para los demás tests.
+  await clearFreeWidgets(page);
 });

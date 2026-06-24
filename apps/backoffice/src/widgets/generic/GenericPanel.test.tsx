@@ -102,7 +102,10 @@ describe('GenericPanel — panel v2 (#204)', () => {
     expect(screen.getByTestId('dash-generic-panel')).toBeInTheDocument();
     expect(screen.getByTestId('dv-chart-grid')).toBeInTheDocument();
     expect(screen.queryByTestId('dv-kpi-row')).toBeNull();
-    expect(screen.getByText('Solo tabla')).toBeInTheDocument();
+    // Panel de UNA sola pieza: el título superior del panel se omite (la pieza ya trae el suyo) →
+    // no se duplica. Se conserva el título de la pieza.
+    expect(screen.queryByText('Solo tabla')).toBeNull();
+    expect(screen.getByText('Productos')).toBeInTheDocument();
   });
 
   it('stockAlertList mapea /stock/alerts (rotura) y /stock/expiring (caducidad) (#209)', async () => {

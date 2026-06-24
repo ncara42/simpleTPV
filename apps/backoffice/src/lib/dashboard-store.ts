@@ -54,6 +54,7 @@ import {
   asRecipe,
   clampInt,
   clampRecipe,
+  decomposePanelSpec,
   inferFormat,
   MAX_BARS,
   MAX_ROWS,
@@ -200,6 +201,31 @@ function placeGeneric(
   const free = freeOf(layout);
   const next = addGenericToFree(free, id, freeSlot(free, freeAnchor(position)), spec.defaultSize);
   return { ...withFree(layout, next), genericWidgets };
+}
+
+// Separa los compuestos YA persistidos (multi-pieza) en widgets independientes. PURO: solo transforma
+// el layout; el registry lo reconstruye el llamador (hydrate) desde el `genericWidgets` resultante.
+// Idempotente: un layout sin compuestos multi-pieza vuelve igual.
+function expandCompositesInLayout(layout: LayoutPref): LayoutPref {
+  const generics = layout.genericWidgets ?? {};
+  const splittable = Object.entries(generics).filter(([, s]) => decomposePanelSpec(s).length > 1);
+  if (splittable.length === 0) return layout;
+  let free = freeOf(layout);
+  const nextGenerics: Record<string, GenericSpec> = { ...generics };
+  for (const [id, spec] of splittable) {
+    const orig = free.find((e) => e.kind === 'widget' && e.widgetId === id);
+    const anchor = orig
+      ? { x: orig.x + orig.w / 2, y: orig.y + orig.h / 2 }
+      : freeAnchor(undefined);
+    free = removeElementEl(free, id);
+    delete nextGenerics[id];
+    decomposePanelSpec(spec).forEach((part, i) => {
+      const childId = `${id}::${i}`;
+      nextGenerics[childId] = part;
+      free = addGenericToFree(free, childId, freeSlot(free, anchor), part.defaultSize);
+    });
+  }
+  return { ...withFree(layout, free), genericWidgets: nextGenerics };
 }
 
 // ── Validación del árbol composite (DSL enriquecido, #189) ──────────────────────
@@ -607,15 +633,20 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       clearTimeout(debounceTimer);
       debounceTimer = null;
     }
-    // Reconstruye el registry de genéricos desde el layout persistido: WIDGET_REGISTRY es estado
-    // de módulo (no se persiste), así que tras recargar hay que re-registrar cada `gen:<uuid>` o
+    // Separa los compuestos persistidos (panel 5-en-1) en widgets INDEPENDIENTES antes de registrar,
+    // para que cada pieza tenga su propio tile (borrable/movible por separado). Idempotente.
+    const expanded = expandCompositesInLayout(layout);
+    // Reconstruye el registry de genéricos desde el layout (ya separado): WIDGET_REGISTRY es estado
+    // de módulo (no se persiste), así que tras recargar hay que re-registrar cada `gen:<id>` o
     // `renderItem('gen:…')` (#189 slice 0.1) no encontraría su spec y la tarjeta saldría vacía.
-    for (const [id, spec] of Object.entries(layout.genericWidgets ?? {})) {
+    for (const [id, spec] of Object.entries(expanded.genericWidgets ?? {})) {
       registerGenericWidget(id, spec);
     }
     // `hydrated: true` habilita la persistencia (ver `persistEnabled`): a partir de aquí cualquier
     // escritura parte del layout real del servidor, no del `{}` inicial.
-    set({ layout, hydrated: true });
+    set({ layout: expanded, hydrated: true });
+    // Persiste la separación si cambió algo (la cota anti-`{}` ya pasó: hydrated:true).
+    if (expanded !== layout) schedulePersist(expanded);
   },
   setPersister: (fn) => {
     persistFn = fn;
@@ -652,30 +683,42 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   removeElement: (elementId) => {
     const { layout } = get();
     const free = freeOf(layout);
-    const nextFree = removeElementEl(free, elementId);
+    const generics = layout.genericWidgets ?? {};
+    // Quita el elemento Y sus piezas separadas (`${id}::*`): así DESHACER un bloque que se separó en
+    // widgets independientes los elimina todos (mantiene el invariante 1-op→1-deshacer).
+    const prefix = `${elementId}::`;
+    const ids = new Set<string>([elementId]);
+    for (const e of free) if (e.id.startsWith(prefix)) ids.add(e.id);
+    for (const gid of Object.keys(generics)) if (gid.startsWith(prefix)) ids.add(gid);
+
+    const nextFree = free.filter((e) => !ids.has(e.id));
     const grid = layout.layouts?.[ACTIVE_PRESET];
     let nextGrid: StoredLayouts | undefined = grid;
     let gridChanged = false;
     if (grid) {
       nextGrid = {};
       for (const [bp, items] of Object.entries(grid)) {
-        const filtered = items.filter((it) => it.i !== elementId);
+        const filtered = items.filter((it) => !ids.has(it.i));
         if (filtered.length !== items.length) gridChanged = true;
         nextGrid[bp] = filtered;
       }
     }
-    const inGeneric = elementId in (layout.genericWidgets ?? {});
-    if (nextFree.length === free.length && !gridChanged && !inGeneric) {
+    const genericHit = [...ids].some((id) => id in generics);
+    if (nextFree.length === free.length && !gridChanged && !genericHit) {
       return rejected(`elemento no encontrado: ${elementId}`);
     }
     let next: LayoutPref = { ...layout };
     if (nextFree.length !== free.length) next = withFree(next, nextFree);
     if (gridChanged && nextGrid) next = withGrid(next, nextGrid);
-    if (inGeneric) {
+    if (genericHit) {
       const genericWidgets = { ...next.genericWidgets };
-      delete genericWidgets[elementId];
+      for (const id of ids) {
+        if (id in genericWidgets) {
+          delete genericWidgets[id];
+          unregisterGenericWidget(id);
+        }
+      }
       next = { ...next, genericWidgets };
-      unregisterGenericWidget(elementId);
     }
     get().setLayout(next);
     return ACCEPTED;

@@ -49,6 +49,7 @@ import {
   minimapProjection,
   offscreenArrow,
 } from '../lib/free-geometry.js';
+import { useEnterAnimation } from '../lib/use-enter-animation.js';
 import { FreeMinimap } from './FreeMinimap.js';
 import { FreeNote } from './FreeNote.js';
 import { FreeShapeView } from './FreeShapeView.js';
@@ -753,6 +754,11 @@ export function FreeBoard({
     });
   }, [past.length, future.length, drawOpen, interactionMode, onCanvasMeta]);
 
+  // Entrada con rebote escalonado de los bloques (widget/nota) recién añadidos —a mano o por el
+  // agente—. Las formas/dibujos/textos a mano se quedan donde se trazan (sin rebote).
+  const blockIds = els.filter((e) => e.kind === 'widget' || e.kind === 'note').map((e) => e.id);
+  useEnterAnimation(blockIds, () => viewportRef.current);
+
   // Minimapa + flecha de orientación (solo con viewport medido y algún elemento).
   const hasViewport = viewportSize.width > 0 && viewportSize.height > 0;
   const projection =
@@ -846,11 +852,17 @@ export function FreeBoard({
           overRef.current = false;
         }}
         onKeyDown={onViewportKeyDown}
-        style={{
-          backgroundSize: `${24 * view.zoom}px ${24 * view.zoom}px`,
-          backgroundPosition: `${view.panX}px ${view.panY}px`,
-        }}
       >
+        {/* Capa de puntos, en su propio plano para poder animarla (ola + rebote) al cambiar de modo
+            sin afectar a los widgets del mundo. Sigue al pan/zoom vía background-size/position. */}
+        <div
+          className="dash-free-dots"
+          aria-hidden="true"
+          style={{
+            backgroundSize: `${24 * view.zoom}px ${24 * view.zoom}px`,
+            backgroundPosition: `${view.panX}px ${view.panY}px`,
+          }}
+        />
         <div
           className="dash-free-world"
           style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})` }}
@@ -1167,6 +1179,7 @@ const ElementView = memo(function ElementView({
         }}
         role="group"
         aria-label={label}
+        data-board-item={el.id}
         onPointerDownCapture={() => onFocus(el.id)}
         onPointerDown={(e) => {
           // GOMA: un clic en cualquier parte de la nota la borra. Sus hijos van inertes por CSS
@@ -1213,6 +1226,7 @@ const ElementView = memo(function ElementView({
         role="group"
         aria-label={label}
         tabIndex={0}
+        data-board-item={el.id}
         onPointerDownCapture={() => onFocus(el.id)}
         onDoubleClick={() => {
           onTextEditStart();
@@ -1251,6 +1265,7 @@ const ElementView = memo(function ElementView({
       role="group"
       tabIndex={0}
       aria-label={`${label}. Usa las flechas para moverla.`}
+      data-board-item={el.id}
     >
       {removeBtn}
       <div className="dash-free-item-body">{body}</div>

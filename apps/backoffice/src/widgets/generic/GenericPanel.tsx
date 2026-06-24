@@ -43,13 +43,17 @@ export function GenericPanel({ spec }: { spec: GenericSpec }) {
   const charts = spec.slots?.charts ?? [];
   const kpiColumns = Math.min(Math.max(kpis.length, 1), MAX_KPI_COLUMNS) as 1 | 2 | 3 | 4;
   const emphasis = recipe === 'heroChart+sideStats' ? 'hero' : 'normal';
+  // Un panel de UNA sola pieza (p. ej. un widget suelto tras separar un bloque) NO necesita título
+  // superior: la pieza (KpiTile/gráfica) ya trae el suyo → se omite para no duplicarlo y ahorrar
+  // espacio. Un panel agrupado (varias piezas) sí conserva su rótulo.
+  const panelTitle = kpis.length + charts.length <= 1 ? '' : spec.title;
   // heroChart+sideStats con KPIs + gráfica → composición side-by-side real (hero 2fr + stats 1fr,
   // #212). Sin KPIs cae al apilado normal (la gráfica hero sola gana alto vía emphasis).
   const isHeroSplit = recipe === 'heroChart+sideStats' && charts.length > 0 && kpis.length > 0;
 
   return (
     <div className="dash-generic dash-generic--panel" data-testid="dash-generic-panel">
-      <PanelShell title={spec.title} density={density}>
+      <PanelShell title={panelTitle} density={density}>
         {isHeroSplit ? (
           <HeroSplit
             hero={<PieceWidget piece={charts[0]!} />}

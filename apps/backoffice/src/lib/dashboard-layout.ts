@@ -317,6 +317,9 @@ export const GENERIC_DEFAULT_SIZE: Record<GenericWidgetType, { w: number; h: num
 // Las claves antiguas (cardOrder/panelOrder, hiddenByPreset, chartKind global) se ignoran.
 export interface LayoutPref {
   preset?: PresetId;
+  /** Modo de disposición del dashboard: 'grid' (rejilla responsive, scroll vertical) o 'free'
+   *  (lienzo libre, colocación a píxel). Por defecto 'free'. Comparten los mismos widgets. */
+  mode?: 'grid' | 'free';
   /** U-02: representación (barras o línea) de cada card con toggle, independiente. */
   chartKinds?: Partial<Record<ChartCard, 'bars' | 'line'>>;
   /** D-19: colocación 2D por preset (layouts por breakpoint de react-grid-layout). */

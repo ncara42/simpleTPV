@@ -34,6 +34,7 @@ import { B2bPage } from './B2bPage.js';
 import { AssistantDock } from './components/chat/AssistantDock.js';
 import { CanvasToolsMenu } from './components/chat/CanvasToolsMenu.js';
 import { viewContextFor } from './components/chat/view-context.js';
+import { DashboardModeToggle } from './components/DashboardModeToggle.js';
 import { FloatingActions } from './components/FloatingActions.js';
 import { DashboardPage } from './DashboardPage.js';
 import { HelpPage } from './HelpPage.js';
@@ -296,6 +297,10 @@ function Home() {
                 />
               </div>
             )}
+            {/* Conmutador de modo (cuadrícula ↔ lienzo libre), arriba-derecha del dashboard. A nivel
+                de shell para quedar por ENCIMA del clúster de búsqueda full-width; visible en AMBOS
+                modos (no depende del binding del lienzo, que se limpia en cuadrícula). */}
+            {tab === 'dashboard' && <DashboardModeToggle />}
             <div className="app-main-row">
               <main className={`bo-main${isCanvas ? ' bo-main--canvas' : ' bo-main--surface'}`}>
                 {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
