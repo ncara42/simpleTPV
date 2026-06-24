@@ -42,6 +42,15 @@ const SESSION_TTL_MS = 30 * 60 * 1000;
 const CODE_TTL_MS = 60 * 1000;
 /** Scopes que ofrece el servidor; least-privilege se refina en Fase 3. */
 const SCOPES_SUPPORTED = ['tpv:read'];
+/**
+ * Orígenes web oficiales de Claude. Anthropic sirve la app desde claude.ai Y
+ * claude.com; ambos deben pasar CORS o el conector falla con "Authorization
+ * failed" (el navegador bloquea DCR/token/mcp). Se permiten SIEMPRE, aunque
+ * `MCP_ALLOWED_ORIGINS` esté fijado a uno solo: los tokens son por usuario (no un
+ * secreto compartido), así que CORS no es la frontera de seguridad y restringir
+ * de más solo rompe el cliente legítimo cuando cambia de dominio.
+ */
+const CLAUDE_WEB_ORIGINS = ['https://claude.ai', 'https://claude.com'];
 
 interface SessionEntry {
   transport: StreamableHTTPServerTransport;
@@ -78,11 +87,17 @@ export async function startHttpServer(): Promise<void> {
   // ERR_ERL_UNEXPECTED_X_FORWARDED_FOR (500). Configurable vía MCP_TRUST_PROXY.
   app.set('trust proxy', cfg.trustProxy);
 
-  // CORS: lista blanca si está configurada; si no, refleja el origen (los
-  // tokens son por usuario, no un secreto compartido).
+  // CORS: si hay lista blanca configurada, se le UNEN siempre los orígenes
+  // oficiales de Claude (claude.ai + claude.com) para que el conector no se rompa
+  // cuando Anthropic sirve la app desde un dominio u otro. Sin lista configurada,
+  // se refleja el origen (los tokens son por usuario, no un secreto compartido).
+  const corsOrigins =
+    cfg.allowedOrigins.length > 0
+      ? [...new Set([...CLAUDE_WEB_ORIGINS, ...cfg.allowedOrigins])]
+      : true;
   app.use(
     cors({
-      origin: cfg.allowedOrigins.length > 0 ? cfg.allowedOrigins : true,
+      origin: corsOrigins,
       exposedHeaders: ['mcp-session-id', 'WWW-Authenticate'],
       allowedHeaders: ['Content-Type', 'Authorization', 'mcp-session-id', 'mcp-protocol-version'],
     }),
