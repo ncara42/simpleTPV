@@ -230,26 +230,28 @@ export function CustomersSection({ tabs }: { tabs?: ReactNode }) {
   return (
     <>
       <div className="table-panel" data-testid="b2b-customers">
-        {tabs}
-        <SectionToolbar
-          actionLabel="Nuevo cliente"
-          onAction={() => setForm({ ...EMPTY })}
-          actionTestId="b2b-new-customer"
-          actionIcon={<Plus size={16} aria-hidden="true" />}
-        >
-          <span className="search-field">
-            <Input
-              className="catalog-search"
-              placeholder="Buscar cliente…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              data-testid="b2b-customers-search"
-            />
-          </span>
-          <span className="muted">
-            {filtered.length} cliente{filtered.length !== 1 ? 's' : ''}
-          </span>
-        </SectionToolbar>
+        <div className="dt-header-row">
+          {tabs}
+          <SectionToolbar
+            actionLabel="Nuevo cliente"
+            onAction={() => setForm({ ...EMPTY })}
+            actionTestId="b2b-new-customer"
+            actionIcon={<Plus size={16} aria-hidden="true" />}
+          >
+            <span className="search-field">
+              <Input
+                className="catalog-search"
+                placeholder="Buscar cliente…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                data-testid="b2b-customers-search"
+              />
+            </span>
+            <span className="muted">
+              {filtered.length} cliente{filtered.length !== 1 ? 's' : ''}
+            </span>
+          </SectionToolbar>
+        </div>
 
         <DataTable
           columns={customerColumns}

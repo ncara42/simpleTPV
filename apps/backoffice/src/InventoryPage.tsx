@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { CatalogPage } from './CatalogPage.js';
@@ -37,6 +38,10 @@ interface InventoryPageProps {
 
 export function InventoryPage({ initialStoreId, onOpenCatalogFamily }: InventoryPageProps) {
   const [params, setParams] = useSearchParams();
+  // Slot de la cabecera única: cada sub-vista (Catálogo/Familias/Existencias) portalea
+  // aquí su toolbar (filtros propios + CTA), para que TODO viva en la misma fila que las
+  // sub-pestañas y el filtro compartido — sin una segunda banda en la card de la sub-vista.
+  const [headerSlot, setHeaderSlot] = useState<HTMLDivElement | null>(null);
   const raw = params.get('vista');
   const vista: Vista = raw === 'familias' || raw === 'existencias' ? raw : 'catalogo';
 
@@ -68,30 +73,37 @@ export function InventoryPage({ initialStoreId, onOpenCatalogFamily }: Inventory
 
   return (
     <div className="inventory-page" data-testid="inventory-page">
-      <InventoryFilters
-        families={families}
-        search={search}
-        onSearchChange={setSearch}
-        familyId={familyId}
-        onFamilyChange={setFamily}
-      />
-      <div className="inventory-views bo-tabs" role="tablist" aria-label="Vista de inventario">
-        {VISTAS.map(({ id, label }) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            className={`bo-tab${vista === id ? ' active' : ''}`}
-            aria-pressed={vista === id}
-            data-testid={`inventory-view-${id}`}
-            onClick={() => selectVista(id)}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="inventory-header">
+        <div className="inventory-views bo-tabs" role="tablist" aria-label="Vista de inventario">
+          {VISTAS.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              className={`bo-tab${vista === id ? ' active' : ''}`}
+              aria-pressed={vista === id}
+              data-testid={`inventory-view-${id}`}
+              onClick={() => selectVista(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="inventory-header-tools">
+          <InventoryFilters
+            families={families}
+            search={search}
+            onSearchChange={setSearch}
+            familyId={familyId}
+            onFamilyChange={setFamily}
+          />
+          {/* Aquí portalean las sub-vistas su toolbar (filtros propios + CTA). */}
+          <div ref={setHeaderSlot} className="inventory-header-actions" />
+        </div>
       </div>
       {vista === 'catalogo' && (
         <CatalogPage
+          headerSlot={headerSlot}
           search={search}
           onSearchChange={setSearch}
           familyFilter={familyId}
@@ -100,6 +112,7 @@ export function InventoryPage({ initialStoreId, onOpenCatalogFamily }: Inventory
       )}
       {vista === 'familias' && (
         <FamiliesPage
+          headerSlot={headerSlot}
           onOpenCatalogFamily={onOpenCatalogFamily}
           search={search}
           onSearchChange={setSearch}
@@ -108,6 +121,7 @@ export function InventoryPage({ initialStoreId, onOpenCatalogFamily }: Inventory
       )}
       {vista === 'existencias' && (
         <StockPage
+          headerSlot={headerSlot}
           initialStoreId={initialStoreId ?? null}
           search={search}
           onSearchChange={setSearch}

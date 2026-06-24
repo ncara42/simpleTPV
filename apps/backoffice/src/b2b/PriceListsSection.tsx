@@ -181,16 +181,18 @@ export function PriceListsSection({ tabs }: { tabs?: ReactNode }) {
 
   return (
     <div className="table-panel" data-testid="b2b-pricelists">
-      {tabs}
-      <SectionToolbar
-        actionLabel="Nueva tarifa"
-        onAction={() => setCreating(true)}
-        actionTestId="b2b-new-pricelist"
-      >
-        <span className="muted">
-          {priceLists.length} tarifa{priceLists.length !== 1 ? 's' : ''}
-        </span>
-      </SectionToolbar>
+      <div className="dt-header-row">
+        {tabs}
+        <SectionToolbar
+          actionLabel="Nueva tarifa"
+          onAction={() => setCreating(true)}
+          actionTestId="b2b-new-pricelist"
+        >
+          <span className="muted">
+            {priceLists.length} tarifa{priceLists.length !== 1 ? 's' : ''}
+          </span>
+        </SectionToolbar>
+      </div>
 
       <DataTable
         data-testid="b2b-pricelists-table"

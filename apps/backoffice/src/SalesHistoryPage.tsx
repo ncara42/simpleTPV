@@ -418,24 +418,26 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
           alimenta `listSales`, así KPIs/gráfica y tabla se recalculan a la vez. */}
       <SalesStats query={toQuery(filters)} />
 
-      <DataTable
-        columns={effectiveColumns}
-        rows={data?.items ?? []}
-        rowKey={(r) => r.id}
-        loading={query.isLoading}
-        toolbar={toolbar}
-        footer={footer}
-        pagination={{
-          page,
-          pageSize: PAGE_SIZE,
-          totalItems: data?.totalItems ?? 0,
-          onPageChange: setPage,
-        }}
-        emptyState={
-          <span data-testid="sales-empty">Sin ventas para los filtros seleccionados.</span>
-        }
-        data-testid="sales-table"
-      />
+      <div className="table-panel">
+        <DataTable
+          columns={effectiveColumns}
+          rows={data?.items ?? []}
+          rowKey={(r) => r.id}
+          loading={query.isLoading}
+          toolbar={toolbar}
+          footer={footer}
+          pagination={{
+            page,
+            pageSize: PAGE_SIZE,
+            totalItems: data?.totalItems ?? 0,
+            onPageChange: setPage,
+          }}
+          emptyState={
+            <span data-testid="sales-empty">Sin ventas para los filtros seleccionados.</span>
+          }
+          data-testid="sales-table"
+        />
+      </div>
 
       {dataModal && (
         <ImportExportModal

@@ -3,6 +3,7 @@ import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { AddExistingProductsModal } from './components/AddExistingProductsModal.js';
 import { useConfirm } from './components/ConfirmProvider.js';
@@ -292,6 +293,7 @@ export function FamiliesPage({
   search: searchProp,
   onSearchChange,
   familyId: familyIdProp,
+  headerSlot,
 }: {
   // Atajo del contador "X productos": navega a Catálogo filtrado por el nodo.
   onOpenCatalogFamily?: (familyId: string) => void;
@@ -303,6 +305,9 @@ export function FamiliesPage({
   search?: string;
   onSearchChange?: (value: string) => void;
   familyId?: string;
+  // Slot de cabecera del shell de Inventario: la toolbar se portalea ahí (no en la card),
+  // para que filtros + tabs + filtro compartido vivan en UNA sola línea.
+  headerSlot?: HTMLElement | null;
 } = {}) {
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -749,53 +754,58 @@ export function FamiliesPage({
     },
   });
 
+  const famToolbar = (
+    <div className="table-toolbar">
+      {/* En modo controlado (shell de Inventario) la búsqueda y la familia las
+          pinta `InventoryFilters` arriba; aquí solo queda «Nueva familia». */}
+      {!controlled && (
+        <div className="sales-filters">
+          <span className="search-field">
+            <Input
+              className="catalog-search"
+              placeholder="Buscar familia…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              data-testid="fam-search"
+            />
+          </span>
+          <Select
+            className="catalog-search"
+            value={rootFilter}
+            onChange={setRootFilter}
+            ariaLabel="Filtrar por familia"
+            data-testid="fam-filter"
+            options={[
+              { value: '', label: 'Todas las familias' },
+              ...view.map((r) => ({ value: r.id, label: r.name })),
+            ]}
+          />
+        </div>
+      )}
+      <Button
+        onClick={() =>
+          setForm({
+            name: '',
+            parentId: null,
+            isArchetype: false,
+            hasChildren: false,
+            color: null,
+            icon: null,
+          })
+        }
+        data-testid="new-family"
+        icon={<Plus size={16} aria-hidden="true" />}
+      >
+        Nueva familia
+      </Button>
+    </div>
+  );
+
   return (
     <section className="catalog">
+      {headerSlot && createPortal(famToolbar, headerSlot)}
       <div className="table-panel">
-        <div className="table-toolbar">
-          {/* En modo controlado (shell de Inventario) la búsqueda y la familia las
-              pinta `InventoryFilters` arriba; aquí solo queda «Nueva familia». */}
-          {!controlled && (
-            <div className="sales-filters">
-              <span className="search-field">
-                <Input
-                  className="catalog-search"
-                  placeholder="Buscar familia…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  data-testid="fam-search"
-                />
-              </span>
-              <Select
-                className="catalog-search"
-                value={rootFilter}
-                onChange={setRootFilter}
-                ariaLabel="Filtrar por familia"
-                data-testid="fam-filter"
-                options={[
-                  { value: '', label: 'Todas las familias' },
-                  ...view.map((r) => ({ value: r.id, label: r.name })),
-                ]}
-              />
-            </div>
-          )}
-          <Button
-            onClick={() =>
-              setForm({
-                name: '',
-                parentId: null,
-                isArchetype: false,
-                hasChildren: false,
-                color: null,
-                icon: null,
-              })
-            }
-            data-testid="new-family"
-            icon={<Plus size={16} aria-hidden="true" />}
-          >
-            Nueva familia
-          </Button>
-        </div>
+        {!headerSlot && famToolbar}
 
         {isLoading ? (
           <p className="catalog-empty">Cargando…</p>

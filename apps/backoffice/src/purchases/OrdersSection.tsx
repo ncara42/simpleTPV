@@ -36,90 +36,92 @@ export function OrdersSection({
 
   return (
     <>
-      <DataTable
-        data-testid="orders-table"
-        rowTestId="order-row"
-        rows={orders}
-        rowKey={(o) => o.id}
-        loading={isLoading}
-        header={tabs}
-        emptyState={
-          supplierId ? (
-            <span className="catalog-empty" data-testid="orders-empty">
-              Este proveedor no tiene pedidos de compra.
-            </span>
-          ) : (
-            <div className="purchases-empty" data-testid="orders-empty">
-              <span className="purchases-empty-icon" aria-hidden="true">
-                <svg
-                  width="26"
-                  height="26"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                  <path d="M3.27 6.96 12 12.01l8.73-5.05" />
-                </svg>
+      <div className="table-panel">
+        <DataTable
+          data-testid="orders-table"
+          rowTestId="order-row"
+          rows={orders}
+          rowKey={(o) => o.id}
+          loading={isLoading}
+          header={tabs}
+          emptyState={
+            supplierId ? (
+              <span className="catalog-empty" data-testid="orders-empty">
+                Este proveedor no tiene pedidos de compra.
               </span>
-              <p className="purchases-empty-title">Sin pedidos abiertos</p>
-              <p className="purchases-empty-text">
-                Genera una propuesta automática a partir de ventas, rotación y mínimos.
-              </p>
-            </div>
-          )
-        }
-        columns={[
-          {
-            key: 'date',
-            header: 'Fecha',
-            render: (o) => (
-              <span className="muted">{new Date(o.createdAt).toLocaleDateString('es-ES')}</span>
-            ),
-          },
-          { key: 'lines', header: 'Líneas', render: (o) => o.lines.length },
-          {
-            key: 'status',
-            header: 'Estado',
-            render: (o) => (
-              <Badge variant="muted" data-testid="order-status">
-                {STATUS_LABEL[o.status]}
-              </Badge>
-            ),
-          },
-          {
-            key: 'actions',
-            header: '',
-            align: 'right',
-            render: (o) => (
-              <>
-                {o.status === 'DRAFT' && (
+            ) : (
+              <div className="purchases-empty" data-testid="orders-empty">
+                <span className="purchases-empty-icon" aria-hidden="true">
+                  <svg
+                    width="26"
+                    height="26"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                    <path d="M3.27 6.96 12 12.01l8.73-5.05" />
+                  </svg>
+                </span>
+                <p className="purchases-empty-title">Sin pedidos abiertos</p>
+                <p className="purchases-empty-text">
+                  Genera una propuesta automática a partir de ventas, rotación y mínimos.
+                </p>
+              </div>
+            )
+          }
+          columns={[
+            {
+              key: 'date',
+              header: 'Fecha',
+              render: (o) => (
+                <span className="muted">{new Date(o.createdAt).toLocaleDateString('es-ES')}</span>
+              ),
+            },
+            { key: 'lines', header: 'Líneas', render: (o) => o.lines.length },
+            {
+              key: 'status',
+              header: 'Estado',
+              render: (o) => (
+                <Badge variant="muted" data-testid="order-status">
+                  {STATUS_LABEL[o.status]}
+                </Badge>
+              ),
+            },
+            {
+              key: 'actions',
+              header: '',
+              align: 'right',
+              render: (o) => (
+                <>
+                  {o.status === 'DRAFT' && (
+                    <button
+                      type="button"
+                      className="link-btn"
+                      disabled={confirmMut.isPending}
+                      onClick={() => confirmMut.mutate(o.id)}
+                      data-testid="order-confirm"
+                    >
+                      Confirmar
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="link-btn"
-                    disabled={confirmMut.isPending}
-                    onClick={() => confirmMut.mutate(o.id)}
-                    data-testid="order-confirm"
+                    onClick={() => setDetailId(o.id)}
+                    data-testid="order-detail"
                   >
-                    Confirmar
+                    Ver
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="link-btn"
-                  onClick={() => setDetailId(o.id)}
-                  data-testid="order-detail"
-                >
-                  Ver
-                </button>
-              </>
-            ),
-          },
-        ]}
-      />
+                </>
+              ),
+            },
+          ]}
+        />
+      </div>
       {detailId && <OrderDetailModal id={detailId} onClose={() => setDetailId(null)} />}
     </>
   );

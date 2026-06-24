@@ -10,6 +10,7 @@ import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { CsvActionButton } from './components/CsvActionButton.js';
 import { ImportExportModal } from './components/ImportExportModal.js';
@@ -98,6 +99,9 @@ interface CatalogPageProps {
   onSearchChange?: (value: string) => void;
   familyFilter?: string;
   onFamilyFilterChange?: (value: string) => void;
+  // Slot de cabecera del shell de Inventario: la toolbar se portalea ahí (no en la card),
+  // para que filtros + tabs + filtro compartido vivan en UNA sola línea.
+  headerSlot?: HTMLElement | null;
 }
 
 export function CatalogPage({
@@ -106,6 +110,7 @@ export function CatalogPage({
   onSearchChange,
   familyFilter: familyFilterProp,
   onFamilyFilterChange,
+  headerSlot,
 }: CatalogPageProps = {}) {
   const qc = useQueryClient();
   // Modo controlado: si el shell de Inventario provee `search`/`familyFilter`, esos
@@ -541,6 +546,7 @@ export function CatalogPage({
 
   return (
     <section className="catalog">
+      {headerSlot && createPortal(toolbar, headerSlot)}
       {columnsEditor}
 
       <div className="table-panel">
@@ -549,7 +555,7 @@ export function CatalogPage({
           rows={pageRows}
           rowKey={(p) => p.id}
           loading={isLoading}
-          toolbar={toolbar}
+          toolbar={headerSlot ? undefined : toolbar}
           {...(sort ? { sort } : {})}
           onSortChange={onSortChange}
           onRowClick={(p) => openEdit(p)}

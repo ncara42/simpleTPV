@@ -295,31 +295,33 @@ export function OrdersSection({ tabs }: { tabs?: ReactNode }) {
 
   return (
     <div className="table-panel" data-testid="b2b-orders">
-      {tabs}
-      <SectionToolbar
-        actionLabel="Nuevo pedido"
-        onAction={() => setCreating(true)}
-        actionTestId="b2b-new-order"
-      >
-        <Badge variant="success" className="gap-1" data-testid="b2b-orders-direction">
-          <ArrowUpRight size={13} aria-hidden="true" />
-          Salientes · a clientes
-        </Badge>
-        <Select
-          className="catalog-search"
-          value={statusFilter}
-          onChange={setStatusFilter}
-          ariaLabel="Filtrar por estado"
-          data-testid="b2b-orders-status"
-          options={[
-            { value: '', label: 'Todos los estados' },
-            { value: 'DRAFT', label: 'Borrador' },
-            { value: 'CONFIRMED', label: 'Confirmado' },
-            { value: 'SHIPPED', label: 'Enviado' },
-            { value: 'CANCELLED', label: 'Cancelado' },
-          ]}
-        />
-      </SectionToolbar>
+      <div className="dt-header-row">
+        {tabs}
+        <SectionToolbar
+          actionLabel="Nuevo pedido"
+          onAction={() => setCreating(true)}
+          actionTestId="b2b-new-order"
+        >
+          <Badge variant="success" className="gap-1" data-testid="b2b-orders-direction">
+            <ArrowUpRight size={13} aria-hidden="true" />
+            Salientes · a clientes
+          </Badge>
+          <Select
+            className="catalog-search"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            ariaLabel="Filtrar por estado"
+            data-testid="b2b-orders-status"
+            options={[
+              { value: '', label: 'Todos los estados' },
+              { value: 'DRAFT', label: 'Borrador' },
+              { value: 'CONFIRMED', label: 'Confirmado' },
+              { value: 'SHIPPED', label: 'Enviado' },
+              { value: 'CANCELLED', label: 'Cancelado' },
+            ]}
+          />
+        </SectionToolbar>
+      </div>
 
       <DataTable
         data-testid="b2b-orders-table"

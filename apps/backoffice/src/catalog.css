@@ -632,6 +632,115 @@
 .ui-dt-header > .bo-tabs .bo-tab.active {
   background: var(--ui-surface-subtle);
 }
+
+/* Cabecera de tabla en UNA sola fila: pestañas a la IZQUIERDA + búsqueda y acción
+   primaria (CTA "Nuevo …") a la DERECHA, en la misma banda (en vez de pestañas y
+   toolbar en dos filas). La fila aporta el filete inferior y el padding; las pestañas
+   recuperan su tamaño natural y la .users-toolbar reclama el resto (search a la
+   izquierda de su zona, CTA fijado a la derecha por su space-between). */
+.dt-header-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.dt-header-row > .bo-tabs {
+  width: auto;
+  flex: none;
+  padding: 0;
+  border: none;
+  background: none;
+}
+.dt-header-row > .bo-tabs .bo-tab.active {
+  background: var(--ui-surface-subtle);
+}
+/* Búsqueda + CTA agrupados JUNTOS a la derecha de la fila (variante "tools" plana,
+   p. ej. Proveedores: buscador + botón como hijos directos). */
+.dt-header-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+/* Variante que PRESERVA la .users-toolbar / SectionToolbar de cada sección dentro de la
+   fila de cabecera: la agrupa a la derecha (búsqueda/filtros + CTA juntos) en vez de su
+   space-between por defecto, sin aplanar su markup. */
+.dt-header-row > .users-toolbar {
+  margin-left: auto;
+  width: auto;
+  flex: 0 0 auto;
+  margin-bottom: 0;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+.dt-header-row > .users-toolbar > .sales-filters {
+  flex: 0 1 auto;
+}
+.dt-header-row > .users-toolbar > .ui-dt-toolbar-actions {
+  margin-left: 0;
+}
+/* Controles de la cabecera (buscador, filtros <Select> y CTA "Nuevo …"): misma altura
+   (36px = botones de acción de la topbar: .csv-action / .float-action-btn) y mismo radio
+   Geist/Vercel (--ui-radius-md = 12px, no pill), para que se lean como un set homogéneo. */
+.dt-header-row input.catalog-search,
+.dt-header-row .ui-select-trigger,
+.dt-header-row .ui-btn {
+  height: 36px;
+  border-radius: var(--ui-radius-md);
+}
+/* El velo de desvanecido del buscador redondea su esquina derecha al mismo radio que
+   el input (si no, sobresaldría de la esquina al dejar de ser pill). */
+.dt-header-row .search-field::after {
+  border-radius: 0 var(--ui-radius-md) var(--ui-radius-md) 0;
+}
+
+/* Mismas dimensiones de control (36px + radio Geist 12px) en las cards SIN pestañas,
+   donde la toolbar vive en su slot propio (.ui-dt-toolbar) o como cabecera del panel
+   (.table-toolbar): Catálogo, Usuarios, Promociones, Traspasos, Stock, Ventas, Familias.
+   El layout NO cambia (búsqueda izquierda · CTA derecha); solo se homogeneízan los
+   controles para que todo el backoffice comparta buscador/filtros/CTA idénticos. */
+.ui-dt-toolbar input.catalog-search,
+.ui-dt-toolbar .ui-select-trigger,
+.ui-dt-toolbar .ui-btn,
+.table-toolbar input.catalog-search,
+.table-toolbar .ui-select-trigger,
+.table-toolbar .ui-btn {
+  height: 36px;
+  border-radius: var(--ui-radius-md);
+}
+.ui-dt-toolbar .search-field::after,
+.table-toolbar .search-field::after {
+  border-radius: 0 var(--ui-radius-md) var(--ui-radius-md) 0;
+}
+
+/* UNA sola línea por cabecera: ni las pestañas, ni la sub-navegación, ni el buscador, ni
+   los filtros, ni los botones parten a una segunda fila. Si en una pantalla estrecha no
+   cupiera todo, la banda hace scroll horizontal (los <Select> abren en portal, no se
+   recortan) en vez de romper a dos filas. */
+.dt-header-row,
+.dt-header-row .users-toolbar,
+.dt-header-row .sales-filters,
+.dt-header-row .ui-dt-toolbar-actions,
+.dt-header-row .dt-header-tools,
+.table-panel .ui-dt-toolbar,
+.table-panel .ui-dt-toolbar .users-toolbar,
+.table-panel .ui-dt-toolbar .sales-filters,
+.table-toolbar,
+.table-toolbar .sales-filters,
+.inventory-header,
+.inventory-header .sales-filters {
+  flex-wrap: nowrap;
+}
+/* Si el contenido excede el ancho, la banda externa hace scroll horizontal (fino) en vez
+   de partir a dos filas o recortar el CTA. */
+.dt-header-row,
+.table-panel .ui-dt-toolbar,
+.table-toolbar,
+.inventory-header {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
 /* Fila de subtabs con acción a la derecha (Stock → Traspasos). */
 .stock-tabs-row {
   display: flex;
@@ -679,6 +788,63 @@
 }
 .inventory-views {
   margin-bottom: 1.25rem;
+}
+/* Inventario: las sub-pestañas (Catálogo/Familias/Existencias), el filtro compartido
+   (búsqueda + familia) y la TOOLBAR de la sub-vista activa (filtros propios + CTA, portada
+   al slot) comparten UNA sola fila — pestañas a la izquierda, todo lo demás a la derecha —
+   en vez de apilarse en bandas flotantes. Es el shell (no una card), así que NO lleva el
+   filete de cabecera; solo alinea y homogeneíza controles. */
+.inventory-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.inventory-header > .inventory-views {
+  margin-bottom: 0;
+}
+/* Filtro compartido + toolbar portada de la sub-vista, agrupados a la derecha. */
+.inventory-header-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: nowrap;
+}
+.inventory-header-tools > .inventory-filters {
+  margin-bottom: 0;
+}
+.inventory-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: nowrap;
+}
+/* La toolbar portada de la sub-vista pierde su ancho completo / space-between y fluye en
+   línea dentro del slot, junto al filtro compartido. */
+.inventory-header-actions .users-toolbar,
+.inventory-header-actions .table-toolbar {
+  width: auto;
+  margin-bottom: 0;
+  gap: 0.6rem;
+  flex-wrap: nowrap;
+}
+.inventory-header-actions .sales-filters {
+  margin-bottom: 0;
+  flex-wrap: nowrap;
+}
+.inventory-header-actions .ui-dt-toolbar-actions {
+  margin-left: 0;
+}
+/* Controles de toda la cabecera (compartido + slot) a 36px y radio 12px, como el resto. */
+.inventory-header input.catalog-search,
+.inventory-header .ui-select-trigger,
+.inventory-header .ui-btn {
+  height: 36px;
+  border-radius: var(--ui-radius-md);
+}
+.inventory-header .search-field::after {
+  border-radius: 0 var(--ui-radius-md) var(--ui-radius-md) 0;
 }
 
 /* La acción "Nuevo traspaso" se ancla al extremo derecho de la cabecera. */
@@ -2131,6 +2297,18 @@
   box-shadow: var(--ui-shadow-sm);
 }
 
+/* Cuando un DataTable vive DENTRO de un .table-panel, su raíz .ui-dt reintroduce su
+   propio marco (borde + radio + fondo) bajo la cabecera → doble marco / esquinas
+   redondeadas anidadas. El panel exterior ya aporta el chrome (borde, radio 18px,
+   sombra): la tabla interior cede su marco para que cabecera + toolbar + filas se lean
+   como UNA sola superficie continua. Unifica el radio de toda card de tabla del
+   backoffice y evita el doble filete (antes el reset estaba scopeado solo a .b2b-page). */
+.table-panel > .ui-dt {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
 /* Banda de acciones de "andamiaje" de la tabla (Columnas + CSV), por ENCIMA de la
    tabla y alineada a la derecha — fuera de la estructura visual de la tabla. */
 .table-actions {
@@ -2244,6 +2422,43 @@
       background 0.12s,
       color 0.12s;
   }
+}
+/* Botón-icono cuadrado de la banda de acciones de vista (.topbar-page-actions):
+   "Columnas" (ajustar columnas de la tabla), Exportar/Importar de tablas sin texto.
+   Mismo acabado en reposo que .csv-action (36px, borde, radio-md, superficie, texto
+   apagado) para que toda la banda case; .is-active marca el toggle de columnas abierto
+   (aria-expanded), igual que .topbar-icon-btn.is-active. */
+.float-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+.float-action-btn:hover,
+.float-action-btn.is-active {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
+.float-action-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.float-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 /* Variante para paneles de CONTENIDO libre (no tabla): Ayuda, etc. La base
    .table-panel no lleva padding porque en las tablas lo aportan la cabecera y las
@@ -2472,19 +2687,8 @@
 
 /* ── B2B mayorista (IT-17) ──────────────────────────────────────────────────
    Fila de alta de precio (tarifa) y de línea de pedido: selector + número +
-   acción, alineados horizontalmente. */
-
-/* En las 3 sub-pestañas de B2B (Clientes/Tarifas/Pedidos) la toolbar (SectionToolbar)
-   se renderiza como HERMANA del DataTable dentro del .table-panel, así que el .ui-dt
-   reintroduce su propio marco redondeado bajo la banda → "fase intermedia" con esquinas
-   redondeadas (doble marco). El panel exterior ya aporta el redondeo: la tabla interior
-   cede su borde y su radio para que toolbar + tabla se lean como una sola superficie
-   continua con esquinas rectas en la junta. Scopeado a .b2b-page; no afecta a otras pages. */
-.b2b-page .table-panel > .ui-dt {
-  border: none;
-  border-radius: 0;
-  background: transparent;
-}
+   acción, alineados horizontalmente. (El reset del doble marco .table-panel > .ui-dt
+   vive ahora junto a .table-panel, generalizado a todo el backoffice.) */
 
 .b2b-item-form {
   display: flex;

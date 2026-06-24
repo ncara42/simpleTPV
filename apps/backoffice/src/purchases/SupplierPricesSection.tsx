@@ -211,27 +211,41 @@ export function SupplierPricesSection({
   // de tarifas (por proveedor / comparativa), apiladas DENTRO del panel en vez de
   // flotar sobre el lienzo. En la vista detalle de proveedor (fixedSupplierId) no hay
   // ni pestañas de página ni sub-vistas → null (sin cabecera).
-  const cardHeader = fixedSupplierId ? null : (
-    <>
-      {tabs}
-      <nav className="bo-tabs" data-testid="sp-view-tabs">
-        <button
-          className={`bo-tab ${view === 'tarifas' ? 'active' : ''}`}
-          onClick={() => setView('tarifas')}
-          data-testid="sp-view-tarifas"
-        >
-          Tarifas por proveedor
-        </button>
-        <button
-          className={`bo-tab ${view === 'comparativa' ? 'active' : ''}`}
-          onClick={() => setView('comparativa')}
-          data-testid="sp-view-comparativa"
-        >
-          Comparativa
-        </button>
-      </nav>
-    </>
+  // Sub-navegación de vistas (Tarifas por proveedor / Comparativa): va en la MISMA línea
+  // de cabecera, junto a las pestañas de página y las herramientas.
+  const subViewNav = (
+    <nav className="bo-tabs" data-testid="sp-view-tabs">
+      <button
+        className={`bo-tab ${view === 'tarifas' ? 'active' : ''}`}
+        onClick={() => setView('tarifas')}
+        data-testid="sp-view-tarifas"
+      >
+        Tarifas por proveedor
+      </button>
+      <button
+        className={`bo-tab ${view === 'comparativa' ? 'active' : ''}`}
+        onClick={() => setView('comparativa')}
+        data-testid="sp-view-comparativa"
+      >
+        Comparativa
+      </button>
+    </nav>
   );
+  // Cabecera de card en UNA sola línea: pestañas de página + sub-navegación de vistas +
+  // herramientas (filtro/CTA), todo en la misma fila. En la vista detalle (fixedSupplierId)
+  // no hay pestañas ni sub-nav: solo la fila de herramientas (si las hay).
+  const renderHeader = (tools: ReactNode) =>
+    fixedSupplierId ? (
+      tools ? (
+        <div className="dt-header-row">{tools}</div>
+      ) : null
+    ) : (
+      <div className="dt-header-row">
+        {tabs}
+        {subViewNav}
+        {tools}
+      </div>
+    );
 
   return (
     <section className="catalog">
@@ -241,12 +255,7 @@ export function SupplierPricesSection({
 
           <div className="table-panel">
             <DataTable
-              header={cardHeader}
-              columns={[...effectiveColumns, deleteColumn]}
-              rows={priceSorted}
-              rowKey={(r) => r.id}
-              loading={pricesLoading}
-              toolbar={
+              header={renderHeader(
                 <div className="users-toolbar">
                   <div className="sales-filters">
                     {!fixedSupplierId && (
@@ -274,8 +283,12 @@ export function SupplierPricesSection({
                       Añadir tarifa
                     </Button>
                   </div>
-                </div>
-              }
+                </div>,
+              )}
+              columns={[...effectiveColumns, deleteColumn]}
+              rows={priceSorted}
+              rowKey={(r) => r.id}
+              loading={pricesLoading}
               {...(sort ? { sort } : {})}
               onSortChange={(key) =>
                 setSort((cur) =>
@@ -295,27 +308,28 @@ export function SupplierPricesSection({
       ) : (
         <>
           <div className="table-panel">
-            {cardHeader}
-            <div className="table-toolbar">
-              <div className="sales-filters">
-                <Select
-                  className="catalog-search"
-                  value={familyId}
-                  onChange={setFamilyId}
-                  ariaLabel="Arquetipo"
-                  data-testid="sp-family"
-                  options={[
-                    { value: '', label: 'Todos los arquetipos' },
-                    // Solo nodos ARQUETIPO: la comparativa agrupa productos casi
-                    // idénticos; filtrar por una familia raíz no casa con el árbol
-                    // canónico (los comparables cuelgan de arquetipos hoja).
-                    ...flattenTree(families)
-                      .filter((f) => f.node.isArchetype)
-                      .map((f) => ({ value: f.node.id, label: f.node.name })),
-                  ]}
-                />
-              </div>
-            </div>
+            {renderHeader(
+              <div className="users-toolbar">
+                <div className="sales-filters">
+                  <Select
+                    className="catalog-search"
+                    value={familyId}
+                    onChange={setFamilyId}
+                    ariaLabel="Arquetipo"
+                    data-testid="sp-family"
+                    options={[
+                      { value: '', label: 'Todos los arquetipos' },
+                      // Solo nodos ARQUETIPO: la comparativa agrupa productos casi
+                      // idénticos; filtrar por una familia raíz no casa con el árbol
+                      // canónico (los comparables cuelgan de arquetipos hoja).
+                      ...flattenTree(families)
+                        .filter((f) => f.node.isArchetype)
+                        .map((f) => ({ value: f.node.id, label: f.node.name })),
+                    ]}
+                  />
+                </div>
+              </div>,
+            )}
           </div>
           {/* Comparativa gráfica: media/mediana por proveedor + producto concreto.
               Apilados para que cada gráfico respire; con ≤3 proveedores las barras

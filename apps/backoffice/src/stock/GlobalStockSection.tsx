@@ -11,6 +11,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 
 import { Modal } from '../components/Modal.js';
@@ -44,6 +45,7 @@ export function GlobalStockSection({
   onSearchChange,
   familyId: familyIdProp,
   onFamilyChange,
+  headerSlot,
 }: {
   initialStoreId?: string | null;
   initialSearch?: string | null;
@@ -55,6 +57,9 @@ export function GlobalStockSection({
   onSearchChange?: (value: string) => void;
   familyId?: string;
   onFamilyChange?: (value: string) => void;
+  // Slot de cabecera del shell de Inventario: la toolbar se portalea ahí (no en la card),
+  // para que filtros + tabs + filtro compartido vivan en UNA sola línea.
+  headerSlot?: HTMLElement | null;
 }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -420,8 +425,67 @@ export function GlobalStockSection({
     </>,
   );
 
+  // Toolbar de existencias (rotación + multi-tienda; búsqueda/familia las gobierna el shell
+  // de Inventario en modo controlado). En Inventario se portalea al header del shell.
+  const stockToolbar = (
+    <div className="users-toolbar">
+      <div className="sales-filters">
+        {/* En modo controlado (shell de Inventario) la búsqueda y la familia
+            las pinta `InventoryFilters` arriba; aquí quedan rotación y tiendas. */}
+        {!controlled && (
+          <>
+            <span className="search-field">
+              <Input
+                className="catalog-search"
+                placeholder="Buscar producto…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                data-testid="stock-search"
+              />
+            </span>
+            <Select
+              className="catalog-search"
+              value={familyId}
+              onChange={(value) => setFamilyId(value)}
+              ariaLabel="Filtrar por familia"
+              data-testid="stock-family"
+              options={[
+                { value: '', label: 'Todas las familias' },
+                ...families.map((f) => ({ value: f.id, label: f.name })),
+              ]}
+            />
+          </>
+        )}
+        <Select
+          className="catalog-search"
+          value={rotation}
+          onChange={(value) => setRotation(value)}
+          ariaLabel="Filtrar por rotación"
+          data-testid="stock-rotation"
+          options={[
+            { value: '', label: 'Toda rotación' },
+            { value: 'alta', label: 'Rotación alta' },
+            { value: 'media', label: 'Rotación media' },
+            { value: 'baja', label: 'Rotación baja' },
+          ]}
+        />
+        <MultiSelect
+          className="catalog-search"
+          values={[...storeIds]}
+          onChange={(values) => setStoreIds(new Set(values))}
+          ariaLabel="Filtrar por tiendas"
+          data-testid="stock-store"
+          placeholder="Todas las tiendas"
+          clearLabel="Todas las tiendas"
+          options={storeOptions.map((s) => ({ value: s.id, label: s.name }))}
+        />
+      </div>
+    </div>
+  );
+
   return (
     <>
+      {headerSlot && createPortal(stockToolbar, headerSlot)}
       {/* S-16/P095: aviso post-creación con acceso a la página de Traspasos. */}
       {transferDone && (
         <div className="table-panel stock-transfer-done" data-testid="stock-transfer-done">
@@ -527,61 +591,7 @@ export function GlobalStockSection({
           rows={sortedRows}
           rowKey={(r) => r.productId}
           loading={isLoading}
-          toolbar={
-            <div className="users-toolbar">
-              <div className="sales-filters">
-                {/* En modo controlado (shell de Inventario) la búsqueda y la familia
-                    las pinta `InventoryFilters` arriba; aquí quedan rotación y tiendas. */}
-                {!controlled && (
-                  <>
-                    <span className="search-field">
-                      <Input
-                        className="catalog-search"
-                        placeholder="Buscar producto…"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        data-testid="stock-search"
-                      />
-                    </span>
-                    <Select
-                      className="catalog-search"
-                      value={familyId}
-                      onChange={(value) => setFamilyId(value)}
-                      ariaLabel="Filtrar por familia"
-                      data-testid="stock-family"
-                      options={[
-                        { value: '', label: 'Todas las familias' },
-                        ...families.map((f) => ({ value: f.id, label: f.name })),
-                      ]}
-                    />
-                  </>
-                )}
-                <Select
-                  className="catalog-search"
-                  value={rotation}
-                  onChange={(value) => setRotation(value)}
-                  ariaLabel="Filtrar por rotación"
-                  data-testid="stock-rotation"
-                  options={[
-                    { value: '', label: 'Toda rotación' },
-                    { value: 'alta', label: 'Rotación alta' },
-                    { value: 'media', label: 'Rotación media' },
-                    { value: 'baja', label: 'Rotación baja' },
-                  ]}
-                />
-                <MultiSelect
-                  className="catalog-search"
-                  values={[...storeIds]}
-                  onChange={(values) => setStoreIds(new Set(values))}
-                  ariaLabel="Filtrar por tiendas"
-                  data-testid="stock-store"
-                  placeholder="Todas las tiendas"
-                  clearLabel="Todas las tiendas"
-                  options={storeOptions.map((s) => ({ value: s.id, label: s.name }))}
-                />
-              </div>
-            </div>
-          }
+          toolbar={headerSlot ? undefined : stockToolbar}
           {...(sort ? { sort } : {})}
           onSortChange={(key) =>
             setSort((cur) =>

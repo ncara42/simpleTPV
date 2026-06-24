@@ -93,85 +93,85 @@ export function SuppliersSection({ tabs }: { tabs?: ReactNode }) {
   return (
     <>
       {/* Fila clicable → vista detalle (I-18); las acciones no propagan (stopPropagation). */}
-      <DataTable
-        data-testid="suppliers-table"
-        rowTestId="supplier-row"
-        rows={filtered}
-        rowKey={(s) => s.id}
-        loading={isLoading}
-        rowClassName={() => 'row-clickable'}
-        onRowClick={(s) => setDetailId(s.id)}
-        header={tabs}
-        toolbar={
-          <div className="users-toolbar">
-            <div className="sales-filters">
-              <span className="search-field">
-                <Input
-                  className="catalog-search"
-                  placeholder="Buscar proveedor…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  data-testid="supplier-search"
-                />
-              </span>
-            </div>
-            <div className="ui-dt-toolbar-actions">
-              <Button
-                type="button"
-                onClick={() => setCreating(true)}
-                data-testid="new-supplier"
-                icon={<Plus size={16} aria-hidden="true" />}
-              >
-                Nuevo proveedor
-              </Button>
-            </div>
-          </div>
-        }
-        emptyState={
-          <span className="catalog-empty" data-testid="suppliers-empty">
-            Sin proveedores.
-          </span>
-        }
-        columns={[
-          { key: 'name', header: 'Nombre', render: (s) => s.name },
-          {
-            key: 'leadTime',
-            header: 'Lead time',
-            render: (s) => <span className="muted">{s.leadTimeDays} días</span>,
-          },
-          {
-            key: 'actions',
-            header: '',
-            align: 'right',
-            render: (s) => (
-              <>
-                <button
+      <div className="table-panel">
+        <DataTable
+          data-testid="suppliers-table"
+          rowTestId="supplier-row"
+          rows={filtered}
+          rowKey={(s) => s.id}
+          loading={isLoading}
+          rowClassName={() => 'row-clickable'}
+          onRowClick={(s) => setDetailId(s.id)}
+          header={
+            <div className="dt-header-row">
+              {tabs}
+              <div className="dt-header-tools">
+                <span className="search-field">
+                  <Input
+                    className="catalog-search"
+                    placeholder="Buscar proveedor…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    data-testid="supplier-search"
+                  />
+                </span>
+                <Button
                   type="button"
-                  className="link-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDetailId(s.id);
-                  }}
-                  data-testid="supplier-open"
+                  onClick={() => setCreating(true)}
+                  data-testid="new-supplier"
+                  icon={<Plus size={16} aria-hidden="true" />}
                 >
-                  Ver
-                </button>
-                <button
-                  type="button"
-                  className="link-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    delMut.mutate(s.id);
-                  }}
-                  data-testid="supplier-delete"
-                >
-                  Eliminar
-                </button>
-              </>
-            ),
-          },
-        ]}
-      />
+                  Nuevo proveedor
+                </Button>
+              </div>
+            </div>
+          }
+          emptyState={
+            <span className="catalog-empty" data-testid="suppliers-empty">
+              Sin proveedores.
+            </span>
+          }
+          columns={[
+            { key: 'name', header: 'Nombre', render: (s) => s.name },
+            {
+              key: 'leadTime',
+              header: 'Lead time',
+              render: (s) => <span className="muted">{s.leadTimeDays} días</span>,
+            },
+            {
+              key: 'actions',
+              header: '',
+              align: 'right',
+              render: (s) => (
+                <>
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDetailId(s.id);
+                    }}
+                    data-testid="supplier-open"
+                  >
+                    Ver
+                  </button>
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      delMut.mutate(s.id);
+                    }}
+                    data-testid="supplier-delete"
+                  >
+                    Eliminar
+                  </button>
+                </>
+              ),
+            },
+          ]}
+        />
+      </div>
       {creating && (
         <SupplierFormModal
           onClose={() => setCreating(false)}

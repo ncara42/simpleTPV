@@ -12,6 +12,7 @@ export function StockPage({
   onSearchChange,
   familyId,
   onFamilyChange,
+  headerSlot,
 }: {
   initialStoreId?: string | null;
   initialSearch?: string | null;
@@ -20,6 +21,8 @@ export function StockPage({
   onSearchChange?: (value: string) => void;
   familyId?: string;
   onFamilyChange?: (value: string) => void;
+  // Slot de cabecera del shell de Inventario: la toolbar se portalea ahí (no en la card).
+  headerSlot?: HTMLElement | null;
 }) {
   const qc = useQueryClient();
 
@@ -50,6 +53,7 @@ export function StockPage({
         {...(onSearchChange ? { onSearchChange } : {})}
         {...(familyId !== undefined ? { familyId } : {})}
         {...(onFamilyChange ? { onFamilyChange } : {})}
+        {...(headerSlot !== undefined ? { headerSlot } : {})}
       />
     </section>
   );
