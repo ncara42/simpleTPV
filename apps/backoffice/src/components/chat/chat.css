@@ -425,21 +425,21 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   }
 }
 
-/* ── Reasoning: bloque colapsable de razonamiento del modelo (ai-elements) ────────── */
+/* ── Cadena de pensamiento (chain-of-thought de ai-elements) ──────────────────────
+   UNA sola sección desplegable por turno: cabecera de TEXTO con flecha (NO una pill) y, al
+   abrir, una timeline que reúne razonamiento + narración intermedia + cada paso de tool. */
 
-.reasoning {
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  background: var(--ui-surface-subtle);
-  overflow: hidden;
+.cot {
+  margin: 2px 0;
 }
 
-.reasoning__trigger {
-  display: flex;
+/* Cabecera: texto atenuado con flecha que gira. Sin borde ni fondo (no es una pill). */
+.cot__trigger {
+  display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  width: 100%;
-  padding: 0.4rem 0.55rem;
+  gap: 0.3rem;
+  max-width: 100%;
+  padding: 2px 0;
   border: none;
   background: transparent;
   color: var(--ui-text-muted);
@@ -451,41 +451,158 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   transition: color var(--ui-motion-fast) var(--ui-ease);
 }
 
-.reasoning__trigger:hover {
+.cot__trigger:hover {
   color: var(--ui-text);
 }
 
-.reasoning__trigger:focus-visible {
+.cot__trigger:focus-visible {
   outline: none;
+  border-radius: var(--ui-radius-xs);
   box-shadow: var(--ui-focus);
 }
 
-.reasoning__trigger svg {
+.cot__caret {
   flex: none;
   color: var(--ui-text-muted);
+  transition: transform var(--ui-motion-fast) var(--ui-ease);
 }
 
-.reasoning__label {
-  flex: 1;
+.cot.is-open .cot__caret {
+  transform: rotate(90deg);
+}
+
+.cot__label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.reasoning__caret {
-  transition: transform var(--ui-motion-fast) var(--ui-ease);
+/* Timeline: nodos enhebrados por una línea conectora vertical, indentada bajo la cabecera. */
+.cot__steps {
+  position: relative;
+  list-style: none;
+  margin: 0.3rem 0 0;
+  padding: 0 0 0 0.3rem;
 }
 
-.reasoning.is-open .reasoning__caret {
-  transform: rotate(180deg);
+.cot__steps::before {
+  content: '';
+  position: absolute;
+  left: calc(0.3rem + 5px);
+  top: 0.6rem;
+  bottom: 0.6rem;
+  width: 1.5px;
+  background: var(--ui-border);
 }
 
-.reasoning__content {
-  padding: 0.45rem 0.6rem 0.5rem;
-  border-top: 1px solid var(--ui-border);
+.cot__step {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 0.55rem;
+  padding: 0.18rem 0;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
+}
+
+.cot__step--tool {
+  align-items: center;
+}
+
+.cot__step--reasoning,
+.cot__step--narration {
+  align-items: flex-start;
+}
+
+/* Nodo: punto/casilla de 12px alineado con la línea conectora. `grid + place-items:center`
+   centra el check de forma exacta (vertical y horizontal), sin depender de la línea base. */
+.cot__node {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface);
+  border: 1.5px solid var(--ui-border-strong);
+  color: #fff;
+  line-height: 0;
+}
+
+/* El check (tools done) como bloque: sin hueco de línea base del SVG. */
+.cot__node svg {
+  display: block;
+}
+
+/* Nodo de texto (razonamiento / narración): punto pequeño y discreto, centrado en la 1ª línea. */
+.cot__node--text {
+  margin-top: 0.2rem;
+  background: transparent;
+  border: none;
+}
+
+.cot__node--text::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-border-strong);
+}
+
+/* Color semántico del nodo de tool: consultas (índigo) vs acciones de lienzo (marca). */
+.cot__step--query.is-done .cot__node {
+  background: var(--ui-chart-accent);
+  border-color: var(--ui-chart-accent);
+}
+
+.cot__step--action.is-done .cot__node {
+  background: var(--ui-brand);
+  border-color: var(--ui-brand);
+}
+
+.cot__step.is-running .cot__node {
+  background: transparent;
+  border-color: var(--ui-brand);
+  border-top-color: transparent;
+  animation: chat-spin 0.7s linear infinite;
+}
+
+.cot__step.is-rejected .cot__node {
+  background: var(--ui-danger);
+  border-color: var(--ui-danger);
+}
+
+.cot__step.is-rejected .cot__tool {
+  color: var(--ui-text-muted);
+  text-decoration: line-through;
+}
+
+.cot__tool {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Texto de razonamiento / narración: markdown atenuado y compacto. */
+.cot__text {
+  min-width: 0;
   color: var(--ui-text-muted);
   font-size: var(--ui-text-xs);
   line-height: 1.55;
+}
+
+@keyframes chat-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cot__step.is-running .cot__node {
+    animation: none;
+  }
 }
 
 /* ── Acciones de mensaje (editar usuario) ───────────────────────────────────────── */
@@ -546,163 +663,8 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   gap: var(--ui-space-2);
 }
 
-/* ── Traza de actividad del agente (timeline de pasos del turno) ─────────────────── */
-
-.agent-trace {
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  background: var(--ui-surface-subtle);
-  overflow: hidden;
-}
-
-.agent-trace__head {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  width: 100%;
-  padding: 0.4rem 0.55rem;
-  border: none;
-  background: transparent;
-  color: var(--ui-text-muted);
-  font: inherit;
-  font-size: var(--ui-text-xs);
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-  transition: color var(--ui-motion-fast) var(--ui-ease);
-}
-
-.agent-trace__head:hover {
-  color: var(--ui-text);
-}
-
-.agent-trace__head:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus);
-}
-
-.agent-trace__title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-trace__caret {
-  flex: none;
-  color: var(--ui-text-muted);
-  transition: transform var(--ui-motion-fast) var(--ui-ease);
-}
-
-.agent-trace.is-open .agent-trace__caret {
-  transform: rotate(180deg);
-}
-
-/* Mini-orbe de la cabecera (misma identidad visual que el orbe grande). */
-.agent-trace__spark {
-  flex: none;
-  width: 13px;
-  height: 13px;
-  border-radius: var(--ui-radius-pill);
-  background: radial-gradient(
-    circle at 32% 28%,
-    color-mix(in srgb, var(--ui-brand) 72%, white) 0%,
-    var(--ui-brand) 42%,
-    var(--ui-chart-accent) 100%
-  );
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-brand) 12%, transparent);
-}
-
-.agent-trace__steps {
-  position: relative;
-  list-style: none;
-  margin: 0;
-  padding: 0.35rem 0.6rem 0.5rem;
-  border-top: 1px solid var(--ui-border);
-}
-
-/* Línea conectora vertical que enhebra los nodos de la timeline. */
-.agent-trace__steps::before {
-  content: '';
-  position: absolute;
-  left: calc(0.6rem + 5px);
-  top: 0.85rem;
-  bottom: 0.85rem;
-  width: 1.5px;
-  background: var(--ui-border-strong);
-}
-
-.agent-step {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.2rem 0;
-  font-size: var(--ui-text-xs);
-  color: var(--ui-text);
-}
-
-.agent-step__node {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 11px;
-  height: 11px;
-  border-radius: var(--ui-radius-pill);
-  background: var(--ui-surface);
-  border: 1.5px solid var(--ui-border-strong);
-  color: #fff;
-}
-
-/* Color semántico del nodo: consultas (acento índigo) vs acciones de lienzo (marca teal). */
-.agent-step--query.is-done .agent-step__node {
-  background: var(--ui-chart-accent);
-  border-color: var(--ui-chart-accent);
-}
-
-.agent-step--action.is-done .agent-step__node {
-  background: var(--ui-brand);
-  border-color: var(--ui-brand);
-}
-
-.agent-step.is-running .agent-step__node {
-  background: transparent;
-  border-color: var(--ui-brand);
-  border-top-color: transparent;
-  animation: chat-spin 0.7s linear infinite;
-}
-
-.agent-step.is-rejected .agent-step__node {
-  background: var(--ui-danger);
-  border-color: var(--ui-danger);
-}
-
-.agent-step.is-rejected .agent-step__label {
-  color: var(--ui-text-muted);
-  text-decoration: line-through;
-}
-
-.agent-step__label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@keyframes chat-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .agent-step.is-running .agent-step__node {
-    animation: none;
-  }
-}
+/* Las antiguas trazas separadas .agent-trace / .agent-step se sustituyeron por .cot
+   (cadena de pensamiento unificada, arriba). El keyframe chat-spin vive ahora en esa sección. */
 
 /* ── Orbe del agente (presencia IA — solo CSS, sin canvas ni WebGL) ───────────────── */
 

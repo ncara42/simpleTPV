@@ -1,9 +1,9 @@
-import { ArrowDown, Check, ChevronDown, Copy, Pencil, RefreshCw } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDown, Check, Copy, Pencil, RefreshCw } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ChatMessage, ToolResult } from '../../lib/chat.js';
+import { ChainOfThought, type ThoughtItem } from './ChainOfThought.js';
 import { ChatMarkdown } from './ChatMarkdown.js';
-import { Reasoning } from './Reasoning.js';
 import { Shimmer } from './Shimmer.js';
 import { Suggestion, Suggestions } from './Suggestions.js';
 import { toolLabel } from './toolLabels.js';
@@ -42,11 +42,8 @@ function messageThinking(message: ChatMessage): string {
     .trim();
 }
 
-// ── Traza de actividad del agente (línea de tiempo de pasos) ───────────────────────
-// Sustituye los chips de tool por una timeline elegante: cada tool-call es un paso con su nodo
-// de estado sobre una línea conectora. Color semántico por tipo: CONSULTAS de datos (acento
-// índigo) vs ACCIONES sobre el lienzo/pantalla (marca teal). Espejo de CANVAS_OP_NAMES /
-// VIEW_ACTION_NAMES del backend (crates/http/src/chat.rs).
+// ── Clasificación de tools (espejo de CANVAS_OP_NAMES / VIEW_ACTION_NAMES del backend) ──
+// CONSULTAS de datos (nodo índigo) vs ACCIONES sobre el lienzo/pantalla (nodo de marca).
 
 const CANVAS_OP_NAMES: ReadonlySet<string> = new Set([
   'add_widget',
@@ -68,65 +65,73 @@ function canvasRejected(result: ToolResult | undefined): boolean {
   return (result.content as { accepted?: boolean }).accepted === false;
 }
 
-interface TraceCall {
-  id?: string;
-  name: string;
+// ── Agrupación por turno ──────────────────────────────────────────────────────────
+// Un turno del agente puede persistirse como VARIOS mensajes de asistente (razonar → tools →
+// razonar → tools → responder). Los reunimos para pintar UNA sola cadena de pensamiento por
+// respuesta en vez de un bloque «Razonamiento» + «Proceso» por ronda.
+
+interface Turn {
+  user: ChatMessage | null;
+  assistants: ChatMessage[];
 }
 
-interface AgentTraceProps {
-  calls: TraceCall[];
-  resultsByCall?: Map<string, ToolResult> | undefined;
-  /** Turno en curso: pasos «en marcha» y traza abierta por defecto. */
-  streaming: boolean;
+function groupTurns(messages: ChatMessage[]): Turn[] {
+  const turns: Turn[] = [];
+  let current: Turn | null = null;
+  for (const msg of messages) {
+    if (msg.role === 'user') {
+      current = { user: msg, assistants: [] };
+      turns.push(current);
+    } else if (msg.role === 'assistant') {
+      if (!current) {
+        current = { user: null, assistants: [] };
+        turns.push(current);
+      }
+      current.assistants.push(msg);
+    }
+    // Los mensajes 'tool' se omiten: sus resultados ya están indexados en resultsByCall.
+  }
+  return turns;
 }
 
-function AgentTrace({ calls, resultsByCall, streaming }: AgentTraceProps) {
-  // Abierta mientras el agente trabaja; plegada al persistirse (igual que el razonamiento).
-  const [open, setOpen] = useState(streaming);
-  if (calls.length === 0) return null;
+/**
+ * Construye la cadena de pensamiento de un turno y separa la CONCLUSIÓN (la última narración del
+ * asistente) para mostrarla fuera de la cadena. Todo lo demás —razonamiento, narración intermedia
+ * y cada paso de tool, en orden— queda dentro de la sección desplegable.
+ */
+function buildTurnItems(
+  assistants: ChatMessage[],
+  resultsByCall: Map<string, ToolResult>,
+): { items: ThoughtItem[]; finalText: string } {
+  const items: ThoughtItem[] = [];
+  for (const msg of assistants) {
+    const thinking = messageThinking(msg);
+    if (thinking) items.push({ kind: 'reasoning', text: thinking });
+    for (const call of msg.toolCalls ?? []) {
+      const action = isActionTool(call.name);
+      const rejected = action && call.id ? canvasRejected(resultsByCall.get(call.id)) : false;
+      items.push({
+        kind: 'tool',
+        label: toolLabel(call.name),
+        variant: action ? 'action' : 'query',
+        status: rejected ? 'rejected' : 'done',
+      });
+    }
+    const text = messageText(msg);
+    if (text) items.push({ kind: 'narration', text });
+  }
 
-  return (
-    <div className={`agent-trace${open ? ' is-open' : ''}`}>
-      <button
-        type="button"
-        className="agent-trace__head"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        data-testid="chat-agent-trace"
-      >
-        <span className="agent-trace__spark" aria-hidden="true" />
-        <span className="agent-trace__title">
-          {streaming ? (
-            <Shimmer>Trabajando…</Shimmer>
-          ) : (
-            `Proceso · ${calls.length} ${calls.length === 1 ? 'paso' : 'pasos'}`
-          )}
-        </span>
-        <ChevronDown size={13} className="agent-trace__caret" aria-hidden="true" />
-      </button>
-      {open && (
-        <ol className="agent-trace__steps">
-          {calls.map((call, i) => {
-            const action = isActionTool(call.name);
-            const rejected =
-              action && call.id ? canvasRejected(resultsByCall?.get(call.id)) : false;
-            const status = streaming ? 'running' : rejected ? 'rejected' : 'done';
-            return (
-              <li
-                key={call.id ?? `${call.name}-${i}`}
-                className={`agent-step agent-step--${action ? 'action' : 'query'} is-${status}`}
-              >
-                <span className="agent-step__node" aria-hidden="true">
-                  {status === 'done' ? <Check size={9} strokeWidth={3} /> : null}
-                </span>
-                <span className="agent-step__label">{toolLabel(call.name)}</span>
-              </li>
-            );
-          })}
-        </ol>
-      )}
-    </div>
-  );
+  // La conclusión es la ÚLTIMA narración: se extrae de la cadena y se muestra como respuesta.
+  let finalText = '';
+  for (let i = items.length - 1; i >= 0; i -= 1) {
+    const item = items[i];
+    if (item && item.kind === 'narration') {
+      finalText = item.text;
+      items.splice(i, 1);
+      break;
+    }
+  }
+  return { items, finalText };
 }
 
 // ── Burbuja de usuario (con edición) ─────────────────────────────────────────────
@@ -187,12 +192,14 @@ function UserBubble({ message, disabled, onEditAndResend }: UserBubbleProps) {
                 type="button"
                 className="chat-msg__action"
                 disabled={disabled}
+                aria-label="Editar y reenviar"
+                title="Editar y reenviar"
                 onClick={() => {
                   setDraft(original);
                   setEditing(true);
                 }}
               >
-                <Pencil size={12} aria-hidden="true" /> Editar y reenviar
+                <Pencil size={14} aria-hidden="true" />
               </button>
             </div>
           )}
@@ -202,28 +209,26 @@ function UserBubble({ message, disabled, onEditAndResend }: UserBubbleProps) {
   );
 }
 
-// ── Mensaje del asistente (texto a todo el ancho + traza + acciones) ───────────────
+// ── Turno del asistente (cadena de pensamiento única + conclusión + acciones) ──────
 
-interface AssistantMessageProps {
-  message: ChatMessage;
+interface AssistantTurnProps {
+  assistants: ChatMessage[];
   resultsByCall: Map<string, ToolResult>;
   disabled: boolean;
   onRegenerate: (assistantMessageId: string) => void;
 }
 
-function AssistantMessage({
-  message,
-  resultsByCall,
-  disabled,
-  onRegenerate,
-}: AssistantMessageProps) {
-  const text = messageText(message);
-  const thinking = messageThinking(message);
-  const calls = message.toolCalls ?? [];
+function AssistantTurn({ assistants, resultsByCall, disabled, onRegenerate }: AssistantTurnProps) {
+  const { items, finalText } = useMemo(
+    () => buildTurnItems(assistants, resultsByCall),
+    [assistants, resultsByCall],
+  );
+  // Regenerar busca el mensaje de usuario anterior, así que cualquier id del turno vale.
+  const lastId = assistants[assistants.length - 1]?.id ?? '';
   const [copied, setCopied] = useState(false);
 
   const copy = (): void => {
-    navigator.clipboard?.writeText(text).then(
+    navigator.clipboard?.writeText(finalText).then(
       () => {
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1500);
@@ -236,14 +241,13 @@ function AssistantMessage({
 
   return (
     <div className="chat-msg chat-msg--assistant">
-      {thinking && <Reasoning isStreaming={false}>{thinking}</Reasoning>}
-      <AgentTrace calls={calls} resultsByCall={resultsByCall} streaming={false} />
-      {text && (
+      <ChainOfThought items={items} isStreaming={false} />
+      {finalText && (
         <div className="chat-response chat-markdown">
-          <ChatMarkdown>{text}</ChatMarkdown>
+          <ChatMarkdown>{finalText}</ChatMarkdown>
         </div>
       )}
-      {text && (
+      {finalText && (
         <div className="chat-actions">
           <button
             type="button"
@@ -262,7 +266,7 @@ function AssistantMessage({
             type="button"
             className="chat-action"
             disabled={disabled}
-            onClick={() => onRegenerate(message.id)}
+            onClick={() => onRegenerate(lastId)}
             aria-label="Regenerar"
             title="Regenerar"
           >
@@ -302,6 +306,25 @@ export function ChatMessages({
     }
     return map;
   }, [messages]);
+
+  const turns = useMemo(() => groupTurns(messages), [messages]);
+
+  // Cadena de pensamiento del turno en curso: razonamiento + tools en marcha (la conclusión
+  // se va escribiendo aparte en streamingText).
+  const streamingItems = useMemo<ThoughtItem[]>(() => {
+    const items: ThoughtItem[] = [];
+    if (streamingReasoning) items.push({ kind: 'reasoning', text: streamingReasoning });
+    for (const call of streamingToolCalls) {
+      const action = isActionTool(call.name);
+      items.push({
+        kind: 'tool',
+        label: toolLabel(call.name),
+        variant: action ? 'action' : 'query',
+        status: 'running',
+      });
+    }
+    return items;
+  }, [streamingReasoning, streamingToolCalls]);
 
   const checkBottom = (): void => {
     const el = scrollRef.current;
@@ -343,44 +366,36 @@ export function ChatMessages({
           </div>
         )}
 
-        {messages.map((message) => {
-          if (message.role === 'tool') return null;
-          if (message.role === 'user') {
-            return (
+        {turns.map((turn, ti) => (
+          <Fragment key={turn.user?.id ?? turn.assistants[0]?.id ?? ti}>
+            {turn.user && (
               <UserBubble
-                key={message.id}
-                message={message}
+                message={turn.user}
                 disabled={streaming}
                 onEditAndResend={onEditAndResend}
               />
-            );
-          }
-
-          return (
-            <AssistantMessage
-              key={message.id}
-              message={message}
-              resultsByCall={resultsByCall}
-              disabled={streaming}
-              onRegenerate={onRegenerate}
-            />
-          );
-        })}
+            )}
+            {turn.assistants.length > 0 && (
+              <AssistantTurn
+                assistants={turn.assistants}
+                resultsByCall={resultsByCall}
+                disabled={streaming}
+                onRegenerate={onRegenerate}
+              />
+            )}
+          </Fragment>
+        ))}
 
         {streaming && (
           <div className="chat-msg chat-msg--assistant">
-            {streamingReasoning && (
-              <Reasoning isStreaming={!streamingText}>{streamingReasoning}</Reasoning>
-            )}
-            <AgentTrace calls={streamingToolCalls} streaming={true} />
+            <ChainOfThought items={streamingItems} isStreaming={true} />
             {streamingText ? (
               <div className="chat-response chat-markdown">
                 <ChatMarkdown>{streamingText}</ChatMarkdown>
                 <span className="chat-cursor" aria-hidden="true" />
               </div>
             ) : (
-              !streamingReasoning &&
-              streamingToolCalls.length === 0 && (
+              streamingItems.length === 0 && (
                 <div className="chat-thinking">
                   <span className="agent-orb agent-orb--sm is-active" aria-hidden="true" />
                   <Shimmer className="chat-messages__hint">Pensando</Shimmer>

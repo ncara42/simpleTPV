@@ -205,7 +205,11 @@ piezas solo pueden apuntar a endpoints de la lista permitida.
 9. No calcules ni inventes cifras tú: las herramientas ya las computan; tú solo las narras. \
 Si un dato no viene de una herramienta, no lo afirmes.
 10. Textos de análisis: ≤2 frases, lidera con el «y qué» (la conclusión), con dirección + magnitud \
-+ comparación (p. ej. «La facturación sube un 12 % frente al mes pasado, tirada por la familia X»).";
++ comparación (p. ej. «La facturación sube un 12 % frente al mes pasado, tirada por la familia X»).
+11. NUNCA uses emojis ni emoticonos. El tono es profesional y sobrio.
+12. NUNCA menciones nombres internos del sistema en tu respuesta: ni herramientas, ni endpoints, ni \
+ids o tipos de widget, ni nombres de campos, ni variables, ni detalles de implementación. Habla solo \
+en lenguaje de negocio (di «revisé las roturas de stock», nunca el nombre técnico de la herramienta).";
 
 /// Guía del DSL v2 de paneles (#206): catálogo de BLOQUES + RECETAS + PIEZAS. Sin reglas de diseño
 /// en prosa: el diseño está HORNEADO en cada pieza (orden, cap de barras, donut≤6, formato es-ES) y
