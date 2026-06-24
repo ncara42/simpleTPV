@@ -31,15 +31,23 @@ export BIND_ADDR="0.0.0.0:3001"
 export THROTTLE_LIMIT="600"
 export CORS_ORIGINS="http://localhost:5174,http://localhost:4174"
 
+# Restaura LOGIN+password de `app` y los atributos de `app_admin`. IMPRESCINDIBLE:
+# la migración `remove_app_password` deja `app` en NOLOGIN (por seguridad, igual que
+# prod); sin re-bootstrap la API no puede conectar como `app` y no carga datos.
+ensure_roles() {
+  dc -c "ALTER ROLE app_admin CREATEROLE BYPASSRLS;" >/dev/null 2>&1 || true
+  dc -c "GRANT app TO app_admin WITH ADMIN OPTION;" >/dev/null 2>&1 || true
+  dc -d "$DB" -f - < packages/db/scripts/dev-bootstrap.sql >/dev/null 2>&1 || true
+}
+
 if [[ "$FRESH" == "--fresh" ]]; then
   echo "▶ Recreando $DB…"
   dc -c "DROP DATABASE IF EXISTS $DB WITH (FORCE);"
   dc -c "CREATE DATABASE $DB;"
-  # app_admin necesita CREATEROLE para la migración app_login (ALTER ROLE app).
-  dc -c "ALTER ROLE app_admin CREATEROLE BYPASSRLS;" || true
-  dc -c "GRANT app TO app_admin WITH ADMIN OPTION;" || true
-  dc -d "$DB" -f - < packages/db/scripts/dev-bootstrap.sql
 fi
+
+echo "▶ Restaurando roles (app con LOGIN)…"
+ensure_roles
 
 echo "▶ Arrancando API en :3001 (log: $APILOG)…"
 nohup "$API" > "$APILOG" 2>&1 &
@@ -48,6 +56,10 @@ for i in $(seq 1 40); do
   if curl -sf http://localhost:3001/health >/dev/null 2>&1; then echo "  ✅ API healthy"; break; fi
   sleep 1
 done
+
+# Tras migrar, `remove_app_password` puede haber dejado `app` en NOLOGIN otra vez:
+# restaurarlo para que las conexiones de runtime (los datos del navegador) funcionen.
+ensure_roles
 
 if [[ "$FRESH" == "--fresh" ]]; then
   echo "▶ Sembrando datos demo…"
