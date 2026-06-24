@@ -4,23 +4,37 @@
  * El MCP devuelve SOLO datos (JSON) y deja que el modelo COMPONGA la presentación
  * (layout, agrupación, elección de visualizaciones). Lo que viaja aquí —vía el
  * campo `instructions` del servidor MCP, que el host inyecta en el contexto del
- * modelo en el `initialize`— NO es estructura sino IDENTIDAD VISUAL: tokens de
- * color, radios, tipografía y reglas de superficie tomados de la fuente de verdad
- * del producto (`packages/ui/src/styles/theme.css`).
+ * modelo en el `initialize`— cubre dos cosas:
+ *
+ *  1. ENTREGA: cómo materializar la vista en el cliente. En claude.ai el modelo
+ *     construye un ARTEFACTO; debe INCRUSTAR en él los datos que ya recibió de las
+ *     tools y NO hacer peticiones de red en runtime. El sandbox de artefactos NO
+ *     puede alcanzar la API del TPV (sin token de la sesión OAuth, CORS), así que
+ *     un artefacto que haga `fetch` "en tiempo real" se rompe con «Load failed»
+ *     —exactamente el bug que esta sección previene—. Los datos ya están en contexto.
+ *  2. IDENTIDAD VISUAL: tokens de color, radios, tipografía y reglas de superficie
+ *     tomados de la fuente de verdad del producto (`packages/ui/src/styles/theme.css`).
  *
  * Objetivo: que el widget conserve la forma de montar del modelo pero se vea "de
  * producto" (personalidad SimpleTPV) en lugar de genérico. Reemplaza al antiguo
  * panel `ui://` (iframe con el design system del backoffice), retirado para que la
- * UI la siga componiendo el modelo: aquí solo le damos la PIEL, no el esqueleto.
+ * UI la siga componiendo el modelo: aquí le damos la ENTREGA y la PIEL, no el esqueleto.
  *
  * Si cambian los tokens en `theme.css`, actualizar los hex de aquí para no derivar.
  */
-export const DESIGN_SYSTEM_INSTRUCTIONS = `# SimpleTPV — sistema visual para presentar estos datos
+export const DESIGN_SYSTEM_INSTRUCTIONS = `# SimpleTPV — cómo presentar estos datos
 
-Las herramientas de este servidor devuelven datos de un TPV (punto de venta) multitienda. Cuando los presentes de forma visual (tarjetas, gráficos, paneles), COMPÓN como mejor sepas —tú eliges el layout, la agrupación y qué visualización usar— pero VÍSTELO con la identidad de SimpleTPV definida abajo, para que el resultado parezca de producto y no genérico.
+Las herramientas de este servidor devuelven datos de un TPV (punto de venta) multitienda. Tu trabajo es PRESENTARLOS, no describirlos: cuando el usuario pregunte por el estado del negocio ("cómo va mi empresa", "cómo va el mes", un resumen o un informe), construye una vista visual con las cifras CONCRETAS que te han devuelto las herramientas.
+
+## Cómo entregar (CRÍTICO — léelo antes de montar nada)
+1. **Usa los datos que YA tienes.** Las tools te han devuelto los números en el resultado de la llamada (p. ej. \`get_company_overview\`, \`get_sales_breakdown\`). Esos valores son tu fuente: van DENTRO de lo que construyas.
+2. **Artefacto autocontenido con los datos incrustados.** En claude.ai/Desktop, presenta el resumen como UN artefacto (React). Escribe los datos como literales en el propio código (un \`const\` con las cifras que recibiste). El artefacto debe pintarse él solo, sin nada externo.
+3. **NUNCA hagas peticiones de red desde el artefacto.** Nada de \`fetch\`, \`XMLHttpRequest\`, \`axios\` ni "cargar en tiempo real" desde la API, \`localhost\` o cualquier URL del TPV. El artefacto corre en un sandbox SIN acceso a tu API ni a tu sesión: cualquier petición falla con «Load failed» y el panel sale roto. No hay datos en vivo; trabajas con la foto que ya tienes en contexto.
+4. **Solo dependencias del sandbox.** React y \`recharts\` para los gráficos (vienen incluidos), e iconos de \`lucide-react\` si hace falta. No importes de CDNs externos.
+5. **Si no puedes crear artefacto** (p. ej. móvil), presenta las KPIs y cortes clave en el propio chat (texto/tablas). Nunca respondas solo "el dashboard carga los datos": SIEMPRE muestra las cifras.
 
 ## Regla de oro: tu estructura, esta piel
-Mantén tu forma de montar el widget. Lo único que cambia es el lenguaje visual: color, forma, tipografía y superficie. No alteres tu composición por seguir esto.
+Tú eliges layout, agrupación y qué visualización usar; ese esqueleto es tuyo. Lo único no negociable es el lenguaje visual de abajo: color, forma, tipografía y superficie. No alteres tu composición por seguir esto, solo vístela.
 
 ## Sin "hoja de papel"
 - NO envuelvas el widget entero en una tarjeta o panel de fondo sólido. El contenedor exterior debe ser TRANSPARENTE y fundirse con el fondo del chat; las piezas (KPIs, gráficos) flotan directamente.
@@ -43,7 +57,8 @@ Mantén tu forma de montar el widget. Lo único que cambia es el lenguaje visual
 - Cifra KPI: grande, peso 600, tracking ligeramente negativo (\`-0.02em\`). Su etiqueta encima: pequeña, en MAYÚSCULAS, peso 600, color suave, \`letter-spacing: 0.04em\`.
 - Título de sección: ~17px, peso 600.
 
-## Gráficos (los tuyos, recoloreados a esta paleta)
+## Gráficos (recharts, recoloreados a esta paleta)
+- Construye los gráficos con \`recharts\`; aplica los hex de abajo a \`fill\`/\`stroke\`. Nada de imágenes ni iframes externos.
 - Comparar categorías → barras horizontales (máx. ~8). Ranking → barras con dos pistas: relleno índigo sobre una pista tenue de fondo.
 - Proporción de un total → donut SOLO si hay ≤6 partes; con más, usa barras.
 - Evolución temporal → línea o área en índigo.
