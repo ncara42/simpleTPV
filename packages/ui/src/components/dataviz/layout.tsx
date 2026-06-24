@@ -36,6 +36,26 @@ export function KpiRow({ columns = 3, children }: KpiRowProps) {
   );
 }
 
+// Rejilla KPI conectada por hairline estilo Vercel Analytics (#264): N columnas fijas, gap de 1px
+// que deja ver el fondo (= hairline) como divisor, cada celda pinta su superficie. `bleed` la deja a
+// sangre (sin esquinas redondeadas, bordes solo arriba/abajo) para una banda full-width.
+export interface KpiGridProps {
+  columns?: number;
+  bleed?: boolean;
+  children: ReactNode;
+}
+export function KpiGrid({ columns = 4, bleed = false, children }: KpiGridProps) {
+  return (
+    <div
+      className={cn('dv-kpigrid', bleed && 'dv-kpigrid--bleed')}
+      style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+      data-testid="dv-kpigrid"
+    >
+      {children}
+    </div>
+  );
+}
+
 // Composición side-by-side de la receta heroChart+sideStats (#212): una gráfica hero ancha (2fr) a
 // la izquierda y una columna de KPIs (stats, 1fr) a la derecha. En móvil colapsa a una columna
 // (stats debajo). Geometría horneada (2fr/1fr), no del agente.
