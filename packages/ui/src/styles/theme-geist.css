@@ -15,17 +15,17 @@
    .topbar-eyebrow del backoffice y el scoping de la forma pill) sigue en el
    styles.css de cada app, no aquí.
 
-   FUENTE: en este entorno Geist (la fuente) no está instalada; el stack cae a
-   Inter, que es la base afinada. Para activar la fuente real cuando haya red,
-   descomenta los @import de abajo y añade @fontsource/geist al package.json.
+   FUENTE: Geist Sans/Mono vendorizadas en ./fonts/ (subset latin, woff2),
+   autohospedadas — sin dependencia de red ni de @fontsource. La tipografía es
+   la palanca nº1 de identidad; cae a Inter solo si el woff2 fallara.
    ════════════════════════════════════════════════════════════════════ */
 
-/* @import '@fontsource/geist-sans/400.css';
-@import '@fontsource/geist-sans/500.css';
-@import '@fontsource/geist-sans/600.css';
-@import '@fontsource/geist-sans/700.css';
-@import '@fontsource/geist-mono/400.css';
-@import '@fontsource/geist-mono/500.css'; */
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/geist-400.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 500; font-display: swap; src: url('./fonts/geist-500.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 600; font-display: swap; src: url('./fonts/geist-600.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/geist-700.woff2') format('woff2'); }
+@font-face { font-family: 'Geist Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/geist-mono-400.woff2') format('woff2'); }
+@font-face { font-family: 'Geist Mono'; font-style: normal; font-weight: 500; font-display: swap; src: url('./fonts/geist-mono-500.woff2') format('woff2'); }
 
 :root {
   /* ─── Escala de grises Geist (neutros fríos, tipo zinc) ──────────────────
@@ -287,22 +287,72 @@ samp,
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   MODO OSCURO (arquitectura preparada, DESACTIVADA en este lote) ──────────
-   Geist trata el dark como arquitectura, no como override. Esta es la base;
-   se ACTIVA en la fase de dark mode (con su toggle y pruebas de contraste).
-   Mantener comentado: activarlo aquí volcaría a los usuarios con el SO en
-   oscuro a un tema aún sin verificar.
-   ──────────────────────────────────────────────────────────────────────
-@media (prefers-color-scheme: dark) {
-  :root {
-    --gst-50: #0a0a0a; --gst-100: #161618; --gst-150: #1c1c1f;
-    --gst-200: #27272a; --gst-300: #3f3f46; --gst-400: #52525b;
-    --gst-500: #a1a1aa; --gst-600: #d4d4d8; --gst-700: #e4e4e7;
-    --gst-800: #f4f4f5; --gst-900: #fafafa;
-    --gst-blue: #3b9eff; --gst-blue-hover: #5aacff; --gst-blue-ink: #6cb6ff;
-    --ui-surface: #161618; --ap-surface: #161618;
-    --ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-    --ui-shadow-panel: 0 1px 2px rgb(0 0 0 / 0.5);
-  }
+   MODO OSCURO — toggle por atributo data-theme en <html>.
+   El script de arranque (index.html) fija data-theme="light|dark" según
+   localStorage('theme') o el SO ANTES de pintar (sin parpadeo). Casi todo
+   deriva de --gst-* / --gst-blue*, así que al invertir esos se propaga; solo
+   se re-declaran los --ui-* que son literales (superficies, semántica, tooltip,
+   sombras) y el poco chrome con colores claros fijos (.topbar).
+   ════════════════════════════════════════════════════════════════════ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  /* Escala de grises invertida (fríos): bg oscuro → texto claro. */
+  --gst-50: #0a0a0a;
+  --gst-100: #161618;
+  --gst-150: #1c1c1f;
+  --gst-200: #27272a;
+  --gst-300: #3f3f46;
+  --gst-400: #52525b;
+  --gst-500: #8b8b94; /* texto terciario (AA sobre oscuro) */
+  --gst-600: #b4b4bb; /* texto secundario */
+  --gst-700: #d4d4d8;
+  --gst-800: #ededef;
+  --gst-900: #fafafa; /* texto principal */
+
+  /* Azul un punto más luminoso para legibilidad sobre oscuro. */
+  --gst-blue: #3b9eff;
+  --gst-blue-hover: #5aacff;
+  --gst-blue-ink: #6cb6ff;
+  --gst-blue-soft: rgba(59, 158, 255, 0.14);
+  --gst-blue-soft-2: rgba(59, 158, 255, 0.24);
+
+  /* Superficies (los --ui-* fijados a literal, no derivados de --gst-*). */
+  --ui-surface: #161618;
+  --ap-surface: #161618;
+  --ap-pearl: #1c1c1f;
+
+  /* Semántica luminosa + soft oscuros translúcidos. */
+  --ui-danger: #ff6166;
+  --ui-danger-soft: rgba(255, 97, 102, 0.14);
+  --ui-warning: #f5a623;
+  --ui-warning-soft: rgba(245, 166, 35, 0.14);
+  --ui-success: #3ecf8e;
+  --ui-success-soft: rgba(62, 207, 142, 0.14);
+
+  --ui-note-bg: #2a2410;
+
+  /* Tooltip de data-viz (no puede heredar --gst-900, que ahora es claro). */
+  --ui-chart-tip-bg: #27272a;
+  --ui-chart-tip-fg: #fafafa;
+  --ui-chart-tip-fg-muted: #a1a1aa;
+  --ui-chart-tip-border: #3f3f46;
+
+  /* Sombras más marcadas sobre oscuro. */
+  --ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.5);
+  --ui-shadow-panel: 0 1px 2px rgb(0 0 0 / 0.5);
+  --ui-shadow-md: 0 4px 16px -6px rgb(0 0 0 / 0.6);
+  --ui-shadow-lg: 0 12px 32px -12px rgb(0 0 0 / 0.7);
+
+  /* Sidebar. */
+  --sidebar-bg: #0e0e10;
+  --sidebar-item-active-bg: rgba(255, 255, 255, 0.1);
+  --sidebar-item-hover-bg: rgba(255, 255, 255, 0.05);
 }
-*/
+
+/* Chrome con colores claros fijos: re-piel en oscuro. */
+:root[data-theme='dark'] .topbar {
+  background: rgba(14, 14, 16, 0.8);
+}
+:root[data-theme='dark'] .topbar-switch-btn.active {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+}

@@ -1,7 +1,9 @@
-import { ArrowLeft, Bell, Home } from 'lucide-react';
+import { ArrowLeft, Bell, Home, Moon, Sun } from 'lucide-react';
+import { useState } from 'react';
 
 import type { Tab } from '../lib/nav.js';
 import { usePageActionsValue } from '../lib/pageActions.js';
+import { getTheme, type Theme, toggleTheme } from '../lib/theme.js';
 import { FunctionSearch } from './FunctionSearch.js';
 
 interface FloatingActionsProps {
@@ -30,6 +32,7 @@ export function FloatingActions({
   notificationsActive,
 }: FloatingActionsProps) {
   const pageActions = usePageActionsValue();
+  const [theme, setThemeState] = useState<Theme>(() => getTheme());
 
   return (
     <div className="float-actions" data-testid="float-actions">
@@ -55,6 +58,20 @@ export function FloatingActions({
         data-testid="float-home"
       >
         <Home size={17} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className="float-action-btn"
+        onClick={() => setThemeState(toggleTheme())}
+        aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+        data-testid="float-theme-toggle"
+      >
+        {theme === 'dark' ? (
+          <Sun size={17} aria-hidden="true" />
+        ) : (
+          <Moon size={17} aria-hidden="true" />
+        )}
       </button>
       <button
         type="button"
