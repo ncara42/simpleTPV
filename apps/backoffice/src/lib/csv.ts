@@ -27,11 +27,19 @@ export function parseCsvRows(csv: string): Array<Record<string, string>> {
 // seguro que el de la API.
 const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
 
+// Neutraliza la inyección de fórmulas de hoja de cálculo (CWE-1236): si el valor
+// empieza por un disparador de fórmula, se prefija con comilla simple. Se exporta
+// para reusarlo en la exportación XLSX (paridad de seguridad con el CSV), donde el
+// vector de inyección es el mismo pero NO hace falta el entrecomillado RFC 4180.
+export function neutralizeFormula(value: string): string {
+  return FORMULA_TRIGGER.test(value) ? `'${value}` : value;
+}
+
 // Escapa un campo de texto para CSV de EXPORTACIÓN: (1) neutraliza la inyección de
 // fórmulas prefijando con comilla simple, (2) entrecomillado RFC 4180 si el campo
 // contiene comas, comillas o saltos de línea.
 export function escapeCsvField(value: string): string {
-  const prefixed = FORMULA_TRIGGER.test(value) ? `'${value}` : value;
+  const prefixed = neutralizeFormula(value);
   return /[",\n]/.test(prefixed) ? `"${prefixed.replace(/"/g, '""')}"` : prefixed;
 }
 

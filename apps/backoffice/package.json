@@ -32,6 +32,7 @@
     "react-router-dom": "^7.9.4",
     "remark-gfm": "^4.0.0",
     "sileo": "^0.1.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
