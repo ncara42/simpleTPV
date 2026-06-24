@@ -12,8 +12,12 @@ import {
 } from 'lucide-react';
 import { type RefObject, useEffect, useRef, useState } from 'react';
 
+import { useAnimatedPresence } from '../../hooks/use-animated-presence.js';
 import type { FreeBoardHandle, InteractionMode } from '../FreeBoard.js';
 import { WidgetPalette } from '../WidgetPalette.js';
+
+/** Duración (ms) del despliegue/plegado del menú del lienzo; coincide con el CSS (0.2s). */
+const MENU_MOTION_MS = 200;
 
 interface CanvasToolsMenuProps {
   /** Handle imperativo del lienzo (puede ser null hasta que monta FreeBoard). */
@@ -52,6 +56,13 @@ export function CanvasToolsMenu({
   const [open, setOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [widgets, setWidgets] = useState<{ id: string; label: string }[]>([]);
+
+  // El menú se mantiene montado mientras dura su salida → se pliega con la animación inversa
+  // (en vez de desaparecer de golpe). El cuello que lo une a «Editar» sigue conectado hasta el final.
+  const { isMounted: menuMounted, isClosing: menuClosing } = useAnimatedPresence(
+    open,
+    MENU_MOTION_MS,
+  );
 
   // Cierra el menú (no la paleta) al pulsar Escape o hacer clic fuera.
   useEffect(() => {
@@ -94,7 +105,7 @@ export function CanvasToolsMenu({
     <div className="canvas-tools" data-testid="dash-free-toolbar" ref={ref}>
       <button
         type="button"
-        className={`canvas-tools__trigger${open ? ' is-open' : ''}`}
+        className={`canvas-tools__trigger${menuMounted ? ' is-open' : ''}`}
         data-testid="dash-free-tools"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -106,8 +117,12 @@ export function CanvasToolsMenu({
         <span className="canvas-tools__trigger-label">Editar</span>
       </button>
 
-      {open && (
-        <div className="canvas-tools__menu" role="menu" aria-label="Herramientas del lienzo">
+      {menuMounted && (
+        <div
+          className={`canvas-tools__menu${menuClosing ? ' is-closing' : ''}`}
+          role="menu"
+          aria-label="Herramientas del lienzo"
+        >
           <button
             type="button"
             role="menuitem"

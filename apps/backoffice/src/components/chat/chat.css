@@ -1018,47 +1018,62 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 .chat-dock {
   position: fixed;
   bottom: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  /* El dock vive ahora en el shell (sibling del lienzo, que es position:fixed inset:0 z-35).
-     Debe quedar POR ENCIMA del lienzo en todas las views; bajo el cuerpo del sidebar (z-40),
-     con el que no solapa espacialmente (dock abajo-centro, sidebar a la izquierda). */
+  left: 0;
+  right: 0;
+  /* El dock vive en el shell (sibling del lienzo, position:fixed inset:0 z-35). Debe quedar POR
+     ENCIMA del lienzo en todas las views; bajo el cuerpo del sidebar (z-40), con el que no solapa
+     (dock abajo-centro, sidebar a la izquierda). Banda a todo el ancho que CENTRA su contenido por
+     flex, así la píldora se re-centra sola al cambiar de ancho. */
   z-index: 39;
-  width: min(680px, calc(100vw - 2rem));
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 0.6rem;
-  /* Morph héroe(Dashboard)↔barra(resto): el dock viaja de centrado a abajo-centro. El movimiento
-     va por `transform` (compositor), el ancho lo acompaña en el mismo gesto. Curva expo-out, en
-     sintonía con el morph del lienzo (use-mode-transition). */
-  transition:
-    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
-    width 0.42s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform;
+  /* La banda deja pasar el ratón al contenido/lienzo; solo el panel y la barra capturan clics. */
+  pointer-events: none;
+  /* Permite animar el ancho intrínseco (fit-content) y el alto auto del morph colapsar/expandir.
+     Curva del morph: glide suave (quint-out), natural, sin rebote. */
+  interpolate-size: allow-keywords;
+  --morph-dur: 0.5s;
+  --morph-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.chat-dock > * {
+  pointer-events: auto;
 }
 
-/* «Asistente de IA» (Dashboard): el composer es el HÉROE — panel + input grandes y centrados.
-   Se eleva al centro del viewport con translateY en dvh; el 50% compensa su propia altura, así
-   queda centrado sea cual sea su tamaño. Quitar la clase (otra view) lo devuelve abajo con el morph. */
-.chat-dock--hero {
-  width: min(760px, calc(100vw - 3rem));
-  transform: translateX(-50%) translateY(calc(-50dvh + 1rem + 50%));
+/* Con el panel abierto, el dock sube POR ENCIMA de toda la app (sidebar z40, topbar z30, lienzo z35,
+   etc.) para que su backdrop pueda capturar cualquier clic fuera del chat. */
+.chat-dock.is-panel-open {
+  z-index: 50;
 }
 
+/* Backdrop: cubre TODA la ventana mientras el chat está abierto. Un clic aquí (cualquier zona que no
+   sea el panel ni el composer) SOLO cierra el chat — el evento aterriza en el backdrop, no en el
+   botón/elemento de debajo, así que NO se activa. Invisible (sin oscurecer). */
+.chat-dock__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: transparent;
+}
+
+/* El panel y el composer van por ENCIMA del backdrop (que es fixed; si no, los taparía). */
+.chat-dock__panel,
+.chat-dock__bar {
+  position: relative;
+  z-index: 1;
+}
+
+/* Modo héroe (Dashboard) — DORMIDO: AssistantDock ya no opta a él (el dock se ancla abajo en todas
+   las views), pero la regla se conserva por si se reactiva. */
 .chat-dock--hero .chat-dock__panel {
   max-height: min(62dvh, 640px);
 }
 
-/* Sin animación de viaje si el usuario pidió menos movimiento: el dock aparece ya en su sitio. */
-@media (prefers-reduced-motion: reduce) {
-  .chat-dock {
-    transition: none;
-    will-change: auto;
-  }
-}
-
-/* Popover de conversación: se despliega ENCIMA del input. */
+/* Popover de conversación: se despliega ENCIMA del input. Ancho propio (el dock es una banda
+   centradora a todo el ancho, ya no lo constriñe). */
 .chat-dock__panel {
+  width: min(680px, calc(100vw - 2rem));
   display: flex;
   flex-direction: column;
   max-height: min(60vh, 540px);
@@ -1072,9 +1087,29 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   animation: chat-panel-in var(--ui-motion-medium) var(--ui-ease);
 }
 
+/* Cierre simétrico: el popover se pliega con la animación inversa. La presencia animada (JS)
+   lo mantiene montado mientras dura, así no desaparece de golpe. */
+.chat-dock__panel.is-closing {
+  animation: chat-panel-out var(--ui-motion-medium) var(--ui-ease) forwards;
+}
+
+@keyframes chat-panel-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
 /* ── Composer (PromptInput) ──────────────────────────────────────────────────────── */
 
 .prompt-input {
+  /* Ancho expandido propio: el dock es una banda centradora a todo el ancho. Colapsado pasa a
+     fit-content (.is-collapsed). El alto es content-driven (lo pliega el pie con max-height). */
+  width: min(680px, calc(100vw - 2rem));
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -1084,7 +1119,12 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
   backdrop-filter: blur(12px);
   box-shadow: 0 6px 20px rgb(0 0 0 / 0.08);
+  /* Morph colapsar/expandir sobre propiedades REALES (no escala): el texto no se deforma y el
+     encoger es natural. El alto lo arrastra el pliegue del pie (su max-height). */
   transition:
+    width var(--morph-dur) var(--morph-ease),
+    border-radius var(--morph-dur) var(--morph-ease),
+    padding var(--morph-dur) var(--morph-ease),
     border-color var(--ui-motion-fast) var(--ui-ease),
     box-shadow var(--ui-motion-fast) var(--ui-ease);
 }
@@ -1137,6 +1177,15 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  /* `overflow` visible (default) para NO recortar el desplegable del selector de modelo
+     (`.me-menu__panel`, cuelga hacia arriba); 2.4rem deja sitio de sobra a los botones (≈34px). */
+  max-height: 2.4rem;
+  /* Al plegar: el alto (max-height) arrastra el alto de la píldora con la misma curva del morph; la
+     opacidad hace un fade rápido. El ancho se neutraliza aparte (width:0) para que no ensanche. */
+  transition:
+    max-height var(--morph-dur) var(--morph-ease),
+    padding var(--morph-dur) var(--morph-ease),
+    opacity var(--ui-motion-fast) var(--ui-ease);
 }
 
 .prompt-input__tools {
@@ -1190,6 +1239,59 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* ── Dock COLAPSADO ───────────────────────────────────────────────────────────────────
+   Fuera del dashboard y sin foco, el composer se reduce a una píldora redonda solo-input: el pie se
+   pliega y la píldora se ciñe al texto. El cambio de ancho/alto/forma lo anima la transición nativa
+   de `.prompt-input` (propiedades reales). Aquí solo van los estados DESTINO. */
+.chat-dock.is-collapsed .prompt-input {
+  /* La píldora se ciñe al ancho del texto (el placeholder), no a un ancho fijo: el textarea se
+     dimensiona a su contenido con field-sizing y la píldora lo abraza. Cota máxima por si se escribe. */
+  width: fit-content;
+  max-width: min(420px, calc(100vw - 2rem));
+  border-radius: var(--ui-radius-pill);
+  /* Padding horizontal SIMÉTRICO → el placeholder queda centrado en la píldora. */
+  padding: 0.28rem 0.95rem;
+  /* Contorno algo más grueso en el color de empresa para destacar la píldora minimizada. */
+  border-color: var(--ui-brand);
+  border-width: 2px;
+}
+
+.chat-dock.is-collapsed .prompt-input__textarea {
+  min-height: 32px;
+  max-height: 32px;
+  /* Centrado VERTICAL de la única línea: un <textarea> alinea su texto arriba, así que igualamos
+     line-height a la altura de la caja y quitamos el padding (lo horizontal lo da la píldora). */
+  line-height: 32px;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-align: center;
+  /* El textarea se ciñe a su contenido (el placeholder) → la píldora mide justo lo que el texto.
+     (field-sizing: Chromium; donde no haya soporte cae al ancho intrínseco del textarea.) Se centra
+     en la píldora también MIENTRAS esta es más ancha (durante la transición de ancho). */
+  field-sizing: content;
+  width: auto;
+  min-width: 0;
+  align-self: center;
+}
+
+.chat-dock.is-collapsed .prompt-input__queue {
+  display: none;
+}
+
+/* Pie plegado EN FLUJO: su `max-height` baja a 0 con la curva del morph → arrastra el alto de la
+   píldora de forma natural (sin saltos). `width:0` + overflow hidden anula su aportación al ANCHO
+   (si no, los botones —más anchos que el placeholder— ensancharían la píldora). Fade por opacidad. */
+.chat-dock.is-collapsed .prompt-input__footer {
+  max-height: 0;
+  width: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* ── Menú «+» de herramientas del lienzo ─────────────────────────────────────────── */
@@ -1350,6 +1452,22 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+/* Cierre simétrico: el menú se pliega con la animación inversa antes de desmontarse. */
+.canvas-tools__menu.is-closing {
+  animation: canvas-tools-drop-out 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes canvas-tools-drop-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
   }
 }
 
@@ -1672,9 +1790,17 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 
 @media (prefers-reduced-motion: reduce) {
   .chat-dock__panel,
+  .chat-dock__panel.is-closing,
   .canvas-tools__menu,
+  .canvas-tools__menu.is-closing,
   .me-menu__panel {
     animation: none;
+  }
+  /* Colapso/expansión sin animación. */
+  .chat-dock,
+  .prompt-input,
+  .prompt-input__footer {
+    transition: none;
   }
 }
 

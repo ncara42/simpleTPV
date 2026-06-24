@@ -18,13 +18,19 @@ interface PromptComposerProps {
   placeholder?: string;
   /** Se invoca al enfocar el textarea (abre el popover de conversación). */
   onFocus?: () => void;
+  /** Colapsado a píldora solo-input (fuera del dashboard, sin foco): oculta el pie y reduce. */
+  collapsed?: boolean;
 }
 
 /**
  * Composer del asistente con la forma del PromptInput de ai-elements (Vercel AI Elements):
- * una superficie redondeada con el textarea autoexpandible arriba y un pie con las acciones
- * — el slot `leading` («+») a la izquierda y el botón de enviar/parar a la derecha. Réplica
- * visual con los tokens del design system (sin shadcn); cableada al store propio del chat.
+ * una superficie redondeada con el textarea autoexpandible arriba y un pie con las acciones.
+ *
+ * El morph colapsar/expandir se anima con CSS NATIVO sobre las propiedades REALES (`width`/`height`/
+ * `border-radius`/`padding`) — no por escala/transform — para que el texto NO se deforme y el encoger
+ * se vea natural. `interpolate-size: allow-keywords` permite interpolar el ancho intrínseco
+ * (`fit-content`) y el alto `auto`. El pie sale de flujo (`position:absolute`) al colapsar para no
+ * ensanchar la píldora, y se desvanece. Ver chat.css (`.prompt-input`, `.is-collapsed`).
  */
 export function PromptComposer({
   status,
@@ -36,10 +42,13 @@ export function PromptComposer({
   trailing,
   placeholder = 'Pregunta al asistente o pídele que componga el dashboard…',
   onFocus,
+  collapsed = false,
 }: PromptComposerProps) {
   const [value, setValue] = useState('');
   const canSend = value.trim().length > 0 && !disabled;
   const busy = status !== 'ready';
+  // Colapsado el hueco es mínimo: un placeholder breve evita que se corte de forma fea.
+  const effectivePlaceholder = collapsed ? 'Tengo una pregunta' : placeholder;
 
   const submit = (): void => {
     const text = value.trim();
@@ -57,7 +66,10 @@ export function PromptComposer({
   };
 
   return (
-    <div className={`prompt-input${disabled ? ' is-disabled' : ''}`} data-testid="chat-composer">
+    <div
+      className={`prompt-input${disabled ? ' is-disabled' : ''}${collapsed ? ' is-collapsed' : ''}`}
+      data-testid="chat-composer"
+    >
       {queueLength > 0 && (
         <p className="prompt-input__queue" role="status">
           {queueLength === 1 ? '1 mensaje en cola' : `${queueLength} mensajes en cola`}
@@ -69,12 +81,13 @@ export function PromptComposer({
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         onFocus={onFocus}
-        placeholder={placeholder}
+        placeholder={effectivePlaceholder}
         rows={Math.min(8, Math.max(1, value.split('\n').length))}
         disabled={disabled}
         data-testid="chat-input"
       />
-      <div className="prompt-input__footer">
+      {/* Pie SIEMPRE montado: se pliega por CSS (sale de flujo + fade) cuando .is-collapsed. */}
+      <div className="prompt-input__footer" aria-hidden={collapsed} inert={collapsed || undefined}>
         <div className="prompt-input__tools">{leading}</div>
         <div className="prompt-input__actions">
           {trailing}

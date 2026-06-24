@@ -1,8 +1,9 @@
 import './chat.css';
 
 import { MessageSquare } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
+import { useAnimatedPresence } from '../../hooks/use-animated-presence.js';
 import type { CanvasOp } from '../../lib/chat.js';
 import { ChatConversationList } from './ChatConversationList.js';
 import { ChatHeader } from './ChatHeader.js';
@@ -12,6 +13,9 @@ import { ModelEffortMenu } from './ModelEffortMenu.js';
 import { PromptComposer } from './PromptComposer.js';
 import { type CanvasApplyResult, useChat } from './useChat.js';
 import type { ViewContext } from './view-context.js';
+
+/** Duración (ms) de la entrada/salida del popover de conversación; coincide con `--ui-motion-medium`. */
+const PANEL_MOTION_MS = 180;
 
 export interface ChatDockProps {
   /** Aplica un canvas_op en el lienzo y devuelve el resultado para el feedback loop. */
@@ -46,11 +50,19 @@ export function ChatDock({
   hero = false,
 }: ChatDockProps) {
   const [panelOpen, setPanelOpen] = useState(false);
-  // En hero el panel es PERMANENTE (es la superficie principal del Dashboard); fuera, se abre/
-  // cierra como popover sobre el input. `showPanel` unifica ambos: en hero siempre visible.
-  const showPanel = hero || panelOpen;
   const [showHistory, setShowHistory] = useState(false);
-  const dockRef = useRef<HTMLDivElement>(null);
+
+  // Fuera del dashboard, y mientras el popover esté cerrado, el dock se reduce a una píldora
+  // redonda solo-input; al enfocarlo (panelOpen → true) o al volver al dashboard recupera su
+  // tamaño y forma originales y reaparecen los botones (todo animado por CSS).
+  const isDashboard = view.id === 'dashboard';
+  const collapsed = !isDashboard && !panelOpen;
+
+  // El popover se mantiene montado mientras dura su animación de salida → cierre simétrico.
+  const { isMounted: panelMounted, isClosing: panelClosing } = useAnimatedPresence(
+    panelOpen,
+    PANEL_MOTION_MS,
+  );
 
   const chat = useChat({
     enabled: true,
@@ -61,22 +73,16 @@ export function ChatDock({
     view: { id: view.id, label: view.label },
   });
 
-  // Cierra el popover de conversación al pulsar Escape o al hacer clic FUERA del dock (panel +
-  // input). El dock (la barra inferior) es permanente: clicar el input no lo cierra; clicar el
-  // lienzo, el sidebar o cualquier otra zona, sí.
+  // Cierra el popover de conversación con Escape. El clic FUERA lo gestiona el backdrop (ver render):
+  // captura el clic para SOLO cerrar el chat, sin activar lo que haya debajo (botones, sidebar, lienzo).
   useEffect(() => {
     if (!panelOpen) return;
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') setPanelOpen(false);
     };
-    const onDown = (e: PointerEvent): void => {
-      if (dockRef.current && !dockRef.current.contains(e.target as Node)) setPanelOpen(false);
-    };
     window.addEventListener('keydown', onKey);
-    document.addEventListener('pointerdown', onDown);
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.removeEventListener('pointerdown', onDown);
     };
   }, [panelOpen]);
 
@@ -116,14 +122,25 @@ export function ChatDock({
 
   return (
     <div
-      className={`chat-dock${hero ? ' chat-dock--hero' : ''}`}
+      className={`chat-dock${hero ? ' chat-dock--hero' : ''}${collapsed ? ' is-collapsed' : ''}${
+        panelOpen ? ' is-panel-open' : ''
+      }`}
       data-testid="chat-dock"
       data-hero={hero ? '' : undefined}
-      ref={dockRef}
     >
-      {showPanel && (
+      {/* Backdrop: con el chat abierto, un clic fuera del panel/composer SOLO cierra el chat y NO
+          activa lo que haya debajo (el clic aterriza aquí, no en el botón). */}
+      {panelOpen && (
+        <div
+          className="chat-dock__backdrop"
+          onClick={() => setPanelOpen(false)}
+          data-testid="chat-backdrop"
+          aria-hidden="true"
+        />
+      )}
+      {(hero || panelMounted) && (
         <aside
-          className="chat-dock__panel"
+          className={`chat-dock__panel${panelClosing ? ' is-closing' : ''}`}
           role="dialog"
           aria-label="Asistente"
           data-testid="chat-panel"
@@ -207,6 +224,7 @@ export function ChatDock({
           onSend={handleSend}
           onStop={chat.stop}
           onFocus={() => setPanelOpen(true)}
+          collapsed={collapsed}
           // En hero el panel (con su cabecera: historial/nueva) es permanente, así que el toggle
           // del input sobra. En barra compacta sí lo mostramos para abrir/cerrar la conversación.
           leading={hero ? undefined : leading}

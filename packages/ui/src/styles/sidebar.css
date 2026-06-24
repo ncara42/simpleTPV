@@ -915,10 +915,15 @@
       0 18px 40px -12px rgb(0 0 0 / 0.2);
     z-index: 40;
     transform-origin: top center;
-    /* Aparece/desaparece EN SU SITIO (fundido + leve escala), nunca deslizándose a un lado. */
+    /* Aparece/desaparece EN SU SITIO (fundido + leve escala), nunca deslizándose a un lado.
+       `visibility` entra en la transición para poder DIFERIR el ocultado: al aparecer es inmediata
+       (visible) y el cuerpo se funde de entrada; al ocultarse espera a que el fundido termine (ver
+       .is-hidden/.is-eclipsed). Sin esto, `visibility:hidden` cortaba la salida y el cuerpo
+       desaparecía de golpe pese a aparecer animado. */
     transition:
       opacity 0.2s var(--ui-ease, ease),
-      transform 0.2s var(--ui-ease, cubic-bezier(0.16, 1, 0.3, 1));
+      transform 0.2s var(--ui-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+      visibility 0s linear 0s;
   }
 
   /* El logo ya vive en la pestaña superior; el header interno (que lo duplicaba) se oculta
@@ -942,6 +947,11 @@
     transform: scale(0.97);
     pointer-events: none;
     visibility: hidden;
+    /* La ocultación de `visibility` se difiere 0.2s → el fundido + escala de salida se ven enteros. */
+    transition:
+      opacity 0.2s var(--ui-ease, ease),
+      transform 0.2s var(--ui-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+      visibility 0s linear 0.2s;
   }
   .sidebar--floating.is-hidden ~ .app-content {
     margin-left: 0;
@@ -955,6 +965,11 @@
     transform: scale(0.97);
     pointer-events: none;
     visibility: hidden;
+    /* Igual que .is-hidden: difiere `visibility` para que el desvanecido se vea completo. */
+    transition:
+      opacity 0.2s var(--ui-ease, ease),
+      transform 0.2s var(--ui-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+      visibility 0s linear 0.2s;
   }
 
   /* ── Pestaña del TOGGLE: arriba-izquierda, comparte borde izquierdo con el cuerpo. Arriba
@@ -1224,7 +1239,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebar--floating {
+  /* Los selectores compuestos igualan la especificidad de .is-hidden/.is-eclipsed para que
+     `transition:none` también gane ahí (si no, su transición con `visibility` animaría igual). */
+  .sidebar--floating,
+  .sidebar--floating.is-hidden,
+  .sidebar--floating.is-eclipsed {
     transition: none;
   }
 }
