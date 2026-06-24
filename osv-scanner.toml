@@ -1,0 +1,25 @@
+# Configuración de OSV-Scanner (CI: .github/workflows/security.yml → job "osv").
+# OSV autodescubre este fichero junto al lockfile escaneado (raíz del repo).
+#
+# Supresiones documentadas. Cada una con justificación verificable; revisar si se
+# cambia de versión de la dependencia.
+
+# ── SheetJS (xlsx) — falsos positivos por el modelo de distribución del paquete ──
+# El paquete `xlsx` de npm está CONGELADO en 0.18.5: SheetJS dejó de publicar en
+# npm y ahora se autohospeda en https://cdn.sheetjs.com. Por eso usamos la 0.20.3
+# del CDN (ver apps/backoffice/package.json). Las advisories de npm no declaran
+# "versión corregida" (porque el fix vive en el CDN, no en el registro npm), así
+# que OSV marca CUALQUIER versión de `xlsx`, incluida la 0.20.3 que SÍ trae los
+# parches. Ambas vulnerabilidades están REALMENTE corregidas en la versión que
+# usamos; son falsos positivos del escáner, no exposición real.
+
+[[IgnoredVulns]]
+id = "GHSA-4r6h-8v6p-xvw6" # CVE-2023-30533 — Prototype Pollution
+# Corregido en xlsx 0.19.3; usamos 0.20.3 (CDN) → parcheado. La advisory de npm no
+# tiene "fixed version" porque el paquete dejó de publicarse en npm.
+reason = "SheetJS 0.20.3 (CDN) ya incluye el fix de prototype pollution (>=0.19.3). npm sin versión-fix porque el paquete está congelado; OSV marca todas las versiones."
+
+[[IgnoredVulns]]
+id = "GHSA-5pgg-2g8v-p4x9" # CVE-2024-22363 — ReDoS
+# Corregido en xlsx 0.20.2; usamos 0.20.3 (CDN) → parcheado.
+reason = "SheetJS 0.20.3 (CDN) ya incluye el fix de ReDoS (>=0.20.2). npm sin versión-fix porque el paquete está congelado; OSV marca todas las versiones."
