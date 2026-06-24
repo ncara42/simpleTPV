@@ -15,25 +15,32 @@ test.beforeEach(async ({ page }) => {
 test('el dock del asistente está presente en todas las views; el «+» de lienzo solo en Dashboard', async ({
   page,
 }) => {
-  // En Dashboard el dock (barra inferior) está montado, con el menú «+» de herramientas del lienzo.
+  // En el Dashboard («Asistente de IA») el composer es el HÉROE: el dock está montado, con el
+  // menú «+» de herramientas del lienzo, y el panel de conversación es PERMANENTE (centrado).
   await expect(page.getByTestId('chat-dock')).toBeVisible();
   await expect(page.getByTestId('dash-free-tools')).toBeVisible();
-  // El popover de conversación está cerrado por defecto.
-  await expect(page.getByTestId('chat-panel')).toHaveCount(0);
+  await expect(page.getByTestId('chat-panel')).toBeVisible();
 
-  // El dock vive ahora en el shell: al navegar a otra view SIGUE presente, pero como chat puro
-  // (sin el «+» de herramientas, porque esa view no tiene lienzo).
+  // Al navegar a otra view, el dock SIGUE presente pero hace morph a la BARRA compacta: sin el «+»
+  // (esa view no tiene lienzo) y con el panel cerrado por defecto (popover bajo demanda).
   await navTo(page, 'stock');
   await expect(page.getByTestId('chat-dock')).toBeVisible();
   await expect(page.getByTestId('dash-free-tools')).toHaveCount(0);
+  await expect(page.getByTestId('chat-panel')).toHaveCount(0);
 
-  // Al volver al Dashboard, el «+» reaparece.
+  // Al volver al Dashboard, reaparecen el «+» y el panel héroe permanente.
   await navTo(page, 'dashboard');
   await expect(page.getByTestId('chat-dock')).toBeVisible();
   await expect(page.getByTestId('dash-free-tools')).toBeVisible();
+  await expect(page.getByTestId('chat-panel')).toBeVisible();
 });
 
-test('el popover de conversación se abre desde la barra y se cierra', async ({ page }) => {
+test('el popover de conversación se abre desde la barra y se cierra (views compactas)', async ({
+  page,
+}) => {
+  // El popover bajo demanda es comportamiento de la BARRA compacta (fuera del Dashboard, donde el
+  // panel es permanente). En Existencias el dock está compactado: panel cerrado por defecto.
+  await navTo(page, 'stock');
   await expect(page.getByTestId('chat-dock')).toBeVisible();
   await expect(page.getByTestId('chat-panel')).toHaveCount(0);
 
@@ -71,15 +78,15 @@ test('el dock expone el input y el selector de modelo en el pie', async ({ page 
   await expect(page.getByTestId('chat-model-select')).toBeVisible();
 });
 
-test('sin proveedor de IA configurado, el popover avisa y el input queda deshabilitado', async ({
+test('sin proveedor de IA configurado, el panel avisa y el input queda deshabilitado', async ({
   page,
 }) => {
   await mockModels(page, []);
   await expect(page.getByTestId('chat-dock')).toBeVisible();
   // El input queda deshabilitado (sin proveedor no se puede enviar).
   await expect(page.getByTestId('chat-input')).toBeDisabled();
-  // Al abrir el popover, se muestra el aviso de IA no configurada en vez de bloquear sin más.
-  await page.getByTestId('chat-toggle-panel').click();
+  // En el Dashboard el panel héroe es permanente: el aviso de IA no configurada se ve directamente
+  // (no hay que abrir popover) en vez de bloquear sin más.
   await expect(page.getByTestId('chat-no-ai')).toBeVisible();
 });
 

@@ -1031,19 +1031,20 @@
   outline: none;
   box-shadow: var(--ui-focus);
 }
-/* Rejilla de puntos en su propio plano (detrás del mundo). Sigue al pan/zoom vía
-   background-size/position inline (en el padre; las capas lo heredan).
+/* Rejilla de puntos en su propio plano (detrás del mundo). Sigue al pan/zoom vía --dots-size/--dots-pos
+   (inline; los comparten las crestas ::before/::after para casar la rejilla). Se anima al cambiar de
+   modo: una «ola» DIAGONAL recorre la rejilla de esquina a esquina (arriba-dcha, junto al toggle →
+   abajo-izq) de forma lenta y fluida. El frente lleva un SWELL de tamaño en 3 niveles —pico (::after,
+   los más grandes), hombro (::before, intermedios) y base (normal)— que hace que los puntos «asomen»
+   grandes en las primeras filas y se asienten a su tamaño al pasar la ola. `--dots-wave` = avance del
+   frente (0 = oculto, 1 = revelado del todo); en reposo 1 ⇒ rejilla íntegra y sin crestas.
 
-   La «ola» de cambio de modo es una DIAGONAL que barre la pantalla, conducida por `--dots-reveal`
-   (0 → oculto, 1 → completo). Dos capas apiladas en pseudo-elementos hacen el efecto:
-     · ::before = puntos a tamaño normal, revelados tras el frente de la ola.
-     · ::after  = puntos un par de px MÁS GRANDES, visibles solo en la banda estrecha que viaja con
-                  el frente. Al pasar la cresta sobre cada punto este crece y, al quedar atrás, se
-                  asienta al tamaño base → cada punto «pop»: aparece mayor y luego se apequeña.
-   En reposo `--dots-reveal` = 1 ⇒ base completa + cresta fuera de pantalla (sin efecto).
-   `inherits: true` es imprescindible: la variable se anima en el padre y debe llegar a las capas. */
-@property --dots-reveal {
+   Geometría común: frente F = var(--dots-wave) * 134% − 4% (recorre de −4% a 130% sobre la diagonal,
+   con margen sobrado para que feather y crestas entren/salgan fuera de pantalla → en reposo, limpio).
+   Las constantes restadas en cada `calc` son F desplazado: p.ej. «134% − 19%» = F − 15%. */
+@property --dots-wave {
   syntax: '<number>';
+  /* Hereda para que las crestas (::before/::after) lean el valor animado del frente del padre. */
   inherits: true;
   initial-value: 1;
 }
@@ -1053,84 +1054,113 @@
   z-index: 0;
   pointer-events: none;
   --dot: color-mix(in srgb, var(--ui-text-muted) 38%, transparent);
-  --dot-crest: color-mix(in srgb, var(--ui-text-muted) 62%, transparent);
-  --dots-reveal: 1;
-  /* Dirección de la ola (diagonal, de la esquina superior-izquierda a la inferior-derecha). */
-  --wave-angle: 135deg;
-  /* Frente de la ola en el eje de la diagonal: de -16% (fuera, oculto) a 116% (fuera, completo). */
-  --wave-front: calc(var(--dots-reveal) * 132% - 16%);
+  /* pan/zoom: tamaño de celda y desfase de la rejilla; FreeBoard los fija inline a cada vista. */
+  --dots-size: 24px;
+  --dots-pos-x: 0px;
+  --dots-pos-y: 0px;
+  background-image: radial-gradient(var(--dot) 1.5px, transparent 1.6px);
+  background-size: var(--dots-size) var(--dots-size);
+  background-position: var(--dots-pos-x) var(--dots-pos-y);
+  /* Máscara base: opaca por DETRÁS del frente (lo ya revelado) con un feather AMPLIO (~16%) en él,
+     para que el borde sea una ola suave y no una línea de barrido. Difumina de F−15% a F+1%. */
+  --dots-wave: 1;
+  -webkit-mask-image: linear-gradient(
+    225deg,
+    #000 calc(var(--dots-wave) * 134% - 19%),
+    transparent calc(var(--dots-wave) * 134% - 3%)
+  );
+  mask-image: linear-gradient(
+    225deg,
+    #000 calc(var(--dots-wave) * 134% - 19%),
+    transparent calc(var(--dots-wave) * 134% - 3%)
+  );
 }
-/* Ambas capas heredan el tiling (background-size/position) del padre → siguen pan/zoom igual. */
-.dash-free-dots::before,
-.dash-free-dots::after {
+/* Crestas de la ola: SOLO existen durante la transición (los pseudos no se pintan en reposo). Misma
+   rejilla y pan/zoom que la base. Apiladas base < ::before (hombro) < ::after (pico): donde el pico es
+   opaco tapa al hombro, y donde el hombro es opaco tapa a la base → swell grande→medio→pequeño.
+   HOMBRO (::before): puntos intermedios (2px) en una banda ancha justo detrás del frente. */
+.dash-free-dots--reveal::before,
+.dash-free-dots--conceal::before {
   content: '';
   position: absolute;
   inset: 0;
-  background-size: inherit;
-  background-position: inherit;
-}
-/* Capa base: puntos normales, opacos por detrás del frente de la ola. */
-.dash-free-dots::before {
-  background-image: radial-gradient(var(--dot) 1.5px, transparent 1.6px);
+  pointer-events: none;
+  --dot-shoulder: color-mix(in srgb, var(--ui-text-muted) 43%, transparent);
+  background-image: radial-gradient(var(--dot-shoulder) 2px, transparent 2.15px);
+  background-size: var(--dots-size) var(--dots-size);
+  background-position: var(--dots-pos-x) var(--dots-pos-y);
+  will-change: mask-image, -webkit-mask-image;
+  /* Banda F−28%…F−4% (meseta F−20%…F−10%). */
   -webkit-mask-image: linear-gradient(
-    var(--wave-angle),
-    #000 var(--wave-front),
-    transparent calc(var(--wave-front) + 16%)
+    225deg,
+    transparent calc(var(--dots-wave) * 134% - 32%),
+    #000 calc(var(--dots-wave) * 134% - 24%),
+    #000 calc(var(--dots-wave) * 134% - 14%),
+    transparent calc(var(--dots-wave) * 134% - 8%)
   );
   mask-image: linear-gradient(
-    var(--wave-angle),
-    #000 var(--wave-front),
-    transparent calc(var(--wave-front) + 16%)
+    225deg,
+    transparent calc(var(--dots-wave) * 134% - 32%),
+    #000 calc(var(--dots-wave) * 134% - 24%),
+    #000 calc(var(--dots-wave) * 134% - 14%),
+    transparent calc(var(--dots-wave) * 134% - 8%)
   );
 }
-/* Capa cresta: puntos más grandes, visibles solo en la banda que cabalga el frente. */
-.dash-free-dots::after {
-  background-image: radial-gradient(var(--dot-crest) 2.7px, transparent 2.8px);
+/* PICO (::after): los puntos más grandes (2.6px ≈ +2px de diámetro) en una banda estrecha en la
+   primerísima fila del frente, donde los puntos acaban de asomar. */
+.dash-free-dots--reveal::after,
+.dash-free-dots--conceal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --dot-peak: color-mix(in srgb, var(--ui-text-muted) 48%, transparent);
+  background-image: radial-gradient(var(--dot-peak) 2.6px, transparent 2.75px);
+  background-size: var(--dots-size) var(--dots-size);
+  background-position: var(--dots-pos-x) var(--dots-pos-y);
+  will-change: mask-image, -webkit-mask-image;
+  /* Banda F−15%…F+1% (meseta F−7%…F−3%). */
   -webkit-mask-image: linear-gradient(
-    var(--wave-angle),
-    transparent calc(var(--wave-front) - 13%),
-    #000 calc(var(--wave-front) - 3%),
-    #000 calc(var(--wave-front) + 3%),
-    transparent calc(var(--wave-front) + 13%)
+    225deg,
+    transparent calc(var(--dots-wave) * 134% - 19%),
+    #000 calc(var(--dots-wave) * 134% - 11%),
+    #000 calc(var(--dots-wave) * 134% - 7%),
+    transparent calc(var(--dots-wave) * 134% - 3%)
   );
   mask-image: linear-gradient(
-    var(--wave-angle),
-    transparent calc(var(--wave-front) - 13%),
-    #000 calc(var(--wave-front) - 3%),
-    #000 calc(var(--wave-front) + 3%),
-    transparent calc(var(--wave-front) + 13%)
+    225deg,
+    transparent calc(var(--dots-wave) * 134% - 19%),
+    #000 calc(var(--dots-wave) * 134% - 11%),
+    #000 calc(var(--dots-wave) * 134% - 7%),
+    transparent calc(var(--dots-wave) * 134% - 3%)
   );
 }
+/* `will-change` solo mientras dura la ola (la clase se quita al terminar): aísla la capa para que la
+   máscara animada no repinte de más. Duraciones en sync con DOTS_REVEAL_MS/DOTS_CONCEAL_MS del hook
+   (use-mode-transition): LENTAS y fluidas (easeInOutCubic) para que la ola de esquina a esquina se
+   note de verdad. La ola va por su cuenta; el cierre del morph la espera (no se corta). */
 .dash-free-dots--reveal {
-  animation: dash-dots-reveal 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: dash-dots-reveal 1200ms cubic-bezier(0.65, 0, 0.35, 1) both;
+  will-change: mask-image, -webkit-mask-image;
 }
 .dash-free-dots--conceal {
-  animation: dash-dots-conceal 380ms cubic-bezier(0.4, 0, 0.2, 1) both;
-}
-/* `will-change` solo mientras dura la ola (la clase se quita al terminar): aísla las capas para que
-   la máscara animada no repinte de más. */
-.dash-free-dots--reveal::before,
-.dash-free-dots--reveal::after,
-.dash-free-dots--conceal::before,
-.dash-free-dots--conceal::after {
-  will-change:
-    mask-image,
-    -webkit-mask-image;
+  animation: dash-dots-conceal 900ms cubic-bezier(0.65, 0, 0.35, 1) both;
+  will-change: mask-image, -webkit-mask-image;
 }
 @keyframes dash-dots-reveal {
   from {
-    --dots-reveal: 0;
+    --dots-wave: 0;
   }
   to {
-    --dots-reveal: 1;
+    --dots-wave: 1;
   }
 }
 @keyframes dash-dots-conceal {
   from {
-    --dots-reveal: 1;
+    --dots-wave: 1;
   }
   to {
-    --dots-reveal: 0;
+    --dots-wave: 0;
   }
 }
 /* Mundo transformable (translate·scale). transform-origin 0 0 es imprescindible para que
@@ -1709,10 +1739,13 @@
    arriba-centro, toolbar abajo-centro, herramientas izq-centro, minimapa abajo-izq, zoom abajo-der. */
 .dashboard--free,
 .dashboard--grid {
-  position: fixed;
+  /* El lienzo llena su host en flujo (.bo-main--canvas, position:relative), NO el viewport:
+     así el sidebar fijo y el topbar sticky quedan fuera (antes flotaba a pantalla completa y
+     tapaba el sidebar). z bajo: el topbar/sub-barra del shell quedan por encima. */
+  position: absolute;
   inset: 0;
-  z-index: 35;
-  /* La section .catalog se centra con max-width + margin auto: anúlalo para cubrir el viewport. */
+  z-index: 1;
+  /* La section .catalog se centra con max-width + margin auto: anúlalo para cubrir el host. */
   width: auto;
   max-width: none;
   margin: 0;
@@ -1769,7 +1802,6 @@
 .dash--morphing .dash-free-zoom,
 .dash--morphing .dash-free-minimap,
 .dash--morphing .dash-free-arrow,
-.dash--morphing .dash-grid-add,
 .dash--morphing .dash-grid-hint,
 .dash--morphing .dash-free-empty {
   opacity: 0;
@@ -1901,25 +1933,13 @@
   left: 0;
 }
 
-/* Barra de herramientas del lienzo del Dashboard (Editar→despliega + Mover + Goma), flotando en la
-   MISMA fila de la topbar (a la altura de logo/avatar/búsqueda, top:12px), EN LUGAR del título de la
-   view (.view-title-float, oculto en Dashboard). Se renderiza a nivel de shell (App.tsx), por eso el
-   selector NO va scopeado a .dashboard--free; z por encima del clúster de búsqueda full-width (z42)
-   para quedar alineada y clicable en el centro de la fila. Píldora de cristal. */
+/* Barra de herramientas del lienzo «Asistente de IA» (Editar→despliega + Mover + Goma). Vive en la
+   sub-barra del shell (.topbar-subbar), por DEBAJO del topbar. Tratamiento un escalón inferior:
+   relleno sutil (surface-subtle) en vez de cristal y sin sombra de elevación → jerarquía secundaria. */
 .dash-canvas-toolbar {
-  position: fixed;
-  top: var(--sidebar-float-gap, 12px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 43;
-  padding: 0.35rem 0.45rem;
-  border: 1px solid var(--ui-border);
-  border-radius: 9999px;
-  background: color-mix(in srgb, var(--ui-surface) 84%, transparent);
-  box-shadow:
-    0 1px 2px rgb(0 0 0 / 0.04),
-    0 8px 26px rgb(0 0 0 / 0.14);
-  backdrop-filter: blur(12px);
+  /* SIN contenedor propio: los botones del lienzo flotan individualmente (cada uno con su
+     superficie + sombra, ver .canvas-tools__trigger/__mode). display:contents elimina la caja. */
+  display: contents;
 }
 
 /* Pill de dibujo flotando justo encima del dock inferior (centrado). El dock (input del
@@ -1949,11 +1969,9 @@
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  /* El dashboard es full-bleed y el sidebar/topbar FLOTAN por encima: se sangra el contenido para
-     que no quede debajo. Izquierda = ancho del sidebar flotante (igual que .bo-main--surface);
-     arriba = fila de acciones + toggle (esquina sup-derecha); abajo = dock del asistente. */
-  padding: 4rem 1.5rem 6rem
-    calc(var(--sidebar-width-expanded) + var(--sidebar-float-gap) * 2 + 0.5rem);
+  /* El lienzo rellena .app-content (también detrás del topbar), así que la rejilla deja aire
+     ARRIBA para no quedar bajo el topbar flotante (~60px) + holgura inferior para el dock. */
+  padding: 4.5rem 1.5rem 6rem;
 }
 .dash-grid-flow {
   display: grid;
@@ -2057,31 +2075,6 @@
   color: var(--ui-danger);
   background: var(--ui-surface);
 }
-/* Tira de alta: tile punteado con «+» para añadir un widget de catálogo. */
-.dash-grid-add {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  min-height: 156px;
-  border: 1.5px dashed var(--ui-border-strong, var(--ui-border));
-  border-radius: var(--ui-radius-lg);
-  background: transparent;
-  color: var(--ui-text-muted);
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease;
-}
-.dash-grid-add:hover {
-  background: var(--ui-surface-subtle);
-  border-color: var(--ui-text-muted);
-  color: var(--ui-text);
-}
 .dash-grid-hint {
   position: absolute;
   left: 50%;
@@ -2098,21 +2091,19 @@
    quedar por ENCIMA del clúster de búsqueda full-width de la topbar. Va a la derecha, justo DEBAJO
    de la fila de acciones (lupa/home/campana) para no taparlas. */
 .dashboard-mode-toggle {
-  position: fixed;
-  /* Misma fila/altura que el resto de botones de la topbar (la barra del lienzo y las acciones van
-     a `--sidebar-float-gap`), pegado al borde derecho. */
-  top: var(--sidebar-float-gap, 12px);
-  right: var(--sidebar-float-gap, 12px);
-  z-index: 43;
+  /* Conmutador cuadrícula ↔ lienzo: vive arriba a la DERECHA del topbar (clúster derecho).
+     Radio de sistema (8px, estilo Vercel) y elevación sutil como las demás pastillas. */
   display: inline-flex;
   gap: 2px;
   padding: 3px;
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-sm);
   border: 1px solid var(--ui-border);
-  background: color-mix(in srgb, var(--ui-surface) 86%, transparent);
-  box-shadow: 0 8px 26px rgb(0 0 0 / 0.14);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  background: color-mix(in srgb, var(--ui-surface) 92%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 0.05),
+    0 6px 14px -6px rgb(0 0 0 / 0.1);
 }
 .dashboard-mode-btn {
   display: inline-flex;
@@ -2120,10 +2111,10 @@
   justify-content: center;
   /* Un poco más anchos que altos (segmentos cómodos); la altura mantiene el toggle en 38px
      totales, igual que los botones redondos de la topbar. */
-  width: 42px;
-  height: 30px;
+  width: 38px;
+  height: 26px;
   border: none;
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-xs);
   background: transparent;
   color: var(--ui-text-muted);
   cursor: pointer;
@@ -2197,6 +2188,20 @@
   position: static;
   width: 20rem;
   max-height: 50vh;
+}
+
+/* Variante topbar: cae como menú flotante FIJO bajo el clúster derecho del topbar (botón «+» de
+   añadir widget). El topbar mide 60px de alto y reserva 1.25rem de margen lateral; alineamos la
+   paleta a ese borde derecho. z alto para coronar las pastillas del topbar (z-index 30). */
+.dash-free-palette--topbar {
+  pointer-events: auto;
+  position: fixed;
+  top: calc(60px + 0.4rem);
+  right: 1.25rem;
+  left: auto;
+  z-index: 60;
+  width: 18rem;
+  max-height: 60vh;
 }
 .dash-free-palette-search {
   display: flex;

@@ -13,10 +13,9 @@ import {
   ClipboardCheck,
   Clock,
   HelpCircle,
-  Moon,
   ReceiptText,
   ShoppingBag,
-  Sun,
+  Store,
   Truck,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -33,7 +32,6 @@ import { formatDuration } from './lib/format.js';
 import { getMe, roleLabel } from './lib/me.js';
 import { switchApp } from './lib/nav.js';
 import { listStores } from './lib/sales.js';
-import { getTheme, type Theme, toggleTheme } from './lib/theme.js';
 import { useOfflineSync } from './lib/useOfflineSync.js';
 import { useTimeClock } from './lib/useTimeClock.js';
 import { SalePage } from './SalePage.js';
@@ -53,45 +51,25 @@ const TPV_NAV: NavItem[] = [
   { id: 'help', label: 'Ayuda', icon: <HelpCircle size={18} /> },
 ];
 
-// Toggle de tema claro/oscuro en el topbar (gemelo del de FloatingActions del
-// backoffice). Reusa el acabado de botón-icono del topbar (.topbar-notif).
-function ThemeToggle() {
-  const [theme, setThemeState] = useState<Theme>(() => getTheme());
-  return (
-    <button
-      type="button"
-      className="topbar-notif"
-      onClick={() => setThemeState(toggleTheme())}
-      aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-      title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-      data-testid="topbar-theme-toggle"
-    >
-      {theme === 'dark' ? (
-        <Sun size={18} aria-hidden="true" />
-      ) : (
-        <Moon size={18} aria-hidden="true" />
-      )}
-    </button>
-  );
-}
-
-function ShellTopBar() {
-  const { title, description, descriptionTestId } = usePageHeaderValue();
-  return (
-    <TopBar
-      title={title}
-      subtitle={description}
-      subtitleTestId={descriptionTestId}
-      activeApp="tpv"
-      onSwitchApp={switchApp}
-      actions={<ThemeToggle />}
-    />
-  );
+// El topbar muestra el título declarado por cada panel (usePageHeader); si el panel
+// no declara ninguno, cae al nombre de la entrada de menú activa. El toggle de tema y
+// el menú de cuenta (cerrar sesión) los aporta el propio TopBar compartido.
+function ShellTopBar({
+  fallbackTitle,
+  onBack,
+}: {
+  fallbackTitle: string;
+  onBack?: (() => void) | undefined;
+}) {
+  const { title } = usePageHeaderValue();
+  return <TopBar title={title || fallbackTitle} titleTestId="page-heading" onBack={onBack} />;
 }
 
 function Home() {
   const logout = useAuthStore((s) => s.clear);
   const [view, setView] = useState<View>('sale');
+  // Historial ligero de vistas: el TPV no usa router, así que apilamos a mano.
+  const [viewStack, setViewStack] = useState<View[]>([]);
   // U-08: tema corporativo compartido con el backoffice (color + logo).
   const branding = useBranding();
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
@@ -111,25 +89,51 @@ function Home() {
         : item,
   );
 
+  // Cada cambio de vista apila la anterior; «atrás» en el topbar la recupera. Sin
+  // historial (pantalla raíz) no se pinta el botón (onBack = undefined).
+  const navTo = (next: View): void => {
+    if (next === view) return;
+    setViewStack((s) => [...s, view]);
+    setView(next);
+  };
+  const goBack = (): void => {
+    if (viewStack.length === 0) return;
+    setView(viewStack[viewStack.length - 1]!);
+    setViewStack((s) => s.slice(0, -1));
+  };
+  const activeLabel = TPV_NAV.find((n) => n.id === view)?.label ?? '';
+
   return (
     <div className="app-shell">
       <Sidebar
         items={navItems}
+        collapsible
         activeItem={view}
-        onSelect={(id) => setView(id as View)}
+        onSelect={(id) => navTo(id as View)}
         logo={
           branding?.logoUrl ? (
             <img className="sidebar-logo-img" src={branding.logoUrl} alt="Logo" />
           ) : undefined
         }
         brand={{ title: 'SimpleTPV', subtitle: 'Punto de venta' }}
+        // Cuenta al PIE del sidebar (avatar → menú cerrar sesión), estilo ChatGPT/Claude.
         account={{ name: me?.name || 'Usuario', subtitle: roleLabel(me?.role) }}
         onLogout={logout}
+        // El cambio a Backoffice es la última entrada del sidebar (no en el topbar).
+        appSwitch={{
+          label: 'Backoffice',
+          icon: <Store size={19} aria-hidden="true" />,
+          onClick: () => switchApp('backoffice'),
+          testId: 'switch-backoffice',
+        }}
       />
       <div className="app-content">
         <ConnectivityBanner queuedCount={queuedCount} />
         <PageHeaderProvider>
-          <ShellTopBar />
+          <ShellTopBar
+            fallbackTitle={activeLabel}
+            onBack={viewStack.length > 0 ? goBack : undefined}
+          />
           <main className="app-main">
             {view === 'sale' && <SalePage />}
             {view === 'tickets' && <TicketsPanel storeId={activeStore} />}

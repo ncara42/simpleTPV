@@ -4,7 +4,8 @@ interface ChatHeaderProps {
   showHistory: boolean;
   onToggleHistory: () => void;
   onNewConversation: () => void;
-  onClose: () => void;
+  /** Cierra el popover. Ausente cuando el panel es permanente (modo hero del Dashboard). */
+  onClose?: (() => void) | undefined;
 }
 
 // Cabecera del popover de conversación. El selector de modelo + esfuerzo se movió al pie del
@@ -40,15 +41,17 @@ export function ChatHeader({
         >
           <Plus size={16} aria-hidden="true" />
         </button>
-        <button
-          type="button"
-          className="chat-icon-btn"
-          onClick={onClose}
-          aria-label="Cerrar"
-          title="Cerrar"
-        >
-          <X size={16} aria-hidden="true" />
-        </button>
+        {onClose && (
+          <button
+            type="button"
+            className="chat-icon-btn"
+            onClick={onClose}
+            aria-label="Cerrar"
+            title="Cerrar"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        )}
       </div>
     </header>
   );

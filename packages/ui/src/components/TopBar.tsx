@@ -1,54 +1,64 @@
-export interface TopBarProps {
-  /**
-   * Etiqueta de contexto persistente (área de la app o tienda activa). NO es el
-   * título de la página: cada vista es dueña de su propio título en el contenido,
-   * así no se duplica. Ver topbar.css (.topbar-eyebrow).
-   */
-  eyebrow?: string;
-  /**
-   * Título de la barra. El backoffice lo usa para reflejar el título de la vista
-   * activa (junto a `subtitle`) y así liberar espacio en el contenido. Otras apps
-   * pueden omitirlo si prefieren que el título viva en la cabecera de la vista.
-   */
-  title?: string;
-  /**
-   * Descripción/subtítulo bajo el título (p. ej. «12 productos activos»). Solo se
-   * pinta si hay `title`. Acompaña a la cabecera informativa del backoffice.
-   */
-  subtitle?: string | undefined;
-  /** data-testid opcional para el subtítulo (preserva hooks de e2e como `catalog-count`). */
-  subtitleTestId?: string | undefined;
-  /** data-testid opcional para el título (preserva hooks de e2e como `page-heading`). */
-  titleTestId?: string | undefined;
-  /**
-   * Slot de búsqueda. Vive en la zona derecha de la barra, entre la campana y el
-   * conmutador de app; el título de la vista ocupa la zona izquierda.
-   */
-  search?: React.ReactNode;
-  /** Slot de acciones extra en la zona derecha (p. ej. el toggle de tema claro/oscuro). */
-  actions?: React.ReactNode;
-  activeApp?: 'backoffice' | 'tpv';
-  onSwitchApp?: (app: 'backoffice' | 'tpv') => void;
-  /** Si se define, pinta la campana de notificaciones a la izquierda del conmutador. */
-  onNotifications?: () => void;
-  /** Nº de notificaciones sin leer; se muestra como badge sobre la campana si > 0. */
-  notificationCount?: number;
-  /** Marca la campana como activa (la vista de notificaciones está abierta). */
-  notificationsActive?: boolean;
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { initials } from '../lib/initials.js';
+
+// Topbar flotante compartido por backoffice y TPV. Dos piezas:
+//  · Isla central (pill): atrás · nombre de la vista (centrado) · tema · campana.
+//  · Clúster derecho: acciones de la vista · búsqueda · cuenta.
+// El tema vive en el atributo `data-theme` de <html> (+ localStorage); el script de
+// arranque de cada index.html lo fija antes de pintar. Aquí solo se conmuta.
+
+export interface TopBarAccount {
+  name: string;
+  subtitle?: string;
+  onLogout?: () => void;
 }
 
-// La campana togglea el panel: el aria-label refleja la acción ("Abrir"/"Cerrar")
-// y conserva el conteo de no leídas como contexto para lectores de pantalla.
-function notificationsAriaLabel(active: boolean, count: number): string {
-  const verb = active ? 'Cerrar notificaciones' : 'Abrir notificaciones';
-  return count > 0 ? `${verb} (${count} sin leer)` : verb;
+export interface TopBarProps {
+  /** Botón atrás. Si se omite, no se pinta (apps sin historial). */
+  onBack?: (() => void) | undefined;
+  /** Nombre de la vista activa: centrado en la isla. */
+  title: string;
+  /** data-testid del título (hook de e2e, p. ej. `page-heading`). */
+  titleTestId?: string | undefined;
+  /** Campana de notificaciones (opcional). */
+  onNotifications?: (() => void) | undefined;
+  notificationCount?: number | undefined;
+  notificationsActive?: boolean | undefined;
+  /** Acciones de la vista activa (export/import…): clúster derecho, antes de la búsqueda. */
+  pageActions?: React.ReactNode;
+  /** Lanzador de búsqueda (⌘K): vive DENTRO de la isla (barra de navegación). */
+  search?: React.ReactNode;
+  /** Slot extra al final del clúster derecho (p. ej. conmutador de modo del dashboard). */
+  endSlot?: React.ReactNode;
+  /** Cuenta: botón con menú (cerrar sesión) en el extremo derecho. */
+  account?: TopBarAccount | undefined;
+}
+
+function BackGlyph() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M19 12H5" />
+      <path d="m12 19-7-7 7-7" />
+    </svg>
+  );
 }
 
 function BellGlyph() {
   return (
     <svg
-      width="19"
-      height="19"
+      width="18"
+      height="18"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -63,77 +73,155 @@ function BellGlyph() {
   );
 }
 
+function LogoutGlyph() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="m16 17 5-5-5-5" />
+      <path d="M21 12H9" />
+    </svg>
+  );
+}
+
+function AccountMenu({ account }: { account: TopBarAccount }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent): void => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className="topbar-account" ref={rootRef}>
+      <button
+        type="button"
+        className={`topbar-account-btn${open ? ' open' : ''}`}
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={account.name}
+        data-testid="account-menu"
+      >
+        <span className="topbar-account-avatar" aria-hidden="true">
+          {initials(account.name)}
+        </span>
+        <span className="topbar-account-meta">
+          <span className="topbar-account-name">{account.name}</span>
+          {account.subtitle && <span className="topbar-account-sub">{account.subtitle}</span>}
+        </span>
+      </button>
+      {open && (
+        <div className="topbar-account-panel" role="menu" aria-label="Cuenta">
+          {account.onLogout && (
+            <button
+              type="button"
+              className="topbar-account-item topbar-account-item--danger"
+              role="menuitem"
+              onClick={() => {
+                close();
+                account.onLogout?.();
+              }}
+              data-testid="logout"
+            >
+              <span className="topbar-account-item-icon">
+                <LogoutGlyph />
+              </span>
+              <span>Cerrar sesión</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TopBar({
-  eyebrow,
+  onBack,
   title,
-  subtitle,
-  subtitleTestId,
   titleTestId,
-  search,
-  actions,
-  activeApp = 'tpv',
-  onSwitchApp,
   onNotifications,
   notificationCount = 0,
   notificationsActive = false,
+  pageActions,
+  search,
+  endSlot,
+  account,
 }: TopBarProps) {
   return (
     <header className="topbar" data-testid="topbar">
-      <div className="topbar-left">
-        {eyebrow && <span className="topbar-eyebrow">{eyebrow}</span>}
-        {title && (
-          <h1 className="topbar-title" data-testid={titleTestId} title={title}>
-            {title}
-          </h1>
+      {/* Isla central: atrás · título (centrado) · tema · campana. */}
+      <div className="topbar-island">
+        {onBack && (
+          <button
+            type="button"
+            className="topbar-icon-btn topbar-island-back"
+            onClick={onBack}
+            aria-label="Volver"
+            title="Volver"
+            data-testid="topbar-back"
+          >
+            <BackGlyph />
+          </button>
         )}
-        {title && subtitle && (
-          <p className="topbar-subtitle" data-testid={subtitleTestId} title={subtitle}>
-            {subtitle}
-          </p>
-        )}
+        <h1 className="topbar-title" data-testid={titleTestId} title={title}>
+          {title}
+        </h1>
+        {search && <div className="topbar-island-actions">{search}</div>}
       </div>
-      <div className="topbar-right">
-        {onNotifications && (
-          <button
-            type="button"
-            className={`topbar-notif${notificationsActive ? ' active' : ''}`}
-            onClick={onNotifications}
-            aria-label={notificationsAriaLabel(notificationsActive, notificationCount)}
-            aria-pressed={notificationsActive}
-            title={notificationsActive ? 'Cerrar notificaciones' : 'Notificaciones'}
-            data-testid="topbar-notifications"
-          >
-            <BellGlyph />
-            {notificationCount > 0 && (
-              <span className="topbar-notif-badge" data-testid="topbar-notifications-badge">
-                {notificationCount}
-              </span>
-            )}
-          </button>
-        )}
-        {search}
-        {actions}
-        <div className="topbar-switch" role="group" aria-label="Cambiar de app">
-          <button
-            type="button"
-            className={`topbar-switch-btn${activeApp === 'backoffice' ? ' active' : ''}`}
-            aria-pressed={activeApp === 'backoffice'}
-            onClick={() => onSwitchApp?.('backoffice')}
-            data-testid="switch-backoffice"
-          >
-            Backoffice
-          </button>
-          <button
-            type="button"
-            className={`topbar-switch-btn${activeApp === 'tpv' ? ' active' : ''}`}
-            aria-pressed={activeApp === 'tpv'}
-            onClick={() => onSwitchApp?.('tpv')}
-            data-testid="switch-tpv"
-          >
-            TPV
-          </button>
+
+      {/* Clúster derecho: acciones de vista · campana · conmutador de modo · cuenta. */}
+      {(pageActions || onNotifications || endSlot || account) && (
+        <div className="topbar-right">
+          {pageActions && <div className="topbar-page-actions">{pageActions}</div>}
+          {onNotifications && (
+            <button
+              type="button"
+              className={`topbar-icon-btn${notificationsActive ? ' is-active' : ''}`}
+              onClick={onNotifications}
+              aria-label={
+                notificationCount > 0
+                  ? `Notificaciones (${notificationCount} sin leer)`
+                  : 'Notificaciones'
+              }
+              aria-pressed={notificationsActive}
+              title="Notificaciones"
+              data-testid="topbar-notifications"
+            >
+              <BellGlyph />
+              {notificationCount > 0 && (
+                <span className="topbar-notif-badge" data-testid="topbar-notifications-badge">
+                  {notificationCount}
+                </span>
+              )}
+            </button>
+          )}
+          {endSlot}
+          {account && <AccountMenu account={account} />}
         </div>
-      </div>
+      )}
     </header>
   );
 }

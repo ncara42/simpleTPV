@@ -38,6 +38,9 @@ export function AssistantDock({ view }: { view: ViewContext }) {
       getCanvasState={buildCanvasSnapshot}
       onViewAction={(action, args) => executeViewAction(action as ViewActionName, args)}
       view={view}
+      // En el Dashboard («Asistente de IA») el composer es el héroe: panel + input grandes y
+      // centrados. Al navegar a otra view, el dock hace morph a la barra compacta inferior.
+      hero={view.id === 'dashboard'}
     />
   );
 }

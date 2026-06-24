@@ -35,9 +35,15 @@ const DURATION = 420; // ms del recorrido de cada bloque
 const STAGGER_MAX = 110; // ms de desfase máximo entre el bloque más cercano y el más lejano al origen
 const APPEAR_LAG = 60; // ms extra para los bloques que solo existen en el destino (entran tras la ola)
 const SETTLE_MS = 150; // ms del crossfade skeleton→real al asentarse
+// Ola de puntos DIAGONAL (esquina a esquina). En sync con las @keyframes dash-dots-reveal/conceal de
+// dashboard.css: si cambias una duración, cambia la otra. LENTA a propósito (mucho más que los vuelos):
+// corre por su cuenta y el cierre del morph la espera —sin congelar el asentamiento de los skeletons—.
+const DOTS_REVEAL_MS = 1200;
+const DOTS_CONCEAL_MS = 900;
 const EASE_MOVE = 'cubic-bezier(0.22, 1, 0.36, 1)'; // glide con asentamiento suave
 const EASE_FADE = 'cubic-bezier(0.16, 1, 0.3, 1)';
-const SAFETY_MS = DURATION + STAGGER_MAX + SETTLE_MS + 400; // red de seguridad si `finished` no resuelve
+// Red de seguridad si `finished` no resuelve: cubre la rama más larga (vuelos+settle o la ola de puntos).
+const SAFETY_MS = Math.max(DURATION + STAGGER_MAX + SETTLE_MS, DOTS_REVEAL_MS) + 450;
 
 interface PendingFrom {
   from: Mode;
@@ -131,19 +137,22 @@ export function useModeTransition(target: Mode): ModeTransition {
     }
     ghostLayer.appendChild(originFrag);
     // Si el lienzo ENTRA, «arma» sus puntos a oculto ANTES del primer paint para que no destellen
-    // llenos un frame antes de que arranque la ola (la animación parte de --dots-reveal:0).
-    if (dots && incoming === 'free') dots.style.setProperty('--dots-reveal', '0');
+    // llenos un frame antes de que arranque la ola (la animación parte de --dots-wave:0).
+    if (dots && incoming === 'free') dots.style.setProperty('--dots-wave', '0');
 
     let cancelled = false;
     const anims: Animation[] = [];
     let rafId = 0;
     let safety = 0;
+    // Promesa de fin de la ola de puntos (se asigna al añadir la clase, dentro del rAF). El morph NO se
+    // cierra hasta que la ola termina, pero los skeletons SÍ asientan a su ritmo (no la esperan).
+    let dotsDone: Promise<unknown> = Promise.resolve();
 
     const cleanupVisuals = (): void => {
       ghostLayer.replaceChildren();
       section.classList.remove('dash--morphing');
       dots?.classList.remove('dash-free-dots--reveal', 'dash-free-dots--conceal');
-      dots?.style.removeProperty('--dots-reveal');
+      dots?.style.removeProperty('--dots-wave');
     };
     const finish = (): void => {
       if (cancelled) return;
@@ -167,17 +176,23 @@ export function useModeTransition(target: Mode): ModeTransition {
     };
 
     // Al aterrizar: revela el contenido real (ya en su sitio, tapado por los skeletons) y funde los
-    // skeletons que tienen destino → crossfade skeleton→real. Los sin destino ya se desvanecieron.
+    // skeletons que tienen destino → crossfade skeleton→real. Los sin destino ya se desvanecieron. El
+    // crossfade ocurre EN CUANTO aterrizan (no espera a la ola); pero el cierre del morph (quitar la
+    // ola, desmontar el saliente) sí espera además a que la ola de puntos —más lenta— termine.
     const settle = (settleSkels: HTMLElement[]): void => {
       if (cancelled) return;
       section.classList.remove('dash--morphing');
-      if (settleSkels.length === 0) {
-        finish();
-        return;
-      }
-      const fades = settleSkels.map((s) => animateSettleOut(s, SETTLE_MS));
-      anims.push(...fades);
-      void Promise.allSettled(fades.map((a) => a.finished)).then(finish);
+      const faded =
+        settleSkels.length === 0
+          ? Promise.resolve()
+          : (() => {
+              const fades = settleSkels.map((s) => animateSettleOut(s, SETTLE_MS));
+              anims.push(...fades);
+              return Promise.allSettled(fades.map((a) => a.finished));
+            })();
+      void Promise.all([faded, dotsDone]).then(() => {
+        if (!cancelled) finish();
+      });
     };
 
     rafId = requestAnimationFrame(() => {
@@ -242,12 +257,22 @@ export function useModeTransition(target: Mode): ModeTransition {
         );
       }
 
-      // Ola de puntos: una diagonal que barre la pantalla (revelar si el lienzo ENTRA, ocultar si
-      // SALE). El barrido lo conduce la animación CSS vía `--dots-reveal`; no depende del origen.
+      // Ola de puntos DIAGONAL: revelar si el lienzo ENTRA, ocultar si SALE. Recorre la rejilla de
+      // esquina a esquina (arriba-dcha → abajo-izq) con un swell de puntos más grandes en el frente
+      // (ver .dash-free-dots en dashboard.css). Ya no usa origen: la diagonal es fija.
       if (dots) {
         dots.classList.add(
           incoming === 'free' ? 'dash-free-dots--reveal' : 'dash-free-dots--conceal',
         );
+        // Corre a SU ritmo (NO entra en `flying`, para no retrasar el crossfade de skeletons). Solo
+        // capturamos su `finished` para que el cierre del morph la espere → la ola no se corta. Si el
+        // motor no expone la animación por getAnimations, caemos a un timeout de su duración.
+        const dotsAnims = dots.getAnimations();
+        dotsDone = dotsAnims.length
+          ? Promise.allSettled(dotsAnims.map((a) => a.finished))
+          : new Promise((res) =>
+              window.setTimeout(res, incoming === 'free' ? DOTS_REVEAL_MS : DOTS_CONCEAL_MS),
+            );
       }
 
       ghostLayer.appendChild(appearFrag); // única escritura al DOM vivo de la tanda
@@ -255,9 +280,14 @@ export function useModeTransition(target: Mode): ModeTransition {
 
       const flying = anims.slice();
       if (flying.length === 0) {
-        // Boards vacíos: nada que volar; deja respirar a la ola de puntos y cierra antes.
+        // Boards vacíos: nada que volar. El cierre lo marca SOLO la ola de puntos (su `finished`), con
+        // una red de seguridad por si no resolviera (p.ej. getAnimations vacío en algún motor).
+        const dotsMs = incoming === 'free' ? DOTS_REVEAL_MS : DOTS_CONCEAL_MS;
+        void dotsDone.then(() => {
+          if (!cancelled) finish();
+        });
         window.clearTimeout(safety);
-        safety = window.setTimeout(finish, DURATION);
+        safety = window.setTimeout(finish, Math.max(DURATION, dotsMs) + 250);
         return;
       }
       void Promise.allSettled(flying.map((a) => a.finished)).then(() => {

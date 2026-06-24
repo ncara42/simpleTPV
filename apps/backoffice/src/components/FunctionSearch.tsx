@@ -29,7 +29,7 @@ export function FunctionSearch({ onNavigate }: { onNavigate: (tab: Tab) => void 
     <>
       <button
         type="button"
-        className="float-action-btn"
+        className="topbar-icon-btn"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-label="Buscar funciones"
