@@ -23,8 +23,10 @@ export interface ImportExportImportConfig {
 
 export interface ImportExportExportConfig {
   headers: string[];
-  /** Construye las filas a exportar EN EL MOMENTO (respeta los filtros actuales). */
-  getRows: () => string[][];
+  /** Construye las filas a exportar EN EL MOMENTO (respeta los filtros actuales).
+   *  Puede ser síncrona (datos en memoria) o asíncrona (p. ej. Ventas, que pide al
+   *  servidor TODO el conjunto filtrado, no solo la página visible). */
+  getRows: () => string[][] | Promise<string[][]>;
   /** Base del nombre de archivo (sin extensión). */
   filenameBase: string;
 }
@@ -62,12 +64,9 @@ export function ImportExportModal({
     if (!exportConfig) return;
     setExporting(format);
     try {
-      await exportRows(
-        format,
-        exportConfig.filenameBase,
-        exportConfig.headers,
-        exportConfig.getRows(),
-      );
+      // `getRows` puede ser síncrona o asíncrona (Ventas pide los datos al servidor).
+      const rows = await exportConfig.getRows();
+      await exportRows(format, exportConfig.filenameBase, exportConfig.headers, rows);
     } finally {
       setExporting(null);
     }
@@ -80,7 +79,13 @@ export function ImportExportModal({
       ariaLabel={`Importar o exportar ${title}`}
       {...(testId ? { testId } : {})}
     >
-      <h3>{title}: importar o exportar</h3>
+      <h3>
+        {canImport && canExport
+          ? `${title}: importar o exportar`
+          : canImport
+            ? `Importar ${title}`
+            : `Exportar ${title}`}
+      </h3>
 
       {canImport && canExport && (
         <nav className="bo-tabs" data-testid="iemodal-tabs">

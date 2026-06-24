@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { CsvActionButton } from './components/CsvActionButton.js';
+import { ImportExportModal } from './components/ImportExportModal.js';
 import { PeriodSegmented } from './components/PeriodSegmented.js';
 import { useTableColumns } from './components/useTableColumns.js';
 import {
@@ -14,7 +15,6 @@ import {
   type SalesQueryInput,
   type SalesViewRow,
 } from './lib/admin.js';
-import { exportRowsToCsv } from './lib/csv.js';
 import type { DashboardPeriod } from './lib/dashboard.js';
 import { type FamilyNode, listFamilies } from './lib/families.js';
 import { useFeatures } from './lib/features.js';
@@ -27,6 +27,17 @@ const hour = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digi
 const PAYMENT_LABEL: Record<string, string> = { CASH: 'Efectivo', CARD: 'Tarjeta' };
 const STATUS_LABEL: Record<string, string> = { COMPLETED: 'Completadas', VOIDED: 'Anuladas' };
 const PAGE_SIZE = 20;
+
+// Cabeceras de exportación de ventas
+const exportHeaders = [
+  'Nº ticket',
+  'Hora',
+  'Tienda',
+  'Vendedor',
+  'Importe (€)',
+  'Método',
+  'Estado',
+];
 
 interface Filters {
   storeId: string;
@@ -86,28 +97,6 @@ function toQuery(filters: Filters): SalesQueryInput {
   };
 }
 
-function downloadCsv(items: SalesViewRow[]): void {
-  const headers: string[] = [
-    'Nº ticket',
-    'Hora',
-    'Tienda',
-    'Vendedor',
-    'Importe (€)',
-    'Método',
-    'Estado',
-  ];
-  const rows: string[][] = items.map((s) => [
-    String(s.ticketNumber),
-    hour.format(new Date(s.createdAt)),
-    s.storeName,
-    s.sellerName,
-    Number(s.total).toFixed(2),
-    PAYMENT_LABEL[s.paymentMethod] ?? s.paymentMethod,
-    s.status === 'VOIDED' ? 'Anulada' : 'Completada',
-  ]);
-  exportRowsToCsv('ventas.csv', headers, rows);
-}
-
 const columns: DataTableColumn<SalesViewRow>[] = [
   { key: 'ticketNumber', header: 'Ticket' },
   { key: 'storeName', header: 'Tienda' },
@@ -145,6 +134,8 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
   });
   const [page, setPage] = useState(1);
   const [views, setViews] = useState<SavedView[]>(() => loadViews());
+  // Modal unificado de Exportar ventas (B-04): solo exportación a CSV/Excel.
+  const [dataModal, setDataModal] = useState<'export' | null>(null);
   // Feature flag (#127 B): oculta el export si el módulo está apagado a nivel org.
   const features = useFeatures();
 
@@ -261,10 +252,18 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
     setPage(1);
   };
 
-  // Exporta TODO el conjunto filtrado (no solo la página visible).
-  const exportCsv = async (): Promise<void> => {
+  // Construye las filas de exportación (todo el conjunto filtrado, no solo la página visible).
+  const buildExportRows = async (): Promise<string[][]> => {
     const all = await listSales({ ...toQuery(filters), page: 1, pageSize: 100000 });
-    downloadCsv(all.items);
+    return all.items.map((s) => [
+      String(s.ticketNumber),
+      hour.format(new Date(s.createdAt)),
+      s.storeName,
+      s.sellerName,
+      Number(s.total).toFixed(2),
+      PAYMENT_LABEL[s.paymentMethod] ?? s.paymentMethod,
+      s.status === 'VOIDED' ? 'Anulada' : 'Completada',
+    ]);
   };
 
   const toolbar = (
@@ -368,8 +367,8 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
       {features.data_export && (
         <CsvActionButton
           kind="export"
-          label="Exportar CSV"
-          onClick={() => void exportCsv()}
+          label="Exportar"
+          onClick={() => setDataModal('export')}
           testId="sales-export"
         />
       )}
@@ -437,6 +436,20 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
         }
         data-testid="sales-table"
       />
+
+      {dataModal && (
+        <ImportExportModal
+          title="Ventas"
+          initialMode={dataModal}
+          onClose={() => setDataModal(null)}
+          testId="sales-data-modal"
+          exportConfig={{
+            headers: exportHeaders,
+            getRows: buildExportRows,
+            filenameBase: 'ventas',
+          }}
+        />
+      )}
     </section>
   );
 }

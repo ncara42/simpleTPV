@@ -5,8 +5,8 @@ import { Check, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { CsvActionButton } from './components/CsvActionButton.js';
+import { ImportExportModal } from './components/ImportExportModal.js';
 import { Modal } from './components/Modal.js';
-import { exportRowsToCsv } from './lib/csv.js';
 import { usePageActions } from './lib/pageActions.js';
 import {
   createPromotion,
@@ -123,6 +123,7 @@ export function PromotionsPage() {
     });
   const [form, setForm] = useState<PromoForm | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const [dataModal, setDataModal] = useState<'export' | null>(null);
 
   const visible = useMemo(() => promos.filter((p) => groups.has(promoGroup(p))), [promos, groups]);
 
@@ -193,19 +194,15 @@ export function PromotionsPage() {
     });
   };
 
-  const handleExport = (): void => {
-    exportRowsToCsv(
-      'promociones.csv',
-      ['Promoción', 'Condición', 'Descuento', 'Vigencia', 'Estado'],
-      visible.map((p) => [
-        p.name,
-        conditionShort(p),
-        discountShort(p),
-        dateRange(p.startDate, p.endDate),
-        STATUS_LABEL[promoStatus(p)],
-      ]),
-    );
-  };
+  const exportHeaders = ['Promoción', 'Condición', 'Descuento', 'Vigencia', 'Estado'];
+  const buildExportRows = (): string[][] =>
+    visible.map((p) => [
+      p.name,
+      conditionShort(p),
+      discountShort(p),
+      dateRange(p.startDate, p.endDate),
+      STATUS_LABEL[promoStatus(p)],
+    ]);
 
   usePageHeader('Promociones', 'Descuentos y reglas programables');
 
@@ -213,8 +210,8 @@ export function PromotionsPage() {
   usePageActions(
     <CsvActionButton
       kind="export"
-      label="Exportar promociones"
-      onClick={handleExport}
+      label="Exportar"
+      onClick={() => setDataModal('export')}
       testId="promotions-export"
     />,
   );
@@ -382,6 +379,20 @@ export function PromotionsPage() {
 
       {form && (
         <PromoModal form={form} onChange={setForm} onClose={() => setForm(null)} onSave={save} />
+      )}
+
+      {dataModal && (
+        <ImportExportModal
+          title="Promociones"
+          initialMode={dataModal}
+          onClose={() => setDataModal(null)}
+          testId="promotions-data-modal"
+          exportConfig={{
+            headers: exportHeaders,
+            getRows: buildExportRows,
+            filenameBase: 'promociones',
+          }}
+        />
       )}
     </section>
   );

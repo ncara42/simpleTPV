@@ -1,10 +1,11 @@
 import { Button, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Download, Plus, SlidersHorizontal, Upload, X } from 'lucide-react';
+import { Check, Plus, SlidersHorizontal, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { CsvDropzone } from './components/CsvDropzone.js';
+import { CsvActionButton } from './components/CsvActionButton.js';
+import { ImportExportModal } from './components/ImportExportModal.js';
 import { Modal } from './components/Modal.js';
 import { useTableColumns } from './components/useTableColumns.js';
 import {
@@ -18,7 +19,6 @@ import {
   updateUser,
   type User,
 } from './lib/admin.js';
-import { exportRowsToCsv } from './lib/csv.js';
 import { formErrorMessage } from './lib/form-error.js';
 import { usePageActions } from './lib/pageActions.js';
 
@@ -82,8 +82,8 @@ export function UsersPage() {
   const [form, setForm] = useState<UserForm | null>(null);
   // Modo asistente (edición en lote). null → alta de un usuario nuevo.
   const [wizard, setWizard] = useState<EditWizard | null>(null);
-  // Modal de importación de usuarios por CSV (alta en lote).
-  const [importing, setImporting] = useState(false);
+  // Modal unificado de Importar/Exportar equipo (B-04).
+  const [dataModal, setDataModal] = useState<'import' | 'export' | null>(null);
   const [sortDesc, setSortDesc] = useState(false);
   // Filtros de la barra superior (espejo de la toolbar de stock).
   const [search, setSearch] = useState('');
@@ -122,19 +122,18 @@ export function UsersPage() {
 
   usePageHeader('Usuarios', `${allUsers.length} usuarios`, 'users-count');
 
-  // Exporta a CSV las filas actualmente filtradas en memoria.
-  const handleExport = (): void => {
-    const headers = ['Nombre', 'Email', 'Rol', 'Tiendas', 'Estado'];
+  // Exportación del equipo: cabeceras + filas (filtradas en memoria) para el modal.
+  const exportHeaders = ['Nombre', 'Email', 'Rol', 'Tiendas', 'Estado'];
+  const buildExportRows = (): string[][] => {
     const storesCsv = (role: Role, storeIds: string[]): string =>
       role === 'ADMIN' ? 'Todas' : storeIds.map(storeName).join('; ');
-    const rows = filtered.map((u) => [
+    return filtered.map((u) => [
       u.name,
       u.email,
       ROLE_LABEL[u.role],
       storesCsv(u.role, u.storeIds ?? []),
       u.active ? 'Activo' : 'Inactivo',
     ]);
-    exportRowsToCsv('usuarios.csv', headers, rows);
   };
 
   // ─── Selección ─────────────────────────────────────────────────────────
@@ -356,26 +355,18 @@ export function UsersPage() {
 
   usePageActions(
     <>
-      <button
-        type="button"
-        className="float-action-btn"
-        onClick={handleExport}
-        aria-label="Exportar CSV"
-        title="Exportar CSV"
-        data-testid="users-export"
-      >
-        <Download size={17} aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        className="float-action-btn"
-        onClick={() => setImporting(true)}
-        aria-label="Importar CSV"
-        title="Importar CSV"
-        data-testid="users-import"
-      >
-        <Upload size={17} aria-hidden="true" />
-      </button>
+      <CsvActionButton
+        kind="export"
+        label="Exportar"
+        onClick={() => setDataModal('export')}
+        testId="users-export"
+      />
+      <CsvActionButton
+        kind="import"
+        label="Importar"
+        onClick={() => setDataModal('import')}
+        testId="users-import"
+      />
       <button
         type="button"
         className={`float-action-btn${columnsEditorOpen ? ' is-active' : ''}`}
@@ -619,34 +610,31 @@ export function UsersPage() {
         </Modal>
       )}
 
-      {importing && (
-        <Modal
-          onClose={() => setImporting(false)}
-          className="modal--form"
-          testId="users-import-modal"
-          ariaLabel="Importar usuarios desde CSV"
-        >
-          <h3>Importar usuarios desde CSV</h3>
-          <CsvDropzone
-            columns={['email', 'name', 'password', 'role']}
-            example={['nuevo@tienda.com', 'Nombre Apellido', 'contrasena8', 'CLERK']}
-            templateName="plantilla_usuarios.csv"
-            testId="users-csv"
-            help={
+      {dataModal && (
+        <ImportExportModal
+          title="Equipo"
+          initialMode={dataModal}
+          onClose={() => setDataModal(null)}
+          testId="users-data-modal"
+          exportConfig={{
+            headers: exportHeaders,
+            getRows: buildExportRows,
+            filenameBase: 'usuarios',
+          }}
+          importConfig={{
+            columns: ['email', 'name', 'password', 'role'],
+            example: ['nuevo@tienda.com', 'Nombre Apellido', 'contrasena8', 'CLERK'],
+            templateBase: 'plantilla_usuarios',
+            instructions: (
               <>
                 Columnas: <code>email,name,password,role</code>. El rol es <code>ADMIN</code>,{' '}
                 <code>MANAGER</code> o <code>CLERK</code>; la contraseña, mínimo 8 caracteres.
               </>
-            }
-            onImport={importUsersCsv}
-            onImported={invalidate}
-          />
-          <div className="modal-foot">
-            <button type="button" onClick={() => setImporting(false)}>
-              Cerrar
-            </button>
-          </div>
-        </Modal>
+            ),
+            onImport: importUsersCsv,
+            onImported: invalidate,
+          }}
+        />
       )}
     </section>
   );

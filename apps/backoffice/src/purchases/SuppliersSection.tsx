@@ -5,9 +5,8 @@ import { Plus } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 import { CsvActionButton } from '../components/CsvActionButton.js';
-import { CsvDropzone } from '../components/CsvDropzone.js';
-import { Modal } from '../components/Modal.js';
-import { exportRowsToCsv, importRowsViaCreate } from '../lib/csv.js';
+import { ImportExportModal } from '../components/ImportExportModal.js';
+import { importRowsViaCreate } from '../lib/csv.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { usePageActions } from '../lib/pageActions.js';
 import { createSupplier, deleteSupplier, listSuppliers, updateSupplier } from '../lib/purchases.js';
@@ -19,8 +18,9 @@ export function SuppliersSection({ tabs }: { tabs?: ReactNode }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
-  // Modal de importación de proveedores por CSV (alta en lote).
-  const [importing, setImporting] = useState(false);
+  // Modal unificado de Importar/Exportar proveedores (B-04): importar por CSV/XLSX
+  // (alta en lote) o exportar los proveedores filtrados a CSV.
+  const [dataModal, setDataModal] = useState<'import' | 'export' | null>(null);
   // Vista detalle (I-18/D-07): fila clicable → todo lo del proveedor en una vista.
   const [detailId, setDetailId] = useState<string | null>(null);
 
@@ -45,12 +45,9 @@ export function SuppliersSection({ tabs }: { tabs?: ReactNode }) {
   const term = search.trim().toLowerCase();
   const filtered = term ? suppliers.filter((s) => s.name.toLowerCase().includes(term)) : suppliers;
 
-  // Exporta los proveedores filtrados a CSV (Nombre + Lead time en días).
-  const handleExport = (): void => {
-    const headers = ['Nombre', 'Lead time (días)'];
-    const rows = filtered.map((s) => [s.name, String(s.leadTimeDays)]);
-    exportRowsToCsv('proveedores.csv', headers, rows);
-  };
+  // Exportación de proveedores: cabeceras + filas (filtradas en memoria) para el modal.
+  const exportHeaders = ['Nombre', 'Lead time (días)'];
+  const buildExportRows = (): string[][] => filtered.map((s) => [s.name, String(s.leadTimeDays)]);
 
   // Import por-fila (sin endpoint bulk): cada fila se da de alta con createSupplier.
   // mapRow LANZA si el nombre viene vacío para que se reporte como fila con error.
@@ -75,14 +72,14 @@ export function SuppliersSection({ tabs }: { tabs?: ReactNode }) {
       <>
         <CsvActionButton
           kind="export"
-          label="Exportar CSV"
-          onClick={handleExport}
+          label="Exportar"
+          onClick={() => setDataModal('export')}
           testId="suppliers-export"
         />
         <CsvActionButton
           kind="import"
-          label="Importar CSV"
-          onClick={() => setImporting(true)}
+          label="Importar"
+          onClick={() => setDataModal('import')}
           testId="suppliers-import"
         />
       </>
@@ -189,30 +186,33 @@ export function SuppliersSection({ tabs }: { tabs?: ReactNode }) {
           }
         />
       )}
-      {importing && (
-        <Modal
-          onClose={() => setImporting(false)}
-          className="modal--form"
-          testId="suppliers-import-modal"
-          ariaLabel="Importar proveedores desde CSV"
-        >
-          <h3>Importar proveedores desde CSV</h3>
-          <CsvDropzone
-            columns={['nombre', 'leadtimedias']}
-            example={['Distribuciones Norte', '7']}
-            templateName="proveedores"
-            testId="suppliers-csv"
-            onImport={onImportCsv}
-            onImported={() => {
+      {dataModal && (
+        <ImportExportModal
+          title="Proveedores"
+          initialMode={dataModal}
+          onClose={() => setDataModal(null)}
+          testId="suppliers-data-modal"
+          exportConfig={{
+            headers: exportHeaders,
+            getRows: buildExportRows,
+            filenameBase: 'proveedores',
+          }}
+          importConfig={{
+            columns: ['nombre', 'leadtimedias'],
+            example: ['Distribuciones Norte', '7'],
+            templateBase: 'proveedores',
+            instructions: (
+              <>
+                Columnas: <code>nombre,leadtimedias</code>. Solo <code>nombre</code> es obligatorio.
+                Lead time por defecto: 7 días.
+              </>
+            ),
+            onImport: onImportCsv,
+            onImported: () => {
               void qc.invalidateQueries({ queryKey: ['suppliers'] });
-            }}
-          />
-          <div className="modal-foot">
-            <button type="button" onClick={() => setImporting(false)}>
-              Cerrar
-            </button>
-          </div>
-        </Modal>
+            },
+          }}
+        />
       )}
     </>
   );

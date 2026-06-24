@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { exportRows } from '../lib/spreadsheet.js';
@@ -46,7 +46,7 @@ describe('ImportExportModal (B-04)', () => {
     expect(screen.queryByTestId('iemodal-import')).not.toBeInTheDocument();
   });
 
-  it('exporta en Excel llamando a exportRows con los datos actuales', () => {
+  it('exporta en Excel llamando a exportRows con los datos actuales', async () => {
     render(
       <ImportExportModal
         title="Catálogo"
@@ -56,15 +56,18 @@ describe('ImportExportModal (B-04)', () => {
       />,
     );
     fireEvent.click(screen.getByTestId('iemodal-export-xlsx'));
-    expect(exportRows).toHaveBeenCalledWith(
-      'xlsx',
-      'catalogo',
-      ['Nombre', 'PVP'],
-      [['Café', '2,50']],
+    // El export resuelve getRows (posiblemente async) antes de llamar a exportRows.
+    await waitFor(() =>
+      expect(exportRows).toHaveBeenCalledWith(
+        'xlsx',
+        'catalogo',
+        ['Nombre', 'PVP'],
+        [['Café', '2,50']],
+      ),
     );
   });
 
-  it('exporta en CSV llamando a exportRows con los datos actuales', () => {
+  it('exporta en CSV llamando a exportRows con los datos actuales', async () => {
     render(
       <ImportExportModal
         title="Catálogo"
@@ -74,11 +77,13 @@ describe('ImportExportModal (B-04)', () => {
       />,
     );
     fireEvent.click(screen.getByTestId('iemodal-export-csv'));
-    expect(exportRows).toHaveBeenCalledWith(
-      'csv',
-      'catalogo',
-      ['Nombre', 'PVP'],
-      [['Café', '2,50']],
+    await waitFor(() =>
+      expect(exportRows).toHaveBeenCalledWith(
+        'csv',
+        'catalogo',
+        ['Nombre', 'PVP'],
+        [['Café', '2,50']],
+      ),
     );
   });
 
