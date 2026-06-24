@@ -183,6 +183,11 @@
   flex-direction: column;
   gap: var(--ui-space-1);
   min-width: 0;
+  /* Celda de la rejilla conectada (estilo Vercel Analytics): superficie propia +
+     padding. El divisor entre celdas es el gap de 1px de .dv-kpi-row, que deja ver
+     el hairline de fondo. Como tile suelto (fuera de la rejilla) es solo una superficie. */
+  background: var(--ui-surface);
+  padding: var(--ui-space-4);
 }
 .dv-kpi-head {
   display: flex;
@@ -341,7 +346,14 @@
      sin columnas fijas por nº de KPIs. minmax(150px,1fr) = tantas columnas como quepan. Las clases
      --1..4 las sigue emitiendo KpiRow y se conservan como hook semántico, sin plantilla propia. */
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--ui-space-3);
+  /* Rejilla CONECTADA con hairline: el gap de 1px deja ver el fondo (= color de
+     borde) como divisor entre celdas; cada tile pinta su superficie. Outer redondeado
+     con overflow:hidden para que las celdas no se salgan de las esquinas. */
+  gap: 1px;
+  background: var(--ui-border);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  overflow: hidden;
   flex: 0 0 auto;
 }
 

@@ -197,10 +197,16 @@
    Las filas de navegación de la sidebar se quedan en rounded-rect salvo la activa.
    ──────────────────────────────────────────────────────────────── */
 .app-shell .ui-select-trigger {
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-sm);
 }
 
 .app-shell button {
+  border-radius: var(--ui-radius-sm);
+}
+
+/* Excepción: los botones-icono del clúster flotante (lupa/atrás/home/tema/campana)
+   siguen siendo CÍRCULOS; la regla con clase gana al de-pill de `.app-shell button`. */
+.app-shell .float-action-btn {
   border-radius: 9999px;
 }
 
