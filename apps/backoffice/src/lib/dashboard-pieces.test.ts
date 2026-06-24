@@ -4,11 +4,13 @@ import { describe, expect, it } from 'vitest';
 // leer fuera de apps/backoffice. El test gemelo en Rust verifica el otro lado contra el mismo JSON.
 import contract from '../../../../docs/contracts/dataviz-contract.json';
 import { BLOCK_IDS } from './dashboard-blocks.js';
+import type { GenericSpec } from './dashboard-layout.js';
 import {
   asFormat,
   asRecipe,
   clampInt,
   clampRecipe,
+  decomposePanelSpec,
   inferFormat,
   PIECE_ALLOWLIST,
   PIECE_FORMATS,
@@ -17,6 +19,75 @@ import {
   slotForPiece,
   WIDGETABLE_ENDPOINTS,
 } from './dashboard-pieces.js';
+
+describe('decomposePanelSpec', () => {
+  const panel: GenericSpec = {
+    type: 'composite',
+    kind: 'panel',
+    version: 2,
+    endpoint: '',
+    title: 'Resumen de ventas',
+    defaultSize: { w: 8, h: 5 },
+    recipe: 'kpiRow+oneChart',
+    density: 'comfortable',
+    slots: {
+      kpis: [
+        {
+          piece: 'kpiTile',
+          title: 'Facturación',
+          endpoint: '/dashboard/sales-kpis',
+          valueField: 'revenue',
+        },
+        {
+          piece: 'kpiTile',
+          title: 'Ticket medio',
+          endpoint: '/dashboard/sales-kpis',
+          valueField: 'avgTicket',
+        },
+      ],
+      charts: [
+        {
+          piece: 'trendArea',
+          title: 'Ventas por hora',
+          endpoint: '/dashboard/sales-by-hour',
+          labelField: 'hour',
+          valueField: 'revenue',
+        },
+      ],
+    },
+  };
+
+  it('separa un panel multi-pieza en N widgets de UNA pieza, conservando el binding de cada uno', () => {
+    const parts = decomposePanelSpec(panel);
+    expect(parts).toHaveLength(3); // 2 KPIs + 1 gráfica
+    // Cada parte es un panel de una sola pieza.
+    for (const p of parts) {
+      const pieceCount = (p.slots?.kpis?.length ?? 0) + (p.slots?.charts?.length ?? 0);
+      expect(pieceCount).toBe(1);
+      expect(p.kind).toBe('panel');
+    }
+    // KPI → kpiRow estrecho; gráfica → tableFull (una pieza a lo ancho).
+    const kpi = parts.find((p) => p.slots?.kpis)!;
+    expect(kpi.recipe).toBe('kpiRow');
+    expect(kpi.title).toBe('Facturación');
+    expect(kpi.slots?.kpis?.[0]?.valueField).toBe('revenue');
+    const chart = parts.find((p) => p.slots?.charts)!;
+    expect(chart.recipe).toBe('tableFull');
+    expect(chart.slots?.charts?.[0]?.piece).toBe('trendArea');
+  });
+
+  it('no toca un panel de una sola pieza ni un genérico que no sea panel', () => {
+    const single: GenericSpec = { ...panel, slots: { kpis: [panel.slots!.kpis![0]!] } };
+    expect(decomposePanelSpec(single)).toEqual([single]);
+    const kpi: GenericSpec = {
+      type: 'kpi',
+      endpoint: '/x',
+      title: 'K',
+      defaultSize: { w: 2, h: 1 },
+    };
+    expect(decomposePanelSpec(kpi)).toEqual([kpi]);
+  });
+});
 
 describe('dashboard-pieces — reparadores del DSL v2 (#204)', () => {
   describe('inferFormat', () => {
