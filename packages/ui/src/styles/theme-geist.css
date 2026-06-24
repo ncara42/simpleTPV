@@ -299,14 +299,14 @@ samp,
 :root[data-theme='dark'] {
   color-scheme: dark;
   /* Escala de grises invertida (fríos): bg oscuro → texto claro. */
-  --gst-50: #0a0a0a;
-  --gst-100: #161618;
-  --gst-150: #1c1c1f;
-  --gst-200: #27272a;
-  --gst-300: #3f3f46;
-  --gst-400: #52525b;
-  --gst-500: #8b8b94; /* texto terciario (AA sobre oscuro) */
-  --gst-600: #b4b4bb; /* texto secundario */
+  --gst-50: #0a0a0a; /* lienzo (el más oscuro) */
+  --gst-100: #141417; /* surface-subtle: zebra/hover/relleno — más oscuro que la tarjeta, como en claro */
+  --gst-150: #24242a; /* pista/relleno que debe verse SOBRE una tarjeta */
+  --gst-200: #2e2e35; /* hairline (claramente visible sobre surface) */
+  --gst-300: #3d3d45; /* hairline marcado */
+  --gst-400: #54545c; /* icono faint / disabled */
+  --gst-500: #8a8a93; /* texto terciario (AA sobre oscuro) */
+  --gst-600: #b3b3bb; /* texto secundario */
   --gst-700: #d4d4d8;
   --gst-800: #ededef;
   --gst-900: #fafafa; /* texto principal */
@@ -318,10 +318,13 @@ samp,
   --gst-blue-soft: rgba(59, 158, 255, 0.14);
   --gst-blue-soft-2: rgba(59, 158, 255, 0.24);
 
-  /* Superficies (los --ui-* fijados a literal, no derivados de --gst-*). */
-  --ui-surface: #161618;
-  --ap-surface: #161618;
-  --ap-pearl: #1c1c1f;
+  /* Superficies (los --ui-* fijados a literal, no derivados de --gst-*).
+     La tarjeta es el nivel más CLARO de las superficies → lift sobre lienzo
+     (#0a0a0a) y sobre subtle (#141417); así zebras/pistas/hover se distinguen
+     de la tarjeta y no se produce la confusión de niveles del primer intento. */
+  --ui-surface: #1e1e22;
+  --ap-surface: #1e1e22;
+  --ap-pearl: #24242a;
 
   /* Semántica luminosa + soft oscuros translúcidos. */
   --ui-danger: #ff6166;
