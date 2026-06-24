@@ -33,15 +33,6 @@ function messageText(message: ChatMessage): string {
     .trim();
 }
 
-// Razonamiento persistido (bloques de contenido `thinking`), si el modelo lo produjo.
-function messageThinking(message: ChatMessage): string {
-  return message.content
-    .filter((b) => b.type === 'thinking')
-    .map((b) => b.text)
-    .join('\n')
-    .trim();
-}
-
 // ── Clasificación de tools (espejo de CANVAS_OP_NAMES / VIEW_ACTION_NAMES del backend) ──
 // CONSULTAS de datos (nodo índigo) vs ACCIONES sobre el lienzo/pantalla (nodo de marca).
 
@@ -105,8 +96,9 @@ function buildTurnItems(
 ): { items: ThoughtItem[]; finalText: string } {
   const items: ThoughtItem[] = [];
   for (const msg of assistants) {
-    const thinking = messageThinking(msg);
-    if (thinking) items.push({ kind: 'reasoning', text: thinking });
+    // El `thinking` crudo del modelo NO se muestra: filtra reglas/variables/código del
+    // system prompt. La cadena solo enseña pasos de tools (etiquetas de negocio) y la
+    // narración del chat (sujeta a la regla de "no nombres internos").
     for (const call of msg.toolCalls ?? []) {
       const action = isActionTool(call.name);
       const rejected = action && call.id ? canvasRejected(resultsByCall.get(call.id)) : false;
@@ -312,8 +304,10 @@ export function ChatMessages({
   // Cadena de pensamiento del turno en curso: razonamiento + tools en marcha (la conclusión
   // se va escribiendo aparte en streamingText).
   const streamingItems = useMemo<ThoughtItem[]>(() => {
+    // Mientras el modelo solo "piensa" (sin tools ni texto), no se muestra nada de ese
+    // razonamiento crudo: el placeholder «Pensando» cubre esa fase. La cadena aparece con
+    // los pasos de tools en marcha.
     const items: ThoughtItem[] = [];
-    if (streamingReasoning) items.push({ kind: 'reasoning', text: streamingReasoning });
     for (const call of streamingToolCalls) {
       const action = isActionTool(call.name);
       items.push({
@@ -324,7 +318,7 @@ export function ChatMessages({
       });
     }
     return items;
-  }, [streamingReasoning, streamingToolCalls]);
+  }, [streamingToolCalls]);
 
   const checkBottom = (): void => {
     const el = scrollRef.current;
