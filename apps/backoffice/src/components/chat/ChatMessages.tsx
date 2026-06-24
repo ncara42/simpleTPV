@@ -182,7 +182,7 @@ function UserBubble({ message, disabled, onEditAndResend }: UserBubbleProps) {
             <div className="chat-msg__toolbar">
               <button
                 type="button"
-                className="chat-msg__action"
+                className="chat-action"
                 disabled={disabled}
                 aria-label="Editar y reenviar"
                 title="Editar y reenviar"

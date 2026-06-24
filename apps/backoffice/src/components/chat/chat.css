@@ -609,33 +609,8 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 
 .chat-msg__toolbar {
   display: flex;
-  gap: var(--ui-space-2);
-  opacity: 0;
-  transition: opacity var(--ui-motion-fast) var(--ui-ease);
-}
-
-.chat-msg:hover .chat-msg__toolbar {
-  opacity: 1;
-}
-
-.chat-msg__action {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: none;
-  background: transparent;
-  color: var(--ui-text-muted);
-  font-size: var(--ui-text-2xs);
-  cursor: pointer;
-}
-
-.chat-msg__action:hover:not(:disabled) {
-  color: var(--ui-text);
-}
-
-.chat-msg__action:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+  gap: 2px;
+  margin-top: 2px;
 }
 
 .chat-msg__edit {
@@ -655,6 +630,15 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   font-size: var(--ui-text-sm);
   background: var(--ui-surface);
   color: var(--ui-text);
+  transition:
+    border-color var(--ui-motion-fast) var(--ui-ease),
+    box-shadow var(--ui-motion-fast) var(--ui-ease);
+}
+
+.chat-msg__edit-area:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--ui-primary) 45%, var(--ui-border));
+  box-shadow: var(--ui-focus);
 }
 
 .chat-msg__edit-actions {
