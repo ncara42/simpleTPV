@@ -12,8 +12,7 @@ import { Plus, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import { CsvActionButton } from './components/CsvActionButton.js';
-import { CsvDropzone } from './components/CsvDropzone.js';
-import { Modal } from './components/Modal.js';
+import { ImportExportModal } from './components/ImportExportModal.js';
 import {
   EMPTY_PRODUCT_FORM,
   ProductFormModal,
@@ -21,7 +20,6 @@ import {
 } from './components/ProductFormModal.js';
 import { ProductMovements } from './components/ProductMovements.js';
 import { useTableColumns } from './components/useTableColumns.js';
-import { exportRowsToCsv } from './lib/csv.js';
 import { type FamilyNode, listFamilies } from './lib/families.js';
 import { findNodePath, flattenTree, isDescendantOf } from './lib/family-tree.js';
 import { formErrorMessage } from './lib/form-error.js';
@@ -122,8 +120,9 @@ export function CatalogPage({
   const [form, setForm] = useState<FormState | null>(null);
   const [wizard, setWizard] = useState<EditWizard | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
-  // Modal de importación de catálogo por CSV (POST /products/import).
-  const [importing, setImporting] = useState(false);
+  // Modal unificado de Importar/Exportar catálogo (B-04): importar por CSV/XLSX
+  // (POST /products/import) o exportar las filas filtradas a CSV/Excel.
+  const [dataModal, setDataModal] = useState<'import' | 'export' | null>(null);
   // Orden y paginación cliente del DataTable (D-04).
   const [sort, setSort] = useState<DataTableSort | undefined>(undefined);
   const [page, setPage] = useState(1);
@@ -175,10 +174,10 @@ export function CatalogPage({
 
   usePageHeader('Catálogo', `${filtered.length} productos activos`, 'catalog-count');
 
-  // Exporta a CSV las filas actualmente filtradas en memoria.
-  const handleExport = (): void => {
-    const headers = ['Nombre', 'SKU', 'EAN', 'Familia', 'PVP', 'Coste', 'Stock'];
-    const rows = filtered.map((p) => [
+  // Exportación del catálogo: cabeceras + filas (filtradas en memoria) para el modal.
+  const exportHeaders = ['Nombre', 'SKU', 'EAN', 'Familia', 'PVP', 'Coste', 'Stock'];
+  const buildExportRows = (): string[][] =>
+    filtered.map((p) => [
       p.name,
       p.sku ?? '',
       p.barcode ?? '',
@@ -187,8 +186,6 @@ export function CatalogPage({
       fmtEur(Number(p.costPrice)),
       String(stockByProduct.get(p.id) ?? 0),
     ]);
-    exportRowsToCsv('catalogo.csv', headers, rows);
-  };
 
   // Orden cliente (numérico para precios/margen/stock; texto para el resto).
   const sortValue = useCallback(
@@ -518,14 +515,14 @@ export function CatalogPage({
     <>
       <CsvActionButton
         kind="export"
-        label="Exportar CSV"
-        onClick={handleExport}
+        label="Exportar"
+        onClick={() => setDataModal('export')}
         testId="catalog-export"
       />
       <CsvActionButton
         kind="import"
-        label="Importar CSV"
-        onClick={() => setImporting(true)}
+        label="Importar"
+        onClick={() => setDataModal('import')}
         testId="catalog-import"
       />
       <button
@@ -592,34 +589,31 @@ export function CatalogPage({
         />
       )}
 
-      {importing && (
-        <Modal
-          onClose={() => setImporting(false)}
-          className="modal--form"
+      {dataModal && (
+        <ImportExportModal
+          title="Catálogo"
+          initialMode={dataModal}
+          onClose={() => setDataModal(null)}
           testId="catalog-import-modal"
-          ariaLabel="Importar catálogo desde CSV"
-        >
-          <h3>Importar catálogo desde CSV</h3>
-          <CsvDropzone
-            columns={['name', 'salePrice', 'sku', 'barcode']}
-            example={['Producto ejemplo', '9.99', 'SKU-001', '8412345678901']}
-            templateName="plantilla_catalogo.csv"
-            testId="catalog-csv"
-            help={
+          exportConfig={{
+            headers: exportHeaders,
+            getRows: buildExportRows,
+            filenameBase: 'catalogo',
+          }}
+          importConfig={{
+            columns: ['name', 'salePrice', 'sku', 'barcode'],
+            example: ['Producto ejemplo', '9.99', 'SKU-001', '8412345678901'],
+            templateBase: 'plantilla_catalogo',
+            instructions: (
               <>
                 Columnas: <code>name,salePrice,sku,barcode</code>. Solo <code>name</code> y{' '}
                 <code>salePrice</code> son obligatorios.
               </>
-            }
-            onImport={importProductsCsv}
-            onImported={invalidate}
-          />
-          <div className="modal-foot">
-            <button type="button" onClick={() => setImporting(false)}>
-              Cerrar
-            </button>
-          </div>
-        </Modal>
+            ),
+            onImport: importProductsCsv,
+            onImported: invalidate,
+          }}
+        />
       )}
     </section>
   );

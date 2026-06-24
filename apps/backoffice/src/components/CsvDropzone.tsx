@@ -3,7 +3,7 @@ import { Download } from 'lucide-react';
 import { type ReactNode, useId, useRef, useState } from 'react';
 
 import { formErrorMessage } from '../lib/form-error.js';
-import { fileToCsv } from '../lib/spreadsheet.js';
+import { downloadTemplate, fileToCsv } from '../lib/spreadsheet.js';
 
 interface Props {
   // Columnas esperadas en la cabecera (para validar y construir la plantilla).
@@ -44,6 +44,8 @@ export function CsvDropzone({
   const templateHref = `data:text/csv;charset=utf-8,${encodeURIComponent(
     `${columns.join(',')}\n${example.join(',')}`,
   )}`;
+  // Base del nombre de plantilla (sin extensión) para generar también la versión Excel.
+  const templateBase = templateName.replace(/\.(csv|xlsx|xls)$/i, '');
 
   // Valida que la cabecera incluya todas las columnas esperadas (admite extras).
   function missingColumns(csv: string): string[] {
@@ -89,10 +91,21 @@ export function CsvDropzone({
   return (
     <div className="csv-dropzone" data-testid={testId}>
       {help && <p className="csv-dropzone-help">{help}</p>}
-      <a className="csv-dropzone-template" href={templateHref} download={templateName}>
-        <Download size={15} aria-hidden="true" />
-        Descargar plantilla CSV
-      </a>
+      <div className="csv-dropzone-templates">
+        <a className="csv-dropzone-template" href={templateHref} download={templateName}>
+          <Download size={15} aria-hidden="true" />
+          Plantilla CSV
+        </a>
+        <button
+          type="button"
+          className="csv-dropzone-template"
+          onClick={() => void downloadTemplate('xlsx', templateBase, columns, example)}
+          data-testid="csv-dropzone-template-xlsx"
+        >
+          <Download size={15} aria-hidden="true" />
+          Plantilla Excel
+        </button>
+      </div>
 
       <input
         ref={inputRef}

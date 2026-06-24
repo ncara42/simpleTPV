@@ -2842,12 +2842,50 @@
   background: var(--ui-surface-subtle);
   font-size: 0.85em;
 }
+.csv-dropzone-templates {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-4, 1rem);
+}
 .csv-dropzone-template {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   font-size: var(--ui-text-sm);
   color: var(--ui-brand);
+  /* B-04: admite <a> (plantilla CSV) y <button> (plantilla Excel en cliente). */
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.csv-dropzone-template:hover {
+  text-decoration: underline;
+}
+
+/* B-04: modal unificado Importar/Exportar. */
+.import-export-modal .iemodal-panel {
+  margin-top: var(--ui-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4);
+}
+.import-export-modal .iemodal-instructions {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-soft);
+}
+.import-export-modal .iemodal-instructions code {
+  font-size: 0.9em;
+  padding: 0.05rem 0.3rem;
+  border-radius: 5px;
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border);
+}
+.import-export-modal .iemodal-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-3);
 }
 .csv-dropzone-input {
   position: absolute;
