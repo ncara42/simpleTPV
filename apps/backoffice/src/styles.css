@@ -33,155 +33,50 @@
   }
 }
 
-/* ─── Shell flotante sin header ───────────────────────────────────────────────
-   Se eliminó la TopBar: el nombre de la view, el clúster de acciones (lupa · home ·
-   campana · conmutador) y el dock del asistente flotan sobre el contenido/lienzo.
-   El Dashboard es un lienzo libre full-bleed (.dashboard--free es fixed inset:0);
-   el resto de views flotan como una superficie sobre el fondo. ───────────────── */
+/* ─── Shell colapsable (sidebar fijo + topbar flotante) ───────────────────────
+   El nombre de la vista vive ahora en la isla del topbar (.topbar-title), no en una
+   etiqueta flotante; el clúster de acciones y la cuenta están en el topbar. El sidebar
+   fijo lo despeja el margin-left de .app-content (rail/expandido). ──────────────── */
 
-/* Nombre de la view activa: pill flotante arriba-centro, donde antes vivía el chip del
-   dashboard y el título del header. Sobre el lienzo (fixed z-35) → z alto. No captura
-   el ratón (es solo etiqueta; el lienzo de debajo sigue siendo arrastrable). */
-.view-title-float {
-  position: fixed;
-  top: 0.85rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 39;
-  padding: 0.4rem 1.15rem;
-  border-radius: 9999px;
-  background: color-mix(in srgb, var(--ui-surface) 84%, transparent);
-  border: 1px solid var(--ui-border);
-  box-shadow:
-    0 1px 2px rgb(0 0 0 / 0.04),
-    0 8px 26px rgb(0 0 0 / 0.14);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  font-size: 0.9rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--ui-text);
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-/* Dashboard: lienzo libre full-bleed (la propia .dashboard--free se sale del flujo). */
+/* «Asistente de IA»: host del lienzo en flujo. position:relative ancla el
+   .dashboard--free/grid (absolute inset:0) a esta área —a la derecha del sidebar y por
+   debajo del topbar+sub-barra—, en vez del viewport. */
 .bo-main--canvas {
+  /* SIN position propio: el lienzo (absolute) escapa a .app-content (su ancestro posicionado)
+     y rellena toda el área, también detrás del topbar → el topbar flota sobre los puntos. */
   padding: 0;
 }
 
-/* Views NO-dashboard: el lienzo de puntitos es FULL-BLEED (cubre todo el viewport, por debajo del
-   sidebar flotante), igual que .dashboard--free. Se anula la columna reservada del sidebar para que
-   no quede una franja gris sólida a la izquierda y el sidebar flote DE VERDAD sobre el contenido.
-   El contenido se sangra a la izquierda para no quedar tapado por el sidebar. */
-.sidebar--floating ~ .app-content--surface {
-  margin-left: 0;
+/* En el lienzo («Asistente de IA») el lienzo (.dashboard--free/grid, absolute inset:0) RELLENA
+   toda esta área —incluido el espacio del topbar— al ser .app-content su ancestro posicionado.
+   Así el topbar transparente flota DE VERDAD sobre el lienzo (puntos/rejilla por debajo), sin
+   banda de cabecera. Solo aplica a la vista lienzo (sin --surface). */
+.app-content:not(.app-content--surface) {
+  position: relative;
 }
 
-/* NO hay card de fondo. El contenido flota directo sobre el fondo plano. Holgura: arriba para
-   la etiqueta de view, izquierda para el sidebar flotante, abajo para el dock del asistente. */
+/* Vistas NO-lienzo: superficie de contenido plana sobre el fondo de .app-content. El
+   sidebar fijo lo despeja el margin-left de .app-content; el topbar sticky reserva su
+   altura. Solo aire interior + holgura inferior para el dock del asistente. La rejilla de
+   puntitos se reserva al lienzo libre (.dashboard--free en dashboard.css). */
 .bo-main--surface {
   margin: 0;
-  /* El borde superior del contenido se alinea con el del cuerpo flotante del sidebar
-     (--sidebar-float-top, heredado de .app-shell): mismo margen superior a ambos lados,
-     en vez de un valor mágico que dejaba el widget un pelín más alto que el sidebar. */
-  padding: var(--sidebar-float-top, 3.6rem) 1.5rem 6rem
-    calc(var(--sidebar-width-expanded) + var(--sidebar-float-gap) * 2 + 0.5rem);
-  min-height: 100vh;
+  padding: 1.5rem 1.75rem 6rem;
   background: none;
   border: none;
   border-radius: 0;
   box-shadow: none;
-  /* Fondo plano y limpio. La rejilla de puntitos se reserva SOLO al lienzo libre
-     del dashboard (.dashboard--free en dashboard.css); en el resto de vistas se retiró. */
-  background-color: var(--ui-surface-subtle);
-}
-
-/* Sidebar oculto: el contenido recupera el sangrado mínimo (ya no hay barra que esquivar). */
-.sidebar--floating.is-hidden ~ .app-content--surface .bo-main--surface {
-  padding-left: 1.5rem;
 }
 
 @media (max-width: 767px) {
-  /* En móvil el sidebar usa off-canvas: el contenido no necesita sangrado lateral. */
+  /* En móvil el sidebar usa off-canvas; el contenido no necesita sangrado lateral. */
   .bo-main--surface {
-    padding: 3.2rem 0.75rem 6rem;
+    padding: 1rem 1rem 6rem;
   }
 }
 
-/* ─── Clúster de acciones flotante (sustituye a la TopBar) ────────────────────
-   Vive dentro de .sidebar-search-float (solo escritorio). Fila: lupa · home ·
-   campana · conmutador, a la altura del logo del sidebar flotante. ───────────── */
-.float-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--sidebar-top-gap, 8px);
-}
-
-/* La lupa es un botón icono; el clúster se ancla al borde derecho (.sidebar-search-float).
-   El conmutador Backoffice↔TPV se retiró: el TPV vive ahora como última entrada del sidebar. */
-@media (min-width: 768px) {
-  .sidebar-search-float {
-    right: var(--sidebar-float-gap);
-  }
-}
-
-/* Acciones de la vista activa: ancladas al borde derecho del clúster (donde estaba el
-   conmutador). Vacío no ocupa ni rompe el layout; con botones, fila a la derecha. */
-.float-page-actions {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sidebar-top-gap, 8px);
-}
-
-/* Botones redondos del clúster (home, campana): mismo tamaño que el logo del sidebar. */
-.float-action-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  flex: none;
-  width: var(--sidebar-tab-h, 38px);
-  height: var(--sidebar-tab-h, 38px);
-  border-radius: 9999px;
-  border: 1px solid var(--ui-border);
-  background: var(--ui-surface);
-  color: var(--ui-text);
-  box-shadow:
-    0 1px 2px rgb(0 0 0 / 0.04),
-    0 10px 24px -14px rgb(0 0 0 / 0.22);
-  cursor: pointer;
-  transition:
-    background 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease;
-}
-.float-action-btn:hover {
-  background: var(--ui-surface-subtle);
-  border-color: var(--ui-border-strong, var(--ui-border));
-}
-.float-action-btn.is-active {
-  background: var(--ui-brand-soft, var(--ui-surface-subtle));
-  color: var(--ui-brand-ink, var(--ui-text));
-  border-color: transparent;
-}
-.float-action-badge {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 9999px;
-  background: var(--ui-danger);
-  color: #fff;
-  font-size: 0.62rem;
-  font-weight: 700;
-  line-height: 16px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
+/* El clúster de acciones flotante (lupa/atrás/home/campana) se retiró: sus controles viven
+   ahora en el topbar flotante (isla + clúster derecho). Ver @simpletpv/ui/topbar.css. */
 
 /* Eyebrow del topbar (específico del backoffice). */
 .topbar-eyebrow {
@@ -204,11 +99,8 @@
   border-radius: var(--ui-radius-sm);
 }
 
-/* Excepción: los botones-icono del clúster flotante (lupa/atrás/home/tema/campana)
-   siguen siendo CÍRCULOS; la regla con clase gana al de-pill de `.app-shell button`. */
-.app-shell .float-action-btn {
-  border-radius: 9999px;
-}
+/* Los botones-icono del topbar usan el radio del sistema (8px, estilo Vercel), no círculos:
+   heredan --ui-radius-sm de `.topbar-icon-btn` / `.app-shell button`. */
 
 .app-shell .sidebar-item,
 .app-shell .sidebar-logout {

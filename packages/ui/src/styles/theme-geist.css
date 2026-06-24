@@ -216,77 +216,9 @@ samp,
   box-shadow: 0 1px 2px rgba(0, 112, 243, 0.25);
 }
 
-/* ════════════════════════════════════════════════════════════
-   TOPBAR — Geist: hairline limpio, blur sutil, pills sobrios, tracking tight
-   ════════════════════════════════════════════════════════════ */
-.topbar {
-  height: 64px;
-  padding: 0 2.5rem;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: saturate(180%) blur(16px);
-  -webkit-backdrop-filter: saturate(180%) blur(16px);
-  border-bottom: 1px solid var(--ui-border);
-  position: sticky;
-  top: 0;
-  z-index: 20;
-}
-
-.topbar-title {
-  font-size: 1.32rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--ui-text);
-}
-
-.topbar-right {
-  gap: 1rem;
-}
-
-.topbar-switch {
-  padding: 0.18rem;
-  border-radius: 9999px;
-  background: var(--gst-100);
-  border: 1px solid var(--ui-border);
-}
-
-.topbar-switch-btn {
-  height: 28px;
-  padding: 0 0.9rem;
-  border-radius: 9999px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  color: var(--ui-text-muted);
-}
-
-.topbar-switch-btn.active {
-  background: var(--ui-surface);
-  color: var(--ui-text);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-}
-
-/* Perfil del usuario en el topbar */
-.topbar-user {
-  padding-left: 1rem;
-  border-left: 1px solid var(--ui-border);
-}
-
-.topbar-avatar {
-  background: var(--gst-100);
-  color: var(--ui-text-muted);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.topbar-user-name {
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--ui-text);
-}
-
-.topbar-user-sub {
-  color: var(--ui-text-soft);
-}
+/* TOPBAR — el topbar flotante (isla central + clúster derecho) vive por completo
+   en @simpletpv/ui/topbar.css (fuente única, dark-aware vía tokens). Aquí ya no se
+   re-declara nada para no pisar ese fichero según el orden de carga. */
 
 /* ════════════════════════════════════════════════════════════════════
    MODO OSCURO — toggle por atributo data-theme en <html>.
@@ -354,10 +286,5 @@ samp,
   --sidebar-item-hover-bg: rgba(255, 255, 255, 0.05);
 }
 
-/* Chrome con colores claros fijos: re-piel en oscuro. */
-:root[data-theme='dark'] .topbar {
-  background: rgba(14, 14, 16, 0.8);
-}
-:root[data-theme='dark'] .topbar-switch-btn.active {
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
-}
+/* El topbar flotante es dark-aware vía tokens (--ui-surface, etc.); no necesita
+   re-piel en oscuro. Ver @simpletpv/ui/topbar.css. */

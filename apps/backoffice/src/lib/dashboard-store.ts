@@ -26,6 +26,7 @@ import {
   addText as addTextEl,
   addWidget as addWidgetToFree,
   autoArrangeFree,
+  availableWidgets,
   type CompositeNode,
   type DataGridColumnSpec,
   DRAW_COLORS,
@@ -175,6 +176,13 @@ function withFree(layout: LayoutPref, next: FreeLayout): LayoutPref {
 }
 function withGrid(layout: LayoutPref, next: StoredLayouts): LayoutPref {
   return { ...layout, layouts: { ...layout.layouts, [ACTIVE_PRESET]: next } };
+}
+
+// Ids del catálogo disponibles para añadir al lienzo del preset activo (los que NO están ya). Lo usa
+// el botón «+» de la topbar (DashboardAddWidget) para poblar su paleta sin replicar aquí el literal
+// del preset ni el helper `freeOf`.
+export function availableWidgetIds(layout: LayoutPref): string[] {
+  return availableWidgets(freeOf(layout));
 }
 
 // Deriva el id de lienzo de un widget genérico a partir del `element_id` que envía el agente.

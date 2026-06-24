@@ -7,7 +7,7 @@ import '@simpletpv/ui/topbar.css';
 import './catalog.css';
 import './styles.css';
 
-import { LoginForm, type NavGroup, type NavItem, Sidebar } from '@simpletpv/ui';
+import { LoginForm, type NavGroup, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
 import { PageHeaderProvider } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -34,8 +34,9 @@ import { B2bPage } from './B2bPage.js';
 import { AssistantDock } from './components/chat/AssistantDock.js';
 import { CanvasToolsMenu } from './components/chat/CanvasToolsMenu.js';
 import { viewContextFor } from './components/chat/view-context.js';
+import { DashboardAddWidget } from './components/DashboardAddWidget.js';
 import { DashboardModeToggle } from './components/DashboardModeToggle.js';
-import { FloatingActions } from './components/FloatingActions.js';
+import { FunctionSearch } from './components/FunctionSearch.js';
 import { DashboardPage } from './DashboardPage.js';
 import { HelpPage } from './HelpPage.js';
 import { InventoryPage } from './InventoryPage.js';
@@ -47,7 +48,7 @@ import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { switchApp, type Tab } from './lib/nav.js';
 import { pathToTab, tabToPath } from './lib/navigation.js';
-import { PageActionsProvider } from './lib/pageActions.js';
+import { PageActionsProvider, usePageActionsValue } from './lib/pageActions.js';
 import { listAlerts } from './lib/stock.js';
 import { NotificationsPage } from './NotificationsPage.js';
 import { PersonalPage } from './PersonalPage.js';
@@ -69,7 +70,7 @@ const NAV_GROUPS: NavGroup[] = [
 ];
 
 const ALL_NAV: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+  { id: 'dashboard', label: 'Asistente de IA', icon: <LayoutDashboard size={18} /> },
   { id: 'notifications', label: 'Notificaciones', icon: <Bell size={18} />, group: 'inventory' },
   // S-02 fase A: una sola entrada "Inventario" monta InventoryPage con vistas
   // segmentadas (Catálogo · Familias · Existencias). Las tres entradas previas se
@@ -100,6 +101,12 @@ const ALL_NAV: NavItem[] = [
 // VeriFactu/Notificaciones quitando su id de este set.
 const HIDDEN_TABS = new Set<Tab>(['notifications', 'verifactu']);
 const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab));
+
+// Lee las acciones de la vista activa (cada page las declara con usePageActions) y
+// las inyecta en el clúster derecho del topbar (antes vivían en el clúster flotante).
+function PageActionsSlot() {
+  return <>{usePageActionsValue()}</>;
+}
 
 function Home() {
   const logout = useAuthStore((s) => s.clear);
@@ -233,7 +240,7 @@ function Home() {
           items={navItems}
           groups={NAV_GROUPS}
           groupsAsDropdowns
-          floating
+          collapsible
           logo={
             branding?.logoUrl ? (
               <img className="sidebar-logo-img" src={branding.logoUrl} alt="Logo" />
@@ -241,66 +248,62 @@ function Home() {
           }
           activeItem={tab}
           onSelect={(id) => navigateTo(id as Tab)}
+          // La cuenta vive al PIE del sidebar (avatar → menú con cerrar sesión), estilo
+          // ChatGPT/Claude; en rail se reduce al avatar. La campana sigue en el topbar.
           account={{ name: 'Administrador', subtitle: 'Central · Admin' }}
           onLogout={logout}
-          onNotifications={toggleNotifications}
-          notificationCount={notificationCount}
-          // El TPV ya no es un toggle en el clúster: es la última entrada del sidebar, separada por
-          // una línea y en azul (appSwitch). Navega al subdominio/URL hermana del TPV.
+          // El TPV es la última entrada del sidebar (appSwitch), separada por una línea y en azul.
           appSwitch={{
             label: 'TPV',
             icon: <Monitor size={19} aria-hidden="true" />,
             onClick: () => switchApp('tpv'),
             testId: 'switch-tpv',
           }}
-          // Clúster de acciones flotante sobre el sidebar (sustituye al header): lupa ⌘K + home +
-          // campana + acciones de la vista activa.
-          floatingActions={
-            <FloatingActions
-              onNavigate={navigateTo}
-              // Atrás (S-03): retrocede en el historial del ROUTER. `location.key === 'default'`
-              // marca la entrada inicial sin historial previo del router (deep-link directo) →
-              // cae al Dashboard sin riesgo de salir del SPA (a diferencia de window.history.length,
-              // que cuenta entradas de otros orígenes). NO sustituye al toggle de la campana.
-              onBack={() => (location.key !== 'default' ? navigate(-1) : navigate('/'))}
-              onHome={() => navigateTo('dashboard')}
-              onNotifications={toggleNotifications}
-              notificationCount={notificationCount}
-              notificationsActive={tab === 'notifications'}
-            />
-          }
         />
         {/* En views NO-lienzo anulamos la columna reservada del sidebar flotante: el lienzo de
           puntitos va full-bleed y el sidebar flota por encima (como en el Dashboard). */}
         <div className={`app-content${isCanvas ? '' : ' app-content--surface'}`}>
           <PageHeaderProvider>
-            {/* Nombre de la view activa, flotando arriba del contenido (reemplaza el header). En el
-              Dashboard se OCULTA: la barra de herramientas del lienzo ocupa ese sitio (arriba-centro)
-              en su lugar (ver DashboardPage .dash-canvas-toolbar). */}
-            {activeLabel && tab !== 'dashboard' && (
-              <span className="view-title-float" data-testid="page-heading">
-                {activeLabel}
-              </span>
-            )}
-            {/* En el Dashboard, EN LUGAR del título: la barra de herramientas del lienzo, alineada en
-              la MISMA fila de la topbar (Editar→despliega + Mover + Goma). Va a nivel de shell (peer
-              de los floats de la topbar) con z por encima del clúster de búsqueda full-width, para
-              quedar alineada y clicable. */}
+            {/* Topbar flotante siempre presente: isla central (atrás · nombre de la vista ·
+              tema · campana) + clúster derecho (acciones de la vista · búsqueda ⌘K · cuenta).
+              El nombre de la vista es el label del menú (en el Dashboard: «Asistente de IA»). */}
+            <TopBar
+              title={activeLabel}
+              titleTestId="page-heading"
+              // Atrás (S-03): retrocede en el historial del ROUTER. `location.key === 'default'`
+              // marca la entrada inicial sin historial previo (deep-link directo) → cae a «/».
+              onBack={() => (location.key !== 'default' ? navigate(-1) : navigate('/'))}
+              onNotifications={toggleNotifications}
+              notificationCount={notificationCount}
+              notificationsActive={tab === 'notifications'}
+              search={<FunctionSearch onNavigate={navigateTo} />}
+              pageActions={<PageActionsSlot />}
+              // Solo en el dashboard: botón «+» de añadir widget (como la campana) + conmutador
+              // cuadrícula↔lienzo, ambos arriba-derecha del topbar (clúster derecho).
+              endSlot={
+                tab === 'dashboard' ? (
+                  <>
+                    <DashboardAddWidget />
+                    <DashboardModeToggle />
+                  </>
+                ) : undefined
+              }
+            />
+            {/* Sub-barra del lienzo: SOLO las herramientas (Editar/Mover/Goma), centradas, y únicamente
+              cuando hay lienzo libre activo. El conmutador de modo ya vive arriba-derecha (endSlot). */}
             {tab === 'dashboard' && canvasBinding && (
-              <div className="dash-canvas-toolbar">
-                <CanvasToolsMenu
-                  canvasRef={canvasBinding.canvasRef}
-                  canUndo={canvasBinding.canvasMeta.canUndo}
-                  canRedo={canvasBinding.canvasMeta.canRedo}
-                  drawActive={canvasBinding.canvasMeta.drawOpen}
-                  mode={canvasBinding.canvasMeta.mode}
-                />
+              <div className="topbar-subbar" data-testid="canvas-subbar">
+                <div className="dash-canvas-toolbar">
+                  <CanvasToolsMenu
+                    canvasRef={canvasBinding.canvasRef}
+                    canUndo={canvasBinding.canvasMeta.canUndo}
+                    canRedo={canvasBinding.canvasMeta.canRedo}
+                    drawActive={canvasBinding.canvasMeta.drawOpen}
+                    mode={canvasBinding.canvasMeta.mode}
+                  />
+                </div>
               </div>
             )}
-            {/* Conmutador de modo (cuadrícula ↔ lienzo libre), arriba-derecha del dashboard. A nivel
-                de shell para quedar por ENCIMA del clúster de búsqueda full-width; visible en AMBOS
-                modos (no depende del binding del lienzo, que se limpia en cuadrícula). */}
-            {tab === 'dashboard' && <DashboardModeToggle />}
             <div className="app-main-row">
               <main className={`bo-main${isCanvas ? ' bo-main--canvas' : ' bo-main--surface'}`}>
                 {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no

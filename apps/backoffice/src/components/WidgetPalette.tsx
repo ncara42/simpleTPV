@@ -9,8 +9,9 @@ export interface WidgetPaletteProps {
   label: (widgetId: string) => string;
   onPick: (widgetId: string) => void;
   onClose: () => void;
-  /** Variante de posición: anclada al botón (toolbar) o centrada (estado vacío). */
-  variant?: 'anchored' | 'center';
+  /** Variante de posición: anclada al botón (toolbar), centrada (estado vacío) o fija bajo el
+   *  clúster derecho del topbar (botón «+» de añadir widget). */
+  variant?: 'anchored' | 'center' | 'topbar';
 }
 
 // Popover de "añadir widget" con buscador: filtra el catálogo por nombre y lo añade al lienzo.

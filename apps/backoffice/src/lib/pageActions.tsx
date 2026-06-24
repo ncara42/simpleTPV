@@ -3,7 +3,7 @@ import { createContext, type ReactNode, useContext, useLayoutEffect, useState } 
 // Dos contextos separados para evitar el bucle de re-render:
 // - SetContext: provee el setter estable (useState dispatch, misma referencia siempre).
 //   Los pages son consumidores de este y NUNCA se re-renderizan cuando cambian las actions.
-// - ValueContext: provee el valor actual. Solo FloatingActions lo consume y se re-renderiza.
+// - ValueContext: provee el valor actual. Solo PageActionsSlot (en el topbar) lo consume y se re-renderiza.
 const PageActionsSetContext = createContext<((a: ReactNode) => void) | null>(null);
 const PageActionsValueContext = createContext<ReactNode>(null);
 

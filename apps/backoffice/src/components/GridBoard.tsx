@@ -1,10 +1,9 @@
-import { Plus, X } from 'lucide-react';
-import { type ReactNode, useRef, useState } from 'react';
+import { X } from 'lucide-react';
+import { type ReactNode, useRef } from 'react';
 
-import { availableWidgets, type FreeElement, type FreeLayout } from '../lib/dashboard-layout.js';
+import { type FreeElement, type FreeLayout } from '../lib/dashboard-layout.js';
 import { useEnterAnimation } from '../lib/use-enter-animation.js';
 import { FreeNote } from './FreeNote.js';
-import { WidgetPalette } from './WidgetPalette.js';
 
 // Modo CUADRÍCULA del dashboard: una vista alternativa del MISMO conjunto de widgets que el lienzo
 // libre (mismos `freeLayouts` del preset). En vez de posicionar a píxel, los bloques fluyen en una
@@ -32,8 +31,6 @@ interface GridBoardProps {
   renderItem: (widgetId: string) => ReactNode;
   /** Etiqueta legible de un widget (paleta + aria). */
   itemLabel: (widgetId: string) => string;
-  /** Añade un widget de catálogo al lienzo (→ aparece también aquí). */
-  onAddWidget: (widgetId: string) => void;
   /** Quita un elemento por id (widget o nota). */
   onRemoveElement: (id: string) => void;
   /** Persiste el documento de una nota al editarla. */
@@ -47,11 +44,9 @@ export function GridBoard({
   elements,
   renderItem,
   itemLabel,
-  onAddWidget,
   onRemoveElement,
   onNoteChange,
 }: GridBoardProps) {
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Bloques visibles en la rejilla, en ORDEN DE LECTURA de su posición libre (arriba→abajo,
@@ -60,7 +55,6 @@ export function GridBoard({
     .filter((e) => GRID_KINDS.has(e.kind))
     .slice()
     .sort((a, b) => a.y - b.y || a.x - b.x);
-  const available = availableWidgets(elements);
 
   // Entrada con rebote escalonado de los tiles recién añadidos (a mano o por el agente). En el
   // montaje del board (cambio de modo) no anima: lo gobierna el morph.
@@ -102,37 +96,12 @@ export function GridBoard({
             </div>
           </div>
         ))}
-
-        {/* Tira de alta: «+» para añadir un widget de catálogo (la paleta es la misma del lienzo). */}
-        <button
-          type="button"
-          className="dash-grid-add"
-          data-testid="dash-grid-add"
-          aria-label="Añadir widget"
-          onClick={() => setPaletteOpen(true)}
-        >
-          <Plus size={24} aria-hidden="true" />
-          <span>Añadir widget</span>
-        </button>
       </div>
 
       {items.length === 0 && (
         <p className="dash-grid-hint" data-testid="dash-grid-empty">
-          Rejilla en blanco · añade widgets con «+» o pídeselos al asistente
+          Rejilla en blanco · añade widgets con «+» (arriba) o pídeselos al asistente
         </p>
-      )}
-
-      {paletteOpen && (
-        <WidgetPalette
-          variant="center"
-          items={available}
-          label={itemLabel}
-          onPick={(id) => {
-            onAddWidget(id);
-            setPaletteOpen(false);
-          }}
-          onClose={() => setPaletteOpen(false)}
-        />
       )}
     </div>
   );

@@ -429,7 +429,7 @@ test('lienzo libre: herramientas de dibujo (forma, lápiz a mano y texto libre)'
   }
 });
 
-test('dashboard: modo cuadrícula — toggle, añadir widget como tile, scroll vertical y volver al lienzo conserva el widget', async ({
+test('dashboard: modo cuadrícula — toggle, añadir widget desde el «+» del topbar, scroll vertical y volver al lienzo conserva el widget', async ({
   page,
 }) => {
   // Arranca en lienzo libre (modo por defecto).
@@ -452,10 +452,10 @@ test('dashboard: modo cuadrícula — toggle, añadir widget como tile, scroll v
   expect(overflow.y).toBe('auto');
   expect(overflow.x).toBe('hidden');
 
-  // Añadir un widget desde el «+» de la rejilla → aparece un tile.
+  // Añadir un widget desde el «+» del topbar (clúster derecho, como la campana) → aparece un tile.
   const tiles = page.locator('.dash-grid-tile');
   await expect(tiles).toHaveCount(0);
-  await page.getByTestId('dash-grid-add').click();
+  await page.getByTestId('topbar-add-widget').click();
   const palette = page.locator('.dash-free-palette');
   await expect(palette).toBeVisible();
   await palette.locator('button[role="menuitem"]').first().click();

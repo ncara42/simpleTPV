@@ -137,7 +137,7 @@ test('Tiendas: el estado operativo PERSISTE tras recargar (I-09, E-02)', async (
   // Con react-router (F0) el reload CONSERVA la ruta (ya no resetea a dashboard);
   // anclamos a float-actions (presente en todas las views) en vez de a 'dashboard'.
   await page.reload();
-  await expect(page.getByTestId('float-actions')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByTestId('topbar')).toBeVisible({ timeout: 15000 });
   await navTo(page, 'stores');
   await page.getByTestId('store-card').filter({ hasText: 'Sur' }).click();
   await expect(page.getByTestId('store-ops-verified')).toBeChecked({ checked: !wasVerified });
@@ -168,7 +168,7 @@ test('Tiendas: crear, editar y borrar persisten (I-10)', async ({ page }) => {
   await expect(page.getByTestId('store-form')).toHaveCount(0);
   // Persiste tras recargar. Con react-router el reload conserva la ruta → ancla float-actions.
   await page.reload();
-  await expect(page.getByTestId('float-actions')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByTestId('topbar')).toBeVisible({ timeout: 15000 });
   await navTo(page, 'stores');
   const renamed = page.getByTestId('store-card').filter({ hasText: `Tienda E2E ${code} Editada` });
   await expect(renamed).toBeVisible();
@@ -293,7 +293,7 @@ test('Stock: ajustar existencias PERSISTE tras recargar (E-01)', async ({ page }
   // Recargar: la cantidad debe venir del backend, no de un overlay local.
   // Con react-router el reload conserva la ruta → ancla float-actions.
   await page.reload();
-  await expect(page.getByTestId('float-actions')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByTestId('topbar')).toBeVisible({ timeout: 15000 });
   await navTo(page, 'stock');
   const row = page.getByTestId('stock-row').filter({ hasText: productName }).first();
   await expect(row).toBeVisible();
@@ -760,7 +760,7 @@ test('S-03: el botón atrás del clúster flotante vuelve a la vista anterior', 
   await navTo(page, 'suppliers');
   await expect(page.getByTestId('page-heading')).toContainText('Proveedores');
   // Atrás → vuelve a Tiendas (historial del router), no al Dashboard.
-  await page.getByTestId('float-back').click();
+  await page.getByTestId('topbar-back').click();
   await expect(page.getByTestId('page-heading')).toContainText('Tiendas');
 });
 
@@ -824,7 +824,7 @@ test('U-08: la marca corporativa se aplica como tema en vivo y persiste', async 
   // Persiste tras recargar (viene de la organización, no de localStorage).
   // Con react-router el reload conserva la ruta → ancla float-actions.
   await page.reload();
-  await expect(page.getByTestId('float-actions')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByTestId('topbar')).toBeVisible({ timeout: 15000 });
   await expect.poll(brandVar).toBe('#aa00ff');
   // Restaurar el estado original (color guardado previo, o el default).
   await navTo(page, 'settings');
@@ -856,8 +856,8 @@ test('U-11/U-12: la campana abre Notificaciones y "Resolver" lleva a Stock del p
   page,
 }) => {
   // La campana vive en el clúster de acciones flotante (sustituye a la TopBar), con badge de roturas.
-  await expect(page.getByTestId('float-notifications')).toBeVisible();
-  await page.getByTestId('float-notifications').click();
+  await expect(page.getByTestId('topbar-notifications')).toBeVisible();
+  await page.getByTestId('topbar-notifications').click();
   await expect(page.getByTestId('notifications-page')).toBeVisible();
   // Cada alerta tiene su botón Resolver → Stock filtrado por el producto.
   const firstAlert = page.getByTestId('alert-row').first();
@@ -870,7 +870,7 @@ test('U-11/U-12: la campana abre Notificaciones y "Resolver" lleva a Stock del p
 });
 
 test('La campana togglea Notificaciones y vuelve a la página anterior', async ({ page }) => {
-  const bell = page.getByTestId('float-notifications');
+  const bell = page.getByTestId('topbar-notifications');
 
   // Desde Stock: abrir Notificaciones con la campana, cerrarla y volver a Stock.
   await navTo(page, 'stock');
