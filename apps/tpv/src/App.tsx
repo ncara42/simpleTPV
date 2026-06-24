@@ -13,8 +13,10 @@ import {
   ClipboardCheck,
   Clock,
   HelpCircle,
+  Moon,
   ReceiptText,
   ShoppingBag,
+  Sun,
   Truck,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -31,6 +33,7 @@ import { formatDuration } from './lib/format.js';
 import { getMe, roleLabel } from './lib/me.js';
 import { switchApp } from './lib/nav.js';
 import { listStores } from './lib/sales.js';
+import { getTheme, type Theme, toggleTheme } from './lib/theme.js';
 import { useOfflineSync } from './lib/useOfflineSync.js';
 import { useTimeClock } from './lib/useTimeClock.js';
 import { SalePage } from './SalePage.js';
@@ -50,6 +53,28 @@ const TPV_NAV: NavItem[] = [
   { id: 'help', label: 'Ayuda', icon: <HelpCircle size={18} /> },
 ];
 
+// Toggle de tema claro/oscuro en el topbar (gemelo del de FloatingActions del
+// backoffice). Reusa el acabado de botón-icono del topbar (.topbar-notif).
+function ThemeToggle() {
+  const [theme, setThemeState] = useState<Theme>(() => getTheme());
+  return (
+    <button
+      type="button"
+      className="topbar-notif"
+      onClick={() => setThemeState(toggleTheme())}
+      aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+      title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+      data-testid="topbar-theme-toggle"
+    >
+      {theme === 'dark' ? (
+        <Sun size={18} aria-hidden="true" />
+      ) : (
+        <Moon size={18} aria-hidden="true" />
+      )}
+    </button>
+  );
+}
+
 function ShellTopBar() {
   const { title, description, descriptionTestId } = usePageHeaderValue();
   return (
@@ -59,6 +84,7 @@ function ShellTopBar() {
       subtitleTestId={descriptionTestId}
       activeApp="tpv"
       onSwitchApp={switchApp}
+      actions={<ThemeToggle />}
     />
   );
 }

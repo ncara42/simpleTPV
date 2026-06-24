@@ -25,6 +25,8 @@ export interface TopBarProps {
    * conmutador de app; el título de la vista ocupa la zona izquierda.
    */
   search?: React.ReactNode;
+  /** Slot de acciones extra en la zona derecha (p. ej. el toggle de tema claro/oscuro). */
+  actions?: React.ReactNode;
   activeApp?: 'backoffice' | 'tpv';
   onSwitchApp?: (app: 'backoffice' | 'tpv') => void;
   /** Si se define, pinta la campana de notificaciones a la izquierda del conmutador. */
@@ -68,6 +70,7 @@ export function TopBar({
   subtitleTestId,
   titleTestId,
   search,
+  actions,
   activeApp = 'tpv',
   onSwitchApp,
   onNotifications,
@@ -109,6 +112,7 @@ export function TopBar({
           </button>
         )}
         {search}
+        {actions}
         <div className="topbar-switch" role="group" aria-label="Cambiar de app">
           <button
             type="button"
