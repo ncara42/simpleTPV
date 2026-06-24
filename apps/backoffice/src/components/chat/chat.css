@@ -1031,11 +1031,20 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   gap: 0.6rem;
   /* La banda deja pasar el ratón al contenido/lienzo; solo el panel y la barra capturan clics. */
   pointer-events: none;
-  /* Permite animar el ancho intrínseco (fit-content) y el alto auto del morph colapsar/expandir.
-     Curva del morph: glide suave (quint-out), natural, sin rebote. */
-  interpolate-size: allow-keywords;
-  --morph-dur: 0.5s;
+  /* Morph en DOS tiempos para que colapsar/expandir se lea como un gesto, no como un escalado:
+       EXPANDIR → primero se ensancha y se redondea (fase ANCHO, sin retardo), y casi al final sube
+                  (fase ALTO, con `--morph-stagger`).
+       COLAPSAR → primero baja (fase ALTO, sin retardo) y al final encoge a píldora (fase ANCHO).
+     Los retardos invertidos por dirección viven en `.is-collapsed …` (más abajo). Rápido, con un
+     pequeño solape entre fases para que no se sienta secuencial-robótico. */
+  /* COLAPSAR: quint-out (cola plana) → encoge rápido y «asienta» suave; se siente bien. */
   --morph-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* EXPANDIR: ease-in-out sin cola plana → el ancho crece UNIFORME, sin el «llega de golpe y luego
+     arrastra» que producía el quint-out al agrandar (se percibía como un parón). */
+  --morph-ease-expand: cubic-bezier(0.65, 0, 0.35, 1);
+  --morph-w-dur: 0.28s; /* fase ancho */
+  --morph-h-dur: 0.26s; /* fase alto */
+  --morph-stagger: 0.16s; /* desfase entre fases (con solape) */
 }
 .chat-dock > * {
   pointer-events: auto;
@@ -1107,9 +1116,12 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 /* ── Composer (PromptInput) ──────────────────────────────────────────────────────── */
 
 .prompt-input {
-  /* Ancho expandido propio: el dock es una banda centradora a todo el ancho. Colapsado pasa a
-     fit-content (.is-collapsed). El alto es content-driven (lo pliega el pie con max-height). */
+  /* El ANCHO del morph lo lleva `max-width` (NUMÉRICO), no `width`: colapsado lo capa a la píldora y
+     expandido lo suelta a su anchura plena. `width` se queda fijo en su tope, así el ancho usado =
+     min(width, max-width) y SOLO max-width transiciona → interpolación garantizada en cualquier
+     navegador (sin depender de `interpolate-size`, que fallaba al expandir por clic). */
   width: min(680px, calc(100vw - 2rem));
+  max-width: min(680px, calc(100vw - 2rem));
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -1119,12 +1131,14 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
   backdrop-filter: blur(12px);
   box-shadow: 0 6px 20px rgb(0 0 0 / 0.08);
-  /* Morph colapsar/expandir sobre propiedades REALES (no escala): el texto no se deforma y el
-     encoger es natural. El alto lo arrastra el pliegue del pie (su max-height). */
+  /* Morph sobre propiedades REALES (no escala): el texto no se deforma y el encoger es natural.
+     Al EXPANDIR: ANCHO (max-width + border-radius) arranca ya; el ALTO (gap, padding, y el
+     pie/textarea más abajo) entra con `--morph-stagger`, así primero llega a su anchura y luego sube. */
   transition:
-    width var(--morph-dur) var(--morph-ease),
-    border-radius var(--morph-dur) var(--morph-ease),
-    padding var(--morph-dur) var(--morph-ease),
+    max-width var(--morph-w-dur) var(--morph-ease-expand),
+    border-radius var(--morph-w-dur) var(--morph-ease-expand),
+    gap var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger),
+    padding var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger),
     border-color var(--ui-motion-fast) var(--ui-ease),
     box-shadow var(--ui-motion-fast) var(--ui-ease);
 }
@@ -1148,8 +1162,14 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 .prompt-input__textarea {
   width: 100%;
   resize: none;
+  /* Auto-crecimiento FLUIDO: el textarea se ciñe a su contenido REAL (líneas envueltas + saltos
+     explícitos), acotado por min/max-height; al superar el máximo hace scroll en vez de desbordar.
+     `field-sizing` es Chromium (target del proyecto); donde no haya soporte, el atributo `rows`
+     (calculado en JS) sigue haciendo de degradación. */
+  field-sizing: content;
   min-height: 42px;
   max-height: 220px;
+  overflow-y: auto;
   padding: 0.4rem 0.5rem 0.1rem;
   border: none;
   background: transparent;
@@ -1157,6 +1177,14 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   font-size: var(--ui-text-md);
   line-height: 1.6;
   color: var(--ui-text);
+  /* El morph mueve min/max-height, line-height y padding; al TECLEAR esos valores NO cambian (solo el
+     alto USADO por field-sizing), así crecer al escribir es instantáneo y solo el morph se anima. El
+     textarea es fase ALTO → al expandir entra con `--morph-stagger`, en sincronía con el pie. */
+  transition:
+    min-height var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger),
+    max-height var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger),
+    line-height var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger),
+    padding var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger);
 }
 
 .prompt-input__textarea:focus {
@@ -1165,6 +1193,17 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 
 .prompt-input__textarea::placeholder {
   color: var(--ui-text-muted);
+}
+
+/* El placeholder NUNCA envuelve: 1 línea recortada. Con `field-sizing: content`, un textarea VACÍO
+   se dimensiona a su placeholder; si éste envolviera (mientras el composer aún es estrecho durante el
+   morph de ancho), inflaría el alto y luego lo bajaría de golpe al ensanchar → el «se agranda y de
+   repente baja». Forzando 1 línea, el alto del vacío es estable. Al escribir, deja de aplicar y el
+   texto real sí envuelve con normalidad. */
+.prompt-input__textarea:placeholder-shown {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .prompt-input__textarea:disabled {
@@ -1180,12 +1219,12 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   /* `overflow` visible (default) para NO recortar el desplegable del selector de modelo
      (`.me-menu__panel`, cuelga hacia arriba); 2.4rem deja sitio de sobra a los botones (≈34px). */
   max-height: 2.4rem;
-  /* Al plegar: el alto (max-height) arrastra el alto de la píldora con la misma curva del morph; la
-     opacidad hace un fade rápido. El ancho se neutraliza aparte (width:0) para que no ensanche. */
+  /* El pie es fase ALTO: al expandir entra tras el ancho (`--morph-stagger`) y aparece con un fade.
+     El ancho se neutraliza aparte (width:0 colapsado) para que no ensanche la píldora. */
   transition:
-    max-height var(--morph-dur) var(--morph-ease),
-    padding var(--morph-dur) var(--morph-ease),
-    opacity var(--ui-motion-fast) var(--ui-ease);
+    max-height var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger),
+    padding var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger),
+    opacity var(--ui-motion-fast) var(--ui-ease) var(--morph-stagger);
 }
 
 .prompt-input__tools {
@@ -1246,16 +1285,31 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
    pliega y la píldora se ciñe al texto. El cambio de ancho/alto/forma lo anima la transición nativa
    de `.prompt-input` (propiedades reales). Aquí solo van los estados DESTINO. */
 .chat-dock.is-collapsed .prompt-input {
-  /* La píldora se ciñe al ancho del texto (el placeholder), no a un ancho fijo: el textarea se
-     dimensiona a su contenido con field-sizing y la píldora lo abraza. Cota máxima por si se escribe. */
-  width: fit-content;
-  max-width: min(420px, calc(100vw - 2rem));
-  border-radius: var(--ui-radius-pill);
+  /* Píldora minimizada: el ancho lo capa `max-width` (numérico) a una banda fija que abraza el
+     placeholder constante («Tengo una pregunta»); el texto se centra dentro. `width` sigue fijo
+     arriba, así solo max-width hace el morph. En viewports estrechos, cede al ancho disponible. */
+  max-width: min(12rem, calc(100vw - 2rem));
+  /* Pill por GEOMETRÍA, no por un radio gigante: la píldora colapsada mide ~45px de alto, así que
+     22px ya redondea los extremos por completo. Evita interpolar 999px→12px (que dejaba las esquinas
+     casi-pill casi toda la animación y luego "saltaba"): de 22px→12px la transición es corta y limpia. */
+  border-radius: 22px;
   /* Padding horizontal SIMÉTRICO → el placeholder queda centrado en la píldora. */
   padding: 0.28rem 0.95rem;
   /* Contorno algo más grueso en el color de empresa para destacar la píldora minimizada. */
   border-color: var(--ui-brand);
   border-width: 2px;
+  /* El pie se pliega a 0, pero el `gap` flex seguiría reservando 0.5rem bajo el texto (cola muerta
+     que descentra la píldora). Lo cerramos también — animado, va en la transición del morph. */
+  gap: 0;
+  /* Al COLAPSAR se invierte el orden: el ALTO (gap/padding) baja YA; el ANCHO (max-width + radius)
+     encoge con `--morph-stagger`, de modo que primero baja y al final se ciñe a píldora. */
+  transition:
+    max-width var(--morph-w-dur) var(--morph-ease) var(--morph-stagger),
+    border-radius var(--morph-w-dur) var(--morph-ease) var(--morph-stagger),
+    gap var(--morph-h-dur) var(--morph-ease),
+    padding var(--morph-h-dur) var(--morph-ease),
+    border-color var(--ui-motion-fast) var(--ui-ease),
+    box-shadow var(--ui-motion-fast) var(--ui-ease);
 }
 
 .chat-dock.is-collapsed .prompt-input__textarea {
@@ -1275,6 +1329,12 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   width: auto;
   min-width: 0;
   align-self: center;
+  /* Fase ALTO al colapsar: encoge YA (sin retardo), antes de que el ancho se ciña a píldora. */
+  transition:
+    min-height var(--morph-h-dur) var(--morph-ease),
+    max-height var(--morph-h-dur) var(--morph-ease),
+    line-height var(--morph-h-dur) var(--morph-ease),
+    padding var(--morph-h-dur) var(--morph-ease);
 }
 
 .chat-dock.is-collapsed .prompt-input__queue {
@@ -1292,6 +1352,11 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   overflow: hidden;
   opacity: 0;
   pointer-events: none;
+  /* Fase ALTO al colapsar: el pie se pliega y se desvanece YA (sin retardo), antes de encoger ancho. */
+  transition:
+    max-height var(--morph-h-dur) var(--morph-ease),
+    padding var(--morph-h-dur) var(--morph-ease),
+    opacity var(--ui-motion-fast) var(--ui-ease);
 }
 
 /* ── Menú «+» de herramientas del lienzo ─────────────────────────────────────────── */
@@ -1796,11 +1861,13 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   .me-menu__panel {
     animation: none;
   }
-  /* Colapso/expansión sin animación. */
+  /* Colapso/expansión sin animación. `!important` para ganar también a los estados `.is-collapsed`
+     (más específicos), que ahora definen sus propias transiciones escalonadas. */
   .chat-dock,
-  .prompt-input,
-  .prompt-input__footer {
-    transition: none;
+  .chat-dock .prompt-input,
+  .chat-dock .prompt-input__textarea,
+  .chat-dock .prompt-input__footer {
+    transition: none !important;
   }
 }
 

@@ -26,11 +26,12 @@ interface PromptComposerProps {
  * Composer del asistente con la forma del PromptInput de ai-elements (Vercel AI Elements):
  * una superficie redondeada con el textarea autoexpandible arriba y un pie con las acciones.
  *
- * El morph colapsar/expandir se anima con CSS NATIVO sobre las propiedades REALES (`width`/`height`/
- * `border-radius`/`padding`) — no por escala/transform — para que el texto NO se deforme y el encoger
- * se vea natural. `interpolate-size: allow-keywords` permite interpolar el ancho intrínseco
- * (`fit-content`) y el alto `auto`. El pie sale de flujo (`position:absolute`) al colapsar para no
- * ensanchar la píldora, y se desvanece. Ver chat.css (`.prompt-input`, `.is-collapsed`).
+ * El morph colapsar/expandir se anima con CSS NATIVO sobre propiedades REALES y NUMÉRICAS (no por
+ * escala/transform) para que el texto no se deforme: el ANCHO lo lleva `max-width`, el ALTO lo llevan
+ * el `max-height` del pie y el `min/max-height` del textarea. Va en DOS tiempos (al expandir, ancho
+ * primero y alto después; al colapsar, al revés) con retardos invertidos por dirección. El pie se
+ * pliega en flujo (su `max-height` a 0 + fade), no ensancha la píldora. Ver chat.css
+ * (`.prompt-input`, `.is-collapsed`).
  */
 export function PromptComposer({
   status,
@@ -82,6 +83,9 @@ export function PromptComposer({
         onKeyDown={handleKeyDown}
         onFocus={onFocus}
         placeholder={effectivePlaceholder}
+        // El alto lo lleva `field-sizing: content` (CSS): crece fluido con el contenido real,
+        // incluidas las líneas envueltas. `rows` queda SOLO como degradación donde no haya
+        // field-sizing (cuenta saltos explícitos; no ve los wraps). No sustituir por una de las dos.
         rows={Math.min(8, Math.max(1, value.split('\n').length))}
         disabled={disabled}
         data-testid="chat-input"
