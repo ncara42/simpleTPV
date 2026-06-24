@@ -493,3 +493,848 @@
   font-weight: 500;
   color: var(--ui-text-muted);
 }
+
+/* ════════════════════════ LOTE GALERÍA (#264) ════════════════════════
+   Widgets nuevos sobre la Fundación Geist, fieles al diseño de origen (px exactos)
+   pero con color por tokens --ui-* → se adaptan a claro/oscuro. La rampa azul mono
+   (treemap, donut, heatmap, bullet) se deriva por color-mix en JS (ver ramp.ts). */
+
+:root {
+  /* Tinta azul oscura para texto sobre celdas claras de la rampa (treemap/heatmap). */
+  --dv-tile-ink: #0d3a73;
+}
+:root[data-theme='dark'] {
+  --dv-tile-ink: #cfe3ff;
+}
+
+/* ── KpiStat (celda KPI con chip + sparkline a sangre) ── */
+.dv-kpistat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--ui-surface);
+}
+.dv-kpistat--grid {
+  padding: 16px 18px 0;
+  min-height: 138px;
+}
+.dv-kpistat--card {
+  position: relative;
+  padding: 18px 20px;
+  min-height: 150px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+}
+/* Con viz al pie (spark/barras a sangre) la tarjeta pierde el padding inferior para que toque el filo. */
+.dv-kpistat--card.dv-kpistat--hasviz {
+  padding-bottom: 0;
+}
+/* Tarjeta de alerta: borde + rótulo + cifra en rojo. */
+.dv-kpistat--danger {
+  border-color: var(--ui-danger);
+}
+.dv-kpistat--danger .dv-stat-label,
+.dv-kpistat--danger .dv-kpistat-value {
+  color: var(--ui-danger);
+}
+.dv-kpistat-bars {
+  display: block;
+  margin-top: auto;
+  width: 100%;
+}
+.dv-kpistat-chip svg {
+  flex: none;
+}
+.dv-kpistat > .dv-stat-label {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+.dv-kpistat-corner {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--gst-400, #a1a1aa);
+}
+.dv-kpistat-value {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.dv-kpistat--grid .dv-kpistat-value {
+  font-size: 25px;
+  margin-top: 10px;
+}
+.dv-kpistat--card .dv-kpistat-value {
+  font-size: 30px;
+  margin-top: 12px;
+}
+.dv-kpistat-chip {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--ui-radius-xs);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.dv-kpistat--grid .dv-kpistat-chip {
+  margin-top: 9px;
+}
+.dv-kpistat--card .dv-kpistat-chip {
+  margin-top: 10px;
+}
+.dv-kpistat-chip--neutral {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.dv-kpistat-chip--success {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.dv-kpistat-chip--danger {
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+}
+.dv-kpistat-chip--warning {
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
+}
+
+/* ── SparkArea (sparkline de área a sangre) ── */
+.dv-spark-area {
+  display: block;
+  width: 100%;
+  margin-top: auto;
+  line-height: 0;
+}
+.dv-spark-area > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── KpiGrid (rejilla conectada por hairline) ── */
+.dv-kpigrid {
+  display: grid;
+  gap: 1px;
+  background: var(--ui-border);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  overflow: hidden;
+}
+.dv-kpigrid--bleed {
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+}
+
+/* ── HeatStrip (mapa de calor por franja) ── */
+.dv-heatstrip {
+  display: grid;
+  gap: 6px;
+}
+.dv-heatcell {
+  aspect-ratio: 1;
+  border-radius: var(--ui-radius-xs);
+  display: flex;
+  align-items: flex-end;
+  padding: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+}
+.dv-heatcell.is-peak {
+  box-shadow:
+    0 0 0 2px var(--ui-brand),
+    0 0 0 4px color-mix(in srgb, var(--ui-brand) 25%, transparent);
+}
+.dv-heat-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--ui-text-soft);
+}
+.dv-heat-legend-swatches {
+  display: flex;
+  gap: 3px;
+}
+.dv-heat-legend-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+}
+
+/* ── Treemap (área proporcional, rampa mono) ── */
+.dv-treemap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-height: 300px;
+}
+.dv-treemap-row {
+  display: flex;
+  gap: 4px;
+  min-height: 0;
+  flex-basis: 0;
+}
+.dv-treemap-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  flex-basis: 0;
+  min-width: 0;
+  padding: 13px 14px;
+  border-radius: var(--ui-radius-sm);
+  overflow: hidden;
+}
+.dv-treemap-name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dv-treemap-note {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-top: 2px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── DonutStat (donut mono con cifra central) ── */
+.dv-donutstat {
+  display: flex;
+  flex-direction: column;
+}
+.dv-donutstat-ring {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  margin: 14px auto 18px;
+}
+.dv-donutstat-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.dv-donutstat-value {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.dv-donutstat-caption {
+  font-size: 11px;
+  color: var(--ui-text-soft);
+  margin-top: 2px;
+}
+.dv-donutstat-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dv-donutstat-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.dv-donutstat-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  flex: none;
+}
+.dv-donutstat-legend-label {
+  flex: 1 1 auto;
+  font-size: 12.5px;
+  color: var(--ui-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dv-donutstat-legend-pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── BulletMeter (objetivo con proyección + marca) ── */
+.dv-bullet {
+  display: flex;
+  flex-direction: column;
+}
+.dv-bullet-track {
+  position: relative;
+  height: 40px;
+  margin-top: 34px;
+  background: var(--ui-surface-subtle);
+  border-radius: var(--ui-radius-sm);
+}
+.dv-bullet-actual {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--ui-brand);
+  border-radius: var(--ui-radius-sm) 0 0 var(--ui-radius-sm);
+}
+.dv-bullet-proj {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--ui-brand) 22%, var(--ui-surface));
+  border-right: 2px dashed var(--ui-brand);
+}
+.dv-bullet-target {
+  position: absolute;
+  top: -7px;
+  bottom: -7px;
+  width: 3px;
+  background: var(--ui-text);
+  border-radius: 2px;
+}
+.dv-bullet-tag {
+  position: absolute;
+  top: -26px;
+  transform: translateX(-50%);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.dv-bullet-tag--actual {
+  color: var(--ui-brand);
+}
+.dv-bullet-tag--target {
+  color: var(--ui-text);
+}
+.dv-bullet-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-top: 28px;
+}
+.dv-bullet-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--ui-text-muted);
+}
+.dv-bullet-legend-item strong {
+  color: var(--ui-text);
+  font-weight: 600;
+  margin-left: 2px;
+}
+.dv-bullet-legend-swatch {
+  border-radius: 3px;
+}
+.dv-bullet-legend-swatch--actual {
+  width: 11px;
+  height: 11px;
+  background: var(--ui-brand);
+}
+.dv-bullet-legend-swatch--proj {
+  width: 11px;
+  height: 11px;
+  background: color-mix(in srgb, var(--ui-brand) 22%, var(--ui-surface));
+}
+.dv-bullet-legend-swatch--target {
+  width: 3px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--ui-text);
+}
+
+/* ── Leaderboard (tarjetas de ranking) ── */
+.dv-leaderboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+}
+.dv-leaderboard-card {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  padding: 14px 15px;
+  min-width: 0;
+}
+.dv-leaderboard-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.dv-leaderboard-rank.is-top {
+  background: var(--ui-brand-soft-2);
+  color: var(--ui-brand-ink);
+}
+.dv-leaderboard-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ui-text);
+  margin-top: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dv-leaderboard-value {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ui-text);
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.dv-leaderboard-detail {
+  font-size: 11.5px;
+  color: var(--ui-text-soft);
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.dv-leaderboard-bar {
+  display: block;
+  height: 3px;
+  background: var(--ui-surface-subtle);
+  border-radius: 2px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+.dv-leaderboard-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+}
+
+/* ── ActivityFeed (línea de tiempo) ── */
+.dv-feed {
+  position: relative;
+  padding: 0 0 0 22px;
+  margin: 0;
+  list-style: none;
+}
+.dv-feed::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 4px;
+  bottom: 4px;
+  width: 1.5px;
+  background: var(--ui-border);
+}
+.dv-feed-item {
+  position: relative;
+  padding-bottom: 16px;
+}
+.dv-feed-item:last-child {
+  padding-bottom: 0;
+}
+.dv-feed-dot {
+  position: absolute;
+  left: -22px;
+  top: 3px;
+  width: 11px;
+  height: 11px;
+  border-radius: var(--ui-radius-pill);
+  box-shadow: 0 0 0 3px var(--ui-surface);
+}
+.dv-feed-dot--accent {
+  background: var(--ui-brand);
+}
+.dv-feed-dot--success {
+  background: var(--ui-success);
+}
+.dv-feed-dot--warning {
+  background: var(--ui-warning);
+}
+.dv-feed-dot--danger {
+  background: var(--ui-danger);
+}
+.dv-feed-title {
+  font-size: 13px;
+  color: var(--ui-text);
+}
+.dv-feed-title strong {
+  font-weight: 600;
+}
+.dv-feed-meta {
+  font-size: 11.5px;
+  color: var(--gst-400, #a1a1aa);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ════════════════════════ LOTE GALERÍA 2 (#264) ════════════════════════
+   Más formatos de cifra (ribbon, dual, hero), mini-gráficas (sparkbars, gauge),
+   reparto en filas (ShareBar), área con proyección y celdas de tabla. */
+
+/* ── SparkBars (mini barras) ── */
+.dv-sparkbars {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+}
+.dv-sparkbars-bar {
+  flex: 1;
+  border-radius: 3px;
+  min-height: 2px;
+}
+
+/* ── Gauge (medidor semicircular) ── */
+.dv-gauge {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+.dv-gauge-svg {
+  width: 110px;
+  height: 60px;
+  display: block;
+}
+.dv-gauge-track {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ui-border) 55%, var(--ui-surface));
+  stroke-width: 11;
+  stroke-linecap: round;
+}
+.dv-gauge-fill {
+  fill: none;
+  stroke: var(--ui-brand);
+  stroke-width: 11;
+  stroke-linecap: round;
+}
+.dv-gauge-value {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── ShareBar (reparto + leyenda en filas) ── */
+.dv-sharebar {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.dv-sharebar-bar {
+  display: flex;
+  border-radius: var(--ui-radius-sm);
+  overflow: hidden;
+  width: 100%;
+}
+.dv-sharebar-bar > span {
+  height: 100%;
+}
+.dv-sharebar-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dv-sharebar-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.dv-sharebar-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+.dv-sharebar-label {
+  flex: 1 1 auto;
+  font-size: 13px;
+  color: var(--ui-text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dv-sharebar-pct {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+/* Variante de bolsillo: barra fina + leyenda en línea. */
+.dv-sharebar--inline {
+  gap: 12px;
+}
+.dv-sharebar--inline .dv-sharebar-legend {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.dv-sharebar--inline .dv-sharebar-row {
+  gap: 5px;
+}
+.dv-sharebar--inline .dv-sharebar-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.dv-sharebar--inline .dv-sharebar-label {
+  flex: none;
+  font-size: 11.5px;
+  color: var(--ui-text-muted);
+}
+.dv-sharebar--inline .dv-sharebar-pct {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+}
+
+/* ── RibbonStat (métrica compacta + mini-viz) ── */
+.dv-ribbon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  background: var(--ui-surface);
+  padding: 14px 20px;
+}
+.dv-ribbon-main {
+  min-width: 0;
+}
+.dv-ribbon-label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+}
+.dv-ribbon-value {
+  display: block;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 3px;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.dv-ribbon-aside {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+/* ── HeroFigure (cifra-héroe a dos columnas) ── */
+.dv-herofigure {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  min-height: 200px;
+}
+.dv-herofigure-main {
+  padding: 30px 32px;
+  min-width: 0;
+}
+.dv-herofigure-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+}
+.dv-herofigure-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ui-brand);
+  background: var(--ui-brand-soft-2);
+  padding: 2px 7px;
+  border-radius: var(--ui-radius-xs);
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+.dv-herofigure-value {
+  font-size: 54px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  margin-top: 16px;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.dv-herofigure-chips {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+.dv-herofigure-chip {
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 7px;
+  padding: 6px 11px;
+}
+.dv-herofigure-chip--neutral {
+  color: var(--ui-text-muted);
+  background: var(--ui-surface-subtle);
+}
+.dv-herofigure-chip--success {
+  color: var(--ui-success);
+  background: var(--ui-success-soft);
+  font-weight: 600;
+}
+.dv-herofigure-chip--danger {
+  color: var(--ui-danger);
+  background: var(--ui-danger-soft);
+  font-weight: 600;
+}
+.dv-herofigure-chart {
+  position: relative;
+  border-left: 1px solid var(--ui-border);
+  display: flex;
+  align-items: flex-end;
+  min-height: 0;
+}
+.dv-herofigure-chart .dv-spark-area {
+  height: 100%;
+  margin-top: 0;
+}
+@media (max-width: 640px) {
+  .dv-herofigure {
+    grid-template-columns: 1fr;
+  }
+  .dv-herofigure-chart {
+    display: none;
+  }
+}
+
+/* ── KpiDual (dos métricas apiladas) ── */
+.dv-kpidual {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  overflow: hidden;
+}
+.dv-kpidual-cell {
+  padding: 16px 18px;
+}
+.dv-kpidual-cell + .dv-kpidual-cell {
+  border-top: 1px solid var(--ui-border);
+}
+.dv-kpidual-value {
+  display: block;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  margin-top: 4px;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── HeatStrip mini (sin etiquetas) ── */
+.dv-heatstrip--mini {
+  gap: 3px;
+}
+.dv-heatstrip--mini .dv-heatcell {
+  border-radius: 3px;
+  padding: 0;
+}
+
+/* ── DataGrid: celdas a medida (mono, badge) ── */
+.dv-cell-mono {
+  font-family: 'Geist Mono', ui-monospace, 'SF Mono', monospace;
+  font-size: 12px;
+  color: var(--ui-text-muted);
+}
+.dv-cell-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--ui-radius-xs);
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.dv-cell-badge--accent {
+  background: var(--ui-brand-soft-2);
+  color: var(--ui-brand-ink);
+}
+
+/* ── ProjectionArea (acumulado + proyección) ── */
+.dv-projarea {
+  width: 100%;
+}
+.dv-projarea-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+.dv-projarea-grid {
+  stroke: var(--ui-border);
+  stroke-width: 1;
+  stroke-dasharray: 2 5;
+  opacity: 0.6;
+}
+.dv-projarea-compare {
+  fill: none;
+  stroke: var(--ui-border-strong);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.dv-projarea-line {
+  fill: none;
+  stroke: var(--ui-brand);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.dv-projarea-proj {
+  fill: none;
+  stroke: var(--ui-brand);
+  stroke-width: 2.5;
+  stroke-dasharray: 5 5;
+  stroke-linecap: round;
+}

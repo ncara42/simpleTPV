@@ -5,12 +5,26 @@
 // `percent` espera el valor YA en escala 0..100 (un 15% es 15). `percentRatio` espera una fracción
 // 0..1 (un 15% es 0,15) y la multiplica ×100 antes de formatear — los endpoints del dashboard
 // (discountRate, returnRate, avgDiscountPct, marginPct, stockout rate) devuelven fracciones (#208).
-export type StatFormat = 'eur' | 'percent' | 'percentRatio' | 'decimal' | 'units' | 'integer';
+export type StatFormat =
+  | 'eur'
+  | 'eur0'
+  | 'percent'
+  | 'percentRatio'
+  | 'decimal'
+  | 'units'
+  | 'integer';
 
 const EUR = new Intl.NumberFormat('es-ES', {
   style: 'currency',
   currency: 'EUR',
   maximumFractionDigits: 2,
+});
+// Euro sin decimales: para cifras redondeadas a miles (treemap, donut, leaderboard, objetivo) donde
+// los céntimos sobran. Las cifras KPI precisas (facturación, ticket medio) siguen usando 'eur'.
+const EUR0 = new Intl.NumberFormat('es-ES', {
+  style: 'currency',
+  currency: 'EUR',
+  maximumFractionDigits: 0,
 });
 const DECIMAL = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 });
 const INTEGER = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 });
@@ -32,6 +46,8 @@ export function formatValue(value: number | null | undefined, format: StatFormat
   switch (format) {
     case 'eur':
       return EUR.format(value);
+    case 'eur0':
+      return EUR0.format(value);
     case 'percent':
       return `${DECIMAL.format(value)} %`;
     case 'percentRatio':
