@@ -1346,7 +1346,7 @@
   justify-content: center;
   height: 1.5rem;
   padding: 0 0.4rem;
-  background: rgb(0 0 0 / 0.05);
+  background: color-mix(in srgb, var(--ui-text) 5%, transparent);
   /* 1px más cerrado que el radio exterior para anidar limpio dentro del borde de la nota. */
   border-radius: calc(var(--ui-radius-lg) - 1px) calc(var(--ui-radius-lg) - 1px) 0 0;
   cursor: grab;
@@ -1360,7 +1360,7 @@
   width: 2.2rem;
   height: 4px;
   border-radius: 2px;
-  background: rgb(0 0 0 / 0.22);
+  background: color-mix(in srgb, var(--ui-text) 22%, transparent);
 }
 .dash-free-note-body {
   flex: 1;
@@ -1382,7 +1382,7 @@
   display: flex;
   gap: 0.15rem;
   padding: 0.25rem 0.35rem;
-  border-bottom: 1px solid rgb(0 0 0 / 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-text) 8%, transparent);
 }
 .dash-free-note-toolbar button {
   display: inline-flex;
@@ -1397,7 +1397,7 @@
   cursor: pointer;
 }
 .dash-free-note-toolbar button:hover {
-  background: rgb(0 0 0 / 0.08);
+  background: color-mix(in srgb, var(--ui-text) 8%, transparent);
 }
 .dash-free-note-toolbar button.is-active {
   background: var(--ui-primary, #2563eb);
@@ -2219,7 +2219,7 @@
   margin: 0;
   font-size: 0.82rem;
   font-weight: 600;
-  color: var(--text, #18181b);
+  color: var(--ui-text);
 }
 .dash-generic--chart {
   gap: 6px;
@@ -2314,7 +2314,7 @@
 .dash-generic-md {
   font-size: 0.85rem;
   line-height: 1.5;
-  color: var(--text, #18181b);
+  color: var(--ui-text);
 }
 .dash-generic-md > :first-child {
   margin-top: 0;
@@ -2329,7 +2329,7 @@
 .dash-generic-md th,
 .dash-generic-md td {
   padding: 4px 8px;
-  border: 1px solid var(--border, #e5e7eb);
+  border: 1px solid var(--ui-border);
   text-align: left;
 }
 

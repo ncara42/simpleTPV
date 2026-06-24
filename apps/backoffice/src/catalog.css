@@ -1549,7 +1549,7 @@
   padding: 0 1rem;
   border: 1.5px solid var(--ui-border);
   border-radius: 9999px;
-  background: #fff;
+  background: var(--ui-surface);
   cursor: pointer;
   font-size: 0.9rem;
 }
@@ -3350,7 +3350,7 @@
   padding: 0.25rem 0.4rem;
   border: 1px solid var(--ui-border);
   border-radius: 0.4rem;
-  background: var(--surface, #fff);
+  background: var(--ui-surface);
   font: inherit;
 }
 
