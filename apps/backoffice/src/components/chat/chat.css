@@ -1028,6 +1028,33 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  /* Morph héroe(Dashboard)↔barra(resto): el dock viaja de centrado a abajo-centro. El movimiento
+     va por `transform` (compositor), el ancho lo acompaña en el mismo gesto. Curva expo-out, en
+     sintonía con el morph del lienzo (use-mode-transition). */
+  transition:
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    width 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+/* «Asistente de IA» (Dashboard): el composer es el HÉROE — panel + input grandes y centrados.
+   Se eleva al centro del viewport con translateY en dvh; el 50% compensa su propia altura, así
+   queda centrado sea cual sea su tamaño. Quitar la clase (otra view) lo devuelve abajo con el morph. */
+.chat-dock--hero {
+  width: min(760px, calc(100vw - 3rem));
+  transform: translateX(-50%) translateY(calc(-50dvh + 1rem + 50%));
+}
+
+.chat-dock--hero .chat-dock__panel {
+  max-height: min(62dvh, 640px);
+}
+
+/* Sin animación de viaje si el usuario pidió menos movimiento: el dock aparece ya en su sitio. */
+@media (prefers-reduced-motion: reduce) {
+  .chat-dock {
+    transition: none;
+    will-change: auto;
+  }
 }
 
 /* Popover de conversación: se despliega ENCIMA del input. */
@@ -1186,8 +1213,12 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   height: 34px;
   padding: 0 0.8rem;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-pill);
+  /* Botón flotante individual (8px Vercel + sombra sutil), no dentro de un contenedor pill. */
+  border-radius: var(--ui-radius-sm);
   background: var(--ui-surface);
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 0.05),
+    0 6px 14px -6px rgb(0 0 0 / 0.1);
   color: var(--ui-text);
   font: inherit;
   font-size: var(--ui-text-sm);
@@ -1331,8 +1362,11 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   width: 34px;
   height: 34px;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-pill);
+  border-radius: var(--ui-radius-sm);
   background: var(--ui-surface);
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 0.05),
+    0 6px 14px -6px rgb(0 0 0 / 0.1);
   color: var(--ui-text-muted);
   cursor: pointer;
   transition:
