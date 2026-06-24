@@ -1028,6 +1028,11 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  /* Rebote al colapsar/expandir (píldora ↔ caja) fuera del dashboard: el back-out sobrepasa un
+     poco el destino y vuelve, dando la sensación de minimizar/maximizar con muelle. */
+  --chat-bounce: cubic-bezier(0.33, 1.28, 0.68, 1);
+  --chat-bounce-dur: 0.3s;
+  transition: width var(--chat-bounce-dur) var(--chat-bounce);
 }
 
 /* Popover de conversación: se despliega ENCIMA del input. */
@@ -1045,6 +1050,23 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   animation: chat-panel-in var(--ui-motion-medium) var(--ui-ease);
 }
 
+/* Cierre simétrico: el popover se pliega con la animación inversa. La presencia animada (JS)
+   lo mantiene montado mientras dura, así no desaparece de golpe. */
+.chat-dock__panel.is-closing {
+  animation: chat-panel-out var(--ui-motion-medium) var(--ui-ease) forwards;
+}
+
+@keyframes chat-panel-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
 /* ── Composer (PromptInput) ──────────────────────────────────────────────────────── */
 
 .prompt-input {
@@ -1059,7 +1081,9 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   box-shadow: 0 6px 20px rgb(0 0 0 / 0.08);
   transition:
     border-color var(--ui-motion-fast) var(--ui-ease),
-    box-shadow var(--ui-motion-fast) var(--ui-ease);
+    box-shadow var(--ui-motion-fast) var(--ui-ease),
+    border-radius var(--chat-bounce-dur, 0.3s) var(--chat-bounce, cubic-bezier(0.33, 1.28, 0.68, 1)),
+    padding var(--chat-bounce-dur, 0.3s) var(--chat-bounce, cubic-bezier(0.33, 1.28, 0.68, 1));
 }
 
 .prompt-input:focus-within {
@@ -1110,6 +1134,18 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  /* Reaparece con rebote al expandir y se pliega al colapsar (estado por defecto = visible).
+     `overflow` se queda VISIBLE aquí para NO recortar el desplegable del selector de modelo
+     (`.me-menu__panel`, position:absolute que cuelga hacia arriba). El recorte solo se aplica en
+     estado colapsado (.is-collapsed), donde no hay desplegables abiertos. */
+  max-height: 3rem;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    max-height var(--chat-bounce-dur, 0.3s) var(--chat-bounce, cubic-bezier(0.33, 1.28, 0.68, 1)),
+    margin var(--chat-bounce-dur, 0.3s) var(--chat-bounce, cubic-bezier(0.33, 1.28, 0.68, 1)),
+    opacity var(--ui-motion-fast) var(--ui-ease),
+    transform var(--chat-bounce-dur, 0.3s) var(--chat-bounce, cubic-bezier(0.33, 1.28, 0.68, 1));
 }
 
 .prompt-input__tools {
@@ -1163,6 +1199,44 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* ── Dock COLAPSADO ───────────────────────────────────────────────────────────────────
+   Fuera del dashboard y sin foco, el composer se reduce a una píldora redonda solo-input:
+   se oculta el pie (botones) y se estrecha. Al enfocarlo (panelOpen) o volver al dashboard,
+   recupera ancho/forma y los botones reaparecen animados. */
+.chat-dock.is-collapsed {
+  width: clamp(190px, 24vw, 260px);
+}
+
+.chat-dock.is-collapsed .prompt-input {
+  border-radius: var(--ui-radius-pill);
+  padding: 0.25rem 0.4rem 0.25rem 0.9rem;
+}
+
+.chat-dock.is-collapsed .prompt-input__textarea {
+  min-height: 34px;
+  max-height: 34px;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+  overflow: hidden;
+  white-space: nowrap;
+  /* El texto/placeholder que no quepa se desvanece a la derecha en vez de cortarse en seco. */
+  -webkit-mask-image: linear-gradient(to right, #000 78%, transparent);
+  mask-image: linear-gradient(to right, #000 78%, transparent);
+}
+
+.chat-dock.is-collapsed .prompt-input__queue {
+  display: none;
+}
+
+.chat-dock.is-collapsed .prompt-input__footer {
+  max-height: 0;
+  margin-top: -0.5rem; /* absorbe el gap del flex al plegarse */
+  overflow: hidden; /* recorta los botones al plegarse (colapsado no hay desplegables que mostrar) */
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
 }
 
 /* ── Menú «+» de herramientas del lienzo ─────────────────────────────────────────── */
@@ -1319,6 +1393,22 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+/* Cierre simétrico: el menú se pliega con la animación inversa antes de desmontarse. */
+.canvas-tools__menu.is-closing {
+  animation: canvas-tools-drop-out 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes canvas-tools-drop-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
   }
 }
 
@@ -1638,9 +1728,17 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 
 @media (prefers-reduced-motion: reduce) {
   .chat-dock__panel,
+  .chat-dock__panel.is-closing,
   .canvas-tools__menu,
+  .canvas-tools__menu.is-closing,
   .me-menu__panel {
     animation: none;
+  }
+  /* Colapso/expansión sin animación. */
+  .chat-dock,
+  .prompt-input,
+  .prompt-input__footer {
+    transition: none;
   }
 }
 

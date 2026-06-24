@@ -18,6 +18,8 @@ interface PromptComposerProps {
   placeholder?: string;
   /** Se invoca al enfocar el textarea (abre el popover de conversación). */
   onFocus?: () => void;
+  /** Colapsado a píldora solo-input (fuera del dashboard, sin foco): oculta el pie y reduce. */
+  collapsed?: boolean;
 }
 
 /**
@@ -36,10 +38,13 @@ export function PromptComposer({
   trailing,
   placeholder = 'Pregunta al asistente o pídele que componga el dashboard…',
   onFocus,
+  collapsed = false,
 }: PromptComposerProps) {
   const [value, setValue] = useState('');
   const canSend = value.trim().length > 0 && !disabled;
   const busy = status !== 'ready';
+  // Colapsado el hueco es mínimo: un placeholder breve evita que se corte de forma fea.
+  const effectivePlaceholder = collapsed ? 'Pregúntame…' : placeholder;
 
   const submit = (): void => {
     const text = value.trim();
@@ -57,7 +62,10 @@ export function PromptComposer({
   };
 
   return (
-    <div className={`prompt-input${disabled ? ' is-disabled' : ''}`} data-testid="chat-composer">
+    <div
+      className={`prompt-input${disabled ? ' is-disabled' : ''}${collapsed ? ' is-collapsed' : ''}`}
+      data-testid="chat-composer"
+    >
       {queueLength > 0 && (
         <p className="prompt-input__queue" role="status">
           {queueLength === 1 ? '1 mensaje en cola' : `${queueLength} mensajes en cola`}
@@ -69,7 +77,7 @@ export function PromptComposer({
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         onFocus={onFocus}
-        placeholder={placeholder}
+        placeholder={effectivePlaceholder}
         rows={Math.min(8, Math.max(1, value.split('\n').length))}
         disabled={disabled}
         data-testid="chat-input"

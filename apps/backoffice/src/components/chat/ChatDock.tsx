@@ -3,6 +3,7 @@ import './chat.css';
 import { MessageSquare } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
+import { useAnimatedPresence } from '../../hooks/use-animated-presence.js';
 import type { CanvasOp } from '../../lib/chat.js';
 import { ChatConversationList } from './ChatConversationList.js';
 import { ChatHeader } from './ChatHeader.js';
@@ -12,6 +13,9 @@ import { ModelEffortMenu } from './ModelEffortMenu.js';
 import { PromptComposer } from './PromptComposer.js';
 import { type CanvasApplyResult, useChat } from './useChat.js';
 import type { ViewContext } from './view-context.js';
+
+/** Duración (ms) de la entrada/salida del popover de conversación; coincide con `--ui-motion-medium`. */
+const PANEL_MOTION_MS = 180;
 
 export interface ChatDockProps {
   /** Aplica un canvas_op en el lienzo y devuelve el resultado para el feedback loop. */
@@ -41,6 +45,18 @@ export function ChatDock({
   const [panelOpen, setPanelOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const dockRef = useRef<HTMLDivElement>(null);
+
+  // Fuera del dashboard, y mientras el popover esté cerrado, el dock se reduce a una píldora
+  // redonda solo-input; al enfocarlo (panelOpen → true) o al volver al dashboard recupera su
+  // tamaño y forma originales y reaparecen los botones (todo animado por CSS).
+  const isDashboard = view.id === 'dashboard';
+  const collapsed = !isDashboard && !panelOpen;
+
+  // El popover se mantiene montado mientras dura su animación de salida → cierre simétrico.
+  const { isMounted: panelMounted, isClosing: panelClosing } = useAnimatedPresence(
+    panelOpen,
+    PANEL_MOTION_MS,
+  );
 
   const chat = useChat({
     enabled: true,
@@ -105,10 +121,14 @@ export function ChatDock({
   );
 
   return (
-    <div className="chat-dock" data-testid="chat-dock" ref={dockRef}>
-      {panelOpen && (
+    <div
+      className={`chat-dock${collapsed ? ' is-collapsed' : ''}`}
+      data-testid="chat-dock"
+      ref={dockRef}
+    >
+      {panelMounted && (
         <aside
-          className="chat-dock__panel"
+          className={`chat-dock__panel${panelClosing ? ' is-closing' : ''}`}
           role="dialog"
           aria-label="Asistente"
           data-testid="chat-panel"
@@ -191,6 +211,7 @@ export function ChatDock({
           onSend={handleSend}
           onStop={chat.stop}
           onFocus={() => setPanelOpen(true)}
+          collapsed={collapsed}
           leading={leading}
           trailing={
             !noAi && chat.models.length > 0 ? (
