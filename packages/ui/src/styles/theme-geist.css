@@ -132,9 +132,11 @@
   --ui-radius: var(--ui-radius-md);
 
   --ui-focus: 0 0 0 3px rgba(0, 112, 243, 0.32);
-  /* Geist eleva con hairline + un soplo de sombra (no plano del todo, no pesado). */
+  /* Geist: tarjetas PLANAS (solo hairline); la sombra se reserva a overlays
+     (--ui-shadow-md/lg en modales, menús, toasts). --ui-shadow-sm queda como
+     soplo mínimo para controles pequeños. */
   --ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
-  --ui-shadow-panel: 0 1px 2px rgb(0 0 0 / 0.04);
+  --ui-shadow-panel: none;
 
   /* ─── Fallbacks --tpv-* usados inline en varias páginas ─── */
   --tpv-line: var(--gst-200);

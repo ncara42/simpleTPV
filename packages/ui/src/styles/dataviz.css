@@ -5,8 +5,8 @@
 /* ── StatValue ── */
 .dv-stat-value {
   font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
+  letter-spacing: -0.025em;
+  line-height: 1;
   color: var(--ui-text);
   font-variant-numeric: tabular-nums;
 }
