@@ -5,12 +5,12 @@ export const tailwindBasePreset: Partial<Config> = {
     extend: {
       colors: {
         brand: {
-          DEFAULT: '#0ea5e9',
+          DEFAULT: '#0070f3',
           foreground: '#ffffff',
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Geist', 'Geist Sans', 'Inter', 'system-ui', 'sans-serif'],
       },
     },
   },

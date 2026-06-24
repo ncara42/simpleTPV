@@ -858,10 +858,15 @@ export function FreeBoard({
         <div
           className="dash-free-dots"
           aria-hidden="true"
-          style={{
-            backgroundSize: `${24 * view.zoom}px ${24 * view.zoom}px`,
-            backgroundPosition: `${view.panX}px ${view.panY}px`,
-          }}
+          style={
+            {
+              // pan/zoom como custom props para que la capa base Y la cresta (::after) compartan
+              // exactamente la misma rejilla durante la ola diagonal (ver dashboard.css).
+              '--dots-size': `${24 * view.zoom}px`,
+              '--dots-pos-x': `${view.panX}px`,
+              '--dots-pos-y': `${view.panY}px`,
+            } as React.CSSProperties
+          }
         />
         <div
           className="dash-free-world"

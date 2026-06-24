@@ -6,7 +6,7 @@
   flex-direction: column;
   gap: 24px;
   padding: 16px;
-  background: var(--ui-color-bg, #fff);
+  background: var(--ui-bg);
 }
 .vis-frame {
   width: 100%;

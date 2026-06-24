@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 @import '@simpletpv/ui/theme.css';
-@import '@simpletpv/ui/theme-apple.css';
+@import '@simpletpv/ui/theme-geist.css';
 @import '@simpletpv/ui/sidebar.css';
 
 /* Tailwind v4 autodetecta el contenido del propio app pero NO los paquetes
@@ -20,8 +20,8 @@
   --radius-xl: var(--ui-radius-xl);
 }
 
-/* La Fundación Apple compartida (tokens, body, shell, topbar) vive en
-   @simpletpv/ui/theme-apple.css. Aquí solo lo específico del TPV. */
+/* La Fundación Geist compartida (tokens, body, shell, topbar) vive en
+   @simpletpv/ui/theme-geist.css. Aquí solo lo específico del TPV. */
 
 /* ─── Contenido principal ─────────────────────────────────── */
 .app-main {

@@ -7,6 +7,8 @@
 >
 > **Nota sobre `DESIGN.md`:** ese archivo es la _referencia estética externa_ (análisis de Apple.com) que
 > inspiró el lenguaje. **Este** documento (`DESIGN_SYSTEM.md`) es el sistema real, implementado y vigente.
+> **Migración a Geist (jun 2026):** sistema ahora vivo en **Fundación Geist** (Vercel Design System):
+> grises fríos, azul Vercel, Geist Sans autohospedada, botones 8px, tarjetas planas, hairlines.
 
 ---
 
@@ -14,7 +16,8 @@
 
 - **Fuentes de verdad (no hardcodear hex):**
   - Capa base de tokens: `packages/ui/src/styles/theme.css`
-  - Remap de marca por app ("Fundación Apple"): `apps/backoffice/src/styles.css` y `apps/tpv/src/styles.css` (idénticos)
+  - **Fundación Geist viva**: `packages/ui/src/styles/theme-geist.css` (remapea TODOS los `--ui-*`; autohospedada Geist Sans, botones 8px, tarjetas planas, azul Vercel)
+  - Importada por: `apps/backoffice/src/styles.css` y `apps/tpv/src/styles.css` → `@import '@simpletpv/ui/theme-geist.css'`
   - Componentes compartidos + sus CSS: `packages/ui/src/components/*` y `packages/ui/src/styles/*`
   - Patrones de página: `apps/backoffice/src/{dashboard,catalog}.css`, `apps/tpv/src/sale.css`
 - **Regla de oro:** usar siempre variables `--ui-*` (o utilidades Tailwind `rounded-*`, que apuntan a los mismos tokens). Nunca un color/medida literal en componentes.
@@ -46,84 +49,85 @@ Capa 1 — BASE neutra (packages/ui/src/styles/theme.css)
          Es el contrato de nombres (--ui-*) y el fallback.
                     │  (cada app la importa y luego la sobre-escribe)
                     ▼
-Capa 2 — FUNDACIÓN APPLE (apps/*/src/styles.css)  ←★ ESTE ES EL ASPECTO VIVO
-         Remapea TODOS los --ui-* a la paleta Apple: Action Blue #0066cc,
-         lienzo parchment #f5f5f7, tinta #1d1d1f, hairlines, SF Pro,
-         radios 8/12/18/pill, cero sombras de chrome. backoffice ≡ tpv.
+Capa 2 — FUNDACIÓN GEIST (packages/ui/src/styles/theme-geist.css)  ←★ ESTE ES EL ASPECTO VIVO
+         Remapea TODOS los --ui-* a la paleta Geist: azul Vercel #0070f3,
+         lienzo blanco roto #fafafa, tinta #18181b, hairlines, Geist Sans,
+         botones 8px, radios 12px, tarjetas planas, grises fríos 6 niveles.
+         Modo oscuro: data-theme="dark" en <html>, lienzo #0a0a0a, tinta #fafafa.
+         Importada por ambas apps vía @simpletpv/ui/theme-geist.css.
                     │
                     ▼
-Capa 3 — TAILWIND @theme inline (apps/tpv/src/styles.css)
+Capa 3 — TAILWIND @theme inline (apps/*/src/styles.css)
          Mapea radius-xs..xl de Tailwind a los tokens --ui-radius-*
          → `rounded-lg` y `var(--ui-radius-lg)` rinden idéntico.
 ```
 
-> **Conclusión operativa:** el aspecto real de ambas apps es la **Fundación Apple** (capa 2). La capa base
+> **Conclusión operativa:** el aspecto real de ambas apps es la **Fundación Geist** (capa 2). La capa base
 > (teal/neutro) solo se vería si una app dejara de remapear. Las tablas de abajo dan **ambos** valores:
-> el `BASE` (contrato) y el `VIVO (Apple)` (lo que se ve).
+> el `BASE` (contrato) y el `VIVO (Geist)` (lo que se ve).
 
 ---
 
 ## 3. Color
 
-### 3.1 Superficies y bordes
+### 3.1 Superficies y bordes (modo claro)
 
-| Token                     | BASE (theme.css) | VIVO (Apple)                 | Uso                                                          |
-| ------------------------- | ---------------- | ---------------------------- | ------------------------------------------------------------ |
-| `--ui-bg`                 | `#f6f6f4`        | `#f5f5f7` (canvas/parchment) | Lienzo de la app                                             |
-| `--ui-surface`            | `#ffffff`        | `#ffffff`                    | Cards, paneles, menús, inputs                                |
-| `--ui-surface-subtle`     | `#f4f4f2`        | `#f5f5f7`                    | Zebra, hover de fila, fondos de tab/track                    |
-| `--ui-border`             | `#e6e5e0`        | `#e3e3e6` (hairline)         | Hairline suave (la elevación por defecto)                    |
-| `--ui-border-strong`      | `#d8d6cf`        | `#d2d2d7`                    | Hairline marcado, líneas base de gráficas, bordes de control |
-| `--ap-pearl` (solo Apple) | —                | `#fafafc`                    | Superficie sutil                                             |
+| Token                     | BASE (theme.css) | VIVO (Geist)         | Uso                                                          |
+| ------------------------- | ---------------- | -------------------- | ------------------------------------------------------------ |
+| `--ui-bg`                 | `#f6f6f4`        | `#fafafa`            | Lienzo de la app (blanco roto)                               |
+| `--ui-surface`            | `#ffffff`        | `#ffffff`            | Cards, paneles, menús, inputs                                |
+| `--ui-surface-subtle`     | `#f4f4f2`        | `#f4f4f5`            | Zebra, hover de fila, fondos de tab/track                    |
+| `--ui-border`             | `#e6e5e0`        | `#e8e8eb` (hairline) | Hairline suave (la elevación por defecto)                    |
+| `--ui-border-strong`      | `#d8d6cf`        | `#d6d6da`            | Hairline marcado, líneas base de gráficas, bordes de control |
+| `--ap-pearl` (solo Geist) | —                | `#f6f6f7`            | Superficie sutil adicional                                   |
 
-### 3.2 Texto
+### 3.2 Texto (modo claro)
 
-| Token             | BASE      | VIVO (Apple)       | Uso                                      | Contraste sobre canvas |
-| ----------------- | --------- | ------------------ | ---------------------------------------- | ---------------------- |
-| `--ui-text`       | `#18181a` | `#1d1d1f` (ink)    | Titulares y cuerpo                       | ~16:1                  |
-| `--ui-text-muted` | `#6b6b66` | `#6e6e73` (gray-1) | Texto secundario                         | 4.7:1 (AA)             |
-| `--ui-text-soft`  | `#71706c` | `#6f6f78` (gray-2) | Texto terciario, placeholders, etiquetas | 4.5:1 (AA)             |
+| Token             | BASE      | VIVO (Geist) | Uso                                      | Contraste sobre canvas |
+| ----------------- | --------- | ------------ | ---------------------------------------- | ---------------------- |
+| `--ui-text`       | `#18181a` | `#18181b`    | Titulares y cuerpo (tinta)               | ~16:1                  |
+| `--ui-text-muted` | `#6b6b66` | `#52525b`    | Texto secundario (gris)                  | 7:1 AA                 |
+| `--ui-text-soft`  | `#71706c` | `#71717a`    | Texto terciario, placeholders, etiquetas | 4.6:1 AA               |
 
-> **WCAG (revisión 2026-06-11):** el terciario era `#86868b` (3.6:1) y NO cumplía
-> AA para texto normal; oscurecido a `#6f6f78` (gray-2) / `#71706c` (base) para
-> alcanzar ≥4.5:1. Todos los tokens de texto cumplen ahora AA sobre `--ui-bg` y
-> `--ui-surface`.
+> **WCAG (revisión 2026-06-24):** todos los tokens cumplen AA sobre `--ui-bg` (`#fafafa`)
+> y `--ui-surface` (`#ffffff`). Primario 16:1, secundario 7:1, terciario 4.6:1.
+> Modo oscuro con rampa 6 niveles adicional (ver §12-bis).
 
-### 3.3 Acción primaria y marca
+### 3.3 Acción primaria y marca (modo claro)
 
-| Token                | BASE              | VIVO (Apple)            | Uso                                                            |
-| -------------------- | ----------------- | ----------------------- | -------------------------------------------------------------- |
-| `--ui-primary`       | `#171717` (tinta) | `#0066cc` (Action Blue) | Botón primario, enlaces, foco                                  |
-| `--ui-primary-hover` | `#000000`         | `#0071e3`               | Hover del primario                                             |
-| `--ui-primary-fg`    | `#ffffff`         | `#ffffff`               | Texto sobre primario                                           |
-| `--ui-brand`         | `#0e7c6b` (teal)  | `#0066cc`               | **Único acento de data-viz**: barras, dots, medidores, activos |
-| `--ui-brand-ink`     | `#0a5447`         | `#0066cc`               | Texto/iconos de acento (check de Select, posición #1)          |
-| `--ui-brand-soft`    | `#0e7c6b14`       | `rgba(0,102,204,.08)`   | Relleno suave de acento (opción activa, área de sparkline)     |
-| `--ui-brand-soft-2`  | `#0e7c6b22`       | `rgba(0,102,204,.14)`   | Acento un punto más sólido (chip de podio)                     |
+| Token                | BASE              | VIVO (Geist)            | Uso                                                              |
+| -------------------- | ----------------- | ----------------------- | ---------------------------------------------------------------- |
+| `--ui-primary`       | `#171717` (tinta) | `#0070f3` (azul Vercel) | Botón primario, enlaces, foco                                    |
+| `--ui-primary-hover` | `#000000`         | `#005bd3`               | Hover del primario                                               |
+| `--ui-primary-fg`    | `#ffffff`         | `#ffffff`               | Texto sobre primario                                             |
+| `--ui-brand`         | `#0e7c6b` (teal)  | `#0070f3`               | **Único acento de data-viz**: barras, dots, medidores, activos   |
+| `--ui-brand-ink`     | `#0a5447`         | `#0061d1`               | Texto/iconos de acento (check de Select, posición #1) — AA 4.5:1 |
+| `--ui-brand-soft`    | `#0e7c6b14`       | `rgba(0,112,243,.10)`   | Relleno suave de acento (opción activa, área de sparkline)       |
+| `--ui-brand-soft-2`  | `#0e7c6b22`       | `rgba(0,112,243,.18)`   | Acento un punto más sólido (chip de podio)                       |
 
-> **En Apple, marca = primario = Action Blue.** No hay dos acentos. El color es escaso por diseño.
+> **En Geist, marca = primario = azul Vercel (#0070f3).** No hay dos acentos. El color es escaso por diseño.
 
-### 3.4 Semántica
+### 3.4 Semántica (modo claro)
 
-| Rol     | Token ink / soft — BASE | Token ink / soft — VIVO (Apple) |
+| Rol     | Token ink / soft — BASE | Token ink / soft — VIVO (Geist) |
 | ------- | ----------------------- | ------------------------------- |
-| Peligro | `#c0392b` / `#fbeae7`   | `#d70015` / `#ffe5e7`           |
-| Aviso   | `#b45309` / `#fdf4e6`   | `#b25000` / `#fff1e3`           |
-| Éxito   | `#16734f` / `#e8f3ec`   | `#1d7d4f` / `#e3f4ea`           |
+| Peligro | `#c0392b` / `#fbeae7`   | `#d6201f` / `#fdecec`           |
+| Aviso   | `#b45309` / `#fdf4e6`   | `#ab5300` / `#fff3e2`           |
+| Éxito   | `#16734f` / `#e8f3ec`   | `#117a3b` / `#e8f6ee`           |
 
 Patrón de uso: **`-soft` como fondo + `ink` como texto/icono** (píldoras de estado, badges de severidad, toasts).
 
-### 3.5 Sidebar (tokens dedicados)
+### 3.5 Sidebar (tokens dedicados, modo claro)
 
-| Token                                               | BASE                | VIVO (Apple)         |
-| --------------------------------------------------- | ------------------- | -------------------- |
-| `--sidebar-bg`                                      | `#ffffff`           | `#ffffff` (surface)  |
-| `--sidebar-item-active-bg`                          | `rgb(0 0 0 / .07)`  | `rgba(0,0,0,.065)`   |
-| `--sidebar-item-hover-bg`                           | `rgb(0 0 0 / .042)` | `rgba(0,0,0,.038)`   |
-| `--sidebar-text`                                    | `#6b6b66`           | `gray-1`             |
-| `--sidebar-text-active`                             | `= --ui-text`       | `ink`                |
-| `--sidebar-group-label-color`                       | `#8d897f`           | `gray-1` (AA a 11px) |
-| `--sidebar-width-rail` / `--sidebar-width-expanded` | `56px` / `232px`    | igual                |
+| Token                                               | BASE                | VIVO (Geist)          |
+| --------------------------------------------------- | ------------------- | --------------------- |
+| `--sidebar-bg`                                      | `#ffffff`           | `#ffffff` (surface)   |
+| `--sidebar-item-active-bg`                          | `rgb(0 0 0 / .07)`  | `rgba(0,0,0,.06)`     |
+| `--sidebar-item-hover-bg`                           | `rgb(0 0 0 / .042)` | `rgba(0,0,0,.038)`    |
+| `--sidebar-text`                                    | `#6b6b66`           | `#52525b`             |
+| `--sidebar-text-active`                             | `= --ui-text`       | `#18181b`             |
+| `--sidebar-group-label-color`                       | `#8d897f`           | `#52525b` (AA a 11px) |
+| `--sidebar-width-rail` / `--sidebar-width-expanded` | `56px` / `232px`    | igual                 |
 
 **Selección "silenciosa" estilo ChatGPT:** el ítem activo NO usa color; usa relleno neutro + tinta plena. El único color del sidebar vive en el logotipo y el anillo de foco.
 
@@ -133,10 +137,10 @@ Patrón de uso: **`-soft` como fondo + `ink` como texto/icono** (píldoras de es
 
 ### 4.1 Familias
 
-- **VIVO (apps):** `'SF Pro Text', system-ui, -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif` con `-webkit-font-smoothing: antialiased` + `text-rendering: optimizeLegibility`.
-- **BASE (theme.css):** `Geist, Inter, ui-sans-serif, system-ui, -apple-system, …`
+- **VIVO (apps):** **Geist Sans** (pesos 400/500/600/700) autohospedada en `packages/ui/src/styles/fonts/*.woff2` (subset latin, vendorizada, `@font-face` en theme-geist.css), cae a Inter si fallara. **Geist Mono** para códigos (SKU/EAN).
+- **BASE (theme.css):** fallback a `Inter, ui-sans-serif, system-ui, -apple-system, …`
 - **Monoespaciada (impresión / ESC-POS, tickets):** `ui-monospace, monospace` / `'Courier New'`.
-- **Numéricos:** `font-variant-numeric: tabular-nums` global en el `body` → las cifras no bailan de ancho.
+- **Numéricos:** `font-variant-numeric: tabular-nums` global en el `body` → las cifras no bailan de ancho. **Regla anti-Mono:** NO usar Geist Mono en cifras con separador de miles (separa raro); usar Geist Sans tabular.
 
 ### 4.2 Escala (tokens `--ui-text-*`, raíz 16px)
 
@@ -163,21 +167,22 @@ Patrón de uso: **`-soft` como fondo + `ink` como texto/icono** (píldoras de es
 
 ## 5. Forma y espaciado
 
-Escala única por rol (`--ui-radius-*`). En la **Fundación Apple** se sobre-escriben tres a 8/12/18:
+Escala única por rol (`--ui-radius-*`). En la **Fundación Geist** botones e inputs usan 8px (SIN cápsula):
 
-| Token              | BASE  | VIVO (Apple) | Rol                                                         |
-| ------------------ | ----- | ------------ | ----------------------------------------------------------- |
-| `--ui-radius-xs`   | 6px   | 6px          | insignias, kbd, micro-controles, cabeceras de grupo sidebar |
-| `--ui-radius-sm`   | 8px   | 8px          | botones, chips, inputs, steppers, tabs, ítems de sidebar    |
-| `--ui-radius-md`   | 10px  | 10px         | filas de lista, ítems internos (`--ui-radius` = md)         |
-| `--ui-radius-lg`   | 12px  | **18px**     | tarjetas, paneles, barras de búsqueda, tablas               |
-| `--ui-radius-xl`   | 16px  | 16px         | modales y superficies grandes (KPI cards)                   |
-| `--ui-radius-pill` | 999px | 999px        | píldoras de estado, dots, selección activa                  |
+| Token              | BASE  | VIVO (Geist) | Rol                                                                 |
+| ------------------ | ----- | ------------ | ------------------------------------------------------------------- |
+| `--ui-radius-xs`   | 6px   | 6px          | insignias, kbd, micro-controles, cabeceras de grupo sidebar         |
+| `--ui-radius-sm`   | 8px   | 8px          | **botones, chips, inputs, selects** — Sin cápsula por defecto       |
+| `--ui-radius-md`   | 10px  | 12px         | filas de lista, ítems internos                                      |
+| `--ui-radius-lg`   | 12px  | 12px         | tarjetas, paneles, barras de búsqueda, tablas, modales              |
+| `--ui-radius-xl`   | 16px  | 12px         | superficies grandes (KPI cards colapsan a lg)                       |
+| `--ui-radius-pill` | 999px | 999px        | **SOLO iconos circulares del clúster flotante** (.float-action-btn) |
 
-**Regla "pill" de Apple (importante, difiere entre apps):**
+**Regla de-pill de Geist (cambio importante):**
 
-- **Backoffice:** dentro de `.app-shell`, **TODOS los `<button>`** y los `.ui-select-trigger` van a cápsula (`border-radius: 9999px`). Las filas de sidebar quedan en rect redondeado salvo la activa/hover (cápsula).
-- **TPV:** la cápsula se aplica **selectivamente** (lista explícita: `.btn-primary`, `.cart-*`, `.pay-*`, `.cash-*`, `.scan-btn`, `.tpv-tab`, inputs de búsqueda…) porque es un POS: la **cuadrícula de producto** (`.prod-card` es un `<button>`) y los **steppers +/-** conservan su radio propio; los `<textarea>` quedan fuera.
+- **Botones, inputs, selects:** radio **8px** (sm), NO cápsula. Cambio: en `apps/backoffice/src/styles.css` `.app-shell button` y `.ui-select-trigger` pasan de `9999px` a `var(--ui-radius-sm)`.
+- **Excepción:** los botones-icono del clúster flotante (`.float-action-btn`) son **CÍRCULOS** (`9999px`): regla adicional `.app-shell .float-action-btn { border-radius: 9999px }`.
+- **Sidebar:** mantiene su tratamiento (selección activa cápsula suave).
 
 **Altura de control estándar del backoffice:** `--bo-control-height: calc(30px + 0.36rem + 2px)` (≈ 39.76px). Iguala la altura exterior de las pills de periodo/tab para que toda cabecera de control alinee.
 
@@ -203,14 +208,14 @@ Convención: el **padding interior de un panel de contenido** es `--ui-space-4` 
 
 ## 6. Elevación, sombras y hairlines
 
-> **Filosofía Apple: la elevación es el hairline, no la sombra.** En la capa viva, `--ui-shadow-sm` y `--ui-shadow-panel` son `none`. La profundidad real se reserva para overlays (menús, modales, toasts, drawers).
+> **Filosofía Geist: la elevación es el hairline, no la sombra. Tarjetas PLANAS.** En la capa viva, `--ui-shadow-sm` y `--ui-shadow-panel` son `none`. La profundidad real se reserva para overlays (menús, modales, toasts, drawers).
 
-| Token               | Valor (BASE)                                           | Uso                       |
-| ------------------- | ------------------------------------------------------ | ------------------------- |
-| `--ui-shadow-sm`    | `0 1px 2px rgb(0 0 0 / .045)` — **`none` en Apple**    | Elevación mínima de panel |
-| `--ui-shadow-md`    | `0 4px 16px -6px rgb(0 0 0 / .12)`                     | Toasts                    |
-| `--ui-shadow-lg`    | `0 12px 32px -12px rgb(0 0 0 / .22)`                   | (reservado)               |
-| `--ui-shadow-panel` | `0 1px 3px /.06, 0 1px 2px /.04` — **`none` en Apple** | Paneles                   |
+| Token               | Valor (BASE)                         | VIVO (Geist)          | Uso                       |
+| ------------------- | ------------------------------------ | --------------------- | ------------------------- |
+| `--ui-shadow-sm`    | `0 1px 2px rgb(0 0 0 / .045)`        | `none`                | Elevación mínima de panel |
+| `--ui-shadow-md`    | `0 4px 16px -6px rgb(0 0 0 / .12)`   | `0 4px 16px -6px …`   | Toasts                    |
+| `--ui-shadow-lg`    | `0 12px 32px -12px rgb(0 0 0 / .22)` | `0 12px 32px -12px …` | (reservado para overlays) |
+| `--ui-shadow-panel` | `0 1px 3px /.06, 0 1px 2px /.04`     | `none`                | Paneles (hairline solo)   |
 
 Sombras concretas de overlays (no tokenizadas, valores literales canónicos):
 
@@ -223,7 +228,7 @@ Sombras concretas de overlays (no tokenizadas, valores literales canónicos):
 
 ## 7. Foco y accesibilidad
 
-- **Anillo de foco** (`--ui-focus`): BASE `0 0 0 3px var(--ui-brand-soft-2)`; **VIVO (Apple)** `0 0 0 4px rgba(0,113,227,.32)`. Se aplica con `:focus-visible` (no `:focus`) en sidebar, select, cuenta, etc.
+- **Anillo de foco** (`--ui-focus`): BASE `0 0 0 3px var(--ui-brand-soft-2)`; **VIVO (Geist)** `0 0 0 4px rgba(0,112,243,.32)`. Se aplica con `:focus-visible` (no `:focus`) en sidebar, select, cuenta, etc.
 - **Objetivo WCAG AA** mínimo; contraste de cuerpo ≥ 4.5:1. Las etiquetas de grupo del sidebar usan `gray-1` (no `gray-2`) precisamente para cumplir AA a 11px.
 - **`prefers-reduced-motion: reduce` se respeta siempre:** se anulan animaciones de toast, barras, sparklines, micro-gestos del sidebar y transforms de `:active`.
 - **`tabular-nums`** global para que las métricas no salten.
@@ -340,22 +345,34 @@ Backdrop `z:60` `rgba(10,20,19,.45)`, contenido anclado a la derecha (`width: mi
 
 Wrapper pill con **lupa lucide a la izquierda** pintada como máscara CSS (se tinta con `--ui-text-soft`); input con `padding-left: 2.6rem`; degradado de desvanecido a la derecha. Cuando envuelve un `<Select>` de filtro, el chrome lo aporta `.ui-select-trigger`.
 
-### 10.15 KPI Card (`.dash-card`, `dashboard.css`)
+### 10.15 KPI Card → "KPI / rejilla conectada" (`.dash-kpi-row`, `dashboard.css`)
 
-`padding 1.15rem 1.25rem`, borde `--ui-border`, **radio 16px**, bg surface, `overflow:hidden`. Hover: borde `--ui-border-strong` + `translateY(-1px)`.
+Los KPIs van en **rejilla CONECTADA con hairline** (estilo Vercel Analytics):
 
+- **Contenedor** (`.dv-kpi-row`): `grid` con `gap:1px` + `background: var(--ui-border)` + `border:1px solid var(--ui-border)` + `border-radius:12px` + `overflow:hidden`.
+- **Celda individual** (`.dv-kpi-tile`): `background: var(--ui-surface)` + padding `1.15rem 1.25rem`; el gap de 1px actúa como divisor (hairline) entre celdas.
 - **Label:** `0.72rem/600` uppercase `0.045em` soft.
-- **Valor:** `1.72rem/600/-0.025em`, tabular.
+- **Valor:** `1.72rem/600/-0.025em`, tabular (**Geist Sans**, NO Mono).
 - **Delta:** píldora `0.74rem/600` con par de color `dash-delta-up/-down/-flat` (`*-soft` + `ink`).
 - **Trend overlay:** píldora que flota a caballo del **borde superior** (surface + hairline), flecha + % por signo.
 - **Sparkline:** SVG **full-bleed** al pie (alto 44px), `stroke-width:1.5` `currentColor`, área en `*-soft`; color por estado (brand/up/down).
 
-### 10.16 Data-viz (barras, familias, rankings)
+### 10.16 Data-viz → Monocromía (barras, familias, rankings)
 
-- **Barras hoy vs ayer:** altura 248px; barra "Ayer" = `--ui-border-strong`; barra "Hoy" = gradiente de marca `linear-gradient(180deg, mix(brand 82% #fff), brand)`; línea base `--ui-border-strong`; cifra vertical dentro de la barra; entrada `dash-bar-rise` con stagger `--i*70ms`; al hover/selección, las demás columnas se atenúan a `opacity:.4`.
-- **Barras por familia:** track pill surface-subtle; relleno gradiente de marca; importe dentro de la barra (blanco, tabular).
-- **Rankings:** posición en chip circular (el #1 con `--ui-brand-soft-2` + `--ui-brand-ink`); medidor fino de 3px bajo cada fila (gradiente de marca); hover de fila surface-subtle.
-- **Regla transversal de data-viz:** un único acento (marca) + tintes `-soft` para severidad; "enfocar atenuando el resto".
+- **Paleta categórica reconvertida a monocromía de acento + gris:**
+  - cat-1 `#0070f3` (serie principal/"hoy", azul)
+  - cat-2 `#52525b` (comparación/"ayer", gris)
+  - cat-3 `#005bd3` (azul oscuro)
+  - cat-4 `#a1a1aa` (gris claro)
+  - cat-5 `#3f3f46` (gris oscuro)
+  - cat-6 `#4aa3ff` (azul claro)
+  - cat-7 `#d6d6da` (gris muy claro)
+  - cat-8 `#a1a1aa` (gris medio)
+- **Barras hoy vs ayer:** altura 248px; barra "Ayer" = `#52525b`; barra "Hoy" = `#0070f3` (primaria, sin gradiente); línea base `--ui-border-strong`; cifra vertical dentro de la barra (blanco); entrada `dash-bar-rise` con stagger `--i*70ms`; al hover/selección, las demás columnas se atenúan a `opacity:.4`.
+- **Barras por familia:** track surface-subtle; relleno monocromo serie primaria (`#0070f3`); importe dentro de la barra (blanco, tabular, Geist Sans).
+- **Rankings:** posición en chip circular (el #1 con `--ui-brand-soft-2` + `--ui-brand-ink`); medidor fino de 3px bajo cada fila (monocromo `#0070f3`); hover de fila surface-subtle.
+- **Tooltip:** oscuro invertido (bg `#18181b`, fg `#ffffff`) para contraste máximo.
+- **Regla transversal de data-viz:** un único acento (azul Vercel `#0070f3`) + gris para comparación; NO arcoíris; "enfocar atenuando el resto".
 
 ### 10.17 POS (TPV) — específicos (`sale.css`)
 
@@ -418,23 +435,84 @@ ruido (anotar en el PR). Los icon-only (sin texto) llevan `aria-label` y `title`
 
 ---
 
+## 11.2 Modo oscuro (`data-theme="dark"`)
+
+El modo oscuro se controla con el atributo `data-theme="dark"` en el elemento `<html>`. Todos los tokens `--ui-*` se redeclaran en `:root[data-theme='dark']` dentro de `theme-geist.css`.
+
+**Controles:**
+
+- Toggle luna/sol en el clúster flotante (`apps/backoffice/src/components/FloatingActions.tsx`).
+- Persistencia: `apps/backoffice/src/lib/theme.ts` con `localStorage`.
+- Script anti-parpadeo: `apps/backoffice/index.html` fija el tema antes de pintar → respeta `prefers-color-scheme` en primera carga.
+
+**Rampa oscura de 6 niveles escalonados (modo oscuro):**
+
+| Token                 | Valor     | Uso                              |
+| --------------------- | --------- | -------------------------------- |
+| `--ui-bg`             | `#0a0a0a` | Lienzo principal (casi negro)    |
+| `--ui-surface-subtle` | `#141417` | Relleno sutil (nivel 1)          |
+| `--ui-surface`        | `#1e1e22` | Cartas/paneles (nivel más claro) |
+| `--ui-surface-strong` | `#24242a` | Pista/track (nivel 2)            |
+| `--ui-border`         | `#2e2e35` | Hairline suave                   |
+| `--ui-border-strong`  | `#3d3d45` | Hairline marcado                 |
+
+**Texto oscuro:**
+
+- `--ui-text` = `#fafafa` (primario, ~16:1 sobre bg)
+- `--ui-text-muted` = `#b3b3bb` (secundario, ~7:1 AA)
+- `--ui-text-soft` = `#8a8a93` (terciario, ~5:1 AA)
+
+**Acento oscuro (azul):**
+
+- `--ui-primary` / `--ui-brand` = `#3b9eff` (más claro para legibilidad)
+- `--ui-primary-hover` / `--ui-brand-ink` = `#5aacff`
+- `--ui-brand-soft` = `rgba(59,158,255,.10)`
+- `--ui-brand-soft-2` = `rgba(59,158,255,.18)`
+
+**Semántica oscura (luminosa):**
+
+- Peligro: `#ff6166` (ink) / `rgba(255,97,102,.15)` (soft)
+- Aviso: `#f5a623` (ink) / `rgba(245,166,35,.12)` (soft)
+- Éxito: `#3ecf8e` (ink) / `rgba(62,207,142,.12)` (soft)
+
+**Sidebar oscuro:**
+
+- `--sidebar-bg` = `#0e0e10`
+- `--sidebar-item-active-bg` = `rgba(255,255,255,.10)`
+- `--sidebar-item-hover-bg` = `rgba(255,255,255,.05)`
+- `--sidebar-text` = `#b3b3bb`
+- `--sidebar-text-active` = `#fafafa`
+
+**Tooltip oscuro:**
+
+- bg `#27272a` (no totalmente negro para suavidad)
+- fg `#fafafa`
+
+> **Implementación:** casi todo se deriva de `--gst-*` / `--gst-blue-*` invertidos (Geist design tokens);
+> solo se redeclaran los `--ui-*` literales. Foco oscuro: `0 0 0 4px rgba(59,158,255,.32)`.
+
+---
+
 ## 12. Reglas y "no hacer"
 
-1. **Un solo acento de color** (Action Blue). Nada de segundas marcas ni gradientes morados/azules decorativos. Gradiente permitido solo en data-viz (mezcla de marca con blanco).
-2. **El color es escaso (regla ~10%).** Las superficies son neutras; el color aparece donde importa (estado, severidad, acento de dato, foco).
-3. **La elevación por defecto es el hairline.** Sombras solo para overlays (menú/modal/toast/drawer).
-4. **Cápsula (pill) según la regla por app** (§5). No poner la cuadrícula de producto ni los steppers en cápsula.
-5. **Tipografía:** pesos 500/600/700; tracking negativo escalado; mayúsculas + tracking positivo solo para micro-etiquetas; siempre `tabular-nums` en cifras.
+1. **Un solo acento de color** (azul Vercel `#0070f3`). Nada de segundas marcas ni gradientes morados/arcoíris. Marca = primario = único acento.
+2. **El color es escaso (regla ~10%).** Las superficies son neutras (grises fríos 6 niveles); el color aparece donde importa (estado, severidad, acento de dato, foco).
+3. **La elevación por defecto es el hairline.** Tarjetas PLANAS. Sombras solo para overlays (menú/modal/toast/drawer).
+4. **Botones, inputs, selects = 8px (radio-sm), NO cápsula.** Excepción: botones-icono del clúster flotante (`.float-action-btn`) CÍRCULOS. Regla: `.app-shell .float-action-btn { border-radius: 9999px }`.
+5. **Tipografía:** familia **Geist Sans** (pesos 400/500/600/700 autohospedada); pesos 500/600/700 en UI; tracking negativo escalado; mayúsculas + tracking positivo solo para micro-etiquetas; siempre `tabular-nums` en cifras (NO Geist Mono con separador de miles — usar Geist Sans tabular). Cifra de stat/KPI (`.dv-stat-value`): 600, `-0.025em`, `line-height:1`.
 6. **Filas de tabla a 3.5rem** y controles a `--bo-control-height` para densidad homogénea.
 7. **Movimiento:** una sola curva (`--ui-ease`) y tres tiempos; respetar `prefers-reduced-motion`.
-8. **Accesibilidad:** foco con `:focus-visible` + `--ui-focus`; contraste AA; ARIA correcto en overlays.
-9. **Nunca hardcodear** un hex/medida en un componente: usar `--ui-*` o utilidades `rounded-*`. Si falta un token, se añade al sistema, no al componente. (U-15) Esto incluye los **fallbacks** de `var()`: nada de `var(--x, #a9a9a9)` con un gris/semántico literal, ni tokens huérfanos legacy (`--tpv-*`, `--border`, `--ui-accent`); referenciar siempre el token canónico `--ui-*` sin fallback hardcodeado. La escala de grises vive en §3.1 (`--ui-bg/surface/surface-subtle/border/border-strong/text-*`).
+8. **Accesibilidad:** foco con `:focus-visible` + `--ui-focus`; contraste AA mínimo (primario 16:1, secundario 7:1, terciario 4.5:1); ARIA correcto en overlays.
+9. **Nunca hardcodear** un hex/medida en un componente: usar `--ui-*` o utilidades `rounded-*`. Si falta un token, se añade al sistema, no al componente. Esto incluye los **fallbacks** de `var()`: nada de `var(--x, #a9a9a9)` con un gris/semántico literal, ni tokens huérfanos legacy (`--tpv-*`, `--border`, `--ui-accent`); referenciar siempre el token canónico `--ui-*` sin fallback hardcodeado. La escala de grises vive en §3.1 y §11.2 (`--ui-bg/surface/surface-subtle/border/border-strong/text-*`).
+10. **Modo claro + oscuro deliberados:** ambos modos con intención, no colores por defecto. Toggle luna/sol accesible. **Rampa oscura precisa:** 6 niveles escalonados distintos (no monotono gris).
+11. **Data-viz monocromática:** serie principal azul (`#0070f3`), comparación/demás en gris; NO arcoíris categórico.
 
 ---
 
 ## 13. Cómo extender el sistema (sin desviarse)
 
-- **Color/medida nuevos** → añadir/editar el token en `packages/ui/src/styles/theme.css` (capa base) y, si afecta a la marca, su equivalente Apple en `apps/*/src/styles.css`. Mantener backoffice y tpv en paridad.
+- **Color/medida nuevos** → añadir/editar el token en `packages/ui/src/styles/theme.css` (capa base) y, si afecta a la marca, su equivalente Geist en `packages/ui/src/styles/theme-geist.css` (importada por ambas apps). Mantener backoffice y tpv en paridad.
 - **Componente compartido nuevo** → vive en `packages/ui/src/components/`, se exporta en `packages/ui/src/index.ts`, consume tokens `--ui-*`, sin Tailwind si debe renderizar también en el TPV (ver patrón de `Alert`).
 - **Radios desde Tailwind** → usar `rounded-xs..xl` (apuntan a `--ui-radius-*` vía `@theme inline`).
 - **Antes de crear una variante**, comprueba si un token o patrón existente ya la cubre. Consistencia > novedad.
+- **Modo oscuro:** redeclarar tokens en `:root[data-theme='dark']` dentro de `theme-geist.css` (no crear fichero separado). Prueba ambos modos antes de merge.

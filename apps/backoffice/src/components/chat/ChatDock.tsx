@@ -27,6 +27,12 @@ export interface ChatDockProps {
   onViewAction?: (action: string, args: unknown) => void;
   /** Vista activa del backoffice: define saludo, sugerencias y el contexto enviado al backend. */
   view: ViewContext;
+  /**
+   * En el Dashboard («Asistente de IA») el composer es el HÉROE: el panel (conversación o
+   * saludo + sugerencias) y el input se muestran grandes y centrados. Fuera del Dashboard es la
+   * barra compacta anclada abajo. El morph entre ambos estados lo anima `.chat-dock` por transform.
+   */
+  hero?: boolean;
 }
 
 /**
@@ -41,6 +47,7 @@ export function ChatDock({
   getCanvasState,
   onViewAction,
   view,
+  hero = false,
 }: ChatDockProps) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -122,11 +129,12 @@ export function ChatDock({
 
   return (
     <div
-      className={`chat-dock${collapsed ? ' is-collapsed' : ''}`}
+      className={`chat-dock${collapsed ? ' is-collapsed' : ''}${hero ? ' chat-dock--hero' : ''}`}
       data-testid="chat-dock"
+      data-hero={hero ? '' : undefined}
       ref={dockRef}
     >
-      {panelMounted && (
+      {(hero || panelMounted) && (
         <aside
           className={`chat-dock__panel${panelClosing ? ' is-closing' : ''}`}
           role="dialog"
@@ -137,7 +145,8 @@ export function ChatDock({
             showHistory={showHistory}
             onToggleHistory={() => setShowHistory((v) => !v)}
             onNewConversation={handleNewConversation}
-            onClose={() => setPanelOpen(false)}
+            // En hero el panel no se cierra (es permanente): se oculta la X.
+            onClose={hero ? undefined : () => setPanelOpen(false)}
           />
 
           {chat.error && (
@@ -212,7 +221,9 @@ export function ChatDock({
           onStop={chat.stop}
           onFocus={() => setPanelOpen(true)}
           collapsed={collapsed}
-          leading={leading}
+          // En hero el panel (con su cabecera: historial/nueva) es permanente, así que el toggle
+          // del input sobra. En barra compacta sí lo mostramos para abrir/cerrar la conversación.
+          leading={hero ? undefined : leading}
           trailing={
             !noAi && chat.models.length > 0 ? (
               <ModelEffortMenu

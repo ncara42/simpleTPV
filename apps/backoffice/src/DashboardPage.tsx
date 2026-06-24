@@ -167,9 +167,9 @@ export function DashboardPage({
   const layout = useDashboardStore((s) => s.layout);
   const hydrated = useDashboardStore((s) => s.hydrated);
   const setStoreLayout = useDashboardStore((s) => s.setLayout);
-  // Acciones del store reusadas por el modo CUADRÍCULA (alta/baja manual de widgets). El agente usa
-  // las mismas vías (applyCanvasOp → addWidget/removeElement), así que el grid y el chat coinciden.
-  const addWidgetToStore = useDashboardStore((s) => s.addWidget);
+  // Baja manual de elementos del modo CUADRÍCULA (la X de cada tile). El agente usa la misma vía
+  // (applyCanvasOp → removeElement), así que el grid y el chat coinciden. El ALTA vive ahora en el
+  // botón «+» del topbar (DashboardAddWidget), que escribe en el store directamente.
   const removeElementFromStore = useDashboardStore((s) => s.removeElement);
   // `setPref` se recrea en cada render (arrow inline en usePreferences); lo leemos vía ref para
   // registrar el persister una sola vez sin re-suscribir.
@@ -1123,7 +1123,6 @@ export function DashboardPage({
             elements={savedFree}
             renderItem={renderItem}
             itemLabel={boardItemLabel}
-            onAddWidget={(id) => addWidgetToStore(id)}
             onRemoveElement={(id) => removeElementFromStore(id)}
             onNoteChange={onGridNoteChange}
           />
