@@ -1032,12 +1032,19 @@
   box-shadow: var(--ui-focus);
 }
 /* Rejilla de puntos en su propio plano (detrás del mundo). Sigue al pan/zoom vía
-   background-size/position inline. Se anima al cambiar de modo: una «ola» revela/oculta los puntos
-   desde el toggle (máscara radial cuyo radio crece) con un rebote de escala. En reposo `--dots-reveal`
-   = 1 ⇒ máscara completa ⇒ puntos íntegros (sin efecto). */
+   background-size/position inline (en el padre; las capas lo heredan).
+
+   La «ola» de cambio de modo es una DIAGONAL que barre la pantalla, conducida por `--dots-reveal`
+   (0 → oculto, 1 → completo). Dos capas apiladas en pseudo-elementos hacen el efecto:
+     · ::before = puntos a tamaño normal, revelados tras el frente de la ola.
+     · ::after  = puntos un par de px MÁS GRANDES, visibles solo en la banda estrecha que viaja con
+                  el frente. Al pasar la cresta sobre cada punto este crece y, al quedar atrás, se
+                  asienta al tamaño base → cada punto «pop»: aparece mayor y luego se apequeña.
+   En reposo `--dots-reveal` = 1 ⇒ base completa + cresta fuera de pantalla (sin efecto).
+   `inherits: true` es imprescindible: la variable se anima en el padre y debe llegar a las capas. */
 @property --dots-reveal {
   syntax: '<number>';
-  inherits: false;
+  inherits: true;
   initial-value: 1;
 }
 .dash-free-dots {
@@ -1046,67 +1053,84 @@
   z-index: 0;
   pointer-events: none;
   --dot: color-mix(in srgb, var(--ui-text-muted) 38%, transparent);
-  background-image: radial-gradient(var(--dot) 1.5px, transparent 1.6px);
+  --dot-crest: color-mix(in srgb, var(--ui-text-muted) 62%, transparent);
   --dots-reveal: 1;
-  --dots-origin: 50% 42%;
-  transform-origin: var(--dots-origin);
-  -webkit-mask-image: radial-gradient(
-    circle at var(--dots-origin),
-    #000 calc(var(--dots-reveal) * 150%),
-    transparent calc(var(--dots-reveal) * 150% + 13%)
+  /* Dirección de la ola (diagonal, de la esquina superior-izquierda a la inferior-derecha). */
+  --wave-angle: 135deg;
+  /* Frente de la ola en el eje de la diagonal: de -16% (fuera, oculto) a 116% (fuera, completo). */
+  --wave-front: calc(var(--dots-reveal) * 132% - 16%);
+}
+/* Ambas capas heredan el tiling (background-size/position) del padre → siguen pan/zoom igual. */
+.dash-free-dots::before,
+.dash-free-dots::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-size: inherit;
+  background-position: inherit;
+}
+/* Capa base: puntos normales, opacos por detrás del frente de la ola. */
+.dash-free-dots::before {
+  background-image: radial-gradient(var(--dot) 1.5px, transparent 1.6px);
+  -webkit-mask-image: linear-gradient(
+    var(--wave-angle),
+    #000 var(--wave-front),
+    transparent calc(var(--wave-front) + 16%)
   );
-  mask-image: radial-gradient(
-    circle at var(--dots-origin),
-    #000 calc(var(--dots-reveal) * 150%),
-    transparent calc(var(--dots-reveal) * 150% + 13%)
+  mask-image: linear-gradient(
+    var(--wave-angle),
+    #000 var(--wave-front),
+    transparent calc(var(--wave-front) + 16%)
   );
 }
-/* `will-change` solo mientras dura la ola (la clase se quita al terminar): aísla la capa para que la
-   máscara animada no repinte de más. */
+/* Capa cresta: puntos más grandes, visibles solo en la banda que cabalga el frente. */
+.dash-free-dots::after {
+  background-image: radial-gradient(var(--dot-crest) 2.7px, transparent 2.8px);
+  -webkit-mask-image: linear-gradient(
+    var(--wave-angle),
+    transparent calc(var(--wave-front) - 13%),
+    #000 calc(var(--wave-front) - 3%),
+    #000 calc(var(--wave-front) + 3%),
+    transparent calc(var(--wave-front) + 13%)
+  );
+  mask-image: linear-gradient(
+    var(--wave-angle),
+    transparent calc(var(--wave-front) - 13%),
+    #000 calc(var(--wave-front) - 3%),
+    #000 calc(var(--wave-front) + 3%),
+    transparent calc(var(--wave-front) + 13%)
+  );
+}
 .dash-free-dots--reveal {
-  animation: dash-dots-reveal 440ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  will-change:
-    transform,
-    opacity,
-    mask-image,
-    -webkit-mask-image;
+  animation: dash-dots-reveal 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .dash-free-dots--conceal {
-  animation: dash-dots-conceal 340ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation: dash-dots-conceal 380ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+/* `will-change` solo mientras dura la ola (la clase se quita al terminar): aísla las capas para que
+   la máscara animada no repinte de más. */
+.dash-free-dots--reveal::before,
+.dash-free-dots--reveal::after,
+.dash-free-dots--conceal::before,
+.dash-free-dots--conceal::after {
   will-change:
-    transform,
-    opacity,
     mask-image,
     -webkit-mask-image;
 }
 @keyframes dash-dots-reveal {
-  0% {
+  from {
     --dots-reveal: 0;
-    transform: scale(0.93);
-    opacity: 0;
   }
-  55% {
-    opacity: 1;
-  }
-  72% {
-    transform: scale(1.03);
-  }
-  100% {
+  to {
     --dots-reveal: 1;
-    transform: scale(1);
-    opacity: 1;
   }
 }
 @keyframes dash-dots-conceal {
-  0% {
+  from {
     --dots-reveal: 1;
-    transform: scale(1);
-    opacity: 1;
   }
-  100% {
+  to {
     --dots-reveal: 0;
-    transform: scale(0.96);
-    opacity: 0;
   }
 }
 /* Mundo transformable (translate·scale). transform-origin 0 0 es imprescindible para que

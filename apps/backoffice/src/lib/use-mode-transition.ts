@@ -143,7 +143,6 @@ export function useModeTransition(target: Mode): ModeTransition {
       ghostLayer.replaceChildren();
       section.classList.remove('dash--morphing');
       dots?.classList.remove('dash-free-dots--reveal', 'dash-free-dots--conceal');
-      dots?.style.removeProperty('--dots-origin');
       dots?.style.removeProperty('--dots-reveal');
     };
     const finish = (): void => {
@@ -243,11 +242,9 @@ export function useModeTransition(target: Mode): ModeTransition {
         );
       }
 
-      // Ola de puntos: revelar si el lienzo ENTRA, ocultar si SALE. El origen relativo a la capa de
-      // puntos alimenta el `radial-gradient` de la máscara y el transform-origin del rebote.
+      // Ola de puntos: una diagonal que barre la pantalla (revelar si el lienzo ENTRA, ocultar si
+      // SALE). El barrido lo conduce la animación CSS vía `--dots-reveal`; no depende del origen.
       if (dots) {
-        const dr = dots.getBoundingClientRect();
-        dots.style.setProperty('--dots-origin', `${origin.x - dr.left}px ${origin.y - dr.top}px`);
         dots.classList.add(
           incoming === 'free' ? 'dash-free-dots--reveal' : 'dash-free-dots--conceal',
         );
