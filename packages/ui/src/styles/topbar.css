@@ -43,7 +43,8 @@
   border: 1px solid var(--ui-border);
   /* Mismo radio que los demás controles del topbar (8px, estilo Vercel), no 12px. */
   border-radius: var(--ui-radius-sm);
-  background: color-mix(in srgb, var(--ui-surface) 92%, transparent);
+  /* Cristal translúcido (70%, igual que el chat): deja ver el contenido por debajo. */
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(18px);
   backdrop-filter: saturate(180%) blur(18px);
   /* Elevación SUTIL: se despega del fondo sin sombra pesada. */
@@ -102,12 +103,13 @@
     border-color 0.14s ease;
 }
 .topbar-icon-btn:hover {
-  background: var(--ui-surface-subtle);
+  /* Tinte translúcido sobre el cristal de la isla (no opaco), para no romper el glass. */
+  background: color-mix(in srgb, var(--ui-surface-subtle) 70%, transparent);
   border-color: var(--ui-border);
   color: var(--ui-text);
 }
 .topbar-icon-btn.is-active {
-  background: var(--ui-surface-subtle);
+  background: color-mix(in srgb, var(--ui-surface-subtle) 70%, transparent);
   border-color: var(--ui-border-strong);
   color: var(--ui-text);
 }
@@ -161,7 +163,8 @@
   width: 34px;
   height: 34px;
   border-color: var(--ui-border);
-  background: color-mix(in srgb, var(--ui-surface) 92%, transparent);
+  /* Cristal translúcido (70%, igual que el chat). */
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(16px);
   backdrop-filter: saturate(180%) blur(16px);
   box-shadow:
@@ -182,7 +185,8 @@
   padding: 0 0.6rem 0 0.4rem;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-sm);
-  background: color-mix(in srgb, var(--ui-surface) 92%, transparent);
+  /* Cristal translúcido (70%, igual que el chat). */
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(16px);
   backdrop-filter: saturate(180%) blur(16px);
   box-shadow:
@@ -197,7 +201,8 @@
 }
 .topbar-account-btn:hover,
 .topbar-account-btn.open {
-  background: var(--ui-surface);
+  /* Feedback sin perder el cristal: un punto más denso (82%) pero aún translúcido. */
+  background: color-mix(in srgb, var(--ui-surface) 82%, transparent);
   border-color: var(--ui-border-strong);
 }
 .topbar-account-btn:focus-visible {

@@ -1270,7 +1270,10 @@
   padding: 0.4rem 0.7rem;
   border: 1px solid var(--ui-border);
   border-radius: 9999px;
-  background: var(--ui-surface);
+  /* Cristal translúcido (70%, igual que el chat y el topbar). */
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--ui-text);
@@ -1281,7 +1284,8 @@
     box-shadow 0.12s ease;
 }
 .dash-free-tool:hover {
-  background: var(--ui-surface-subtle);
+  /* Feedback translúcido, sin saltar a opaco. */
+  background: color-mix(in srgb, var(--ui-surface-subtle) 70%, transparent);
   border-color: var(--ui-border-strong, var(--ui-border));
 }
 .dash-free-tool:active {
@@ -1885,7 +1889,8 @@
   padding: 0.4rem 0.5rem;
   border: 1px solid var(--ui-border);
   border-radius: 9999px;
-  background: color-mix(in srgb, var(--ui-surface) 84%, transparent);
+  /* Cristal translúcido (70%, igual que el chat y el topbar). */
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
   box-shadow: 0 8px 26px rgb(0 0 0 / 0.14);
   backdrop-filter: blur(12px);
 }
@@ -2038,6 +2043,20 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* El texto de los widgets no se selecciona (igual que en el lienzo libre, .dash-free-item-body):
+     estorba al arrastrar/redimensionar el tile. Las notas y campos editables se reactivan abajo. */
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Excepción: el contenido editable (nota TipTap, inputs) SÍ debe poder seleccionarse/escribirse. */
+.dash-free-item-body [contenteditable='true'],
+.dash-free-item-body input,
+.dash-free-item-body textarea,
+.dash-grid-tile-body [contenteditable='true'],
+.dash-grid-tile-body input,
+.dash-grid-tile-body textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 /* El contenido (panel/KPI/nota) llena el tile. */
 .dash-grid-tile-body > * {
