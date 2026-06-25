@@ -34,6 +34,27 @@ const STATE_COLORS: Record<StockState, string> = {
 };
 const ROTATION_LABELS: Record<Rotation, string> = { alta: 'Alta', media: 'Media', baja: 'Baja' };
 
+// Paleta para texto de familia en el carril de facetas. Tonos oscuros de espectro
+// amplio — legibles sobre fondo claro, distintos entre sí, sin depender del color
+// de avatar de la familia (que está optimizado para fondo, no para texto).
+const FAM_TEXT_PALETTE = [
+  '#1d4ed8', // azul
+  '#7c3aed', // violeta
+  '#be185d', // rosa
+  '#0f766e', // teal
+  '#b45309', // ámbar
+  '#15803d', // verde
+  '#c2410c', // naranja
+  '#6b21a8', // púrpura
+];
+
+// Hash estable del ID de la familia → color del texto (sin depender del orden).
+function familyTextColor(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return FAM_TEXT_PALETTE[h % FAM_TEXT_PALETTE.length]!;
+}
+
 interface CatalogFacetsProps {
   facets: FacetCounts;
   filters: CatalogFilters;
@@ -93,7 +114,7 @@ export function CatalogFacets({
               checked={filters.families.has(family.id)}
               onToggle={() => onToggleFamily(family.id)}
               label={family.name}
-              labelColor={family.color ?? undefined}
+              labelColor={familyTextColor(family.id)}
               count={count}
             />
           ))}
