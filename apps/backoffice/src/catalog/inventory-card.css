@@ -143,7 +143,8 @@
   flex-direction: column;
   padding: 1.15rem 1.1rem 1.5rem;
   overflow-y: auto;
-  scrollbar-width: thin;
+  /* Barra de scroll oculta (el scroll sigue activo: rueda/trackpad/teclado). */
+  scrollbar-width: none;
 }
 .cat-rail-search {
   margin-bottom: 1.35rem;
@@ -307,7 +308,13 @@
   position: relative;
   overflow-y: auto;
   border-left: 1px solid var(--ui-border);
-  scrollbar-width: thin;
+  /* Barra de scroll oculta (el scroll sigue activo: rueda/trackpad/teclado). */
+  scrollbar-width: none;
+}
+/* WebKit/Blink (Chrome/Safari/Edge): oculta la barra de ambos contenedores con scroll. */
+.cat-rail::-webkit-scrollbar,
+.cat-main::-webkit-scrollbar {
+  display: none;
 }
 .cat-table {
   width: 100%;
