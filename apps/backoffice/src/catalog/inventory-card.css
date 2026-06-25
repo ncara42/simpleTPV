@@ -51,7 +51,7 @@
   background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(16px);
   backdrop-filter: saturate(180%) blur(16px);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.05), 0 6px 14px -6px rgb(0 0 0 / 0.08);
+  /* Sin sombra: plano como el resto del topbar (cristal + borde). */
   font-size: 0.82rem;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -67,15 +67,12 @@
   border-color: var(--ui-border-strong);
   color: var(--ui-text);
 }
-/* Pestaña activa: azul sólido con sombra de color. */
+/* Pestaña activa: azul sólido, sin sombra (plano como el resto del topbar). */
 .inv-nav-tab.is-active {
   background: var(--ap-blue, var(--ui-primary));
   border-color: transparent;
   color: #fff;
   font-weight: 600;
-  box-shadow:
-    0 1px 3px rgb(0 0 0 / 0.14),
-    0 4px 14px -4px color-mix(in srgb, var(--ap-blue, var(--ui-primary)) 55%, transparent);
 }
 .inv-nav-tab:focus-visible {
   outline: none;
@@ -590,7 +587,7 @@
 }
 
 /* Chip de conteo y botones: mismo lenguaje que los controles del topbar / pestañas
-   .inv-nav-tab — alto 34px, cristal translúcido, borde hairline, sombra suave, radio 8px. */
+   .inv-nav-tab — alto 34px, cristal translúcido, borde hairline, radio 8px, SIN sombra. */
 .cat-selbar__count,
 .cat-selbar__btn {
   display: inline-flex;
@@ -602,9 +599,6 @@
   background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(16px);
   backdrop-filter: saturate(180%) blur(16px);
-  box-shadow:
-    0 1px 3px rgb(0 0 0 / 0.05),
-    0 6px 14px -6px rgb(0 0 0 / 0.08);
   font-size: 0.82rem;
   font-weight: 500;
   letter-spacing: -0.01em;

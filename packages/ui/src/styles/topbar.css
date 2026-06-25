@@ -58,10 +58,7 @@
   background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(18px);
   backdrop-filter: saturate(180%) blur(18px);
-  /* Elevación SUTIL: se despega del fondo sin sombra pesada. */
-  box-shadow:
-    0 1px 3px rgb(0 0 0 / 0.05),
-    0 6px 14px -6px rgb(0 0 0 / 0.1);
+  /* Sin sombra: en el topbar los elementos van planos; el cristal + borde los despegan. */
 }
 
 .topbar-island-back {
@@ -178,9 +175,7 @@
   background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(16px);
   backdrop-filter: saturate(180%) blur(16px);
-  box-shadow:
-    0 1px 3px rgb(0 0 0 / 0.05),
-    0 6px 14px -6px rgb(0 0 0 / 0.1);
+  /* Sin sombra: plano como el resto del topbar (cristal + borde). */
 }
 
 /* ─── Cuenta (avatar + nombre + menú) ─────────────────────────────────────────
@@ -200,9 +195,7 @@
   background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(16px);
   backdrop-filter: saturate(180%) blur(16px);
-  box-shadow:
-    0 2px 6px rgb(0 0 0 / 0.06),
-    0 10px 24px -6px rgb(0 0 0 / 0.16);
+  /* Sin sombra: plano como el resto del topbar (cristal + borde). */
   color: var(--ui-text);
   cursor: pointer;
   transition:
