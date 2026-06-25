@@ -61,9 +61,11 @@ export function Select({
   const listboxId = useId();
   // El menú se renderiza en un portal (document.body) para no quedar recortado
   // por ancestros con overflow:hidden (p. ej. el árbol de Familias). Posición fija
-  // calculada desde el disparador; abre hacia abajo o hacia arriba según el hueco.
+  // calculada desde el disparador; abre hacia abajo o hacia arriba según el hueco,
+  // y se ancla al borde derecho del trigger cuando sobresaldría por la derecha.
   const [menuPos, setMenuPos] = useState<{
-    left: number;
+    left: number | 'auto';
+    right: number | 'auto';
     width: number;
     top: number | 'auto';
     bottom: number | 'auto';
@@ -121,13 +123,14 @@ export function Select({
     const spaceAbove = rect.top - margin;
     // Abre hacia abajo salvo que no quepa y arriba haya más sitio.
     const below = spaceBelow >= Math.min(maxH, 220) || spaceBelow >= spaceAbove;
-    // Recorta el left para que el menú no sobresalga por el borde derecho.
-    // 180px es la anchura mínima estimada del menú (el contenido puede agrandarlo,
-    // pero el punto de anclaje ya queda dentro del viewport).
-    const minMenuW = Math.max(rect.width, 180);
-    const left = Math.max(0, Math.min(rect.left, window.innerWidth - minMenuW - margin));
+    // Ancla al borde derecho del trigger cuando abrir desde la izquierda sobresaldría.
+    // 240px = anchura mínima razonable del menú (las opciones pueden ser largas).
+    const minMenuW = Math.max(rect.width, 240);
+    const alignRight = rect.left + minMenuW + margin > window.innerWidth;
     setMenuPos({
-      left,
+      // 'auto' explícito es necesario: anula el `left:0` del CSS de la clase.
+      left: alignRight ? 'auto' : rect.left,
+      right: alignRight ? window.innerWidth - rect.right : 'auto',
       width: rect.width,
       top: below ? rect.bottom + margin : 'auto',
       bottom: below ? 'auto' : window.innerHeight - rect.top + margin,
@@ -273,7 +276,9 @@ export function Select({
             data-has-selection={value ? 'true' : undefined}
             style={{
               position: 'fixed',
-              left: menuPos.left,
+              // 'auto' explícito anula el left:0 del CSS clase; undefined lo dejaría colar.
+              left: menuPos.left === 'auto' ? 'auto' : menuPos.left,
+              right: menuPos.right === 'auto' ? undefined : menuPos.right,
               top: menuPos.top,
               bottom: menuPos.bottom,
               minWidth: menuPos.width,
