@@ -39,7 +39,6 @@ export function CatalogGroupedTable({
     <div className="cat-main" data-testid="catalog-table">
       <table className="cat-table">
         <colgroup>
-          <col className="cat-col-check" />
           <col className="cat-col-name" />
           <col className="cat-col-sku" />
           <col className="cat-col-pvp" />
@@ -48,7 +47,6 @@ export function CatalogGroupedTable({
         </colgroup>
         <thead className="cat-thead">
           <tr>
-            <th aria-hidden="true" />
             <th className="cat-th cat-th-name">Producto</th>
             <th className="cat-th">SKU</th>
             <th className="cat-th cat-th-num">PVP</th>
@@ -62,16 +60,12 @@ export function CatalogGroupedTable({
           return (
             <tbody key={key} className="cat-group">
               <tr className="cat-group-head" onClick={() => toggleGroup(key)}>
-                <td className="cat-group-cell" colSpan={6}>
+                <td className="cat-group-cell" colSpan={5}>
                   <div className="cat-group-inner">
                     <ChevronDown
                       size={15}
                       className={`cat-group-caret${isCollapsed ? ' is-collapsed' : ''}`}
                       aria-hidden="true"
-                    />
-                    <span
-                      className="cat-group-dot"
-                      style={{ background: group.family?.color ?? 'var(--ui-text-soft)' }}
                     />
                     <span className="cat-group-name">{group.family?.name ?? 'Sin familia'}</span>
                     <span className="cat-group-count">
@@ -92,7 +86,12 @@ export function CatalogGroupedTable({
                       onClick={() => onRowClick(product)}
                       aria-selected={isSelected}
                     >
-                      <td className="cat-cell-check">
+                      {/* Checkbox como overlay en el sangrado izquierdo de la celda de nombre:
+                          aparece al hover/selección sin desplazar el texto. Al no ser una
+                          columna propia (de ancho automático que variaba con el viewport), el
+                          nombre arranca a un sangrado FIJO → alinea con la cabecera y el grupo
+                          a cualquier ancho. */}
+                      <td className="cat-cell-name">
                         <input
                           type="checkbox"
                           className="cat-row-check"
@@ -102,8 +101,8 @@ export function CatalogGroupedTable({
                           onChange={() => onToggleSelect(product.id)}
                           onClick={(e) => e.stopPropagation()}
                         />
+                        {product.name}
                       </td>
-                      <td className="cat-cell-name">{product.name}</td>
                       <td className="cat-cell-sku">{product.sku ?? '—'}</td>
                       <td className="cat-cell-pvp">{fmtEur(Number(product.salePrice))}</td>
                       <td className="cat-cell-margin">

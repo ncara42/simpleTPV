@@ -6,12 +6,18 @@
    ════════════════════════════════════════════════════════════════════════════ */
 
 /* ─── Card contenedora ─────────────────────────────────────────────────────── */
+/* Cuando el inventario ocupa la vista, la card sube hasta casi pegar con el topbar
+   (padding-top 0.4rem, a la altura del primer botón del sidebar) y se alinea en horizontal
+   con el contenido del topbar (1.25rem laterales). El padding-bottom queda en 1.5rem (el 6rem
+   original reservaba el dock del asistente; aquí no se necesita). */
+.bo-main--surface:has(.inventory-page) {
+  padding: 0.4rem 1.25rem 1.5rem;
+}
 .inventory-page {
   max-width: 78rem;
   margin: 0 auto;
-  /* Ocupa toda la altura disponible entre el topbar y el borde inferior del área.
-     Offset = topbar (60px) + bo-main--surface padding-top (1.5rem) + padding-bottom (6rem). */
-  height: calc(100dvh - 60px - 7.5rem);
+  /* Offset = topbar (60px) + padding-top (0.4rem) + padding-bottom (1.5rem). */
+  height: calc(100dvh - 60px - 1.9rem);
   display: flex;
   flex-direction: column;
 }
@@ -23,9 +29,7 @@
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-xl);
-  box-shadow:
-    0 1px 2px rgb(0 0 0 / 0.04),
-    0 10px 28px -16px rgb(0 0 0 / 0.14);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.04), 0 4px 24px -8px rgb(0 0 0 / 0.10);
   overflow: hidden;
 }
 
@@ -87,11 +91,13 @@
   }
 }
 
-/* ─── Cuerpo: el filete superior es el separador a todo lo ancho de la card ─── */
+/* ─── Cuerpo ────────────────────────────────────────────────────────────────── */
+/* Sin border-top: el header fue eliminado; el thead ya tiene su propio border-bottom
+   que separa visualmente las columnas de los datos. Añadir border-top aquí creaba
+   un borde doble visible en la parte superior de la card. */
 .inv-card-body {
   flex: 1;
   min-height: 0;
-  border-top: 1px solid var(--ui-border);
 }
 .inv-card-body--catalogo {
   flex: 1;
@@ -197,8 +203,8 @@
   color: var(--ui-text);
 }
 .cat-view.is-active {
-  background: var(--ui-text);
-  color: var(--ui-surface);
+  background: var(--ap-blue, var(--ui-primary));
+  color: #fff;
   font-weight: 550;
 }
 .cat-view-label {
@@ -213,7 +219,7 @@
   color: var(--ui-text-soft);
 }
 .cat-view.is-active .cat-view-count {
-  color: color-mix(in srgb, var(--ui-surface) 62%, transparent);
+  color: rgba(255 255 255 / 0.62);
 }
 
 /* Opción de faceta (checkbox custom + punto opcional + etiqueta + contador). */
@@ -264,6 +270,8 @@
   outline: none;
   box-shadow: var(--ui-focus);
 }
+/* Solo lo usan los estados de stock (modificadores .cat-dot-* con color semántico). Las
+   facetas de familia ya no llevan punto. */
 .cat-facet-dot {
   flex-shrink: 0;
   width: 0.5rem;
@@ -306,9 +314,6 @@
   border-collapse: collapse;
   font-size: 0.9rem;
 }
-.cat-col-check {
-  width: 2.4rem;
-}
 .cat-col-sku {
   width: 7.5rem;
 }
@@ -337,11 +342,18 @@
   border-bottom: 1px solid var(--ui-border);
   white-space: nowrap;
 }
-.cat-th-name {
-  padding-left: 1rem;
-}
-.cat-th-num {
+.cat-thead .cat-th-num {
   text-align: right;
+}
+/* Sangrado FIJO de la primera columna (3.3rem): aloja el checkbox-overlay de las filas
+   y deja la cabecera "Producto" alineada con los nombres y con el título del grupo a
+   cualquier ancho. Antes había una columna-checkbox de ancho automático que variaba con el
+   viewport y desalineaba la cabecera respecto a las filas.
+   NOTA: este sangrado, el padding-left de .cat-group-inner y el left de .cat-row-check se
+   mueven JUNTOS (mismo delta) para conservar el borde izquierdo común y el aire respecto al
+   carril de facetas. */
+.cat-thead .cat-th-name {
+  padding-left: 3.3rem;
 }
 
 /* Cabecera de grupo: familia · nº productos · total de unidades (plegable).
@@ -364,24 +376,26 @@
   border-bottom: 1px solid var(--ui-border);
 }
 .cat-group-inner {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.78rem 1.1rem 0.78rem 0.9rem;
+  /* Sin punto de familia: el nombre arranca al MISMO sangrado que los nombres de producto
+     (3.3rem) y el caret va en absoluto dentro del canalón izquierdo (alineado con el
+     checkbox-overlay de las filas). Así familia y productos comparten borde izquierdo. */
+  padding: 0.78rem 1.1rem 0.78rem 3.3rem;
 }
 .cat-group-caret {
+  position: absolute;
+  left: 1.05rem;
+  top: 50%;
+  transform: translateY(-50%);
   flex-shrink: 0;
   color: var(--ui-text-soft);
   transition: transform var(--ui-motion-fast) var(--ui-ease);
 }
 .cat-group-caret.is-collapsed {
-  transform: rotate(-90deg);
-}
-.cat-group-dot {
-  flex-shrink: 0;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
+  transform: translateY(-50%) rotate(-90deg);
 }
 .cat-group-name {
   font-size: 0.9rem;
@@ -418,11 +432,15 @@
   padding: 0 0.9rem;
   vertical-align: middle;
   color: var(--ui-text);
+  border-bottom: 1px solid var(--ui-border);
 }
-.cat-cell-check {
-  text-align: center;
-}
+/* Checkbox-overlay: posicionado en el sangrado izquierdo de la celda de nombre (no es
+   una columna propia). Aparece al hover/selección sin reflujo del texto. */
 .cat-row-check {
+  position: absolute;
+  left: 1.05rem;
+  top: 50%;
+  transform: translateY(-50%);
   width: 1rem;
   height: 1rem;
   accent-color: var(--ui-primary);
@@ -436,8 +454,11 @@
 .cat-row-check:focus-visible {
   opacity: 1;
 }
-.cat-cell-name {
-  padding-left: 1rem;
+/* `.cat-row .cat-cell-name` (0-2-0) gana al base `.cat-row td` (0-1-1) para fijar el
+   sangrado en 3.3rem; `position: relative` ancla el checkbox-overlay. */
+.cat-row .cat-cell-name {
+  position: relative;
+  padding-left: 3.3rem;
   letter-spacing: -0.012em;
 }
 .cat-cell-sku {

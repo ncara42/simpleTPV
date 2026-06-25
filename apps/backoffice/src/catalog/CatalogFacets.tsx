@@ -84,12 +84,6 @@ export function CatalogFacets({
               key={family.id}
               checked={filters.families.has(family.id)}
               onToggle={() => onToggleFamily(family.id)}
-              dot={
-                <span
-                  className="cat-facet-dot"
-                  style={{ background: family.color ?? 'var(--ui-text-soft)' }}
-                />
-              }
               label={family.name}
               count={count}
             />
