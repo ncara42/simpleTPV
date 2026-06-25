@@ -34,18 +34,17 @@ const STATE_COLORS: Record<StockState, string> = {
 };
 const ROTATION_LABELS: Record<Rotation, string> = { alta: 'Alta', media: 'Media', baja: 'Baja' };
 
-// Paleta para texto de familia en el carril de facetas. Tonos oscuros de espectro
-// amplio — legibles sobre fondo claro, distintos entre sí, sin depender del color
-// de avatar de la familia (que está optimizado para fondo, no para texto).
+// Paleta Radix UI paso 11 — colores diseñados específicamente para texto sobre fondo
+// claro, WCAG AA, usados por Linear / Vercel / Radix como estándar de referencia.
 const FAM_TEXT_PALETTE = [
-  '#1d4ed8', // azul
-  '#7c3aed', // violeta
-  '#be185d', // rosa
-  '#0f766e', // teal
-  '#b45309', // ámbar
-  '#15803d', // verde
-  '#c2410c', // naranja
-  '#6b21a8', // púrpura
+  '#0D74CE', // Blue 11
+  '#6550B9', // Violet 11
+  '#CB1D63', // Crimson 11
+  '#008573', // Teal 11
+  '#AD5700', // Amber 11
+  '#218358', // Green 11
+  '#BD4B00', // Orange 11
+  '#9C2BAD', // Plum 11
 ];
 
 // Hash estable del ID de la familia → color del texto (sin depender del orden).
