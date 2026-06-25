@@ -366,16 +366,17 @@
 .cat-group-head {
   cursor: pointer;
 }
-.cat-group + .cat-group .cat-group-head td {
-  border-top: 1px solid var(--ui-border);
-}
 .cat-group-cell {
   padding: 0;
   position: sticky;
   top: 2.3rem;
   z-index: 1;
   background: var(--ui-surface-subtle);
-  border-bottom: 1px solid var(--ui-border);
+  /* border-collapse: collapse elimina los border en celdas sticky; box-shadow
+     se pinta sobre el stacking context y siempre aparece en ambos bordes. */
+  box-shadow:
+    0 -1px 0 0 var(--ui-border),
+    0 1px 0 0 var(--ui-border);
 }
 .cat-group-inner {
   position: relative;
