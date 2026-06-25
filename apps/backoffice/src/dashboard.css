@@ -2142,10 +2142,11 @@
    de la fila de acciones (lupa/home/campana) para no taparlas. */
 .dashboard-mode-toggle {
   /* Conmutador cuadrícula ↔ lienzo: vive arriba a la DERECHA del topbar (clúster derecho).
-     Radio de sistema (8px, estilo Vercel) y elevación sutil como las demás pastillas. */
+     Radio de sistema (8px, estilo Vercel) y elevación sutil como las demás pastillas.
+     Altura total 30px (= logo sidebar): 26px botones + 2px padding × 2. */
   display: inline-flex;
   gap: 2px;
-  padding: 3px;
+  padding: 2px;
   border-radius: var(--ui-radius-sm);
   border: 1px solid var(--ui-border);
   background: color-mix(in srgb, var(--ui-surface) 92%, transparent);
@@ -2159,8 +2160,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* Un poco más anchos que altos (segmentos cómodos); la altura mantiene el toggle en 38px
-     totales, igual que los botones redondos de la topbar. */
+  /* Un poco más anchos que altos (segmentos cómodos); la altura mantiene el toggle en 30px
+     totales (= logo sidebar), igual que los botones del clúster derecho. */
   width: 38px;
   height: 26px;
   border: none;

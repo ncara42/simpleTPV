@@ -42,7 +42,7 @@
 .inv-nav-tab {
   display: inline-flex;
   align-items: center;
-  height: 34px;
+  height: 30px;
   padding: 0 0.82rem;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-sm);

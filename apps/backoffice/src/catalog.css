@@ -2399,9 +2399,9 @@
   display: inline-flex;
   align-items: center;
   gap: 0;
-  height: 36px;
-  max-width: 36px;
-  padding: 0 9px;
+  height: 30px;
+  max-width: 30px;
+  padding: 0 7px;
   overflow: hidden;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-md);
@@ -2457,15 +2457,15 @@
 }
 /* Botón-icono cuadrado de la banda de acciones de vista (.topbar-page-actions):
    "Columnas" (ajustar columnas de la tabla), Exportar/Importar de tablas sin texto.
-   Mismo acabado en reposo que .csv-action (36px, borde, radio-md, superficie, texto
+   Mismo acabado en reposo que .csv-action (30px, borde, radio-md, superficie, texto
    apagado) para que toda la banda case; .is-active marca el toggle de columnas abierto
    (aria-expanded), igual que .topbar-icon-btn.is-active. */
 .float-action-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   flex: none;
   padding: 0;
   border: 1px solid var(--ui-border);

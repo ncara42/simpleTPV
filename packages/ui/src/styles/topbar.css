@@ -97,8 +97,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 23px;
+  height: 23px;
   flex: none;
   border: 1px solid transparent;
   border-radius: var(--ui-radius-sm);
@@ -162,14 +162,21 @@
   /* Las acciones de vista no parten su texto cuando el espacio aprieta. */
   white-space: nowrap;
 }
+/* <Button> (ui-btn) en el slot de acciones: normalizado a 30px (= logo sidebar).
+   El padding lateral se ajusta proporcionalmente (h-9/px-4 → 30px/px-3). */
+.topbar-page-actions .ui-btn {
+  height: 30px;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
 
 /* La campana del clúster derecho flota como botón propio (relleno + sombra, mismo acabado
    que el conmutador de modo), no fantasma como la búsqueda que vive DENTRO de la isla. */
 .topbar-right > .topbar-icon-btn {
-  /* Misma altura que el conmutador de modo vecino (34px), para que el clúster derecho quede
-     uniforme; los botones-isla (atrás/búsqueda) son 26px porque viven dentro de la pastilla. */
-  width: 34px;
-  height: 34px;
+  /* Misma altura que el logo del sidebar (30px): normaliza el clúster derecho a la referencia
+     visual del shell; los botones-isla (atrás/búsqueda) son 23px (proporcional). */
+  width: 30px;
+  height: 30px;
   border-color: var(--ui-border);
   /* Cristal translúcido (70%, igual que el chat). */
   background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
@@ -187,7 +194,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  height: 38px;
+  height: 30px;
   padding: 0 0.6rem 0 0.4rem;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-sm);
@@ -217,8 +224,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   flex: none;
   border-radius: 9999px;
   background: var(--ui-primary, #0070f3);
