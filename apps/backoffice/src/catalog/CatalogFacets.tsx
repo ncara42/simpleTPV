@@ -34,24 +34,12 @@ const STATE_COLORS: Record<StockState, string> = {
 };
 const ROTATION_LABELS: Record<Rotation, string> = { alta: 'Alta', media: 'Media', baja: 'Baja' };
 
-// Paleta Radix UI paso 11 — colores diseñados específicamente para texto sobre fondo
-// claro, WCAG AA, usados por Linear / Vercel / Radix como estándar de referencia.
-const FAM_TEXT_PALETTE = [
-  '#0D74CE', // Blue 11
-  '#6550B9', // Violet 11
-  '#CB1D63', // Crimson 11
-  '#008573', // Teal 11
-  '#AD5700', // Amber 11
-  '#218358', // Green 11
-  '#BD4B00', // Orange 11
-  '#9C2BAD', // Plum 11
-];
-
-// Hash estable del ID de la familia → color del texto (sin depender del orden).
+// 8 tokens CSS dark-aware definidos en inventory-card.css (Radix UI paso-11,
+// light + dark override). Hash del ID → índice estable independiente del orden.
 function familyTextColor(id: string): string {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return FAM_TEXT_PALETTE[h % FAM_TEXT_PALETTE.length]!;
+  return `var(--fam-c-${h % 8})`;
 }
 
 interface CatalogFacetsProps {
