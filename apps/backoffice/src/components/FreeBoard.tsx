@@ -72,7 +72,10 @@ const WHEEL_ZOOM_SENSITIVITY = 0.002;
 const KEY_PAN = 48; // px de pan por flecha en el fondo
 const KEY_MOVE = 10; // px de mundo por flecha al mover un elemento enfocado
 const HISTORY_MAX = 50; // tope de la pila de deshacer
-const MINIMAP_SIZE = { width: 180, height: 130 };
+// Alto ≈ al del composer del asistente expandido (≈104px), su vecino abajo: así el minimapa no
+// lo sobresale (ambos anclados a `bottom: 1rem`). El ancho mayor da una caja apaisada acorde al
+// viewport (más ancho que alto); la proyección encaja el contenido por `contain`, sin deformar.
+const MINIMAP_SIZE = { width: 180, height: 104 };
 const MIN_SHAPE = 4; // px de mundo mínimos para crear una forma (evita formas de un clic)
 const NOTE_MIN_W = 160; // px de mundo mínimos al redimensionar una nota
 const NOTE_MIN_H = 120;
