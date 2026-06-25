@@ -1,6 +1,5 @@
 import type { Rotation } from '@simpletpv/auth';
 import { Input } from '@simpletpv/ui';
-import type { ReactNode } from 'react';
 
 import {
   ALL_ROTATIONS,
@@ -23,7 +22,16 @@ const VIEW_LABELS: Record<SavedView, string> = {
 };
 const VIEW_ORDER: readonly SavedView[] = ['all', 'low', 'out', 'lowMargin'];
 
-const STATE_LABELS: Record<StockState, string> = { ok: 'OK', low: 'Bajo', out: 'Sin stock' };
+const STATE_LABELS: Record<StockState, string> = {
+  ok: 'En stock',
+  low: 'Stock bajo',
+  out: 'Sin stock',
+};
+const STATE_COLORS: Record<StockState, string> = {
+  ok: 'var(--ui-success)',
+  low: 'var(--ui-warning)',
+  out: 'var(--ui-danger)',
+};
 const ROTATION_LABELS: Record<Rotation, string> = { alta: 'Alta', media: 'Media', baja: 'Baja' };
 
 interface CatalogFacetsProps {
@@ -85,6 +93,7 @@ export function CatalogFacets({
               checked={filters.families.has(family.id)}
               onToggle={() => onToggleFamily(family.id)}
               label={family.name}
+              labelColor={family.color ?? undefined}
               count={count}
             />
           ))}
@@ -98,8 +107,8 @@ export function CatalogFacets({
             key={state}
             checked={filters.states.has(state)}
             onToggle={() => onToggleState(state)}
-            dot={<span className={`cat-facet-dot cat-dot-${state}`} />}
             label={STATE_LABELS[state]}
+            labelColor={STATE_COLORS[state]}
             count={facets.states[state]}
           />
         ))}
@@ -124,18 +133,22 @@ export function CatalogFacets({
 interface FacetOptionProps {
   checked: boolean;
   onToggle: () => void;
-  dot?: ReactNode;
   label: string;
+  labelColor?: string;
   count: number;
 }
 
-function FacetOption({ checked, onToggle, dot, label, count }: FacetOptionProps) {
+function FacetOption({ checked, onToggle, label, labelColor, count }: FacetOptionProps) {
   return (
     <label className={`cat-facet-opt${checked ? ' is-checked' : ''}`}>
       <input type="checkbox" className="cat-facet-input" checked={checked} onChange={onToggle} />
       <span className="cat-check" aria-hidden="true" />
-      {dot}
-      <span className="cat-facet-label">{label}</span>
+      <span
+        className="cat-facet-label"
+        style={labelColor ? { color: labelColor, fontWeight: 550 } : undefined}
+      >
+        {label}
+      </span>
       <span className="cat-facet-count">{count}</span>
     </label>
   );

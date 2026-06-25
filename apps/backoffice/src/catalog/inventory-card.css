@@ -266,23 +266,6 @@
   outline: none;
   box-shadow: var(--ui-focus);
 }
-/* Solo lo usan los estados de stock (modificadores .cat-dot-* con color semántico). Las
-   facetas de familia ya no llevan punto. */
-.cat-facet-dot {
-  flex-shrink: 0;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-}
-.cat-dot-ok {
-  background: var(--ui-success);
-}
-.cat-dot-low {
-  background: var(--ui-warning);
-}
-.cat-dot-out {
-  background: var(--ui-danger);
-}
 .cat-facet-label {
   flex: 1;
   min-width: 0;
