@@ -6,6 +6,7 @@ import '@simpletpv/ui/select.css';
 import '@simpletpv/ui/topbar.css';
 import './catalog.css';
 import './catalog/inventory-card.css';
+import './catalog/families-nav.css';
 import './styles.css';
 
 import { LoginForm, type NavGroup, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';

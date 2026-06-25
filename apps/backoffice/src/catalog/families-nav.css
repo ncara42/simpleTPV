@@ -1,0 +1,383 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   FAMILIAS — navegador de columnas (Miller columns / drill-down).
+   Reemplaza el árbol plegable con sangría por un navegador estilo Finder: una
+   columna por nivel abierto (raíz → subfamilia → … → productos). Misma piel que
+   el Catálogo facetado (tokens --ui-*: azul único de acento, neutros fríos,
+   hairlines, radios). Las familias son carpetas navegables; los productos, hojas.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* El cuerpo de la pestaña Familias pasa a columna flex para que el navegador llene
+   el alto del card. Se anula el padding-bottom heredado: la rejilla llega a ras del
+   borde inferior del card (separadores y pies sin "flotar" sobre un hueco). El aire
+   inferior lo da el propio padding del pie de columna. */
+.inv-card-body--familias {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
+.mc-nav {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+/* ─── Cabecera: breadcrumb (izda) + CTA "Nueva familia" (dcha) ────────────── */
+.mc-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1.25rem 0.8rem;
+}
+.mc-crumbs {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.05rem;
+}
+.mc-crumb {
+  display: inline-flex;
+  align-items: center;
+  max-width: 14rem;
+  padding: 0.2rem 0.42rem;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  font-size: 0.85rem;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition:
+    color var(--ui-motion-fast) var(--ui-ease),
+    background var(--ui-motion-fast) var(--ui-ease);
+}
+.mc-crumb:hover {
+  color: var(--ui-text);
+  background: var(--ui-surface-subtle);
+}
+.mc-crumb.is-current {
+  color: var(--ui-text);
+  font-weight: 600;
+  cursor: default;
+}
+.mc-crumb.is-current:hover {
+  background: none;
+}
+.mc-crumb-sep {
+  flex-shrink: 0;
+  display: inline-flex;
+  color: var(--ui-text-soft);
+  opacity: 0.55;
+}
+
+/* ─── Pista de columnas ──────────────────────────────────────────────────── */
+/* Contenedor con scroll horizontal COMPARTIDO: la fila de cabeceras y la de
+   columnas se desplazan juntas (rutas profundas). El scroll vertical es por
+   columna (.mc-col-body). */
+.mc-scroll {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  border-top: 1px solid var(--ui-border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.mc-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Fila de cabeceras a TODO el ancho. La línea inferior se pinta en CADA celda (y
+   en el relleno del área vacía), NO en este contenedor: con `width: max-content` +
+   relleno flex, el borde del contenedor no llegaba a la última columna en rutas
+   profundas y la línea se cortaba de golpe. Por celda, la línea va bajo cada
+   columna y bajo el hueco vacío sin depender del ancho calculado del contenedor. */
+.mc-headrow {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 100%;
+  width: max-content;
+}
+.mc-headrow-fill {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+/* Celda de cabecera (nivel) en mayúsculas, con el separador vertical que continúa
+   hacia el cuerpo y la línea inferior propia (rejilla continua a cualquier ancho). */
+.mc-col-head {
+  display: flex;
+  align-items: center;
+  flex: 0 0 19rem;
+  min-width: 0;
+  /* Altura fija + padding solo horizontal → el título queda centrado vertical de
+     forma exacta (antes el padding asimétrico lo dejaba algo por debajo). */
+  height: 2.85rem;
+  padding: 0 1rem;
+  border-right: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+}
+.mc-col-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Fila de cuerpos: mismo ancho de celda (19rem) que las cabeceras → alinean los
+   separadores verticales en una rejilla continua. */
+.mc-colsrow {
+  display: flex;
+  flex: 1;
+  min-width: 100%;
+  width: max-content;
+  min-height: 0;
+}
+.mc-col {
+  display: flex;
+  flex: 0 0 19rem;
+  min-width: 0;
+  flex-direction: column;
+  border-right: 1px solid var(--ui-border);
+}
+.mc-col-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.mc-col-body::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── Filas (familia navegable + producto hoja comparten base) ───────────── */
+.mc-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 3.1rem;
+  padding: 0.4rem 0.85rem 0.4rem 1rem;
+  border: none;
+  border-bottom: 1px solid transparent;
+  background: none;
+  font: inherit;
+  font-size: 0.9rem;
+  letter-spacing: -0.012em;
+  text-align: left;
+  color: var(--ui-text);
+  cursor: pointer;
+  transition: background var(--ui-motion-fast) var(--ui-ease);
+}
+.mc-row:hover {
+  background: var(--ui-surface-subtle);
+}
+.mc-row.is-active,
+.mc-row.is-active:hover {
+  background: var(--ui-brand-soft);
+}
+.mc-row:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--ap-blue, var(--ui-primary));
+}
+
+/* Punto de color de la familia (hereda el de la raíz si la hija no tiene). */
+.mc-dot {
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--ui-text-soft);
+}
+
+.mc-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  font-weight: 550;
+}
+.mc-name-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  /* El nombre que no cabe se DESVANECE al borde derecho (en vez de cortarse con
+     ellipsis). Máscara a transparente → válida sobre cualquier fondo de fila
+     (reposo / hover / activa). Como el texto vive en un flex que encoge, al pasar
+     el ratón cede su ancho a las acciones: nunca las tapa. */
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+}
+
+/* Contador "N prod." + chevron a la derecha de la familia. */
+.mc-count {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-soft);
+}
+.mc-chev {
+  flex-shrink: 0;
+  display: inline-flex;
+  color: var(--ui-text-soft);
+}
+.mc-row.is-active .mc-chev {
+  color: var(--ui-primary);
+}
+
+/* Acciones de la fila familia: ceden el sitio del contador al pasar el ratón
+   (sin reflujo: el contador desaparece, las acciones ocupan su hueco, el chevron
+   se mantiene). La fila activa conserva su contador limpio — las acciones siguen
+   siendo solo de hover. */
+.mc-fam-actions {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.1rem;
+}
+.mc-row--fam:hover .mc-count {
+  display: none;
+}
+.mc-row--fam:hover .mc-fam-actions {
+  display: inline-flex;
+}
+.mc-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease),
+    box-shadow var(--ui-motion-fast) var(--ui-ease);
+}
+.mc-act:hover {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: inset 0 0 0 1px var(--ui-border);
+}
+.mc-act--danger:hover {
+  color: var(--ui-danger);
+  box-shadow: inset 0 0 0 1px var(--ui-danger);
+}
+
+/* ─── Producto (hoja: nombre + precio) ───────────────────────────────────── */
+.mc-prods {
+  /* separador sutil entre el bloque de subfamilias y el de productos directos */
+  border-top: 1px solid var(--ui-border);
+}
+.mc-col-body > .mc-prods:first-child {
+  border-top: none;
+}
+.mc-prod-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.mc-prod-price {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+}
+/* El precio cede sitio al selector "Mover a…" al pasar el ratón. */
+.mc-prod-move {
+  display: none;
+  flex-shrink: 0;
+  max-width: 9rem;
+}
+.mc-row--prod:hover .mc-prod-price {
+  display: none;
+}
+.mc-row--prod:hover .mc-prod-move {
+  display: inline-flex;
+}
+.mc-prod-move .ui-select-trigger {
+  height: 1.9rem;
+  font-size: 0.8rem;
+  border-radius: var(--ui-radius-sm);
+}
+
+/* ─── Pie de columna: altas del nodo dueño ───────────────────────────────── */
+.mc-col-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.6rem 0.85rem 0.85rem;
+  border-top: 1px solid var(--ui-border);
+}
+.mc-foot-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 30px;
+  padding: 0 0.62rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  font-size: 0.79rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease),
+    border-color var(--ui-motion-fast) var(--ui-ease);
+}
+.mc-foot-btn:hover {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--ui-surface-subtle);
+}
+
+/* Vacío de columna. */
+.mc-col-empty {
+  padding: 1.4rem 1rem;
+  font-size: 0.85rem;
+  color: var(--ui-text-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-row,
+  .mc-crumb,
+  .mc-act,
+  .mc-foot-btn {
+    transition: none;
+  }
+}
+
+/* En pantallas estrechas las columnas siguen en horizontal con scroll (no se
+   apilan: el modelo de columnas pierde sentido si se rompe en vertical). */
+@media (max-width: 720px) {
+  .mc-col,
+  .mc-col-head {
+    flex-basis: 15.5rem;
+  }
+}

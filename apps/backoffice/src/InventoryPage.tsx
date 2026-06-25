@@ -103,7 +103,6 @@ export function InventoryPage({ initialStoreId, onOpenCatalogFamily }: Inventory
               onOpenCatalogFamily={onOpenCatalogFamily}
               search={search}
               onSearchChange={setSearch}
-              familyId={familyId}
             />
           )}
           {vista === 'existencias' && (
