@@ -783,8 +783,6 @@
    Familias / Existencias) se centra sobre el contenido y se separa de la página
    montada debajo (cada vista trae su propio contenedor `.catalog`). */
 .inventory-page {
-  max-width: 75rem;
-  margin: 0 auto;
 }
 .inventory-views {
   margin-bottom: 1.25rem;
