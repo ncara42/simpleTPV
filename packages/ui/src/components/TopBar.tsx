@@ -27,6 +27,8 @@ export interface TopBarProps {
   notificationsActive?: boolean | undefined;
   /** Acciones de la vista activa (export/import…): clúster derecho, antes de la búsqueda. */
   pageActions?: React.ReactNode;
+  /** Sub-navegación de la vista activa (pestañas Catálogo/Familias…): columna izquierda. */
+  pageNav?: React.ReactNode;
   /** Lanzador de búsqueda (⌘K): vive DENTRO de la isla (barra de navegación). */
   search?: React.ReactNode;
   /** Slot extra al final del clúster derecho (p. ej. conmutador de modo del dashboard). */
@@ -166,12 +168,15 @@ export function TopBar({
   notificationCount = 0,
   notificationsActive = false,
   pageActions,
+  pageNav,
   search,
   endSlot,
   account,
 }: TopBarProps) {
   return (
     <header className="topbar" data-testid="topbar">
+      {/* Columna izquierda: sub-navegación de la vista activa (pestañas Catálogo/Familias…). */}
+      {pageNav && <div className="topbar-page-nav">{pageNav}</div>}
       {/* Isla central: atrás · título (centrado) · tema · campana. */}
       <div className="topbar-island">
         {onBack && (

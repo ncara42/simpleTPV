@@ -5,6 +5,7 @@ import '@simpletpv/ui/login.css';
 import '@simpletpv/ui/select.css';
 import '@simpletpv/ui/topbar.css';
 import './catalog.css';
+import './catalog/inventory-card.css';
 import './styles.css';
 
 import { LoginForm, type NavGroup, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
@@ -49,6 +50,7 @@ import { useFeatures } from './lib/features.js';
 import { switchApp, type Tab } from './lib/nav.js';
 import { pathToTab, tabToPath } from './lib/navigation.js';
 import { PageActionsProvider, usePageActionsValue } from './lib/pageActions.js';
+import { PageNavProvider, usePageNavValue } from './lib/pageNav.js';
 import { listAlerts } from './lib/stock.js';
 import { NotificationsPage } from './NotificationsPage.js';
 import { PersonalPage } from './PersonalPage.js';
@@ -106,6 +108,12 @@ const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab)
 // las inyecta en el clúster derecho del topbar (antes vivían en el clúster flotante).
 function PageActionsSlot() {
   return <>{usePageActionsValue()}</>;
+}
+
+// Lee la sub-navegación de la vista activa (pestañas Catálogo/Familias…) y la
+// inyecta en la columna izquierda del topbar.
+function PageNavSlot() {
+  return <>{usePageNavValue()}</>;
 }
 
 function Home() {
@@ -234,135 +242,140 @@ function Home() {
   }
 
   return (
-    <PageActionsProvider>
-      <div className="app-shell">
-        <Sidebar
-          items={navItems}
-          groups={NAV_GROUPS}
-          groupsAsDropdowns
-          collapsible
-          logo={
-            branding?.logoUrl ? (
-              <img className="sidebar-logo-img" src={branding.logoUrl} alt="Logo" />
-            ) : undefined
-          }
-          activeItem={tab}
-          onSelect={(id) => navigateTo(id as Tab)}
-          // La cuenta vive al PIE del sidebar (avatar → menú con cerrar sesión), estilo
-          // ChatGPT/Claude; en rail se reduce al avatar. La campana sigue en el topbar.
-          account={{ name: 'Administrador', subtitle: 'Central · Admin' }}
-          onLogout={logout}
-          // El TPV es la última entrada del sidebar (appSwitch), separada por una línea y en azul.
-          appSwitch={{
-            label: 'TPV',
-            icon: <Monitor size={19} aria-hidden="true" />,
-            onClick: () => switchApp('tpv'),
-            testId: 'switch-tpv',
-          }}
-        />
-        {/* En views NO-lienzo anulamos la columna reservada del sidebar flotante: el lienzo de
+    <PageNavProvider>
+      <PageActionsProvider>
+        <div className="app-shell">
+          <Sidebar
+            items={navItems}
+            groups={NAV_GROUPS}
+            groupsAsDropdowns
+            collapsible
+            logo={
+              branding?.logoUrl ? (
+                <img className="sidebar-logo-img" src={branding.logoUrl} alt="Logo" />
+              ) : undefined
+            }
+            activeItem={tab}
+            onSelect={(id) => navigateTo(id as Tab)}
+            // La cuenta vive al PIE del sidebar (avatar → menú con cerrar sesión), estilo
+            // ChatGPT/Claude; en rail se reduce al avatar. La campana sigue en el topbar.
+            account={{ name: 'Administrador', subtitle: 'Central · Admin' }}
+            onLogout={logout}
+            // El TPV es la última entrada del sidebar (appSwitch), separada por una línea y en azul.
+            appSwitch={{
+              label: 'TPV',
+              icon: <Monitor size={19} aria-hidden="true" />,
+              onClick: () => switchApp('tpv'),
+              testId: 'switch-tpv',
+            }}
+          />
+          {/* En views NO-lienzo anulamos la columna reservada del sidebar flotante: el lienzo de
           puntitos va full-bleed y el sidebar flota por encima (como en el Dashboard). */}
-        <div className={`app-content${isCanvas ? '' : ' app-content--surface'}`}>
-          <PageHeaderProvider>
-            {/* Topbar flotante siempre presente: isla central (atrás · nombre de la vista ·
+          <div className={`app-content${isCanvas ? '' : ' app-content--surface'}`}>
+            <PageHeaderProvider>
+              {/* Topbar flotante siempre presente: isla central (atrás · nombre de la vista ·
               tema · campana) + clúster derecho (acciones de la vista · búsqueda ⌘K · cuenta).
               El nombre de la vista es el label del menú (en el Dashboard: «Asistente de IA»). */}
-            <TopBar
-              title={activeLabel}
-              titleTestId="page-heading"
-              // Atrás (S-03): retrocede en el historial del ROUTER. `location.key === 'default'`
-              // marca la entrada inicial sin historial previo (deep-link directo) → cae a «/».
-              onBack={() => (location.key !== 'default' ? navigate(-1) : navigate('/'))}
-              onNotifications={toggleNotifications}
-              notificationCount={notificationCount}
-              notificationsActive={tab === 'notifications'}
-              search={<FunctionSearch onNavigate={navigateTo} />}
-              pageActions={<PageActionsSlot />}
-              // Solo en el dashboard: botón «+» de añadir widget (como la campana) + conmutador
-              // cuadrícula↔lienzo, ambos arriba-derecha del topbar (clúster derecho).
-              endSlot={
-                tab === 'dashboard' ? (
-                  <>
-                    <DashboardAddWidget />
-                    <DashboardModeToggle />
-                  </>
-                ) : undefined
-              }
-            />
-            {/* Sub-barra del lienzo: SOLO las herramientas (Editar/Mover/Goma), centradas, y únicamente
+              <TopBar
+                title={activeLabel}
+                titleTestId="page-heading"
+                // Atrás (S-03): retrocede en el historial del ROUTER. `location.key === 'default'`
+                // marca la entrada inicial sin historial previo (deep-link directo) → cae a «/».
+                onBack={() => (location.key !== 'default' ? navigate(-1) : navigate('/'))}
+                onNotifications={toggleNotifications}
+                notificationCount={notificationCount}
+                notificationsActive={tab === 'notifications'}
+                search={<FunctionSearch onNavigate={navigateTo} />}
+                pageActions={<PageActionsSlot />}
+                pageNav={<PageNavSlot />}
+                // Solo en el dashboard: botón «+» de añadir widget (como la campana) + conmutador
+                // cuadrícula↔lienzo, ambos arriba-derecha del topbar (clúster derecho).
+                endSlot={
+                  tab === 'dashboard' ? (
+                    <>
+                      <DashboardAddWidget />
+                      <DashboardModeToggle />
+                    </>
+                  ) : undefined
+                }
+              />
+              {/* Sub-barra del lienzo: SOLO las herramientas (Editar/Mover/Goma), centradas, y únicamente
               cuando hay lienzo libre activo. El conmutador de modo ya vive arriba-derecha (endSlot). */}
-            {tab === 'dashboard' && canvasBinding && (
-              <div className="topbar-subbar" data-testid="canvas-subbar">
-                <div className="dash-canvas-toolbar">
-                  <CanvasToolsMenu
-                    canvasRef={canvasBinding.canvasRef}
-                    canUndo={canvasBinding.canvasMeta.canUndo}
-                    canRedo={canvasBinding.canvasMeta.canRedo}
-                    drawActive={canvasBinding.canvasMeta.drawOpen}
-                    mode={canvasBinding.canvasMeta.mode}
-                  />
+              {tab === 'dashboard' && canvasBinding && (
+                <div className="topbar-subbar" data-testid="canvas-subbar">
+                  <div className="dash-canvas-toolbar">
+                    <CanvasToolsMenu
+                      canvasRef={canvasBinding.canvasRef}
+                      canUndo={canvasBinding.canvasMeta.canUndo}
+                      canRedo={canvasBinding.canvasMeta.canRedo}
+                      drawActive={canvasBinding.canvasMeta.drawOpen}
+                      mode={canvasBinding.canvasMeta.mode}
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
-            <div className="app-main-row">
-              <main className={`bo-main${isCanvas ? ' bo-main--canvas' : ' bo-main--surface'}`}>
-                {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
+              )}
+              <div className="app-main-row">
+                <main className={`bo-main${isCanvas ? ' bo-main--canvas' : ' bo-main--surface'}`}>
+                  {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
                   embebe la tabla — enlaza con "Ver todas las ventas →". */}
-                {tab === 'dashboard' && (
-                  <DashboardPage
-                    onNavigate={navigateTo}
-                    onOpenSupplierComparison={openSupplierComparison}
-                  />
-                )}
-                {tab === 'sales' && <SalesHistoryPage initialStoreId={searchParams.get('store')} />}
-                {tab === 'notifications' && <NotificationsPage onResolve={{ resolveStock }} />}
-                {/* S-02 fase A: shell unificado de Inventario (Catálogo · Familias ·
+                  {tab === 'dashboard' && (
+                    <DashboardPage
+                      onNavigate={navigateTo}
+                      onOpenSupplierComparison={openSupplierComparison}
+                    />
+                  )}
+                  {tab === 'sales' && (
+                    <SalesHistoryPage initialStoreId={searchParams.get('store')} />
+                  )}
+                  {tab === 'notifications' && <NotificationsPage onResolve={{ resolveStock }} />}
+                  {/* S-02 fase A: shell unificado de Inventario (Catálogo · Familias ·
                   Existencias). La vista activa vive en `?vista=`; cada segmento monta la
                   página existente con sus props de deep-link (family/store/q). */}
-                {tab === 'inventory' && (
-                  <InventoryPage
-                    initialFamilyId={searchParams.get('family')}
-                    initialStoreId={searchParams.get('store')}
-                    initialSearch={searchParams.get('q')}
-                    onOpenCatalogFamily={openCatalogFamily}
-                  />
-                )}
-                {tab === 'transfers' && <TransfersPage />}
-                {tab === 'promotions' && <PromotionsPage />}
-                {/* S-01: shell unificado de Personal (Equipo · Fichajes). La vista
+                  {tab === 'inventory' && (
+                    <InventoryPage
+                      initialFamilyId={searchParams.get('family')}
+                      initialStoreId={searchParams.get('store')}
+                      initialSearch={searchParams.get('q')}
+                      onOpenCatalogFamily={openCatalogFamily}
+                    />
+                  )}
+                  {tab === 'transfers' && <TransfersPage />}
+                  {tab === 'promotions' && <PromotionsPage />}
+                  {/* S-01: shell unificado de Personal (Equipo · Fichajes). La vista
                   activa vive en `?vista=`; cada segmento monta la página existente
                   (UsersPage / TimeClockPage) tal cual. */}
-                {tab === 'personal' && <PersonalPage />}
-                {tab === 'stores' && <StoresPage onOpenStoreView={openStoreView} />}
-                {/* S-25: la comparativa de precios es accesible en ≤1 clic vía
+                  {tab === 'personal' && <PersonalPage />}
+                  {tab === 'stores' && <StoresPage onOpenStoreView={openStoreView} />}
+                  {/* S-25: la comparativa de precios es accesible en ≤1 clic vía
                   deep-link `?vista=comparativa`. Reutiliza la Tab 'suppliers': la
                   query fija la sección 'prices' en su sub-vista 'comparativa'. */}
-                {tab === 'suppliers' && (
-                  <SuppliersPage
-                    initialSection={searchParams.get('vista') === 'comparativa' ? 'prices' : null}
-                    initialPricesView={
-                      searchParams.get('vista') === 'comparativa' ? 'comparativa' : null
-                    }
-                  />
-                )}
-                {tab === 'verifactu' && <VerifactuPage />}
-                {/* S-21: deep-link a la subsección Tarifas (`/b2b?section=pricelists`)
+                  {tab === 'suppliers' && (
+                    <SuppliersPage
+                      initialSection={searchParams.get('vista') === 'comparativa' ? 'prices' : null}
+                      initialPricesView={
+                        searchParams.get('vista') === 'comparativa' ? 'comparativa' : null
+                      }
+                    />
+                  )}
+                  {tab === 'verifactu' && <VerifactuPage />}
+                  {/* S-21: deep-link a la subsección Tarifas (`/b2b?section=pricelists`)
                   desde el buscador. `B2bPage` valida el valor; uno inválido cae a la
                   subtab Clientes por defecto. */}
-                {tab === 'b2b' && <B2bPage initialSection={searchParams.get('section')} />}
-                {tab === 'settings' && <SettingsPage />}
-                {tab === 'help' && <HelpPage />}
-              </main>
-            </div>
-            {/* Asistente unificado a nivel de shell: input + (en el Dashboard) menú «+» de
+                  {tab === 'b2b' && <B2bPage initialSection={searchParams.get('section')} />}
+                  {tab === 'settings' && <SettingsPage />}
+                  {tab === 'help' && <HelpPage />}
+                </main>
+              </div>
+              {/* Asistente unificado a nivel de shell: input + (en el Dashboard) menú «+» de
               herramientas del lienzo. Presente en TODAS las views; el binding del lienzo lo
               registra DashboardPage vía canvas-bridge. La vista activa define su saludo,
               sugerencias y el contexto que viaja al backend. */}
-            <AssistantDock view={viewContextFor(tab)} />
-          </PageHeaderProvider>
+              <AssistantDock view={viewContextFor(tab)} />
+            </PageHeaderProvider>
+          </div>
         </div>
-      </div>
-    </PageActionsProvider>
+      </PageActionsProvider>
+    </PageNavProvider>
   );
 }
 

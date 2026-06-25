@@ -28,6 +28,17 @@
   pointer-events: auto;
 }
 
+/* ─── Sub-navegación de vista (columna izquierda) ─────────────────────────────
+   Slot para los botones de navegación de la vista activa (Catálogo / Familias…).
+   Ocupa la columna izquierda del grid de tres columnas; si está vacío el div no
+   se renderiza y la isla sigue centrada. */
+.topbar-page-nav {
+  grid-column: 1;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+}
+
 /* ─── Isla central ─────────────────────────────────────────────────────────────
    Pastilla compacta que se ajusta a su contenido (no una barra ancha y vacía): atrás ·
    nombre de la vista · ┊ · tema · campana. Un filete vertical separa el rótulo de los
