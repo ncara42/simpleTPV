@@ -12,7 +12,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { AddExistingProductsModal } from './components/AddExistingProductsModal.js';
 import { useConfirm } from './components/ConfirmProvider.js';
@@ -806,6 +806,18 @@ function NavFamilyRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = () => {
+    hoverTimer.current = setTimeout(onOpen, 170);
+  };
+  const handleMouseLeave = () => {
+    if (hoverTimer.current) {
+      clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+  };
+
   return (
     <div
       className={`mc-row mc-row--fam${active ? ' is-active' : ''}`}
@@ -815,6 +827,8 @@ function NavFamilyRow({
       tabIndex={0}
       aria-current={active}
       onClick={onOpen}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
