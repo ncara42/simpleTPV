@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { CatalogPage } from './CatalogPage.js';
@@ -34,6 +35,10 @@ export function InventoryPage({ initialStoreId, onOpenCatalogFamily }: Inventory
 
   const search = params.get('q') ?? '';
   const familyId = params.get('family') ?? '';
+
+  // Host (hermano del card) donde el Catálogo portaliza su barra de selección: al estar FUERA
+  // de .inv-card, su aparición reduce la altura del card (flex) en vez de vivir dentro de él.
+  const [selBarHost, setSelBarHost] = useState<HTMLDivElement | null>(null);
 
   const { data: families = [] } = useQuery({
     queryKey: ['families'],
@@ -90,6 +95,7 @@ export function InventoryPage({ initialStoreId, onOpenCatalogFamily }: Inventory
               onSearchChange={setSearch}
               familyFilter={familyId}
               onFamilyFilterChange={setFamily}
+              selectionBarHost={selBarHost}
             />
           )}
           {vista === 'familias' && (
@@ -111,6 +117,9 @@ export function InventoryPage({ initialStoreId, onOpenCatalogFamily }: Inventory
           )}
         </div>
       </div>
+      {/* Hermano del card (FUERA de .inv-card): destino del portal de la barra de selección del
+          Catálogo. Vacío en Familias/Existencias. Su contenido (el slot) empuja al card al crecer. */}
+      <div className="inv-selbar-host" ref={setSelBarHost} />
     </div>
   );
 }

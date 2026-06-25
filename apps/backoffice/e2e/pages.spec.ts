@@ -63,7 +63,7 @@ test('Catálogo: selección múltiple y edición en lote', async ({ page }) => {
   const checks = page.getByTestId('product-select');
   await checks.nth(0).check();
   await checks.nth(1).check();
-  await expect(page.getByTestId('products-edit')).toHaveText('Editar (2)');
+  await expect(page.getByTestId('selection-count')).toHaveText('2 seleccionados');
   await page.getByTestId('products-edit').click();
   // El asistente recorre los seleccionados de uno en uno.
   await expect(page.getByTestId('form-save')).toHaveText('Siguiente (1 / 2)');

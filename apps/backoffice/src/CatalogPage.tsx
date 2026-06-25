@@ -4,9 +4,11 @@ import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { CatalogFacets } from './catalog/CatalogFacets.js';
 import { CatalogGroupedTable } from './catalog/CatalogGroupedTable.js';
+import { CatalogSelectionBar } from './catalog/CatalogSelectionBar.js';
 import {
   applyFilters,
   buildRows,
@@ -97,6 +99,9 @@ interface CatalogPageProps {
   onSearchChange?: (value: string) => void;
   familyFilter?: string;
   onFamilyFilterChange?: (value: string) => void;
+  /** Nodo DOM (fuera del card de productos) donde se portaliza la barra de selección, para
+   *  que al aparecer reduzca la altura del card en vez de vivir dentro de él. */
+  selectionBarHost?: HTMLElement | null;
 }
 
 export function CatalogPage({
@@ -104,6 +109,7 @@ export function CatalogPage({
   search: searchProp,
   onSearchChange,
   familyFilter: familyFilterProp,
+  selectionBarHost,
 }: CatalogPageProps = {}) {
   const qc = useQueryClient();
   // Modo controlado: si el shell de Inventario provee `search`, ese valor manda.
@@ -202,10 +208,6 @@ export function CatalogPage({
   const clearSelection = (): void => setSelected([]);
 
   const displayedProducts = useMemo(() => displayedRows.map((r) => r.product), [displayedRows]);
-  const allFilteredSelected =
-    displayedProducts.length > 0 && displayedProducts.every((p) => selectedSet.has(p.id));
-  const selectAllFiltered = (): void =>
-    setSelected((prev) => [...new Set([...prev, ...displayedProducts.map((p) => p.id)])]);
   const selectedProducts = useMemo(
     () => displayedProducts.filter((p) => selectedSet.has(p.id)),
     [displayedProducts, selectedSet],
@@ -227,6 +229,13 @@ export function CatalogPage({
 
   const removeSelected = (): void => {
     void Promise.all(selected.map((id) => deleteProduct(id))).then(invalidate);
+    clearSelection();
+  };
+
+  // Mueve los productos seleccionados a una familia (un updateProduct por id; la tabla se
+  // refresca por invalidate). Persistencia real, igual que el resto de mutaciones.
+  const moveSelectedToFamily = (familyId: string): void => {
+    void Promise.all(selected.map((id) => updateProduct(id, { familyId }))).then(invalidate);
     clearSelection();
   };
 
@@ -291,53 +300,18 @@ export function CatalogPage({
         : 'Guardar';
 
   // Toolbar de la card (en el slot de cabecera del shell): acciones de selección o el CTA.
-  const toolbar =
-    selected.length > 0 ? (
-      <div className="cat-bulk">
-        {!allFilteredSelected && (
-          <button
-            type="button"
-            className="users-sel-btn"
-            onClick={selectAllFiltered}
-            data-testid="products-select-all"
-          >
-            Seleccionar todo
-          </button>
-        )}
-        <button
-          type="button"
-          className="users-sel-btn"
-          onClick={clearSelection}
-          data-testid="products-clear"
-        >
-          Quitar selección
-        </button>
-        <button
-          type="button"
-          className="users-bulk-edit"
-          onClick={openBulkEdit}
-          data-testid="products-edit"
-        >
-          Editar{selected.length > 1 ? ` (${selected.length})` : ''}
-        </button>
-        <button
-          type="button"
-          className="users-bulk-del"
-          onClick={removeSelected}
-          data-testid="products-delete"
-        >
-          Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
-        </button>
-      </div>
-    ) : (
-      <Button
-        onClick={openCreate}
-        data-testid="new-product"
-        icon={<Plus size={16} aria-hidden="true" />}
-      >
-        Nuevo producto
-      </Button>
-    );
+  // CTA fijo del slot de la TopBar. Las acciones de selección (editar/mover/borrar/cancelar)
+  // ya NO viven aquí: se montan en la barra flotante CatalogSelectionBar (abajo-centro) cuando
+  // hay productos seleccionados.
+  const toolbar = (
+    <Button
+      onClick={openCreate}
+      data-testid="new-product"
+      icon={<Plus size={16} aria-hidden="true" />}
+    >
+      Nuevo producto
+    </Button>
+  );
 
   usePageActions(
     <>
@@ -386,6 +360,27 @@ export function CatalogPage({
           }
         />
       </div>
+
+      {/* La barra de selección se portaliza FUERA del card de productos (a `selectionBarHost`, un
+          hermano de .inv-card dentro de .inventory-page). Así, al aparecer, el slot reduce la
+          altura del card (flex) en vez de vivir dentro de él. El slot reserva el alto y revela la
+          barra (grid-rows 0fr→1fr + slide); se mantiene montada para animar también la salida. */}
+      {selectionBarHost &&
+        createPortal(
+          <div className={`cat-selbar-slot${selected.length > 0 ? ' is-open' : ''}`}>
+            <div className="cat-selbar-slot__inner">
+              <CatalogSelectionBar
+                count={selected.length}
+                familyOptions={archetypeOptions}
+                onEdit={openBulkEdit}
+                onMoveFamily={moveSelectedToFamily}
+                onDelete={removeSelected}
+                onCancel={clearSelection}
+              />
+            </div>
+          </div>,
+          selectionBarHost,
+        )}
 
       {form && (
         <ProductFormModal

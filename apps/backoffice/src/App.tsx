@@ -367,10 +367,12 @@ function Home() {
                 </main>
               </div>
               {/* Asistente unificado a nivel de shell: input + (en el Dashboard) menú «+» de
-              herramientas del lienzo. Presente en TODAS las views; el binding del lienzo lo
-              registra DashboardPage vía canvas-bridge. La vista activa define su saludo,
+              herramientas del lienzo. Presente en todas las views MENOS Inventario: ahí la franja
+              inferior queda reservada para la barra de acciones de selección del catálogo, así que
+              el dock se oculta (el acceso al asistente se reubicará más adelante). El binding del
+              lienzo lo registra DashboardPage vía canvas-bridge. La vista activa define su saludo,
               sugerencias y el contexto que viaja al backend. */}
-              <AssistantDock view={viewContextFor(tab)} />
+              {tab !== 'inventory' && <AssistantDock view={viewContextFor(tab)} />}
             </PageHeaderProvider>
           </div>
         </div>
