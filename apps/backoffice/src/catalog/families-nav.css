@@ -306,16 +306,21 @@
   letter-spacing: -0.012em;
   color: var(--ui-text);
 }
-/* El precio cede sitio al selector "Mover a…" al pasar el ratón. */
+/* El precio cede sitio al selector "Mover a…" al pasar el ratón o cuando el
+   menú está abierto. :has([aria-expanded='true']) mantiene el trigger visible
+   mientras el desplegable (portaled fuera del row) está activo, evitando que
+   el menú quede flotando sin anclaje visible al perder el hover. */
 .mc-prod-move {
   display: none;
   flex-shrink: 0;
   max-width: 9rem;
 }
-.mc-row--prod:hover .mc-prod-price {
+.mc-row--prod:hover .mc-prod-price,
+.mc-row--prod:has(.ui-select-trigger[aria-expanded='true']) .mc-prod-price {
   display: none;
 }
-.mc-row--prod:hover .mc-prod-move {
+.mc-row--prod:hover .mc-prod-move,
+.mc-row--prod:has(.ui-select-trigger[aria-expanded='true']) .mc-prod-move {
   display: inline-flex;
 }
 .mc-prod-move .ui-select-trigger {
