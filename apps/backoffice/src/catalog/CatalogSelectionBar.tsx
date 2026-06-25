@@ -1,5 +1,5 @@
 import { FolderInput, Pencil, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 type FamilyOption = {
   value: string;
@@ -16,9 +16,9 @@ type Props = {
 };
 
 /**
- * Barra de acciones de selección del catálogo: píldora oscura flotante anclada abajo-centro
- * del contenedor (la monta CatalogPage cuando hay productos seleccionados). Sustituye a los
- * botones de selección que vivían en el slot de la TopBar.
+ * Barra de acciones de selección del catálogo: fila de botones flotantes (estilo TopBar) que
+ * CatalogPage portaliza FUERA del card, alineada a la derecha. Sustituye a los botones de
+ * selección que vivían en el slot de la TopBar.
  */
 export function CatalogSelectionBar({
   count,
@@ -32,6 +32,13 @@ export function CatalogSelectionBar({
 
   const closeMove = (): void => setMoveOpen(false);
 
+  // Conteo mostrado: retiene el último valor > 0 para que, al cerrarse la barra (count→0
+  // tras deseleccionar), NO parpadee a «0 seleccionados» (más largo) durante la animación
+  // de salida. La barra está oculta cuando count===0, así que solo importa el texto residual.
+  const lastCountRef = useRef(count);
+  if (count > 0) lastCountRef.current = count;
+  const shownCount = count > 0 ? count : lastCountRef.current;
+
   return (
     <div
       className="cat-selbar"
@@ -40,7 +47,7 @@ export function CatalogSelectionBar({
       data-testid="catalog-selection-bar"
     >
       <span className="cat-selbar__count" data-testid="selection-count">
-        {count} seleccionado{count === 1 ? '' : 's'}
+        {shownCount} seleccionado{shownCount === 1 ? '' : 's'}
       </span>
 
       <button

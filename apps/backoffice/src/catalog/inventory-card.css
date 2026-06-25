@@ -543,21 +543,22 @@
 .cat-selbar-slot {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 0.28s var(--ui-ease, ease);
+  transition: grid-template-rows 0.34s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .cat-selbar-slot.is-open {
   grid-template-rows: 1fr;
 }
 .cat-selbar-slot__inner {
   display: flex;
-  justify-content: center;
+  /* Opciones alineadas a la derecha (no centradas). */
+  justify-content: flex-end;
   min-height: 0;
   /* Clipa el contenido mientras el slot está colapsado/animando; cuando el popover «Mover
      familia» está abierto, libera el overflow para que el menú (que abre hacia arriba) no se
      recorte. La visibilidad se retrasa al cierre para no cortar la animación de salida. */
   overflow: hidden;
   visibility: hidden;
-  transition: visibility 0s 0.28s;
+  transition: visibility 0s 0.34s;
 }
 .cat-selbar-slot.is-open .cat-selbar-slot__inner {
   visibility: visible;
@@ -574,14 +575,17 @@
   align-items: center;
   gap: 0.5rem;
   margin: 0.85rem 0 0;
-  transform: translateY(0.6rem);
+  /* Aparición pulida: sube + escala desde la esquina inferior derecha (donde queda anclada),
+     con ease-out-expo, sincronizada con el revelado del slot. */
+  transform-origin: bottom right;
+  transform: translateY(0.8rem) scale(0.98);
   opacity: 0;
   transition:
-    transform 0.28s var(--ui-ease, ease),
-    opacity 0.2s var(--ui-ease, ease);
+    transform 0.34s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.24s ease;
 }
 .cat-selbar-slot.is-open .cat-selbar {
-  transform: translateY(0);
+  transform: none;
   opacity: 1;
 }
 
