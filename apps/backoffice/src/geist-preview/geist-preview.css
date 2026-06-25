@@ -1,0 +1,96 @@
+/* Harness de diseño de los widgets Geist (dev/preview). Lienzo oscuro estilo dashboard. */
+.geist-preview {
+  min-height: 100vh;
+  background: var(--ui-bg, #0a0a0a);
+  color: var(--ui-text);
+  padding: 24px 28px 80px;
+  font-family:
+    'Geist',
+    system-ui,
+    sans-serif;
+}
+
+.gp-status {
+  padding: 40px;
+  color: var(--ui-text-muted);
+  font-family: 'Geist', system-ui, sans-serif;
+}
+.gp-status--error {
+  color: var(--ui-danger);
+}
+
+.gp-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+.gp-title {
+  display: flex;
+  flex-direction: column;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.gp-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ui-text-muted);
+}
+
+.gp-periods {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface-subtle, var(--ui-surface));
+}
+.gp-periods button {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--ui-text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.gp-periods button:hover {
+  color: var(--ui-text);
+}
+.gp-periods button.is-active {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+}
+
+/* Rejilla de 12 columnas como el dashboard; cada widget ocupa su span de tamaño. */
+.gp-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.gp-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.gp-cell-label {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--ui-text-soft, var(--ui-text-muted));
+}
+.gp-cell-body {
+  min-width: 0;
+}
+/* El panel del widget rellena la celda (replica `.dash-free-item-body > *` del lienzo). */
+.gp-cell-body > .dash-panel {
+  height: 100%;
+  overflow: hidden;
+}

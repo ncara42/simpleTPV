@@ -173,12 +173,12 @@ mod canvas_op_tests {
     fn from_tool_call_normaliza_widget_id_a_camel() {
         let op = CanvasOp::from_tool_call(
             "add_widget",
-            &json!({ "widget_id": "kpi-today", "position": "top-left", "element_id": "e1" }),
+            &json!({ "widget_id": "dash-bars", "position": "top-left", "element_id": "e1" }),
         );
         assert_eq!(op.op, "add_widget");
         assert_eq!(op.element_id.as_deref(), Some("e1"));
         // El frontend lee `widgetId` (camelCase) — debe existir tras la normalización.
-        assert_eq!(op.extra["widgetId"], json!("kpi-today"));
+        assert_eq!(op.extra["widgetId"], json!("dash-bars"));
         assert_eq!(op.extra["position"], json!("top-left"));
         // `elementId` se sirve por su campo propio, no duplicado dentro de `extra`.
         assert!(op.extra.get("elementId").is_none());

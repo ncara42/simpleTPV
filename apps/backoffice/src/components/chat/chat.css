@@ -1018,8 +1018,13 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 .chat-dock {
   position: fixed;
   bottom: 1rem;
-  left: 0;
+  /* El dock vive dentro de .app-content, que el sidebar fijo despeja con `margin-left`. Como el
+     dock es position:fixed, NO hereda ese margen → su borde izquierdo arranca en el ancho del
+     sidebar para CENTRAR en el área de contenido (no en el viewport). Así la píldora se re-centra
+     al desplegar/contraer el sidebar, en sincronía con el contenido (misma var y duración). */
+  left: var(--sidebar-current-width);
   right: 0;
+  transition: left 0.15s var(--ui-ease, ease);
   /* El dock vive en el shell (sibling del lienzo, position:fixed inset:0 z-35). Debe quedar POR
      ENCIMA del lienzo en todas las views; bajo el cuerpo del sidebar (z-40), con el que no solapa
      (dock abajo-centro, sidebar a la izquierda). Banda a todo el ancho que CENTRA su contenido por
@@ -1048,6 +1053,22 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 }
 .chat-dock > * {
   pointer-events: auto;
+}
+
+/* Sidebar contraído a rail: el contenido se reajusta al ancho del rail (ver .app-content); el dock
+   sigue el mismo borde para no descentrarse. El dock cuelga de .app-content (hermano del sidebar),
+   así que la selección estructural lo alcanza sin depender del tema. */
+.sidebar.collapsed ~ .app-content .chat-dock {
+  left: var(--sidebar-width-rail);
+}
+
+/* Móvil: el sidebar es off-canvas y el contenido no lleva sangrado lateral → el dock ocupa todo
+   el ancho y se centra en el viewport, como el resto de la app. */
+@media (max-width: 767px) {
+  .chat-dock,
+  .sidebar.collapsed ~ .app-content .chat-dock {
+    left: 0;
+  }
 }
 
 /* Con el panel abierto, el dock sube POR ENCIMA de toda la app (sidebar z40, topbar z30, lienzo z35,

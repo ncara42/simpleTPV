@@ -2156,6 +2156,36 @@
   background: none;
   color: inherit;
 }
+
+/* Catálogo · señal de stock (Geist). El nivel rojo/ámbar/verde se calculaba y
+   se descartaba (stock-tag lo neutraliza). Aquí se recupera con criterio: el
+   color es semántico, no decorativo. Stock sano → tinta neutra, sin punto, sin
+   ruido; bajo (≤5) → ámbar; agotado (0) → rojo. El punto-señal solo aparece en
+   los dos estados que importan. Cifra tabular y flush a la derecha. */
+.cat-stock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.cat-stock-green {
+  color: var(--ui-text);
+}
+.cat-stock-yellow {
+  color: var(--ui-warning);
+}
+.cat-stock-red {
+  color: var(--ui-danger);
+}
+.cat-stock-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: var(--ui-radius-pill);
+  background: currentColor;
+  flex-shrink: 0;
+}
 /* Anti-rotura por arquetipo (IT-13): nota de que hay sustituto en la familia →
    la rotura está degradada (no crítica). */
 .alert-substitute {
@@ -2289,12 +2319,16 @@
 /* Panel que enmarca la toolbar de filtros + la tabla (espejo de .dash-panel).
    Marco común de Stock, Usuarios y Catálogo: superficie blanca, borde fino y
    esquinas redondeadas (sin doble borde con la tabla interior). */
+/* Chrome de card de tabla. Alineado al lenguaje Geist (cards PLANAS: solo
+   hairline, sin sombra; la sombra se reserva a overlays) y a los MISMOS tokens
+   que `.ui-dt` (radio --ui-radius-lg = 12px en Geist), en vez de hardcodear
+   18px + --ui-shadow-sm. Token-driven: el tema (claro/oscuro) decide el valor. */
 .table-panel {
   border: 1px solid var(--ui-border);
-  border-radius: 18px;
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
   overflow: hidden;
-  box-shadow: var(--ui-shadow-sm);
+  box-shadow: var(--ui-shadow-panel);
 }
 
 /* Cuando un DataTable vive DENTRO de un .table-panel, su raíz .ui-dt reintroduce su
@@ -3290,19 +3324,23 @@
 }
 /* Cada aviso es una tarjeta con aire: acento a la izquierda, fondo semántico
    suave, padding cómodo y columnas alineadas (producto · tienda · tipo). */
+/* Roturas (Geist): se aplanan los bloques crema saturados. La severidad vive
+   SOLO en la barra de la izquierda (ámbar = con sustituto, rojo = crítica); el
+   relleno pasa a un lift neutro (surface-subtle) + hairline, más denso. Lista
+   silenciosa con jerarquía, no muro de color. */
 .stock-alert-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: var(--ui-space-4);
-  padding: var(--ui-space-3) var(--ui-space-4);
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border: 1px solid var(--ui-border);
   border-left: 3px solid var(--ui-warning);
-  border-radius: var(--ui-radius-md);
-  background: var(--ui-warning-soft);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-subtle);
 }
 .stock-alert-item.sev-critical {
   border-left-color: var(--ui-danger);
-  background: var(--ui-danger-soft);
 }
 .stock-alert-name {
   font-weight: 600;

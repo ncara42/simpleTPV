@@ -98,7 +98,8 @@ test.skip('el toggle de gráfico y el desplegable de comparación viven dentro d
 });
 
 test.skip('Ventas por familia: lista con scroll vertical y buscador', async () => {
-  // Reimplementar en F1.2 — requiere widget dash-family en el lienzo.
+  // Obsoleto (#264): el widget clásico `dash-family` se retiró al migrar a los widgets Geist; el
+  // reparto por familia lo cubren ahora `geist-treemap-family` / `geist-donut-family`.
 });
 
 test.skip('preferencias por defecto: el dashboard recuerda el periodo elegido (IT-16)', async () => {

@@ -102,13 +102,13 @@ pub fn canvas_tools() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "add_widget",
-                "description": "Añade un widget al dashboard. TRES formas, de menos a más esfuerzo: (1) BLOQUE pre-cableado (widget_id 'block:<id>') = un panel entero ya diseñado con UNA llamada — el preferido; (2) widget del CATÁLOGO simple (widget_id 'kpi-today', 'dash-bars', …); (3) PANEL a medida (widget_id 'gen:panel' + generic_spec con kind 'panel', recipe y slots). NO emitas geometría (w/h/span/gap): la receta dicta el layout. Para combinar varias métricas en una tarjeta usa un bloque o gen:panel (no hay árbol de layout libre).",
+                "description": "Añade un widget al dashboard. Por DEFECTO compón con WIDGETS DEL CATÁLOGO independientes (widget_id 'dash-bars', 'dash-hour', 'geist-stat-today', 'geist-treemap-family', …): una métrica = una tarjeta; varias llamadas en el turno se escalonan solas. Usa un BLOQUE pre-cableado (widget_id 'block:<id>', un panel agrupado ya diseñado) SOLO si el usuario pide explícitamente «un panel/bloque que junte…». Usa un PANEL a medida (widget_id 'gen:panel' + generic_spec con kind 'panel', recipe y slots) solo si ningún catálogo/bloque encaja. NO emitas geometría (w/h/span/gap): la receta dicta el layout.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "widget_id": {
                             "type": "string",
-                            "description": "ID del widget. Bloques (un panel entero ya diseñado, PREFIÉRELOS): 'block:sales-overview', 'block:stock-risk', 'block:staff-performance', 'block:product-ranking', 'block:top-margin', 'block:dead-stock', 'block:profitability', 'block:discount-control', 'block:sales-mix', 'block:store-comparison'. Catálogo (1 métrica): 'kpi-today', 'dash-bars', etc. Panel a medida (si ningún bloque encaja): 'gen:panel'."
+                            "description": "ID del widget. Catálogo independiente (POR DEFECTO, una métrica cada uno): 'dash-bars', 'dash-hour', 'geist-stat-today', 'geist-hero-profit', 'geist-dual-margin', 'geist-gauge-margin', 'geist-treemap-family', 'geist-donut-family', 'geist-share-stores', 'geist-leaderboard-sellers', 'geist-leaderboard-products', 'geist-heat-hours', 'geist-feed-alerts', etc. Bloques (un panel AGRUPADO ya diseñado, SOLO a petición explícita de un panel): 'block:sales-overview', 'block:stock-risk', 'block:staff-performance', 'block:product-ranking', 'block:top-margin', 'block:dead-stock', 'block:profitability', 'block:discount-control', 'block:sales-mix', 'block:store-comparison'. Panel a medida (si nada encaja): 'gen:panel'."
                         },
                         "position": {
                             "type": "string",

@@ -4,6 +4,7 @@
 // preset, vía "Personalizar" (tablero arrastrable con snap a la rejilla), persistida por
 // preset en la preferencia `dashboard.layout`.
 
+import { GEIST_WIDGET_META } from '../widgets/geist/meta.js';
 import type { DashboardPeriod } from './dashboard.js';
 
 export type PresetId = 'personalizado' | 'ventas' | 'beneficio' | 'inventario' | 'equipo';
@@ -33,22 +34,7 @@ export const PRESETS: PresetDef[] = [
 // Orden CANÓNICO de los paneles (= orden de maquetación histórico). Define el orden por
 // defecto de colocación: se filtra por los paneles que el preset incluye. El bloque de
 // rankings se representa con tres ids (uno por pestaña inicial); solo uno por preset.
-export const PANEL_CANON: string[] = [
-  'dash-bars',
-  'dash-family',
-  'dash-stockout',
-  'rank-sales',
-  'rank-margin',
-  'rank-rotation',
-  'dash-expiring',
-  'dash-purchase-orders',
-  'dash-hour',
-  'dash-sales-emp',
-  'dash-discount-emp',
-  'dash-suppliers',
-  'dash-rotation',
-  'dash-timeclock',
-];
+export const PANEL_CANON: string[] = ['dash-bars', 'dash-hour'];
 
 // Orden por defecto de los paneles de un preset: los del preset, en orden canónico.
 export function defaultPanelOrder(preset: PresetDef): string[] {
@@ -60,34 +46,18 @@ export function defaultPanelOrder(preset: PresetDef): string[] {
 // tarjetas KPI ocupan 2 columnas y 1 fila; los paneles heredan su ancho histórico
 // (span 5/7/12) y un alto que encaja su contenido (gráfico ~200px o lista con scroll).
 export const BOARD_COLS = 12;
-const CARD_SPEC = { w: 2, h: 1 };
 export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
-  // Tarjetas KPI
-  'kpi-today': CARD_SPEC,
-  'kpi-avg-ticket': CARD_SPEC,
-  'kpi-upt': CARD_SPEC,
-  'kpi-margin': CARD_SPEC,
-  'kpi-profit': CARD_SPEC,
-  'kpi-discount': CARD_SPEC,
-  'kpi-return': CARD_SPEC,
-  'kpi-lost-sales': CARD_SPEC,
-  // Paneles
+  // Únicos clásicos que se conservan (#264): «Ventas» y «Ventas por hora». El resto del catálogo
+  // histórico (KPIs, rankings, stock, equipo…) se retiró al migrar el dashboard a los widgets Geist;
+  // el agente y la paleta componen con estos dos + las moléculas Geist.
   'dash-bars': { w: 7, h: 2 },
   // "Ventas por hora": gráfico + barra fina de navegación. El gráfico llena el alto del tile
   // (dash-panel--fill), así que 2 filas bastan sin dejar hueco inferior.
   'dash-hour': { w: 7, h: 2 },
-  'dash-family': { w: 5, h: 2 },
-  'rank-sales': { w: 5, h: 2 },
-  'rank-margin': { w: 7, h: 2 },
-  'rank-rotation': { w: 7, h: 2 },
-  'dash-stockout': { w: 5, h: 2 },
-  'dash-expiring': { w: 7, h: 2 },
-  'dash-purchase-orders': { w: 5, h: 2 },
-  'dash-sales-emp': { w: 7, h: 2 },
-  'dash-discount-emp': { w: 5, h: 2 },
-  'dash-suppliers': { w: 12, h: 2 },
-  'dash-rotation': { w: 12, h: 3 },
-  'dash-timeclock': { w: 12, h: 2 },
+  // Widgets Geist (#264): moléculas dataviz montadas como widgets fijos. Su tamaño (y etiqueta) viven
+  // en `widgets/geist/meta.ts` (fuente única); aquí solo se inyectan para que la paleta los liste y
+  // `addWidget`/`reconcileFreeLayout` los acepten igual que los del catálogo clásico.
+  ...Object.fromEntries(Object.entries(GEIST_WIDGET_META).map(([id, m]) => [id, m.size])),
 };
 
 const DEFAULT_SPEC = { w: 4, h: 2 };
