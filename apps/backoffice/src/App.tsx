@@ -8,6 +8,7 @@ import './catalog.css';
 import './catalog/inventory-card.css';
 import './catalog/families-nav.css';
 import './stock/existences.css';
+import './sales/ventas.css';
 import './styles.css';
 
 import { LoginForm, type NavGroup, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
@@ -289,7 +290,23 @@ function Home() {
                 notificationsActive={tab === 'notifications'}
                 search={<FunctionSearch onNavigate={navigateTo} />}
                 pageActions={<PageActionsSlot />}
-                pageNav={<PageNavSlot />}
+                pageNav={
+                  // En el lienzo del dashboard, las herramientas (Editar/Mover/Goma) viven DENTRO
+                  // del topbar, en la columna izquierda (a la altura de la isla central de
+                  // navegación), no en una sub-barra aparte. El resto de vistas usan su
+                  // sub-navegación normal (pestañas Catálogo/Familias…).
+                  tab === 'dashboard' && canvasBinding ? (
+                    <CanvasToolsMenu
+                      canvasRef={canvasBinding.canvasRef}
+                      canUndo={canvasBinding.canvasMeta.canUndo}
+                      canRedo={canvasBinding.canvasMeta.canRedo}
+                      drawActive={canvasBinding.canvasMeta.drawOpen}
+                      mode={canvasBinding.canvasMeta.mode}
+                    />
+                  ) : (
+                    <PageNavSlot />
+                  )
+                }
                 // Solo en el dashboard: botón «+» de añadir widget (como la campana) + conmutador
                 // cuadrícula↔lienzo, ambos arriba-derecha del topbar (clúster derecho).
                 endSlot={
@@ -301,21 +318,6 @@ function Home() {
                   ) : undefined
                 }
               />
-              {/* Sub-barra del lienzo: SOLO las herramientas (Editar/Mover/Goma), centradas, y únicamente
-              cuando hay lienzo libre activo. El conmutador de modo ya vive arriba-derecha (endSlot). */}
-              {tab === 'dashboard' && canvasBinding && (
-                <div className="topbar-subbar" data-testid="canvas-subbar">
-                  <div className="dash-canvas-toolbar">
-                    <CanvasToolsMenu
-                      canvasRef={canvasBinding.canvasRef}
-                      canUndo={canvasBinding.canvasMeta.canUndo}
-                      canRedo={canvasBinding.canvasMeta.canRedo}
-                      drawActive={canvasBinding.canvasMeta.drawOpen}
-                      mode={canvasBinding.canvasMeta.mode}
-                    />
-                  </div>
-                </div>
-              )}
               <div className="app-main-row">
                 <main className={`bo-main${isCanvas ? ' bo-main--canvas' : ' bo-main--surface'}`}>
                   {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
@@ -369,12 +371,15 @@ function Home() {
                 </main>
               </div>
               {/* Asistente unificado a nivel de shell: input + (en el Dashboard) menú «+» de
-              herramientas del lienzo. Presente en todas las views MENOS Inventario: ahí la franja
-              inferior queda reservada para la barra de acciones de selección del catálogo, así que
-              el dock se oculta (el acceso al asistente se reubicará más adelante). El binding del
-              lienzo lo registra DashboardPage vía canvas-bridge. La vista activa define su saludo,
-              sugerencias y el contexto que viaja al backend. */}
-              {tab !== 'inventory' && <AssistantDock view={viewContextFor(tab)} />}
+              herramientas del lienzo. Presente en todas las views MENOS Inventario y Ventas: en
+              Inventario la franja inferior queda reservada para la barra de acciones de selección;
+              Ventas es un ledger facetado a pantalla completa (3 columnas) que ocupa todo el alto,
+              así que el dock se oculta (el acceso al asistente se reubicará más adelante). El
+              binding del lienzo lo registra DashboardPage vía canvas-bridge. La vista activa define
+              su saludo, sugerencias y el contexto que viaja al backend. */}
+              {tab !== 'inventory' && tab !== 'sales' && (
+                <AssistantDock view={viewContextFor(tab)} />
+              )}
             </PageHeaderProvider>
           </div>
         </div>

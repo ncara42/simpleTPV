@@ -1969,14 +1969,10 @@
   left: 0;
 }
 
-/* Barra de herramientas del lienzo «Asistente de IA» (Editar→despliega + Mover + Goma). Vive en la
-   sub-barra del shell (.topbar-subbar), por DEBAJO del topbar. Tratamiento un escalón inferior:
-   relleno sutil (surface-subtle) en vez de cristal y sin sombra de elevación → jerarquía secundaria. */
-.dash-canvas-toolbar {
-  /* SIN contenedor propio: los botones del lienzo flotan individualmente (cada uno con su
-     superficie + sombra, ver .canvas-tools__trigger/__mode). display:contents elimina la caja. */
-  display: contents;
-}
+/* La barra de herramientas del lienzo «Asistente de IA» (Editar→despliega + Mover + Goma) vive
+   DENTRO del topbar, en la columna izquierda (slot `pageNav` → .topbar-page-nav), a la altura de
+   la isla central de navegación. Su aspecto lo dan .canvas-tools* (chat.css); aquí no hace falta
+   posicionado propio. */
 
 /* Pill de dibujo flotando justo encima del dock inferior (centrado). El dock (input del
    asistente + menú «+») ocupa la franja inferior, así que el pill se eleva para no chocar. */

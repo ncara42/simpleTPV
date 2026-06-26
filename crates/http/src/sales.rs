@@ -98,6 +98,20 @@ pub async fn void(
     Ok(Json(sale))
 }
 
+/// `POST /sales/:id/collect` — registra el cobro de una factura a crédito
+/// (ADMIN/MANAGER): la marca PAID y sella `paidAt`. Evento de tesorería, no fiscal
+/// (no toca VeriFactu ni stock). Org-scoped por RLS, igual que `void`; el CLERK no
+/// puede cobrar (la ruta exige ADMIN/MANAGER).
+pub async fn collect(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Sale>, ApiError> {
+    user.require_role(&[Role::Admin, Role::Manager])?;
+    let sale = service::collect(state.db(), user.organization_id, id, user.user_id).await?;
+    Ok(Json(sale))
+}
+
 /// `GET /sales/by-ticket/:ticketNumber`.
 pub async fn by_ticket(
     State(state): State<AppState>,
@@ -153,6 +167,10 @@ pub struct ListQuery {
     #[serde(default)]
     q: Option<String>,
     #[serde(default)]
+    channel: Option<String>,
+    #[serde(default)]
+    payment_status: Option<String>,
+    #[serde(default)]
     date: Option<String>,
     #[serde(default)]
     from: Option<String>,
@@ -170,6 +188,17 @@ pub struct ListQuery {
 fn build_filter(q: ListQuery) -> Result<SalesFilter, ApiError> {
     if let Some(s) = &q.status {
         if s != "COMPLETED" && s != "VOIDED" {
+            return Err(AppError::BadRequest.into());
+        }
+    }
+    // Cobro: canal ∈ {TPV, ONLINE, B2B}; estado de cobro ∈ {PAID, PENDING, OVERDUE}.
+    if let Some(ch) = &q.channel {
+        if !matches!(ch.as_str(), "TPV" | "ONLINE" | "B2B") {
+            return Err(AppError::BadRequest.into());
+        }
+    }
+    if let Some(ps) = &q.payment_status {
+        if !matches!(ps.as_str(), "PAID" | "PENDING" | "OVERDUE") {
             return Err(AppError::BadRequest.into());
         }
     }
@@ -193,6 +222,8 @@ fn build_filter(q: ListQuery) -> Result<SalesFilter, ApiError> {
         status: q.status,
         family_id: q.family_id,
         q: q.q,
+        channel: q.channel,
+        payment_status: q.payment_status,
         from,
         to,
         page: q.page.unwrap_or(1),

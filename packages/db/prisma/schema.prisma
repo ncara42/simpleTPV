@@ -280,6 +280,13 @@ model Sale {
   // clientId en la org se devuelve la existente en vez de duplicarla. NULL en las
   // ventas online normales (Postgres permite múltiples NULL en el índice único).
   clientId       String?       @db.Uuid
+  // Cobro (cuentas por cobrar): canal de la venta, estado de cobro, vencimiento de
+  // la factura a crédito (NULL al contado) y fecha de cobro (NULL mientras PENDING).
+  // VENCIDA es virtual (PENDING + dueDate pasada): no se almacena.
+  channel        SaleChannel   @default(TPV)
+  paymentStatus  PaymentStatus @default(PAID)
+  dueDate        DateTime?     @db.Date
+  paidAt         DateTime?
   createdAt      DateTime      @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id])
@@ -291,6 +298,10 @@ model Sale {
   @@unique([organizationId, ticketNumber])
   @@unique([organizationId, clientId])
   @@index([organizationId, storeId, createdAt])
+  // El ledger de cobro filtra por canal/estado. El índice parcial de cartera
+  // vencida (WHERE paymentStatus='PENDING') vive en la migración SQL (Prisma no
+  // expresa índices parciales).
+  @@index([organizationId, channel, paymentStatus, createdAt])
 }
 
 model SaleLine {
@@ -829,11 +840,28 @@ enum SaleUnit {
 enum PaymentMethod {
   CASH
   CARD
+  TRANSFER
+  BIZUM
+  DIRECT_DEBIT
 }
 
 enum SaleStatus {
   COMPLETED
   VOIDED
+}
+
+// Canal de la venta para el ledger de cobro: TPV en tienda, online o mayorista B2B.
+enum SaleChannel {
+  TPV
+  ONLINE
+  B2B
+}
+
+// Estado de cobro de la venta. VENCIDA es virtual (PENDING + dueDate pasada): no se
+// almacena, se deriva en consulta.
+enum PaymentStatus {
+  PENDING
+  PAID
 }
 
 enum DiscountSource {

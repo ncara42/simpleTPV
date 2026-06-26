@@ -138,7 +138,7 @@ test('el dashboard no embebe la tabla de ventas (I-17, D-06)', async ({ page }) 
   // El dashboard ya no contiene el historial de ventas (E-10: scroll eterno); Ventas es
   // page propia accesible desde el sidebar.
   await expect(page.getByTestId('dashboard')).toBeVisible();
-  await expect(page.getByTestId('sales-table')).toHaveCount(0);
+  await expect(page.getByTestId('sales-page')).toHaveCount(0);
 });
 
 test('lienzo libre: añadir un widget desde la paleta y quitarlo', async ({ page }) => {

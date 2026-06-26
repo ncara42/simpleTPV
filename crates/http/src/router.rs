@@ -299,6 +299,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/sales/{id}/ticket", get(sales::ticket))
         .route("/sales/{id}/receipt", get(sales::receipt))
         .route("/sales/{id}/void", post(sales::void))
+        // Cobro (cuentas por cobrar): registra el pago de una factura a crédito.
+        .route("/sales/{id}/collect", post(sales::collect))
         // Devoluciones (Fase 2): con ticket + ciega (PIN) + listado.
         .route("/returns", post(returns::create).get(returns::list))
         .route("/returns/blind", post(returns::create_blind))
