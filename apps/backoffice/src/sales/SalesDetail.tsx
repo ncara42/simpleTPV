@@ -1,5 +1,5 @@
 import type { SaleTicket } from '@simpletpv/auth';
-import { FileText } from 'lucide-react';
+import { Check, FileText, X } from 'lucide-react';
 
 import type { SalesViewRow } from '../lib/admin.js';
 import { fmtEur } from '../lib/format.js';
@@ -7,7 +7,6 @@ import {
   avatarBg,
   avatarOf,
   CHANNEL_LABELS,
-  COBRO_LABELS,
   type CobroStatus,
   cobroStatusOf,
   customerOf,
@@ -80,6 +79,32 @@ function buildTimeline(row: SalesViewRow, cobro: CobroStatus): TimelineItem[] {
     items.push({ tone: 'void', icon: '×', label: 'Venta anulada', when: 'Anulada', line: false });
   }
   return items;
+}
+
+function CobroIcon({ cobro }: { cobro: CobroStatus }) {
+  if (cobro === 'paid')
+    return (
+      <span className="ventas-cobro-icon" data-cobro="paid">
+        <Check size={11} strokeWidth={3} />
+      </span>
+    );
+  if (cobro === 'pending')
+    return (
+      <span className="ventas-cobro-icon" data-cobro="pending">
+        <span className="ventas-cobro-dot" />
+      </span>
+    );
+  if (cobro === 'overdue')
+    return (
+      <span className="ventas-cobro-icon" data-cobro="overdue">
+        <X size={11} strokeWidth={3} />
+      </span>
+    );
+  return (
+    <span className="ventas-cobro-icon" data-cobro="void">
+      <X size={11} strokeWidth={3} />
+    </span>
+  );
 }
 
 interface SalesDetailProps {
@@ -157,9 +182,7 @@ export function SalesDetail({
           <span className={`ventas-detail-total${cobro === 'void' ? ' is-void' : ''}`}>
             {fmtEur(Number(row.total))}
           </span>
-          <span className="ventas-pill ventas-pill--lg" data-cobro={cobro}>
-            {COBRO_LABELS[cobro]}
-          </span>
+          <CobroIcon cobro={cobro} />
         </div>
       </div>
 

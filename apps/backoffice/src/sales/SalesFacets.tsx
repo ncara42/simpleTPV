@@ -62,10 +62,7 @@ export function SalesFacets({
             onClick={() => onView(v.id)}
             data-testid={`sales-view-${v.id}`}
           >
-            <span className="cat-view-label">
-              {v.cobro && <span className="ventas-dot" data-cobro={v.cobro} aria-hidden="true" />}{' '}
-              {v.label}
-            </span>
+            <span className="cat-view-label">{v.label}</span>
             <span className="cat-view-count">{v.count}</span>
           </button>
         ))}
@@ -89,12 +86,6 @@ export function SalesFacets({
                   onChange={() => onToggleFacet(group.key, opt.key)}
                 />
                 <span className="cat-check" aria-hidden="true" />
-                {opt.cobro && (
-                  <span className="ventas-dot" data-cobro={opt.cobro} aria-hidden="true" />
-                )}
-                {opt.channel && (
-                  <span className="ventas-dot" data-channel={opt.channel} aria-hidden="true" />
-                )}
                 <span className="cat-facet-label">{opt.label}</span>
                 <span className="cat-facet-count">{opt.count}</span>
               </label>
