@@ -59,6 +59,9 @@ fn payment_label(method: PaymentMethod) -> String {
     match method {
         PaymentMethod::Cash => "Efectivo".to_owned(),
         PaymentMethod::Card => "Tarjeta".to_owned(),
+        PaymentMethod::Transfer => "Transferencia".to_owned(),
+        PaymentMethod::Bizum => "Bizum".to_owned(),
+        PaymentMethod::DirectDebit => "Domiciliado".to_owned(),
     }
 }
 

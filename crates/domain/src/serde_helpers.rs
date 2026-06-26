@@ -4,7 +4,7 @@
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Deserializer};
-use time::PrimitiveDateTime;
+use time::{Date, PrimitiveDateTime};
 
 /// Deserializa un campo en `Option<Option<T>>` para distinguir "ausente" de
 /// `null` en un PATCH (paridad con el `data: input` de Prisma): combinado con
@@ -64,6 +64,21 @@ pub fn iso_opt_utc<S: serde::Serializer>(
 ) -> Result<S::Ok, S::Error> {
     match dt {
         Some(v) => iso_utc(v, s),
+        None => s.serialize_none(),
+    }
+}
+
+/// Serializa una `DATE` (sin hora) como `YYYY-MM-DD`; `null` si es `None`. Lo usa
+/// el vencimiento de cobro (`dueDate`), que es una fecha de calendario, no un
+/// instante.
+pub fn iso_opt_date<S: serde::Serializer>(d: &Option<Date>, s: S) -> Result<S::Ok, S::Error> {
+    match d {
+        Some(date) => {
+            let formatted = date
+                .format(&time::macros::format_description!("[year]-[month]-[day]"))
+                .map_err(serde::ser::Error::custom)?;
+            s.serialize_str(&formatted)
+        }
         None => s.serialize_none(),
     }
 }

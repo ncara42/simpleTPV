@@ -81,7 +81,20 @@ export function deleteStore(id: string): Promise<void> {
 }
 
 export async function listSales(params: SalesQueryInput): Promise<SalesView> {
-  const { storeId, date, from, to, userId, familyId, status, q, page = 1, pageSize = 20 } = params;
+  const {
+    storeId,
+    date,
+    from,
+    to,
+    userId,
+    familyId,
+    status,
+    q,
+    channel,
+    paymentStatus,
+    page = 1,
+    pageSize = 20,
+  } = params;
 
   const res = await api.get<SalesPage>('/sales', {
     ...(storeId ? { storeId } : {}),
@@ -92,6 +105,8 @@ export async function listSales(params: SalesQueryInput): Promise<SalesView> {
     ...(familyId ? { familyId } : {}),
     ...(status ? { status } : {}),
     ...(q ? { q } : {}),
+    ...(channel ? { channel } : {}),
+    ...(paymentStatus ? { paymentStatus } : {}),
     ...(page ? { page: String(page) } : {}),
     ...(pageSize ? { pageSize: String(pageSize) } : {}),
   });

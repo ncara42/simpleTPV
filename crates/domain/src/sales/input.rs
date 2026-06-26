@@ -5,9 +5,10 @@ use rust_decimal::Decimal;
 use serde::Deserialize;
 use simpletpv_shared::limits::{max_amount, max_quantity};
 use simpletpv_shared::AppError;
+use time::Date;
 use uuid::Uuid;
 
-use super::model::PaymentMethod;
+use super::model::{PaymentMethod, SaleChannel};
 
 const MAX_LINES: usize = 200;
 const HUNDRED: i64 = 100;
@@ -63,9 +64,26 @@ pub struct CreateSale {
     /// Factura completa F1: razón social / nombre del destinatario.
     #[serde(default)]
     pub customer_name: Option<String>,
+    /// Canal de la venta para el ledger de cobro: TPV (por defecto si ausente),
+    /// Online o B2B. Una factura a crédito se emite en canal B2B/Online.
+    #[serde(default)]
+    pub channel: Option<SaleChannel>,
+    /// Vencimiento del cobro (`YYYY-MM-DD`) para facturas a crédito. Si va presente,
+    /// la venta nace PENDING de cobro; solo se admite en canal B2B/Online.
+    #[serde(default)]
+    pub credit_due_date: Option<String>,
 }
 
 impl CreateSale {
+    /// Vencimiento de cobro parseado cuando la venta es **a crédito**; `None` →
+    /// venta al contado (PAID). La coherencia con el canal la garantiza `validate`.
+    pub fn credit_due(&self) -> Result<Option<Date>, AppError> {
+        match normalize_opt(&self.credit_due_date) {
+            Some(s) => Ok(Some(parse_due_date(&s)?)),
+            None => Ok(None),
+        }
+    }
+
     /// Destinatario fiscal normalizado `(NIF, razón social)` cuando la venta pide
     /// **factura completa F1**: ambos presentes y no vacíos (ya trimmed). `None` →
     /// factura simplificada (ticket `F2`). Coherencia garantizada por `validate`.
@@ -119,8 +137,28 @@ impl CreateSale {
         }
         check_pct(self.ticket_discount_pct)?;
         check_amt(self.ticket_discount_amt)?;
+        // Cobro a crédito: el vencimiento (si va) debe ser una fecha YYYY-MM-DD
+        // válida y SOLO se admite en canal B2B/Online (una venta TPV es al contado).
+        if let Some(due) = normalize_opt(&self.credit_due_date) {
+            if !matches!(
+                self.channel,
+                Some(SaleChannel::B2b) | Some(SaleChannel::Online)
+            ) {
+                return Err(AppError::BadRequest);
+            }
+            parse_due_date(&due)?;
+        }
         Ok(())
     }
+}
+
+/// Parsea una fecha de vencimiento de cobro `YYYY-MM-DD`.
+fn parse_due_date(s: &str) -> Result<Date, AppError> {
+    Date::parse(
+        s,
+        time::macros::format_description!("[year]-[month]-[day]"),
+    )
+    .map_err(|_| AppError::BadRequest)
 }
 
 /// `POST /sales/ticket-block`: reserva un bloque de números de ticket.
@@ -191,6 +229,8 @@ mod tests {
             ticket_discount_amt: None,
             customer_tax_id: tax.map(str::to_owned),
             customer_name: name.map(str::to_owned),
+            channel: None,
+            credit_due_date: None,
         }
     }
 

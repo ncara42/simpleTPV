@@ -158,6 +158,12 @@ export interface SaleLine {
   lineTotal: string;
 }
 
+// Cobro (cuentas por cobrar): canal de la venta y estado de cobro. VENCIDA es un
+// estado DERIVADO en el cliente (PENDING + dueDate pasada); el backend solo
+// almacena PENDING|PAID.
+export type SaleChannel = 'TPV' | 'ONLINE' | 'B2B';
+export type SalePaymentStatus = 'PENDING' | 'PAID';
+
 export interface Sale {
   id: string;
   storeId: string;
@@ -176,6 +182,12 @@ export interface Sale {
   // tickets F2 (factura simplificada).
   customerTaxId: string | null;
   customerName: string | null;
+  // Cobro: canal, estado de cobro, vencimiento de la factura a crédito (null al
+  // contado) y fecha de cobro (null mientras PENDING).
+  channel: SaleChannel;
+  paymentStatus: SalePaymentStatus;
+  dueDate: string | null;
+  paidAt: string | null;
   createdAt: string;
   lines: SaleLine[];
 }
@@ -190,6 +202,14 @@ export interface SaleSummary {
   paymentMethod: string;
   status: string;
   storeId: string;
+  // Destinatario de factura completa F1 (null en F2). El listado lo trae porque
+  // aplana la venta completa; el ledger lo usa como nombre de cliente de la fila.
+  customerName: string | null;
+  // Cobro (ledger de Ventas): canal + estado de cobro + vencimiento + fecha de cobro.
+  channel: SaleChannel;
+  paymentStatus: SalePaymentStatus;
+  dueDate: string | null;
+  paidAt: string | null;
 }
 
 // Página de ventas con metadatos de paginación y totales del día. `totals`
@@ -205,6 +225,10 @@ export interface SalesPage {
     totalAmount: string;
     avgDiscountPct: number;
     avgMarginPct: number;
+    // Split de cobro (solo ventas COMPLETED): cobrado / pendiente / vencido (importe).
+    paidTotal: string;
+    pendingTotal: string;
+    overdueTotal: string;
   };
 }
 
@@ -245,6 +269,10 @@ export interface SalesQueryInput {
   familyId?: string;
   status?: string;
   q?: string;
+  // Cobro: canal ('TPV'|'ONLINE'|'B2B') y estado de cobro ('PAID'|'PENDING'|'OVERDUE',
+  // OVERDUE virtual). Filtran el ledger de Ventas.
+  channel?: string;
+  paymentStatus?: string;
   page?: number;
   pageSize?: number;
 }
@@ -284,7 +312,9 @@ export interface SaleTicket {
 export interface CreateSaleInput {
   storeId: string;
   lines: Array<{ productId: string; qty: number; discountPct?: number; discountAmt?: number }>;
-  paymentMethod: 'CASH' | 'CARD';
+  // El TPV solo usa CASH/CARD; las facturas a crédito (B2B/Online) pueden usar
+  // transferencia, Bizum o domiciliación.
+  paymentMethod: 'CASH' | 'CARD' | 'TRANSFER' | 'BIZUM' | 'DIRECT_DEBIT';
   cashGiven?: number;
   ticketDiscountPct?: number;
   ticketDiscountAmt?: number;
@@ -297,6 +327,10 @@ export interface CreateSaleInput {
   // ninguno (el backend rechaza solo uno). Ausentes → ticket simplificado F2.
   customerTaxId?: string;
   customerName?: string;
+  // Cobro: canal de la venta y vencimiento de cobro. `creditDueDate` (YYYY-MM-DD)
+  // marca la venta como factura a crédito (PENDING); solo válido en canal B2B/Online.
+  channel?: SaleChannel;
+  creditDueDate?: string;
 }
 
 // Sesión de caja (apertura/cierre con cuadre). Los Decimal de Prisma viajan

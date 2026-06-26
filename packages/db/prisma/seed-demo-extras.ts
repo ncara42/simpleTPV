@@ -16,8 +16,10 @@ import {
   DiscountSource,
   MovementType,
   PaymentMethod,
+  PaymentStatus,
   PrismaClient,
   PurchaseOrderStatus,
+  SaleChannel,
   SalesExportStatus,
   SaleStatus,
   SaleUnit,
@@ -1559,6 +1561,66 @@ async function backfillSaleLineCosts(prisma: PrismaClient, orgId: string): Promi
   }
 }
 
+/**
+ * Da variedad de COBRO al ledger de Ventas: convierte un puñado de ventas recientes
+ * en facturas a crédito B2B (unas pendientes, otras vencidas) y un par en ventas de
+ * canal Online, para que el ledger muestre el split Cobrado/Pendiente/Vencido y los
+ * canales TPV/Online/B2B (las anuladas las aporta seedSpecialSales). Los vencimientos
+ * son relativos a HOY (una factura vencida lo sigue estando al re-sembrar). Idempotente:
+ * no toca nada si ya hay ventas con canal distinto de TPV.
+ */
+async function seedCobroLedger(prisma: PrismaClient, orgId: string): Promise<void> {
+  const already = await prisma.sale.count({
+    where: { organizationId: orgId, channel: { not: SaleChannel.TPV } },
+  });
+  if (already > 0) return;
+
+  // Facturas B2B: razón social (nombre de cliente del ledger) + método + vencimiento
+  // relativo a hoy (negativo = vencida; positivo = pendiente).
+  const b2b = [
+    { name: 'Obrador San Blas', method: PaymentMethod.TRANSFER, dueInDays: -3 },
+    { name: 'Cafetería Lluvia', method: PaymentMethod.DIRECT_DEBIT, dueInDays: -9 },
+    { name: 'Bar Quintana', method: PaymentMethod.TRANSFER, dueInDays: 12 },
+    { name: 'Restaurante El Faro', method: PaymentMethod.TRANSFER, dueInDays: 20 },
+    { name: 'Hotel Mar Azul', method: PaymentMethod.TRANSFER, dueInDays: 18 },
+  ];
+
+  // Ventas COMPLETED más recientes (excluye la anulada de seedSpecialSales).
+  const recent = await prisma.sale.findMany({
+    where: { organizationId: orgId, status: SaleStatus.COMPLETED },
+    orderBy: { createdAt: 'desc' },
+    take: b2b.length + 2,
+    select: { id: true },
+  });
+  if (recent.length < b2b.length + 2) return;
+
+  for (let i = 0; i < b2b.length; i += 1) {
+    const due = new Date();
+    due.setHours(0, 0, 0, 0);
+    due.setDate(due.getDate() + b2b[i]!.dueInDays);
+    await prisma.sale.update({
+      where: { id: recent[i]!.id },
+      data: {
+        channel: SaleChannel.B2B,
+        paymentStatus: PaymentStatus.PENDING,
+        paymentMethod: b2b[i]!.method,
+        dueDate: due,
+        paidAt: null,
+        customerName: b2b[i]!.name,
+        customerTaxId: `B${(63000000 + i).toString()}`,
+      },
+    });
+  }
+
+  // Dos ventas de canal Online (cobradas en el acto: se quedan PAID).
+  for (let i = 0; i < 2; i += 1) {
+    await prisma.sale.update({
+      where: { id: recent[b2b.length + i]!.id },
+      data: { channel: SaleChannel.ONLINE },
+    });
+  }
+}
+
 /** Punto de entrada: ejecuta todos los extras en orden de dependencia. */
 export async function seedExtras(prisma: PrismaClient, orgId: string): Promise<void> {
   await seedProductDetails(prisma, orgId);
@@ -1570,6 +1632,7 @@ export async function seedExtras(prisma: PrismaClient, orgId: string): Promise<v
   await seedCashMovements(prisma, orgId);
   await seedTimeClockBreaks(prisma, orgId);
   await seedSpecialSales(prisma, orgId);
+  await seedCobroLedger(prisma, orgId);
   await seedPurchaseOrderStates(prisma, orgId);
   await seedWholesaleStates(prisma, orgId);
   await seedVerifactuStates(prisma, orgId);

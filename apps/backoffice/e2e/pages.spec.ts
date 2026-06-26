@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { gotoApp, navTo, selectByLabel, selectByValue } from './helpers.js';
+import { gotoApp, navTo, selectByLabel } from './helpers.js';
 
 // E2E del backoffice contra backend real (seed-demo). Patrón: descubrir datos por
 // etiqueta (los IDs son UUIDs, no se hardcodean) y aserciones alineadas al seed.
@@ -97,8 +97,10 @@ test('Tiendas: orden por ventas y acceso directo a stock (UX)', async ({ page })
   const storeName = (await card.locator('.store-card-name').textContent()) ?? '';
   await card.click();
   await page.getByTestId('store-open-sales').click();
-  await expect(page.getByTestId('sales-table')).toBeVisible();
-  await expect(page.getByTestId('sales-store')).toContainText(storeName);
+  await expect(page.getByTestId('sales-page')).toBeVisible();
+  // Prefiltrada por la tienda (deep-link `?store=`): el ledger se acota a esa tienda,
+  // así que el carril de facetas la muestra en la sección Tienda.
+  await expect(page.getByTestId('sales-facets')).toContainText(storeName);
 });
 
 test('Tiendas: detalle, estado operativo y registro de fichajes (#100, #102)', async ({ page }) => {
@@ -309,45 +311,59 @@ test('Stock: ajustar existencias PERSISTE tras recargar (E-01)', async ({ page }
   await expect(page.getByTestId('stock-adjust-form')).toHaveCount(0);
 });
 
-test('Ventas: DataTable con filtros, paginación y agregados (#95 / IT-06)', async ({ page }) => {
+test('Ventas: ledger facetado con lista, ficha y split de cobro', async ({ page }) => {
   await navTo(page, 'sales');
-  await expect(page.getByTestId('sales-table')).toBeVisible();
-  // Primera página del DataTable: 20 filas (hay histórico abundante).
-  await expect(page.getByTestId('ui-dt-row')).toHaveCount(20);
-  await expect(page.getByTestId('sales-totals')).toContainText('Margen medio');
-  // Paginación: página siguiente, otras 20 filas.
-  await page.getByLabel('Página siguiente').click();
-  await expect(page.getByTestId('ui-dt-row')).toHaveCount(20);
-  // Filtrar por la vendedora que tiene el histórico (Dependiente Demo).
-  await selectByLabel(page, 'sales-seller', 'Dependiente');
-  const rows = page.getByTestId('ui-dt-row');
+  // El ledger de 3 columnas: carril de facetas · lista · ficha.
+  await expect(page.getByTestId('sales-page')).toBeVisible();
+  await expect(page.getByTestId('sales-facets')).toBeVisible();
+  await expect(page.getByTestId('sales-list')).toBeVisible();
+  // Chips de cobro (Cobrado/Pendiente/Vencido) y al menos una venta en la lista.
+  await expect(page.getByTestId('sales-summary')).toBeVisible();
+  const rows = page.getByTestId('sales-row');
+  // Aserción con reintento: el listado se carga de forma asíncrona (useQuery).
+  await expect(rows.first()).toBeVisible();
   expect(await rows.count()).toBeGreaterThan(0);
-  await expect(rows.first()).toContainText('Dependiente');
-  // Guardar la vista actual y verla como chip reutilizable.
-  await page.getByTestId('sales-save-view').click();
-  await expect(page.getByTestId('sales-views')).toContainText('Dependiente');
-  // Limpiar vuelve a la primera página completa.
+  // Abrir un ticket muestra su ficha (desglose + seguimiento del cobro + acciones).
+  await rows.first().click();
+  await expect(page.getByTestId('sales-detail')).toBeVisible();
+  await expect(page.getByTestId('sales-detail-name')).toBeVisible();
+  await expect(page.getByTestId('sales-view-invoice')).toBeVisible();
+  // Vista guardada «Vencidas»: el botón queda activo (aria-pressed).
+  await page.getByTestId('sales-view-overdue').click();
+  await expect(page.getByTestId('sales-view-overdue')).toHaveAttribute('aria-pressed', 'true');
+  // «Limpiar filtros» (carril) vuelve a todas las ventas.
   await page.getByTestId('sales-clear').click();
-  await expect(page.getByTestId('ui-dt-row')).toHaveCount(20);
-  // Filtro por estado anulada: en la vista solo aparecen anuladas (ninguna completada).
-  await selectByValue(page, 'sales-status', 'VOIDED');
-  await expect(page.getByTestId('ui-dt-row').filter({ hasText: 'Completada' })).toHaveCount(0);
+  await expect(page.getByTestId('sales-view-all')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('sales-row').first()).toBeVisible();
 });
 
-test('S-11: el filtro de periodo de Ventas filtra la tabla y persiste en la URL', async ({
-  page,
-}) => {
+test('Ventas: «Registrar cobro» marca una factura a crédito como pagada', async ({ page }) => {
   await navTo(page, 'sales');
-  await expect(page.getByTestId('sales-table')).toBeVisible();
+  await expect(page.getByTestId('sales-page')).toBeVisible();
+  // Vista «Pendientes de cobro»: el seed crea facturas B2B a crédito.
+  await page.getByTestId('sales-view-pending').click();
+  const pendingRows = page.getByTestId('sales-row');
+  // Espera (con reintento) a que carguen las pendientes antes de contarlas.
+  await expect(pendingRows.first()).toBeVisible();
+  const before = await pendingRows.count();
+  expect(before).toBeGreaterThan(0);
+  // Abrir la primera pendiente y registrar su cobro.
+  await pendingRows.first().click();
+  await expect(page.getByTestId('sales-collect')).toBeVisible();
+  await page.getByTestId('sales-collect').click();
+  // Cobrada → sale de «Pendientes de cobro»: una fila menos en la vista.
+  await expect(pendingRows).toHaveCount(before - 1);
+});
 
-  // El filtro "Periodo" está en la toolbar (segmentado visible, sin submenús).
+test('S-11: el periodo de Ventas filtra el ledger y persiste en la URL', async ({ page }) => {
+  await navTo(page, 'sales');
+  await expect(page.getByTestId('sales-page')).toBeVisible();
+
+  // El control de periodo (segmentado) vive en el clúster derecho del topbar.
   const periodFilter = page.getByTestId('sales-period');
   await expect(periodFilter).toBeVisible();
-  await expect(periodFilter).toContainText('Periodo');
-  // Por defecto no hay periodo activo: el histórico completo (20 filas en la primera página).
-  await expect(page.getByTestId('ui-dt-row')).toHaveCount(20);
 
-  // Elegir "Hoy" filtra la tabla por el día actual y escribe ?period=today en la URL.
+  // Elegir "Hoy" acota el ledger al día y escribe ?period=today en la URL.
   await periodFilter.getByTestId('period-opt-today').click();
   await expect(periodFilter.getByTestId('period-opt-today')).toHaveAttribute(
     'aria-pressed',
@@ -357,34 +373,15 @@ test('S-11: el filtro de periodo de Ventas filtra la tabla y persiste en la URL'
 
   // Recargar conserva el periodo desde la URL.
   await page.reload();
-  await expect(page.getByTestId('sales-table')).toBeVisible();
+  await expect(page.getByTestId('sales-page')).toBeVisible();
   await expect(page.getByTestId('sales-period').getByTestId('period-opt-today')).toHaveAttribute(
     'aria-pressed',
     'true',
   );
 
-  // "Limpiar" resetea el periodo (y quita ?period= de la URL) → vuelve el histórico completo.
+  // "Limpiar filtros" resetea el periodo (y quita ?period= de la URL).
   await page.getByTestId('sales-clear').click();
   await expect.poll(() => new URL(page.url()).searchParams.get('period')).toBeNull();
-  await expect(page.getByTestId('ui-dt-row')).toHaveCount(20);
-});
-
-test('Ventas: columnas configurables ocultan una columna y persiste (IT-16)', async ({ page }) => {
-  await navTo(page, 'sales');
-  await expect(page.getByRole('columnheader', { name: 'Vendedor' })).toBeVisible();
-  await page.getByTestId('sales-columns-toggle').click();
-  await expect(page.getByTestId('sales-columns-editor')).toBeVisible();
-  await page.getByTestId('col-toggle-sellerName').click();
-  await expect(page.getByRole('columnheader', { name: 'Vendedor' })).toBeHidden();
-  // Persiste tras recargar (preferencia en /me/preferences).
-  await page.reload();
-  await navTo(page, 'sales');
-  await expect(page.getByTestId('sales-table')).toBeVisible();
-  await expect(page.getByRole('columnheader', { name: 'Vendedor' })).toBeHidden();
-  // Restaura la columna para no dejar la preferencia sucia.
-  await page.getByTestId('sales-columns-toggle').click();
-  await page.getByTestId('col-toggle-sellerName').click();
-  await expect(page.getByRole('columnheader', { name: 'Vendedor' })).toBeVisible();
 });
 
 test('Compras y VeriFactu están retiradas del menú (#106)', async ({ page }) => {

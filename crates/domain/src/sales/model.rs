@@ -3,16 +3,20 @@
 
 use rust_decimal::Decimal;
 use serde::Serialize;
-use time::PrimitiveDateTime;
+use time::{Date, PrimitiveDateTime};
 use uuid::Uuid;
 
 use super::domain::TaxBreakdownItem;
 
 pg_text_enum! {
-    /// Método de pago (enum `PaymentMethod` de Prisma/Postgres).
+    /// Método de pago (enum `PaymentMethod` de Prisma/Postgres). Los métodos a
+    /// crédito (transferencia, Bizum, domiciliación) los usan las facturas B2B.
     pub enum PaymentMethod {
         Cash = "CASH",
         Card = "CARD",
+        Transfer = "TRANSFER",
+        Bizum = "BIZUM",
+        DirectDebit = "DIRECT_DEBIT",
     }
 }
 
@@ -21,6 +25,24 @@ pg_text_enum! {
     pub enum SaleStatus {
         Completed = "COMPLETED",
         Voided = "VOIDED",
+    }
+}
+
+pg_text_enum! {
+    /// Canal de la venta (enum `SaleChannel`): TPV en tienda, online o mayorista B2B.
+    pub enum SaleChannel {
+        Tpv = "TPV",
+        Online = "ONLINE",
+        B2b = "B2B",
+    }
+}
+
+pg_text_enum! {
+    /// Estado de cobro de la venta (enum `PaymentStatus`). VENCIDA es virtual
+    /// (PENDING + dueDate pasada): no se almacena, se deriva en consulta.
+    pub enum PaymentStatus {
+        Pending = "PENDING",
+        Paid = "PAID",
     }
 }
 
@@ -70,6 +92,14 @@ pub struct Sale {
     /// Factura completa F1: NIF y razón social del destinatario (NULL en F2).
     pub customer_tax_id: Option<String>,
     pub customer_name: Option<String>,
+    /// Cobro (cuentas por cobrar): canal de la venta, estado de cobro, vencimiento
+    /// de la factura a crédito y fecha en que se cobró. TPV al contado nace PAID.
+    pub channel: SaleChannel,
+    pub payment_status: PaymentStatus,
+    #[serde(serialize_with = "crate::serde_helpers::iso_opt_date")]
+    pub due_date: Option<Date>,
+    #[serde(serialize_with = "crate::serde_helpers::iso_opt_utc")]
+    pub paid_at: Option<PrimitiveDateTime>,
     #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
     pub created_at: PrimitiveDateTime,
 }
@@ -132,6 +162,15 @@ pub struct SalesTotals {
     pub avg_discount_pct: Decimal,
     #[serde(serialize_with = "rust_decimal::serde::float::serialize")]
     pub avg_margin_pct: Decimal,
+    // Split de cobro (SOLO ventas COMPLETED del filtro, ignorando el filtro de
+    // estado de cobro): cobrado (PAID), pendiente (PENDING) y vencido (PENDING +
+    // dueDate pasada). Alimentan los chips Cobrado/Pendiente/Vencido del ledger.
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub paid_total: Decimal,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub pending_total: Decimal,
+    #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
+    pub overdue_total: Decimal,
 }
 
 /// KPIs de un periodo para la comparativa de estadísticas (S-10). Mismos importes
