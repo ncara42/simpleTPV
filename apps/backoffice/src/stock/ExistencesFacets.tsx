@@ -133,7 +133,7 @@ function FacetOption({ checked, onToggle, label, color, count, testId }: FacetOp
     <label className={`cat-facet-opt${checked ? ' is-checked' : ''}`} data-testid={testId}>
       <input type="checkbox" className="cat-facet-input" checked={checked} onChange={onToggle} />
       <span className="cat-check" aria-hidden="true" />
-      <span className="cat-facet-label" style={color ? { color, fontWeight: 550 } : undefined}>
+      <span className="cat-facet-label" style={color ? { color } : undefined}>
         {label}
       </span>
       {count !== undefined && <span className="cat-facet-count">{count}</span>}
