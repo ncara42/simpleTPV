@@ -141,7 +141,7 @@
 .ventas-summary {
   display: flex;
   gap: 0.5rem;
-  padding: 0.85rem 1rem;
+  padding: 1rem;
   border-bottom: 1px solid var(--ui-border);
   flex: 0 0 auto;
 }
@@ -186,7 +186,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.6rem 1.1rem;
+  padding: 0.6rem 1rem;
   border-bottom: 1px solid var(--ui-border);
   flex: 0 0 auto;
 }
@@ -196,14 +196,35 @@
   color: var(--ui-text-muted);
 }
 .ventas-list-sort {
+  font: inherit;
   font-size: 0.74rem;
   color: var(--ui-text-soft);
+  background: none;
+  border: 0;
+  padding: 0.15rem 0.4rem;
+  margin: -0.15rem -0.4rem;
+  border-radius: var(--ui-radius-sm);
+  cursor: pointer;
+  transition:
+    color var(--ui-motion-fast) var(--ui-ease),
+    background var(--ui-motion-fast) var(--ui-ease);
+}
+.ventas-list-sort:hover {
+  color: var(--ui-text);
+  background: var(--ui-surface-subtle);
+}
+.ventas-list-sort:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
 }
 
 .ventas-list-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 0 0.6rem 0.9rem;
+  /* Inset uniforme de 1rem en los cuatro lados: las filas quedan al ancho exacto de las
+     3 cards de resumen y la última fila guarda la misma distancia al borde inferior que
+     los chips al superior → márgenes simétricos en toda la columna. */
+  padding: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.18rem;
@@ -211,6 +232,17 @@
 }
 .ventas-list-scroll::-webkit-scrollbar {
   display: none;
+}
+
+/* Pie «Cargar más»: acumula la siguiente página de 100 ventas. */
+.ventas-list-more {
+  display: flex;
+  justify-content: center;
+  padding: 0.7rem 0 0.3rem;
+}
+.ventas-list-more .ventas-btn {
+  font-size: 0.78rem;
+  height: 2.1rem;
 }
 
 /* Tarjeta de venta. */
@@ -351,16 +383,6 @@
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--ui-text);
-}
-
-/* Aviso de tope (cap) cuando hay más ventas de las cargadas. */
-.ventas-cap-note {
-  padding: 0.5rem 1.1rem;
-  font-size: 0.72rem;
-  color: var(--ui-text-soft);
-  border-top: 1px solid var(--ui-border);
-  text-align: center;
-  flex: 0 0 auto;
 }
 
 /* ─── Columna derecha: ficha de detalle ──────────────────────────────────────── */

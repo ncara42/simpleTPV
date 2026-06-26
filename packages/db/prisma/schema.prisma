@@ -953,6 +953,14 @@ model Customer {
   phone          String?
   address        String?
   priceListId    String?  @db.Uuid
+  // ─── CRM / cartera B2B (Clientes B2B maestro-detalle) ────────────────────────
+  // tags: segmentos/etiquetas libres (VIP, HORECA, Farmacia…). paymentTerms: días
+  // de crédito (null/0 = contado) → vencimiento del pedido. salesRep: comercial
+  // asignado. creditLimit: límite de crédito en € (null = sin límite).
+  tags           String[] @default([])
+  paymentTerms   Int?
+  salesRep       String?
+  creditLimit    Decimal? @db.Decimal(12, 2)
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -1013,6 +1021,14 @@ model WholesaleOrder {
   status         WholesaleOrderStatus @default(DRAFT)
   total          Decimal              @default(0) @db.Decimal(12, 2)
   notes          String?
+  // ─── Cobro (cartera B2B) ─────────────────────────────────────────────────────
+  // Reusa el enum PaymentStatus del ledger retail. Un pedido mayorista nace
+  // PENDING (a crédito), a diferencia de la venta TPV que nace PAID (al contado).
+  // dueDate se calcula al crear desde paymentTerms del cliente. VENCIDO es virtual
+  // (PENDING AND dueDate < hoy), no se almacena.
+  paymentStatus  PaymentStatus        @default(PENDING)
+  dueDate        DateTime?            @db.Date
+  paidAt         DateTime?
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
 
@@ -1021,6 +1037,7 @@ model WholesaleOrder {
   lines        WholesaleOrderLine[]
 
   @@index([organizationId, status])
+  @@index([organizationId, customerId, createdAt])
 }
 
 model WholesaleOrderLine {

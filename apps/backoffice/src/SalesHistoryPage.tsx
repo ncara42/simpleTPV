@@ -1,5 +1,11 @@
 import { usePageHeader } from '@simpletpv/ui';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -28,6 +34,8 @@ import {
   METHOD_LABELS,
   type SalesFacetState,
   type SavedViewId,
+  type SortDir,
+  sortSalesByDate,
   todayIso,
   toggleInSet,
 } from './sales/sales-facets.js';
@@ -37,7 +45,7 @@ import { SalesList } from './sales/SalesList.js';
 
 // Tope de ventas cargadas por periodo. El backend acota cada página a 100; el ledger
 // es client-driven (facetas/recuentos/chips/búsqueda se calculan en el cliente sobre
-// este conjunto). Si el periodo tiene más, se avisa (cap-note) y se afina con filtros.
+// este conjunto). Si el periodo tiene más, se afina con filtros o se acota el periodo.
 const LEDGER_PAGE_SIZE = 100;
 
 const hourFmt = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
@@ -65,6 +73,9 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
   const [period, setPeriodState] = useState<DashboardPeriod | ''>(urlPeriod);
 
   const [view, setView] = useState<SavedViewId>('all');
+  // Orden del ledger por fecha (cliente): el backend solo sirve DESC fijo. Por
+  // defecto «Recientes» (más reciente primero), igual que el orden del servidor.
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [facets, setFacets] = useState<SalesFacetState>(EMPTY_SALES_FACETS);
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -76,20 +87,28 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
   usePageHeader('Ventas', 'Historial de tickets y facturas · cobro y estado en un vistazo');
 
   const periodRange = period ? periodToRange(period) : {};
-  const query = useQuery({
+  // El servidor topa cada página a 100 (MAX_SALES_PAGE_SIZE); para ver más se acumulan
+  // páginas en cliente (el ledger es client-driven: facetas/recuentos/chips/búsqueda/orden
+  // se calculan sobre el conjunto cargado). `totalItems` indica cuándo dejar de pedir.
+  const query = useInfiniteQuery({
     queryKey: ['sales-ledger', period, serverStoreId],
-    queryFn: () =>
+    queryFn: ({ pageParam }) =>
       listSales({
         ...periodRange,
         ...(serverStoreId ? { storeId: serverStoreId } : {}),
-        page: 1,
+        page: pageParam,
         pageSize: LEDGER_PAGE_SIZE,
       }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, pages) => {
+      const loaded = pages.reduce((n, p) => n + p.items.length, 0);
+      return loaded < lastPage.totalItems ? pages.length + 1 : undefined;
+    },
     placeholderData: keepPreviousData,
   });
-  const rows = query.data?.items ?? [];
-  const totalItems = query.data?.totalItems ?? 0;
-  const capExtra = Math.max(0, totalItems - rows.length);
+  const rows = useMemo(() => query.data?.pages.flatMap((p) => p.items) ?? [], [query.data]);
+  const totalItems = query.data?.pages[0]?.totalItems ?? 0;
+  const remaining = Math.max(0, totalItems - rows.length);
 
   const today = todayIso();
   const facetGroups = useMemo(() => computeSalesFacets(rows, today), [rows, today]);
@@ -98,8 +117,9 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
     () => filterSales(rows, view, facets, search, today),
     [rows, view, facets, search, today],
   );
+  const sorted = useMemo(() => sortSalesByDate(filtered, sortDir), [filtered, sortDir]);
   const chips = useMemo(() => cobroTotals(filtered, today), [filtered, today]);
-  const selected = filtered.find((r) => r.id === selectedId) ?? filtered[0] ?? null;
+  const selected = sorted.find((r) => r.id === selectedId) ?? sorted[0] ?? null;
 
   // Detalle del ticket (desglose de líneas) de la venta seleccionada.
   const ticketQuery = useQuery({
@@ -131,6 +151,8 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
 
   const toggleFacet = (key: FacetKey, optKey: string): void =>
     setFacets((f) => ({ ...f, [key]: toggleInSet(f[key] as ReadonlySet<string>, optKey) }));
+
+  const toggleSort = (): void => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'));
 
   const filtersActive =
     hasActiveFilters(view, facets, search) || period !== 'today' || serverStoreId !== null;
@@ -169,7 +191,7 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
   };
 
   const buildExportRows = async (): Promise<string[][]> =>
-    filtered.map((r) => [
+    sorted.map((r) => [
       String(r.ticketNumber),
       hourFmt.format(new Date(r.createdAt)),
       customerOf(r),
@@ -217,14 +239,18 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
             onClear={clearFilters}
           />
           <SalesList
-            rows={filtered}
+            rows={sorted}
             chips={chips}
             showSummary
             selectedId={selected?.id ?? null}
             onSelect={setSelectedId}
-            capExtra={capExtra}
             hasFilters={filtersActive}
             onClearFilters={clearFilters}
+            sortDir={sortDir}
+            onToggleSort={toggleSort}
+            remaining={remaining}
+            onLoadMore={() => void query.fetchNextPage()}
+            loadingMore={query.isFetchingNextPage}
           />
           <SalesDetail
             row={selected}

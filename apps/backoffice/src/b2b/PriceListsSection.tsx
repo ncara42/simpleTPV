@@ -1,6 +1,7 @@
 import { Button, DataTable, Input } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ReactNode, useState } from 'react';
+import { Plus } from 'lucide-react';
+import { useState } from 'react';
 import { sileo } from 'sileo';
 
 import { useConfirm } from '../components/ConfirmProvider.js';
@@ -17,6 +18,7 @@ import {
   setPriceListItem,
 } from '../lib/b2b.js';
 import { formErrorMessage } from '../lib/form-error.js';
+import { usePageActions } from '../lib/pageActions.js';
 
 function eur(n: number | string): string {
   return `${Number(n).toFixed(2)} €`;
@@ -147,7 +149,7 @@ function PriceListDetail({
   );
 }
 
-export function PriceListsSection({ tabs }: { tabs?: ReactNode }) {
+export function PriceListsSection() {
   const qc = useQueryClient();
   const confirm = useConfirm();
   const [creating, setCreating] = useState(false);
@@ -179,15 +181,22 @@ export function PriceListsSection({ tabs }: { tabs?: ReactNode }) {
     onError: (e) => sileo.error({ title: formErrorMessage(e, 'No se pudo eliminar la tarifa') }),
   });
 
+  // El «Nueva tarifa» vive en el clúster derecho de la TopBar (pageActions), junto a las
+  // sub-pestañas de B2bPage; el recuento queda en la cabecera del panel.
+  usePageActions(
+    <Button
+      onClick={() => setCreating(true)}
+      data-testid="b2b-new-pricelist"
+      icon={<Plus size={16} aria-hidden="true" />}
+    >
+      Nueva tarifa
+    </Button>,
+  );
+
   return (
     <div className="table-panel" data-testid="b2b-pricelists">
-      <div className="dt-header-row">
-        {tabs}
-        <SectionToolbar
-          actionLabel="Nueva tarifa"
-          onAction={() => setCreating(true)}
-          actionTestId="b2b-new-pricelist"
-        >
+      <div className="dt-header-row dt-header-row--bare">
+        <SectionToolbar>
           <span className="muted">
             {priceLists.length} tarifa{priceLists.length !== 1 ? 's' : ''}
           </span>

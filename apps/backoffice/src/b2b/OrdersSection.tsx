@@ -1,7 +1,7 @@
 import { Badge, Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowUpRight } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { ArrowUpRight, Plus } from 'lucide-react';
+import { useState } from 'react';
 import { sileo } from 'sileo';
 
 import { Modal } from '../components/Modal.js';
@@ -15,6 +15,7 @@ import {
   type WholesaleOrderStatus,
 } from '../lib/b2b.js';
 import { formErrorMessage } from '../lib/form-error.js';
+import { usePageActions } from '../lib/pageActions.js';
 import { listProducts } from '../lib/products.js';
 
 const STATUS_LABEL: Record<WholesaleOrderStatus, string> = {
@@ -279,7 +280,7 @@ function OrderDetailModal({ orderId, onClose }: { orderId: string; onClose: () =
   );
 }
 
-export function OrdersSection({ tabs }: { tabs?: ReactNode }) {
+export function OrdersSection() {
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
   const [creating, setCreating] = useState(false);
@@ -293,15 +294,22 @@ export function OrdersSection({ tabs }: { tabs?: ReactNode }) {
 
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['b2b-orders'] });
 
+  // El «Nuevo pedido» vive en el clúster derecho de la TopBar (pageActions), junto a las
+  // sub-pestañas de B2bPage; los filtros (dirección + estado) quedan en la cabecera del panel.
+  usePageActions(
+    <Button
+      onClick={() => setCreating(true)}
+      data-testid="b2b-new-order"
+      icon={<Plus size={16} aria-hidden="true" />}
+    >
+      Nuevo pedido
+    </Button>,
+  );
+
   return (
     <div className="table-panel" data-testid="b2b-orders">
-      <div className="dt-header-row">
-        {tabs}
-        <SectionToolbar
-          actionLabel="Nuevo pedido"
-          onAction={() => setCreating(true)}
-          actionTestId="b2b-new-order"
-        >
+      <div className="dt-header-row dt-header-row--bare">
+        <SectionToolbar>
           <Badge variant="success" className="gap-1" data-testid="b2b-orders-direction">
             <ArrowUpRight size={13} aria-hidden="true" />
             Salientes · a clientes

@@ -272,6 +272,22 @@ export function filterSales(
   });
 }
 
+/** Dirección de orden del ledger por fecha de creación. */
+export type SortDir = 'desc' | 'asc';
+
+/**
+ * Ordena las ventas por `createdAt` en cliente (el backend solo sirve DESC fijo).
+ * Inmutable: copia con spread, no muta el array de entrada. `desc` = más reciente
+ * primero (orden por defecto), `asc` = más antigua primero.
+ */
+export function sortSalesByDate(rows: SalesViewRow[], dir: SortDir): SalesViewRow[] {
+  return [...rows].sort((a, b) => {
+    const ta = new Date(a.createdAt).getTime();
+    const tb = new Date(b.createdAt).getTime();
+    return dir === 'desc' ? tb - ta : ta - tb;
+  });
+}
+
 export interface CobroChips {
   paid: number;
   pending: number;

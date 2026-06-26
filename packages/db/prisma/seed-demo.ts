@@ -1079,9 +1079,34 @@ async function seedB2B(orgId: string): Promise<void> {
     });
   }
 
+  const DAY = 86_400_000;
+  // `cobro` decide el estado de cartera del pedido demo: pendiente al corriente vs
+  // pendiente vencido → la ficha B2B muestra saldo y vencido reales.
   const customers = [
-    { name: 'Herbolario Natural SL', nif: 'B12345678', email: 'compras@herbolario.com' },
-    { name: 'Farmacia Centro', nif: 'B87654321', email: 'pedidos@farmaciacentro.com' },
+    {
+      name: 'Herbolario Natural SL',
+      nif: 'B12345678',
+      email: 'compras@herbolario.com',
+      phone: '+34 915 220 184',
+      address: 'C/ Gran Vía 10, 28013 Madrid',
+      tags: ['Retail', 'VIP'],
+      paymentTerms: 30,
+      salesRep: 'Lucía Marín',
+      creditLimit: 5000,
+      cobro: 'pending' as const,
+    },
+    {
+      name: 'Farmacia Centro',
+      nif: 'B87654321',
+      email: 'pedidos@farmaciacentro.com',
+      phone: '+34 954 210 087',
+      address: 'C/ Sierpes 45, 41004 Sevilla',
+      tags: ['Farmacia'],
+      paymentTerms: 60,
+      salesRep: 'Ana Ferrer',
+      creditLimit: 10000,
+      cobro: 'overdue' as const,
+    },
   ];
 
   for (const c of customers) {
@@ -1095,6 +1120,12 @@ async function seedB2B(orgId: string): Promise<void> {
           name: c.name,
           nif: c.nif,
           email: c.email,
+          phone: c.phone,
+          address: c.address,
+          tags: c.tags,
+          paymentTerms: c.paymentTerms,
+          salesRep: c.salesRep,
+          creditLimit: c.creditLimit,
           priceListId: priceList.id,
         },
       });
@@ -1114,12 +1145,17 @@ async function seedB2B(orgId: string): Promise<void> {
       lineTotal: Number(p.salePrice) * 0.7 * 10,
     }));
 
+    // Pendiente al corriente → vence en +15 días; vencido → venció hace 10 días.
+    const dueDate = new Date(Date.now() + (c.cobro === 'overdue' ? -10 : 15) * DAY);
+
     await prisma.wholesaleOrder.create({
       data: {
         organizationId: orgId,
         customerId: customer.id,
         status: 'CONFIRMED',
         total: lines.reduce((sum, l) => sum + l.lineTotal, 0),
+        paymentStatus: 'PENDING',
+        dueDate,
         lines: { create: lines },
       },
     });

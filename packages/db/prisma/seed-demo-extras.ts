@@ -1086,6 +1086,10 @@ async function seedWholesaleStates(prisma: PrismaClient, orgId: string): Promise
         email: 'pedidos@gardensevilla.es',
         phone: '+34 954 11 22 33',
         address: 'C/ Feria 12, 41003 Sevilla',
+        tags: ['HORECA', 'Nuevo'],
+        paymentTerms: 90,
+        salesRep: 'Jon Arrieta',
+        creditLimit: 2500,
         priceListId: null, // sin tarifa: las líneas congelan el PVP
       },
     });
@@ -1111,6 +1115,7 @@ async function seedWholesaleStates(prisma: PrismaClient, orgId: string): Promise
       customer: herbolario,
       status: WholesaleOrderStatus.DRAFT,
       daysAgo: 0,
+      paid: false,
       items: products
         .slice(0, 2)
         .map((p) => ({ id: p.id, price: Number(p.salePrice) * 0.7, qty: 6 })),
@@ -1120,6 +1125,7 @@ async function seedWholesaleStates(prisma: PrismaClient, orgId: string): Promise
       customer: farmacia,
       status: WholesaleOrderStatus.SHIPPED,
       daysAgo: 6,
+      paid: true, // enviado y ya cobrado → la ficha muestra un pedido "Pagado"
       items: products
         .slice(2, 5)
         .map((p) => ({ id: p.id, price: Number(p.salePrice) * 0.7, qty: 12 })),
@@ -1129,6 +1135,7 @@ async function seedWholesaleStates(prisma: PrismaClient, orgId: string): Promise
       customer: growshop,
       status: WholesaleOrderStatus.CANCELLED,
       daysAgo: 10,
+      paid: false,
       items: products.slice(5, 6).map((p) => ({ id: p.id, price: Number(p.salePrice), qty: 20 })),
     },
   ];
@@ -1147,6 +1154,7 @@ async function seedWholesaleStates(prisma: PrismaClient, orgId: string): Promise
       unitPrice: round2(i.price),
       lineTotal: round2(i.price * i.qty),
     }));
+    const createdAt = dateDaysAgo(spec.daysAgo, 12, 0);
     await prisma.wholesaleOrder.create({
       data: {
         organizationId: orgId,
@@ -1154,7 +1162,9 @@ async function seedWholesaleStates(prisma: PrismaClient, orgId: string): Promise
         status: spec.status,
         notes: spec.marker,
         total: round2(lines.reduce((sum, l) => sum + l.lineTotal, 0)),
-        createdAt: dateDaysAgo(spec.daysAgo, 12, 0),
+        paymentStatus: spec.paid ? 'PAID' : 'PENDING',
+        paidAt: spec.paid ? createdAt : null,
+        createdAt,
         lines: { create: lines },
       },
     });

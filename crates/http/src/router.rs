@@ -225,7 +225,9 @@ pub fn build_router(state: AppState) -> Router {
             patch(product_families::update).delete(product_families::remove),
         )
         // Clientes B2B (Fase 4, #154, IT-17): función de central → ADMIN/MANAGER.
+        // `/customers/ledger` (agregado de cartera) antes que `/customers/{id}`.
         .route("/customers", get(customers::list).post(customers::create))
+        .route("/customers/ledger", get(customers::ledger))
         .route(
             "/customers/{id}",
             patch(customers::update).delete(customers::remove),
@@ -255,6 +257,10 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/wholesale-orders/{id}/status",
             patch(wholesale_orders::update_status),
+        )
+        .route(
+            "/wholesale-orders/{id}/collect",
+            post(wholesale_orders::collect),
         )
         .route("/wholesale-orders/{id}", get(wholesale_orders::get))
         // Promociones (Fase 4, #154): catálogo de central. Lectura abierta a la

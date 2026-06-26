@@ -10,6 +10,7 @@ import {
   type CobroChips,
   cobroStatusOf,
   customerOf,
+  type SortDir,
 } from './sales-facets.js';
 
 const hourFmt = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
@@ -20,10 +21,13 @@ interface SalesListProps {
   showSummary: boolean;
   selectedId: string | null;
   onSelect: (id: string) => void;
-  /** Nº de ventas del periodo que NO se cargaron (tope de página); 0 si todas. */
-  capExtra: number;
   hasFilters: boolean;
   onClearFilters: () => void;
+  sortDir: SortDir;
+  onToggleSort: () => void;
+  remaining: number;
+  onLoadMore: () => void;
+  loadingMore: boolean;
 }
 
 export function SalesList({
@@ -32,9 +36,13 @@ export function SalesList({
   showSummary,
   selectedId,
   onSelect,
-  capExtra,
   hasFilters,
   onClearFilters,
+  sortDir,
+  onToggleSort,
+  remaining,
+  onLoadMore,
+  loadingMore,
 }: SalesListProps) {
   return (
     <div className="ventas-list" data-testid="sales-list">
@@ -66,7 +74,17 @@ export function SalesList({
           <span className="ventas-list-count" data-testid="sales-count">
             {rows.length} ventas
           </span>
-          <span className="ventas-list-sort">Recientes ↓</span>
+          <button
+            type="button"
+            className="ventas-list-sort"
+            onClick={onToggleSort}
+            data-testid="sales-sort"
+            aria-label={
+              sortDir === 'desc' ? 'Ordenar por más antiguas' : 'Ordenar por más recientes'
+            }
+          >
+            {sortDir === 'desc' ? 'Recientes ↓' : 'Antiguas ↑'}
+          </button>
         </div>
 
         {rows.length === 0 ? (
@@ -118,13 +136,20 @@ export function SalesList({
                 </button>
               );
             })}
-          </div>
-        )}
 
-        {capExtra > 0 && (
-          <div className="ventas-cap-note" data-testid="sales-cap-note">
-            Mostrando las {rows.length} ventas más recientes · {capExtra} más en el periodo. Afina
-            con los filtros o acota el periodo.
+            {remaining > 0 && (
+              <div className="ventas-list-more">
+                <button
+                  type="button"
+                  className="ventas-btn"
+                  onClick={onLoadMore}
+                  disabled={loadingMore}
+                  data-testid="sales-load-more"
+                >
+                  {loadingMore ? 'Cargando…' : `Cargar más · ${remaining} restantes`}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

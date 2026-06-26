@@ -709,11 +709,10 @@ test('Confirmación: borrar cliente usa el diálogo del design system (IT-19)', 
   await page.getByTestId('b2b-customer-save').click();
   await expect(page.getByTestId('b2b-customer-form')).toHaveCount(0);
   await expect(page.getByTestId('b2b-customers-table')).toContainText(victim);
-  await page
-    .getByTestId('b2b-customer-row')
-    .filter({ hasText: victim })
-    .getByRole('button', { name: 'Borrar' })
-    .click();
+  // El borrado vive ahora en la cabecera de la ficha (ya no hay papelera por fila):
+  // seleccionamos el cliente y pulsamos «Borrar» en su ficha.
+  await page.getByTestId('b2b-customer-row').filter({ hasText: victim }).click();
+  await page.getByTestId('b2b-customer-delete').click();
   await expect(page.getByTestId('confirm-dialog')).toBeVisible();
   await page.getByTestId('confirm-accept').click();
   await expect(page.getByTestId('b2b-customers-table')).not.toContainText(victim);

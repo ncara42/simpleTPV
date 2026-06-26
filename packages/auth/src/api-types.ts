@@ -850,7 +850,15 @@ export interface Customer {
   phone: string | null;
   address: string | null;
   priceListId: string | null;
+  // CRM/cartera B2B: segmentos/etiquetas, días de crédito (null/0 = contado),
+  // comercial asignado, límite de crédito (Decimal → string, null = sin límite).
+  tags: string[];
+  paymentTerms: number | null;
+  salesRep: string | null;
+  creditLimit: string | null;
   active: boolean;
+  createdAt: string;
+  updatedAt: string;
   // En list/update la API incluye la tarifa asignada (id + nombre).
   priceList?: { id: string; name: string } | null;
 }
@@ -862,7 +870,22 @@ export interface CustomerInput {
   phone?: string;
   address?: string;
   priceListId?: string | null;
+  tags?: string[];
+  paymentTerms?: number | null;
+  salesRep?: string;
+  creditLimit?: number | null;
   active?: boolean;
+}
+
+// Agregado de cartera por cliente (GET /customers/ledger): se cruza con `Customer`
+// por `customerId` en el frontend. Importes Decimal → string; `lastOrderAt` ISO|null.
+export interface CustomerLedgerRow {
+  customerId: string;
+  orderCount: number;
+  lastOrderAt: string | null;
+  billed12m: string;
+  balance: string;
+  overdue: string;
 }
 
 // Resumen de tarifa (lista). itemCount = precios fijados; customerCount = clientes que la usan.
@@ -954,6 +977,10 @@ export interface WholesaleOrderSummary {
   status: WholesaleOrderStatus;
   total: string;
   lineCount: number;
+  // Cobro (cartera B2B): VENCIDO es virtual (PENDING + dueDate pasada).
+  paymentStatus: SalePaymentStatus;
+  dueDate: string | null;
+  paidAt: string | null;
   createdAt: string;
 }
 
@@ -970,6 +997,9 @@ export interface WholesaleOrderDetail {
   status: WholesaleOrderStatus;
   total: string;
   notes: string | null;
+  paymentStatus: SalePaymentStatus;
+  dueDate: string | null;
+  paidAt: string | null;
   createdAt: string;
   customer: { name: string; nif: string | null };
   lines: WholesaleOrderLine[];

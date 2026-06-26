@@ -2,6 +2,7 @@ import type {
   CreateWholesaleOrderInput,
   Customer,
   CustomerInput,
+  CustomerLedgerRow,
   PriceListDetail,
   PriceListSummary,
   WholesaleOrderDetail,
@@ -15,6 +16,7 @@ export type {
   CreateWholesaleOrderInput,
   Customer,
   CustomerInput,
+  CustomerLedgerRow,
   PriceListDetail,
   PriceListSummary,
   WholesaleOrderDetail,
@@ -24,6 +26,12 @@ export type {
 
 export function listCustomers(): Promise<Customer[]> {
   return api.get<Customer[]>('/customers');
+}
+
+/** Agregado de cartera por cliente (saldo, vencido, facturado 12m, nº pedidos,
+ *  último pedido). Se cruza con `listCustomers` por `customerId` en la vista. */
+export function customerLedger(): Promise<CustomerLedgerRow[]> {
+  return api.get<CustomerLedgerRow[]>('/customers/ledger');
 }
 
 export function createCustomer(input: CustomerInput): Promise<Customer> {
@@ -68,10 +76,12 @@ export function removePriceListItem(priceListId: string, productId: string): Pro
 
 export function listWholesaleOrders(params: {
   status?: string;
+  customerId?: string;
   page?: number;
 }): Promise<WholesaleOrdersPage> {
   return api.get<WholesaleOrdersPage>('/wholesale-orders', {
     ...(params.status ? { status: params.status } : {}),
+    ...(params.customerId ? { customerId: params.customerId } : {}),
     ...(params.page ? { page: String(params.page) } : {}),
   });
 }
@@ -93,4 +103,9 @@ export function updateWholesaleOrderStatus(
   return api.patch<{ id: string; status: WholesaleOrderStatus }>(`/wholesale-orders/${id}/status`, {
     status,
   });
+}
+
+/** Registra el cobro de un pedido a crédito: lo marca PAID. Tesorería, no fiscal. */
+export function collectWholesaleOrder(id: string): Promise<WholesaleOrderDetail> {
+  return api.post<WholesaleOrderDetail>(`/wholesale-orders/${id}/collect`, {});
 }

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { CustomersSection } from './b2b/CustomersSection.js';
 import { OrdersSection } from './b2b/OrdersSection.js';
 import { PriceListsSection } from './b2b/PriceListsSection.js';
+import { usePageNav } from './lib/pageNav.js';
 
 type Section = 'customers' | 'pricelists' | 'orders';
 
@@ -28,39 +29,54 @@ interface B2bPageProps {
 export function B2bPage({ initialSection }: B2bPageProps = {}) {
   const [section, setSection] = useState<Section>(() => resolveInitialSection(initialSection));
   usePageHeader('Clientes B2B', 'Clientes, tarifas de venta y pedidos salientes');
-  // Las pestañas viven DENTRO de la card de la sección activa (como cabecera del
-  // panel), no flotando sobre el lienzo: cada sección las pinta como primer hijo
-  // de su `.table-panel`. El estado sigue aquí; solo se delega el render.
-  const tabs = (
-    <nav className="bo-tabs" data-testid="b2b-subtabs">
+  // Las sub-pestañas (Clientes · Tarifas · Pedidos) viven en la columna izquierda de
+  // la TopBar (slot pageNav), igual que Catálogo/Familias/Existencias en Inventario.
+  // Reutilizan las píldoras de cristal `.inv-nav-tab` del topbar; la acción primaria de
+  // cada sección (Nuevo cliente/pedido/tarifa) va al clúster derecho (pageActions).
+  usePageNav(
+    <nav
+      className="inv-nav-tabs"
+      role="tablist"
+      aria-label="Sección de clientes B2B"
+      data-testid="b2b-subtabs"
+    >
       <button
-        className={`bo-tab ${section === 'customers' ? 'active' : ''}`}
+        type="button"
+        role="tab"
+        className={`inv-nav-tab${section === 'customers' ? ' is-active' : ''}`}
+        aria-pressed={section === 'customers'}
         onClick={() => setSection('customers')}
         data-testid="b2b-tab-customers"
       >
         Clientes
       </button>
       <button
-        className={`bo-tab ${section === 'pricelists' ? 'active' : ''}`}
+        type="button"
+        role="tab"
+        className={`inv-nav-tab${section === 'pricelists' ? ' is-active' : ''}`}
+        aria-pressed={section === 'pricelists'}
         onClick={() => setSection('pricelists')}
         data-testid="b2b-tab-pricelists"
       >
         Tarifas
       </button>
       <button
-        className={`bo-tab ${section === 'orders' ? 'active' : ''}`}
+        type="button"
+        role="tab"
+        className={`inv-nav-tab${section === 'orders' ? ' is-active' : ''}`}
+        aria-pressed={section === 'orders'}
         onClick={() => setSection('orders')}
         data-testid="b2b-tab-orders"
       >
         Pedidos salientes
       </button>
-    </nav>
+    </nav>,
   );
   return (
     <section className="catalog b2b-page" data-testid="b2b-page">
-      {section === 'customers' && <CustomersSection tabs={tabs} />}
-      {section === 'pricelists' && <PriceListsSection tabs={tabs} />}
-      {section === 'orders' && <OrdersSection tabs={tabs} />}
+      {section === 'customers' && <CustomersSection />}
+      {section === 'pricelists' && <PriceListsSection />}
+      {section === 'orders' && <OrdersSection />}
     </section>
   );
 }

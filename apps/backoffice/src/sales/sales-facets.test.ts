@@ -12,6 +12,7 @@ import {
   filterSales,
   hasActiveFilters,
   type SalesFacetState,
+  sortSalesByDate,
   toggleInSet,
 } from './sales-facets.js';
 
@@ -121,6 +122,28 @@ describe('filterSales', () => {
   it('búsqueda por nombre de cliente', () => {
     const out = filterSales(rows, 'all', EMPTY_SALES_FACETS, 'obrador', TODAY);
     expect(out.map((r) => r.id)).toEqual(['c']);
+  });
+});
+
+describe('sortSalesByDate', () => {
+  const rows = [
+    row({ id: 'med', createdAt: '2026-06-26T12:00:00Z' }),
+    row({ id: 'old', createdAt: '2026-06-26T08:00:00Z' }),
+    row({ id: 'new', createdAt: '2026-06-26T20:00:00Z' }),
+  ];
+
+  it('desc deja la más reciente primero', () => {
+    expect(sortSalesByDate(rows, 'desc').map((r) => r.id)).toEqual(['new', 'med', 'old']);
+  });
+
+  it('asc deja la más antigua primero', () => {
+    expect(sortSalesByDate(rows, 'asc').map((r) => r.id)).toEqual(['old', 'med', 'new']);
+  });
+
+  it('es inmutable: no muta el array de entrada', () => {
+    const original = rows.map((r) => r.id);
+    sortSalesByDate(rows, 'asc');
+    expect(rows.map((r) => r.id)).toEqual(original);
   });
 });
 

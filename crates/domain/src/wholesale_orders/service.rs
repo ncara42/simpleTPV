@@ -10,16 +10,16 @@ use rust_decimal::Decimal;
 use simpletpv_db::with_tenant_tx;
 use simpletpv_shared::AppError;
 use sqlx::{PgPool, Postgres, Transaction};
-use time::PrimitiveDateTime;
+use time::{Date, PrimitiveDateTime};
 use uuid::Uuid;
 
 use crate::feature_flags::assert_flag_enabled;
 
 use super::input::CreateWholesaleOrder;
 use super::model::{
-    CustomerName, CustomerNameNif, OrderLine, OrderLineDetail, ProductName, StatusResult,
-    WholesaleOrderCreated, WholesaleOrderDetail, WholesaleOrderListItem, WholesaleOrderPage,
-    WholesaleOrderStatus,
+    CustomerName, CustomerNameNif, OrderLine, OrderLineDetail, PaymentStatus, ProductName,
+    StatusResult, WholesaleOrderCreated, WholesaleOrderDetail, WholesaleOrderListItem,
+    WholesaleOrderPage, WholesaleOrderStatus,
 };
 
 const PAGE_SIZE: i64 = 20;
@@ -28,6 +28,18 @@ const VALID_STATUS: [&str; 4] = ["DRAFT", "CONFIRMED", "SHIPPED", "CANCELLED"];
 
 fn is_valid_status(s: &str) -> bool {
     VALID_STATUS.contains(&s)
+}
+
+/// Cabecera devuelta por el INSERT de `create` (incluye el cobro recién fijado).
+#[derive(sqlx::FromRow)]
+struct CreatedHeaderRow {
+    total: Decimal,
+    notes: Option<String>,
+    payment_status: PaymentStatus,
+    due_date: Option<Date>,
+    paid_at: Option<PrimitiveDateTime>,
+    created_at: PrimitiveDateTime,
+    updated_at: PrimitiveDateTime,
 }
 
 pub async fn create(
@@ -39,15 +51,17 @@ pub async fn create(
     assert_flag_enabled(pool, org, "b2b", None).await?;
     let result: Result<WholesaleOrderCreated, AppError> =
         with_tenant_tx(pool, org, async move |tx, _after| {
-            // 1. Cliente del tenant (requireOwned → 400).
-            let customer: Option<(String, Option<Uuid>)> = sqlx::query_as(
-                r#"SELECT name, "priceListId" FROM "Customer" WHERE id = $1 AND "organizationId" = $2"#,
+            // 1. Cliente del tenant (requireOwned → 400). También sus días de crédito
+            //    (`paymentTerms`) para fijar el vencimiento del pedido.
+            let customer: Option<(String, Option<Uuid>, Option<i32>)> = sqlx::query_as(
+                r#"SELECT name, "priceListId", "paymentTerms"
+                   FROM "Customer" WHERE id = $1 AND "organizationId" = $2"#,
             )
             .bind(input.customer_id)
             .bind(org)
             .fetch_optional(&mut **tx)
             .await?;
-            let Some((customer_name, price_list_id)) = customer else {
+            let Some((customer_name, price_list_id, payment_terms)) = customer else {
                 return Ok(Err(AppError::BadRequest));
             };
 
@@ -107,22 +121,30 @@ pub async fn create(
                 .sum::<Decimal>()
                 .round_dp(2);
 
-            // 5. Cabecera (DRAFT).
+            // 5. Cabecera (DRAFT, PENDING de cobro). El vencimiento se calcula desde
+            //    los días de crédito del cliente: hoy (Europe/Madrid) + paymentTerms.
+            //    Sin días de crédito (null/0 = contado) → sin vencimiento.
             let order_id = Uuid::new_v4();
-            let header: (Decimal, Option<String>, PrimitiveDateTime, PrimitiveDateTime) =
-                sqlx::query_as(
-                    r#"INSERT INTO "WholesaleOrder"
-                         (id, "organizationId", "customerId", status, total, notes, "updatedAt")
-                       VALUES ($1, $2, $3, 'DRAFT'::"WholesaleOrderStatus", $4, $5, now())
-                       RETURNING total, notes, "createdAt", "updatedAt""#,
-                )
-                .bind(order_id)
-                .bind(org)
-                .bind(input.customer_id)
-                .bind(total)
-                .bind(input.notes.as_deref())
-                .fetch_one(&mut **tx)
-                .await?;
+            let header: CreatedHeaderRow = sqlx::query_as(
+                r#"INSERT INTO "WholesaleOrder"
+                     (id, "organizationId", "customerId", status, total, notes, "dueDate", "updatedAt")
+                   VALUES ($1, $2, $3, 'DRAFT'::"WholesaleOrderStatus", $4, $5,
+                           CASE WHEN $6 IS NOT NULL AND $6 > 0
+                                THEN ((now() AT TIME ZONE 'Europe/Madrid')::date + ($6 * INTERVAL '1 day'))::date
+                                ELSE NULL END,
+                           now())
+                   RETURNING total, notes, "paymentStatus"::text AS payment_status,
+                     "dueDate" AS due_date, "paidAt" AS paid_at,
+                     "createdAt" AS created_at, "updatedAt" AS updated_at"#,
+            )
+            .bind(order_id)
+            .bind(org)
+            .bind(input.customer_id)
+            .bind(total)
+            .bind(input.notes.as_deref())
+            .bind(payment_terms)
+            .fetch_one(&mut **tx)
+            .await?;
 
             // 6. Líneas.
             let mut lines_out: Vec<OrderLine> = Vec::with_capacity(built.len());
@@ -158,10 +180,13 @@ pub async fn create(
                 organization_id: org,
                 customer_id: input.customer_id,
                 status: WholesaleOrderStatus::Draft,
-                total: header.0,
-                notes: header.1,
-                created_at: header.2,
-                updated_at: header.3,
+                total: header.total,
+                notes: header.notes,
+                payment_status: header.payment_status,
+                due_date: header.due_date,
+                paid_at: header.paid_at,
+                created_at: header.created_at,
+                updated_at: header.updated_at,
                 customer: CustomerName { name: customer_name },
                 lines: lines_out,
             }))
@@ -193,8 +218,10 @@ pub async fn list(
         .await?;
         let items: Vec<WholesaleOrderListItem> = sqlx::query_as(
             r#"SELECT o.id, o."customerId" AS customer_id, c.name AS customer_name,
-                 o.status::text AS status, o.total, o."createdAt" AS created_at,
-                 (SELECT count(*) FROM "WholesaleOrderLine" l WHERE l."orderId" = o.id) AS line_count
+                 o.status::text AS status, o.total,
+                 (SELECT count(*) FROM "WholesaleOrderLine" l WHERE l."orderId" = o.id) AS line_count,
+                 o."paymentStatus"::text AS payment_status, o."dueDate" AS due_date,
+                 o."paidAt" AS paid_at, o."createdAt" AS created_at
                FROM "WholesaleOrder" o
                JOIN "Customer" c ON c.id = o."customerId"
                WHERE o."organizationId" = $1
@@ -227,10 +254,61 @@ struct DetailHeaderRow {
     status: WholesaleOrderStatus,
     total: Decimal,
     notes: Option<String>,
+    payment_status: PaymentStatus,
+    due_date: Option<Date>,
+    paid_at: Option<PrimitiveDateTime>,
     created_at: PrimitiveDateTime,
     updated_at: PrimitiveDateTime,
     customer_name: String,
     customer_nif: Option<String>,
+}
+
+/// Carga la cabecera de un pedido (con cliente anidado) dentro del tenant.
+async fn load_header(
+    tx: &mut Transaction<'_, Postgres>,
+    org: Uuid,
+    id: Uuid,
+) -> Result<Option<DetailHeaderRow>, sqlx::Error> {
+    sqlx::query_as(
+        r#"SELECT o.id, o."customerId" AS customer_id, o.status::text AS status,
+             o.total, o.notes, o."paymentStatus"::text AS payment_status,
+             o."dueDate" AS due_date, o."paidAt" AS paid_at,
+             o."createdAt" AS created_at, o."updatedAt" AS updated_at,
+             c.name AS customer_name, c.nif AS customer_nif
+           FROM "WholesaleOrder" o
+           JOIN "Customer" c ON c.id = o."customerId"
+           WHERE o.id = $1 AND o."organizationId" = $2"#,
+    )
+    .bind(id)
+    .bind(org)
+    .fetch_optional(&mut **tx)
+    .await
+}
+
+/// Ensambla la respuesta de detalle desde la cabecera + sus líneas.
+fn build_detail(
+    h: DetailHeaderRow,
+    org: Uuid,
+    lines: Vec<OrderLineDetail>,
+) -> WholesaleOrderDetail {
+    WholesaleOrderDetail {
+        id: h.id,
+        organization_id: org,
+        customer_id: h.customer_id,
+        status: h.status,
+        total: h.total,
+        notes: h.notes,
+        payment_status: h.payment_status,
+        due_date: h.due_date,
+        paid_at: h.paid_at,
+        created_at: h.created_at,
+        updated_at: h.updated_at,
+        customer: CustomerNameNif {
+            name: h.customer_name,
+            nif: h.customer_nif,
+        },
+        lines,
+    }
 }
 
 #[derive(sqlx::FromRow)]
@@ -283,37 +361,62 @@ async fn load_lines(
 pub async fn get(pool: &PgPool, org: Uuid, id: Uuid) -> Result<WholesaleOrderDetail, AppError> {
     let result: Result<WholesaleOrderDetail, AppError> =
         with_tenant_tx(pool, org, async move |tx, _after| {
-            let header: Option<DetailHeaderRow> = sqlx::query_as(
-                r#"SELECT o.id, o."customerId" AS customer_id, o.status::text AS status,
-                     o.total, o.notes, o."createdAt" AS created_at, o."updatedAt" AS updated_at,
-                     c.name AS customer_name, c.nif AS customer_nif
-                   FROM "WholesaleOrder" o
-                   JOIN "Customer" c ON c.id = o."customerId"
-                   WHERE o.id = $1 AND o."organizationId" = $2"#,
-            )
-            .bind(id)
-            .bind(org)
-            .fetch_optional(&mut **tx)
-            .await?;
-            let Some(h) = header else {
+            let Some(h) = load_header(tx, org, id).await? else {
                 return Ok(Err(AppError::NotFound));
             };
             let lines = load_lines(tx, org, h.id).await?;
-            Ok(Ok(WholesaleOrderDetail {
-                id: h.id,
-                organization_id: org,
-                customer_id: h.customer_id,
-                status: h.status,
-                total: h.total,
-                notes: h.notes,
-                created_at: h.created_at,
-                updated_at: h.updated_at,
-                customer: CustomerNameNif {
-                    name: h.customer_name,
-                    nif: h.customer_nif,
-                },
-                lines,
-            }))
+            Ok(Ok(build_detail(h, org, lines)))
+        })
+        .await?;
+    result
+}
+
+/// Registra el cobro de un pedido mayorista a crédito (ADMIN/MANAGER): lo marca
+/// PAID y sella `paidAt`. Mismo patrón que `sales::service::collect` — evento de
+/// tesorería, no fiscal. Idempotente (si ya está PAID, lo devuelve tal cual);
+/// un pedido CANCELLED no se puede cobrar.
+pub async fn collect_order(
+    pool: &PgPool,
+    org: Uuid,
+    id: Uuid,
+) -> Result<WholesaleOrderDetail, AppError> {
+    let result: Result<WholesaleOrderDetail, AppError> =
+        with_tenant_tx(pool, org, async move |tx, _after| {
+            // Lock pesimista para serializar cobros concurrentes del mismo pedido.
+            sqlx::query(r#"SELECT id FROM "WholesaleOrder" WHERE id = $1 AND "organizationId" = $2 FOR UPDATE"#)
+                .bind(id)
+                .bind(org)
+                .execute(&mut **tx)
+                .await?;
+            let Some(header) = load_header(tx, org, id).await? else {
+                return Ok(Err(AppError::NotFound));
+            };
+            if header.status == WholesaleOrderStatus::Cancelled {
+                return Ok(Err(AppError::BadRequest)); // un pedido anulado no se cobra
+            }
+            if header.payment_status == PaymentStatus::Paid {
+                let lines = load_lines(tx, org, id).await?;
+                return Ok(Ok(build_detail(header, org, lines))); // idempotente
+            }
+            let updated = sqlx::query(
+                r#"UPDATE "WholesaleOrder"
+                   SET "paymentStatus" = 'PAID'::"PaymentStatus", "paidAt" = now(), "updatedAt" = now()
+                   WHERE id = $1 AND "organizationId" = $2
+                     AND "paymentStatus" = 'PENDING'::"PaymentStatus""#,
+            )
+            .bind(id)
+            .bind(org)
+            .execute(&mut **tx)
+            .await?
+            .rows_affected();
+            if updated == 0 {
+                return Ok(Err(AppError::Conflict)); // carrera perdida
+            }
+            let header = load_header(tx, org, id)
+                .await?
+                .ok_or(sqlx::Error::RowNotFound)?;
+            let lines = load_lines(tx, org, id).await?;
+            Ok(Ok(build_detail(header, org, lines)))
         })
         .await?;
     result
