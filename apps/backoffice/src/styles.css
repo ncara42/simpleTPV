@@ -107,12 +107,14 @@
   border-radius: 8px;
 }
 
+/* Hover y selección activa comparten el radio del sistema (8px, estilo Vercel/Geist),
+   igual que la base del item: rectángulo redondeado sutil, no píldora. */
 .app-shell .sidebar-item.active {
-  border-radius: 9999px;
+  border-radius: 8px;
 }
 
 .app-shell .sidebar-item:hover {
-  border-radius: 9999px;
+  border-radius: 8px;
 }
 
 .app-shell .sidebar-group-header {

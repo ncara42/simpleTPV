@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { initials } from '../lib/initials.js';
+import { Tooltip } from './Tooltip.js';
 
 // Variantes de la micro-animación del icono al hacer hover (definidas como
 // @keyframes en sidebar.css). Se reparten ciclando por la posición del item:
@@ -382,40 +383,47 @@ export function Sidebar({
     [onSelect, groupsAsDropdowns, closeDropdown],
   );
 
-  const renderItems = (filterGroup?: string, onlyId?: string) =>
+  // `withTooltip`: solo los items PADRE (entradas directas de primer nivel) reciben
+  // el tooltip con estilo propio en modo expandido; los hijos de un grupo, no.
+  const renderItems = (filterGroup?: string, onlyId?: string, withTooltip = false) =>
     items
       .filter((item) => item.group === filterGroup && (onlyId === undefined || item.id === onlyId))
       .map((item, index) => {
         const isActive = activeItem === item.id;
+        // En expandido manda el <Tooltip>; en rail, la burbuja CSS. Por eso el title
+        // nativo solo se usa cuando NO hay tooltip de componente (evita duplicar).
+        const usesTooltip = withTooltip && !collapsed;
+        const button = (
+          <button
+            type="button"
+            className={`sidebar-item${isActive ? ' active' : ''}`}
+            onClick={() => handleSelect(item.id)}
+            title={usesTooltip || collapsed ? undefined : item.label}
+            aria-current={isActive ? 'page' : undefined}
+            data-testid={`nav-${item.id}`}
+          >
+            <span
+              className="sidebar-item-icon"
+              style={{ '--sidebar-icon-anim': iconAnimAt(index) } as React.CSSProperties}
+            >
+              {item.icon}
+            </span>
+            <span className="sidebar-item-label">{item.label}</span>
+            {item.counter && (
+              <span className="sidebar-item-counter" data-testid={`nav-${item.id}-counter`}>
+                {item.counter}
+              </span>
+            )}
+            {item.badge != null && item.badge > 0 && (
+              <span className="sidebar-item-badge" data-testid={`nav-${item.id}-badge`}>
+                {item.badge}
+              </span>
+            )}
+          </button>
+        );
         return (
           <li key={item.id}>
-            <button
-              type="button"
-              className={`sidebar-item${isActive ? ' active' : ''}`}
-              onClick={() => handleSelect(item.id)}
-              // En rail la burbuja CSS ya enseña el nombre; el title nativo duplicaría.
-              title={collapsed ? undefined : item.label}
-              aria-current={isActive ? 'page' : undefined}
-              data-testid={`nav-${item.id}`}
-            >
-              <span
-                className="sidebar-item-icon"
-                style={{ '--sidebar-icon-anim': iconAnimAt(index) } as React.CSSProperties}
-              >
-                {item.icon}
-              </span>
-              <span className="sidebar-item-label">{item.label}</span>
-              {item.counter && (
-                <span className="sidebar-item-counter" data-testid={`nav-${item.id}-counter`}>
-                  {item.counter}
-                </span>
-              )}
-              {item.badge != null && item.badge > 0 && (
-                <span className="sidebar-item-badge" data-testid={`nav-${item.id}-badge`}>
-                  {item.badge}
-                </span>
-              )}
-            </button>
+            {usesTooltip ? <Tooltip label={item.label}>{button}</Tooltip> : button}
           </li>
         );
       });
@@ -505,7 +513,7 @@ export function Sidebar({
                 if (!item.group) {
                   out.push(
                     <ul className="sidebar-group-items" key={item.id}>
-                      {renderItems(undefined, item.id)}
+                      {renderItems(undefined, item.id, true)}
                     </ul>,
                   );
                   continue;
@@ -516,37 +524,46 @@ export function Sidebar({
                 if (!group) continue;
                 const isOpen = openGroup === group.id;
                 const groupActive = items.some((i) => i.group === group.id && i.id === activeItem);
+                // La cabecera de grupo es un item «padre». En EXPANDIDO usa el <Tooltip>
+                // JS (portal, escapa del overflow). En RAIL usa la MISMA burbuja CSS que
+                // los items directos (instantánea y consistente, ver sidebar.css), por eso
+                // el Tooltip JS se desactiva ahí. También se desactiva con el flyout abierto.
+                const groupEntry = (
+                  <button
+                    type="button"
+                    className={`sidebar-item sidebar-group-entry${groupActive ? ' active' : ''}`}
+                    onClick={() => onGroupClick(group.id)}
+                    aria-label={group.label}
+                    aria-expanded={isOpen}
+                    aria-haspopup="true"
+                    data-testid={`nav-group-${group.id}`}
+                  >
+                    {group.icon && <span className="sidebar-item-icon">{group.icon}</span>}
+                    <span className="sidebar-item-label">{group.label}</span>
+                    <svg
+                      className={`sidebar-group-chevron${isOpen ? ' open' : ''}`}
+                      width="11"
+                      height="11"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+                );
                 out.push(
                   <div
                     key={group.id}
                     className={`sidebar-group sidebar-group--dd${isOpen ? ' open' : ''}`}
                   >
-                    <button
-                      type="button"
-                      className={`sidebar-item sidebar-group-entry${groupActive ? ' active' : ''}`}
-                      onClick={() => onGroupClick(group.id)}
-                      title={group.label}
-                      aria-expanded={isOpen}
-                      aria-haspopup="true"
-                      data-testid={`nav-group-${group.id}`}
-                    >
-                      {group.icon && <span className="sidebar-item-icon">{group.icon}</span>}
-                      <span className="sidebar-item-label">{group.label}</span>
-                      <svg
-                        className={`sidebar-group-chevron${isOpen ? ' open' : ''}`}
-                        width="11"
-                        height="11"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <polyline points="6 9 12 15 18 9" />
-                      </svg>
-                    </button>
+                    <Tooltip label={group.label} disabled={collapsed || isOpen}>
+                      {groupEntry}
+                    </Tooltip>
                     {isOpen && (
                       <ul className="sidebar-group-items sidebar-dd-items">
                         {renderItems(group.id)}
