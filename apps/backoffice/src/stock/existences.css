@@ -240,24 +240,21 @@
   justify-content: center;
   width: 1.75rem;
   height: 1.75rem;
-  border: 1px solid var(--ui-border);
+  border: 1px solid transparent;
   border-radius: 7px;
-  background: var(--ui-surface);
-  color: var(--ui-text-muted);
+  background: color-mix(in srgb, var(--ui-text) 10%, var(--ui-surface));
+  color: var(--ui-text-soft);
   cursor: pointer;
   transition:
     background 0.15s ease,
     color 0.15s ease,
-    border-color 0.15s ease,
     box-shadow 0.2s ease;
 }
 .ex-act-btn:hover {
-  border-color: var(--ui-border-strong);
-  background: var(--ui-surface-subtle);
+  background: color-mix(in srgb, var(--ui-text) 18%, var(--ui-surface));
   color: var(--ui-text);
 }
 .ex-act-btn.is-primary {
-  border-color: var(--ap-blue, var(--ui-primary));
   background: var(--ap-blue, var(--ui-primary));
   color: #fff;
 }
