@@ -244,22 +244,25 @@
 }
 
 /* Opción de faceta: píldora seleccionable (marca azul + etiqueta + contador).
-   Seleccionada → fondo azul claro, etiqueta en negrita y contador azul. */
+   Tipografía alineada con .cat-view (Vistas guardadas): 0.86rem, color muted,
+   activo en peso 550. Seleccionada → fondo azul claro, tinta plena y contador azul. */
 .cat-facet-opt {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.48rem 0.65rem;
-  border-radius: 10px;
+  gap: 0.55rem;
+  padding: 0.42rem 0.6rem;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 0.9rem;
-  color: var(--ui-text);
+  font-size: 0.86rem;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
   transition:
     background var(--ui-motion-fast) var(--ui-ease),
     color var(--ui-motion-fast) var(--ui-ease);
 }
 .cat-facet-opt:hover {
   background: var(--ui-surface-subtle);
+  color: var(--ui-text);
 }
 .cat-facet-opt.is-checked {
   background: var(--ui-brand-soft);
@@ -304,22 +307,19 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  letter-spacing: -0.01em;
-  font-weight: 500;
 }
+/* Activo: mismo realce que .cat-view.is-active (peso 550, tinta plena), no negrita dura. */
 .cat-facet-opt.is-checked .cat-facet-label {
-  font-weight: 700;
+  font-weight: 550;
   color: var(--ui-text);
 }
 .cat-facet-count {
   flex-shrink: 0;
-  font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
   color: var(--ui-text-soft);
 }
 .cat-facet-opt.is-checked .cat-facet-count {
   color: var(--ui-primary);
-  font-weight: 600;
 }
 
 /* ─── Tabla agrupada ───────────────────────────────────────────────────────── */
