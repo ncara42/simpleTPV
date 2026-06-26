@@ -290,7 +290,23 @@ function Home() {
                 notificationsActive={tab === 'notifications'}
                 search={<FunctionSearch onNavigate={navigateTo} />}
                 pageActions={<PageActionsSlot />}
-                pageNav={<PageNavSlot />}
+                pageNav={
+                  // En el lienzo del dashboard, las herramientas (Editar/Mover/Goma) viven DENTRO
+                  // del topbar, en la columna izquierda (a la altura de la isla central de
+                  // navegación), no en una sub-barra aparte. El resto de vistas usan su
+                  // sub-navegación normal (pestañas Catálogo/Familias…).
+                  tab === 'dashboard' && canvasBinding ? (
+                    <CanvasToolsMenu
+                      canvasRef={canvasBinding.canvasRef}
+                      canUndo={canvasBinding.canvasMeta.canUndo}
+                      canRedo={canvasBinding.canvasMeta.canRedo}
+                      drawActive={canvasBinding.canvasMeta.drawOpen}
+                      mode={canvasBinding.canvasMeta.mode}
+                    />
+                  ) : (
+                    <PageNavSlot />
+                  )
+                }
                 // Solo en el dashboard: botón «+» de añadir widget (como la campana) + conmutador
                 // cuadrícula↔lienzo, ambos arriba-derecha del topbar (clúster derecho).
                 endSlot={
@@ -302,21 +318,6 @@ function Home() {
                   ) : undefined
                 }
               />
-              {/* Sub-barra del lienzo: SOLO las herramientas (Editar/Mover/Goma), centradas, y únicamente
-              cuando hay lienzo libre activo. El conmutador de modo ya vive arriba-derecha (endSlot). */}
-              {tab === 'dashboard' && canvasBinding && (
-                <div className="topbar-subbar" data-testid="canvas-subbar">
-                  <div className="dash-canvas-toolbar">
-                    <CanvasToolsMenu
-                      canvasRef={canvasBinding.canvasRef}
-                      canUndo={canvasBinding.canvasMeta.canUndo}
-                      canRedo={canvasBinding.canvasMeta.canRedo}
-                      drawActive={canvasBinding.canvasMeta.drawOpen}
-                      mode={canvasBinding.canvasMeta.mode}
-                    />
-                  </div>
-                </div>
-              )}
               <div className="app-main-row">
                 <main className={`bo-main${isCanvas ? ' bo-main--canvas' : ' bo-main--surface'}`}>
                   {/* Ventas vuelve a ser page propia (I-17/D-06): el dashboard ya no
