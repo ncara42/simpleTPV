@@ -7,17 +7,9 @@
    ════════════════════════════════════════════════════════════════════════════ */
 
 /* ─── Encaje en la card de Inventario ──────────────────────────────────────────
-   A diferencia del Catálogo (que reserva respiro inferior para su barra de selección
-   flotante), Existencias no la tiene: igualamos el margen inferior al superior (0.4rem)
-   para que la card quede equilibrada y no «sobre» margen abajo. Las dos reglas van
-   juntas (padding de la superficie + alto de la página) para no dejar hueco ni desbordar.
-   Acotadas a Existencias vía :has(.inv-card-body--existencias). */
-.bo-main--surface:has(.inv-card-body--existencias) {
-  padding-bottom: 0.4rem;
-}
-.inventory-page:has(.inv-card-body--existencias) {
-  height: calc(100dvh - 60px - 0.8rem);
-}
+   Existencias hereda el encaje base de la card (alto de página y respiro inferior)
+   de inventory-card.css, igual que Catálogo y Familias: las tres comparten
+   `height: calc(100dvh - 60px - 1.9rem)`. Sin sobrescritura de altura propia. */
 
 /* ─── Tabla de existencias ─────────────────────────────────────────────────── */
 .ex-table {
