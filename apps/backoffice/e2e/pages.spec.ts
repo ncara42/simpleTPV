@@ -317,8 +317,11 @@ test('Ventas: ledger facetado con lista, ficha y split de cobro', async ({ page 
   await expect(page.getByTestId('sales-page')).toBeVisible();
   await expect(page.getByTestId('sales-facets')).toBeVisible();
   await expect(page.getByTestId('sales-list')).toBeVisible();
-  // Chips de cobro (Cobrado/Pendiente/Vencido) y al menos una venta en la lista.
+  // Chips de cobro (Cobrado/Pendiente/Vencido).
   await expect(page.getByTestId('sales-summary')).toBeVisible();
+  // El periodo arranca en «Hoy» (la línea base de la vista). Para ejercitar el ledger
+  // histórico de forma determinista, ampliamos a «Año» antes de aseverar filas.
+  await page.getByTestId('sales-period').getByTestId('period-opt-year').click();
   const rows = page.getByTestId('sales-row');
   // Aserción con reintento: el listado se carga de forma asíncrona (useQuery).
   await expect(rows.first()).toBeVisible();
@@ -331,15 +334,21 @@ test('Ventas: ledger facetado con lista, ficha y split de cobro', async ({ page 
   // Vista guardada «Vencidas»: el botón queda activo (aria-pressed).
   await page.getByTestId('sales-view-overdue').click();
   await expect(page.getByTestId('sales-view-overdue')).toHaveAttribute('aria-pressed', 'true');
-  // «Limpiar filtros» (carril) vuelve a todas las ventas.
+  // «Limpiar filtros» (carril) resetea vista, facetas y periodo a la línea base («Hoy»).
   await page.getByTestId('sales-clear').click();
   await expect(page.getByTestId('sales-view-all')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByTestId('sales-row').first()).toBeVisible();
+  await expect(page.getByTestId('sales-period').getByTestId('period-opt-today')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 });
 
 test('Ventas: «Registrar cobro» marca una factura a crédito como pagada', async ({ page }) => {
   await navTo(page, 'sales');
   await expect(page.getByTestId('sales-page')).toBeVisible();
+  // El periodo arranca en «Hoy»; ampliamos a «Año» para abarcar las facturas B2B a
+  // crédito que el seed reparte a lo largo del histórico.
+  await page.getByTestId('sales-period').getByTestId('period-opt-year').click();
   // Vista «Pendientes de cobro»: el seed crea facturas B2B a crédito.
   await page.getByTestId('sales-view-pending').click();
   const pendingRows = page.getByTestId('sales-row');

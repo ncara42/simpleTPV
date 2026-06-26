@@ -61,71 +61,73 @@ export function SalesList({
         </div>
       )}
 
-      <div className="ventas-list-head">
-        <span className="ventas-list-count" data-testid="sales-count">
-          {rows.length} ventas
-        </span>
-        <span className="ventas-list-sort">Recientes ↓</span>
-      </div>
-
-      {rows.length === 0 ? (
-        <div className="ventas-empty" data-testid="sales-empty">
-          <Search size={20} aria-hidden="true" />
-          <span className="ventas-empty-title">Sin ventas para estos filtros</span>
-          {hasFilters && (
-            <button type="button" className="ventas-btn" onClick={onClearFilters}>
-              Limpiar filtros
-            </button>
-          )}
+      <div className="ventas-list-body">
+        <div className="ventas-list-head">
+          <span className="ventas-list-count" data-testid="sales-count">
+            {rows.length} ventas
+          </span>
+          <span className="ventas-list-sort">Recientes ↓</span>
         </div>
-      ) : (
-        <div className="ventas-list-scroll">
-          {rows.map((row) => {
-            const cobro = cobroStatusOf(row);
-            const avatar = avatarOf(row);
-            return (
-              <button
-                key={row.id}
-                type="button"
-                className={`ventas-row${row.id === selectedId ? ' is-selected' : ''}`}
-                onClick={() => onSelect(row.id)}
-                data-testid="sales-row"
-              >
-                <span
-                  className="ventas-avatar"
-                  style={{ ['--avatar-bg' as string]: avatarBg(avatar.tone) }}
-                  aria-hidden="true"
-                >
-                  {avatar.initials}
-                </span>
-                <span className="ventas-row-main">
-                  <span className="ventas-row-name">{customerOf(row)}</span>
-                  <span className="ventas-row-sub">
-                    <span className="ventas-ticket">#{row.ticketNumber}</span> ·{' '}
-                    {hourFmt.format(new Date(row.createdAt))} ·{' '}
-                    {CHANNEL_SHORT[row.channel] ?? row.channel}
-                  </span>
-                </span>
-                <span className="ventas-row-end">
-                  <span className={`ventas-row-total${cobro === 'void' ? ' is-void' : ''}`}>
-                    {fmtEur(Number(row.total))}
-                  </span>
-                  <span className="ventas-pill" data-cobro={cobro}>
-                    {COBRO_LABELS[cobro]}
-                  </span>
-                </span>
+
+        {rows.length === 0 ? (
+          <div className="ventas-empty" data-testid="sales-empty">
+            <Search size={20} aria-hidden="true" />
+            <span className="ventas-empty-title">Sin ventas para estos filtros</span>
+            {hasFilters && (
+              <button type="button" className="ventas-btn" onClick={onClearFilters}>
+                Limpiar filtros
               </button>
-            );
-          })}
-        </div>
-      )}
+            )}
+          </div>
+        ) : (
+          <div className="ventas-list-scroll">
+            {rows.map((row) => {
+              const cobro = cobroStatusOf(row);
+              const avatar = avatarOf(row);
+              return (
+                <button
+                  key={row.id}
+                  type="button"
+                  className={`ventas-row${row.id === selectedId ? ' is-selected' : ''}`}
+                  onClick={() => onSelect(row.id)}
+                  data-testid="sales-row"
+                >
+                  <span
+                    className="ventas-avatar"
+                    style={{ ['--avatar-bg' as string]: avatarBg(avatar.tone) }}
+                    aria-hidden="true"
+                  >
+                    {avatar.initials}
+                  </span>
+                  <span className="ventas-row-main">
+                    <span className="ventas-row-name">{customerOf(row)}</span>
+                    <span className="ventas-row-sub">
+                      <span className="ventas-ticket">#{row.ticketNumber}</span> ·{' '}
+                      {hourFmt.format(new Date(row.createdAt))} ·{' '}
+                      {CHANNEL_SHORT[row.channel] ?? row.channel}
+                    </span>
+                  </span>
+                  <span className="ventas-row-end">
+                    <span className={`ventas-row-total${cobro === 'void' ? ' is-void' : ''}`}>
+                      {fmtEur(Number(row.total))}
+                    </span>
+                    <span className="ventas-pill" data-cobro={cobro}>
+                      {COBRO_LABELS[cobro]}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-      {capExtra > 0 && (
-        <div className="ventas-cap-note" data-testid="sales-cap-note">
-          Mostrando las {rows.length} ventas más recientes · {capExtra} más en el periodo. Afina con
-          los filtros o acota el periodo.
-        </div>
-      )}
+        {capExtra > 0 && (
+          <div className="ventas-cap-note" data-testid="sales-cap-note">
+            Mostrando las {rows.length} ventas más recientes · {capExtra} más en el periodo. Afina
+            con los filtros o acota el periodo.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

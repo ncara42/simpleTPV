@@ -10,7 +10,8 @@ import { listSales } from './lib/admin.js';
 import type { DashboardPeriod } from './lib/dashboard.js';
 import { useFeatures } from './lib/features.js';
 import { usePageActions } from './lib/pageActions.js';
-import { isDashboardPeriod, periodToRange } from './lib/period.js';
+import { usePageNav } from './lib/pageNav.js';
+import { parsePeriod, periodToRange } from './lib/period.js';
 import { collectSale, getReceiptHtml, getTicket } from './lib/sales.js';
 import {
   CHANNEL_LABELS,
@@ -58,10 +59,9 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // El periodo es URL-state (?period=): sobrevive al reload y es compartible.
-  const urlPeriod: DashboardPeriod | '' = isDashboardPeriod(searchParams.get('period'))
-    ? (searchParams.get('period') as DashboardPeriod)
-    : '';
+  // El periodo es URL-state (?period=): sobrevive al reload y es compartible. Por defecto
+  // arranca en «Hoy» (sin ?period= en la URL) — es la línea base de la vista.
+  const urlPeriod = parsePeriod(searchParams.get('period'), 'today');
   const [period, setPeriodState] = useState<DashboardPeriod | ''>(urlPeriod);
 
   const [view, setView] = useState<SavedViewId>('all');
@@ -133,7 +133,7 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
     setFacets((f) => ({ ...f, [key]: toggleInSet(f[key] as ReadonlySet<string>, optKey) }));
 
   const filtersActive =
-    hasActiveFilters(view, facets, search) || period !== '' || serverStoreId !== null;
+    hasActiveFilters(view, facets, search) || period !== 'today' || serverStoreId !== null;
 
   const clearFilters = (): void => {
     setView('all');
@@ -141,7 +141,7 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
     setSearch('');
     setServerStoreId(null);
     setSelectedId(null);
-    setPeriodState('');
+    setPeriodState('today');
     setSearchParams(
       (prev) => {
         const updated = new URLSearchParams(prev);
@@ -181,20 +181,23 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
       Number(r.total).toFixed(2),
     ]);
 
-  usePageActions(
-    <div className="ventas-topbar-actions">
-      <div className="sales-period-filter" data-testid="sales-period">
-        <PeriodSegmented value={period as DashboardPeriod} onChange={setPeriod} label="Periodo" />
-      </div>
-      {features.data_export && (
-        <CsvActionButton
-          kind="export"
-          label="Exportar"
-          onClick={() => setDataModal('export')}
-          testId="sales-export"
-        />
-      )}
+  // El filtro de periodo vive en el slot IZQUIERDO del topbar (pageNav), igual que las
+  // pestañas de Inventario; la acción Exportar queda en el clúster derecho (pageActions).
+  usePageNav(
+    <div className="sales-period-filter" data-testid="sales-period">
+      <PeriodSegmented value={period as DashboardPeriod} onChange={setPeriod} label="Periodo" />
     </div>,
+  );
+
+  usePageActions(
+    features.data_export ? (
+      <CsvActionButton
+        kind="export"
+        label="Exportar"
+        onClick={() => setDataModal('export')}
+        testId="sales-export"
+      />
+    ) : null,
   );
 
   return (
