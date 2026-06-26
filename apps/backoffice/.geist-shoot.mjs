@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import { chromium } from '@playwright/test';
 
 const DIR = process.env.SHOT_DIR;
