@@ -253,8 +253,8 @@ test('Stock: filtro por rotación re-renderiza la tabla (#96)', async ({ page })
   await navTo(page, 'stock');
   await expect(page.getByTestId('stock-table')).toBeVisible();
   const total = await page.getByTestId('stock-row').count();
-  // Filtrar por rotación baja: puede dejar 0 filas (estado vacío), nunca más que el total.
-  await selectByValue(page, 'stock-rotation', 'baja');
+  // Filtrar por rotación baja (faceta de casilla): puede dejar 0 filas, nunca más que el total.
+  await page.getByTestId('stock-rotation-baja').click();
   expect(await page.getByTestId('stock-row').count()).toBeLessThanOrEqual(total);
 });
 
@@ -278,11 +278,13 @@ test('Movimientos de stock viven en el detalle del producto (I-12, D-05)', async
 test('Stock: ajustar existencias PERSISTE tras recargar (E-01)', async ({ page }) => {
   await navTo(page, 'stock');
   await expect(page.getByTestId('stock-row').first()).toBeVisible();
-  // Abrir el desglose del primer producto y su primera tienda.
+  // Acotar el ámbito a una tienda concreta: así «Disponible» = stock de esa tienda
+  // y el ajuste actúa sobre ella (no sobre la suma global).
+  await page.getByTestId('existences-store').first().click();
   const firstRow = page.getByTestId('stock-row').first();
   const productName = (await firstRow.locator('td').first().innerText()).trim();
-  await firstRow.getByTestId('stock-heatmap').click();
-  await page.getByTestId('stock-store-cell').first().click();
+  // Abrir el ajuste desde el badge de disponible de la fila.
+  await firstRow.getByTestId('stock-disp').click();
   await expect(page.getByTestId('stock-adjust-form')).toBeVisible();
   const original = await page.getByTestId('stock-adjust-qty').inputValue();
   const target = String(Number(original) + 7);
@@ -295,12 +297,12 @@ test('Stock: ajustar existencias PERSISTE tras recargar (E-01)', async ({ page }
   await page.reload();
   await expect(page.getByTestId('topbar')).toBeVisible({ timeout: 15000 });
   await navTo(page, 'stock');
+  await page.getByTestId('existences-store').first().click();
   const row = page.getByTestId('stock-row').filter({ hasText: productName }).first();
   await expect(row).toBeVisible();
-  await row.getByTestId('stock-heatmap').click();
-  await expect(page.getByTestId('stock-store-cell').first()).toContainText(target);
+  await expect(row.getByTestId('stock-disp')).toContainText(target);
   // Restaurar el valor original para no contaminar el seed entre runs.
-  await page.getByTestId('stock-store-cell').first().click();
+  await row.getByTestId('stock-disp').click();
   await page.getByTestId('stock-adjust-qty').fill(original);
   await page.getByTestId('stock-adjust-reason').fill('e2e: restaurar');
   await page.getByTestId('stock-adjust-save').click();

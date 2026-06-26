@@ -3,32 +3,22 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { api } from './lib/auth.js';
-import { GlobalStockSection } from './stock/GlobalStockSection.js';
+import { ExistencesView } from './stock/ExistencesView.js';
 
 export function StockPage({
   initialStoreId,
-  initialSearch,
   search,
   onSearchChange,
-  familyId,
-  onFamilyChange,
-  headerSlot,
 }: {
   initialStoreId?: string | null;
-  initialSearch?: string | null;
   // S-02 fase E — filtro compartido del shell de Inventario (controlado).
   search?: string;
   onSearchChange?: (value: string) => void;
-  familyId?: string;
-  onFamilyChange?: (value: string) => void;
-  // Slot de cabecera del shell de Inventario: la toolbar se portalea ahí (no en la card).
-  headerSlot?: HTMLElement | null;
 }) {
   const qc = useQueryClient();
 
-  // Tiempo real (#33): el SSE invalida las queries de stock al recibir los
-  // eventos, así el panel se actualiza sin recargar. Las alertas viven ahora en
-  // Notificaciones (su propio SSE), no aquí.
+  // Tiempo real (#33): el SSE invalida las queries de stock al recibir los eventos,
+  // así la vista se actualiza sin recargar. Las alertas viven en Notificaciones.
   useEffect(() => {
     const unsubscribe = api.subscribeEvents((event) => {
       if (event.type === 'stock.changed') {
@@ -39,22 +29,15 @@ export function StockPage({
     return unsubscribe;
   }, [qc]);
 
-  // S-12: 'Inventario' es el término visible del dominio de existencias ('Stock'
-  // deja de usarse como nombre de página). El título visible lo pinta el shell
-  // desde el label de navigation.ts; esto alimenta el contexto de cabecera.
+  // S-12: 'Inventario' es el término visible del dominio de existencias. El título lo
+  // pinta el shell desde navigation.ts; esto alimenta el contexto de cabecera.
   usePageHeader('Inventario', 'Existencias por tienda en tiempo real');
 
   return (
-    <section className="catalog" data-testid="stock-page">
-      <GlobalStockSection
-        initialStoreId={initialStoreId ?? null}
-        initialSearch={initialSearch ?? null}
-        {...(search !== undefined ? { search } : {})}
-        {...(onSearchChange ? { onSearchChange } : {})}
-        {...(familyId !== undefined ? { familyId } : {})}
-        {...(onFamilyChange ? { onFamilyChange } : {})}
-        {...(headerSlot !== undefined ? { headerSlot } : {})}
-      />
-    </section>
+    <ExistencesView
+      initialStoreId={initialStoreId ?? null}
+      {...(search !== undefined ? { search } : {})}
+      {...(onSearchChange ? { onSearchChange } : {})}
+    />
   );
 }

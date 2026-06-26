@@ -110,8 +110,6 @@ export function InventoryPage({ initialStoreId, onOpenCatalogFamily }: Inventory
               initialStoreId={initialStoreId ?? null}
               search={search}
               onSearchChange={setSearch}
-              familyId={familyId}
-              onFamilyChange={setFamily}
             />
           )}
         </div>

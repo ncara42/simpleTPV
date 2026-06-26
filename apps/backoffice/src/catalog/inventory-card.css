@@ -118,17 +118,18 @@
   flex: 1;
   min-height: 0;
 }
-.inv-card-body--catalogo {
+/* Catálogo y Existencias comparten el mismo esqueleto facetado (carril + tabla en una
+   sola superficie, ocupando todo el alto de la card). */
+.inv-card-body--catalogo,
+.inv-card-body--existencias {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
-/* Familias y Existencias conservan su contenido y su geometría tal cual (su disposición
-   de dos columnas árbol+panel es sensible al ancho: estrecharla reflowa las filas). Por
-   eso el cuerpo solo respira en vertical, SIN padding horizontal que reduzca el ancho. */
-.inv-card-body--familias,
-.inv-card-body--existencias {
+/* Familias conserva su disposición de dos columnas (árbol+panel), sensible al ancho:
+   el cuerpo solo respira en vertical, SIN padding horizontal que reduzca el ancho. */
+.inv-card-body--familias {
   padding: 0.85rem 0 1.25rem;
 }
 
@@ -341,7 +342,8 @@
   top: 0;
   z-index: 2;
   background: var(--ui-surface);
-  padding: 0.7rem 0.9rem 0.6rem;
+  /* Cabecera de columnas compacta, igual que el thead de Existencias (.ex-thead th). */
+  padding: 0.55rem 0.9rem 0.5rem;
   font-size: 0.68rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -368,15 +370,15 @@
 /* Cabecera de grupo: familia · nº productos · total de unidades (plegable).
    Sticky sobre el <td> (no el <tr>) para que quede confinada al <tbody> del grupo:
    el header de una familia se pega mientras el usuario está en sus filas y desaparece
-   al entrar en la siguiente familia. top ≈ alto del <thead> (padding 1.3rem + contenido
-   ~0.9rem + borde 1px ≈ 2.3rem). */
+   al entrar en la siguiente familia. top ≈ alto del <thead> (padding 1.05rem + contenido
+   ~0.85rem + borde 1px ≈ 1.95rem). */
 .cat-group-head {
   cursor: pointer;
 }
 .cat-group-cell {
   padding: 0;
   position: sticky;
-  top: 2.3rem;
+  top: 1.95rem;
   z-index: 1;
   background: var(--ui-surface-subtle);
   /* border-collapse: collapse elimina los border en celdas sticky; box-shadow
@@ -392,8 +394,9 @@
   gap: 0.5rem;
   /* Sin punto de familia: el nombre arranca al MISMO sangrado que los nombres de producto
      (3.3rem) y el caret va en absoluto dentro del canalón izquierdo (alineado con el
-     checkbox-overlay de las filas). Así familia y productos comparten borde izquierdo. */
-  padding: 0.78rem 1.1rem 0.78rem 3.3rem;
+     checkbox-overlay de las filas). Así familia y productos comparten borde izquierdo.
+     Padding vertical compacto (0.5rem), igual que la cabecera de grupo de Existencias. */
+  padding: 0.5rem 1.1rem 0.5rem 3.3rem;
 }
 .cat-group-caret {
   position: absolute;
@@ -438,7 +441,8 @@
   background: var(--ui-brand-soft);
 }
 .cat-row td {
-  height: 3.4rem;
+  /* Misma altura compacta que las filas de Existencias (.ex-row td). */
+  height: 2.75rem;
   padding: 0 0.9rem;
   vertical-align: middle;
   color: var(--ui-text);
