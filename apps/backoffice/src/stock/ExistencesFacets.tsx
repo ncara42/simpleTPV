@@ -1,6 +1,7 @@
 import type { Rotation, Store } from '@simpletpv/auth';
 import { Input } from '@simpletpv/ui';
 
+import { type FacetDragSelect, useFacetDragSelect } from '../hooks/use-facet-drag-select.js';
 import {
   ALL_ROTATIONS,
   EX_VIEWS,
@@ -44,6 +45,7 @@ export function ExistencesFacets({
   onToggleFamily,
   onToggleRotation,
 }: ExistencesFacetsProps) {
+  const drag = useFacetDragSelect();
   return (
     <aside className="cat-rail" aria-label="Filtros de existencias" data-testid="existences-facets">
       <span className="search-field cat-rail-search">
@@ -82,6 +84,7 @@ export function ExistencesFacets({
             onToggle={() => onToggleStore(store.id)}
             label={store.name}
             testId="existences-store"
+            drag={drag}
           />
         ))}
       </section>
@@ -97,6 +100,7 @@ export function ExistencesFacets({
               label={family.name}
               color={familyColorVar(family.id)}
               count={count}
+              drag={drag}
             />
           ))}
         </section>
@@ -112,6 +116,7 @@ export function ExistencesFacets({
             label={ROTATION_LABELS[rotation]}
             count={facets.rotations[rotation]}
             testId={`stock-rotation-${rotation}`}
+            drag={drag}
           />
         ))}
       </section>
@@ -126,12 +131,24 @@ interface FacetOptionProps {
   color?: string;
   count?: number;
   testId?: string;
+  drag: FacetDragSelect;
 }
 
-function FacetOption({ checked, onToggle, label, color, count, testId }: FacetOptionProps) {
+function FacetOption({ checked, onToggle, label, color, count, testId, drag }: FacetOptionProps) {
   return (
-    <label className={`cat-facet-opt${checked ? ' is-checked' : ''}`} data-testid={testId}>
-      <input type="checkbox" className="cat-facet-input" checked={checked} onChange={onToggle} />
+    <label
+      className={`cat-facet-opt${checked ? ' is-checked' : ''}`}
+      data-testid={testId}
+      onMouseDown={() => drag.onItemMouseDown(checked, onToggle)}
+      onMouseEnter={() => drag.onItemMouseEnter(checked, onToggle)}
+    >
+      <input
+        type="checkbox"
+        className="cat-facet-input"
+        checked={checked}
+        onChange={onToggle}
+        onClick={drag.onItemClick}
+      />
       <span className="cat-check" aria-hidden="true" />
       <span className="cat-facet-label" style={color ? { color } : undefined}>
         {label}

@@ -1,6 +1,7 @@
 import type { Rotation } from '@simpletpv/auth';
 import { Input } from '@simpletpv/ui';
 
+import { type FacetDragSelect, useFacetDragSelect } from '../hooks/use-facet-drag-select.js';
 import {
   ALL_ROTATIONS,
   ALL_STATES,
@@ -63,6 +64,7 @@ export function CatalogFacets({
   search,
   onSearchChange,
 }: CatalogFacetsProps) {
+  const drag = useFacetDragSelect();
   return (
     <aside className="cat-rail" aria-label="Filtros del catálogo" data-testid="catalog-facets">
       <span className="search-field cat-rail-search">
@@ -103,6 +105,7 @@ export function CatalogFacets({
               label={family.name}
               labelColor={familyTextColor(family.id)}
               count={count}
+              drag={drag}
             />
           ))}
         </section>
@@ -118,6 +121,7 @@ export function CatalogFacets({
             label={STATE_LABELS[state]}
             labelColor={STATE_COLORS[state]}
             count={facets.states[state]}
+            drag={drag}
           />
         ))}
       </section>
@@ -131,6 +135,7 @@ export function CatalogFacets({
             onToggle={() => onToggleRotation(rotation)}
             label={ROTATION_LABELS[rotation]}
             count={facets.rotations[rotation]}
+            drag={drag}
           />
         ))}
       </section>
@@ -144,12 +149,23 @@ interface FacetOptionProps {
   label: string;
   labelColor?: string;
   count: number;
+  drag: FacetDragSelect;
 }
 
-function FacetOption({ checked, onToggle, label, labelColor, count }: FacetOptionProps) {
+function FacetOption({ checked, onToggle, label, labelColor, count, drag }: FacetOptionProps) {
   return (
-    <label className={`cat-facet-opt${checked ? ' is-checked' : ''}`}>
-      <input type="checkbox" className="cat-facet-input" checked={checked} onChange={onToggle} />
+    <label
+      className={`cat-facet-opt${checked ? ' is-checked' : ''}`}
+      onMouseDown={() => drag.onItemMouseDown(checked, onToggle)}
+      onMouseEnter={() => drag.onItemMouseEnter(checked, onToggle)}
+    >
+      <input
+        type="checkbox"
+        className="cat-facet-input"
+        checked={checked}
+        onChange={onToggle}
+        onClick={drag.onItemClick}
+      />
       <span className="cat-check" aria-hidden="true" />
       <span className="cat-facet-label" style={labelColor ? { color: labelColor } : undefined}>
         {label}

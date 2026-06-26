@@ -256,6 +256,9 @@
   font-size: 0.86rem;
   letter-spacing: -0.01em;
   color: var(--ui-text-muted);
+  /* Sin selección de texto: permite arrastrar el ratón para «pintar» la selección. */
+  user-select: none;
+  -webkit-user-select: none;
   transition:
     background var(--ui-motion-fast) var(--ui-ease),
     color var(--ui-motion-fast) var(--ui-ease);
@@ -269,6 +272,15 @@
 }
 .cat-facet-opt.is-checked:hover {
   background: var(--ui-brand-soft-2);
+}
+/* Seleccionadas contiguas → un solo bloque continuo: se aplanan las esquinas que se tocan. */
+.cat-facet-opt.is-checked:has(+ .cat-facet-opt.is-checked) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.cat-facet-opt.is-checked + .cat-facet-opt.is-checked {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 /* Anillo de foco sobre toda la píldora (en vez de solo la marca). */
 .cat-facet-opt:has(.cat-facet-input:focus-visible) {
