@@ -212,8 +212,8 @@ export function LoginForm({ onSubmit, initialEmail = '', initialPassword = '' }:
             <span className="login-card-logo-name">SimpleTPV</span>
           </div>
 
-          <h1 className="login-title">Inicia sesión</h1>
-          <p className="login-subtitle">Introduce tus credenciales para acceder al backoffice.</p>
+          <h1 className="login-title">Bienvenido de nuevo</h1>
+          <p className="login-subtitle">Accede para seguir donde lo dejaste.</p>
 
           <form className="login-form" onSubmit={handleSubmit} noValidate>
             <div className="login-field">
