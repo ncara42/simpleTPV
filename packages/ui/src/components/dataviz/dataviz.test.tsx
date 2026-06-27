@@ -32,11 +32,11 @@ describe('formatValue (es-ES)', () => {
   it('formatea decimal a máx 2', () => {
     expect(formatValue(3.766, 'decimal')).toBe('3,77');
   });
-  it('formatea unidades enteras con sufijo (4 dígitos sin agrupar, regla es-ES)', () => {
-    expect(formatValue(1200, 'units')).toBe('1200 uds.');
+  it('formatea unidades enteras con sufijo (agrupa también 4 dígitos, useGrouping always)', () => {
+    expect(formatValue(1200, 'units')).toBe('1.200 uds.');
   });
-  it('formatea entero: agrupa a partir de 5 dígitos, no en 4 (es-ES)', () => {
-    expect(formatValue(1087, 'integer')).toBe('1087');
+  it('formatea entero agrupando los miles también en 4 dígitos (useGrouping always)', () => {
+    expect(formatValue(1087, 'integer')).toBe('1.087');
     expect(formatValue(10870, 'integer')).toBe('10.870');
   });
   it('devuelve — para nulo/no finito', () => {

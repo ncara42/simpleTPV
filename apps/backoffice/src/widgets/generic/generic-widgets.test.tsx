@@ -66,7 +66,9 @@ describe('GenericKpi', () => {
       period: 'month',
     };
     renderWithClient(<GenericKpi spec={spec} />);
-    await waitFor(() => expect(screen.getByTestId('dash-generic-kpi')).toHaveTextContent('1234,5'));
+    await waitFor(() =>
+      expect(screen.getByTestId('dash-generic-kpi')).toHaveTextContent('1.234,5'),
+    );
     // El period viaja como query param.
     expect(getMock).toHaveBeenCalledWith('/dashboard/sales-kpis', { period: 'month' });
   });
