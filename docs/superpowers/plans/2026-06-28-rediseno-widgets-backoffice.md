@@ -4,6 +4,18 @@
 > Origen: handoff de Claude Design «SimpleTPV Widgets.dc.html»
 > (proyecto `264c1a67-5aa2-457c-b315-193fe16ad34e`). Idioma: español de España.
 
+## Estado global (2026-06-28)
+
+Rama `origin/feat/rediseno-widgets-backoffice`. **Hecho: tandas 0, 1, 2, 3, 5, 6, 7** (16 widgets
+nuevos + 2 clásicos conservados, 8 categorías de la galería pobladas). Cada tanda con su test
+(datos mock + paridad) y la puerta verde (typecheck + lint + unit + build). **Tanda 4 DEFERIDA**
+(faltan datos). **Pendiente: tandas 8, 9, 10, 11** (ver roadmap).
+
+⚠️ **Verificación visual pendiente:** los widgets se validan por test unitario (etiquetas/cifras
+renderizadas) + build de producción, pero **no se han revisado por captura en el dashboard real**
+en esta sesión (requiere levantar el dev server con API/auth o un arnés de Playwright). Antes de
+abrir el PR a `main`: revisar en claro y oscuro a 1440/768/375 y validar la galería del `+`.
+
 ## Objetivo
 
 Rehacer la galería de widgets del dashboard del **backoffice** con el lenguaje visual
