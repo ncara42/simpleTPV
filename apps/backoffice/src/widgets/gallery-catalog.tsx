@@ -186,6 +186,112 @@ function ThumbHeatmap(): ReactNode {
   );
 }
 
+// «Reparto por familia» (lista-familia): riel segmentado en la rampa azul + dos filas de leyenda.
+function ThumbShareBar(): ReactNode {
+  const segs = [50, 34, 24, 16]; // anchos en px (suman ~124); intensidad descendente.
+  let x = 6;
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {segs.map((w, i) => {
+        const rx = x;
+        x += w;
+        return (
+          <rect
+            key={i}
+            x={rx}
+            y={12}
+            width={w - 2}
+            height={12}
+            rx={2}
+            fill={`color-mix(in oklab, var(--ui-brand) ${100 - i * 22}%, var(--ui-surface))`}
+          />
+        );
+      })}
+      <rect x={6} y={34} width={6} height={6} rx={2} fill="var(--ui-brand)" />
+      <rect x={18} y={36} width={48} height={3} rx={1.5} fill={SOFT_BLUE} />
+      <rect x={6} y={48} width={6} height={6} rx={2} fill={SOFT_BLUE} />
+      <rect x={18} y={50} width={36} height={3} rx={1.5} fill={SOFT_BLUE} />
+    </svg>
+  );
+}
+
+// «Ranking de productos» (lista-rankings): tres filas con chip de puesto y barra proporcional.
+function ThumbLeaderboard(): ReactNode {
+  const rows = [
+    { w: 96, top: true },
+    { w: 70, top: false },
+    { w: 50, top: false },
+  ];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {rows.map((r, i) => {
+        const y = 8 + i * 18;
+        return (
+          <g key={i}>
+            <rect
+              x={6}
+              y={y}
+              width={11}
+              height={11}
+              rx={2.5}
+              fill={r.top ? 'var(--ui-brand)' : SOFT_BLUE}
+            />
+            <rect
+              x={22}
+              y={y + 2}
+              width={r.w}
+              height={7}
+              rx={2}
+              fill={r.top ? 'var(--ui-brand)' : SOFT_BLUE}
+            />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// «Mix por familia» (lista-mix): mapa de área (treemap) con un tile grande y tres menores.
+function ThumbTreemap(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <rect x={6} y={8} width={66} height={48} rx={3} fill="var(--ui-brand)" />
+      <rect
+        x={76}
+        y={8}
+        width={50}
+        height={23}
+        rx={3}
+        fill={`color-mix(in oklab, var(--ui-brand) 64%, var(--ui-surface))`}
+      />
+      <rect
+        x={76}
+        y={35}
+        width={30}
+        height={21}
+        rx={3}
+        fill={`color-mix(in oklab, var(--ui-brand) 42%, var(--ui-surface))`}
+      />
+      <rect x={110} y={35} width={16} height={21} rx={3} fill={SOFT_BLUE} />
+    </svg>
+  );
+}
+
 // Entradas de la galería (se amplía por tandas).
 export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
   // Sección 01 · KPIs
@@ -224,5 +330,27 @@ export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
     category: 'graficas',
     description: 'Intensidad de ventas por hora',
     thumbnail: <ThumbHeatmap />,
+  },
+  // Sección 03 · Listas
+  {
+    id: 'lista-familia',
+    label: 'Reparto por familia',
+    category: 'listas',
+    description: 'Cuotas de facturación por familia',
+    thumbnail: <ThumbShareBar />,
+  },
+  {
+    id: 'lista-rankings',
+    label: 'Ranking de productos',
+    category: 'listas',
+    description: 'Top de productos más vendidos',
+    thumbnail: <ThumbLeaderboard />,
+  },
+  {
+    id: 'lista-mix',
+    label: 'Mix por familia (treemap)',
+    category: 'listas',
+    description: 'Mapa de área por familia',
+    thumbnail: <ThumbTreemap />,
   },
 ];

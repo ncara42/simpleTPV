@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ITEM_SPECS } from '../lib/dashboard-layout.js';
-import { GALLERY_ENTRIES } from '../widgets/gallery-catalog.js';
+import { GALLERY_CATEGORIES, GALLERY_ENTRIES } from '../widgets/gallery-catalog.js';
 import { WidgetGalleryModal } from './WidgetGalleryModal.js';
 
 const ALL_IDS = GALLERY_ENTRIES.map((e) => e.id);
@@ -73,11 +73,14 @@ describe('WidgetGalleryModal', () => {
   });
 
   it('muestra el placeholder de roadmap en una categoría vacía', async () => {
+    // Elige dinámicamente una categoría aún sin widgets (se van rellenando por tandas).
+    const used = new Set(GALLERY_ENTRIES.map((e) => e.category));
+    const empty = GALLERY_CATEGORIES.find((c) => !used.has(c.id));
+    if (!empty) return; // rediseño completo: ya no hay categorías vacías.
+
     const user = userEvent.setup();
     renderModal();
-
-    // «03 · Listas» aún no tiene widgets (se rellena en una tanda posterior).
-    await user.click(screen.getByTestId('widget-gallery-cat-listas'));
+    await user.click(screen.getByTestId(`widget-gallery-cat-${empty.id}`));
 
     expect(screen.getByText(/Aún no hay widgets en esta categoría/i)).toBeInTheDocument();
   });

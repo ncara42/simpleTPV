@@ -3,6 +3,7 @@ import type { ReactElement } from 'react';
 import type { DashboardPeriod } from '../../lib/dashboard.js';
 import { HourHeatmap } from './graficas.js';
 import { ClassicKpiCard, ConnectedKpiGrid } from './kpis.js';
+import { FamilyShare, FamilyTreemap, ProductRanking } from './listas.js';
 import type { PanelProps } from './types.js';
 
 // Registro de RENDER de los widgets del rediseño. Una entrada por widget; se amplía por tandas (cada
@@ -15,6 +16,10 @@ export const WIDGET_PANELS: Record<string, (props: PanelProps) => ReactElement> 
   'kpi-classic': ClassicKpiCard,
   // Sección 02 · Gráficas (dash-bars/dash-hour son clásicos, fuera de este registro)
   'graf-heatmap': HourHeatmap,
+  // Sección 03 · Listas
+  'lista-familia': FamilyShare,
+  'lista-rankings': ProductRanking,
+  'lista-mix': FamilyTreemap,
 };
 
 // Ids de los widgets con render (para el test de paridad con el catálogo).

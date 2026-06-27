@@ -56,6 +56,10 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'kpi-classic': { w: 3, h: 2 },
   // Sección 02 · Gráficas (rediseño): tira de mapa de calor horario (ancha, una fila de celdas).
   'graf-heatmap': { w: 6, h: 2 },
+  // Sección 03 · Listas (rediseño): reparto por familia, ranking de productos y mix (treemap).
+  'lista-familia': { w: 4, h: 2 },
+  'lista-rankings': { w: 4, h: 3 },
+  'lista-mix': { w: 5, h: 3 },
 };
 
 const DEFAULT_SPEC = { w: 4, h: 2 };
