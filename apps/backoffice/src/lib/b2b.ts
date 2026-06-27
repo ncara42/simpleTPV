@@ -4,10 +4,12 @@ import type {
   CustomerInput,
   CustomerLedgerRow,
   PriceListDetail,
+  PriceListItem,
   PriceListSummary,
   WholesaleOrderDetail,
   WholesaleOrdersPage,
   WholesaleOrderStatus,
+  WholesaleOrderSummary,
 } from '@simpletpv/auth';
 
 import { api } from './auth.js';
@@ -18,10 +20,12 @@ export type {
   CustomerInput,
   CustomerLedgerRow,
   PriceListDetail,
+  PriceListItem,
   PriceListSummary,
   WholesaleOrderDetail,
   WholesaleOrdersPage,
   WholesaleOrderStatus,
+  WholesaleOrderSummary,
 };
 
 export function listCustomers(): Promise<Customer[]> {
@@ -58,6 +62,17 @@ export function createPriceList(name: string): Promise<PriceListSummary> {
   return api.post<PriceListSummary>('/price-lists', { name });
 }
 
+// PATCH /price-lists/:id — renombra o activa/desactiva la tarifa. El backend
+// (UpdatePriceList) acepta `name` y/o `active`; aplica COALESCE, así que omitir una
+// clave la deja intacta. Devuelve el objeto base (id, name, active); la vista
+// reconsulta `listPriceLists`/`getPriceList` para refrescar recuentos derivados.
+export function updatePriceList(
+  id: string,
+  input: { name?: string; active?: boolean },
+): Promise<{ id: string; name: string; active: boolean }> {
+  return api.patch<{ id: string; name: string; active: boolean }>(`/price-lists/${id}`, input);
+}
+
 export function deletePriceList(id: string): Promise<void> {
   return api.del(`/price-lists/${id}`);
 }
@@ -84,6 +99,24 @@ export function listWholesaleOrders(params: {
     ...(params.customerId ? { customerId: params.customerId } : {}),
     ...(params.page ? { page: String(params.page) } : {}),
   });
+}
+
+/** Trae TODOS los pedidos paginando hasta agotar (la pantalla de Pedidos los filtra en
+ *  cliente por estado/periodo/tarifa, así que necesita el conjunto completo). El bucle
+ *  está acotado por `totalItems` y por un tope de páginas defensivo. */
+export async function listAllWholesaleOrders(): Promise<WholesaleOrderSummary[]> {
+  const first = await listWholesaleOrders({ page: 1 });
+  const all: WholesaleOrderSummary[] = [...first.items];
+  const total = first.totalItems;
+  const MAX_PAGES = 200;
+  let page = 2;
+  while (all.length < total && page <= MAX_PAGES) {
+    const next = await listWholesaleOrders({ page });
+    if (next.items.length === 0) break;
+    all.push(...next.items);
+    page += 1;
+  }
+  return all;
 }
 
 export function getWholesaleOrder(id: string): Promise<WholesaleOrderDetail | null> {

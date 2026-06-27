@@ -1,40 +1,41 @@
-import { Badge, Button, DataTable, Input, Select } from '@simpletpv/ui';
+import { Button, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowUpRight, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { sileo } from 'sileo';
 
+import { useConfirm } from '../components/ConfirmProvider.js';
 import { Modal } from '../components/Modal.js';
-import { SectionToolbar } from '../components/SectionToolbar.js';
 import {
   createWholesaleOrder,
   getWholesaleOrder,
+  listAllWholesaleOrders,
   listCustomers,
-  listWholesaleOrders,
+  listPriceLists,
   updateWholesaleOrderStatus,
   type WholesaleOrderStatus,
 } from '../lib/b2b.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { usePageActions } from '../lib/pageActions.js';
 import { listProducts } from '../lib/products.js';
-
-const STATUS_LABEL: Record<WholesaleOrderStatus, string> = {
-  DRAFT: 'Borrador',
-  CONFIRMED: 'Confirmado',
-  SHIPPED: 'Enviado',
-  CANCELLED: 'Cancelado',
-};
-
-// Transiciones permitidas desde cada estado (espejo de wholesale-orders.service).
-const NEXT: Record<WholesaleOrderStatus, WholesaleOrderStatus[]> = {
-  DRAFT: ['CONFIRMED', 'CANCELLED'],
-  CONFIRMED: ['SHIPPED', 'CANCELLED'],
-  SHIPPED: [],
-  CANCELLED: [],
-};
-
-const eur = (n: number | string): string => `${Number(n).toFixed(2)} €`;
-const fmtDate = (iso: string): string => new Date(iso).toLocaleDateString('es-ES');
+import {
+  activeFacetCount,
+  daysSince,
+  EMPTY_FACETS,
+  type EstadoFilter,
+  filterOrders,
+  mergeOrders,
+  type OrderFacetState,
+  type OrderView,
+  type PeriodoFilter,
+  PVP_KEY,
+  searchBase,
+  statusLabel,
+  statusTone,
+} from './order-facets.js';
+import { OrderDetail } from './OrderDetail.js';
+import { type FacetGroupView, OrderFacets } from './OrderFacets.js';
+import { OrderList } from './OrderList.js';
 
 interface DraftLine {
   productId: string;
@@ -179,123 +180,175 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
   );
 }
 
-// Modal de detalle: líneas con precio congelado, total y transiciones de estado.
-function OrderDetailModal({ orderId, onClose }: { orderId: string; onClose: () => void }) {
+// Pedidos salientes: maestro-detalle de 3 columnas (carril de facetas · lista · ficha),
+// espejo de Clientes/Tarifas. Las sub-pestañas y el «Nuevo pedido» viven en la TopBar.
+export function OrdersSection() {
   const qc = useQueryClient();
-  const { data: order } = useQuery({
-    queryKey: ['b2b-order', orderId],
-    queryFn: () => getWholesaleOrder(orderId),
+  const confirm = useConfirm();
+  const now = useMemo(() => Date.now(), []);
+
+  const [facets, setFacets] = useState<OrderFacetState>(EMPTY_FACETS);
+  const [sortDesc, setSortDesc] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const { data: orders = [] } = useQuery({
+    queryKey: ['b2b-orders'],
+    queryFn: listAllWholesaleOrders,
+  });
+  const { data: customers = [] } = useQuery({
+    queryKey: ['b2b-customers'],
+    queryFn: listCustomers,
+  });
+  const { data: priceLists = [] } = useQuery({
+    queryKey: ['b2b-pricelists'],
+    queryFn: listPriceLists,
+  });
+
+  const views = useMemo(
+    () => mergeOrders(orders, customers, priceLists),
+    [orders, customers, priceLists],
+  );
+
+  const invalidateOrders = () => {
+    void qc.invalidateQueries({ queryKey: ['b2b-orders'] });
+    void qc.invalidateQueries({ queryKey: ['b2b-order'] });
+  };
+
+  // ── Lista filtrada + selección ─────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    const rows = filterOrders(views, facets, now);
+    const dir = sortDesc ? -1 : 1;
+    return rows
+      .slice()
+      .sort(
+        (a, b) =>
+          (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir ||
+          a.ref.localeCompare(b.ref),
+      );
+  }, [views, facets, now, sortDesc]);
+
+  const totalAmount = useMemo(() => filtered.reduce((acc, o) => acc + o.total, 0), [filtered]);
+
+  const selected = useMemo(() => {
+    if (selectedId) {
+      const found = views.find((o) => o.id === selectedId);
+      if (found) return found;
+    }
+    return filtered[0] ?? null;
+  }, [selectedId, views, filtered]);
+
+  const { data: detail = null, isLoading: detailLoading } = useQuery({
+    queryKey: ['b2b-order', selected?.id],
+    queryFn: () => getWholesaleOrder(selected!.id),
+    enabled: !!selected,
   });
 
   const statusMut = useMutation({
-    mutationFn: (status: WholesaleOrderStatus) => updateWholesaleOrderStatus(orderId, status),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['b2b-order', orderId] });
-      void qc.invalidateQueries({ queryKey: ['b2b-orders'] });
-      sileo.success({ title: 'Estado del pedido actualizado' });
+    mutationFn: (v: { id: string; status: WholesaleOrderStatus }) =>
+      updateWholesaleOrderStatus(v.id, v.status),
+    onSuccess: (_data, v) => {
+      invalidateOrders();
+      sileo.success({
+        title:
+          v.status === 'CANCELLED'
+            ? 'Pedido cancelado'
+            : `Pedido marcado como ${statusLabel(v.status).toLowerCase()}`,
+      });
     },
     onError: (e) => sileo.error({ title: formErrorMessage(e, 'No se pudo cambiar el estado') }),
   });
 
-  return (
-    <Modal onClose={onClose} className="modal--form" testId="b2b-order-detail">
-      <header className="modal-head">
-        <h3>Pedido {order ? `· ${order.customer.name}` : ''}</h3>
-      </header>
-      <div className="modal-body">
-        {!order ? (
-          <p className="catalog-empty">Cargando…</p>
-        ) : (
-          <>
-            <p className="muted">
-              {fmtDate(order.createdAt)} ·{' '}
-              <span className="role-badge">{STATUS_LABEL[order.status]}</span>
-            </p>
-            <DataTable
-              rows={order.lines}
-              rowKey={(l) => l.id}
-              footer={
-                <span>
-                  Total <strong>{eur(order.total)}</strong>
-                </span>
-              }
-              columns={[
-                {
-                  key: 'product',
-                  header: 'Producto',
-                  render: (l) => l.product?.name ?? l.productId,
-                },
-                {
-                  key: 'qty',
-                  header: 'Cant.',
-                  render: (l) => <span className="muted">{Number(l.qty)}</span>,
-                },
-                {
-                  key: 'price',
-                  header: 'Precio',
-                  render: (l) => <span className="muted">{eur(l.unitPrice)}</span>,
-                },
-                { key: 'subtotal', header: 'Subtotal', render: (l) => eur(l.lineTotal) },
-              ]}
-            />
-            {order.notes && <p className="muted">Notas: {order.notes}</p>}
-          </>
-        )}
-      </div>
-      <div className="modal-foot modal-foot--split">
-        <div className="b2b-status-actions">
-          {order &&
-            NEXT[order.status].map((next) =>
-              next === 'CANCELLED' ? (
-                <button
-                  key={next}
-                  type="button"
-                  className="link-btn"
-                  disabled={statusMut.isPending}
-                  onClick={() => statusMut.mutate(next)}
-                  data-testid={`b2b-order-to-${next}`}
-                >
-                  Cancelar pedido
-                </button>
-              ) : (
-                <Button
-                  key={next}
-                  type="button"
-                  disabled={statusMut.isPending}
-                  onClick={() => statusMut.mutate(next)}
-                  data-testid={`b2b-order-to-${next}`}
-                >
-                  {`Marcar ${STATUS_LABEL[next].toLowerCase()}`}
-                </Button>
-              ),
-            )}
-        </div>
-        <div className="modal-foot-actions">
-          <button type="button" onClick={onClose}>
-            Cerrar
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
+  // ── Facetas ────────────────────────────────────────────────────────────────────
+  const base = useMemo(() => searchBase(views, facets.search), [views, facets.search]);
+  const cnt = (pred: (o: OrderView) => boolean) => base.filter(pred).length;
 
-export function OrdersSection() {
-  const qc = useQueryClient();
-  const [statusFilter, setStatusFilter] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [detailId, setDetailId] = useState<string | null>(null);
+  // Tarifas presentes entre los pedidos (price lists usadas + PVP al final).
+  const tariffPairs = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const v of views) map.set(v.tariffKey, v.tariffName);
+    return [...map.entries()].sort((a, b) => {
+      if (a[0] === PVP_KEY) return 1;
+      if (b[0] === PVP_KEY) return -1;
+      return a[1].localeCompare(b[1]);
+    });
+  }, [views]);
 
-  const { data: page, isLoading } = useQuery({
-    queryKey: ['b2b-orders', statusFilter],
-    queryFn: () => listWholesaleOrders(statusFilter ? { status: statusFilter } : {}),
-  });
-  const orders = page?.items ?? [];
+  const groups: FacetGroupView[] = [
+    {
+      key: 'estado',
+      title: 'Estado',
+      options: [
+        { key: 'all', label: 'Todos', count: base.length, active: facets.estado === 'all' },
+        ...(['DRAFT', 'CONFIRMED', 'SHIPPED', 'CANCELLED'] as const).map((s) => ({
+          key: s,
+          label: statusLabel(s),
+          count: cnt((o) => o.status === s),
+          active: facets.estado === s,
+          tone: statusTone(s),
+        })),
+      ],
+    },
+    {
+      key: 'periodo',
+      title: 'Periodo',
+      options: [
+        { key: 'all', label: 'Cualquiera', count: base.length, active: facets.periodo === 'all' },
+        {
+          key: 'today',
+          label: 'Hoy',
+          count: cnt((o) => daysSince(o.createdAt, now) <= 0),
+          active: facets.periodo === 'today',
+        },
+        {
+          key: '7',
+          label: 'Últimos 7 días',
+          count: cnt((o) => daysSince(o.createdAt, now) < 7),
+          active: facets.periodo === '7',
+        },
+        {
+          key: '30',
+          label: 'Últimos 30 días',
+          count: cnt((o) => daysSince(o.createdAt, now) < 30),
+          active: facets.periodo === '30',
+        },
+      ],
+    },
+    {
+      key: 'tarifa',
+      title: 'Tarifa',
+      options: [
+        { key: '__all__', label: 'Todas', count: base.length, active: facets.tarifas.size === 0 },
+        ...tariffPairs.map(([key, name]) => ({
+          key,
+          label: name,
+          count: cnt((o) => o.tariffKey === key),
+          active: facets.tarifas.has(key),
+        })),
+      ],
+    },
+  ];
 
-  const invalidate = () => void qc.invalidateQueries({ queryKey: ['b2b-orders'] });
+  const toggleFacet = (groupKey: string, optKey: string) => {
+    setFacets((f) => {
+      if (groupKey === 'estado') {
+        return { ...f, estado: f.estado === optKey ? 'all' : (optKey as EstadoFilter) };
+      }
+      if (groupKey === 'periodo') {
+        return { ...f, periodo: f.periodo === optKey ? 'all' : (optKey as PeriodoFilter) };
+      }
+      // tarifa (multi): «Todas» limpia el set; el resto alterna su clave.
+      if (optKey === '__all__') return { ...f, tarifas: new Set<string>() };
+      const next = new Set(f.tarifas);
+      if (next.has(optKey)) next.delete(optKey);
+      else next.add(optKey);
+      return { ...f, tarifas: next };
+    });
+  };
 
-  // El «Nuevo pedido» vive en el clúster derecho de la TopBar (pageActions), junto a las
-  // sub-pestañas de B2bPage; los filtros (dirección + estado) quedan en la cabecera del panel.
+  const clearFilters = () => setFacets((f) => ({ ...EMPTY_FACETS, search: f.search }));
+
+  // ── Acciones de la TopBar (Nuevo pedido) ───────────────────────────
   usePageActions(
     <Button
       onClick={() => setCreating(true)}
@@ -306,81 +359,65 @@ export function OrdersSection() {
     </Button>,
   );
 
-  return (
-    <div className="table-panel" data-testid="b2b-orders">
-      <div className="dt-header-row dt-header-row--bare">
-        <SectionToolbar>
-          <Badge variant="success" className="gap-1" data-testid="b2b-orders-direction">
-            <ArrowUpRight size={13} aria-hidden="true" />
-            Salientes · a clientes
-          </Badge>
-          <Select
-            className="catalog-search"
-            value={statusFilter}
-            onChange={setStatusFilter}
-            ariaLabel="Filtrar por estado"
-            data-testid="b2b-orders-status"
-            options={[
-              { value: '', label: 'Todos los estados' },
-              { value: 'DRAFT', label: 'Borrador' },
-              { value: 'CONFIRMED', label: 'Confirmado' },
-              { value: 'SHIPPED', label: 'Enviado' },
-              { value: 'CANCELLED', label: 'Cancelado' },
-            ]}
-          />
-        </SectionToolbar>
-      </div>
+  const hasFilters = activeFacetCount(facets) > 0 || facets.search.trim() !== '';
 
-      <DataTable
-        data-testid="b2b-orders-table"
-        rowTestId="b2b-order-row"
-        rows={orders}
-        rowKey={(o) => o.id}
-        loading={isLoading}
-        emptyState={
-          <span className="catalog-empty">No hay pedidos mayoristas para este filtro.</span>
-        }
-        columns={[
-          {
-            key: 'date',
-            header: 'Fecha',
-            render: (o) => <span className="muted">{fmtDate(o.createdAt)}</span>,
-          },
-          { key: 'customer', header: 'Cliente', render: (o) => o.customerName },
-          {
-            key: 'status',
-            header: 'Estado',
-            render: (o) => <span className="role-badge">{STATUS_LABEL[o.status]}</span>,
-          },
-          {
-            key: 'lines',
-            header: 'Líneas',
-            render: (o) => <span className="muted">{o.lineCount}</span>,
-          },
-          { key: 'total', header: 'Total', render: (o) => eur(o.total) },
-          {
-            key: 'actions',
-            header: '',
-            align: 'right',
-            render: (o) => (
-              <button type="button" className="link-btn" onClick={() => setDetailId(o.id)}>
-                Ver
-              </button>
-            ),
-          },
-        ]}
-      />
+  return (
+    <div className="b2b-orders-page">
+      <div className="cust-card">
+        <div className="pl-layout">
+          <OrderFacets
+            search={facets.search}
+            onSearchChange={(v) => setFacets((f) => ({ ...f, search: v }))}
+            groups={groups}
+            onToggleFacet={toggleFacet}
+            showClear={activeFacetCount(facets) > 0}
+            clearCount={activeFacetCount(facets)}
+            onClear={clearFilters}
+          />
+          <OrderList
+            rows={filtered}
+            total={views.length}
+            totalAmount={totalAmount}
+            selectedId={selected?.id ?? null}
+            onSelect={setSelectedId}
+            sortDesc={sortDesc}
+            onToggleSort={() => setSortDesc((s) => !s)}
+            now={now}
+            hasFilters={hasFilters}
+            onClearFilters={clearFilters}
+          />
+          <OrderDetail
+            order={selected}
+            detail={detail}
+            detailLoading={detailLoading}
+            busy={statusMut.isPending}
+            now={now}
+            onAdvance={(status) => {
+              if (selected) statusMut.mutate({ id: selected.id, status });
+            }}
+            onCancel={async () => {
+              if (!selected) return;
+              const ok = await confirm({
+                title: 'Cancelar pedido',
+                message: `¿Cancelar el pedido ${selected.ref} de ${selected.customerName}? No podrá reactivarse.`,
+                confirmLabel: 'Cancelar pedido',
+                danger: true,
+              });
+              if (ok) statusMut.mutate({ id: selected.id, status: 'CANCELLED' });
+            }}
+          />
+        </div>
+      </div>
 
       {creating && (
         <NewOrderModal
           onClose={() => setCreating(false)}
           onCreated={() => {
-            invalidate();
+            invalidateOrders();
             setCreating(false);
           }}
         />
       )}
-      {detailId && <OrderDetailModal orderId={detailId} onClose={() => setDetailId(null)} />}
     </div>
   );
 }

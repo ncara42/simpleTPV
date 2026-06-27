@@ -10,6 +10,8 @@ import './catalog/families-nav.css';
 import './stock/existences.css';
 import './sales/ventas.css';
 import './b2b/customers.css';
+import './b2b/pricelists.css';
+import './b2b/pedidos.css';
 import './styles.css';
 
 import { LoginForm, type NavGroup, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';

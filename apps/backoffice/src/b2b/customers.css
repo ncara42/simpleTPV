@@ -295,8 +295,10 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  line-height: 1.25;
+  /* Misma separación nombre↔subtítulo y line-height que la cabecera de la ficha de
+     Ventas (`.ventas-detail-titles`: gap 0.05rem; name/meta-line a line-height 1.2). */
+  gap: 0.05rem;
+  line-height: 1.2;
 }
 .cust-detail-name-row {
   display: flex;
@@ -305,7 +307,9 @@
   flex-wrap: wrap;
 }
 .cust-detail-name {
-  font-size: 1.15rem;
+  /* font-size + line-height igualados a la ficha de Ventas (`.ventas-detail-name`). */
+  font-size: 1rem;
+  line-height: 1.2;
   font-weight: 650;
   letter-spacing: -0.01em;
   color: var(--ui-text);
@@ -315,7 +319,9 @@
   align-items: center;
   gap: 0.4rem;
   flex-wrap: wrap;
+  /* font-size + line-height igualados a Ventas (`.ventas-detail-meta-line`). */
   font-size: 0.78rem;
+  line-height: 1.2;
   color: var(--ui-text-soft);
 }
 .cust-detail-actions {
@@ -323,6 +329,23 @@
   align-items: center;
   gap: 0.5rem;
   flex: 0 0 auto;
+}
+/* Botones de la cabecera de la ficha (Editar · Borrar): mismo tratamiento que la
+   cabecera de Tarifas — solo icono, cuadrados y compactos, alineados a la derecha. */
+.cust-detail-head .cust-detail-actions {
+  gap: 0.35rem;
+}
+.cust-detail-head .cust-detail-actions .ventas-btn {
+  height: 2rem;
+  padding: 0 0.6rem;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+}
+.cust-detail-head .cust-detail-actions .ventas-btn--icon {
+  width: 2rem;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
 }
 /* Botón «Borrar» de la ficha: mismo botón base que «Editar» (`.ventas-btn`), pero
    neutro en reposo y rojo (peligro) al pasar el ratón / enfocar. Reemplaza a la

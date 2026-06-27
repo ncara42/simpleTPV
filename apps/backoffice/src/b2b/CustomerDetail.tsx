@@ -162,21 +162,23 @@ export function CustomerDetail({
         <div className="cust-detail-actions">
           <button
             type="button"
-            className="ventas-btn"
+            className="ventas-btn ventas-btn--icon"
             onClick={() => onEdit(c)}
             data-testid="b2b-customer-edit"
+            title="Editar"
+            aria-label="Editar cliente"
           >
-            <Pencil size={14} aria-hidden="true" />
-            Editar
+            <Pencil size={15} aria-hidden="true" />
           </button>
           <button
             type="button"
-            className="ventas-btn cust-del-btn"
+            className="ventas-btn ventas-btn--icon cust-del-btn"
             onClick={() => onDelete(c)}
             data-testid="b2b-customer-delete"
+            title="Borrar"
+            aria-label="Borrar cliente"
           >
-            <Trash2 size={14} aria-hidden="true" />
-            Borrar
+            <Trash2 size={15} aria-hidden="true" />
           </button>
         </div>
       </div>
