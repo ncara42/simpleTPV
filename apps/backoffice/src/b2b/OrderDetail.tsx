@@ -1,6 +1,7 @@
 import type { WholesaleOrderDetail } from '@simpletpv/auth';
 import { Check, PackageOpen, X } from 'lucide-react';
 
+import { useScrollShadow } from '../hooks/use-scroll-shadow.js';
 import { fmtEur } from '../lib/format.js';
 import {
   fmtOrderDate,
@@ -69,6 +70,7 @@ export function OrderDetail({
   onAdvance,
   onCancel,
 }: OrderDetailProps) {
+  const { scrollRef, sentinelRef, showShadow } = useScrollShadow();
   if (!order) {
     return (
       <div className="pl-detail" data-testid="b2b-order-detail">
@@ -102,7 +104,10 @@ export function OrderDetail({
   ];
 
   return (
-    <div className="pl-detail" data-testid="b2b-order-detail">
+    <div
+      className={`pl-detail scroll-shadow-host${showShadow ? ' has-scroll-shadow' : ''}`}
+      data-testid="b2b-order-detail"
+    >
       <div className="pl-detail-head">
         <div className="cust-detail-id">
           <span
@@ -167,7 +172,7 @@ export function OrderDetail({
         </div>
       </div>
 
-      <div className="pl-detail-body">
+      <div className="pl-detail-body" ref={scrollRef}>
         {/* Stepper de seguimiento. */}
         <div className="ped-stepper-card">
           <div className="ped-stepper">
@@ -251,6 +256,7 @@ export function OrderDetail({
             <p className="ped-notes">{detail.notes}</p>
           </div>
         )}
+        <span className="scroll-shadow-sentinel" ref={sentinelRef} aria-hidden="true" />
       </div>
     </div>
   );

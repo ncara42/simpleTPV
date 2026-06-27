@@ -1,5 +1,6 @@
 import { Copy, Pencil, Plus, Tags, Trash2 } from 'lucide-react';
 
+import { useScrollShadow } from '../hooks/use-scroll-shadow.js';
 import { fmtEur } from '../lib/format.js';
 import {
   discountLabel,
@@ -47,6 +48,7 @@ export function PriceListDetail({
   onEditItem,
   onRemoveItem,
 }: PriceListDetailProps) {
+  const { scrollRef, sentinelRef, showShadow } = useScrollShadow();
   if (!priceList) {
     return (
       <div className="pl-detail" data-testid="b2b-pricelist-detail">
@@ -88,7 +90,10 @@ export function PriceListDetail({
   ];
 
   return (
-    <div className="pl-detail" data-testid="b2b-pricelist-detail">
+    <div
+      className={`pl-detail scroll-shadow-host${showShadow ? ' has-scroll-shadow' : ''}`}
+      data-testid="b2b-pricelist-detail"
+    >
       <div className="pl-detail-head">
         <div className="cust-detail-id">
           <span className="cust-avatar cust-avatar--lg" aria-hidden="true">
@@ -157,7 +162,7 @@ export function PriceListDetail({
         </div>
       </div>
 
-      <div className="pl-detail-body">
+      <div className="pl-detail-body" ref={scrollRef}>
         <div className="cust-stats">
           {stats.map((s) => (
             <div className="cust-stat" key={s.label}>
@@ -265,6 +270,7 @@ export function PriceListDetail({
             </div>
           )}
         </div>
+        <span className="scroll-shadow-sentinel" ref={sentinelRef} aria-hidden="true" />
       </div>
     </div>
   );

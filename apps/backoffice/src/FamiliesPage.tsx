@@ -12,7 +12,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { type ReactNode, useMemo, useRef, useState } from 'react';
 
 import { AddExistingProductsModal } from './components/AddExistingProductsModal.js';
 import { useConfirm } from './components/ConfirmProvider.js';
@@ -22,6 +22,7 @@ import {
   ProductFormModal,
   type ProductFormState,
 } from './components/ProductFormModal.js';
+import { useScrollShadow } from './hooks/use-scroll-shadow.js';
 import {
   createFamily,
   deleteFamily,
@@ -91,6 +92,22 @@ interface NavColumn {
   color: string | null;
   families: FamilyNode[];
   products: Product[];
+}
+
+// Cuerpo scrollable de cada columna del miller, con la sombra de scroll inferior. Como las
+// columnas se generan en un map, cada cuerpo necesita su propio `useScrollShadow`; de ahí
+// este componente. El host (`.mc-col-bodywrap`) queda POR ENCIMA del pie de columna, así la
+// sombra se difumina al borde del cuerpo, no del pie.
+function ColumnBody({ children }: { children: ReactNode }) {
+  const { scrollRef, sentinelRef, showShadow } = useScrollShadow();
+  return (
+    <div className={`mc-col-bodywrap scroll-shadow-host${showShadow ? ' has-scroll-shadow' : ''}`}>
+      <div className="mc-col-body" ref={scrollRef}>
+        {children}
+        <span className="scroll-shadow-sentinel" ref={sentinelRef} aria-hidden="true" />
+      </div>
+    </div>
+  );
 }
 
 export function FamiliesPage({
@@ -528,7 +545,7 @@ export function FamiliesPage({
                 const isEmpty = col.families.length === 0 && col.products.length === 0;
                 return (
                   <div className="mc-col" key={col.ownerId ?? '__root__'}>
-                    <div className="mc-col-body">
+                    <ColumnBody>
                       {col.families.map((fam) => (
                         <NavFamilyRow
                           key={fam.id}
@@ -573,7 +590,7 @@ export function FamiliesPage({
                           {q ? 'Sin coincidencias.' : 'Sin productos.'}
                         </p>
                       )}
-                    </div>
+                    </ColumnBody>
 
                     {col.ownerId && (
                       <div className="mc-col-foot">

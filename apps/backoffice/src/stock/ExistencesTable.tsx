@@ -1,6 +1,7 @@
 import { ArrowLeftRight, ChevronDown, Pencil } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
+import { ScrollShadowCell } from '../components/ScrollShadowCell.js';
 import {
   type ExGroup,
   type ExRow,
@@ -43,7 +44,7 @@ export function ExistencesTable({
   const isEmpty = groups.length === 0;
 
   return (
-    <div className="cat-main ex-main" data-testid="stock-table">
+    <ScrollShadowCell className="cat-main ex-main" data-testid="stock-table">
       <table className="ex-table">
         <colgroup>
           <col className="ex-col-name" />
@@ -99,7 +100,7 @@ export function ExistencesTable({
         })}
       </table>
       {isEmpty && <div className="cat-empty ex-empty">{empty}</div>}
-    </div>
+    </ScrollShadowCell>
   );
 }
 

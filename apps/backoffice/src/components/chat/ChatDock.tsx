@@ -9,7 +9,6 @@ import { ChatConversationList } from './ChatConversationList.js';
 import { ChatHeader } from './ChatHeader.js';
 import { ChatMessages } from './ChatMessages.js';
 import { Context } from './Context.js';
-import { ModelEffortMenu } from './ModelEffortMenu.js';
 import { PromptComposer } from './PromptComposer.js';
 import { type CanvasApplyResult, useChat } from './useChat.js';
 import type { ViewContext } from './view-context.js';
@@ -228,17 +227,6 @@ export function ChatDock({
           // En hero el panel (con su cabecera: historial/nueva) es permanente, así que el toggle
           // del input sobra. En barra compacta sí lo mostramos para abrir/cerrar la conversación.
           leading={hero ? undefined : leading}
-          trailing={
-            !noAi && chat.models.length > 0 ? (
-              <ModelEffortMenu
-                models={chat.models}
-                model={chat.model}
-                onModelChange={chat.setModel}
-                effort={chat.effort}
-                onEffortChange={chat.setEffort}
-              />
-            ) : undefined
-          }
         />
       </div>
     </div>

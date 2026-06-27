@@ -64,9 +64,10 @@
   flex: 1;
   min-height: 0;
 }
-.cust-layout > .cat-rail {
+/* El carril va envuelto en `.scroll-shadow-cell` (sombra de scroll); el shell toma la
+   celda y ocupa ambas filas. `.cat-rail` scrollea dentro (ver styles/scroll-shadow.css). */
+.cust-layout > .scroll-shadow-cell {
   grid-row: 1 / 3;
-  min-height: 0;
 }
 
 /* ─── Columna central: lista de clientes ──────────────────────────────────────── */
@@ -88,6 +89,8 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* Sombra de scroll (styles/scroll-shadow.css): la lista se difumina a su propio fondo. */
+  --scroll-shadow-bg: var(--ui-surface-subtle);
 }
 /* Si la fila 1 del subgrid la estira la cabecera de la ficha, las cards centran su
    contenido (sin hueco inferior). */
@@ -627,7 +630,7 @@
     grid-template-columns: 14rem minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr);
   }
-  .cust-layout > .cat-rail {
+  .cust-layout > .scroll-shadow-cell {
     grid-row: 1 / 4;
   }
   .cust-list {

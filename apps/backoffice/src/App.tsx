@@ -12,6 +12,8 @@ import './sales/ventas.css';
 import './b2b/customers.css';
 import './b2b/pricelists.css';
 import './b2b/pedidos.css';
+import './promotions/promotions.css';
+import './styles/scroll-shadow.css';
 import './styles.css';
 
 import { LoginForm, type NavGroup, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
@@ -374,14 +376,15 @@ function Home() {
                 </main>
               </div>
               {/* Asistente unificado a nivel de shell: input + (en el Dashboard) menú «+» de
-              herramientas del lienzo. Presente en todas las views MENOS Inventario, Ventas y
-              Clientes B2B: en Inventario la franja inferior queda reservada para la barra de
-              acciones de selección; Ventas y Clientes B2B son ledgers facetados a pantalla completa
-              (3 columnas) que ocupan todo el alto, así que el dock se oculta (el acceso al asistente
-              se reubicará más adelante). El binding del lienzo lo registra DashboardPage vía
-              canvas-bridge. La vista activa define su saludo, sugerencias y el contexto que viaja al
-              backend. */}
-              {tab !== 'inventory' && tab !== 'sales' && tab !== 'b2b' && (
+              herramientas del lienzo. Presente en todas las views MENOS Inventario, Ventas,
+              Clientes B2B y Promociones: en Inventario la franja inferior queda reservada para la
+              barra de acciones de selección; Ventas y Clientes B2B son ledgers facetados a pantalla
+              completa (3 columnas) que ocupan todo el alto; en Promociones el dock se oculta a
+              propósito (la vista gestiona reglas a pantalla completa). En todos esos casos el acceso
+              al asistente se reubicará más adelante. El binding del lienzo lo registra DashboardPage
+              vía canvas-bridge. La vista activa define su saludo, sugerencias y el contexto que
+              viaja al backend. */}
+              {tab !== 'inventory' && tab !== 'sales' && tab !== 'b2b' && tab !== 'promotions' && (
                 <AssistantDock view={viewContextFor(tab)} />
               )}
             </PageHeaderProvider>

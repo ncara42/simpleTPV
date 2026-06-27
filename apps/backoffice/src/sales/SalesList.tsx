@@ -1,5 +1,6 @@
 import { Search } from 'lucide-react';
 
+import { useScrollShadow } from '../hooks/use-scroll-shadow.js';
 import type { SalesViewRow } from '../lib/admin.js';
 import { fmtEur } from '../lib/format.js';
 import {
@@ -48,6 +49,7 @@ export function SalesList({
   onLoadMore,
   loadingMore,
 }: SalesListProps) {
+  const { scrollRef, sentinelRef, showShadow } = useScrollShadow();
   return (
     <div className="ventas-list" data-testid="sales-list">
       {showSummary && (
@@ -73,7 +75,9 @@ export function SalesList({
         </div>
       )}
 
-      <div className="ventas-list-body">
+      <div
+        className={`ventas-list-body scroll-shadow-host${showShadow ? ' has-scroll-shadow' : ''}`}
+      >
         <div className="ventas-list-head">
           <span className="ventas-list-count" data-testid="sales-count">
             {totalCount !== undefined && totalCount > rows.length
@@ -104,7 +108,7 @@ export function SalesList({
             )}
           </div>
         ) : (
-          <div className="ventas-list-scroll">
+          <div className="ventas-list-scroll" ref={scrollRef}>
             {rows.map((row) => {
               const cobro = cobroStatusOf(row);
               const avatar = avatarOf(row);
@@ -156,6 +160,9 @@ export function SalesList({
                 </button>
               </div>
             )}
+            {/* Centinela de fin de scroll: cuando entra en el viewport del scroller,
+                estamos al fondo y la sombra inferior se difumina. */}
+            <span className="scroll-shadow-sentinel" ref={sentinelRef} aria-hidden="true" />
           </div>
         )}
       </div>

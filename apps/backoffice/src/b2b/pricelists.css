@@ -30,7 +30,9 @@
   flex: 1;
   min-height: 0;
 }
-.pl-layout > .cat-rail {
+/* El carril va envuelto en `.scroll-shadow-cell` (sombra de scroll, ver
+   styles/scroll-shadow.css); `.cat-rail` scrollea dentro. */
+.pl-layout > .scroll-shadow-cell {
   min-height: 0;
 }
 
@@ -42,6 +44,8 @@
   border-left: 1px solid var(--ui-border);
   border-right: 1px solid var(--ui-border);
   background: var(--ui-surface-subtle);
+  /* Sombra de scroll: la lista se difumina a su propio fondo. */
+  --scroll-shadow-bg: var(--ui-surface-subtle);
 }
 .pl-list-head {
   display: flex;
@@ -317,7 +321,7 @@
     grid-template-columns: 14rem minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto;
   }
-  .pl-layout > .cat-rail {
+  .pl-layout > .scroll-shadow-cell {
     grid-row: 1 / 3;
   }
   .pl-detail {

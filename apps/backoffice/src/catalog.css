@@ -2594,7 +2594,7 @@
 .promo-discount {
   display: inline-block;
   padding: 0.12rem 0.55rem;
-  border-radius: 999px;
+  border-radius: var(--ui-radius-xs);
   font-size: 0.8rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;

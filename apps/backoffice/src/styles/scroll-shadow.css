@@ -1,0 +1,84 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   SOMBRA DE SCROLL (reutilizable, global) — pista visual de «hay más contenido abajo».
+   Un degradado en el borde inferior del scroller que aparece cuando hay overflow y se
+   difumina al llegar al final. La detección la hace `useScrollShadow` (hooks/) con un
+   IntersectionObserver sobre un centinela `.scroll-shadow-sentinel` (último hijo del
+   scroller): mientras el centinela no esté a la vista hay más abajo → `.has-scroll-shadow`.
+
+   USO:
+   - El HOST es el contenedor NO scrollable (`.scroll-shadow-host`); el scroller
+     (overflow:auto) va DENTRO y el centinela es su último hijo.
+   - El color al que se difumina se configura con `--scroll-shadow-bg` (por defecto la
+     superficie de la card); ponlo en el host cuando el fondo sea otro (p. ej. la columna
+     de la lista usa `--ui-surface-subtle`).
+   - Para un scroller que ES a la vez celda del layout (el carril `.cat-rail`, la tabla
+     `.cat-main`…), envuélvelo en `.scroll-shadow-cell` (host no scrollable que toma la
+     celda) y, si el layout tenía una regla de colocación para el scroller, reapúntala a
+     `.scroll-shadow-cell`. El componente `<ScrollShadowCell>` hace este envoltorio.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.scroll-shadow-host {
+  position: relative;
+  /* Color al que se difumina la sombra (cada host puede sobrescribirlo). */
+  --scroll-shadow-bg: var(--ui-surface);
+}
+.scroll-shadow-host::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 4.5rem;
+  pointer-events: none;
+  z-index: 3;
+  /* Degradado «scrim» con curva de suavizado (no una rampa lineal): los tramos siguen una
+     cubic-ease, así el arranque arriba es imperceptible (sin la «línea» del fade) y la
+     opacidad sube de forma natural hacia el borde. Cada parada es el MISMO color del fondo
+     a distinto alfa vía `color-mix(... transparent)` — NO se difumina a `transparent`
+     directamente (que es negro transparente y ensuciaría los medios tonos con un velo gris).
+     `color-mix` premultiplica el alfa, así que el RGB se conserva y el fundido es limpio. */
+  background: linear-gradient(
+    to top,
+    var(--scroll-shadow-bg) 0%,
+    color-mix(in srgb, var(--scroll-shadow-bg) 73.8%, transparent) 19%,
+    color-mix(in srgb, var(--scroll-shadow-bg) 54.1%, transparent) 34%,
+    color-mix(in srgb, var(--scroll-shadow-bg) 38.2%, transparent) 47%,
+    color-mix(in srgb, var(--scroll-shadow-bg) 27.8%, transparent) 56.5%,
+    color-mix(in srgb, var(--scroll-shadow-bg) 19.4%, transparent) 65%,
+    color-mix(in srgb, var(--scroll-shadow-bg) 12.6%, transparent) 73%,
+    color-mix(in srgb, var(--scroll-shadow-bg) 7.5%, transparent) 80.2%,
+    color-mix(in srgb, var(--scroll-shadow-bg) 4.2%, transparent) 86.1%,
+    color-mix(in srgb, var(--scroll-shadow-bg) 2.1%, transparent) 91%,
+    color-mix(in srgb, var(--scroll-shadow-bg) 0.8%, transparent) 95.2%,
+    color-mix(in srgb, var(--scroll-shadow-bg) 0.2%, transparent) 98.2%,
+    transparent 100%
+  );
+  opacity: 0;
+  transition: opacity 300ms var(--ui-ease);
+}
+.scroll-shadow-host.has-scroll-shadow::after {
+  opacity: 1;
+}
+
+/* Centinela de fin de scroll: marcador de alto mínimo, sin afectar al layout. Va como
+   ÚLTIMO hijo dentro del scroller. */
+.scroll-shadow-sentinel {
+  display: block;
+  height: 1px;
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+
+/* Envoltorio NO scrollable para un scroller que es a la vez celda del layout (carril
+   `.cat-rail`, tabla `.cat-main`, lista…). El shell toma la celda (grid/flex) y el scroller
+   —su único hijo— la rellena y scrollea dentro. La COLOCACIÓN en el grid (grid-row,
+   responsive) la define cada layout reapuntando su regla al shell. `min-width: 0` evita que
+   una columna flexible (1fr) se desborde por su contenido. */
+.scroll-shadow-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.scroll-shadow-cell > * {
+  flex: 1;
+  min-height: 0;
+}

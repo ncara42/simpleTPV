@@ -153,6 +153,16 @@
   flex-direction: column;
   border-right: 1px solid var(--ui-border);
 }
+/* Envoltorio del cuerpo de columna: toma el `flex: 1` que tenía el cuerpo y aloja la sombra
+   de scroll (`.scroll-shadow-host`, ver styles/scroll-shadow.css). El cuerpo scrollea
+   dentro; el pie de columna queda fuera, debajo, así la sombra se difumina al borde del
+   cuerpo (no del pie). */
+.mc-col-bodywrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 .mc-col-body {
   flex: 1;
   min-height: 0;

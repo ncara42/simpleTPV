@@ -1,6 +1,7 @@
 import type { SaleTicket } from '@simpletpv/auth';
 import { Check, FileText, X } from 'lucide-react';
 
+import { useScrollShadow } from '../hooks/use-scroll-shadow.js';
 import type { SalesViewRow } from '../lib/admin.js';
 import { fmtEur } from '../lib/format.js';
 import {
@@ -124,6 +125,7 @@ export function SalesDetail({
   onCollect,
   onViewInvoice,
 }: SalesDetailProps) {
+  const { scrollRef, sentinelRef, showShadow } = useScrollShadow();
   if (!row) {
     return (
       <div className="ventas-detail" data-testid="sales-detail">
@@ -158,7 +160,10 @@ export function SalesDetail({
   ];
 
   return (
-    <div className="ventas-detail" data-testid="sales-detail">
+    <div
+      className={`ventas-detail scroll-shadow-host${showShadow ? ' has-scroll-shadow' : ''}`}
+      data-testid="sales-detail"
+    >
       <div className="ventas-detail-head">
         <div className="ventas-detail-id">
           <span
@@ -186,7 +191,7 @@ export function SalesDetail({
         </div>
       </div>
 
-      <div className="ventas-detail-body">
+      <div className="ventas-detail-body" ref={scrollRef}>
         <div className="ventas-meta-grid">
           {meta.map((m) => (
             <div className="ventas-meta" key={m.label}>
@@ -264,6 +269,9 @@ export function SalesDetail({
             Ver factura
           </button>
         </div>
+
+        {/* Centinela de fin de scroll: difumina la sombra inferior al llegar al final. */}
+        <span className="scroll-shadow-sentinel" ref={sentinelRef} aria-hidden="true" />
       </div>
     </div>
   );

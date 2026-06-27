@@ -1,5 +1,6 @@
 import { PackageOpen } from 'lucide-react';
 
+import { useScrollShadow } from '../hooks/use-scroll-shadow.js';
 import { fmtEurCompact } from '../lib/format.js';
 import { type OrderView, relDays, statusLabel, statusTone } from './order-facets.js';
 
@@ -34,8 +35,12 @@ export function OrderList({
   hasFilters,
   onClearFilters,
 }: OrderListProps) {
+  const { scrollRef, sentinelRef, showShadow } = useScrollShadow();
   return (
-    <div className="pl-list" data-testid="b2b-orders">
+    <div
+      className={`pl-list scroll-shadow-host${showShadow ? ' has-scroll-shadow' : ''}`}
+      data-testid="b2b-orders"
+    >
       <div className="pl-list-head">
         <span className="cust-list-count">
           {rows.length} de {total} pedido{total !== 1 ? 's' : ''}
@@ -62,7 +67,7 @@ export function OrderList({
           )}
         </div>
       ) : (
-        <div className="pl-list-scroll" data-testid="b2b-orders-table">
+        <div className="pl-list-scroll" data-testid="b2b-orders-table" ref={scrollRef}>
           {rows.map((o) => {
             const tone = statusTone(o.status);
             return (
@@ -95,6 +100,7 @@ export function OrderList({
               </button>
             );
           })}
+          <span className="scroll-shadow-sentinel" ref={sentinelRef} aria-hidden="true" />
         </div>
       )}
     </div>

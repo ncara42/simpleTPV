@@ -1,6 +1,7 @@
 import type { Rotation } from '@simpletpv/auth';
 import { Input } from '@simpletpv/ui';
 
+import { ScrollShadowCell } from '../components/ScrollShadowCell.js';
 import { type FacetDragSelect, useFacetDragSelect } from '../hooks/use-facet-drag-select.js';
 import {
   ALL_ROTATIONS,
@@ -66,7 +67,12 @@ export function CatalogFacets({
 }: CatalogFacetsProps) {
   const drag = useFacetDragSelect();
   return (
-    <aside className="cat-rail" aria-label="Filtros del catálogo" data-testid="catalog-facets">
+    <ScrollShadowCell
+      as="aside"
+      className="cat-rail"
+      aria-label="Filtros del catálogo"
+      data-testid="catalog-facets"
+    >
       <span className="search-field cat-rail-search">
         <Input
           className="catalog-search"
@@ -139,7 +145,7 @@ export function CatalogFacets({
           />
         ))}
       </section>
-    </aside>
+    </ScrollShadowCell>
   );
 }
 

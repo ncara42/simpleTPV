@@ -1,6 +1,7 @@
 import type { WholesaleOrderSummary } from '@simpletpv/auth';
 import { Pencil, Trash2, Users } from 'lucide-react';
 
+import { useScrollShadow } from '../hooks/use-scroll-shadow.js';
 import { fmtEur } from '../lib/format.js';
 import {
   balanceTone,
@@ -81,6 +82,7 @@ export function CustomerDetail({
   onDelete,
   now,
 }: CustomerDetailProps) {
+  const { scrollRef, sentinelRef, showShadow } = useScrollShadow();
   if (!customer) {
     return (
       <div className="cust-detail" data-testid="b2b-customer-detail">
@@ -129,7 +131,10 @@ export function CustomerDetail({
   const activity = buildActivity(c, now);
 
   return (
-    <div className="cust-detail" data-testid="b2b-customer-detail">
+    <div
+      className={`cust-detail scroll-shadow-host${showShadow ? ' has-scroll-shadow' : ''}`}
+      data-testid="b2b-customer-detail"
+    >
       <div className="cust-detail-head">
         <div className="cust-detail-id">
           <span className="cust-avatar cust-avatar--lg" aria-hidden="true">
@@ -183,7 +188,7 @@ export function CustomerDetail({
         </div>
       </div>
 
-      <div className="cust-detail-body">
+      <div className="cust-detail-body" ref={scrollRef}>
         <div className="cust-stats">
           {stats.map((s) => (
             <div className="cust-stat" key={s.label}>
@@ -328,6 +333,7 @@ export function CustomerDetail({
             ))}
           </div>
         </div>
+        <span className="scroll-shadow-sentinel" ref={sentinelRef} aria-hidden="true" />
       </div>
     </div>
   );

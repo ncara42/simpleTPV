@@ -1,5 +1,6 @@
 import { Tags } from 'lucide-react';
 
+import { useScrollShadow } from '../hooks/use-scroll-shadow.js';
 import { fmtEurCompact } from '../lib/format.js';
 import { type PriceListView, swCode, tipoLabel } from './pricelist-facets.js';
 
@@ -29,8 +30,12 @@ export function PriceListList({
   hasFilters,
   onClearFilters,
 }: PriceListListProps) {
+  const { scrollRef, sentinelRef, showShadow } = useScrollShadow();
   return (
-    <div className="pl-list" data-testid="b2b-pricelists">
+    <div
+      className={`pl-list scroll-shadow-host${showShadow ? ' has-scroll-shadow' : ''}`}
+      data-testid="b2b-pricelists"
+    >
       <div className="pl-list-head">
         <span className="cust-list-count">
           {rows.length} de {total} tarifa{total !== 1 ? 's' : ''}
@@ -51,7 +56,7 @@ export function PriceListList({
           )}
         </div>
       ) : (
-        <div className="pl-list-scroll" data-testid="b2b-pricelists-table">
+        <div className="pl-list-scroll" data-testid="b2b-pricelists-table" ref={scrollRef}>
           {rows.map((t) => (
             <button
               key={t.id}
@@ -80,6 +85,7 @@ export function PriceListList({
               </span>
             </button>
           ))}
+          <span className="scroll-shadow-sentinel" ref={sentinelRef} aria-hidden="true" />
         </div>
       )}
     </div>

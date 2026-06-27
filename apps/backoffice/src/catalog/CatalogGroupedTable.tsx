@@ -1,6 +1,7 @@
 import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
+import { ScrollShadowCell } from '../components/ScrollShadowCell.js';
 import { fmtEur } from '../lib/format.js';
 import type { Product } from '../lib/products.js';
 import { type CatalogGroup, LOW_MARGIN_THRESHOLD } from './facets.js';
@@ -36,7 +37,7 @@ export function CatalogGroupedTable({
   const isEmpty = groups.length === 0;
 
   return (
-    <div className="cat-main" data-testid="catalog-table">
+    <ScrollShadowCell className="cat-main" data-testid="catalog-table">
       <table className="cat-table">
         <colgroup>
           <col className="cat-col-name" />
@@ -124,7 +125,7 @@ export function CatalogGroupedTable({
         })}
       </table>
       {isEmpty && <div className="cat-empty">{empty}</div>}
-    </div>
+    </ScrollShadowCell>
   );
 }
 

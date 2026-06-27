@@ -1,0 +1,508 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   PROMOCIONES — maestro-detalle de 3 columnas (carril de facetas · lista · ficha),
+   diseño Geist. Reutiliza el carril facetado del Catálogo (`.cat-*`) y el lenguaje
+   visual de la ficha de Ventas (`.ventas-*`, ambos globales vía App.tsx), igual que
+   Clientes B2B. Las píldoras de descuento/estado y la caja de preview del modal
+   reutilizan `.promo-discount` · `.promo-badge` · `.promo-preview` (catalog.css).
+   Añade la lista de promociones, la ficha con regla/vigencia/actividad y los chips
+   de resumen. Paleta vía tokens --ui-*.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.bo-main--surface:has(.promo-page) {
+  padding: 0.4rem 1.25rem 1.5rem;
+}
+
+.promo-page {
+  /* Offset = topbar (60px) + padding-top (0.4rem) + padding-bottom (1.5rem). */
+  height: calc(100dvh - 60px - 1.9rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.promo-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.04),
+    0 4px 24px -8px rgb(0 0 0 / 0.1);
+  /* `clip` + `contain: paint`: aísla el overflow de los scrollers internos para que
+     no propaguen scroll al documento (ver ventas.css/customers.css). */
+  overflow: clip;
+  contain: paint;
+}
+
+/* ─── Rejilla de 3 columnas: carril · lista · ficha ───────────────────────────── */
+.promo-layout {
+  display: grid;
+  /* Misma anchura de columna central (24rem) que Ventas/Clientes, referencia del
+     maestro-detalle de 3 columnas. */
+  grid-template-columns: 15.75rem 24rem minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+.promo-layout > .scroll-shadow-cell {
+  grid-row: 1 / 3;
+}
+
+/* ─── Columna central: lista de promociones ───────────────────────────────────── */
+.promo-list {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: 1 / 3;
+  min-height: 0;
+  border-left: 1px solid var(--ui-border);
+  border-right: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+
+/* Chips de resumen (Activas · Programadas · Inactivas): ocupan la fila 1 del subgrid,
+   alineados con la cabecera de la ficha. Color semántico por estado. */
+.promo-summary {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.promo-stat-chip {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--ui-radius-md);
+}
+.promo-stat-chip[data-tone='activa'] {
+  background: color-mix(in srgb, var(--ui-success) 10%, var(--ui-surface));
+  color: var(--ui-success);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-success) 30%, transparent);
+}
+.promo-stat-chip[data-tone='programada'] {
+  background: color-mix(in srgb, var(--ui-primary) 10%, var(--ui-surface));
+  color: var(--ui-primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-primary) 30%, transparent);
+}
+.promo-stat-chip[data-tone='inactiva'] {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+  box-shadow: inset 0 0 0 1px var(--ui-border);
+}
+.promo-stat-chip-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.promo-stat-chip-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.promo-list-body {
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  --scroll-shadow-bg: var(--ui-surface-subtle);
+}
+.promo-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--ui-border);
+  flex: 0 0 auto;
+}
+.promo-list-count {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+}
+.promo-sort {
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--ui-text-soft);
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+  margin: -0.15rem -0.4rem;
+  border-radius: var(--ui-radius-sm);
+  transition: color var(--ui-motion-fast) var(--ui-ease);
+}
+.promo-sort:hover {
+  color: var(--ui-text);
+}
+.promo-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  scrollbar-width: none;
+}
+.promo-list-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.promo-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 2rem 1rem;
+  color: var(--ui-text-soft);
+  text-align: center;
+}
+.promo-empty-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+}
+
+/* Fila de promoción: un único botón (seleccionar → ficha), espejo de la fila de Ventas. */
+.promo-row {
+  display: grid;
+  grid-template-columns: 2.1rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-md);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--ui-motion-fast) var(--ui-ease);
+}
+.promo-row:hover {
+  background: color-mix(in srgb, var(--ui-surface) 60%, transparent);
+}
+.promo-row.is-selected {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+}
+.promo-row:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.promo-avatar {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-subtle);
+  box-shadow: inset 0 0 0 1px var(--ui-border);
+  color: var(--ui-text-muted);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+.promo-avatar--lg {
+  width: 2.4rem;
+  height: 2.4rem;
+}
+.promo-row-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  line-height: 1.3;
+}
+.promo-row-name {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.promo-row-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.promo-row-dot {
+  color: var(--ui-border-strong);
+}
+.promo-row-end {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.22rem;
+  line-height: 1.3;
+  text-align: right;
+}
+
+.promo-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Columna derecha: ficha de la promoción ──────────────────────────────────── */
+.promo-detail {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: 1 / 3;
+  min-width: 0;
+  min-height: 0;
+  background: var(--ui-surface);
+}
+.promo-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding: 0 1.5rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.promo-detail-id {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+  padding: 0.7rem 0;
+}
+.promo-detail-titles {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  line-height: 1.2;
+}
+.promo-detail-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.promo-detail-name {
+  font-size: 1rem;
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+}
+.promo-detail-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  color: var(--ui-text-soft);
+}
+.promo-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+}
+/* Botones de acción de la cabecera (Editar · Pausar/Activar · Duplicar · Borrar):
+   solo icono, cuadrados y compactos, neutros en reposo. */
+.promo-act-btn {
+  width: 2rem;
+  height: 2rem;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease),
+    border-color var(--ui-motion-fast) var(--ui-ease);
+}
+.promo-act-btn:hover {
+  background: var(--ui-surface-subtle);
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+}
+.promo-act-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.promo-act-btn--danger:hover {
+  color: var(--ui-danger);
+  background: color-mix(in srgb, var(--ui-danger) 10%, var(--ui-surface));
+  border-color: color-mix(in srgb, var(--ui-danger) 30%, var(--ui-border));
+}
+.promo-detail-body {
+  grid-row: 2;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 1.2rem 1.5rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.3rem;
+  max-width: 46rem;
+}
+.promo-detail-body::-webkit-scrollbar {
+  display: none;
+}
+/* Las tarjetas de la ficha no deben comprimirse: al ser el cuerpo un flex en
+   columna con alto fijo (fila 2 del grid), por defecto los hijos encogen
+   (flex-shrink:1) y aplastan las cajas en vez de hacer scroll. `.promo-rule`
+   tiene overflow:hidden, así que el contenido aplastado se recorta.
+   Con flex-shrink:0 el contenido conserva su alto natural y el cuerpo hace scroll. */
+.promo-detail-body > * {
+  flex-shrink: 0;
+}
+
+/* Stats de la ficha (4 cajas). */
+.promo-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+}
+.promo-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+}
+.promo-stat-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ui-text-soft);
+}
+.promo-stat-value {
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+}
+.promo-stat-value[data-tone='brand'] {
+  color: var(--ui-primary);
+}
+.promo-stat-value[data-tone='activa'] {
+  color: var(--ui-success);
+}
+.promo-stat-value[data-tone='programada'] {
+  color: var(--ui-primary);
+}
+.promo-stat-value[data-tone='pausada'] {
+  color: var(--ui-warning);
+}
+.promo-stat-value[data-tone='expirada'] {
+  color: var(--ui-text-muted);
+}
+
+/* Regla aplicada: condición → recompensa. */
+.promo-rule {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg, 0.75rem);
+  overflow: hidden;
+}
+.promo-rule-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 0.95rem;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+.promo-rule-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.promo-rule-note {
+  font-size: 0.72rem;
+  color: var(--ui-text-soft);
+}
+.promo-rule-body {
+  padding: 1.3rem 1.1rem;
+  display: flex;
+  align-items: stretch;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+.promo-rule-cell {
+  flex: 1;
+  min-width: 11rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1rem 1rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+}
+.promo-rule-cell--reward {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+}
+.promo-rule-cell-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-soft);
+}
+.promo-rule-cell--reward .promo-rule-cell-label {
+  color: var(--ui-brand-ink, var(--ui-primary));
+}
+.promo-rule-cell-text {
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--ui-text);
+}
+.promo-rule-reward {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ui-primary);
+}
+.promo-rule-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ui-text-soft);
+  flex: 0 0 auto;
+}
+
+/* ─── Responsive: ficha bajo la lista en pantallas estrechas ──────────────────── */
+@media (max-width: 1100px) {
+  .promo-layout {
+    grid-template-columns: 14rem minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+  .promo-layout > .scroll-shadow-cell {
+    grid-row: 1 / 4;
+  }
+  .promo-list {
+    grid-row: 1 / 3;
+  }
+  .promo-detail {
+    grid-column: 2 / 3;
+    grid-row: 3;
+    border-top: 1px solid var(--ui-border);
+  }
+  .promo-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

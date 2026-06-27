@@ -1,6 +1,7 @@
 import { Input } from '@simpletpv/ui';
 import { X } from 'lucide-react';
 
+import { ScrollShadowCell } from '../components/ScrollShadowCell.js';
 import { useFacetDragSelect } from '../hooks/use-facet-drag-select.js';
 import type { SavedViewId } from './customer-facets.js';
 
@@ -54,7 +55,12 @@ export function CustomerFacets({
 }: CustomerFacetsProps) {
   const drag = useFacetDragSelect();
   return (
-    <aside className="cat-rail" aria-label="Filtros de clientes" data-testid="b2b-customer-facets">
+    <ScrollShadowCell
+      as="aside"
+      className="cat-rail"
+      aria-label="Filtros de clientes"
+      data-testid="b2b-customer-facets"
+    >
       <span className="search-field cat-rail-search">
         <Input
           className="catalog-search"
@@ -122,6 +128,6 @@ export function CustomerFacets({
           Limpiar filtros · {clearCount}
         </button>
       )}
-    </aside>
+    </ScrollShadowCell>
   );
 }

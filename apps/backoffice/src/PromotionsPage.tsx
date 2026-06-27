@@ -1,12 +1,14 @@
-import { Button, DataTable, Input, Select } from '@simpletpv/ui';
-import { usePageHeader } from '@simpletpv/ui';
+import { Button, Input, Select, usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { sileo } from 'sileo';
 
+import { useConfirm } from './components/ConfirmProvider.js';
 import { CsvActionButton } from './components/CsvActionButton.js';
 import { ImportExportModal } from './components/ImportExportModal.js';
 import { Modal } from './components/Modal.js';
+import { formErrorMessage } from './lib/form-error.js';
 import { usePageActions } from './lib/pageActions.js';
 import {
   createPromotion,
@@ -19,8 +21,31 @@ import {
   promoStatus,
   type Promotion,
   updatePromotion,
-  type UpdatePromotionInput,
 } from './lib/promotions.js';
+import {
+  activeFacetCount,
+  activeSavedView,
+  applySavedView,
+  condClause,
+  condShort,
+  dateRange,
+  discPhrase,
+  discShort,
+  EMPTY_PROMO_FACETS,
+  filterPromotions,
+  isExpiringSoon,
+  type PromoFacetGroupKey,
+  type PromoFacetState,
+  type PromoSavedViewId,
+  type PromoSortMode,
+  searchBase,
+  sortPromotions,
+  statusChips,
+  todayLocal,
+} from './promotions/promo-facets.js';
+import { PromotionDetail } from './promotions/PromotionDetail.js';
+import { type PromoFacetGroupView, PromotionFacets } from './promotions/PromotionFacets.js';
+import { PromotionList } from './promotions/PromotionList.js';
 
 const STATUS_LABEL: Record<PromoStatus, string> = {
   activa: 'Activa',
@@ -28,60 +53,9 @@ const STATUS_LABEL: Record<PromoStatus, string> = {
   expirada: 'Expirada',
   pausada: 'Pausada',
 };
-// Tres grupos de filtrado (informe §5): activas, programadas e inactivas
-// (expiradas + pausadas). Se muestran todos por defecto y cada chip los alterna.
-type PromoGroup = 'activa' | 'programada' | 'inactiva';
-const PROMO_GROUPS: { id: PromoGroup; label: string }[] = [
-  { id: 'activa', label: 'Activas' },
-  { id: 'programada', label: 'Programadas' },
-  { id: 'inactiva', label: 'Inactivas' },
-];
-function promoGroup(p: Promotion): PromoGroup {
-  const s = promoStatus(p);
-  return s === 'activa' || s === 'programada' ? s : 'inactiva';
-}
-function conditionText(p: { conditionType: PromoConditionType; threshold: number }): string {
-  return p.conditionType === 'min_qty'
-    ? `Si el ticket lleva ${p.threshold} o más productos`
-    : `Si el ticket supera ${p.threshold} €`;
-}
-function actionText(p: { discountType: PromoDiscountType; discountValue: number }): string {
-  return p.discountType === 'percent'
-    ? `descuento del ${p.discountValue}%`
-    : `descuento de ${p.discountValue} €`;
-}
-
-// Versiones condensadas para las celdas de la tabla (el texto largo se reserva
-// para la previsualización del modal).
-function conditionShort(p: { conditionType: PromoConditionType; threshold: number }): string {
-  return p.conditionType === 'min_qty'
-    ? `≥ ${p.threshold} productos`
-    : `≥ ${p.threshold} € de ticket`;
-}
-function discountShort(p: { discountType: PromoDiscountType; discountValue: number }): string {
-  return p.discountType === 'percent' ? `−${p.discountValue}%` : `−${p.discountValue} €`;
-}
-
-// Vigencia compacta «20 may. – 30 jun. 2026». Las fechas llegan como YYYY-MM-DD;
-// se parsean en horario local para no desplazar el día por zona horaria.
-const fmtDM = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' });
-const fmtDMY = new Intl.DateTimeFormat('es-ES', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-});
-function parseLocal(d: string): Date {
-  const [y, m, day] = d.split('-').map(Number);
-  return new Date(y ?? 1970, (m ?? 1) - 1, day ?? 1);
-}
-function dateRange(start: string, end: string): string {
-  const s = parseLocal(start);
-  const e = parseLocal(end);
-  const startLabel = s.getFullYear() === e.getFullYear() ? fmtDM.format(s) : fmtDMY.format(s);
-  return `${startLabel} – ${fmtDMY.format(e)}`;
-}
 
 type PromoForm = Omit<Promotion, 'id'> & { id?: string };
+
 const EMPTY: PromoForm = {
   name: '',
   conditionType: 'min_qty',
@@ -93,9 +67,13 @@ const EMPTY: PromoForm = {
   active: true,
 };
 
+function toForm(p: Promotion): PromoForm {
+  return { ...p };
+}
+
 function toInput(f: PromoForm): CreatePromotionInput {
   return {
-    name: f.name,
+    name: f.name.trim(),
     conditionType: f.conditionType,
     threshold: f.threshold,
     discountType: f.discountType,
@@ -106,279 +84,293 @@ function toInput(f: PromoForm): CreatePromotionInput {
   };
 }
 
+function promoToInput(p: Promotion): CreatePromotionInput {
+  return {
+    name: p.name,
+    conditionType: p.conditionType,
+    threshold: p.threshold,
+    discountType: p.discountType,
+    discountValue: p.discountValue,
+    startDate: p.startDate,
+    endDate: p.endDate,
+    active: p.active,
+  };
+}
+
+/** Alterna `key` en un set de facetas tipado (devuelve un set nuevo, sin mutar). */
+function toggleInSet<T extends string>(set: ReadonlySet<T>, key: string): Set<T> {
+  const next = new Set(set);
+  if (next.has(key as T)) next.delete(key as T);
+  else next.add(key as T);
+  return next;
+}
+
 export function PromotionsPage() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
+  // `today` se fija una vez por montaje: el estado de cada promoción (activa, programada…)
+  // es una derivación de presentación sobre la fecha de hoy, no un dato del servidor.
+  const today = useMemo(() => todayLocal(), []);
+
   const { data: promos = [] } = useQuery({ queryKey: ['promotions'], queryFn: listPromotions });
-  const invalidate = (): void => void qc.invalidateQueries({ queryKey: ['promotions'] });
-  // Grupos visibles: los tres activos por defecto (se ven todas las promociones).
-  const [groups, setGroups] = useState<Set<PromoGroup>>(
-    () => new Set<PromoGroup>(['activa', 'programada', 'inactiva']),
-  );
-  const toggleGroup = (g: PromoGroup): void =>
-    setGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(g)) next.delete(g);
-      else next.add(g);
-      return next;
-    });
+  const invalidate = (): Promise<void> => qc.invalidateQueries({ queryKey: ['promotions'] });
+
+  const [facets, setFacets] = useState<PromoFacetState>(EMPTY_PROMO_FACETS);
+  const [sortMode, setSortMode] = useState<PromoSortMode>('estado');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState<PromoForm | null>(null);
-  const [selected, setSelected] = useState<string[]>([]);
   const [dataModal, setDataModal] = useState<'export' | null>(null);
 
-  const visible = useMemo(() => promos.filter((p) => groups.has(promoGroup(p))), [promos, groups]);
-
-  // ── Selección múltiple + acciones en lote (mismo patrón que Usuarios) ──
-  const selectedSet = useMemo(() => new Set(selected), [selected]);
-  const toggleSelect = (id: string): void =>
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  const clearSelection = (): void => setSelected([]);
-  const allVisibleSelected = visible.length > 0 && visible.every((p) => selectedSet.has(p.id));
-  const selectAllVisible = (): void =>
-    setSelected((prev) => [...new Set([...prev, ...visible.map((p) => p.id)])]);
-
-  const selectedPromos = useMemo(
-    () => promos.filter((p) => selectedSet.has(p.id)),
-    [promos, selectedSet],
+  // ── Filtrado + orden + selección ────────────────────────────────────────────
+  const filtered = useMemo(
+    () => sortPromotions(filterPromotions(promos, facets, today), sortMode, today),
+    [promos, facets, today, sortMode],
   );
-  // Pausar/activar solo aplica a las que están vigentes (activa ⇄ pausada).
-  const activeSel = selectedPromos.filter((p) => promoStatus(p) === 'activa');
-  const pausedSel = selectedPromos.filter((p) => promoStatus(p) === 'pausada');
+  const chips = useMemo(() => statusChips(filtered, today), [filtered, today]);
+  const selected = useMemo(() => {
+    const inFiltered = selectedId ? filtered.find((p) => p.id === selectedId) : undefined;
+    return inFiltered ?? filtered[0] ?? null;
+  }, [selectedId, filtered]);
 
-  const createMut = useMutation({
-    mutationFn: (f: PromoForm) => createPromotion(toInput(f)),
-    onSuccess: () => {
-      setForm(null);
-      clearSelection();
-      invalidate();
-    },
-  });
-  const updateMut = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UpdatePromotionInput }) =>
-      updatePromotion(id, input),
-    onSuccess: invalidate,
-  });
+  // ── Facetas + vistas guardadas (recuentos sobre la base de búsqueda) ─────────
+  const base = useMemo(() => searchBase(promos, facets.search), [promos, facets.search]);
+  const cnt = (pred: (p: Promotion) => boolean): number => base.filter(pred).length;
 
-  const save = (f: PromoForm): void => {
-    if (f.id) {
-      updateMut.mutate(
-        { id: f.id, input: toInput(f) },
+  const groups: PromoFacetGroupView[] = [
+    {
+      key: 'estados',
+      title: 'Estado',
+      options: [
         {
-          onSuccess: () => {
-            setForm(null);
-            clearSelection();
-            invalidate();
-          },
+          key: 'activa',
+          label: 'Activas',
+          count: cnt((p) => promoStatus(p, today) === 'activa'),
+          active: facets.estados.has('activa'),
         },
-      );
-    } else {
-      createMut.mutate(f);
-    }
-  };
-  const editSelected = (): void => {
-    const target = selectedPromos[0];
-    if (target) setForm({ ...target });
-  };
-  // Acciones en lote: una mutación por id (sin endpoint bulk) + invalidación al final.
-  const setActiveFor = (ids: Set<string>, active: boolean): void => {
-    void Promise.all([...ids].map((id) => updatePromotion(id, { active }))).then(() => {
-      clearSelection();
-      invalidate();
+        {
+          key: 'programada',
+          label: 'Programadas',
+          count: cnt((p) => promoStatus(p, today) === 'programada'),
+          active: facets.estados.has('programada'),
+        },
+        {
+          key: 'pausada',
+          label: 'Pausadas',
+          count: cnt((p) => promoStatus(p, today) === 'pausada'),
+          active: facets.estados.has('pausada'),
+        },
+        {
+          key: 'expirada',
+          label: 'Expiradas',
+          count: cnt((p) => promoStatus(p, today) === 'expirada'),
+          active: facets.estados.has('expirada'),
+        },
+      ],
+    },
+    {
+      key: 'condiciones',
+      title: 'Condición',
+      options: [
+        {
+          key: 'min_qty',
+          label: 'Por nº de productos',
+          count: cnt((p) => p.conditionType === 'min_qty'),
+          active: facets.condiciones.has('min_qty'),
+        },
+        {
+          key: 'min_ticket',
+          label: 'Por importe de ticket',
+          count: cnt((p) => p.conditionType === 'min_ticket'),
+          active: facets.condiciones.has('min_ticket'),
+        },
+      ],
+    },
+    {
+      key: 'descuentos',
+      title: 'Descuento',
+      options: [
+        {
+          key: 'percent',
+          label: 'Porcentaje (%)',
+          count: cnt((p) => p.discountType === 'percent'),
+          active: facets.descuentos.has('percent'),
+        },
+        {
+          key: 'amount',
+          label: 'Importe fijo (€)',
+          count: cnt((p) => p.discountType === 'amount'),
+          active: facets.descuentos.has('amount'),
+        },
+      ],
+    },
+  ];
+
+  const cntStatus = (s: PromoStatus): number =>
+    promos.filter((p) => promoStatus(p, today) === s).length;
+  const av = activeSavedView(facets);
+  const savedViewDefs: Array<{ id: PromoSavedViewId; label: string; count: number }> = [
+    { id: 'all', label: 'Todas', count: promos.length },
+    { id: 'activas', label: 'Activas', count: cntStatus('activa') },
+    { id: 'programadas', label: 'Programadas', count: cntStatus('programada') },
+    { id: 'pausadas', label: 'Pausadas', count: cntStatus('pausada') },
+    { id: 'expiradas', label: 'Expiradas', count: cntStatus('expirada') },
+    {
+      id: 'vencen',
+      label: 'Vencen pronto',
+      count: promos.filter((p) => isExpiringSoon(p, today)).length,
+    },
+  ];
+  const savedViews = savedViewDefs.map((v) => ({ ...v, active: av === v.id }));
+
+  // Alternar una faceta limpia la vista «vencen pronto» (son ejes distintos del mismo carril).
+  const toggleFacet = (groupKey: PromoFacetGroupKey, optKey: string): void => {
+    setFacets((f) => {
+      if (groupKey === 'estados') {
+        return { ...f, estados: toggleInSet(f.estados, optKey), soon: false };
+      }
+      if (groupKey === 'condiciones') {
+        return { ...f, condiciones: toggleInSet(f.condiciones, optKey), soon: false };
+      }
+      return { ...f, descuentos: toggleInSet(f.descuentos, optKey), soon: false };
     });
   };
-  const pauseSelected = (): void => setActiveFor(new Set(activeSel.map((p) => p.id)), false);
-  const activateSelected = (): void => setActiveFor(new Set(pausedSel.map((p) => p.id)), true);
-  const removeSelected = (): void => {
-    void Promise.all(selected.map((id) => deletePromotion(id))).then(() => {
-      clearSelection();
-      invalidate();
+  const clearFilters = (): void =>
+    setFacets((f) => ({
+      ...EMPTY_PROMO_FACETS,
+      estados: new Set(),
+      condiciones: new Set(),
+      descuentos: new Set(),
+      search: f.search,
+    }));
+
+  // ── Mutaciones ───────────────────────────────────────────────────────────────
+  const saveMut = useMutation({
+    mutationFn: (f: PromoForm) =>
+      f.id ? updatePromotion(f.id, toInput(f)) : createPromotion(toInput(f)),
+    onSuccess: (saved, f) => {
+      void invalidate();
+      setForm(null);
+      setSelectedId(saved.id);
+      sileo.success({ title: f.id ? 'Promoción actualizada' : 'Promoción creada' });
+    },
+    onError: (e) => sileo.error({ title: formErrorMessage(e, 'No se pudo guardar la promoción') }),
+  });
+  const pauseMut = useMutation({
+    mutationFn: (p: Promotion) => updatePromotion(p.id, { active: !p.active }),
+    onSuccess: (_saved, p) => {
+      void invalidate();
+      sileo.success({ title: p.active ? 'Promoción pausada' : 'Promoción activada' });
+    },
+    onError: (e) => sileo.error({ title: formErrorMessage(e, 'No se pudo cambiar el estado') }),
+  });
+  const dupMut = useMutation({
+    mutationFn: (p: Promotion) =>
+      createPromotion({ ...promoToInput(p), name: `${p.name} (copia)` }),
+    onSuccess: (created) => {
+      void invalidate();
+      setSelectedId(created.id);
+      sileo.success({ title: 'Promoción duplicada' });
+    },
+    onError: (e) => sileo.error({ title: formErrorMessage(e, 'No se pudo duplicar la promoción') }),
+  });
+  const delMut = useMutation({
+    mutationFn: (p: Promotion) => deletePromotion(p.id),
+    onSuccess: (_data, p) => {
+      void invalidate();
+      setSelectedId((cur) => (cur === p.id ? null : cur));
+      sileo.success({ title: 'Promoción eliminada' });
+    },
+    onError: (e) => sileo.error({ title: formErrorMessage(e, 'No se pudo eliminar la promoción') }),
+  });
+
+  const removePromo = async (p: Promotion): Promise<void> => {
+    const ok = await confirm({
+      title: 'Eliminar promoción',
+      message: `¿Eliminar la promoción "${p.name}"? Esta acción no se puede deshacer.`,
+      confirmLabel: 'Eliminar',
+      danger: true,
     });
+    if (ok) delMut.mutate(p);
   };
+
+  // ── Cabecera + acciones flotantes (export · nueva) ───────────────────────────
+  usePageHeader('Promociones', 'Descuentos y reglas programables');
+  usePageActions(
+    <>
+      <CsvActionButton
+        kind="export"
+        label="Exportar"
+        onClick={() => setDataModal('export')}
+        testId="promotions-export"
+      />
+      <Button
+        onClick={() => setForm({ ...EMPTY })}
+        data-testid="new-promo"
+        icon={<Plus size={16} aria-hidden="true" />}
+      >
+        Nueva promoción
+      </Button>
+    </>,
+  );
 
   const exportHeaders = ['Promoción', 'Condición', 'Descuento', 'Vigencia', 'Estado'];
   const buildExportRows = (): string[][] =>
-    visible.map((p) => [
+    filtered.map((p) => [
       p.name,
-      conditionShort(p),
-      discountShort(p),
+      condShort(p),
+      discShort(p),
       dateRange(p.startDate, p.endDate),
-      STATUS_LABEL[promoStatus(p)],
+      STATUS_LABEL[promoStatus(p, today)],
     ]);
 
-  usePageHeader('Promociones', 'Descuentos y reglas programables');
-
-  // Export en el clúster flotante (junto al conmutador Backoffice↔TPV).
-  usePageActions(
-    <CsvActionButton
-      kind="export"
-      label="Exportar"
-      onClick={() => setDataModal('export')}
-      testId="promotions-export"
-    />,
-  );
+  const hasFilters = activeFacetCount(facets) > 0 || facets.search.trim() !== '';
 
   return (
-    <section className="catalog">
-      <div className="table-panel">
-        <DataTable
-          className={`promo-table${selected.length ? ' has-selection' : ''}`}
-          data-testid="promo-list"
-          rowTestId="promo-card"
-          rows={visible}
-          rowKey={(p) => p.id}
-          onRowClick={(p) => toggleSelect(p.id)}
-          rowClassName={(p) => (selectedSet.has(p.id) ? 'is-selected' : undefined)}
-          rowAriaSelected={(p) => selectedSet.has(p.id)}
-          toolbar={
-            <div className="users-toolbar">
-              <div className="sales-filters">
-                <div className="promo-chips" role="group" aria-label="Filtrar por estado">
-                  {PROMO_GROUPS.map((g) => (
-                    <button
-                      key={g.id}
-                      type="button"
-                      className={`promo-chip${groups.has(g.id) ? ' is-on' : ''}`}
-                      aria-pressed={groups.has(g.id)}
-                      onClick={() => toggleGroup(g.id)}
-                      data-testid={`promo-group-${g.id}`}
-                    >
-                      <Check size={14} className="promo-chip__check" aria-hidden="true" />
-                      {g.label}
-                    </button>
-                  ))}
-                </div>
-                {selected.length > 0 && (
-                  <>
-                    {!allVisibleSelected && (
-                      <button
-                        type="button"
-                        className="users-sel-btn"
-                        onClick={selectAllVisible}
-                        data-testid="promo-select-all"
-                      >
-                        Seleccionar todo
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="users-sel-btn"
-                      onClick={clearSelection}
-                      data-testid="promo-clear"
-                    >
-                      Quitar selección
-                    </button>
-                  </>
-                )}
-              </div>
-              {selected.length > 0 ? (
-                <div className="ui-dt-toolbar-actions">
-                  {selected.length === 1 && (
-                    <button
-                      type="button"
-                      className="users-bulk-edit"
-                      onClick={editSelected}
-                      data-testid="promo-edit"
-                    >
-                      Editar
-                    </button>
-                  )}
-                  {activeSel.length > 0 && (
-                    <button
-                      type="button"
-                      className="promo-bulk-toggle"
-                      onClick={pauseSelected}
-                      data-testid="promo-pause"
-                    >
-                      Pausar{activeSel.length > 1 ? ` (${activeSel.length})` : ''}
-                    </button>
-                  )}
-                  {pausedSel.length > 0 && (
-                    <button
-                      type="button"
-                      className="promo-bulk-toggle"
-                      onClick={activateSelected}
-                      data-testid="promo-activate"
-                    >
-                      Activar{pausedSel.length > 1 ? ` (${pausedSel.length})` : ''}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="users-bulk-del"
-                    onClick={removeSelected}
-                    data-testid="promo-delete"
-                  >
-                    Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
-                  </button>
-                </div>
-              ) : (
-                <div className="ui-dt-toolbar-actions">
-                  <Button
-                    onClick={() => setForm({ ...EMPTY })}
-                    data-testid="new-promo"
-                    icon={<Plus size={16} aria-hidden="true" />}
-                  >
-                    Nueva promoción
-                  </Button>
-                </div>
-              )}
-            </div>
-          }
-          emptyState={
-            <span className="catalog-empty" data-testid="promos-empty">
-              No hay promociones con ese estado.
-            </span>
-          }
-          columns={[
-            {
-              key: 'select',
-              header: '',
-              width: '3rem',
-              render: (p) => (
-                <input
-                  type="checkbox"
-                  className="user-check"
-                  aria-label={`Seleccionar ${p.name}`}
-                  data-testid="promo-select"
-                  checked={selectedSet.has(p.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={() => toggleSelect(p.id)}
-                />
-              ),
-            },
-            { key: 'name', header: 'Promoción', render: (p) => p.name },
-            {
-              key: 'condition',
-              header: 'Condición',
-              render: (p) => <span className="muted">{conditionShort(p)}</span>,
-            },
-            {
-              key: 'discount',
-              header: 'Descuento',
-              render: (p) => <span className="promo-discount">{discountShort(p)}</span>,
-            },
-            {
-              key: 'validity',
-              header: 'Vigencia',
-              render: (p) => <span className="muted">{dateRange(p.startDate, p.endDate)}</span>,
-            },
-            {
-              key: 'status',
-              header: 'Estado',
-              render: (p) => {
-                const status = promoStatus(p);
-                return (
-                  <span className={`promo-badge promo-${status}`} data-testid="promo-status">
-                    {STATUS_LABEL[status]}
-                  </span>
-                );
-              },
-            },
-          ]}
-        />
+    <div className="promo-page" data-testid="promotions-page">
+      <div className="promo-card">
+        <div className="promo-layout">
+          <PromotionFacets
+            search={facets.search}
+            onSearchChange={(v) => setFacets((f) => ({ ...f, search: v }))}
+            savedViews={savedViews}
+            onSavedView={(id) => setFacets((f) => ({ ...applySavedView(id), search: f.search }))}
+            groups={groups}
+            onToggleFacet={toggleFacet}
+            showClear={activeFacetCount(facets) > 0}
+            clearCount={activeFacetCount(facets)}
+            onClear={clearFilters}
+          />
+          <PromotionList
+            rows={filtered}
+            total={promos.length}
+            chips={chips}
+            today={today}
+            selectedId={selected?.id ?? null}
+            onSelect={setSelectedId}
+            sortMode={sortMode}
+            onToggleSort={() => setSortMode((m) => (m === 'estado' ? 'vigencia' : 'estado'))}
+            hasFilters={hasFilters}
+            onClearFilters={clearFilters}
+          />
+          <PromotionDetail
+            promo={selected}
+            today={today}
+            onEdit={(p) => setForm(toForm(p))}
+            onTogglePause={(p) => pauseMut.mutate(p)}
+            onDuplicate={(p) => dupMut.mutate(p)}
+            onDelete={(p) => void removePromo(p)}
+          />
+        </div>
       </div>
 
       {form && (
-        <PromoModal form={form} onChange={setForm} onClose={() => setForm(null)} onSave={save} />
+        <PromoModal
+          form={form}
+          onChange={setForm}
+          onClose={() => setForm(null)}
+          onSave={(f) => saveMut.mutate(f)}
+          saving={saveMut.isPending}
+        />
       )}
 
       {dataModal && (
@@ -394,7 +386,7 @@ export function PromotionsPage() {
           }}
         />
       )}
-    </section>
+    </div>
   );
 }
 
@@ -403,11 +395,13 @@ function PromoModal({
   onChange,
   onClose,
   onSave,
+  saving,
 }: {
   form: PromoForm;
   onChange: (f: PromoForm) => void;
   onClose: () => void;
   onSave: (f: PromoForm) => void;
+  saving: boolean;
 }) {
   const valid =
     form.name.trim().length > 0 &&
@@ -431,6 +425,7 @@ function PromoModal({
         <Input
           required
           value={form.name}
+          placeholder="Nombre de la promoción"
           onChange={(e) => onChange({ ...form, name: e.target.value })}
           data-testid="promo-name"
         />
@@ -469,8 +464,8 @@ function PromoModal({
             ariaLabel="Tipo de descuento"
             data-testid="promo-discount-type"
             options={[
-              { value: 'percent', label: 'Descuento %' },
-              { value: 'amount', label: 'Descuento €' },
+              { value: 'percent', label: 'Descuento (%)' },
+              { value: 'amount', label: 'Descuento (€)' },
             ]}
           />
         </label>
@@ -512,13 +507,13 @@ function PromoModal({
           onChange={(e) => onChange({ ...form, active: e.target.checked })}
           data-testid="promo-active"
         />
-        Activa
+        Activa (visible en el TPV mientras esté vigente)
       </label>
 
       <div className="promo-preview" data-testid="promo-preview">
         <span className="promo-preview-title">Previsualización del impacto</span>
         <p>
-          {conditionText(form)} → <strong>{actionText(form)}</strong>.
+          {condClause(form)} → <strong>{discPhrase(form)}</strong>.
         </p>
         <p className="muted">
           Vigente del {form.startDate} al {form.endDate}.
@@ -529,8 +524,8 @@ function PromoModal({
         <button type="button" onClick={onClose}>
           Cancelar
         </button>
-        <Button type="submit" disabled={!valid} data-testid="promo-save">
-          {form.id ? 'Guardar' : 'Crear'}
+        <Button type="submit" disabled={!valid || saving} data-testid="promo-save">
+          {form.id ? (saving ? 'Guardando…' : 'Guardar') : saving ? 'Creando…' : 'Crear'}
         </Button>
       </div>
     </Modal>

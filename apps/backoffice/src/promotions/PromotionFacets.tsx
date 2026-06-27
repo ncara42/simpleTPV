@@ -3,61 +3,71 @@ import { X } from 'lucide-react';
 
 import { ScrollShadowCell } from '../components/ScrollShadowCell.js';
 import { useFacetDragSelect } from '../hooks/use-facet-drag-select.js';
-import type {
-  FacetGroup,
-  FacetKey,
-  SalesFacetState,
-  SavedView,
-  SavedViewId,
-} from './sales-facets.js';
+import type { PromoFacetGroupKey, PromoSavedViewId } from './promo-facets.js';
 
-// Carril de facetas del ledger de Ventas: búsqueda + vistas guardadas (estado de
-// cobro) + facetas multi-selección (Estado de cobro · Canal · Tienda · Vendedor ·
-// Método de pago). Reutiliza el lenguaje visual del carril del Catálogo (`.cat-*`)
-// y añade el punto de color de cobro/canal. Componente presentacional puro.
+// Carril de facetas de Promociones: búsqueda + vistas guardadas + facetas
+// (Estado · Condición · Descuento). Reutiliza el lenguaje visual del carril del
+// Catálogo/Ventas/Clientes (`.cat-*`). Presentacional puro: el contenedor decide la
+// semántica multi de cada grupo y los recuentos.
 
-interface SalesFacetsProps {
+export interface PromoFacetOption {
+  key: string;
+  label: string;
+  count: number;
+  active: boolean;
+}
+
+export interface PromoFacetGroupView {
+  key: PromoFacetGroupKey;
+  title: string;
+  options: PromoFacetOption[];
+}
+
+interface SavedView {
+  id: PromoSavedViewId;
+  label: string;
+  count: number;
+  active: boolean;
+}
+
+interface PromotionFacetsProps {
   search: string;
   onSearchChange: (value: string) => void;
   savedViews: SavedView[];
-  view: SavedViewId;
-  onView: (view: SavedViewId) => void;
-  facetGroups: FacetGroup[];
-  facets: SalesFacetState;
-  onToggleFacet: (key: FacetKey, optKey: string) => void;
+  onSavedView: (id: PromoSavedViewId) => void;
+  groups: PromoFacetGroupView[];
+  onToggleFacet: (groupKey: PromoFacetGroupKey, optKey: string) => void;
   showClear: boolean;
+  clearCount: number;
   onClear: () => void;
 }
 
-export function SalesFacets({
+export function PromotionFacets({
   search,
   onSearchChange,
   savedViews,
-  view,
-  onView,
-  facetGroups,
-  facets,
+  onSavedView,
+  groups,
   onToggleFacet,
   showClear,
+  clearCount,
   onClear,
-}: SalesFacetsProps) {
+}: PromotionFacetsProps) {
   const drag = useFacetDragSelect();
   return (
-    // `ScrollShadowCell` envuelve el carril (`.cat-rail` scrollea dentro) y le añade la
-    // sombra de scroll inferior + el centinela de fin.
     <ScrollShadowCell
       as="aside"
       className="cat-rail"
-      aria-label="Filtros de ventas"
-      data-testid="sales-facets"
+      aria-label="Filtros de promociones"
+      data-testid="promo-facets"
     >
       <span className="search-field cat-rail-search">
         <Input
           className="catalog-search"
-          placeholder="Buscar ticket o cliente…"
+          placeholder="Buscar promoción…"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          data-testid="sales-search"
+          data-testid="promo-search"
         />
       </span>
 
@@ -67,10 +77,10 @@ export function SalesFacets({
           <button
             key={v.id}
             type="button"
-            className={`cat-view${view === v.id ? ' is-active' : ''}`}
-            aria-pressed={view === v.id}
-            onClick={() => onView(v.id)}
-            data-testid={`sales-view-${v.id}`}
+            className={`cat-view${v.active ? ' is-active' : ''}`}
+            aria-pressed={v.active}
+            onClick={() => onSavedView(v.id)}
+            data-testid={`promo-view-${v.id}`}
           >
             <span className="cat-view-label">{v.label}</span>
             <span className="cat-view-count">{v.count}</span>
@@ -78,24 +88,23 @@ export function SalesFacets({
         ))}
       </section>
 
-      {facetGroups.map((group) => (
+      {groups.map((group) => (
         <section className="cat-facet" key={group.key}>
           <h3 className="cat-facet-title">{group.title}</h3>
           {group.options.map((opt) => {
-            const checked = (facets[group.key] as ReadonlySet<string>).has(opt.key);
             const toggle = () => onToggleFacet(group.key, opt.key);
             return (
               <label
                 key={opt.key}
-                className={`cat-facet-opt${checked ? ' is-checked' : ''}`}
-                data-testid={`sales-facet-${group.key}`}
-                onMouseDown={() => drag.onItemMouseDown(checked, toggle)}
-                onMouseEnter={() => drag.onItemMouseEnter(checked, toggle)}
+                className={`cat-facet-opt${opt.active ? ' is-checked' : ''}`}
+                data-testid={`promo-facet-${group.key}`}
+                onMouseDown={() => drag.onItemMouseDown(opt.active, toggle)}
+                onMouseEnter={() => drag.onItemMouseEnter(opt.active, toggle)}
               >
                 <input
                   type="checkbox"
                   className="cat-facet-input"
-                  checked={checked}
+                  checked={opt.active}
                   onChange={toggle}
                   onClick={drag.onItemClick}
                 />
@@ -109,9 +118,9 @@ export function SalesFacets({
       ))}
 
       {showClear && (
-        <button type="button" className="ventas-clear" onClick={onClear} data-testid="sales-clear">
+        <button type="button" className="ventas-clear" onClick={onClear} data-testid="promo-clear">
           <X size={13} aria-hidden="true" />
-          Limpiar filtros
+          Limpiar filtros · {clearCount}
         </button>
       )}
     </ScrollShadowCell>

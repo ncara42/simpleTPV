@@ -1,5 +1,6 @@
 import { Users } from 'lucide-react';
 
+import { useScrollShadow } from '../hooks/use-scroll-shadow.js';
 import { fmtEur } from '../lib/format.js';
 import { type CustomerView, initials, relOrderDate } from './customer-facets.js';
 
@@ -41,6 +42,7 @@ export function CustomerList({
   hasFilters,
   onClearFilters,
 }: CustomerListProps) {
+  const { scrollRef, sentinelRef, showShadow } = useScrollShadow();
   return (
     <div className="cust-list" data-testid="b2b-customers">
       {/* Cards de resumen de la cartera filtrada (mismo lenguaje visual que Ventas:
@@ -66,7 +68,7 @@ export function CustomerList({
         </div>
       </div>
 
-      <div className="cust-list-body">
+      <div className={`cust-list-body scroll-shadow-host${showShadow ? ' has-scroll-shadow' : ''}`}>
         <div className="cust-list-head">
           <span className="cust-list-count">
             {rows.length} de {total} cliente{total !== 1 ? 's' : ''}
@@ -87,7 +89,7 @@ export function CustomerList({
             )}
           </div>
         ) : (
-          <div className="cust-list-scroll" data-testid="b2b-customers-table">
+          <div className="cust-list-scroll" data-testid="b2b-customers-table" ref={scrollRef}>
             {rows.map((c) => {
               const tariff = c.priceList?.name ?? 'PVP';
               const mini = saldoMini(c);
@@ -120,6 +122,7 @@ export function CustomerList({
                 </button>
               );
             })}
+            <span className="scroll-shadow-sentinel" ref={sentinelRef} aria-hidden="true" />
           </div>
         )}
       </div>
