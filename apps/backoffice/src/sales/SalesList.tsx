@@ -18,6 +18,9 @@ const hourFmt = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-d
 interface SalesListProps {
   rows: SalesViewRow[];
   chips: CobroChips;
+  /** Total real del periodo (servidor) cuando no hay filtros de cliente; el ledger
+   *  carga de 100 en 100, así que `rows.length` es solo lo cargado. */
+  totalCount?: number | undefined;
   showSummary: boolean;
   selectedId: string | null;
   onSelect: (id: string) => void;
@@ -33,6 +36,7 @@ interface SalesListProps {
 export function SalesList({
   rows,
   chips,
+  totalCount,
   showSummary,
   selectedId,
   onSelect,
@@ -72,7 +76,9 @@ export function SalesList({
       <div className="ventas-list-body">
         <div className="ventas-list-head">
           <span className="ventas-list-count" data-testid="sales-count">
-            {rows.length} ventas
+            {totalCount !== undefined && totalCount > rows.length
+              ? `${rows.length} de ${totalCount} ventas`
+              : `${rows.length} ventas`}
           </span>
           <button
             type="button"

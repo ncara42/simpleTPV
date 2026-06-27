@@ -118,7 +118,24 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
     [rows, view, facets, search, today],
   );
   const sorted = useMemo(() => sortSalesByDate(filtered, sortDir), [filtered, sortDir]);
-  const chips = useMemo(() => cobroTotals(filtered, today), [filtered, today]);
+
+  // Resumen Cobrado/Pendiente/Vencido. Sin filtros de cliente (vista=Todas, sin
+  // búsqueda ni facetas), usa el AGREGADO DEL SERVIDOR: suma TODO el periodo/tienda,
+  // no solo las páginas cargadas (el ledger pagina de 100 en 100). Con facetas o
+  // búsqueda activas el servidor no las conoce → se recalcula sobre el conjunto
+  // cargado (limitación conocida del ledger client-driven).
+  const serverTotals = query.data?.pages[0]?.totals;
+  const clientFiltersActive = hasActiveFilters(view, facets, search);
+  const chips = useMemo(() => {
+    if (!clientFiltersActive && serverTotals) {
+      return {
+        paid: Number(serverTotals.paidTotal),
+        pending: Number(serverTotals.pendingTotal),
+        overdue: Number(serverTotals.overdueTotal),
+      };
+    }
+    return cobroTotals(filtered, today);
+  }, [clientFiltersActive, serverTotals, filtered, today]);
   const selected = sorted.find((r) => r.id === selectedId) ?? sorted[0] ?? null;
 
   // Detalle del ticket (desglose de líneas) de la venta seleccionada.
@@ -241,6 +258,7 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
           <SalesList
             rows={sorted}
             chips={chips}
+            totalCount={clientFiltersActive ? undefined : totalItems}
             showSummary
             selectedId={selected?.id ?? null}
             onSelect={setSelectedId}
