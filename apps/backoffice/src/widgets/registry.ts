@@ -36,6 +36,11 @@ export const WIDGET_LABELS: Record<string, string> = {
   'cmp-hero': 'Cifra-héroe',
   // Sección 06 · Diagnóstico (rediseño)
   'diag-actividad': 'Actividad (alertas)',
+  // Sección 07 · KPIs · más formatos (rediseño)
+  'kpi-dual': 'KPI dual',
+  'kpi-area': 'KPI con área',
+  'kpi-alerta': 'KPI de alerta',
+  'kpi-7dias': 'KPI 7 días',
 };
 
 // Tipo de widget en el registry. Los del catálogo son 'kpi' o 'panel' (su render lo posee

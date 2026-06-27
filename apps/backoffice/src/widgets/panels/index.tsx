@@ -11,6 +11,7 @@ import {
 import { DiagnosticActivity } from './diagnostico.js';
 import { HourHeatmap } from './graficas.js';
 import { ClassicKpiCard, ConnectedKpiGrid } from './kpis.js';
+import { AlertKpi, AreaKpi, DualKpi, SevenDayKpi } from './kpis-formatos.js';
 import { FamilyShare, FamilyTreemap, ProductRanking } from './listas.js';
 import type { PanelProps } from './types.js';
 
@@ -36,6 +37,11 @@ export const WIDGET_PANELS: Record<string, (props: PanelProps) => ReactElement> 
   'cmp-hero': CompactHero,
   // Sección 06 · Diagnóstico
   'diag-actividad': DiagnosticActivity,
+  // Sección 07 · KPIs · más formatos
+  'kpi-dual': DualKpi,
+  'kpi-area': AreaKpi,
+  'kpi-alerta': AlertKpi,
+  'kpi-7dias': SevenDayKpi,
 };
 
 // Ids de los widgets con render (para el test de paridad con el catálogo).

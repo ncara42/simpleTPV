@@ -409,6 +409,135 @@ function ThumbActivity(): ReactNode {
   );
 }
 
+// «KPI dual» (kpi-dual): tarjeta con dos métricas apiladas separadas por hairline.
+function ThumbKpiDual(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <rect
+        x={6}
+        y={6}
+        width={120}
+        height={52}
+        rx={6}
+        fill="none"
+        stroke="var(--ui-border)"
+        strokeWidth={1}
+      />
+      <rect x={16} y={12} width={26} height={3} rx={1.5} fill={SOFT_BLUE} />
+      <rect x={16} y={18} width={44} height={8} rx={2} fill="var(--ui-brand)" />
+      <line x1={16} y1={32} x2={116} y2={32} stroke="var(--ui-border)" strokeWidth={1} />
+      <rect x={16} y={38} width={26} height={3} rx={1.5} fill={SOFT_BLUE} />
+      <rect x={16} y={44} width={44} height={8} rx={2} fill="var(--ui-brand)" />
+    </svg>
+  );
+}
+
+// «KPI con área» (kpi-area): tarjeta con cifra y área de tendencia a sangre al pie.
+function ThumbKpiArea(): ReactNode {
+  const line = 'M10,46 L34,40 L58,43 L86,34 L110,40 L122,35';
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <rect
+        x={6}
+        y={6}
+        width={120}
+        height={52}
+        rx={6}
+        fill="none"
+        stroke="var(--ui-border)"
+        strokeWidth={1}
+      />
+      <rect x={16} y={13} width={28} height={4} rx={2} fill={SOFT_BLUE} />
+      <rect x={16} y={22} width={52} height={10} rx={2} fill="var(--ui-brand)" />
+      <path d={`${line} L122,52 L10,52 Z`} fill="var(--ui-brand-soft)" />
+      <path
+        d={line}
+        fill="none"
+        stroke="var(--ui-brand)"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
+// «KPI de alerta» (kpi-alerta): tarjeta teñida de rojo con cifra y chip de roturas.
+function ThumbKpiAlert(): ReactNode {
+  const danger = 'var(--ui-danger, #d6201f)';
+  const dangerSoft = 'color-mix(in oklab, var(--ui-danger, #d6201f) 24%, var(--ui-surface))';
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <rect
+        x={6}
+        y={6}
+        width={120}
+        height={52}
+        rx={6}
+        fill="none"
+        stroke={danger}
+        strokeWidth={1.5}
+      />
+      <rect x={16} y={14} width={34} height={4} rx={2} fill={dangerSoft} />
+      <rect x={16} y={24} width={50} height={11} rx={2} fill={danger} />
+      <rect x={16} y={44} width={40} height={8} rx={4} fill={dangerSoft} />
+    </svg>
+  );
+}
+
+// «KPI 7 días» (kpi-7dias): tarjeta con cifra y mini-barras de la serie reciente (última resaltada).
+function ThumbKpi7d(): ReactNode {
+  const heights = [10, 16, 12, 20, 14, 22, 26];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <rect
+        x={6}
+        y={6}
+        width={120}
+        height={52}
+        rx={6}
+        fill="none"
+        stroke="var(--ui-border)"
+        strokeWidth={1}
+      />
+      <rect x={16} y={13} width={26} height={4} rx={2} fill={SOFT_BLUE} />
+      <rect x={16} y={22} width={44} height={9} rx={2} fill="var(--ui-brand)" />
+      {heights.map((h, i) => (
+        <rect
+          key={i}
+          x={16 + i * 15}
+          y={52 - h}
+          width={10}
+          height={h}
+          rx={2}
+          fill={i === heights.length - 1 ? 'var(--ui-brand)' : SOFT_BLUE}
+        />
+      ))}
+    </svg>
+  );
+}
+
 // Entradas de la galería (se amplía por tandas).
 export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
   // Sección 01 · KPIs
@@ -513,5 +642,34 @@ export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
     category: 'diagnostico',
     description: 'Línea de tiempo de alertas de stock',
     thumbnail: <ThumbActivity />,
+  },
+  // Sección 07 · KPIs · más formatos
+  {
+    id: 'kpi-dual',
+    label: 'KPI dual',
+    category: 'kpis-formatos',
+    description: 'Dos métricas apiladas en una tarjeta',
+    thumbnail: <ThumbKpiDual />,
+  },
+  {
+    id: 'kpi-area',
+    label: 'KPI con área',
+    category: 'kpis-formatos',
+    description: 'Cifra con área de tendencia',
+    thumbnail: <ThumbKpiArea />,
+  },
+  {
+    id: 'kpi-alerta',
+    label: 'KPI de alerta',
+    category: 'kpis-formatos',
+    description: 'Venta perdida por roturas (rojo)',
+    thumbnail: <ThumbKpiAlert />,
+  },
+  {
+    id: 'kpi-7dias',
+    label: 'KPI 7 días',
+    category: 'kpis-formatos',
+    description: 'Cifra con mini-barras recientes',
+    thumbnail: <ThumbKpi7d />,
   },
 ];
