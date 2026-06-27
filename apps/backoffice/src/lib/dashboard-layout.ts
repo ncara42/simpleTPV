@@ -54,6 +54,8 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   // Sección 01 · KPIs (rediseño): rejilla conectada (banda full-bleed de 6 KPIs) y tarjeta clásica.
   'kpi-grid-connected': { w: 12, h: 2 },
   'kpi-classic': { w: 3, h: 2 },
+  // Sección 02 · Gráficas (rediseño): tira de mapa de calor horario (ancha, una fila de celdas).
+  'graf-heatmap': { w: 6, h: 2 },
 };
 
 const DEFAULT_SPEC = { w: 4, h: 2 };

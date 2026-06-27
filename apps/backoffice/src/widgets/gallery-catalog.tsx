@@ -161,6 +161,31 @@ function ThumbKpiCard(): ReactNode {
   );
 }
 
+// «Mapa de calor horario» (graf-heatmap): tira de celdas, intensidad por facturación; el pico saturado.
+function ThumbHeatmap(): ReactNode {
+  const heat = [0.16, 0.34, 0.58, 1, 0.82, 0.46, 0.24]; // intensidades [0,1]; la de valor 1 = hora punta.
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {heat.map((t, i) => (
+        <rect
+          key={i}
+          x={6 + i * 18}
+          y={20}
+          width={15}
+          height={24}
+          rx={2.5}
+          fill={`color-mix(in oklab, var(--ui-brand) ${Math.round(8 + t * 92)}%, var(--ui-surface))`}
+        />
+      ))}
+    </svg>
+  );
+}
+
 // Entradas de la galería (se amplía por tandas).
 export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
   // Sección 01 · KPIs
@@ -192,5 +217,12 @@ export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
     category: 'graficas',
     description: 'Distribución horaria del día',
     thumbnail: <ThumbHours />,
+  },
+  {
+    id: 'graf-heatmap',
+    label: 'Mapa de calor horario',
+    category: 'graficas',
+    description: 'Intensidad de ventas por hora',
+    thumbnail: <ThumbHeatmap />,
   },
 ];

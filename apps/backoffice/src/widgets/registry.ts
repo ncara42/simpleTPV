@@ -22,6 +22,8 @@ export const WIDGET_LABELS: Record<string, string> = {
   // Sección 01 · KPIs (rediseño)
   'kpi-grid-connected': 'KPIs (rejilla conectada)',
   'kpi-classic': 'KPI (tarjeta clásica)',
+  // Sección 02 · Gráficas (rediseño)
+  'graf-heatmap': 'Mapa de calor horario',
 };
 
 // Tipo de widget en el registry. Los del catálogo son 'kpi' o 'panel' (su render lo posee

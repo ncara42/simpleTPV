@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 
 import type { DashboardPeriod } from '../../lib/dashboard.js';
+import { HourHeatmap } from './graficas.js';
 import { ClassicKpiCard, ConnectedKpiGrid } from './kpis.js';
 import type { PanelProps } from './types.js';
 
@@ -12,6 +13,8 @@ export const WIDGET_PANELS: Record<string, (props: PanelProps) => ReactElement> 
   // Sección 01 · KPIs
   'kpi-grid-connected': ConnectedKpiGrid,
   'kpi-classic': ClassicKpiCard,
+  // Sección 02 · Gráficas (dash-bars/dash-hour son clásicos, fuera de este registro)
+  'graf-heatmap': HourHeatmap,
 };
 
 // Ids de los widgets con render (para el test de paridad con el catálogo).
