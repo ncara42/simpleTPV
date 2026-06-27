@@ -66,6 +66,8 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'cmp-treemap': { w: 3, h: 2 },
   'cmp-leaderboard': { w: 3, h: 3 },
   'cmp-hero': { w: 5, h: 2 },
+  // Sección 06 · Diagnóstico (rediseño): feed de actividad (lista alta).
+  'diag-actividad': { w: 4, h: 3 },
 };
 
 const DEFAULT_SPEC = { w: 4, h: 2 };

@@ -34,6 +34,8 @@ export const WIDGET_LABELS: Record<string, string> = {
   'cmp-treemap': 'Treemap compacto',
   'cmp-leaderboard': 'Top vendedores',
   'cmp-hero': 'Cifra-héroe',
+  // Sección 06 · Diagnóstico (rediseño)
+  'diag-actividad': 'Actividad (alertas)',
 };
 
 // Tipo de widget en el registry. Los del catálogo son 'kpi' o 'panel' (su render lo posee

@@ -382,6 +382,33 @@ function ThumbHero(): ReactNode {
   );
 }
 
+// «Actividad» (diag-actividad): línea de tiempo con punto por hito y dos líneas de texto por fila.
+function ThumbActivity(): ReactNode {
+  const rows = [12, 32, 52];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <line x1={13} y1={8} x2={13} y2={56} stroke="var(--ui-border)" strokeWidth={1.5} />
+      {rows.map((y, i) => (
+        <g key={i}>
+          <circle
+            cx={13}
+            cy={y}
+            r={4}
+            fill={`color-mix(in oklab, var(--ui-brand) ${100 - i * 30}%, var(--ui-surface))`}
+          />
+          <rect x={26} y={y - 5} width={74} height={4} rx={2} fill="var(--ui-brand)" />
+          <rect x={26} y={y + 2} width={48} height={3} rx={1.5} fill={SOFT_BLUE} />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 // Entradas de la galería (se amplía por tandas).
 export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
   // Sección 01 · KPIs
@@ -478,5 +505,13 @@ export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
     category: 'compactos',
     description: 'La cifra del periodo, en grande',
     thumbnail: <ThumbHero />,
+  },
+  // Sección 06 · Diagnóstico
+  {
+    id: 'diag-actividad',
+    label: 'Actividad (alertas)',
+    category: 'diagnostico',
+    description: 'Línea de tiempo de alertas de stock',
+    thumbnail: <ThumbActivity />,
   },
 ];

@@ -8,6 +8,7 @@ import {
   CompactRibbon,
   CompactTreemap,
 } from './compactos.js';
+import { DiagnosticActivity } from './diagnostico.js';
 import { HourHeatmap } from './graficas.js';
 import { ClassicKpiCard, ConnectedKpiGrid } from './kpis.js';
 import { FamilyShare, FamilyTreemap, ProductRanking } from './listas.js';
@@ -33,6 +34,8 @@ export const WIDGET_PANELS: Record<string, (props: PanelProps) => ReactElement> 
   'cmp-treemap': CompactTreemap,
   'cmp-leaderboard': CompactLeaderboard,
   'cmp-hero': CompactHero,
+  // Sección 06 · Diagnóstico
+  'diag-actividad': DiagnosticActivity,
 };
 
 // Ids de los widgets con render (para el test de paridad con el catálogo).
