@@ -60,6 +60,12 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'lista-familia': { w: 4, h: 2 },
   'lista-rankings': { w: 4, h: 3 },
   'lista-mix': { w: 5, h: 3 },
+  // Sección 05 · Compactos (rediseño): tiles pequeños (ribbon, donut, treemap, top, cifra-héroe).
+  'cmp-ribbon': { w: 3, h: 2 },
+  'cmp-donut': { w: 3, h: 2 },
+  'cmp-treemap': { w: 3, h: 2 },
+  'cmp-leaderboard': { w: 3, h: 3 },
+  'cmp-hero': { w: 5, h: 2 },
 };
 
 const DEFAULT_SPEC = { w: 4, h: 2 };

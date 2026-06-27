@@ -292,6 +292,96 @@ function ThumbTreemap(): ReactNode {
   );
 }
 
+// «Banda compacta» (cmp-ribbon): tres filas de métrica (rótulo + cifra) con mini-tendencia a la dcha.
+function ThumbRibbon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[0, 20, 40].map((dy, i) => (
+        <g key={i}>
+          <rect x={6} y={9 + dy} width={28} height={4} rx={2} fill={SOFT_BLUE} />
+          <rect x={6} y={16 + dy} width={22} height={6} rx={2} fill="var(--ui-brand)" />
+          <path
+            d={`M86,${17 + dy} L98,${12 + dy} L110,${15 + dy} L124,${10 + dy}`}
+            fill="none"
+            stroke={SOFT_BLUE}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// «Donut por familia» (cmp-donut): anillo segmentado en la rampa azul con hueco central.
+function ThumbDonut(): ReactNode {
+  const R = 20;
+  const C = 2 * Math.PI * R;
+  const segs = [0.5, 0.3, 0.2];
+  let acc = 0;
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <g transform="translate(66,32) rotate(-90)">
+        {segs.map((f, i) => {
+          const len = f * C;
+          const node = (
+            <circle
+              key={i}
+              r={R}
+              fill="none"
+              strokeWidth={11}
+              stroke={`color-mix(in oklab, var(--ui-brand) ${100 - i * 30}%, var(--ui-surface))`}
+              strokeDasharray={`${len} ${C - len}`}
+              strokeDashoffset={-acc}
+            />
+          );
+          acc += len;
+          return node;
+        })}
+      </g>
+    </svg>
+  );
+}
+
+// «Cifra-héroe» (cmp-hero): número gigante + chip a la izquierda y área de tendencia a la derecha.
+function ThumbHero(): ReactNode {
+  const line = 'M74,50 L88,40 L100,44 L112,32 L126,36';
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <rect x={8} y={12} width={24} height={4} rx={2} fill={SOFT_BLUE} />
+      <rect x={8} y={22} width={52} height={15} rx={3} fill="var(--ui-brand)" />
+      <rect x={8} y={44} width={30} height={6} rx={3} fill={SOFT_BLUE} />
+      <path d={`${line} L126,58 L74,58 Z`} fill="var(--ui-brand-soft)" />
+      <path
+        d={line}
+        fill="none"
+        stroke="var(--ui-brand)"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
 // Entradas de la galería (se amplía por tandas).
 export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
   // Sección 01 · KPIs
@@ -352,5 +442,41 @@ export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
     category: 'listas',
     description: 'Mapa de área por familia',
     thumbnail: <ThumbTreemap />,
+  },
+  // Sección 05 · Compactos
+  {
+    id: 'cmp-ribbon',
+    label: 'Banda compacta de métricas',
+    category: 'compactos',
+    description: 'Facturación, tickets y ticket medio',
+    thumbnail: <ThumbRibbon />,
+  },
+  {
+    id: 'cmp-donut',
+    label: 'Donut por familia',
+    category: 'compactos',
+    description: 'Anillo de reparto por familia',
+    thumbnail: <ThumbDonut />,
+  },
+  {
+    id: 'cmp-treemap',
+    label: 'Treemap compacto',
+    category: 'compactos',
+    description: 'Mapa de área en tile pequeño',
+    thumbnail: <ThumbTreemap />,
+  },
+  {
+    id: 'cmp-leaderboard',
+    label: 'Top vendedores',
+    category: 'compactos',
+    description: 'Ranking de vendedores',
+    thumbnail: <ThumbLeaderboard />,
+  },
+  {
+    id: 'cmp-hero',
+    label: 'Cifra-héroe',
+    category: 'compactos',
+    description: 'La cifra del periodo, en grande',
+    thumbnail: <ThumbHero />,
   },
 ];

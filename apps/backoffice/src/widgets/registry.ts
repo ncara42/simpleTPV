@@ -28,6 +28,12 @@ export const WIDGET_LABELS: Record<string, string> = {
   'lista-familia': 'Reparto por familia',
   'lista-rankings': 'Ranking de productos',
   'lista-mix': 'Mix por familia (treemap)',
+  // Sección 05 · Compactos (rediseño)
+  'cmp-ribbon': 'Banda compacta de métricas',
+  'cmp-donut': 'Donut por familia',
+  'cmp-treemap': 'Treemap compacto',
+  'cmp-leaderboard': 'Top vendedores',
+  'cmp-hero': 'Cifra-héroe',
 };
 
 // Tipo de widget en el registry. Los del catálogo son 'kpi' o 'panel' (su render lo posee

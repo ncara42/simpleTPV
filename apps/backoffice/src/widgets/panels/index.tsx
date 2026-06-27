@@ -1,6 +1,13 @@
 import type { ReactElement } from 'react';
 
 import type { DashboardPeriod } from '../../lib/dashboard.js';
+import {
+  CompactDonut,
+  CompactHero,
+  CompactLeaderboard,
+  CompactRibbon,
+  CompactTreemap,
+} from './compactos.js';
 import { HourHeatmap } from './graficas.js';
 import { ClassicKpiCard, ConnectedKpiGrid } from './kpis.js';
 import { FamilyShare, FamilyTreemap, ProductRanking } from './listas.js';
@@ -20,6 +27,12 @@ export const WIDGET_PANELS: Record<string, (props: PanelProps) => ReactElement> 
   'lista-familia': FamilyShare,
   'lista-rankings': ProductRanking,
   'lista-mix': FamilyTreemap,
+  // Sección 05 · Compactos
+  'cmp-ribbon': CompactRibbon,
+  'cmp-donut': CompactDonut,
+  'cmp-treemap': CompactTreemap,
+  'cmp-leaderboard': CompactLeaderboard,
+  'cmp-hero': CompactHero,
 };
 
 // Ids de los widgets con render (para el test de paridad con el catálogo).
