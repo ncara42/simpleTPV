@@ -1,10 +1,6 @@
-import {
-  type FormEvent,
-  type MouseEvent as ReactMouseEvent,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
+
+import { useBrandMesh } from '../hooks/use-brand-mesh.js';
 
 export interface LoginFormProps {
   onSubmit: (email: string, password: string) => Promise<void>;
@@ -12,14 +8,94 @@ export interface LoginFormProps {
   initialPassword?: string;
 }
 
-function EyeReveal({ open }: { open: boolean }) {
+// Validación local previa al envío (idéntica al diseño Login.dc): formato de
+// correo y longitud mínima de contraseña. Ahorra un viaje al servidor para
+// errores triviales; el error de credenciales real llega del `onSubmit`.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD_LENGTH = 6;
+
+// ── Iconos en línea (SVG decorativos, sin dependencia de librería) ──────────
+function MailIcon() {
   return (
     <svg
-      key={String(open)}
-      className={`eye-icon${open ? ' eye-icon--open' : ' eye-icon--closed'}`}
-      width="18"
-      height="18"
+      className="login-input-icon"
       viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      aria-hidden="true"
+    >
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 7l9 6 9-6" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg
+      className="login-input-icon"
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      aria-hidden="true"
+    >
+      <rect x="4" y="11" width="16" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
+function EyeIcon({ slashed }: { slashed: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="17"
+      height="17"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+      {slashed && <line x1="3" y1="3" x2="21" y2="21" />}
+    </svg>
+  );
+}
+
+function AlertIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="13"
+      height="13"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <line x1="12" y1="8" x2="12" y2="13" />
+      <line x1="12" y1="16.5" x2="12" y2="16.5" />
+    </svg>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -27,19 +103,26 @@ function EyeReveal({ open }: { open: boolean }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <g className="eye-lids">
-        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
-        <circle className="eye-pupil" cx="12" cy="12" r="3" />
-        <circle
-          className="eye-glint"
-          cx="13.4"
-          cy="10.6"
-          r="0.75"
-          fill="currentColor"
-          stroke="none"
-        />
-      </g>
-      <line className="eye-slash" x1="2" y1="2" x2="22" y2="22" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="13 6 19 12 13 18" />
+    </svg>
+  );
+}
+
+function BrandMark() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="17"
+      height="17"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M5 12l5 5L20 7" />
     </svg>
   );
 }
@@ -48,9 +131,18 @@ export function LoginForm({ onSubmit, initialEmail = '', initialPassword = '' }:
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState(initialPassword);
   const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [emailErr, setEmailErr] = useState('');
+  const [passwordErr, setPasswordErr] = useState('');
+  const [serverErr, setServerErr] = useState('');
+
+  // Panel de marca: malla animada en <canvas> (se aparta del puntero, respeta
+  // prefers-reduced-motion y se limpia sola).
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useBrandMesh(canvasRef);
+
+  // Evita el set de estado en el `finally` si el login tuvo éxito y App ya
+  // desmontó el formulario (el accessToken cambió → render de Home).
   const mountedRef = useRef(true);
   useEffect(
     () => () => {
@@ -59,178 +151,181 @@ export function LoginForm({ onSubmit, initialEmail = '', initialPassword = '' }:
     [],
   );
 
-  // El halo de marca sigue al puntero (suavizado vía transición CSS).
-  // Se desactiva en táctil y bajo prefers-reduced-motion.
-  const shellRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number | null>(null);
-  const staticBgRef = useRef(false);
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const coarse = window.matchMedia('(pointer: coarse)');
-    const sync = (): void => {
-      staticBgRef.current = reduced.matches || coarse.matches;
-    };
-    sync();
-    reduced.addEventListener('change', sync);
-    coarse.addEventListener('change', sync);
-    return () => {
-      reduced.removeEventListener('change', sync);
-      coarse.removeEventListener('change', sync);
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    };
-  }, []);
-
-  function handlePointerMove(e: ReactMouseEvent<HTMLDivElement>): void {
-    if (staticBgRef.current || rafRef.current !== null) return;
-    const el = shellRef.current;
-    if (!el) return;
-    const { clientX, clientY } = e;
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      const r = el.getBoundingClientRect();
-      el.style.setProperty('--login-px', ((clientX - r.left) / r.width - 0.5).toFixed(3));
-      el.style.setProperty('--login-py', ((clientY - r.top) / r.height - 0.5).toFixed(3));
-    });
+  function validate(): boolean {
+    const mail = email.trim();
+    let mailErr = '';
+    let pwErr = '';
+    if (!mail) mailErr = 'Introduce tu correo electrónico.';
+    else if (!EMAIL_RE.test(mail)) mailErr = 'Introduce un correo electrónico válido.';
+    if (!password) pwErr = 'Introduce tu contraseña.';
+    else if (password.length < MIN_PASSWORD_LENGTH)
+      pwErr = `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`;
+    setEmailErr(mailErr);
+    setPasswordErr(pwErr);
+    return !mailErr && !pwErr;
   }
 
   async function handleSubmit(e: FormEvent): Promise<void> {
-    if (loading) return;
     e.preventDefault();
-    setError(null);
-    setLoading(true);
+    if (submitting) return;
+    setServerErr('');
+    if (!validate()) return;
+    setSubmitting(true);
     try {
-      await onSubmit(email, password);
+      await onSubmit(email.trim(), password);
+      // En caso de éxito no pintamos pantalla de «acceso concedido»: el
+      // accessToken cambia y App deja de renderizar este formulario.
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión');
+      setServerErr(err instanceof Error ? err.message : 'No se pudo iniciar sesión.');
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (mountedRef.current) setSubmitting(false);
     }
   }
 
   return (
-    <div className="login-shell" ref={shellRef} onMouseMove={handlePointerMove}>
-      {/* Panel izquierdo — marca */}
+    <div className="login-root">
+      {/* Panel de marca (izquierda) — oculto en ≤880px */}
       <aside className="login-brand">
-        {/* Fondo: precisión, no decoración — rejilla técnica, halo de
-            marca anclado y grano fino. Sin constelaciones ni haces. */}
-        <div className="login-brand-grid" aria-hidden="true" />
-        <div className="login-brand-bloom" aria-hidden="true" />
-        <div className="login-brand-grain" aria-hidden="true" />
-
-        <div className="login-brand-logo">
-          <span className="login-brand-name">simple</span>
-          <span className="login-brand-suffix">TPV</span>
-        </div>
-
-        <div className="login-brand-copy">
-          <span className="login-brand-eyebrow">Plataforma de gestión</span>
-          <h2 className="login-brand-title">
-            Todo tu retail,
-            <br />
-            en un solo lugar.
-          </h2>
-          <p className="login-brand-text">
-            Ventas, inventario, equipo y analítica, sincronizados en tiempo real entre todas tus
-            tiendas.
-          </p>
+        <canvas ref={canvasRef} className="login-brand-mesh" aria-hidden="true" />
+        <div className="login-brand-inner">
+          <div className="login-brand-head">
+            <span className="login-brand-wordmark">SimpleTPV</span>
+          </div>
+          <div className="login-brand-message">
+            <span className="login-brand-rule" aria-hidden="true" />
+            <blockquote className="login-brand-quote">
+              Centralizamos catálogo, inventario y pedidos B2B en una sola herramienta. Cerramos
+              cada mes cuadrado y sin hojas de cálculo.
+            </blockquote>
+          </div>
         </div>
       </aside>
 
-      {/* Panel derecho — formulario */}
-      <main className="login-panel">
-        <form onSubmit={handleSubmit} className="login-form" noValidate data-testid="login-card">
-          <div className="login-heading">
-            <h1 className="login-title">Bienvenido de nuevo</h1>
-            <p className="login-subtitle">Tu negocio al completo, desde aquí.</p>
+      {/* Panel del formulario (derecha) */}
+      <section className="login-formpanel">
+        <div className="login-card" data-testid="login-card">
+          {/* Logo solo visible cuando el panel de marca se oculta (móvil) */}
+          <div className="login-card-logo">
+            <span className="login-card-logo-mark">
+              <BrandMark />
+            </span>
+            <span className="login-card-logo-name">SimpleTPV</span>
           </div>
 
-          <label className="login-field">
-            <span className="login-label">Usuario</span>
-            <input
-              type="text"
-              autoComplete="username"
-              required
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                setError(null);
-              }}
-              className={`login-input${error ? ' login-input--error' : ''}`}
-              data-testid="login-email"
-              disabled={loading}
-            />
-          </label>
+          <h1 className="login-title">Inicia sesión</h1>
+          <p className="login-subtitle">Introduce tus credenciales para acceder al backoffice.</p>
 
-          <label className="login-field">
-            <span className="login-label">Contraseña</span>
-            <div className="login-input-wrap">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setError(null);
-                }}
-                className={`login-input login-input--password${error ? ' login-input--error' : ''}`}
-                data-testid="login-password"
-                disabled={loading}
-              />
-              <button
-                type="button"
-                className="login-reveal"
-                onClick={() => setShowPassword((v) => !v)}
-                tabIndex={-1}
-                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-              >
-                <EyeReveal open={showPassword} />
-              </button>
+          <form className="login-form" onSubmit={handleSubmit} noValidate>
+            <div className="login-field">
+              <label className="login-label" htmlFor="login-email-input">
+                Correo electrónico
+              </label>
+              <span className="login-input-wrap">
+                <MailIcon />
+                <input
+                  id="login-email-input"
+                  className="login-input"
+                  type="email"
+                  autoComplete="username"
+                  placeholder="tu@empresa.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setEmailErr('');
+                    setServerErr('');
+                  }}
+                  data-testid="login-email"
+                  data-err={emailErr ? '1' : '0'}
+                  aria-invalid={emailErr ? true : undefined}
+                  aria-describedby={emailErr ? 'login-email-error' : undefined}
+                  disabled={submitting}
+                />
+              </span>
+              {emailErr && (
+                <p className="login-field-error" id="login-email-error">
+                  <AlertIcon />
+                  {emailErr}
+                </p>
+              )}
             </div>
-          </label>
 
-          {error && (
-            <p className="login-error" role="alert" data-testid="login-error">
-              {error}
-            </p>
-          )}
+            <div className="login-field">
+              <div className="login-label-row">
+                <label className="login-label" htmlFor="login-password-input">
+                  Contraseña
+                </label>
+                <button type="button" className="login-link">
+                  La olvidé
+                </button>
+              </div>
+              <span className="login-input-wrap">
+                <LockIcon />
+                <input
+                  id="login-password-input"
+                  className="login-input login-input--password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="Tu contraseña"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setPasswordErr('');
+                    setServerErr('');
+                  }}
+                  data-testid="login-password"
+                  data-err={passwordErr ? '1' : '0'}
+                  aria-invalid={passwordErr ? true : undefined}
+                  aria-describedby={passwordErr ? 'login-password-error' : undefined}
+                  disabled={submitting}
+                />
+                <button
+                  type="button"
+                  className="login-eye"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  <EyeIcon slashed={showPassword} />
+                </button>
+              </span>
+              {passwordErr && (
+                <p className="login-field-error" id="login-password-error">
+                  <AlertIcon />
+                  {passwordErr}
+                </p>
+              )}
+            </div>
 
-          <div className="login-options">
-            <label className="login-remember">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-              />
-              <span>Recordar sesión</span>
-            </label>
-            <a className="login-forgot" href="#">
-              ¿Olvidaste tu contraseña?
-            </a>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="login-submit"
-            data-testid="login-submit"
-          >
-            {loading ? (
-              <>
-                <span className="login-spinner" aria-hidden="true" />
-                <span className="login-sr-only">Iniciando sesión…</span>
-              </>
-            ) : (
-              'Iniciar sesión'
+            {serverErr && (
+              <p
+                className="login-field-error login-server-error"
+                role="alert"
+                data-testid="login-error"
+              >
+                <AlertIcon />
+                {serverErr}
+              </p>
             )}
-          </button>
+
+            <button
+              type="submit"
+              className="login-submit"
+              disabled={submitting}
+              data-testid="login-submit"
+            >
+              {submitting && <span className="login-spinner" aria-hidden="true" />}
+              {submitting ? 'Comprobando…' : 'Iniciar sesión'}
+              {!submitting && <ArrowIcon />}
+            </button>
+          </form>
 
           <p className="login-footnote">
-            ¿Problemas para acceder? <span>Contacta con tu administrador</span>
+            ¿Necesitas una cuenta?{' '}
+            <button type="button" className="login-link">
+              Solicita acceso
+            </button>
           </p>
-        </form>
-      </main>
+        </div>
+      </section>
     </div>
   );
 }

@@ -1,21 +1,32 @@
-/* ─── Tokens locales del login ───────────────────────────── */
-.login-shell {
-  --login-blue: #4f7cff;
-  --login-blue-hover: #6a90ff;
-  --login-ink: #f5f6fa;
-  --login-muted: rgba(255, 255, 255, 0.55);
-  --login-soft: rgba(255, 255, 255, 0.38);
-  --login-border: rgba(255, 255, 255, 0.14);
-  --login-border-focus: var(--login-blue);
-  --login-field-bg: rgba(255, 255, 255, 0.045);
+/* ─── Login — diseño Login.dc (split: panel de marca + tarjeta de acceso) ───
+   Superficie pre-auth a pantalla completa y autónoma: define sus propios tokens
+   (paleta Geist/Vercel clara) en .login-root, de modo que se ve idéntica tanto
+   con el tema claro como con el oscuro de la app. El panel de marca (izquierda)
+   es claro (casi blanco) con una malla animada en <canvas> y un filete que lo
+   separa del formulario (derecha), una tarjeta clara. En ≤880px la marca se
+   oculta y el formulario pasa a tarjeta. */
 
-  position: relative;
-  display: flex;
-  justify-content: flex-end;
-  align-items: stretch;
+.login-root {
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --subtle: #f4f4f5;
+  --line: #e8e8eb;
+  --line2: #d6d6da;
+  --ink: #18181b;
+  --mut: #52525b;
+  --soft: #71717a;
+  --faint: #a1a1aa;
+  --blue: #0070f3;
+  --blue-hover: #005bd3;
+  --blue-ink: #0061d1;
+  --dang: #d6201f;
+  --focus: 0 0 0 3px rgba(0, 112, 243, 0.3);
+
   min-height: 100vh;
-  overflow: hidden;
-  background: #0d0d10;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 392px;
+  background: var(--bg);
+  color: var(--ink);
   font-family:
     Geist,
     Inter,
@@ -26,625 +37,322 @@
     'Segoe UI',
     sans-serif;
   -webkit-font-smoothing: antialiased;
-  color: var(--login-ink);
+  text-rendering: optimizeLegibility;
 }
 
-@media (max-width: 860px) {
-  .login-shell {
-    justify-content: center;
-  }
-}
-
-/* ─── Panel izquierdo — marca ─────────────────────────────── */
+/* ─── Panel de marca (izquierda) ─────────────────────────────────────────── */
 .login-brand {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
+  --bp-fg: #18181b;
+  position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: 3rem 3.25rem;
-  background: radial-gradient(125% 125% at 0% 100%, #12141b 0%, #0c0c11 46%, #08080b 100%);
-  color: #ffffff;
-  isolation: isolate;
+  padding: 48px;
+  border-right: 1px solid var(--line);
+  background: linear-gradient(180deg, #fcfcfd, #f6f6f8);
+  color: var(--bp-fg);
 }
 
-@media (max-width: 860px) {
-  .login-brand {
-    padding: 1.75rem;
-  }
-  /* Especificidad extra: la regla base de .login-brand-copy aparece más abajo */
-  .login-shell .login-brand-copy {
-    display: none;
-  }
+/* La malla se pinta a sangre (ignora el padding) y se difumina hacia los bordes
+   con una máscara radial anclada arriba a la derecha. */
+.login-brand-mesh {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(135% 125% at 62% 32%, #000 36%, transparent 100%);
+  mask-image: radial-gradient(135% 125% at 62% 32%, #000 36%, transparent 100%);
 }
 
-/* El contenido se mantiene por encima de las capas decorativas */
-.login-brand-logo,
-.login-brand-copy {
+.login-brand-inner {
   position: relative;
   z-index: 1;
-}
-
-/* ─── Fondo: precisión, no decoración ─────────────────────────
-   Rejilla técnica + halo de marca anclado + grano fino.
-   El lujo está en la quietud y el detalle, no en el movimiento:
-   nada de constelaciones, haces ni formas flotantes (eso leía
-   como «SaaS genérico»). */
-
-/* Rejilla de ingeniería en dos escalas (fina + maestra), recta y
-   estática. Enmascarada hacia la esquina de marca (abajo-izquierda)
-   y desvanecida antes del formulario. La precisión se lee como quietud. */
-.login-brand-grid {
-  pointer-events: none;
-  position: absolute;
-  inset: -28px;
-  z-index: -2;
-  transform: translate3d(calc(var(--login-px, 0) * -22px), calc(var(--login-py, 0) * -16px), 0);
-  transition: transform 1.3s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
-  background-image:
-    linear-gradient(to right, rgba(150, 172, 224, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(150, 172, 224, 0.05) 1px, transparent 1px),
-    linear-gradient(to right, rgba(150, 172, 224, 0.09) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(150, 172, 224, 0.09) 1px, transparent 1px);
-  background-size:
-    34px 34px,
-    34px 34px,
-    170px 170px,
-    170px 170px;
-  -webkit-mask-image: radial-gradient(
-    120% 135% at 6% 94%,
-    #000 0%,
-    rgba(0, 0, 0, 0.5) 34%,
-    transparent 64%
-  );
-  mask-image: radial-gradient(
-    120% 135% at 6% 94%,
-    #000 0%,
-    rgba(0, 0, 0, 0.5) 34%,
-    transparent 64%
-  );
-}
-
-/* Halo de marca: un único foco frío anclado tras el titular, abajo a
-   la izquierda. Da presencia sin convertirse en «spotlight». Respira
-   muy despacio; imperceptible, vivo. */
-.login-brand-bloom {
-  pointer-events: none;
-  position: absolute;
-  left: -14%;
-  bottom: -20%;
-  width: 62%;
-  height: 78%;
-  z-index: -1;
-  transform: translate3d(calc(var(--login-px, 0) * 72px), calc(var(--login-py, 0) * 52px), 0);
-  transition: transform 1s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
-}
-
-/* La luz respira por su cuenta; el contenedor sigue al puntero.
-   Separar ambas capas evita que un transform pise al otro. */
-.login-brand-bloom::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    closest-side at center,
-    rgba(79, 124, 255, 0.24),
-    rgba(79, 124, 255, 0.08) 46%,
-    transparent 72%
-  );
-  filter: blur(14px);
-  animation: login-bloom-breathe 9s ease-in-out infinite;
-}
-
-@keyframes login-bloom-breathe {
-  0%,
-  100% {
-    opacity: 0.78;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.06);
-  }
-}
-
-/* Grano fino: mata el banding del degradado y aporta textura de
-   «pantalla cara». Soft-light, casi imperceptible. */
-.login-brand-grain {
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  opacity: 0.5;
-  mix-blend-mode: soft-light;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 160px 160px;
-}
-
-/* Respeta a quien prefiere menos movimiento */
-@media (prefers-reduced-motion: reduce) {
-  .login-brand-grid,
-  .login-brand-bloom {
-    transform: none;
-    transition: none;
-  }
-
-  .login-brand-bloom::before {
-    animation: none;
-  }
-
-  .login-brand-logo,
-  .login-brand-copy {
-    animation: none;
-  }
-
-  .eye-icon,
-  .eye-lids,
-  .eye-pupil,
-  .eye-glint {
-    animation: none !important;
-  }
-
-  .eye-icon--open .eye-glint {
-    opacity: 0.65;
-  }
-
-  .eye-icon--closed .eye-pupil {
-    opacity: 0.22;
-  }
-
-  .eye-icon--closed .eye-slash {
-    animation: none !important;
-    stroke-dashoffset: 0;
-    opacity: 1;
-  }
-}
-
-@keyframes login-brand-enter {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.login-brand-logo {
-  display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  font-size: 1.375rem;
-  letter-spacing: -0.01em;
-  animation: login-brand-enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
-}
-
-.login-brand-name {
-  font-weight: 700;
-  color: #ffffff;
-}
-
-.login-brand-suffix {
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.45);
-}
-
-.login-brand-copy {
   display: flex;
   flex-direction: column;
-  max-width: 22rem;
-  animation: login-brand-enter 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.16s both;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
-.login-brand-eyebrow {
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: rgba(255, 255, 255, 0.58);
-  margin-bottom: 1.1rem;
+.login-brand-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
 }
 
-.login-brand-title {
-  margin: 0 0 1.1rem;
-  font-size: 2.5rem;
+.login-brand-wordmark {
+  font-size: 20px;
   font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.025em;
-  color: #ffffff;
-  text-wrap: balance;
+  letter-spacing: -0.02em;
+  color: var(--bp-fg);
 }
 
-.login-brand-text {
+.login-brand-message {
+  margin-top: auto;
+  max-width: 452px;
+}
+
+.login-brand-rule {
+  display: block;
+  width: 34px;
+  height: 3px;
+  margin-bottom: 26px;
+  border-radius: 2px;
+  background: var(--blue);
+}
+
+.login-brand-quote {
   margin: 0;
-  font-size: 0.9375rem;
-  line-height: 1.55;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 20px;
+  font-weight: 550;
+  line-height: 1.42;
+  letter-spacing: -0.018em;
+  color: var(--bp-fg);
+  text-wrap: pretty;
 }
 
-/* ─── Panel derecho — formulario ──────────────────────────── */
-.login-panel {
-  position: relative;
-  z-index: 2;
+/* ─── Panel del formulario (derecha) ─────────────────────────────────────── */
+.login-formpanel {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 54%;
-  min-height: 100vh;
-  padding: 2rem 1.5rem;
-  background: transparent;
+  padding: 40px 28px;
+  background: var(--surface);
 }
 
-@media (max-width: 860px) {
-  .login-panel {
-    width: 100%;
-  }
-}
-
-.login-form {
-  display: flex;
-  flex-direction: column;
+.login-card {
   width: 100%;
-  max-width: 340px;
-  animation: login-rise 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+  max-width: 330px;
 }
 
-@keyframes login-rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+/* Logo en la tarjeta: solo visible cuando la marca se oculta (móvil). En el
+   split de escritorio el formulario arranca directo en el título. */
+.login-card-logo {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 26px;
 }
 
-/* ─── Cabecera ────────────────────────────────────────────── */
-.login-heading {
-  margin-bottom: 1.25rem;
+.login-card-logo-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+}
+
+.login-card-logo-name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .login-title {
-  margin: 0 0 0.4rem;
-  font-size: 1.625rem;
-  font-weight: 600;
+  margin: 0;
+  font-size: 23px;
+  font-weight: 680;
   letter-spacing: -0.02em;
-  color: var(--login-ink);
+  color: var(--ink);
 }
 
 .login-subtitle {
-  margin: 0;
-  font-size: 0.9375rem;
-  color: var(--login-muted);
+  margin: 8px 0 24px;
+  font-size: 13.5px;
+  color: var(--soft);
 }
 
-/* ─── Campos ──────────────────────────────────────────────── */
+/* ─── Campos ─────────────────────────────────────────────────────────────── */
 .login-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 0.8rem;
+  margin-bottom: 15px;
 }
 
 .login-label {
-  font-size: 0.8125rem;
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12.5px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--mut);
+}
+
+.login-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.login-label-row .login-label {
+  margin-bottom: 0;
+}
+
+.login-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.login-input-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--faint);
+  pointer-events: none;
 }
 
 .login-input {
   width: 100%;
-  height: 2.875rem;
-  padding: 0 1.125rem;
-  background: var(--login-field-bg);
-  border: 1px solid var(--login-border);
-  border-radius: 9999px;
-  font-size: 0.9375rem;
-  color: var(--login-ink);
+  height: 44px;
+  padding: 0 12px 0 38px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--surface);
   outline: none;
   transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    background-color 0.15s ease;
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
 .login-input::placeholder {
-  color: var(--login-soft);
-}
-
-.login-input:hover:not(:focus) {
-  border-color: rgba(255, 255, 255, 0.22);
+  color: var(--faint);
 }
 
 .login-input:focus {
-  border-color: var(--login-border-focus);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.25);
-}
-
-/* Evita que el autocompletado del navegador pinte el campo de blanco */
-.login-input:-webkit-autofill,
-.login-input:-webkit-autofill:hover,
-.login-input:-webkit-autofill:focus {
-  -webkit-text-fill-color: var(--login-ink);
-  -webkit-box-shadow: 0 0 0 1000px rgba(26, 26, 32, 0.94) inset;
-  caret-color: var(--login-ink);
-  transition: background-color 9999s ease-in-out 0s;
-}
-
-.login-input--error {
-  border-color: #e2574c;
-}
-
-.login-input--error:focus {
-  box-shadow: 0 0 0 3px rgba(226, 87, 76, 0.16);
-}
-
-/* Campo de contraseña con acción «Mostrar» */
-.login-input-wrap {
-  position: relative;
+  border-color: var(--blue);
+  box-shadow: var(--focus);
 }
 
 .login-input--password {
-  padding-right: 3.25rem;
+  padding-right: 42px;
 }
 
-.login-reveal {
+.login-input[data-err='1'] {
+  border-color: var(--dang);
+}
+
+.login-input[data-err='1']:focus {
+  box-shadow: 0 0 0 3px rgba(214, 32, 31, 0.18);
+}
+
+.login-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-eye {
   position: absolute;
   top: 50%;
-  right: 0.625rem;
+  right: 6px;
   transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: none;
+  width: 32px;
+  height: 32px;
   border: none;
-  border-radius: 50%;
-  padding: 0.375rem;
-  color: var(--login-muted);
+  border-radius: 7px;
+  background: none;
+  color: var(--faint);
   cursor: pointer;
   transition:
-    color 0.15s ease,
-    background-color 0.15s ease;
+    color 0.12s ease,
+    background-color 0.12s ease;
 }
 
-.login-reveal:hover {
-  color: var(--login-blue);
-  background-color: rgba(59, 111, 230, 0.06);
+.login-eye:hover {
+  color: var(--mut);
+  background: var(--subtle);
 }
 
-/* ─── Icono de ojo — personalidad y estados ──────────────── */
-.eye-icon {
-  display: block;
-  overflow: visible;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: eye-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.eye-lids {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-.eye-pupil {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-.eye-glint {
-  opacity: 0;
-}
-
-.eye-slash {
-  stroke-dasharray: 30;
-  stroke-dashoffset: 30;
-  opacity: 0;
-}
-
-/* Ojo abierto: parpadeo doble periódico + pupila viva + destello */
-.eye-icon--open .eye-lids {
-  animation: eye-blink 7s ease-in-out 2s infinite;
-}
-
-.eye-icon--open .eye-pupil {
-  animation: eye-pupil-breathe 3.5s ease-in-out 0.5s infinite;
-}
-
-.eye-icon--open .eye-glint {
-  animation: eye-glint-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
-}
-
-/* Ojo cerrado: ojo completo visible + pupila atenuada + trazo diagonal */
-.eye-icon--closed .eye-pupil {
-  animation: eye-pupil-dim 0.18s ease both;
-}
-
-.eye-icon--closed .eye-slash {
-  opacity: 1;
-  animation: eye-slash-draw 0.22s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
-}
-
-@keyframes eye-enter {
-  from {
-    transform: scale(0.65);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes eye-blink {
-  0%,
-  80%,
-  100% {
-    transform: scaleY(1);
-  }
-  83% {
-    transform: scaleY(0.06);
-  }
-  87% {
-    transform: scaleY(1);
-  }
-  89% {
-    transform: scaleY(0.18);
-  }
-  92% {
-    transform: scaleY(1);
-  }
-}
-
-@keyframes eye-pupil-breathe {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.22);
-  }
-}
-
-@keyframes eye-pupil-dim {
-  to {
-    opacity: 0.22;
-  }
-}
-
-@keyframes eye-slash-draw {
-  from {
-    stroke-dashoffset: 30;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-@keyframes eye-glint-in {
-  from {
-    transform: scale(0);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 0.65;
-  }
-}
-
-/* ─── Error ───────────────────────────────────────────────── */
-.login-error {
-  margin: 0 0 1rem;
-  font-size: 0.8125rem;
-  color: #ff9088;
-  animation: login-rise 0.15s ease both;
-}
-
-/* ─── Opciones (recordar / olvidé) ────────────────────────── */
-.login-options {
+/* ─── Errores (validación local + credenciales del servidor) ─────────────── */
+.login-field-error {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin: 0.1rem 0 1.1rem;
-  padding-inline: 0.875rem;
+  gap: 5px;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--dang);
 }
 
-.login-remember {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  color: var(--login-muted);
-  cursor: pointer;
-  user-select: none;
+.login-field-error svg {
+  flex: 0 0 auto;
 }
 
-.login-remember input {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 1.125rem;
-  height: 1.125rem;
-  margin: 0;
-  flex-shrink: 0;
-  border: 1.5px solid var(--login-border);
-  border-radius: 50%;
-  background: var(--login-field-bg);
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
+.login-server-error {
+  margin-bottom: 4px;
 }
 
-.login-remember input:checked {
-  background: var(--login-blue);
-  border-color: var(--login-blue);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='8' viewBox='0 0 10 8'%3E%3Cpath d='M1 4l2.5 2.5L9 1' stroke='white' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: center;
-}
-
-.login-remember input:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(59, 111, 230, 0.2);
-}
-
-.login-forgot {
-  font-size: 0.8125rem;
+/* ─── Enlaces (placeholders: «La olvidé» / «Solicita acceso») ────────────── */
+.login-link {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
   font-weight: 500;
-  color: var(--login-blue);
-  text-decoration: none;
-  white-space: nowrap;
+  color: var(--blue-ink);
+  cursor: pointer;
 }
 
-.login-forgot:hover {
+.login-link:hover {
   text-decoration: underline;
 }
 
-/* ─── Botón ───────────────────────────────────────────────── */
+.login-footnote {
+  margin: 22px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--soft);
+}
+
+.login-footnote .login-link {
+  font-size: 13px;
+}
+
+/* ─── Botón de envío ─────────────────────────────────────────────────────── */
 .login-submit {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 3rem;
-  background: var(--login-blue);
-  color: #ffffff;
-  border: none;
-  border-radius: 9999px;
-  font-size: 0.9375rem;
+  gap: 8px;
+  width: 100%;
+  height: 44px;
+  margin-top: 4px;
+  border: 1px solid var(--blue);
+  border-radius: 9px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 14px;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   transition:
-    background-color 0.15s ease,
-    transform 0.05s ease;
+    background-color 0.12s ease,
+    border-color 0.12s ease;
 }
 
 .login-submit:hover:not(:disabled) {
-  background: var(--login-blue-hover);
-}
-
-.login-submit:active:not(:disabled) {
-  transform: translateY(1px);
+  background: var(--blue-hover);
+  border-color: var(--blue-hover);
 }
 
 .login-submit:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
+  opacity: 0.62;
+  cursor: default;
 }
 
 .login-spinner {
-  width: 1rem;
-  height: 1rem;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #ffffff;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
   border-radius: 50%;
-  animation: login-spin 0.6s linear infinite;
+  animation: login-spin 0.7s linear infinite;
 }
 
 @keyframes login-spin {
@@ -653,25 +361,31 @@
   }
 }
 
-/* ─── Pie ─────────────────────────────────────────────────── */
-.login-footnote {
-  margin: 1.1rem 0 0;
-  text-align: center;
-  font-size: 0.8125rem;
-  color: var(--login-soft);
-}
+/* ─── Responsive: ≤880px oculta la marca; el formulario es una tarjeta ───── */
+@media (max-width: 880px) {
+  .login-root {
+    grid-template-columns: 1fr;
+    background: var(--bg);
+  }
 
-.login-footnote span {
-  color: var(--login-muted);
-  font-weight: 500;
-}
+  .login-brand {
+    display: none;
+  }
 
-/* ─── Utilidad accesible ──────────────────────────────────── */
-.login-sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
+  .login-formpanel {
+    padding: 28px 20px;
+    background: transparent;
+  }
+
+  .login-card {
+    padding: 28px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+
+  .login-card-logo {
+    display: flex;
+  }
 }
