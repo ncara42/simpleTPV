@@ -4,7 +4,6 @@
 // preset, vía "Personalizar" (tablero arrastrable con snap a la rejilla), persistida por
 // preset en la preferencia `dashboard.layout`.
 
-import { GEIST_WIDGET_META } from '../widgets/geist/meta.js';
 import type { DashboardPeriod } from './dashboard.js';
 
 export type PresetId = 'personalizado' | 'ventas' | 'beneficio' | 'inventario' | 'equipo';
@@ -47,17 +46,14 @@ export function defaultPanelOrder(preset: PresetDef): string[] {
 // (span 5/7/12) y un alto que encaja su contenido (gráfico ~200px o lista con scroll).
 export const BOARD_COLS = 12;
 export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
-  // Únicos clásicos que se conservan (#264): «Ventas» y «Ventas por hora». El resto del catálogo
-  // histórico (KPIs, rankings, stock, equipo…) se retiró al migrar el dashboard a los widgets Geist;
-  // el agente y la paleta componen con estos dos + las moléculas Geist.
+  // Únicos widgets del catálogo: «Ventas» y «Ventas por hora».
   'dash-bars': { w: 7, h: 2 },
   // "Ventas por hora": gráfico + barra fina de navegación. El gráfico llena el alto del tile
   // (dash-panel--fill), así que 2 filas bastan sin dejar hueco inferior.
   'dash-hour': { w: 7, h: 2 },
-  // Widgets Geist (#264): moléculas dataviz montadas como widgets fijos. Su tamaño (y etiqueta) viven
-  // en `widgets/geist/meta.ts` (fuente única); aquí solo se inyectan para que la paleta los liste y
-  // `addWidget`/`reconcileFreeLayout` los acepten igual que los del catálogo clásico.
-  ...Object.fromEntries(Object.entries(GEIST_WIDGET_META).map(([id, m]) => [id, m.size])),
+  // Sección 01 · KPIs (rediseño): rejilla conectada (banda full-bleed de 6 KPIs) y tarjeta clásica.
+  'kpi-grid-connected': { w: 12, h: 2 },
+  'kpi-classic': { w: 3, h: 2 },
 };
 
 const DEFAULT_SPEC = { w: 4, h: 2 };

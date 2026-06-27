@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { GenericSpec } from '../lib/dashboard-layout.js';
-import { GEIST_WIDGET_IDS } from './geist/meta.js';
+import { PANEL_RENDER_IDS } from './panels/index.js';
 import {
   ALL_WIDGET_IDS,
   buildGenericWidgetSpec,
@@ -13,24 +13,20 @@ import {
 } from './registry.js';
 
 describe('WIDGET_REGISTRY', () => {
-  it('siembra los widgets fijos del catálogo: 2 clásicos (Ventas/Ventas por hora) + los Geist (#264)', () => {
+  it('siembra los clásicos (Ventas/Ventas por hora) más los paneles registrados', () => {
     // Solo los fijos (los genéricos se registran en runtime; los bloques #205 van con prefijo block:).
     const fixed = [...WIDGET_REGISTRY.values()].filter(
       (w) => w.kind !== 'generic' && !w.id.startsWith('block:'),
     );
-    const geist = fixed.filter((w) => w.id.startsWith('geist-'));
-    const classic = fixed.filter((w) => !w.id.startsWith('geist-'));
-    // Tras la migración a los widgets Geist (#264) solo se conservan «Ventas» y «Ventas por hora».
-    expect(classic.map((w) => w.id).sort()).toEqual(['dash-bars', 'dash-hour']);
-    expect(geist).toHaveLength(GEIST_WIDGET_IDS.length);
+    // Clásicos conservados + los paneles que añade cada tanda (PANEL_RENDER_IDS).
+    const expected = ['dash-bars', 'dash-hour', ...PANEL_RENDER_IDS].sort();
+    expect(fixed.map((w) => w.id).sort()).toEqual(expected);
     expect(WIDGET_REGISTRY.size).toBeGreaterThanOrEqual(fixed.length);
   });
 
-  it('siembra los bloques pre-cableados (#205) como metadatos block:<id>', () => {
+  it('no hay bloques pre-cableados registrados', () => {
     const blocks = [...WIDGET_REGISTRY.keys()].filter((id) => id.startsWith('block:'));
-    expect(blocks).toContain('block:sales-overview');
-    expect(blocks).toContain('block:stock-risk');
-    expect(WIDGET_REGISTRY.get('block:sales-overview')?.label).toBe('Resumen de ventas');
+    expect(blocks).toHaveLength(0);
   });
 
   it('cada entrada del catálogo tiene label, kind y defaultSize', () => {
@@ -43,10 +39,9 @@ describe('WIDGET_REGISTRY', () => {
     }
   });
 
-  it('clasifica los widgets conservados y los Geist como panel (ya no hay kpi-* en el catálogo)', () => {
+  it('clasifica los widgets conservados como panel (ya no hay kpi-* en el catálogo)', () => {
     expect(WIDGET_REGISTRY.get('dash-bars')!.kind).toBe('panel');
     expect(WIDGET_REGISTRY.get('dash-hour')!.kind).toBe('panel');
-    expect(WIDGET_REGISTRY.get('geist-stat-today')!.kind).toBe('panel');
   });
 });
 

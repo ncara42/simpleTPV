@@ -19,8 +19,6 @@ export default mergeConfig(createViteConfig({ port: 5174, previewPort: 4174 }), 
         index: fileURLToPath(new URL('./index.html', import.meta.url)),
         visual: fileURLToPath(new URL('./visual.html', import.meta.url)),
         gallery: fileURLToPath(new URL('./gallery.html', import.meta.url)),
-        // Harness de diseño de los widgets Geist con datos reales (#264). Dev/preview, fuera de la app.
-        'geist-preview': fileURLToPath(new URL('./geist-preview.html', import.meta.url)),
       },
     },
   },

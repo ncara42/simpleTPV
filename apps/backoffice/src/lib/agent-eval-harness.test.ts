@@ -49,7 +49,7 @@ describe('agent-eval-harness — validación determinista (#226)', () => {
   });
 
   it('detecta widget desconocido', () => {
-    const r = validateComposition([widget('block:no-existe')]);
+    const r = validateComposition([widget('dash-unknown')]);
     expect(r.valid).toBe(false);
     expect(r.violations[0]!.code).toBe('unknown-widget');
   });
@@ -147,7 +147,7 @@ describe('agent-eval-harness — integridad del conjunto de peticiones', () => {
   });
 
   it('hasDataComposition distingue composición de datos de meras anotaciones', () => {
-    expect(hasDataComposition([widget('block:sales-overview')])).toBe(true);
+    expect(hasDataComposition([widget('dash-bars')])).toBe(true);
     expect(hasDataComposition([widget('gen:panel')])).toBe(true);
     expect(
       hasDataComposition([

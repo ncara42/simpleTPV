@@ -457,9 +457,9 @@ test('dashboard: modo cuadrícula — toggle, añadir widget desde el «+» del 
   const tiles = page.locator('.dash-grid-tile');
   await expect(tiles).toHaveCount(0);
   await page.getByTestId('topbar-add-widget').click();
-  const palette = page.locator('.dash-free-palette');
-  await expect(palette).toBeVisible();
-  await palette.locator('button[role="menuitem"]').first().click();
+  const gallery = page.getByTestId('widget-gallery-modal');
+  await expect(gallery).toBeVisible();
+  await gallery.getByTestId('widget-gallery-card-dash-bars').click();
   await expect(tiles).toHaveCount(1);
 
   // Volver a LIENZO LIBRE: el MISMO widget sigue ahí (mismo set, dos vistas).
