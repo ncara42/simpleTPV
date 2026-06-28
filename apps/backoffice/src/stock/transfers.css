@@ -543,11 +543,11 @@
   align-items: center;
   gap: 0.5rem;
   align-self: flex-start;
-  /* Misma altura y radio (píldora) que el CTA «Nuevo traspaso» de la topbar
-     (Button md = h-9 = 2.25rem, rounded-full). */
+  /* Misma altura que el CTA «Nuevo traspaso» (2.25rem) y mismo radio que el botón
+     «Ver N mensajes» (--ui-radius-sm). */
   height: 2.25rem;
   padding: 0 0.85rem;
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-sm);
   background: color-mix(in srgb, var(--ui-danger) 9%, var(--ui-surface));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-danger) 28%, transparent);
   color: var(--ui-danger);
@@ -569,11 +569,11 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  /* Misma altura y radio (píldora) que la incidencia y el CTA «Nuevo traspaso». */
+  /* Misma altura (2.25rem) y radio (--ui-radius-sm) compartido con la píldora. */
   height: 2.25rem;
   padding: 0 0.85rem;
   border: 1px solid color-mix(in srgb, var(--ui-danger) 30%, var(--ui-border));
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-sm);
   background: var(--ui-surface);
   color: var(--ui-danger);
   font: inherit;
