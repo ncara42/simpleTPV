@@ -4,8 +4,9 @@
    Colores por token (rampa azul derivada del acento → sigue el tema). */
 .hm-panel {
   background: var(--ui-surface);
-  border-top: 1px solid var(--ui-border);
-  border-bottom: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  overflow: hidden;
   padding: 24px 0;
   display: flex;
   flex-direction: column;
