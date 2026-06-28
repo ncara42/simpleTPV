@@ -1,0 +1,30 @@
+/* ════════════════════════════════════════════════════════════════════════════════
+   Lanzador del asistente (robot) en la isla de la TopBar. Variante de `.topbar-icon-btn`:
+   el icono va en el COLOR DE MARCA de la empresa (--ui-brand). El fondo aparece SOLO en
+   hover; al activarse (asistente abierto / clic) NO queda fondo, solo se intensifica el
+   color. Sobre-especifica con la doble clase para ganar a `.topbar-icon-btn`.
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+.assistant-launcher.topbar-icon-btn {
+  color: var(--ui-brand);
+}
+
+/* Hover: tinte de marca translúcido como fondo (sí deja fondo). */
+.assistant-launcher.topbar-icon-btn:hover {
+  background: var(--ui-brand-soft-2);
+  border-color: transparent;
+  color: var(--ui-brand-ink);
+}
+
+/* Activo (asistente abierto, tras el clic): SIN fondo ni borde; solo el color de marca más
+   intenso marca el estado. Anula el fondo que `.topbar-icon-btn.is-active` aplica por defecto. */
+.assistant-launcher.topbar-icon-btn.is-active {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ui-brand-ink);
+}
+
+/* Estando activo, el hover SÍ vuelve a teñir el fondo (el fondo es propio del hover, no del clic). */
+.assistant-launcher.topbar-icon-btn.is-active:hover {
+  background: var(--ui-brand-soft-2);
+}

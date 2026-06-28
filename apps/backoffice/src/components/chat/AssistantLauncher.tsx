@@ -1,3 +1,5 @@
+import './AssistantLauncher.css';
+
 import { Bot } from 'lucide-react';
 
 import { useAssistantStore } from '../../lib/assistant-store.js';
@@ -13,7 +15,7 @@ export function AssistantLauncher() {
   return (
     <button
       type="button"
-      className={`topbar-icon-btn${open ? ' is-active' : ''}`}
+      className={`topbar-icon-btn assistant-launcher${open ? ' is-active' : ''}`}
       onClick={toggle}
       aria-label={open ? 'Cerrar asistente de IA' : 'Abrir asistente de IA'}
       aria-pressed={open}
