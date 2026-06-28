@@ -79,8 +79,9 @@ export function useFloatingWindow(rect: WindowRect, setRect: (r: WindowRect) => 
 
   const startMove = useCallback(
     (e: ReactPointerEvent) => {
-      // No arrastrar al pulsar los botones de la cabecera (historial/nueva/cerrar).
-      if ((e.target as HTMLElement).closest('button')) return;
+      // No arrastrar al pulsar los botones de la cabecera (historial/nueva/cerrar) ni al interactuar
+      // con widgets marcados `data-no-drag` (p. ej. el indicador de contexto y su popover).
+      if ((e.target as HTMLElement).closest('button, [data-no-drag]')) return;
       e.preventDefault();
       begin({ kind: 'move', px: e.clientX, py: e.clientY, start: rectRef.current });
     },

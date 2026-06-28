@@ -916,19 +916,6 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   }
 }
 
-/* ── Pie con coste ─────────────────────────────────────────────────────────────── */
-
-.chat-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ui-space-2);
-  padding: var(--ui-space-2) var(--ui-space-3);
-  border-top: 1px solid var(--ui-border);
-  color: var(--ui-text-muted);
-  font-size: var(--ui-text-2xs);
-}
-
 /* ════════════════════════════════════════════════════════════════════════════════
    Contenedor del asistente. La GEOMETRÍA (ventana flotante movible/redimensionable,
    overlay `position: fixed`) vive en assistant-drawer.css. Aquí quedan solo las reglas
@@ -1661,7 +1648,8 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 
 .ctx__panel {
   position: absolute;
-  bottom: calc(100% + 0.4rem);
+  /* Vive en la cabecera (arriba) → abre hacia ABAJO, sobre el cuerpo del asistente. */
+  top: calc(100% + 0.4rem);
   right: 0;
   z-index: 33;
   min-width: 12rem;

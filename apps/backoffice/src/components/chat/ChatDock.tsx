@@ -140,6 +140,15 @@ export function ChatDock({
             onToggleHistory={() => setShowHistory((v) => !v)}
             onNewConversation={handleNewConversation}
             onClose={() => setOpen(false)}
+            contextSlot={
+              chat.usage ? (
+                <Context
+                  inputTokens={chat.usage.total.inputTokens}
+                  outputTokens={chat.usage.total.outputTokens}
+                  costEur={chat.usage.total.costEur}
+                />
+              ) : undefined
+            }
           />
         </div>
 
@@ -185,17 +194,6 @@ export function ChatDock({
               activarlo.
             </p>
           </div>
-        )}
-
-        {chat.usage && (
-          <footer className="chat-footer">
-            <span>Esta conversación</span>
-            <Context
-              inputTokens={chat.usage.total.inputTokens}
-              outputTokens={chat.usage.total.outputTokens}
-              costEur={chat.usage.total.costEur}
-            />
-          </footer>
         )}
 
         <div className="chat-dock__bar">
