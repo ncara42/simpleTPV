@@ -81,7 +81,7 @@
 .tr-scroll {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: auto;
   position: relative;
   scrollbar-width: none;
 }
@@ -122,22 +122,24 @@
 /* ─── Tabla agrupada ──────────────────────────────────────────────────────────── */
 .tr-table {
   width: 100%;
-  min-width: 38rem;
+  /* Floor modesto: por debajo el scroller hace scroll horizontal en vez de recortar
+     columnas (la columna Unidades nunca queda cortada por el `clip` de la card). */
+  min-width: 30rem;
   border-collapse: collapse;
   font-size: 0.9rem;
   table-layout: fixed;
 }
-.tr-col-route {
-  width: 9rem;
-}
+/* Traspaso y Ruta son flexibles (sin width): se reparten el espacio restante a partes
+   iguales — Ruta legible en pantallas anchas y nunca desbordan. Solo las columnas
+   numéricas llevan ancho fijo. */
 .tr-col-lines {
-  width: 4.5rem;
+  width: 4rem;
 }
 .tr-col-created {
-  width: 6rem;
+  width: 5.5rem;
 }
 .tr-col-units {
-  width: 6rem;
+  width: 5.5rem;
 }
 .tr-thead th {
   position: sticky;
@@ -237,14 +239,14 @@
   color: var(--ui-text);
 }
 .tr-cell-name {
+  /* `position: relative` ancla el caret; SIN `overflow: hidden` aquí (recortaba el caret
+     contra el borde de la columna). La elipsis del nombre la hacen `.tr-ref`/`.tr-note`. */
   position: relative;
   padding-left: 1.9rem;
-  max-width: 0;
-  overflow: hidden;
 }
 .tr-row-caret {
   position: absolute;
-  left: 0.5rem;
+  left: 0.6rem;
   top: 50%;
   transform: translateY(-50%);
   flex-shrink: 0;

@@ -81,7 +81,7 @@ export function TransfersTable({
           <table className="tr-table">
             <colgroup>
               <col />
-              <col className="tr-col-route" />
+              <col />
               <col className="tr-col-lines" />
               <col className="tr-col-created" />
               <col className="tr-col-units" />
@@ -184,7 +184,7 @@ function TransferRow({
             )}
           </div>
         </td>
-        <td className="tr-cell-route" data-testid="transfer-route">
+        <td className="tr-cell-route" data-testid="transfer-route" title={row.route}>
           {row.route}
         </td>
         <td className="tr-cell-lines">{row.linesLabel}</td>
