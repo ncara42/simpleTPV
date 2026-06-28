@@ -1,10 +1,11 @@
 import './hour-area.css';
+import './store-bars.css';
 
 import { HeatStrip } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type ReactElement, useState } from 'react';
 
-import { getSalesByHourOnDay, type SalesByHour } from '../../lib/dashboard.js';
+import { getSalesByHourOnDay, getSalesToday, type SalesByHour } from '../../lib/dashboard.js';
 import { PanelShell } from './PanelShell.js';
 import type { PanelProps } from './types.js';
 
@@ -253,6 +254,61 @@ export function HourArea({ store }: PanelProps): ReactElement {
           </div>
         ) : (
           <div className="ha-empty">{q.isLoading ? 'Cargando…' : 'Sin ventas en el periodo'}</div>
+        )}
+      </div>
+    </PanelShell>
+  );
+}
+
+// ── Sección 02 · «Ventas por tienda» (barras) — réplica pixel-a-pixel del handoff ──
+const STORE_BARS_MAX = 8; // tope de columnas para que no se aprieten
+const PODIUM = 3; // nº de tiendas en acento; el resto en azul suave
+
+// Facturación neta por tienda (del mes), de mayor a menor. Las 3 primeras en acento; valor encima de
+// cada barra y nombre debajo. Reusa la query 'dash-comparison' (mes, todas las tiendas) → caché común.
+function kEur(v: number): string {
+  return v >= 1000 ? `${(v / 1000).toFixed(1).replace('.', ',')}k` : `${Math.round(v)}`;
+}
+
+export function StoreBars(_: PanelProps): ReactElement {
+  const q = useQuery({
+    queryKey: ['dash-comparison', 'month', undefined],
+    queryFn: () => getSalesToday(undefined, 'month'),
+    placeholderData: keepPreviousData,
+  });
+  const stores = [...(q.data?.byStore ?? [])]
+    .sort((a, b) => b.today - a.today)
+    .slice(0, STORE_BARS_MAX);
+  const maxRev = Math.max(1, ...stores.map((s) => s.today));
+
+  return (
+    <PanelShell id="graf-store-bars" fill bare>
+      <div className="sb-panel">
+        <h3 className="sb-title">Ventas por tienda</h3>
+        <p className="sb-sub">Facturación neta · este mes</p>
+        {stores.length > 0 ? (
+          <>
+            <div className="sb-bars">
+              {stores.map((s, i) => (
+                <div className="sb-col" key={s.storeId}>
+                  <span className="sb-val">{kEur(s.today)}</span>
+                  <span
+                    className={`sb-bar${i >= PODIUM ? ' sb-bar--soft' : ''}`}
+                    style={{ height: `${(s.today / maxRev) * 100}%` }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="sb-labels">
+              {stores.map((s) => (
+                <span className="sb-label" key={s.storeId}>
+                  {s.storeName}
+                </span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="sb-empty">{q.isLoading ? 'Cargando…' : 'Sin ventas en el periodo'}</div>
         )}
       </div>
     </PanelShell>

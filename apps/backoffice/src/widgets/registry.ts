@@ -24,6 +24,7 @@ export const WIDGET_LABELS: Record<string, string> = {
   'kpi-classic': 'KPI (tarjeta clásica)',
   // Sección 02 · Gráficas (rediseño)
   'graf-hour-area': 'Distribución horaria',
+  'graf-store-bars': 'Ventas por tienda',
   'graf-heatmap': 'Mapa de calor horario',
   // Sección 03 · Listas (rediseño)
   'lista-familia': 'Reparto por familia',

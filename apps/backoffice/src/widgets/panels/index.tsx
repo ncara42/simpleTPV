@@ -9,7 +9,7 @@ import {
   CompactTreemap,
 } from './compactos.js';
 import { DiagnosticActivity } from './diagnostico.js';
-import { HourArea, HourHeatmap } from './graficas.js';
+import { HourArea, HourHeatmap, StoreBars } from './graficas.js';
 import { ClassicKpiCard, ConnectedKpiGrid } from './kpis.js';
 import { AlertKpi, AreaKpi, DualKpi, SevenDayKpi } from './kpis-formatos.js';
 import { FamilyShare, FamilyTreemap, ProductRanking } from './listas.js';
@@ -25,6 +25,7 @@ export const WIDGET_PANELS: Record<string, (props: PanelProps) => ReactElement> 
   'kpi-classic': ClassicKpiCard,
   // Sección 02 · Gráficas (dash-bars/dash-hour son clásicos, fuera de este registro)
   'graf-hour-area': HourArea,
+  'graf-store-bars': StoreBars,
   'graf-heatmap': HourHeatmap,
   // Sección 03 · Listas
   'lista-familia': FamilyShare,

@@ -1,0 +1,96 @@
+/* Sección 02 · «Ventas por tienda» — barras de facturación por tienda (banda con hairline arriba/abajo),
+   réplica pixel-a-pixel del handoff «Fundación Geist». Las 3 primeras en acento, el resto en azul suave;
+   valor encima de cada barra y nombre debajo. Área de barras flexible (crece con el alto del tile). */
+.sb-panel {
+  background: var(--ui-surface);
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+  padding: 24px 0 20px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.sb-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+  padding: 0 40px;
+  color: var(--ui-text);
+}
+.sb-sub {
+  font-size: 12.5px;
+  color: var(--ui-text-soft);
+  margin: 3px 0 0;
+  padding: 0 40px;
+}
+.sb-bars {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin-top: 26px;
+  padding: 0 24px 2px;
+  border-bottom: 1px solid var(--ui-border-strong);
+  min-height: 170px;
+}
+.sb-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+.sb-val {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.sb-bar {
+  width: 100%;
+  max-width: 42px;
+  border-radius: 6px 6px 0 0;
+  background: var(--ui-brand);
+  transform-origin: bottom;
+  animation: sb-grow 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* Tiendas fuera del podio: azul suave (≈ #bcd9fb), derivado del acento → sigue el tema. */
+.sb-bar--soft {
+  background: color-mix(in srgb, var(--ui-brand) 28%, var(--ui-surface));
+}
+@keyframes sb-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+.sb-labels {
+  display: flex;
+  gap: 14px;
+  margin-top: 9px;
+  padding: 0 24px;
+}
+.sb-label {
+  flex: 1;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ui-text-soft);
+}
+.sb-empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-height: 170px;
+  font-size: 13px;
+  color: var(--ui-text-soft);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-bar {
+    animation: none;
+  }
+}

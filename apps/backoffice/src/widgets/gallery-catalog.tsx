@@ -619,6 +619,13 @@ export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
     thumbnail: <ThumbHourArea />,
   },
   {
+    id: 'graf-store-bars',
+    label: 'Ventas por tienda',
+    category: 'graficas',
+    description: 'Barras de facturación neta por tienda',
+    thumbnail: <ThumbBars />,
+  },
+  {
     id: 'graf-heatmap',
     label: 'Mapa de calor horario',
     category: 'graficas',
