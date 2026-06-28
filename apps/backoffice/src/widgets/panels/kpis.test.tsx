@@ -81,7 +81,7 @@ describe('Widgets de panel · Sección 01 (KPIs)', () => {
     renderWidget(<ClassicKpiCard period="month" store={undefined} />);
 
     expect(await screen.findByText('762 tickets')).toBeInTheDocument();
-    expect(screen.getByText('Clásica')).toBeInTheDocument();
+    expect(screen.getByText('A · Clásica')).toBeInTheDocument();
     expect(screen.getByText('Facturación')).toBeInTheDocument();
   });
 });

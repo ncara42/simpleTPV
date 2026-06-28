@@ -1,0 +1,112 @@
+/* KPIs (rediseño · sección 01 del handoff «Fundación Geist»): RÉPLICA EXACTA de la rejilla conectada
+   por hairline (estilo Vercel Analytics) y la tarjeta clásica. Todos los colores por token → pixel-
+   perfect en claro (= valores del handoff) y correcto en oscuro. */
+
+/* Panel sin chrome: la rejilla va a sangre (sus propias hairlines) y la tarjeta trae su borde propio.
+   Mayor especificidad que `.dash-panel` para ganar sin depender del orden de import. */
+.dash-panel.dash-panel--bare {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* ── Rejilla conectada (a sangre): gap de 1px sobre fondo hairline = divisores ── */
+.kw-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--ui-border);
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+  overflow: hidden;
+  height: 100%;
+}
+.kw-cell {
+  background: var(--ui-surface);
+  padding: 16px 18px 0;
+  min-height: 138px;
+  display: flex;
+  flex-direction: column;
+}
+.kw-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+}
+.kw-value {
+  font-size: 25px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  color: var(--ui-text);
+  margin-top: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.kw-chip {
+  align-self: flex-start;
+  margin-top: 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.kw-chip--neutral {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.kw-chip--success {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.kw-chip--danger {
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+}
+.kw-spark {
+  width: 100%;
+  height: 42px;
+  margin-top: auto;
+  display: block;
+}
+
+/* ── Tarjeta clásica (tratamiento A) ── */
+.kw-card {
+  position: relative;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  min-height: 150px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.kw-corner {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gst-400);
+}
+.kw-card .kw-value {
+  font-size: 30px;
+  margin-top: 12px;
+}
+.kw-card .kw-chip {
+  font-size: 12px;
+  padding: 3px 8px;
+  margin-top: 10px;
+}
+.kw-card .kw-spark {
+  height: 46px;
+  margin-left: -20px;
+  margin-right: -20px;
+  width: calc(100% + 40px);
+}

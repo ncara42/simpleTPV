@@ -9,16 +9,22 @@ export function PanelShell({
   title,
   subtitle,
   fill = false,
+  bare = false,
   children,
 }: {
   id: string;
   title?: string;
   subtitle?: string;
   fill?: boolean;
+  /** Sin chrome: quita padding/borde/fondo/radio del tile (widgets a sangre o con tarjeta propia). */
+  bare?: boolean;
   children: ReactNode;
 }) {
   return (
-    <div className={`dash-panel${fill ? ' dash-panel--fill' : ''}`} data-testid={id}>
+    <div
+      className={`dash-panel${fill ? ' dash-panel--fill' : ''}${bare ? ' dash-panel--bare' : ''}`}
+      data-testid={id}
+    >
       {title ? (
         <header className="dash-panel-head">
           <div className="dash-panel-titles">
