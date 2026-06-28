@@ -28,7 +28,7 @@ import { ITEM_SPECS } from '../../lib/dashboard-layout.js';
 import { GALLERY_ENTRIES } from '../gallery-catalog.js';
 import { WIDGET_LABELS } from '../registry.js';
 import { WIDGET_PANELS } from './index.js';
-import { FamilyShare, FamilyTreemap, ProductRanking } from './listas.js';
+import { FamilyShare, ProductRanking, SalesMix } from './listas.js';
 
 function renderWidget(node: ReactNode): void {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -46,27 +46,33 @@ describe('Widgets de panel · Sección 03 (Listas)', () => {
     }
   });
 
-  it('reparto por familia: riel + leyenda con las familias', async () => {
+  it('ventas por familia: fila por familia con cifra y cuota', async () => {
     renderWidget(<FamilyShare period="month" store={undefined} />);
 
     expect(await screen.findByText('Bebidas')).toBeInTheDocument();
+    expect(screen.getByText('Ventas por familia')).toBeInTheDocument();
     expect(screen.getByText('Snacks')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Reparto' })).toBeInTheDocument();
+    // Bebidas = 4.200 de 9.000 → 46,7% de cuota.
+    expect(screen.getByText('46,7%')).toBeInTheDocument();
   });
 
-  it('ranking de productos: nombre y pista de unidades por puesto', async () => {
+  it('rankings: pestañas y top de productos por ventas', async () => {
     renderWidget(<ProductRanking period="month" store={undefined} />);
 
     expect(await screen.findByText('Agua 1,5L')).toBeInTheDocument();
+    expect(screen.getByText('Rankings')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Top ventas' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Peor rotación' })).toBeInTheDocument();
     expect(screen.getByText('Café molido')).toBeInTheDocument();
-    expect(screen.getByText('900 uds')).toBeInTheDocument();
   });
 
-  it('mix por familia: mapa de área con las familias', async () => {
-    renderWidget(<FamilyTreemap period="month" store={undefined} />);
+  it('mix de ventas: barra apilada monocroma + leyenda con «Otras familias»', async () => {
+    renderWidget(<SalesMix period="month" store={undefined} />);
 
+    // «Bebidas» depende de los datos → se espera con findBy; el resto ya está en el DOM.
     expect(await screen.findByText('Bebidas')).toBeInTheDocument();
-    expect(screen.getByText('Otras')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Reparto por área' })).toBeInTheDocument();
+    expect(screen.getByText('Mix de ventas')).toBeInTheDocument();
+    expect(screen.getByText('Otras familias')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Reparto de ventas por familia' })).toBeInTheDocument();
   });
 });

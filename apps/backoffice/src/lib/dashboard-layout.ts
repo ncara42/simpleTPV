@@ -60,9 +60,9 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'graf-store-bars': { w: 6, h: 2 },
   'graf-heatmap': { w: 6, h: 2 },
   // Sección 03 · Listas (rediseño): reparto por familia, ranking de productos y mix (treemap).
-  'lista-familia': { w: 4, h: 2 },
+  'lista-familia': { w: 4, h: 3 },
   'lista-rankings': { w: 4, h: 3 },
-  'lista-mix': { w: 5, h: 3 },
+  'lista-mix': { w: 4, h: 3 },
   // Sección 05 · Compactos (rediseño): tiles pequeños (ribbon, donut, treemap, top, cifra-héroe).
   'cmp-ribbon': { w: 3, h: 2 },
   'cmp-donut': { w: 3, h: 2 },

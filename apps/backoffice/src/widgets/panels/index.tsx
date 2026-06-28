@@ -12,7 +12,7 @@ import { DiagnosticActivity } from './diagnostico.js';
 import { HourArea, HourHeatmap, StoreBars } from './graficas.js';
 import { ClassicKpiCard, ConnectedKpiGrid } from './kpis.js';
 import { AlertKpi, AreaKpi, DualKpi, SevenDayKpi } from './kpis-formatos.js';
-import { FamilyShare, FamilyTreemap, ProductRanking } from './listas.js';
+import { FamilyShare, ProductRanking, SalesMix } from './listas.js';
 import type { PanelProps } from './types.js';
 
 // Registro de RENDER de los widgets del rediseño. Una entrada por widget; se amplía por tandas (cada
@@ -30,7 +30,7 @@ export const WIDGET_PANELS: Record<string, (props: PanelProps) => ReactElement> 
   // Sección 03 · Listas
   'lista-familia': FamilyShare,
   'lista-rankings': ProductRanking,
-  'lista-mix': FamilyTreemap,
+  'lista-mix': SalesMix,
   // Sección 05 · Compactos
   'cmp-ribbon': CompactRibbon,
   'cmp-donut': CompactDonut,
