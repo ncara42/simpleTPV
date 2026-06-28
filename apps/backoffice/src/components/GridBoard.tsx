@@ -16,9 +16,11 @@ import { FreeNote } from './FreeNote.js';
 
 // Umbrales (en px de mundo del elemento) para derivar el tramo de la rejilla. Un KPI mide ~184×144,
 // un panel/gráfica ~484–684 × ~304, y los compuestos/tablas/rotación ~464–784 de alto.
-// - Ancho: solo lo de verdad ancho (w7≈684, compuestos) pasa a 2 columnas; w5≈484 cae a 1 → compacto.
+// - Ancho: la banda a 12 unidades (≈1184px, p. ej. la rejilla de 6 KPIs) ocupa la FILA COMPLETA;
+//   lo de verdad ancho (w7≈684, compuestos) pasa a 2 columnas; w5≈484 cae a 1 → compacto.
 // - Alto en 3 tramos: KPI→1 fila; panel/gráfica (304)→2 filas (altura legible); compuesto/tabla
 //   (≥440)→3 filas para que quepa SIN recorte (un compuesto 5-en-1 no entra en 2 filas).
+const FULL_PX = 900;
 const WIDE_PX = 520;
 const TALL_PX = 200;
 const XTALL_PX = 440;
@@ -39,6 +41,13 @@ interface GridBoardProps {
 
 const colSpan = (e: FreeElement): number => (e.w >= WIDE_PX ? 2 : 1);
 const rowSpan = (e: FreeElement): number => (e.h >= XTALL_PX ? 3 : e.h >= TALL_PX ? 2 : 1);
+
+// La banda a 12 unidades (rejilla de 6 KPIs) ocupa la fila completa (`1 / -1`): con un span fijo de 2
+// caía a ~2 columnas y recortaba las cifras. El resto usa el tramo por umbral de ancho.
+const tileGridStyle = (e: FreeElement): { gridColumn: string; gridRow: string } => ({
+  gridColumn: e.w >= FULL_PX ? '1 / -1' : `span ${colSpan(e)}`,
+  gridRow: `span ${rowSpan(e)}`,
+});
 
 export function GridBoard({
   elements,
@@ -73,7 +82,7 @@ export function GridBoard({
           <div
             key={el.id}
             className={`dash-grid-tile dash-grid-tile--${el.kind}`}
-            style={{ gridColumn: `span ${colSpan(el)}`, gridRow: `span ${rowSpan(el)}` }}
+            style={tileGridStyle(el)}
             data-testid={`dash-grid-tile-${el.id}`}
             data-board-item={el.id}
           >
