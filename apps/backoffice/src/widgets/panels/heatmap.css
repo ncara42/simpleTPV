@@ -1,0 +1,86 @@
+/* Sección 02 · «Mapa de calor horario» — celdas cuadradas, intensidad por facturación (banda con
+   hairline arriba/abajo), réplica pixel-a-pixel del handoff «Fundación Geist». Muestra las 24 horas;
+   por defecto se ven 07–17 y el resto se desplaza horizontalmente (11 celdas encajan en el viewport).
+   Colores por token (rampa azul derivada del acento → sigue el tema). */
+.hm-panel {
+  background: var(--ui-surface);
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+}
+.hm-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 0 40px;
+}
+.hm-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--ui-text);
+}
+.hm-badge {
+  margin-left: 6px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ui-brand);
+  background: color-mix(in srgb, var(--ui-brand) 10%, transparent);
+  border-radius: 6px;
+}
+.hm-sub {
+  font-size: 12.5px;
+  color: var(--ui-text-soft);
+  margin: 3px 0 0;
+}
+.hm-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+}
+.hm-legend-swatches {
+  display: flex;
+  gap: 3px;
+}
+.hm-legend-swatches span {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+}
+/* Tira desplazable: 11 celdas (07–17) encajan en el viewport; las demás (00–06, 18–23) hacen scroll. */
+.hm-scroll {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  padding: 2px 16px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+.hm-cell {
+  flex: 0 0 calc((100% - 60px) / 11); /* 11 visibles + 10 gaps de 6px = ancho de contenido */
+  aspect-ratio: 1;
+  display: flex;
+  align-items: flex-end;
+  padding: 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.hm-cell--peak {
+  box-shadow:
+    0 0 0 2px var(--ui-brand),
+    0 0 0 4px color-mix(in srgb, var(--ui-brand) 25%, transparent);
+}

@@ -57,7 +57,7 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   // Sección 02 · Gráficas (rediseño): distribución horaria (área), ventas por tienda (barras) y heatmap.
   'graf-hour-area': { w: 12, h: 3 },
   'graf-store-bars': { w: 12, h: 2 },
-  'graf-heatmap': { w: 6, h: 2 },
+  'graf-heatmap': { w: 12, h: 2 },
   // Sección 03 · Listas (rediseño): reparto por familia, ranking de productos y mix (treemap).
   'lista-familia': { w: 4, h: 2 },
   'lista-rankings': { w: 4, h: 3 },

@@ -49,13 +49,15 @@ describe('Widgets de panel · Sección 02 (Gráficas)', () => {
     expect(graficas).toContain('graf-heatmap');
   });
 
-  it('el mapa de calor pinta una celda por hora con ventas', async () => {
+  it('el mapa de calor pinta las 24 horas con su etiqueta', async () => {
     renderWidget(<HourHeatmap period="month" store={undefined} />);
 
-    expect(await screen.findByText('14')).toBeInTheDocument(); // hora punta
-    expect(screen.getByText('9')).toBeInTheDocument();
-    expect(screen.getByText('21')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /intensidad por franja/i })).toBeInTheDocument();
+    // Rejilla de 24 celdas (00–23) con la hora a dos dígitos; la hora punta (14) lleva anillo.
+    expect(await screen.findByText('14')).toBeInTheDocument();
+    expect(screen.getByText('00')).toBeInTheDocument();
+    expect(screen.getByText('09')).toBeInTheDocument();
+    expect(screen.getByText('23')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /intensidad de ventas por hora/i })).toBeInTheDocument();
   });
 
   it('graf-hour-area está cableado en render, catálogo y galería', () => {

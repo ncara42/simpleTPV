@@ -1,9 +1,9 @@
 import './hour-area.css';
 import './store-bars.css';
+import './heatmap.css';
 
-import { HeatStrip } from '@simpletpv/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { type ReactElement, useState } from 'react';
+import { type ReactElement, useEffect, useRef, useState } from 'react';
 
 import { getSalesByHourOnDay, getSalesToday, type SalesByHour } from '../../lib/dashboard.js';
 import { PanelShell } from './PanelShell.js';
@@ -14,9 +14,16 @@ function todayLocalIso(): string {
   return new Intl.DateTimeFormat('en-CA').format(new Date());
 }
 
-// Sección 02 · Mapa de calor horario — una celda por hora con ventas; intensidad por facturación.
-// Lectura instantánea de la hora punta del día (la celda más saturada = el máximo, marcada con anillo).
-// Comparte el `queryKey` 'dash-hour' con el widget clásico de hora → caché compartida.
+// Sección 02 · «Mapa de calor horario» (réplica pixel-a-pixel del handoff). Una celda cuadrada por hora;
+// la intensidad del azul = facturación de la franja, el pico con anillo. Muestra las 24 h: por defecto
+// se ven 07–17 y el resto se desplaza horizontalmente. Comparte el queryKey 'dash-hour' → caché común.
+const HM_HOURS: readonly number[] = Array.from({ length: 24 }, (_, h) => h);
+const HM_DEFAULT_START = 7; // primera hora visible al montar (07–17 a la vista)
+const HM_INK = '#0d3a73'; // texto sobre celdas claras (azul tinta del handoff)
+const hmRamp = (t: number): string =>
+  `color-mix(in oklab, var(--ui-brand) ${Math.round(8 + Math.max(0, Math.min(1, t)) * 92)}%, var(--ui-surface))`;
+const hh2 = (h: number): string => String(h).padStart(2, '0');
+
 export function HourHeatmap({ store }: PanelProps): ReactElement {
   const day = todayLocalIso();
   const q = useQuery({
@@ -24,11 +31,70 @@ export function HourHeatmap({ store }: PanelProps): ReactElement {
     queryFn: () => getSalesByHourOnDay(day, store),
     placeholderData: keepPreviousData,
   });
-  const cells = (q.data ?? []).map((h: SalesByHour) => ({ label: `${h.hour}`, value: h.revenue }));
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const startRef = useRef<HTMLDivElement>(null);
+
+  const rows = q.data ?? [];
+  const byHour = new Map<number, SalesByHour>(rows.map((h) => [h.hour, h]));
+  const maxRev = Math.max(0, ...rows.map((h) => h.revenue));
+  const peakHour: number | null =
+    maxRev > 0 ? rows.reduce((b, h) => (h.revenue > b.revenue ? h : b)).hour : null;
+
+  // Al montar (y al llegar datos) deja 07–17 a la vista; el resto queda desplazable.
+  useEffect(() => {
+    const sc = scrollRef.current;
+    const st = startRef.current;
+    if (sc && st) sc.scrollLeft = Math.max(0, st.offsetLeft - 16);
+  }, [rows.length]);
 
   return (
-    <PanelShell id="graf-heatmap" fill>
-      <HeatStrip items={cells} isLoading={q.isLoading} isError={q.isError} />
+    <PanelShell id="graf-heatmap" bare>
+      <div className="hm-panel">
+        <div className="hm-head">
+          <div>
+            <h3 className="hm-title">
+              Mapa de calor horario<span className="hm-badge">ALT</span>
+            </h3>
+            <p className="hm-sub">
+              Intensidad de ventas por hora — lectura instantánea de los picos
+            </p>
+          </div>
+          <div className="hm-legend">
+            Menos
+            <span className="hm-legend-swatches" aria-hidden="true">
+              <span style={{ background: hmRamp(0.05) }} />
+              <span style={{ background: hmRamp(0.35) }} />
+              <span style={{ background: hmRamp(0.65) }} />
+              <span style={{ background: hmRamp(1) }} />
+            </span>
+            Más
+          </div>
+        </div>
+        <div
+          className="hm-scroll"
+          ref={scrollRef}
+          role="img"
+          aria-label="Intensidad de ventas por hora (24 horas, 07–17 a la vista)"
+        >
+          {HM_HOURS.map((h) => {
+            const rev = byHour.get(h)?.revenue ?? 0;
+            const t = maxRev > 0 ? rev / maxRev : 0;
+            return (
+              <div
+                key={h}
+                ref={h === HM_DEFAULT_START ? startRef : undefined}
+                className={`hm-cell${peakHour === h ? ' hm-cell--peak' : ''}`}
+                style={{
+                  background: hmRamp(t),
+                  color: t >= 0.55 ? 'var(--ui-chart-tip-fg)' : HM_INK,
+                }}
+              >
+                {hh2(h)}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </PanelShell>
   );
 }
@@ -39,7 +105,6 @@ const EUR0 = new Intl.NumberFormat('es-ES', {
   currency: 'EUR',
   maximumFractionDigits: 0,
 });
-const hh2 = (h: number): string => String(h).padStart(2, '0');
 
 // Geometría del viewBox del handoff (1100×240, base en y=210, techo de escala en y=20).
 const VB_W = 1100;
