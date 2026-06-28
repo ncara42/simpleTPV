@@ -331,7 +331,9 @@
   border-bottom: 1px solid var(--ui-border);
 }
 .tr-detail {
-  padding: 1.15rem 1.5rem 1.35rem;
+  /* Padding inferior = al superior (1.15rem) para que el último bloque (Revisión de
+     recepción) no quede con más aire por abajo que el ritmo del resto. */
+  padding: 1.15rem 1.5rem;
   border-left: 3px solid var(--ui-primary);
   display: flex;
   flex-direction: column;
@@ -455,14 +457,14 @@
 }
 
 /* ─── Revisión de recepción: incidencias/comentarios + fotos ──────────────────── */
-/* Vive bajo «Productos del traspaso» (misma columna). Separación superior generosa
-   (alineada con el ritmo vertical del detalle) para que NO quede pegado a los
-   productos y se lea como un bloque propio. */
+/* Vive bajo «Productos del traspaso» (misma columna). Margen superior = al ritmo
+   vertical del detalle (1.15rem, el mismo `gap` entre secciones) para que la
+   separación sea uniforme y no quede ni pegado ni descolgado. */
 .tr-review {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  margin-top: 1.35rem;
+  margin-top: 1.15rem;
 }
 .tr-review-pending {
   margin: 0;
