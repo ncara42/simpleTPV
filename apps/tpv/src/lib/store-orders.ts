@@ -1,13 +1,13 @@
 import type {
-  CreateTransferAttachmentInput,
+  CreateTransferMessageInput,
   ReceiveStoreOrderInput,
   StoreOrder,
-  TransferAttachment,
+  TransferMessage,
 } from '@simpletpv/auth';
 
 import { api } from './auth.js';
 
-export type { StoreOrder };
+export type { StoreOrder, TransferMessage };
 
 function normalizeOrder(order: StoreOrder): StoreOrder {
   return {
@@ -37,11 +37,14 @@ export function receiveStoreOrder(id: string, input: ReceiveStoreOrderInput): Pr
   return api.post<StoreOrder>(`/store-orders/${id}/receive`, input).then(normalizeOrder);
 }
 
-// Sube una foto de la recepción (incidencia/prueba de estado), atada al pedido y,
-// opcionalmente, a una línea concreta. La imagen ya viene comprimida como data-URL.
-export function uploadStoreOrderAttachment(
+// Chat del pedido/traspaso: el dependiente habla con central (texto y/o foto).
+export function listStoreOrderMessages(id: string): Promise<TransferMessage[]> {
+  return api.get<TransferMessage[]>(`/store-orders/${id}/messages`);
+}
+
+export function postStoreOrderMessage(
   id: string,
-  input: CreateTransferAttachmentInput,
-): Promise<TransferAttachment> {
-  return api.post<TransferAttachment>(`/store-orders/${id}/attachments`, input);
+  input: CreateTransferMessageInput,
+): Promise<TransferMessage> {
+  return api.post<TransferMessage>(`/store-orders/${id}/messages`, input);
 }

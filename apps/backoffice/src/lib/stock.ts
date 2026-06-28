@@ -1,7 +1,7 @@
 import type {
   AdjustStockInput,
-  CreateTransferAttachmentInput,
   CreateTransferInput,
+  CreateTransferMessageInput,
   ExpiringBatch,
   ReceiveTransferInput,
   SetMinStockInput,
@@ -9,7 +9,7 @@ import type {
   StockGlobalRow,
   StockMovementsPage,
   Transfer,
-  TransferAttachment,
+  TransferMessage,
 } from '@simpletpv/auth';
 
 import { api } from './auth.js';
@@ -21,7 +21,7 @@ export type {
   StockAlert,
   StockGlobalRow,
   Transfer,
-  TransferAttachment,
+  TransferMessage,
 };
 
 export function getGlobalStock(): Promise<StockGlobalRow[]> {
@@ -68,16 +68,16 @@ export function closeTransfer(id: string): Promise<Transfer> {
   return api.post<Transfer>(`/transfers/${id}/close`);
 }
 
-// Fotos de la recepción del traspaso (galería del detalle).
-export function listTransferAttachments(id: string): Promise<TransferAttachment[]> {
-  return api.get<TransferAttachment[]>(`/transfers/${id}/attachments`);
+// Chat del traspaso (hilo entre central y la tienda que recibe).
+export function listTransferMessages(id: string): Promise<TransferMessage[]> {
+  return api.get<TransferMessage[]>(`/transfers/${id}/messages`);
 }
 
-export function uploadTransferAttachment(
+export function postTransferMessage(
   id: string,
-  input: CreateTransferAttachmentInput,
-): Promise<TransferAttachment> {
-  return api.post<TransferAttachment>(`/transfers/${id}/attachments`, input);
+  input: CreateTransferMessageInput,
+): Promise<TransferMessage> {
+  return api.post<TransferMessage>(`/transfers/${id}/messages`, input);
 }
 
 export function adjustStock(input: AdjustStockInput): Promise<unknown> {

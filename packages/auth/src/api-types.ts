@@ -655,6 +655,23 @@ export interface CreateTransferAttachmentInput {
   caption?: string | null;
 }
 
+// Mensaje del chat de traspaso. `author` = 'store' (la tienda que recibe / dependiente)
+// o 'central' (backoffice). Lleva texto y/o una foto (`dataUrl`, data-URL base64).
+export type TransferMessageAuthor = 'store' | 'central';
+export interface TransferMessage {
+  id: string;
+  author: TransferMessageAuthor;
+  body: string | null;
+  dataUrl: string | null;
+  mimeType: string | null;
+  createdAt: string;
+}
+
+export interface CreateTransferMessageInput {
+  body?: string | null;
+  dataUrl?: string | null;
+}
+
 export interface OfficialDeviceStatus {
   authorized: boolean;
   device: {

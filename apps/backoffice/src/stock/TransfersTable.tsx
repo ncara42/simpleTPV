@@ -1,6 +1,13 @@
 import type { Transfer } from '@simpletpv/auth';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, MessageCircle } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
+
+/** Datos para abrir el chat de un traspaso desde una fila. */
+export interface TransferChatTarget {
+  id: string;
+  title: string;
+  subtitle: string;
+}
 
 import { ScrollShadowCell } from '../components/ScrollShadowCell.js';
 import {
@@ -25,6 +32,8 @@ interface TransfersTableProps {
   onAction: (kind: TransferActionKind, transfer: Transfer) => void;
   /** id del traspaso con una mutación en vuelo (deshabilita su acción). */
   pendingId: string | null;
+  /** Abre el chat (pop-up) del traspaso de la fila. */
+  onOpenChat: (chat: TransferChatTarget) => void;
   empty: ReactNode;
 }
 
@@ -34,6 +43,7 @@ export function TransfersTable({
   resolveProduct,
   onAction,
   pendingId,
+  onOpenChat,
   empty,
 }: TransfersTableProps) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
@@ -64,6 +74,7 @@ export function TransfersTable({
             <col className="tr-col-lines" />
             <col className="tr-col-created" />
             <col className="tr-col-units" />
+            <col className="tr-col-chat" />
           </colgroup>
           <thead className="tr-thead">
             <tr>
@@ -72,6 +83,7 @@ export function TransfersTable({
               <th className="tr-th-num">Líneas</th>
               <th>Creado</th>
               <th className="tr-th-num">Unidades</th>
+              <th className="tr-th-chat" aria-label="Comentarios" />
             </tr>
           </thead>
           {groups.map((group) => {
@@ -79,7 +91,7 @@ export function TransfersTable({
             return (
               <tbody key={group.key}>
                 <tr className="tr-group-head" onClick={() => toggleGroup(group.key)}>
-                  <td className="tr-group-cell" colSpan={5}>
+                  <td className="tr-group-cell" colSpan={6}>
                     <div className="tr-group-inner">
                       <ChevronDown
                         size={15}
@@ -105,6 +117,7 @@ export function TransfersTable({
                       onToggle={() => toggleExpand(transfer.id)}
                       onAction={onAction}
                       pending={pendingId === transfer.id}
+                      onOpenChat={onOpenChat}
                     />
                   ))}
               </tbody>
@@ -124,6 +137,7 @@ interface TransferRowProps {
   onToggle: () => void;
   onAction: (kind: TransferActionKind, transfer: Transfer) => void;
   pending: boolean;
+  onOpenChat: (chat: TransferChatTarget) => void;
 }
 
 function TransferRow({
@@ -134,6 +148,7 @@ function TransferRow({
   onToggle,
   onAction,
   pending,
+  onOpenChat,
 }: TransferRowProps) {
   const row = buildRow(transfer, nameOf);
   return (
@@ -173,10 +188,25 @@ function TransferRow({
             {row.unitsLabel}
           </span>
         </td>
+        <td className="tr-cell-chat">
+          <button
+            type="button"
+            className={`tr-chat-btn${row.incident ? ' is-incid' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenChat({ id: transfer.id, title: row.ref, subtitle: row.route });
+            }}
+            title="Comentarios"
+            aria-label="Abrir comentarios"
+            data-testid="transfer-chat-open"
+          >
+            <MessageCircle size={16} aria-hidden="true" />
+          </button>
+        </td>
       </tr>
       {expanded && (
         <tr className="tr-detail-row">
-          <td className="tr-detail-cell" colSpan={5}>
+          <td className="tr-detail-cell" colSpan={6}>
             <TransferRowDetail
               detail={buildTransferDetail(transfer, nameOf, resolveProduct)}
               onAction={(kind) => onAction(kind, transfer)}

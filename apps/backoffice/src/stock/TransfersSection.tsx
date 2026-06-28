@@ -33,8 +33,9 @@ import {
   transferLabel,
   type TransferView,
 } from './transfer-view.js';
+import { TransferChatModal } from './TransferChatModal.js';
 import { TransferFacets } from './TransferFacets.js';
-import { TransfersTable } from './TransfersTable.js';
+import { type TransferChatTarget, TransfersTable } from './TransfersTable.js';
 
 // Toggle inmutable de una clave en un Set (origen/destino de las facetas).
 function toggleInSet(set: ReadonlySet<string>, key: string): Set<string> {
@@ -54,6 +55,8 @@ export function TransfersSection() {
   const [view, setView] = useState<TransferView>('all');
   const [origins, setOrigins] = useState<ReadonlySet<string>>(new Set());
   const [dests, setDests] = useState<ReadonlySet<string>>(new Set());
+  // Chat (pop-up) abierto desde el botón de comentarios de una fila.
+  const [chat, setChat] = useState<TransferChatTarget | null>(null);
 
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ['transfers'],
@@ -297,11 +300,21 @@ export function TransfersSection() {
               resolveProduct={resolveProduct}
               onAction={runAction}
               pendingId={pendingId}
+              onOpenChat={setChat}
               empty={emptyNode}
             />
           </div>
         </div>
       </div>
+
+      {chat && (
+        <TransferChatModal
+          transferId={chat.id}
+          title={chat.title}
+          subtitle={chat.subtitle}
+          onClose={() => setChat(null)}
+        />
+      )}
 
       {creating && (
         <CreateTransferModal

@@ -1,0 +1,332 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   TransferChat — chat de traspaso (central ↔ tienda). Réplica del lenguaje del
+   chatbot (panel glass, burbujas, composer) con tokens --ui-*. Sin IA.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.tc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgb(0 0 0 / 0.42);
+  animation: tc-fade 0.16s var(--ui-ease, ease) both;
+}
+@keyframes tc-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.tc-panel {
+  width: min(460px, 96vw);
+  height: min(660px, 88vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl, 16px);
+  background: color-mix(in srgb, var(--ui-surface) 88%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 20px 56px -12px rgb(0 0 0 / 0.34);
+  animation: tc-pop 0.18s var(--ui-ease, ease) both;
+}
+@keyframes tc-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+/* ─── Cabecera ─────────────────────────────────────────────────────────────── */
+.tc-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
+}
+.tc-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--ui-brand-soft, color-mix(in srgb, var(--ui-primary) 12%, var(--ui-surface)));
+  color: var(--ui-brand-ink, var(--ui-primary));
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.tc-head-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.tc-title {
+  font-size: 0.9rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tc-sub {
+  font-size: 0.74rem;
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tc-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: var(--ui-radius-sm, 8px);
+  background: transparent;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.tc-iconbtn:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+
+/* ─── Hilo de mensajes ─────────────────────────────────────────────────────── */
+.tc-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1rem 0.9rem;
+  scrollbar-width: thin;
+}
+.tc-state {
+  margin: auto;
+  font-size: 0.84rem;
+  color: var(--ui-text-soft);
+  text-align: center;
+}
+.tc-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-width: 82%;
+  animation: tc-msg-in 0.26s var(--ui-ease, ease) both;
+}
+@keyframes tc-msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+.tc-msg--peer {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+.tc-msg--own {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+.tc-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--ui-radius-lg, 12px);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.tc-msg--peer .tc-bubble {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  border-bottom-left-radius: var(--ui-radius-xs, 6px);
+}
+.tc-msg--own .tc-bubble {
+  background: var(--ui-brand-soft, color-mix(in srgb, var(--ui-primary) 12%, var(--ui-surface)));
+  color: var(--ui-brand-ink, var(--ui-text));
+  border-bottom-right-radius: var(--ui-radius-xs, 6px);
+}
+.tc-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.tc-photo {
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: var(--ui-radius-md, 10px);
+  overflow: hidden;
+  cursor: pointer;
+  line-height: 0;
+}
+.tc-photo img {
+  max-width: 13rem;
+  max-height: 13rem;
+  width: 100%;
+  object-fit: cover;
+  display: block;
+}
+.tc-time {
+  font-size: 0.66rem;
+  color: var(--ui-text-soft);
+  padding: 0 0.2rem;
+}
+
+/* ─── Composer ─────────────────────────────────────────────────────────────── */
+.tc-composer {
+  flex-shrink: 0;
+  padding: 0.6rem 0.7rem 0.7rem;
+  border-top: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
+}
+.tc-staged {
+  position: relative;
+  width: 3.2rem;
+  height: 3.2rem;
+  margin-bottom: 0.5rem;
+  border-radius: var(--ui-radius-md, 10px);
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+}
+.tc-staged img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.tc-staged-del {
+  position: absolute;
+  top: -0.3rem;
+  right: -0.3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border: none;
+  border-radius: 50%;
+  background: var(--ui-danger);
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+}
+.tc-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.45rem;
+  padding: 0.4rem 0.45rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl, 16px);
+  background: var(--ui-surface);
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.tc-input-row:focus-within {
+  border-color: color-mix(in srgb, var(--ui-primary) 45%, var(--ui-border));
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.08);
+}
+.tc-attach {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.tc-attach:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+.tc-textarea {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  field-sizing: content;
+  min-height: 1.7rem;
+  max-height: 8rem;
+  padding: 0.35rem 0.2rem;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--ui-text);
+}
+.tc-textarea:focus {
+  outline: none;
+}
+.tc-textarea::placeholder {
+  color: var(--ui-text-soft);
+}
+.tc-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: none;
+  border-radius: 50%;
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg, #fff);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background 0.12s ease,
+    opacity 0.12s ease;
+}
+.tc-send:hover:not(:disabled) {
+  background: var(--ui-primary-hover, var(--ui-primary));
+  filter: brightness(0.96);
+}
+.tc-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── Lightbox ─────────────────────────────────────────────────────────────── */
+.tc-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: rgb(0 0 0 / 0.8);
+  cursor: zoom-out;
+}
+.tc-lightbox img {
+  max-width: 92vw;
+  max-height: 88vh;
+  border-radius: var(--ui-radius-md, 10px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tc-overlay,
+  .tc-panel,
+  .tc-msg {
+    animation: none;
+  }
+}

@@ -1,15 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
 import { Check, TriangleAlert } from 'lucide-react';
-import { useState } from 'react';
 
-import { listTransferAttachments } from '../lib/stock.js';
 import type { TransferActionKind, TransferDetail } from './transfer-view.js';
 
-// Panel de detalle EN LÍNEA de un traspaso (acordeón): se despliega bajo la fila al
-// pulsarla. Muestra meta en rejilla, productos (recibido/enviado) + total y, justo
-// debajo de los productos, el cuadro «Revisión de recepción» (incidencias/comentarios
-// + fotos, o «Todo en perfecto estado» con tick verde); a la derecha, la línea de
-// tiempo. Y por último la acción real disponible.
+// Panel de detalle EN LÍNEA de un traspaso (acordeón): meta en rejilla, productos
+// (recibido/enviado) + total y, debajo, un RESUMEN de la revisión de recepción («Todo
+// en perfecto estado» o «N incidencias»). El detalle completo —comentarios y fotos—
+// vive en el chat (pop-up) que se abre desde el botón de comentarios de la fila.
 
 interface TransferRowDetailProps {
   detail: TransferDetail;
@@ -18,13 +14,7 @@ interface TransferRowDetailProps {
 }
 
 export function TransferRowDetail({ detail, onAction, pending }: TransferRowDetailProps) {
-  const [lightbox, setLightbox] = useState<string | null>(null);
-  // Fotos de la recepción: solo se consultan una vez recibido (antes no las hay).
-  const { data: photos = [] } = useQuery({
-    queryKey: ['transfer-attachments', detail.id],
-    queryFn: () => listTransferAttachments(detail.id),
-    enabled: detail.reviewState !== 'pending',
-  });
+  const incidents = detail.incidents.length;
 
   return (
     <div className="tr-detail" data-testid="transfer-detail">
@@ -56,12 +46,9 @@ export function TransferRowDetail({ detail, onAction, pending }: TransferRowDeta
             </div>
           </div>
 
-          {/* Revisión de recepción, justo debajo de los productos: comentarios/
-              incidencias por línea + fotos; si no hubo nada, «Todo en perfecto
-              estado» con tick verde. */}
+          {/* Resumen de la revisión; los comentarios/fotos están en el chat de la fila. */}
           <section className="tr-review" data-testid="transfer-review">
             <h4 className="tr-section-title">Revisión de recepción</h4>
-
             {detail.reviewState === 'pending' ? (
               <p className="tr-review-pending">Pendiente de recepción.</p>
             ) : detail.reviewState === 'perfect' ? (
@@ -72,41 +59,12 @@ export function TransferRowDetail({ detail, onAction, pending }: TransferRowDeta
                 Todo en perfecto estado
               </div>
             ) : (
-              <ul className="tr-review-list" data-testid="transfer-review-incidents">
-                {detail.incidents.map((inc, i) => (
-                  <li className="tr-review-item" key={i}>
-                    <TriangleAlert className="tr-review-ico" size={14} aria-hidden="true" />
-                    <span className="tr-review-body">
-                      <span className="tr-review-head">
-                        <span className="tr-review-prod">{inc.product}</span>
-                        <span className={`tr-review-qty${inc.short ? ' is-short' : ''}`}>
-                          {inc.qtyLabel}
-                        </span>
-                      </span>
-                      {inc.note && <span className="tr-review-note">{inc.note}</span>}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {photos.length > 0 ? (
-              <div className="tr-photos" data-testid="transfer-photos">
-                {photos.map((a) => (
-                  <button
-                    type="button"
-                    className="tr-photo"
-                    key={a.id}
-                    onClick={() => setLightbox(a.dataUrl)}
-                    title={a.caption ?? 'Foto de la recepción'}
-                  >
-                    <img src={a.dataUrl} alt={a.caption ?? 'Foto de la recepción'} loading="lazy" />
-                  </button>
-                ))}
+              <div className="tr-review-bad" data-testid="transfer-review-incidents">
+                <TriangleAlert size={14} aria-hidden="true" />
+                {incidents} {incidents === 1 ? 'incidencia' : 'incidencias'} · revísalas en
+                comentarios
               </div>
-            ) : detail.reviewState !== 'pending' ? (
-              <p className="tr-photos-empty">Sin fotos adjuntas.</p>
-            ) : null}
+            )}
           </section>
         </div>
 
@@ -142,19 +100,6 @@ export function TransferRowDetail({ detail, onAction, pending }: TransferRowDeta
           >
             {detail.action.label} traspaso
           </button>
-        </div>
-      )}
-
-      {lightbox && (
-        <div
-          className="tr-lightbox"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Foto de la recepción"
-          onClick={() => setLightbox(null)}
-          data-testid="transfer-photo-lightbox"
-        >
-          <img src={lightbox} alt="Foto de la recepción" />
         </div>
       )}
     </div>

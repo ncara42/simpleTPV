@@ -16,14 +16,17 @@ use crate::stock::service::{
 };
 use crate::store_access::has_store_access;
 
-use super::input::{CreateAttachment, CreateTransfer, ReceiveTransfer};
+use super::input::{CreateAttachment, CreateMessage, CreateTransfer, ReceiveTransfer};
 use super::model::{
     Transfer, TransferAttachment, TransferAttachmentRow, TransferLine, TransferLineRow,
-    TransferStatus, TransferWithLines,
+    TransferMessage, TransferMessageRow, TransferStatus, TransferWithLines,
 };
 
 const ATTACHMENT_COLS: &str = r#"id, "transferLineId" AS transfer_line_id,
     "mimeType" AS mime_type, "dataUrl" AS data_url, caption, "createdAt" AS created_at"#;
+
+const MESSAGE_COLS: &str = r#"id, author, body, "mimeType" AS mime_type,
+    "dataUrl" AS data_url, "createdAt" AS created_at"#;
 
 const TRANSFER_COLS: &str = r#"id, "organizationId" AS organization_id,
     "originStoreId" AS origin_store_id, "destStoreId" AS dest_store_id, status::text AS status,
@@ -430,6 +433,77 @@ pub async fn list_attachments(
         let rows: Vec<TransferAttachmentRow> =
             sqlx::query_as(&sql).bind(transfer_id).fetch_all(&mut **tx).await?;
         Ok(rows.into_iter().map(TransferAttachment::from).collect())
+    })
+    .await
+}
+
+/// `POST /transfers/:id/messages` — añade un mensaje al chat. El autor lo decide el
+/// rol: org-wide → 'central'; el resto (CLERK) → 'store' (acotado a su tienda destino,
+/// SEC-01). Lleva texto y/o foto.
+pub async fn add_message(
+    pool: &PgPool,
+    org: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
+    transfer_id: Uuid,
+    input: CreateMessage,
+) -> Result<TransferMessage, AppError> {
+    input.validate()?;
+    let author = if is_org_wide { "central" } else { "store" };
+    let body = input
+        .body
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let data_url = input.data_url.as_deref().filter(|s| !s.is_empty());
+    let mime = data_url.and_then(|u| super::input::validate_image_data_url(u).ok());
+    let result: Result<TransferMessage, AppError> =
+        with_tenant_tx(pool, org, async move |tx, _after| {
+            let Some(t) = load_transfer(tx, org, transfer_id).await? else {
+                return Ok(Err(AppError::NotFound));
+            };
+            if !is_org_wide && !has_store_access(tx, user_id, t.dest_store_id).await? {
+                return Ok(Err(AppError::Forbidden));
+            }
+            let id = Uuid::new_v4();
+            sqlx::query(
+                r#"INSERT INTO "TransferMessage"
+                   (id, "organizationId", "transferId", author, body, "dataUrl", "mimeType", "createdBy")
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+            )
+            .bind(id)
+            .bind(org)
+            .bind(transfer_id)
+            .bind(author)
+            .bind(body)
+            .bind(data_url)
+            .bind(mime)
+            .bind(user_id)
+            .execute(&mut **tx)
+            .await?;
+            let sql = format!(r#"SELECT {MESSAGE_COLS} FROM "TransferMessage" WHERE id = $1"#);
+            let row: TransferMessageRow =
+                sqlx::query_as(&sql).bind(id).fetch_one(&mut **tx).await?;
+            Ok(Ok(TransferMessage::from(row)))
+        })
+        .await?;
+    result
+}
+
+/// `GET /transfers/:id/messages` — hilo del chat (cronológico).
+pub async fn list_messages(
+    pool: &PgPool,
+    org: Uuid,
+    transfer_id: Uuid,
+) -> Result<Vec<TransferMessage>, AppError> {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        let sql = format!(
+            r#"SELECT {MESSAGE_COLS} FROM "TransferMessage"
+               WHERE "transferId" = $1 ORDER BY "createdAt", id"#
+        );
+        let rows: Vec<TransferMessageRow> =
+            sqlx::query_as(&sql).bind(transfer_id).fetch_all(&mut **tx).await?;
+        Ok(rows.into_iter().map(TransferMessage::from).collect())
     })
     .await
 }

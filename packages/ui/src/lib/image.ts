@@ -1,7 +1,6 @@
-// Compresión de imágenes para las fotos de recepción de pedidos/traspasos.
-// La cámara del móvil produce JPEG de varios MB; los redimensionamos al lado
-// máximo y recomprimimos a JPEG para que el data-URL quede pequeño (~100-350 KB),
-// bien por debajo del tope del endpoint de adjuntos y del límite de body de Axum.
+// Compresión de imágenes para fotos del chat de traspaso. La cámara del móvil produce
+// JPEG de varios MB; se redimensionan al lado máximo y se recomprimen a JPEG para que
+// el data-URL quede pequeño (~100-350 KB), bajo el tope del endpoint y el body de Axum.
 
 const MAX_DIM = 1280;
 const QUALITY = 0.72;

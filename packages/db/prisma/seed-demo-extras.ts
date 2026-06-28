@@ -6,7 +6,7 @@
 // Todas las funciones son idempotentes (marker en notes/ticket o upsert).
 // Helpers de fecha duplicados a propósito: cada seed es autocontenido.
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import bcrypt from 'bcryptjs';
 
@@ -448,6 +448,40 @@ async function seedTransfers(prisma: PrismaClient, orgId: string): Promise<void>
             createdAt: dateDaysAgo(t.receivedDaysAgo!, 11, 0),
           },
         });
+      }
+    }
+
+    // Chat demo de la recepción: si el traspaso recibido trae una incidencia (nota de
+    // discrepancia), sembramos un hilo central ↔ tienda para poblar el pop-up de
+    // comentarios. Idempotente: solo se crea junto al traspaso (rama de alta).
+    const hasIncidentNote = wasReceived && lines.some((l) => l.note);
+    if (hasIncidentNote) {
+      const convo: Array<{ author: 'store' | 'central'; body: string; min: number }> = [
+        {
+          author: 'store',
+          body: 'Buenas, ha llegado el pedido pero una unidad de Pre-roll CBD x3 viene dañada. La aparto.',
+          min: 5,
+        },
+        {
+          author: 'central',
+          body: '¿Puedes hacerle una foto y la registramos como incidencia? Gracias por avisar.',
+          min: 18,
+        },
+        {
+          author: 'store',
+          body: 'Hecho. El resto del pedido, todo correcto. 👍',
+          min: 32,
+        },
+      ];
+      for (const m of convo) {
+        await prisma.$executeRaw`
+          INSERT INTO "TransferMessage"
+            (id, "organizationId", "transferId", author, body, "createdBy", "createdAt")
+          VALUES (
+            ${randomUUID()}::uuid, ${orgId}::uuid, ${transfer.id}::uuid,
+            ${m.author}, ${m.body}, ${admin.id}::uuid,
+            ${dateDaysAgo(t.receivedDaysAgo!, 11, m.min)}
+          )`;
       }
     }
   }

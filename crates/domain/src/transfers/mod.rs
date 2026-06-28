@@ -6,8 +6,9 @@ pub mod model;
 pub mod service;
 
 pub use input::{
-    CreateAttachment, CreateTransfer, CreateTransferLine, ReceiveTransfer, ReceiveTransferLine,
+    CreateAttachment, CreateMessage, CreateTransfer, CreateTransferLine, ReceiveTransfer,
+    ReceiveTransferLine,
 };
 pub use model::{
-    Transfer, TransferAttachment, TransferLine, TransferStatus, TransferWithLines,
+    Transfer, TransferAttachment, TransferLine, TransferMessage, TransferStatus, TransferWithLines,
 };

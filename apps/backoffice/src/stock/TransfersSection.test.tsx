@@ -21,8 +21,8 @@ vi.mock('../lib/stock.js', () => ({
   sendTransfer: vi.fn(() => Promise.resolve({})),
   receiveTransfer: vi.fn(() => Promise.resolve({})),
   closeTransfer: vi.fn(() => Promise.resolve({})),
-  listTransferAttachments: vi.fn(() => Promise.resolve([])),
-  uploadTransferAttachment: vi.fn(() => Promise.resolve({})),
+  listTransferMessages: vi.fn(() => Promise.resolve([])),
+  postTransferMessage: vi.fn(() => Promise.resolve({})),
 }));
 vi.mock('../lib/admin.js', () => ({ listStores: vi.fn(() => Promise.resolve([])) }));
 vi.mock('../lib/products.js', () => ({ listProducts: vi.fn(() => Promise.resolve([])) }));
@@ -267,7 +267,7 @@ describe('TransfersSection v2 — grupos, detalle en línea y ciclo de vida', ()
     );
   });
 
-  it('lista la incidencia y el comentario por línea en la revisión', async () => {
+  it('resume las incidencias en el detalle (el detalle por línea vive en el chat)', async () => {
     vi.mocked(listTransfers).mockResolvedValue([
       makeTransfer({
         id: 't1',
@@ -288,8 +288,19 @@ describe('TransfersSection v2 — grupos, detalle en línea y ciclo de vida', ()
 
     fireEvent.click(await screen.findByTestId('transfer-row'));
     const incidents = await screen.findByTestId('transfer-review-incidents');
-    expect(incidents).toHaveTextContent('Unidad dañada en transporte');
-    expect(incidents).toHaveTextContent('5 / 6');
+    expect(incidents).toHaveTextContent('1 incidencia');
+  });
+
+  it('abre el chat de comentarios desde el botón de la fila', async () => {
+    vi.mocked(listTransfers).mockResolvedValue([
+      makeTransfer({ id: 't1', status: 'RECEIVED', lines: [makeLine({ id: 'l1' })] }),
+    ]);
+    renderWithClient(<TransfersSection />);
+
+    await screen.findByTestId('transfer-row');
+    expect(screen.queryByTestId('transfer-chat')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('transfer-chat-open'));
+    expect(await screen.findByTestId('transfer-chat')).toBeInTheDocument();
   });
 
   it('filtra por la vista de estado seleccionada', async () => {

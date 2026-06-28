@@ -100,6 +100,47 @@
   /* Algo más ancha: el contador "15 / 16" (con espacios) necesita aire. */
   width: 6.75rem;
 }
+.tr-col-chat {
+  width: 3.5rem;
+}
+
+/* Botón de comentarios (chat) al final de la fila: verde si todo OK, rojo si hubo
+   incidencia. Abre el pop-up de chat. */
+.tr-cell-chat {
+  text-align: center;
+  padding-right: 0.7rem;
+}
+.tr-chat-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.95rem;
+  height: 1.95rem;
+  border: 1px solid color-mix(in srgb, var(--ui-success) 35%, var(--ui-border));
+  border-radius: 50%;
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    transform var(--ui-motion-fast) var(--ui-ease);
+}
+.tr-chat-btn:hover {
+  background: color-mix(in srgb, var(--ui-success) 18%, var(--ui-surface));
+  transform: translateY(-1px);
+}
+.tr-chat-btn.is-incid {
+  border-color: color-mix(in srgb, var(--ui-danger) 35%, var(--ui-border));
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+}
+.tr-chat-btn.is-incid:hover {
+  background: color-mix(in srgb, var(--ui-danger) 18%, var(--ui-surface));
+}
+.tr-chat-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
 .tr-thead th {
   position: sticky;
   top: 0;
@@ -494,6 +535,23 @@
   border-radius: 50%;
   background: var(--ui-success);
   color: #fff;
+  flex-shrink: 0;
+}
+/* Resumen de incidencias (el detalle por línea + fotos vive en el chat). */
+.tr-review-bad {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  align-self: flex-start;
+  padding: 0.5rem 0.8rem;
+  border-radius: var(--ui-radius-md);
+  background: color-mix(in srgb, var(--ui-danger) 9%, var(--ui-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-danger) 28%, transparent);
+  color: var(--ui-danger);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.tr-review-bad svg {
   flex-shrink: 0;
 }
 .tr-review-list {

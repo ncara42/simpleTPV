@@ -7,8 +7,10 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 use simpletpv_auth::Role;
-use simpletpv_domain::transfers::model::{TransferAttachment, TransferWithLines};
-use simpletpv_domain::transfers::{service, CreateAttachment, CreateTransfer, ReceiveTransfer};
+use simpletpv_domain::transfers::model::{TransferAttachment, TransferMessage, TransferWithLines};
+use simpletpv_domain::transfers::{
+    service, CreateAttachment, CreateMessage, CreateTransfer, ReceiveTransfer,
+};
 use simpletpv_shared::AppError;
 use uuid::Uuid;
 
@@ -119,6 +121,37 @@ pub async fn list_attachments(
 ) -> Result<Json<Vec<TransferAttachment>>, ApiError> {
     Ok(Json(
         service::list_attachments(state.db(), user.organization_id, id).await?,
+    ))
+}
+
+/// `POST /transfers/:id/messages` — añade un mensaje al chat (texto y/o foto). El autor
+/// ('central'/'store') se deriva del rol; CLERK acotado a su tienda destino.
+pub async fn add_message(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(body): Json<CreateMessage>,
+) -> Result<(StatusCode, Json<TransferMessage>), ApiError> {
+    let m = service::add_message(
+        state.db(),
+        user.organization_id,
+        user.user_id,
+        user.role.is_org_wide(),
+        id,
+        body,
+    )
+    .await?;
+    Ok((StatusCode::CREATED, Json(m)))
+}
+
+/// `GET /transfers/:id/messages` — hilo del chat (cualquier rol con sesión).
+pub async fn list_messages(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<TransferMessage>>, ApiError> {
+    Ok(Json(
+        service::list_messages(state.db(), user.organization_id, id).await?,
     ))
 }
 
