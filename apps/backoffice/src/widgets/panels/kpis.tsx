@@ -167,7 +167,7 @@ export function ConnectedKpiGrid({ period, store }: PanelProps): ReactElement {
   const ss = s?.series;
 
   return (
-    <PanelShell id="kpi-grid-connected" fill bare>
+    <PanelShell id="kpi-grid-connected" bare>
       <div className="kw-grid">
         <Cell
           label="Facturación"

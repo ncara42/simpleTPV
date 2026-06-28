@@ -21,12 +21,11 @@
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg);
   overflow: hidden;
-  height: 100%;
 }
 .kw-cell {
   background: var(--ui-surface);
-  padding: 14px 18px 0;
-  min-height: 132px;
+  padding: 13px 18px 0;
+  min-height: 118px;
   display: flex;
   flex-direction: column;
 }
@@ -71,8 +70,8 @@
    pega al fondo. La rejilla recorta con su radio (las celdas de las esquinas redondean el sparkline). */
 .kw-spark {
   width: calc(100% + 36px);
-  margin: auto -18px 0;
-  height: 40px;
+  margin: 8px -18px 0;
+  height: 38px;
   display: block;
 }
 
