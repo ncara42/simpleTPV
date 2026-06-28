@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { Fragment, type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { RESIZE_DIRS, useFloatingWindow, type WindowRect } from '../hooks/use-floating-window.js';
 import { fileToCompressedDataUrl } from '../lib/image.js';
@@ -152,96 +152,107 @@ export function TransferChat({
           ) : messages.length === 0 ? (
             <p className="tc-state">{emptyHint}</p>
           ) : (
-            messages.map((m) => {
+            messages.map((m, i) => {
               const own = m.author === side;
+              const prev = messages[i - 1];
+              const divider = !prev || needsDivider(prev.createdAt, m.createdAt);
+              const day = divider ? (
+                <div className="tc-daydiv">
+                  <span>{fmtDayTime(m.createdAt)}</span>
+                </div>
+              ) : null;
               if (editId === m.id) {
                 return (
-                  <div key={m.id} className={`tc-msg ${own ? 'tc-msg--own' : 'tc-msg--peer'}`}>
-                    <div className="tc-edit">
-                      <textarea
-                        className="tc-edit-area"
-                        value={editDraft}
-                        onChange={(e) => setEditDraft(e.target.value)}
-                        rows={Math.min(6, Math.max(2, editDraft.split('\n').length))}
-                        autoFocus
-                      />
-                      <div className="tc-edit-actions">
-                        <button
-                          type="button"
-                          className="tc-edit-cancel"
-                          onClick={() => setEditId(null)}
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          type="button"
-                          className="tc-edit-save"
-                          onClick={saveEdit}
-                          disabled={editDraft.trim() === ''}
-                        >
-                          Guardar
-                        </button>
+                  <Fragment key={m.id}>
+                    {day}
+                    <div className={`tc-msg ${own ? 'tc-msg--own' : 'tc-msg--peer'}`}>
+                      <div className="tc-edit">
+                        <textarea
+                          className="tc-edit-area"
+                          value={editDraft}
+                          onChange={(e) => setEditDraft(e.target.value)}
+                          rows={Math.min(6, Math.max(2, editDraft.split('\n').length))}
+                          autoFocus
+                        />
+                        <div className="tc-edit-actions">
+                          <button
+                            type="button"
+                            className="tc-edit-cancel"
+                            onClick={() => setEditId(null)}
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            className="tc-edit-save"
+                            onClick={saveEdit}
+                            disabled={editDraft.trim() === ''}
+                          >
+                            Guardar
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </Fragment>
                 );
               }
               return (
-                <div
-                  key={m.id}
-                  className={`tc-msg ${own ? 'tc-msg--own' : 'tc-msg--peer'}`}
-                  data-testid="tc-message"
-                >
-                  <div className="tc-bubble">
-                    {m.dataUrl && (
-                      <button
-                        type="button"
-                        className="tc-photo"
-                        onClick={() => setLightbox(m.dataUrl)}
-                        title="Ver foto"
-                      >
-                        <img src={m.dataUrl} alt="Foto del mensaje" loading="lazy" />
-                      </button>
-                    )}
-                    {m.body && <span className="tc-text">{m.body}</span>}
+                <Fragment key={m.id}>
+                  {day}
+                  <div
+                    className={`tc-msg ${own ? 'tc-msg--own' : 'tc-msg--peer'}`}
+                    data-testid="tc-message"
+                  >
+                    <div className="tc-bubble">
+                      {m.dataUrl && (
+                        <button
+                          type="button"
+                          className="tc-photo"
+                          onClick={() => setLightbox(m.dataUrl)}
+                          title="Ver foto"
+                        >
+                          <img src={m.dataUrl} alt="Foto del mensaje" loading="lazy" />
+                        </button>
+                      )}
+                      {m.body && <span className="tc-text">{m.body}</span>}
+                    </div>
+                    <div className="tc-msg-tools">
+                      {m.body && (
+                        <button
+                          type="button"
+                          className="tc-msg-act"
+                          onClick={() => copy(m.id, m.body!)}
+                          title="Copiar"
+                          aria-label="Copiar"
+                        >
+                          {copiedId === m.id ? <IconCheck /> : <IconCopy />}
+                        </button>
+                      )}
+                      {m.body && onEdit && (
+                        <button
+                          type="button"
+                          className="tc-msg-act"
+                          onClick={() => startEdit(m)}
+                          title="Editar"
+                          aria-label="Editar"
+                        >
+                          <IconPencil />
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button
+                          type="button"
+                          className="tc-msg-act"
+                          onClick={() => onDelete(m.id)}
+                          title="Borrar"
+                          aria-label="Borrar"
+                        >
+                          <IconTrash />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="tc-msg-tools">
-                    {m.body && (
-                      <button
-                        type="button"
-                        className="tc-msg-act"
-                        onClick={() => copy(m.id, m.body!)}
-                        title="Copiar"
-                        aria-label="Copiar"
-                      >
-                        {copiedId === m.id ? <IconCheck /> : <IconCopy />}
-                      </button>
-                    )}
-                    {m.body && onEdit && (
-                      <button
-                        type="button"
-                        className="tc-msg-act"
-                        onClick={() => startEdit(m)}
-                        title="Editar"
-                        aria-label="Editar"
-                      >
-                        <IconPencil />
-                      </button>
-                    )}
-                    {onDelete && (
-                      <button
-                        type="button"
-                        className="tc-msg-act tc-msg-act--danger"
-                        onClick={() => onDelete(m.id)}
-                        title="Borrar"
-                        aria-label="Borrar"
-                      >
-                        <IconTrash />
-                      </button>
-                    )}
-                    <time className="tc-time">{fmtTime(m.createdAt)}</time>
-                  </div>
-                </div>
+                </Fragment>
               );
             })
           )}
@@ -336,12 +347,37 @@ function initialRect(): WindowRect {
   };
 }
 
-function fmtTime(iso: string): string {
+const MONTHS_ES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+/** Separador estilo Instagram: «2 de julio, 22:21». */
+function fmtDayTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   const hh = String(d.getHours()).padStart(2, '0');
   const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${hh}:${mm}`;
+  return `${d.getDate()} de ${MONTHS_ES[d.getMonth()]}, ${hh}:${mm}`;
+}
+
+/** Inserta un separador cuando cambia el día o hay más de 1 h de hueco. */
+function needsDivider(prevIso: string, curIso: string): boolean {
+  const a = new Date(prevIso);
+  const b = new Date(curIso);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return false;
+  if (a.toDateString() !== b.toDateString()) return true;
+  return b.getTime() - a.getTime() > 60 * 60 * 1000;
 }
 
 function Svg({ children, size = 16 }: { children: ReactNode; size?: number }) {

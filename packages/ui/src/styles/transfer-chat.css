@@ -240,49 +240,59 @@ body.tc-dragging .tc-panel {
   object-fit: cover;
   display: block;
 }
-.tc-time {
-  font-size: 0.66rem;
-  color: var(--ui-text-soft);
-  padding: 0 0.2rem;
-}
-
-/* Acciones por mensaje (copiar/editar/borrar): visibles al hover, como el chatbot. La
-   hora va siempre visible; solo los botones aparecen al pasar el ratón. */
-.tc-msg-tools {
+/* Separador de fecha/hora estilo Instagram: «—— 2 de julio, 22:21 ——». */
+.tc-daydiv {
   display: flex;
   align-items: center;
-  gap: 0.1rem;
+  gap: 0.7rem;
+  margin: 0.5rem 0.1rem;
+  color: var(--ui-text-soft);
+  font-size: 0.68rem;
+  font-weight: 500;
 }
-.tc-msg--own .tc-msg-tools {
-  flex-direction: row-reverse;
+.tc-daydiv::before,
+.tc-daydiv::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--ui-border);
+}
+
+/* Acciones por mensaje (copiar/editar/borrar): réplica EXACTA de .chat-actions /
+   .chat-action del chatbot (28px, radius-sm, transparente, muted → text al hover). */
+.tc-msg-tools {
+  display: flex;
+  gap: 2px;
+  margin-top: 2px;
+  opacity: 0;
+  transition: opacity var(--ui-motion-fast) var(--ui-ease);
+}
+.tc-msg:hover .tc-msg-tools,
+.tc-msg:focus-within .tc-msg-tools {
+  opacity: 1;
 }
 .tc-msg-act {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 28px;
+  height: 28px;
   border: none;
-  border-radius: var(--ui-radius-sm, 8px);
+  border-radius: var(--ui-radius-sm);
   background: transparent;
-  color: var(--ui-text-soft);
+  color: var(--ui-text-muted);
   cursor: pointer;
-  opacity: 0;
   transition:
-    background 0.12s ease,
-    color 0.12s ease,
-    opacity 0.12s ease;
-}
-.tc-msg:hover .tc-msg-act,
-.tc-msg:focus-within .tc-msg-act {
-  opacity: 1;
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
 }
 .tc-msg-act:hover {
   background: var(--ui-surface-subtle);
   color: var(--ui-text);
 }
-.tc-msg-act--danger:hover {
-  color: var(--ui-danger);
+.tc-msg-act:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
 }
 
 /* Edición en línea de un mensaje. */
