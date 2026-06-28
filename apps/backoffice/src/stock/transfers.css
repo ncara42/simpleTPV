@@ -457,13 +457,11 @@
 }
 
 /* ─── Revisión de recepción: incidencias/comentarios + fotos ──────────────────── */
-/* Vive bajo «Productos del traspaso» (misma columna). Margen superior = al ritmo
-   vertical del detalle (1.15rem, el mismo `gap` entre secciones) para que la
-   separación sea uniforme y no quede ni pegado ni descolgado. */
+/* Vive bajo «Productos del traspaso» (misma columna) y replica su espaciado: margen
+   superior = al ritmo del detalle (1.15rem) y, en flujo de bloque normal, el h4 deja
+   sus 0.5rem bajo el título IGUAL que «Productos» (no usamos `flex gap`, que se
+   sumaba al margen del h4 y dejaba el título con más aire que el de Productos). */
 .tr-review {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
   margin-top: 1.15rem;
 }
 .tr-review-pending {
@@ -551,6 +549,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  /* Separación respecto al bloque de estado (antes la daba el `gap` del contenedor). */
+  margin-top: 0.6rem;
 }
 .tr-photo {
   width: 4.5rem;
@@ -580,7 +580,7 @@
   box-shadow: var(--ui-focus);
 }
 .tr-photos-empty {
-  margin: 0;
+  margin: 0.6rem 0 0;
   font-size: 0.79rem;
   color: var(--ui-text-soft);
 }
