@@ -134,17 +134,18 @@ describe('CreateTransferModal — campo Nombre y notes', () => {
 });
 
 describe('TransfersSection — nombre, buscador y fallback', () => {
-  it('muestra el nombre (notes) y el fallback "Origen → Destino" en la columna', async () => {
+  it('muestra la nota como subtítulo y la ruta en su propia columna', async () => {
     vi.mocked(listTransfers).mockResolvedValue([
       makeTransfer({ id: 't1', notes: 'Pedido semanal' }),
       makeTransfer({ id: 't2', notes: null }),
     ]);
     renderWithClient(<TransfersSection />);
 
-    const cells = await screen.findAllByTestId('transfer-name-cell');
-    const texts = cells.map((c) => c.textContent);
-    expect(texts).toContain('Pedido semanal');
-    expect(texts).toContain('Centro → Norte');
+    // La nota del usuario aparece como subtítulo (solo en la fila con nota).
+    expect(await screen.findByTestId('transfer-note')).toHaveTextContent('Pedido semanal');
+    // La ruta va en su propia columna, en ambas filas (con y sin nota).
+    const routes = screen.getAllByTestId('transfer-route').map((c) => c.textContent);
+    expect(routes).toEqual(['Centro → Norte', 'Centro → Norte']);
   });
 
   it('filtra la lista por el buscador (data-testid transfers-search)', async () => {
@@ -166,8 +167,8 @@ describe('TransfersSection — nombre, buscador y fallback', () => {
   });
 });
 
-describe('TransfersSection v2 — grupos, ficha y ciclo de vida', () => {
-  it('agrupa por estado y abre la ficha al pulsar una fila', async () => {
+describe('TransfersSection v2 — grupos, detalle en línea y ciclo de vida', () => {
+  it('agrupa por estado y despliega el detalle en línea al pulsar una fila', async () => {
     vi.mocked(listTransfers).mockResolvedValue([
       makeTransfer({ id: 't1', notes: 'Pedido semanal', status: 'DRAFT', lines: [makeLine()] }),
     ]);
@@ -178,27 +179,28 @@ describe('TransfersSection v2 — grupos, ficha y ciclo de vida', () => {
     expect(
       within(screen.getByTestId('transfers-table')).getByText('Borradores'),
     ).toBeInTheDocument();
+    // El detalle no está montado hasta desplegar la fila.
+    expect(screen.queryByTestId('transfer-detail')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('transfer-row'));
 
-    const drawer = await screen.findByTestId('transfer-drawer');
-    expect(within(drawer).getByText('Pedido semanal')).toBeInTheDocument();
-    expect(within(drawer).getByText('Traspaso creado')).toBeInTheDocument();
+    const detail = await screen.findByTestId('transfer-detail');
+    expect(within(detail).getByText('Traspaso creado')).toBeInTheDocument();
   });
 
-  it('envía un borrador desde la acción en línea sin abrir la ficha', async () => {
+  it('envía un borrador desde la acción del detalle desplegado', async () => {
     vi.mocked(listTransfers).mockResolvedValue([
       makeTransfer({ id: 't1', status: 'DRAFT', lines: [makeLine()] }),
     ]);
     renderWithClient(<TransfersSection />);
 
+    fireEvent.click(await screen.findByTestId('transfer-row'));
     const action = await screen.findByTestId('transfer-action');
     expect(action).toHaveTextContent('Enviar');
 
     fireEvent.click(action);
 
     await waitFor(() => expect(sendTransfer).toHaveBeenCalledWith('t1'));
-    expect(screen.queryByTestId('transfer-drawer')).not.toBeInTheDocument();
   });
 
   it('recibe un traspaso en tránsito con todas sus líneas', async () => {
@@ -212,6 +214,7 @@ describe('TransfersSection v2 — grupos, ficha y ciclo de vida', () => {
     ]);
     renderWithClient(<TransfersSection />);
 
+    fireEvent.click(await screen.findByTestId('transfer-row'));
     const action = await screen.findByTestId('transfer-action');
     expect(action).toHaveTextContent('Recibir');
 
@@ -235,6 +238,7 @@ describe('TransfersSection v2 — grupos, ficha y ciclo de vida', () => {
     ]);
     renderWithClient(<TransfersSection />);
 
+    fireEvent.click(await screen.findByTestId('transfer-row'));
     const action = await screen.findByTestId('transfer-action');
     expect(action).toHaveTextContent('Cerrar');
 

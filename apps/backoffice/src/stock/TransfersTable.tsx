@@ -1,27 +1,30 @@
 import type { Transfer } from '@simpletpv/auth';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 import { ScrollShadowCell } from '../components/ScrollShadowCell.js';
 import {
   buildRow,
+  buildTransferDetail,
+  type ProductResolver,
   type StoreNameResolver,
   type TransferActionKind,
   type TransferGroup,
 } from './transfer-view.js';
+import { TransferRowDetail } from './TransferRowDetail.js';
 
 // Tabla de Traspasos agrupada por estado (Borradores · En tránsito · Recibidos ·
-// Cerrados). Cabecera fija; una cabecera por grupo (punto de estado · nombre · nº ·
-// total de uds) plegable; filas con nombre+ruta, líneas, fecha, píldora de unidades
-// teñida por estado y la acción real en línea. Al pulsar una fila se abre la ficha.
+// Cerrados). Cabecera fija; cabeceras de grupo plegables; filas con referencia + nota,
+// ruta, líneas, fecha y píldora de unidades (recibidas/enviadas) teñida solo cuando
+// importa. Al pulsar una fila se DESPLIEGA su detalle en línea (acordeón), no un cajón.
 
 interface TransfersTableProps {
   groups: TransferGroup[];
   nameOf: StoreNameResolver;
+  resolveProduct: ProductResolver;
   count: number;
   sortDesc: boolean;
   onToggleSort: () => void;
-  onOpen: (transfer: Transfer) => void;
   onAction: (kind: TransferActionKind, transfer: Transfer) => void;
   /** id del traspaso con una mutación en vuelo (deshabilita su acción). */
   pendingId: string | null;
@@ -31,15 +34,16 @@ interface TransfersTableProps {
 export function TransfersTable({
   groups,
   nameOf,
+  resolveProduct,
   count,
   sortDesc,
   onToggleSort,
-  onOpen,
   onAction,
   pendingId,
   empty,
 }: TransfersTableProps) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const toggleGroup = (key: string): void =>
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -47,6 +51,8 @@ export function TransfersTable({
       else next.add(key);
       return next;
     });
+  const toggleExpand = (id: string): void =>
+    setExpandedId((current) => (current === id ? null : id));
 
   const isEmpty = groups.length === 0;
 
@@ -75,18 +81,18 @@ export function TransfersTable({
           <table className="tr-table">
             <colgroup>
               <col />
+              <col className="tr-col-route" />
               <col className="tr-col-lines" />
               <col className="tr-col-created" />
               <col className="tr-col-units" />
-              <col className="tr-col-act" />
             </colgroup>
             <thead className="tr-thead">
               <tr>
                 <th className="tr-th-name">Traspaso</th>
+                <th>Ruta</th>
                 <th className="tr-th-num">Líneas</th>
                 <th>Creado</th>
                 <th className="tr-th-num">Unidades</th>
-                <th className="tr-th-num" aria-label="Acciones" />
               </tr>
             </thead>
             {groups.map((group) => {
@@ -116,7 +122,9 @@ export function TransfersTable({
                         key={transfer.id}
                         transfer={transfer}
                         nameOf={nameOf}
-                        onOpen={onOpen}
+                        resolveProduct={resolveProduct}
+                        expanded={expandedId === transfer.id}
+                        onToggle={() => toggleExpand(transfer.id)}
                         onAction={onAction}
                         pending={pendingId === transfer.id}
                       />
@@ -134,46 +142,70 @@ export function TransfersTable({
 interface TransferRowProps {
   transfer: Transfer;
   nameOf: StoreNameResolver;
-  onOpen: (transfer: Transfer) => void;
+  resolveProduct: ProductResolver;
+  expanded: boolean;
+  onToggle: () => void;
   onAction: (kind: TransferActionKind, transfer: Transfer) => void;
   pending: boolean;
 }
 
-function TransferRow({ transfer, nameOf, onOpen, onAction, pending }: TransferRowProps) {
+function TransferRow({
+  transfer,
+  nameOf,
+  resolveProduct,
+  expanded,
+  onToggle,
+  onAction,
+  pending,
+}: TransferRowProps) {
   const row = buildRow(transfer, nameOf);
   return (
-    <tr className="tr-row" data-testid="transfer-row" onClick={() => onOpen(transfer)}>
-      <td className="tr-cell-name">
-        <div className="tr-name-wrap">
-          <span className="tr-name" data-testid="transfer-name-cell">
-            {row.name}
+    <>
+      <tr
+        className={`tr-row${expanded ? ' is-expanded' : ''}`}
+        data-testid="transfer-row"
+        aria-expanded={expanded}
+        onClick={onToggle}
+      >
+        <td className="tr-cell-name">
+          <ChevronRight
+            size={13}
+            className={`tr-row-caret${expanded ? ' is-expanded' : ''}`}
+            aria-hidden="true"
+          />
+          <div className="tr-name-wrap">
+            <span className="tr-ref" data-testid="transfer-ref">
+              {row.ref}
+            </span>
+            {row.hasNote && (
+              <span className="tr-note" data-testid="transfer-note">
+                {row.note}
+              </span>
+            )}
+          </div>
+        </td>
+        <td className="tr-cell-route" data-testid="transfer-route">
+          {row.route}
+        </td>
+        <td className="tr-cell-lines">{row.linesLabel}</td>
+        <td className="tr-cell-created">{row.createdLabel}</td>
+        <td className="tr-cell-units">
+          <span className={`tr-badge tr-badge--${row.badgeTone}`} data-testid="transfer-units">
+            {row.unitsLabel}
           </span>
-          <span className="tr-route">{row.route}</span>
-        </div>
-      </td>
-      <td className="tr-cell-lines">{row.linesLabel}</td>
-      <td className="tr-cell-created">{row.createdLabel}</td>
-      <td className="tr-cell-units">
-        <span className={`tr-badge tr-badge--${row.tone}`} data-testid="transfer-units">
-          {row.unitsLabel}
-        </span>
-      </td>
-      <td className="tr-cell-act">
-        {row.action && (
-          <button
-            type="button"
-            className="tr-action"
-            disabled={pending}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (row.action) onAction(row.action.kind, transfer);
-            }}
-            data-testid="transfer-action"
-          >
-            {row.action.label}
-          </button>
-        )}
-      </td>
-    </tr>
+        </td>
+      </tr>
+      {expanded && (
+        <tr className="tr-detail-row">
+          <td className="tr-detail-cell" colSpan={5}>
+            <TransferRowDetail
+              detail={buildTransferDetail(transfer, nameOf, resolveProduct)}
+              onAction={(kind) => onAction(kind, transfer)}
+              pending={pending}
+            />
+          </td>
+        </tr>
+      )}
+    </>
   );
 }

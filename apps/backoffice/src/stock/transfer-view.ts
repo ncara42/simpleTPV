@@ -132,6 +132,20 @@ export function transferRoute(t: Transfer, nameOf: StoreNameResolver): string {
 export function transferLabel(t: Transfer, nameOf: StoreNameResolver): string {
   return transferDisplayName(t.notes, nameOf(t.originStoreId), nameOf(t.destStoreId));
 }
+/** Nota libre del traspaso (el nombre escrito por el usuario), o '' si no tiene. */
+export function transferNote(t: Transfer): string {
+  return (t.notes ?? '').trim();
+}
+/**
+ * Referencia corta y estable derivada del id, p. ej. `TR-9FB249`. El backend no
+ * guarda un número correlativo, así que se compone de forma determinista a partir
+ * del id (uuid sin guiones, primeros 6 alfanuméricos en mayúscula) — único y estable
+ * por traspaso, sirve como identificador legible en la tabla y la ficha.
+ */
+export function transferRef(id: string): string {
+  const alnum = id.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  return `TR-${alnum.slice(0, 6) || '—'}`;
+}
 
 // ─── Filtrado, orden y agrupación ─────────────────────────────────────────────
 export function matchesSearch(t: Transfer, term: string, nameOf: StoreNameResolver): boolean {
@@ -279,26 +293,42 @@ export function fmtDateTime(iso: string): string {
 }
 
 // ─── Filas de la tabla ────────────────────────────────────────────────────────
+/** Tono de la píldora de unidades: el color solo aparece cuando importa. */
+export type UnitsBadgeTone = 'neutral' | 'received' | 'incid';
+export function unitsBadgeTone(t: Transfer): UnitsBadgeTone {
+  if (statusKey(t) === 'incid') return 'incid';
+  if (t.status === 'RECEIVED') return 'received';
+  return 'neutral';
+}
+
 export interface TransferRowVM {
   id: string;
-  name: string;
+  /** Referencia corta (TR-XXXXXX), identificador principal de la fila. */
+  ref: string;
+  /** Nota/nombre del usuario (subtítulo), '' si no tiene. */
+  note: string;
+  hasNote: boolean;
   route: string;
   linesLabel: string;
   createdLabel: string;
+  /** "recibidas/enviadas" cuando ya se recibió/cerró; si no, solo enviadas. */
   unitsLabel: string;
-  tone: StatusTone;
-  action: TransferAction | null;
+  badgeTone: UnitsBadgeTone;
 }
 export function buildRow(t: Transfer, nameOf: StoreNameResolver): TransferRowVM {
+  const note = transferNote(t);
+  const sent = unitsSent(t);
+  const showRecv = t.status === 'RECEIVED' || t.status === 'CLOSED';
   return {
     id: t.id,
-    name: transferLabel(t, nameOf),
+    ref: transferRef(t.id),
+    note,
+    hasNote: note !== '',
     route: transferRoute(t, nameOf),
     linesLabel: String(t.lines.length),
     createdLabel: fmtShortDate(t.createdAt),
-    unitsLabel: `${unitsSent(t)} uds`,
-    tone: statusMeta(t).tone,
-    action: primaryAction(t),
+    unitsLabel: showRecv ? `${unitsReceived(t)}/${sent}` : `${sent}`,
+    badgeTone: unitsBadgeTone(t),
   };
 }
 
@@ -441,12 +471,12 @@ export function buildTransferDetail(
     tone: meta.tone,
     glyph: meta.glyph,
     meta: [
+      { label: 'Referencia', value: transferRef(t.id) },
       { label: 'Estado', value: meta.label },
+      { label: 'Creado', value: fmtDateTime(t.createdAt) },
       { label: 'Origen', value: nameOf(t.originStoreId) },
       { label: 'Destino', value: nameOf(t.destStoreId) },
-      { label: 'Creado', value: fmtDateTime(t.createdAt) },
       { label: 'Líneas', value: String(lc) },
-      { label: 'Unidades', value: `${u} uds` },
     ],
     lines,
     lineTotalLabel: showRecv ? 'Recibidas / enviadas' : 'Unidades enviadas',

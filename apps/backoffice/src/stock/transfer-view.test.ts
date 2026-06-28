@@ -18,6 +18,7 @@ import {
   sortTransfers,
   statusKey,
   transferLabel,
+  transferRef,
   transferRoute,
   unitsSent,
 } from './transfer-view.js';
@@ -231,9 +232,10 @@ describe('transfer-view · acciones reales por estado', () => {
 });
 
 describe('transfer-view · fila y ficha', () => {
-  it('arma la fila de tabla', () => {
+  it('arma la fila de tabla (ref + nota + ruta, sin sufijo de uds)', () => {
     const row = buildRow(
       makeTransfer({
+        id: 't1',
         notes: 'Pedido',
         status: 'DRAFT',
         lines: [line({ quantitySent: '5' }), line({ id: 'l2', quantitySent: '3' })],
@@ -241,13 +243,31 @@ describe('transfer-view · fila y ficha', () => {
       nameOf,
     );
     expect(row).toMatchObject({
-      name: 'Pedido',
+      ref: 'TR-T1',
+      note: 'Pedido',
+      hasNote: true,
       route: 'Centro → Norte',
       linesLabel: '2',
-      unitsLabel: '8 uds',
-      tone: 'draft',
+      unitsLabel: '8',
+      badgeTone: 'neutral',
     });
-    expect(row.action).toMatchObject({ kind: 'send' });
+  });
+
+  it('fila recibida con falta: ratio recibido/enviado y tono de incidencia', () => {
+    const row = buildRow(
+      makeTransfer({
+        status: 'RECEIVED',
+        lines: [line({ quantitySent: '10', quantityReceived: '7' })],
+      }),
+      nameOf,
+    );
+    expect(row.unitsLabel).toBe('7/10');
+    expect(row.badgeTone).toBe('incid');
+  });
+
+  it('deriva una referencia corta y estable del id', () => {
+    expect(transferRef('9fb24962-1a2b-3c4d')).toBe('TR-9FB249');
+    expect(transferRef('t1')).toBe('TR-T1');
   });
 
   it('arma la ficha con líneas recibidas/enviadas y nota de incidencia', () => {

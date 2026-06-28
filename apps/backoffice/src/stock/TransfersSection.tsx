@@ -24,7 +24,6 @@ import {
   applyStoreFacets,
   applyView,
   buildFullReceiveInput,
-  buildTransferDetail,
   computeStoreFacets,
   computeViewCounts,
   groupTransfers,
@@ -34,7 +33,6 @@ import {
   transferLabel,
   type TransferView,
 } from './transfer-view.js';
-import { TransferDrawer } from './TransferDrawer.js';
 import { TransferFacets } from './TransferFacets.js';
 import { TransfersTable } from './TransfersTable.js';
 
@@ -57,8 +55,6 @@ export function TransfersSection() {
   const [origins, setOrigins] = useState<ReadonlySet<string>>(new Set());
   const [dests, setDests] = useState<ReadonlySet<string>>(new Set());
   const [sortDesc, setSortDesc] = useState(true);
-  // Ficha lateral abierta (id del traspaso) o null.
-  const [drawerId, setDrawerId] = useState<string | null>(null);
 
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ['transfers'],
@@ -108,12 +104,6 @@ export function TransfersSection() {
   );
 
   const showClear = search.trim() !== '' || view !== 'all' || origins.size > 0 || dests.size > 0;
-
-  const drawerTransfer = drawerId ? (transfers.find((t) => t.id === drawerId) ?? null) : null;
-  const detail = useMemo(
-    () => (drawerTransfer ? buildTransferDetail(drawerTransfer, nameOf, resolveProduct) : null),
-    [drawerTransfer, nameOf, resolveProduct],
-  );
 
   // ─── Mutaciones del ciclo (enviar/recibir/cerrar) ───────────────────────────
   const invalidate = (): void => {
@@ -303,10 +293,10 @@ export function TransfersSection() {
             <TransfersTable
               groups={groups}
               nameOf={nameOf}
+              resolveProduct={resolveProduct}
               count={sorted.length}
               sortDesc={sortDesc}
               onToggleSort={() => setSortDesc((d) => !d)}
-              onOpen={(t) => setDrawerId(t.id)}
               onAction={runAction}
               pendingId={pendingId}
               empty={emptyNode}
@@ -314,17 +304,6 @@ export function TransfersSection() {
           </div>
         </div>
       </div>
-
-      {detail && (
-        <TransferDrawer
-          detail={detail}
-          onClose={() => setDrawerId(null)}
-          onAction={(kind) => {
-            if (drawerTransfer) runAction(kind, drawerTransfer);
-          }}
-          pending={pendingId === drawerId}
-        />
-      )}
 
       {creating && (
         <CreateTransferModal
