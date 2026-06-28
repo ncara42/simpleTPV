@@ -38,6 +38,100 @@ export function contentBounds(layout: readonly FreeElement[]): Bounds | null {
   return { minX, minY, maxX, maxY };
 }
 
+// ── Imán / snapping al arrastrar (lienzo libre) ──
+// Rectángulo en coords de mundo (esquina sup-izq + tamaño).
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+// Guía visual: línea en un eje (`x` = vertical, `y` = horizontal) a la coordenada `pos`, que abarca
+// de `start` a `end` en el eje perpendicular (todo en mundo).
+export interface SnapGuide {
+  axis: 'x' | 'y';
+  pos: number;
+  start: number;
+  end: number;
+}
+export interface SnapResult {
+  x: number;
+  y: number;
+  guides: SnapGuide[];
+}
+
+// Candidatos de ajuste de `moving` contra UN vecino `o` en un eje. Cada candidato es la posición de
+// inicio (left/top) que tomaría `moving` y la coordenada de la guía a pintar (borde/centro compartido):
+//  - alinear inicio/fin/centro (bordes alineados, sin separación);
+//  - adyacencia con MARGEN `gap` a cada lado (pegado «imán» dejando exactamente ese hueco).
+function axisCandidates(
+  mStart: number,
+  mSize: number,
+  oStart: number,
+  oSize: number,
+  gap: number,
+): Array<{ start: number; guide: number }> {
+  const oEnd = oStart + oSize;
+  return [
+    { start: oStart, guide: oStart }, // alinear inicios
+    { start: oEnd - mSize, guide: oEnd }, // alinear finales
+    { start: oStart + oSize / 2 - mSize / 2, guide: oStart + oSize / 2 }, // alinear centros
+    { start: oEnd + gap, guide: oEnd }, // pegar DESPUÉS del vecino (con margen)
+    { start: oStart - gap - mSize, guide: oStart }, // pegar ANTES del vecino (con margen)
+  ];
+}
+
+// Imán: ajusta la posición de `moving` para alinearse/pegarse a `others`, por eje INDEPENDIENTE
+// (gana el candidato más cercano dentro de `threshold`, en px de MUNDO). Mantiene un margen `gap` al
+// pegar adyacente. NO redimensiona nada. Devuelve la posición ajustada y las guías a pintar. Pura.
+export function snapMovingRect(
+  moving: Rect,
+  others: readonly Rect[],
+  gap: number,
+  threshold: number,
+): SnapResult {
+  let best = {
+    x: { dist: Infinity, start: moving.x, guide: 0, other: null as Rect | null },
+    y: { dist: Infinity, start: moving.y, guide: 0, other: null as Rect | null },
+  };
+  for (const o of others) {
+    for (const c of axisCandidates(moving.x, moving.w, o.x, o.w, gap)) {
+      const d = Math.abs(moving.x - c.start);
+      if (d < best.x.dist)
+        best = { ...best, x: { dist: d, start: c.start, guide: c.guide, other: o } };
+    }
+    for (const c of axisCandidates(moving.y, moving.h, o.y, o.h, gap)) {
+      const d = Math.abs(moving.y - c.start);
+      if (d < best.y.dist)
+        best = { ...best, y: { dist: d, start: c.start, guide: c.guide, other: o } };
+    }
+  }
+  const snapX = best.x.dist <= threshold;
+  const snapY = best.y.dist <= threshold;
+  const x = snapX ? best.x.start : moving.x;
+  const y = snapY ? best.y.start : moving.y;
+  const guides: SnapGuide[] = [];
+  if (snapX && best.x.other) {
+    const o = best.x.other;
+    guides.push({
+      axis: 'x',
+      pos: best.x.guide,
+      start: Math.min(y, o.y),
+      end: Math.max(y + moving.h, o.y + o.h),
+    });
+  }
+  if (snapY && best.y.other) {
+    const o = best.y.other;
+    guides.push({
+      axis: 'y',
+      pos: best.y.guide,
+      start: Math.min(x, o.x),
+      end: Math.max(x + moving.w, o.x + o.w),
+    });
+  }
+  return { x, y, guides };
+}
+
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
 type Edge = 'top' | 'right' | 'bottom' | 'left';

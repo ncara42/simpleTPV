@@ -21,6 +21,7 @@ import {
   freeItemSize,
   type FreeShape,
   type FreeText,
+  freeUnitsFromPx,
   type FreeWidget,
   GENERIC_DEFAULT_SIZE,
   GRID_BREAKPOINT_COLS,
@@ -163,6 +164,39 @@ describe('freeItemSize', () => {
       w: 4 * FREE_COL - FREE_GAP,
       h: 2 * FREE_ROW - FREE_GAP,
     });
+  });
+});
+
+describe('freeUnitsFromPx', () => {
+  it('es la INVERSA EXACTA de freeItemSize para todo el catálogo (round-trip sin pérdida)', () => {
+    // El modo CUADRÍCULA depende de recuperar las unidades enteras EXACTAS desde el px del lienzo;
+    // si esto perdiera precisión, los tiles dejarían de teselar limpio. `cols` se clampa a BOARD_COLS.
+    for (const [id, spec] of Object.entries(ITEM_SPECS)) {
+      const { w, h } = freeItemSize(id);
+      expect(freeUnitsFromPx(w, h)).toEqual({
+        cols: Math.min(BOARD_COLS, spec.w),
+        rows: spec.h,
+      });
+    }
+  });
+
+  it('recupera las unidades de un tamaño genérico (u·FREE_COL − GAP)', () => {
+    // Un widget genérico del agente con defaultSize {w:6,h:3} sembrado en el lienzo.
+    expect(freeUnitsFromPx(6 * FREE_COL - FREE_GAP, 3 * FREE_ROW - FREE_GAP)).toEqual({
+      cols: 6,
+      rows: 3,
+    });
+  });
+
+  it('clampa columnas a [1, BOARD_COLS] y filas a ≥1', () => {
+    expect(freeUnitsFromPx(99999, 99999).cols).toBe(BOARD_COLS);
+    expect(freeUnitsFromPx(0, 0)).toEqual({ cols: 1, rows: 1 });
+    expect(freeUnitsFromPx(-500, -500)).toEqual({ cols: 1, rows: 1 });
+  });
+
+  it('redondea al entero de celdas más cercano para tamaños libres (notas)', () => {
+    // NOTE_DEFAULT = 240×180 → round((240+16)/100)=3 col, round((180+16)/160)=1 fila.
+    expect(freeUnitsFromPx(NOTE_DEFAULT.w, NOTE_DEFAULT.h)).toEqual({ cols: 3, rows: 1 });
   });
 });
 

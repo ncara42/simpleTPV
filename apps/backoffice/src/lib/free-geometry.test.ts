@@ -6,6 +6,8 @@ import {
   minimapClickToPan,
   minimapProjection,
   offscreenArrow,
+  type Rect,
+  snapMovingRect,
 } from './free-geometry.js';
 
 const widget = (id: string, x: number, y: number, w = 100, h = 100): FreeElement => ({
@@ -94,5 +96,44 @@ describe('minimapProjection', () => {
     const worldX = proj.worldMinX + 80 / proj.scale;
     const screenX = worldX * view.zoom + pan.panX;
     expect(screenX).toBeCloseTo(viewport.width / 2, 5);
+  });
+});
+
+describe('snapMovingRect (imán)', () => {
+  const GAP = 16;
+  const other: Rect = { x: 100, y: 100, w: 200, h: 100 }; // vecino fijo
+
+  it('no ajusta nada si está lejos (fuera del umbral)', () => {
+    const moving: Rect = { x: 500, y: 500, w: 100, h: 100 };
+    const res = snapMovingRect(moving, [other], GAP, 8);
+    expect(res).toEqual({ x: 500, y: 500, guides: [] });
+  });
+
+  it('alinea el borde izquierdo con el del vecino al acercarse', () => {
+    // moving.x = 105 está a 5px del left del vecino (100) → snap a 100.
+    const res = snapMovingRect({ x: 105, y: 400, w: 50, h: 50 }, [other], GAP, 8);
+    expect(res.x).toBe(100);
+    expect(res.guides.some((g) => g.axis === 'x' && g.pos === 100)).toBe(true);
+  });
+
+  it('se PEGA a la derecha del vecino manteniendo el margen exacto (gap)', () => {
+    // El vecino acaba en x=300; moving.left cerca de 300+gap=316 → debe quedar a 316 (16px de hueco).
+    const res = snapMovingRect({ x: 313, y: 100, w: 80, h: 100 }, [other], GAP, 8);
+    expect(res.x).toBe(other.x + other.w + GAP); // 316
+  });
+
+  it('alinea por eje INDEPENDIENTE (pega a la derecha y alinea arriba a la vez)', () => {
+    // x cerca de la adyacencia derecha (316) e y cerca del top del vecino (100).
+    const res = snapMovingRect({ x: 314, y: 103, w: 80, h: 100 }, [other], GAP, 8);
+    expect(res.x).toBe(316); // pegado con margen
+    expect(res.y).toBe(100); // alineado arriba
+    expect(res.guides).toHaveLength(2);
+  });
+
+  it('no redimensiona: el tamaño del rect movido nunca cambia', () => {
+    const moving: Rect = { x: 102, y: 98, w: 123, h: 77 };
+    const res = snapMovingRect(moving, [other], GAP, 8);
+    // Solo devuelve x/y (+guías); w/h no forman parte del resultado → imposible redimensionar.
+    expect(Object.keys(res).sort()).toEqual(['guides', 'x', 'y']);
   });
 });

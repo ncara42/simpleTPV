@@ -529,6 +529,19 @@ export function freeItemSize(id: string): { w: number; h: number } {
   return { w: spec.w * FREE_COL - FREE_GAP, h: spec.h * FREE_ROW - FREE_GAP };
 }
 
+// INVERSA EXACTA de `freeItemSize`: recupera las unidades enteras de rejilla (columnas/filas) a
+// partir del tamaño en píxeles de un elemento del lienzo. Como el px de mundo es `u·CELDA − GAP`,
+// `round((px + GAP) / CELDA)` devuelve la unidad original sin pérdida para todo lo sembrado desde
+// la rejilla (catálogo y genéricos); para elementos de tamaño libre (notas redimensionadas) cae al
+// número entero de celdas más cercano. Las columnas se clampan a [1, BOARD_COLS]; las filas a ≥1.
+// Es lo que usa el modo CUADRÍCULA para teselar sin huecos sobre una rejilla real de 12 columnas,
+// en vez de aproximar el tramo con umbrales de píxel (que dejaban huecos y no llenaban el ancho).
+export function freeUnitsFromPx(w: number, h: number): { cols: number; rows: number } {
+  const cols = Math.min(BOARD_COLS, Math.max(1, Math.round((w + FREE_GAP) / FREE_COL)));
+  const rows = Math.max(1, Math.round((h + FREE_GAP) / FREE_ROW));
+  return { cols, rows };
+}
+
 // Tamaño por defecto de una nota nueva (px de mundo).
 export const NOTE_DEFAULT = { w: 240, h: 180 };
 
