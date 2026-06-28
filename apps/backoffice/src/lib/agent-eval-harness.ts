@@ -69,16 +69,14 @@ export const EVAL_REQUESTS: readonly EvalRequest[] = [
     id: 'briefing-matinal',
     prompt: '¿Cómo va la mañana? Dame un resumen rápido de ventas de hoy.',
     intent: 'Resumen de ventas del día (KPIs + tendencia).',
-    expectsAnyOf: ['block:sales-overview', '/dashboard/sales-kpis', '/dashboard/sales-by-hour'],
-    reference: [
-      { op: 'add_widget', widgetId: 'block:sales-overview', position: 'top-left', period: 'today' },
-    ],
+    expectsAnyOf: ['/dashboard/sales-kpis', '/dashboard/sales-by-hour'],
+    reference: [{ op: 'add_widget', widgetId: 'dash-bars', position: 'top-left', period: 'today' }],
   },
   {
     id: 'rentabilidad',
     prompt: '¿Qué productos me dejan más margen este mes?',
     intent: 'Top de productos por margen.',
-    expectsAnyOf: ['block:top-margin', '/dashboard/product-rankings', '/dashboard/margin-kpis'],
+    expectsAnyOf: ['/dashboard/product-rankings', '/dashboard/margin-kpis'],
   },
   {
     id: 'control-descuento',
@@ -96,15 +94,7 @@ export const EVAL_REQUESTS: readonly EvalRequest[] = [
     id: 'comparar-tiendas',
     prompt: '¿Qué tienda sube y cuál baja esta semana? ¿Quién es el rezagado?',
     intent: 'Comparativa entre tiendas (multitienda).',
-    expectsAnyOf: ['block:store-comparison', '/dashboard/sales-by-store'],
-    reference: [
-      {
-        op: 'add_widget',
-        widgetId: 'block:store-comparison',
-        position: 'top-left',
-        period: 'week',
-      },
-    ],
+    expectsAnyOf: ['/dashboard/sales-by-store'],
   },
   {
     id: 'cierre-de-mes',
@@ -164,7 +154,7 @@ export const EVAL_REQUESTS: readonly EvalRequest[] = [
     id: 'peor-rotacion',
     prompt: '¿Qué productos no se mueven? Enséñame el stock muerto.',
     intent: 'Productos de peor rotación.',
-    expectsAnyOf: ['block:dead-stock', '/dashboard/product-rankings'],
+    expectsAnyOf: ['/dashboard/product-rankings'],
   },
 ];
 

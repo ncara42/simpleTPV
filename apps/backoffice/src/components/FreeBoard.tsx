@@ -54,7 +54,6 @@ import { FreeMinimap } from './FreeMinimap.js';
 import { FreeNote } from './FreeNote.js';
 import { FreeShapeView } from './FreeShapeView.js';
 import { FreeText } from './FreeText.js';
-import { WidgetPalette } from './WidgetPalette.js';
 
 // Lienzo "edgeless" estilo Affine: los elementos viven en coordenadas de MUNDO (px) dentro de
 // un `world` con transform translate(pan)·scale(zoom) y transform-origin 0 0; el viewport
@@ -917,35 +916,6 @@ export function FreeBoard({
             </div>
           )}
         </div>
-
-        {/* Estado vacío (p. ej. preset «Personalizado»): "+" central que abre el buscador de
-            widgets para componer el lienzo desde cero. */}
-        {els.length === 0 && (
-          <div className="dash-free-empty" data-testid="dash-free-empty">
-            <button
-              type="button"
-              className="dash-free-empty-add"
-              data-testid="dash-free-empty-add"
-              aria-label="Añadir widget"
-              onClick={() => setEmptyPaletteOpen(true)}
-            >
-              <Plus size={30} aria-hidden="true" />
-            </button>
-            <p className="dash-free-empty-hint">Lienzo en blanco · añade los widgets que quieras</p>
-            {emptyPaletteOpen && (
-              <WidgetPalette
-                variant="center"
-                items={available}
-                label={itemLabel}
-                onPick={(id) => {
-                  onAddWidget(id);
-                  setEmptyPaletteOpen(false);
-                }}
-                onClose={() => setEmptyPaletteOpen(false)}
-              />
-            )}
-          </div>
-        )}
 
         {/* Flecha de orientación off-screen: persiste mientras el contenido no se vea. */}
         {arrow && (

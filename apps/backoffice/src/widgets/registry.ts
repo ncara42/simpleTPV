@@ -13,16 +13,34 @@ import {
   type GenericSpec,
   ITEM_SPECS,
 } from '../lib/dashboard-layout.js';
-import { GEIST_WIDGET_META } from './geist/meta.js';
 import { GenericWidget } from './generic/GenericWidget.js';
 
-// Etiquetas legibles del catálogo. Clásicos conservados (#264): solo «Ventas» y «Ventas por hora»;
-// el resto del catálogo histórico se retiró al migrar a los widgets Geist.
+// Etiquetas legibles del catálogo. Solo conservamos «Ventas» y «Ventas por hora».
 export const WIDGET_LABELS: Record<string, string> = {
   'dash-bars': 'Ventas',
   'dash-hour': 'Ventas por hora',
-  // Widgets Geist (#264): etiquetas desde la fuente única `widgets/geist/meta.ts`.
-  ...Object.fromEntries(Object.entries(GEIST_WIDGET_META).map(([id, m]) => [id, m.label])),
+  // Sección 01 · KPIs (rediseño)
+  'kpi-grid-connected': 'KPIs (rejilla conectada)',
+  'kpi-classic': 'KPI (tarjeta clásica)',
+  // Sección 02 · Gráficas (rediseño)
+  'graf-heatmap': 'Mapa de calor horario',
+  // Sección 03 · Listas (rediseño)
+  'lista-familia': 'Reparto por familia',
+  'lista-rankings': 'Ranking de productos',
+  'lista-mix': 'Mix por familia (treemap)',
+  // Sección 05 · Compactos (rediseño)
+  'cmp-ribbon': 'Banda compacta de métricas',
+  'cmp-donut': 'Donut por familia',
+  'cmp-treemap': 'Treemap compacto',
+  'cmp-leaderboard': 'Top vendedores',
+  'cmp-hero': 'Cifra-héroe',
+  // Sección 06 · Diagnóstico (rediseño)
+  'diag-actividad': 'Actividad (alertas)',
+  // Sección 07 · KPIs · más formatos (rediseño)
+  'kpi-dual': 'KPI dual',
+  'kpi-area': 'KPI con área',
+  'kpi-alerta': 'KPI de alerta',
+  'kpi-7dias': 'KPI 7 días',
 };
 
 // Tipo de widget en el registry. Los del catálogo son 'kpi' o 'panel' (su render lo posee

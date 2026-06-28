@@ -2,8 +2,7 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { availableWidgetIds, useDashboardStore } from '../lib/dashboard-store.js';
-import { getWidgetLabel } from '../widgets/registry.js';
-import { WidgetPalette } from './WidgetPalette.js';
+import { WidgetGalleryModal } from './WidgetGalleryModal.js';
 
 // Botón «+» del clúster derecho del topbar (mismo acabado que la campana) para añadir un widget al
 // dashboard. Sustituye a la tira «Añadir widget» que vivía DENTRO del modo cuadrícula. Auto-contenido
@@ -30,10 +29,8 @@ export function DashboardAddWidget() {
         <Plus size={18} aria-hidden="true" />
       </button>
       {open && (
-        <WidgetPalette
-          variant="topbar"
-          items={available}
-          label={getWidgetLabel}
+        <WidgetGalleryModal
+          availableIds={available}
           onPick={(id) => {
             addWidget(id);
             setOpen(false);

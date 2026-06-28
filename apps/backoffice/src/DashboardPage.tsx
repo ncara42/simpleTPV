@@ -58,8 +58,7 @@ import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
 import { useModeTransition } from './lib/use-mode-transition.js';
 import { STATUS_LABEL } from './purchases/labels.js';
 import { ALERT_LABEL, df, EXPIRY_LABEL, expiryDaysText } from './stock/labels.js';
-import { GeistWidget } from './widgets/geist/geistWidgets.js';
-import { isGeistWidget } from './widgets/geist/meta.js';
+import { WIDGET_PANELS } from './widgets/panels/index.js';
 import { getWidgetLabel, getWidgetSpec } from './widgets/registry.js';
 
 // Subtítulo de panel según el periodo seleccionado (más claro que "Periodo actual").
@@ -1091,11 +1090,9 @@ export function DashboardPage({
     if (id.startsWith('gen:')) {
       return getWidgetSpec(id)?.render?.() ?? null;
     }
-    // Widgets Geist (#264): cada uno consulta sus propios datos al montarse (solo se monta si está en
-    // el lienzo), por eso reciben `period`/`store` y no se gatean con `vis` como los clásicos.
-    if (isGeistWidget(id)) {
-      return <GeistWidget id={id} period={period} store={store} />;
-    }
+    // Widgets del rediseño: cada uno consulta sus datos al montarse (recibe period/store).
+    const Panel = WIDGET_PANELS[id];
+    if (Panel) return <Panel period={period} store={store} />;
     const card = cardDefs.find((c) => c.id === id);
     return card ? card.node : (renderPanel(id)?.node ?? null);
   };

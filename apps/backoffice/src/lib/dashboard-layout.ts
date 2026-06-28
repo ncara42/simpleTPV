@@ -4,7 +4,6 @@
 // preset, vía "Personalizar" (tablero arrastrable con snap a la rejilla), persistida por
 // preset en la preferencia `dashboard.layout`.
 
-import { GEIST_WIDGET_META } from '../widgets/geist/meta.js';
 import type { DashboardPeriod } from './dashboard.js';
 
 export type PresetId = 'personalizado' | 'ventas' | 'beneficio' | 'inventario' | 'equipo';
@@ -47,17 +46,33 @@ export function defaultPanelOrder(preset: PresetDef): string[] {
 // (span 5/7/12) y un alto que encaja su contenido (gráfico ~200px o lista con scroll).
 export const BOARD_COLS = 12;
 export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
-  // Únicos clásicos que se conservan (#264): «Ventas» y «Ventas por hora». El resto del catálogo
-  // histórico (KPIs, rankings, stock, equipo…) se retiró al migrar el dashboard a los widgets Geist;
-  // el agente y la paleta componen con estos dos + las moléculas Geist.
+  // Únicos widgets del catálogo: «Ventas» y «Ventas por hora».
   'dash-bars': { w: 7, h: 2 },
   // "Ventas por hora": gráfico + barra fina de navegación. El gráfico llena el alto del tile
   // (dash-panel--fill), así que 2 filas bastan sin dejar hueco inferior.
   'dash-hour': { w: 7, h: 2 },
-  // Widgets Geist (#264): moléculas dataviz montadas como widgets fijos. Su tamaño (y etiqueta) viven
-  // en `widgets/geist/meta.ts` (fuente única); aquí solo se inyectan para que la paleta los liste y
-  // `addWidget`/`reconcileFreeLayout` los acepten igual que los del catálogo clásico.
-  ...Object.fromEntries(Object.entries(GEIST_WIDGET_META).map(([id, m]) => [id, m.size])),
+  // Sección 01 · KPIs (rediseño): rejilla conectada (tarjeta redondeada de 6 KPIs, banda baja) y clásica.
+  'kpi-grid-connected': { w: 12, h: 1 },
+  'kpi-classic': { w: 3, h: 1 },
+  // Sección 02 · Gráficas (rediseño): tira de mapa de calor horario (ancha, una fila de celdas).
+  'graf-heatmap': { w: 6, h: 2 },
+  // Sección 03 · Listas (rediseño): reparto por familia, ranking de productos y mix (treemap).
+  'lista-familia': { w: 4, h: 2 },
+  'lista-rankings': { w: 4, h: 3 },
+  'lista-mix': { w: 5, h: 3 },
+  // Sección 05 · Compactos (rediseño): tiles pequeños (ribbon, donut, treemap, top, cifra-héroe).
+  'cmp-ribbon': { w: 3, h: 2 },
+  'cmp-donut': { w: 3, h: 2 },
+  'cmp-treemap': { w: 3, h: 2 },
+  'cmp-leaderboard': { w: 3, h: 3 },
+  'cmp-hero': { w: 5, h: 2 },
+  // Sección 06 · Diagnóstico (rediseño): feed de actividad (lista alta).
+  'diag-actividad': { w: 4, h: 3 },
+  // Sección 07 · KPIs · más formatos (rediseño): tarjetas KPI (dual, área, alerta, 7 días).
+  'kpi-dual': { w: 3, h: 2 },
+  'kpi-area': { w: 3, h: 2 },
+  'kpi-alerta': { w: 3, h: 2 },
+  'kpi-7dias': { w: 3, h: 2 },
 };
 
 const DEFAULT_SPEC = { w: 4, h: 2 };

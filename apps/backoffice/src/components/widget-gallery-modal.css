@@ -1,0 +1,357 @@
+/* Modal galería «Añadir widget» — selector gráfico del botón «+» de la topbar.
+   Lenguaje «Fundación Geist» (tokens --ui-* de @simpletpv/ui/theme-geist.css): superficie plana,
+   hairlines, acento azul único, sombra reservada al overlay. Claro/oscuro por tokens. */
+
+.wg-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 0.45);
+  animation: wg-fade 120ms ease-out;
+}
+
+@keyframes wg-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.wg-modal {
+  width: min(960px, 100%);
+  max-height: min(86vh, 700px);
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-lg, 0 12px 32px -12px rgb(0 0 0 / 0.3));
+  overflow: hidden;
+  animation: wg-pop 150ms var(--ui-ease, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+@keyframes wg-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wg-overlay,
+  .wg-modal {
+    animation: none;
+  }
+}
+
+/* ── Cabecera ── */
+.wg-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 0;
+}
+
+.wg-head-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wg-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-brand-ink);
+}
+
+.wg-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ui-text);
+}
+
+.wg-close {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-text-soft);
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.wg-close:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
+
+.wg-close:focus-visible {
+  outline: none;
+  border-color: var(--ui-brand);
+  box-shadow: var(--ui-focus);
+}
+
+/* ── Buscador ── */
+.wg-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 20px 16px;
+  padding: 0 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-text-soft);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.wg-search:focus-within {
+  border-color: var(--ui-brand);
+  box-shadow: var(--ui-focus);
+}
+
+.wg-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 9px 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ui-text);
+}
+
+.wg-search-input::placeholder {
+  color: var(--ui-text-soft);
+}
+
+/* ── Cuerpo: carril de categorías + rejilla de tarjetas ── */
+.wg-body {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  min-height: 0;
+  flex: 1;
+  border-top: 1px solid var(--ui-border);
+}
+
+.wg-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 10px;
+  overflow-y: auto;
+  border-right: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+
+.wg-rail-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  transition:
+    background 100ms ease,
+    color 100ms ease;
+}
+
+.wg-rail-item:hover {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+
+.wg-rail-item.is-active {
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-ink);
+  font-weight: 600;
+}
+
+.wg-rail-item:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+.wg-rail-num {
+  width: 18px;
+  flex: none;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+
+.wg-rail-item.is-active .wg-rail-num {
+  color: var(--ui-brand-ink);
+}
+
+.wg-rail-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wg-rail-count {
+  flex: none;
+  min-width: 20px;
+  text-align: center;
+  padding: 1px 6px;
+  border-radius: var(--ui-radius-pill);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text-soft);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.wg-rail-item.is-active .wg-rail-count {
+  color: var(--ui-brand-ink);
+}
+
+/* ── Rejilla de tarjetas ── */
+.wg-content {
+  overflow-y: auto;
+  padding: 18px 20px 22px;
+  min-height: 0;
+}
+
+.wg-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px;
+}
+
+.wg-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  cursor: pointer;
+  overflow: hidden;
+  text-align: left;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.wg-card:hover:not(:disabled) {
+  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-shadow-sm);
+  transform: translateY(-1px);
+}
+
+.wg-card:focus-visible {
+  outline: none;
+  border-color: var(--ui-brand);
+  box-shadow: var(--ui-focus);
+}
+
+.wg-card:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.wg-card-thumb {
+  display: block;
+  height: 96px;
+  padding: 14px 16px;
+  background: var(--ui-surface-subtle);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.wg-thumb-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.wg-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 11px 14px 13px;
+}
+
+.wg-card-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+}
+
+.wg-card-sub {
+  font-size: 12px;
+  color: var(--ui-text-soft);
+}
+
+.wg-card-added {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 2px 7px;
+  border-radius: var(--ui-radius-pill);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text-soft);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.wg-empty {
+  margin: 0;
+  padding: 28px 4px;
+  font-size: 13.5px;
+  color: var(--ui-text-soft);
+}
+
+/* ── Responsive: carril arriba en pantallas estrechas ── */
+@media (max-width: 560px) {
+  .wg-body {
+    grid-template-columns: 1fr;
+  }
+
+  .wg-rail {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .wg-rail-item {
+    flex: none;
+  }
+}

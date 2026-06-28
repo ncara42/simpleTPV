@@ -248,24 +248,24 @@
   height: 100%;
 }
 
-/* ─── Widgets Geist (#264): moléculas dataviz montadas como widgets fijos ─── */
+/* ─── Widgets de panel (rediseño): cuerpo que envuelve la molécula dataviz ─── */
 /* El cuerpo del panel envuelve la molécula. Con `fill` (treemap, leaderboard, área, feed) crece para
    llenar el tile y la molécula se estira; sin `fill` ocupa su alto natural (KPIs, donut, calor). */
-.dash-geist-body {
+.dash-widget-body {
   min-width: 0;
 }
-.dash-panel--fill > .dash-geist-body {
+.dash-panel--fill > .dash-widget-body {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
-.dash-panel--fill > .dash-geist-body > * {
+.dash-panel--fill > .dash-widget-body > * {
   flex: 1;
   min-height: 0;
 }
 /* Contenedor de sparkline a sangre (área/barras): la molécula mide al 100% de este alto. */
-.dash-geist-spark {
+.dash-widget-spark {
   width: 100%;
   min-height: 96px;
 }

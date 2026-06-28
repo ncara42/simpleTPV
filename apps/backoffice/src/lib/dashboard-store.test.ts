@@ -646,54 +646,6 @@ describe('normalizeGenericSpec — panel v2 (#204): REPARA en vez de podar', () 
   });
 });
 
-describe('bloques pre-cableados (#205): add_widget block:<id>', () => {
-  it('coloca un bloque entero con UNA llamada y lo registra (E2E)', () => {
-    const r = store().applyCanvasOp({
-      op: 'add_widget',
-      position: 'center',
-      elementId: 'blk-1',
-      widgetId: 'block:sales-overview',
-      period: 'month',
-    });
-    expect(r.accepted).toBe(true);
-    const id = genericElementId('blk-1');
-    expect(id).toBe('gen:blk-1');
-    const spec = store().layout.genericWidgets?.[id];
-    expect(spec).toBeDefined();
-    expect(spec!.kind).toBe('panel');
-    expect(spec!.recipe).toBe('kpiRow+oneChart');
-    // params heredados en las hojas
-    expect(spec!.slots?.kpis?.[0]?.period).toBe('month');
-    // registrado y renderizable
-    expect(getWidgetSpec(id)).toBeDefined();
-    expect(typeof getWidgetSpec(id)!.render).toBe('function');
-    // y colocado en el lienzo libre
-    expect(freeOf().some((e) => e.id === id)).toBe(true);
-  });
-
-  it('el undo elimina el bloque por su id', () => {
-    store().applyCanvasOp({
-      op: 'add_widget',
-      position: 'center',
-      elementId: 'blk-2',
-      widgetId: 'block:stock-risk',
-    });
-    const id = genericElementId('blk-2');
-    expect(store().layout.genericWidgets?.[id]).toBeDefined();
-    const undo = store().removeElement(id);
-    expect(undo.accepted).toBe(true);
-    expect(store().layout.genericWidgets?.[id]).toBeUndefined();
-    expect(getWidgetSpec(id)).toBeUndefined();
-    expect(freeOf().some((e) => e.id === id)).toBe(false);
-  });
-
-  it('un bloque desconocido se rechaza', () => {
-    const r = store().applyCanvasOp({ op: 'add_widget', widgetId: 'block:no-existe' });
-    expect(r.accepted).toBe(false);
-    expect(r.reason).toMatch(/bloque desconocido/);
-  });
-});
-
 // Cuenta hojas de un árbol composite normalizado (para aserciones de poda).
 function countLeaves(node: CompositeNode | undefined): number {
   if (!node) return 0;

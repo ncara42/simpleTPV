@@ -42,19 +42,17 @@ import {
 // cualquier PresetDef, así que estos fixtures reproducen los presets retirados
 // (Ventas/Inventario) para no perder la cobertura de la lógica de maquetación.
 // El catálogo clásico se redujo (#264) a dos paneles (dash-bars/dash-hour) más las
-// moléculas Geist; los fixtures usan esos ids. Nota: defaultPanelOrder filtra los
-// `panels` por PANEL_CANON (= dash-bars/dash-hour), así que las moléculas Geist van
-// en `cards` (no se filtran) y los dos paneles clásicos en `panels`.
+// Fixtures de presets para tests. Los presets reales solo tienen dos widgets: dash-bars y dash-hour.
 const ventas: PresetDef = {
   id: 'ventas',
   label: 'Ventas',
-  cards: ['geist-stat-today', 'geist-dual-margin', 'geist-gauge-margin'],
+  cards: [],
   panels: ['dash-bars', 'dash-hour'],
 };
 const inventario: PresetDef = {
   id: 'inventario',
   label: 'Inventario',
-  cards: ['geist-ribbon-kpis', 'geist-spark-ticket', 'geist-bars-profit'],
+  cards: [],
   panels: ['dash-hour'],
 };
 // Presets a validar en las invariantes «para todos los presets»: los reales + los fixtures.
@@ -75,14 +73,8 @@ describe('defaultPanelOrder', () => {
 });
 
 describe('presetItemIds + ITEM_SPECS', () => {
-  it('Ventas: tarjetas (en orden de preset) seguidas de paneles (en orden canónico)', () => {
-    expect(presetItemIds(ventas)).toEqual([
-      'geist-stat-today',
-      'geist-dual-margin',
-      'geist-gauge-margin',
-      'dash-bars',
-      'dash-hour',
-    ]);
+  it('Ventas: solo paneles (en orden canónico)', () => {
+    expect(presetItemIds(ventas)).toEqual(['dash-bars', 'dash-hour']);
   });
 
   it('cada elemento de cada preset tiene un tamaño en ITEM_SPECS', () => {
@@ -95,17 +87,13 @@ describe('presetItemIds + ITEM_SPECS', () => {
 });
 
 describe('buildDefaultLayout', () => {
-  it('Ventas: banda de tarjetas (w3,h2) arriba y paneles fluyendo en filas de 12', () => {
+  it('Ventas: paneles (bars y hour) fluyendo en filas de 12', () => {
     const layout = buildDefaultLayout(ventas);
     const byId = Object.fromEntries(layout.map((it) => [it.i, it]));
-    // Tres tarjetas Geist de 3 columnas (h2) en la fila 0: 3+3+3 = 9 ≤ 12.
-    expect(byId['geist-stat-today']).toEqual({ i: 'geist-stat-today', x: 0, y: 0, w: 3, h: 2 });
-    expect(byId['geist-dual-margin']).toEqual({ i: 'geist-dual-margin', x: 3, y: 0, w: 3, h: 2 });
-    expect(byId['geist-gauge-margin']).toEqual({ i: 'geist-gauge-margin', x: 6, y: 0, w: 3, h: 2 });
-    // Paneles bajo las tarjetas (salto de fila a y=2). bars(7) ocupa toda su fila.
-    expect(byId['dash-bars']).toEqual({ i: 'dash-bars', x: 0, y: 2, w: 7, h: 2 });
-    // hour(7) no cabe junto a bars (7+7>12): salta a la fila siguiente (y=4).
-    expect(byId['dash-hour']).toEqual({ i: 'dash-hour', x: 0, y: 4, w: 7, h: 2 });
+    // bars(7) ocupa la primera fila completa.
+    expect(byId['dash-bars']).toEqual({ i: 'dash-bars', x: 0, y: 0, w: 7, h: 2 });
+    // hour(7) no cabe junto a bars (7+7>12): salta a la segunda fila.
+    expect(byId['dash-hour']).toEqual({ i: 'dash-hour', x: 0, y: 2, w: 7, h: 2 });
   });
 
   it('ningún elemento se sale de las 12 columnas', () => {
@@ -128,22 +116,22 @@ describe('buildDefaultLayout', () => {
 
 describe('reconcileLayout', () => {
   it('añade al final (con su tamaño por defecto) los elementos que falten', () => {
-    const saved = [{ i: 'geist-stat-today', x: 0, y: 0, w: 3, h: 2 }];
-    const result = reconcileLayout(saved, ['geist-stat-today', 'geist-dual-margin']);
+    const saved = [{ i: 'dash-bars', x: 0, y: 0, w: 7, h: 2 }];
+    const result = reconcileLayout(saved, ['dash-bars', 'dash-hour']);
     expect(result).toHaveLength(2);
-    const added = result.find((it) => it.i === 'geist-dual-margin')!;
-    // geist-dual-margin = {w:3,h:2} en ITEM_SPECS.
-    expect(added).toMatchObject({ w: 3, h: 2 });
+    const added = result.find((it) => it.i === 'dash-hour')!;
+    // dash-hour = {w:7,h:2} en ITEM_SPECS.
+    expect(added).toMatchObject({ w: 7, h: 2 });
     expect(added.y).toBeGreaterThanOrEqual(2);
   });
 
   it('descarta coordenadas de ids que ya no existen en el preset', () => {
     const saved = [
-      { i: 'geist-stat-today', x: 0, y: 0, w: 3, h: 2 },
+      { i: 'dash-bars', x: 0, y: 0, w: 7, h: 2 },
       { i: 'obsoleto', x: 3, y: 0, w: 2, h: 1 },
     ];
-    const result = reconcileLayout(saved, ['geist-stat-today']);
-    expect(result.map((it) => it.i)).toEqual(['geist-stat-today']);
+    const result = reconcileLayout(saved, ['dash-bars']);
+    expect(result.map((it) => it.i)).toEqual(['dash-bars']);
   });
 
   it('layout completo: devuelve los mismos elementos sin tocar el orden', () => {
@@ -158,13 +146,13 @@ describe('reconcileLayout', () => {
 
 describe('freeItemSize', () => {
   it('traduce el tamaño de rejilla a píxeles (col×FREE_COL − gap, fila×FREE_ROW − gap)', () => {
-    // geist-stat-today = {w:3,h:2}
-    expect(freeItemSize('geist-stat-today')).toEqual({
-      w: 3 * FREE_COL - FREE_GAP,
-      h: 2 * FREE_ROW - FREE_GAP,
-    });
     // dash-bars = {w:7,h:2}
     expect(freeItemSize('dash-bars')).toEqual({
+      w: 7 * FREE_COL - FREE_GAP,
+      h: 2 * FREE_ROW - FREE_GAP,
+    });
+    // dash-hour = {w:7,h:2}
+    expect(freeItemSize('dash-hour')).toEqual({
       w: 7 * FREE_COL - FREE_GAP,
       h: 2 * FREE_ROW - FREE_GAP,
     });
@@ -232,19 +220,19 @@ describe('reconcileFreeLayout', () => {
 
   it('NO re-añade widgets que el usuario quitó: conserva exactamente lo guardado', () => {
     // El usuario dejó solo un widget del preset Ventas.
-    const saved = [{ i: 'geist-stat-today', x: 50, y: 60, w: 184, h: 144 }];
+    const saved = [{ i: 'dash-hour', x: 50, y: 60, w: 184, h: 144 }];
     const result = reconcileFreeLayout(saved, ventas);
-    expect(result.map((e) => e.id)).toEqual(['geist-stat-today']);
+    expect(result.map((e) => e.id)).toEqual(['dash-hour']);
   });
 
   it('descarta widgets cuyo id ya no existe en el catálogo pero conserva notas', () => {
     const saved = [
-      { i: 'geist-stat-today', x: 0, y: 0, w: 1, h: 1 },
+      { i: 'dash-hour', x: 0, y: 0, w: 1, h: 1 },
       { i: 'obsoleta', x: 5, y: 5, w: 1, h: 1 },
       { kind: 'note', id: 'n1', x: 9, y: 9, w: 200, h: 150, z: 2, doc: null },
     ];
     const result = reconcileFreeLayout(saved, ventas);
-    expect(result.map((e) => e.id).sort()).toEqual(['geist-stat-today', 'n1']);
+    expect(result.map((e) => e.id).sort()).toEqual(['dash-hour', 'n1']);
   });
 
   it('CONSERVA los widgets genéricos del agente (gen:*), aunque no estén en ITEM_SPECS (#188/#189)', () => {
@@ -253,8 +241,8 @@ describe('reconcileFreeLayout', () => {
     const saved = [
       {
         kind: 'widget',
-        id: 'geist-stat-today',
-        widgetId: 'geist-stat-today',
+        id: 'dash-hour',
+        widgetId: 'dash-hour',
         x: 0,
         y: 0,
         w: 184,
@@ -274,17 +262,21 @@ describe('reconcileFreeLayout', () => {
       { i: 'obsoleta', x: 5, y: 5, w: 1, h: 1 },
     ];
     const result = reconcileFreeLayout(saved, ventas);
-    expect(result.map((e) => e.id).sort()).toEqual(['geist-stat-today', 'gen:comp-1']);
+    expect(result.map((e) => e.id).sort()).toEqual(['dash-hour', 'gen:comp-1']);
   });
 });
 
 describe('helpers de añadir/quitar/orden', () => {
   it('availableWidgets devuelve el catálogo menos los ya presentes', () => {
     const layout = buildDefaultFreeLayout(ventas);
+    const present = new Set(
+      layout.filter((el): el is FreeWidget => el.kind === 'widget').map((el) => el.id),
+    );
     const available = availableWidgets(layout);
-    expect(available).not.toContain('geist-stat-today'); // está en el preset Ventas
-    expect(available).toContain('geist-feed-alerts'); // no está en Ventas
-    expect(available.every((id) => id in ITEM_SPECS)).toBe(true);
+    // Ningún disponible está ya en el lienzo, y todos existen en el catálogo.
+    expect(available.every((id) => id in ITEM_SPECS && !present.has(id))).toBe(true);
+    // Presentes ∪ disponibles = catálogo completo, sin solapamiento (invariante estable por tandas).
+    expect([...present, ...available].sort()).toEqual(Object.keys(ITEM_SPECS).sort());
   });
 
   it('addWidget centra el widget en el punto y lo pone al frente; no duplica', () => {
@@ -321,11 +313,11 @@ describe('helpers de añadir/quitar/orden', () => {
   });
 
   it('bringToFront da al elemento el mayor z', () => {
-    const a = addWidget([], 'geist-stat-today', { x: 0, y: 0 });
-    const b = addWidget(a, 'geist-dual-margin', { x: 0, y: 0 });
-    const front = bringToFront(b, 'geist-stat-today');
-    const top = front.find((e) => e.id === 'geist-stat-today')!;
-    expect(top.z).toBeGreaterThan(front.find((e) => e.id === 'geist-dual-margin')!.z);
+    const a = addWidget([], 'dash-bars', { x: 0, y: 0 });
+    const b = addWidget(a, 'dash-hour', { x: 0, y: 0 });
+    const front = bringToFront(b, 'dash-bars');
+    const top = front.find((e) => e.id === 'dash-bars')!;
+    expect(top.z).toBeGreaterThan(front.find((e) => e.id === 'dash-hour')!.z);
   });
 
   it('autoArrangeFree recoloca en filas sin solaparse, conservando el orden por z', () => {

@@ -397,7 +397,6 @@ export function WidgetGallery() {
           <div className="gw-grid gw-grid--3">
             <KpiStat
               variant="card"
-              corner="A · CLÁSICA"
               label="Facturación"
               value={63526.52}
               format="eur"
