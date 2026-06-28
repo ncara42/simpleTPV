@@ -1,6 +1,3 @@
-import { useEffect } from 'react';
-
-import { useAssistantStore } from '../../lib/assistant-store.js';
 import type { CanvasOp, ViewActionName } from '../../lib/chat.js';
 import {
   buildCanvasSnapshot,
@@ -33,17 +30,15 @@ const undoCanvasOps = (ops: CanvasOp[]): void => {
 };
 
 export function AssistantDock({ view }: { view: ViewContext }) {
-  const setOpen = useAssistantStore((s) => s.setOpen);
   const isDashboard = view.id === 'dashboard';
 
-  // Estado abierto/cerrado por defecto al cambiar de view:
-  //   · Views de trabajo → ventana flotante ABIERTA (overlay sobre el borde derecho → el lienzo
-  //     conserva su ancho, no se reescala nada).
+  // El asistente NUNCA se auto-abre: arranca cerrado (estado por defecto del store, `open: false`) y
+  // solo lo abre el usuario con el lanzador ✦/🤖 de la isla. El store conserva el estado abierto/
+  // cerrado en memoria entre cambios de view, así que respeta tu última elección al navegar.
+  //   · Views de trabajo → ventana flotante (overlay sobre el borde derecho → el lienzo conserva su
+  //     ancho, no se reescala nada).
   //   · Dashboard → barra inferior SIEMPRE visible, pero su popover de conversación arranca CERRADO
   //     para no tapar el lienzo; se abre con el robot 🤖 de la isla, el botón 💬 o al enfocar.
-  useEffect(() => {
-    setOpen(!isDashboard);
-  }, [isDashboard, setOpen]);
 
   // La barra de herramientas del lienzo vive ARRIBA en el DashboardPage (no en el dock); el dock es
   // chat puro en todas las views. Por eso ya no consume el canvas-bridge.
