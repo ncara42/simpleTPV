@@ -102,3 +102,41 @@ pub struct TransferWithLines {
     pub transfer: Transfer,
     pub lines: Vec<TransferLine>,
 }
+
+/// Fila plana de un adjunto de traspaso (foto de recepción).
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct TransferAttachmentRow {
+    pub id: Uuid,
+    pub transfer_line_id: Option<Uuid>,
+    pub mime_type: String,
+    pub data_url: String,
+    pub caption: Option<String>,
+    pub created_at: PrimitiveDateTime,
+}
+
+/// Adjunto de traspaso (salida JSON). `data_url` es el data-URL base64 listo para
+/// pintar inline con `<img src=…>` (mismo enfoque que el logo de marca).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferAttachment {
+    pub id: Uuid,
+    pub transfer_line_id: Option<Uuid>,
+    pub mime_type: String,
+    pub data_url: String,
+    pub caption: Option<String>,
+    #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
+    pub created_at: PrimitiveDateTime,
+}
+
+impl From<TransferAttachmentRow> for TransferAttachment {
+    fn from(r: TransferAttachmentRow) -> Self {
+        TransferAttachment {
+            id: r.id,
+            transfer_line_id: r.transfer_line_id,
+            mime_type: r.mime_type,
+            data_url: r.data_url,
+            caption: r.caption,
+            created_at: r.created_at,
+        }
+    }
+}

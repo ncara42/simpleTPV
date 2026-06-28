@@ -1,4 +1,9 @@
-import type { ReceiveStoreOrderInput, StoreOrder } from '@simpletpv/auth';
+import type {
+  CreateTransferAttachmentInput,
+  ReceiveStoreOrderInput,
+  StoreOrder,
+  TransferAttachment,
+} from '@simpletpv/auth';
 
 import { api } from './auth.js';
 
@@ -30,4 +35,13 @@ export async function listIncomingStoreOrders(destStoreId: string): Promise<Stor
 
 export function receiveStoreOrder(id: string, input: ReceiveStoreOrderInput): Promise<StoreOrder> {
   return api.post<StoreOrder>(`/store-orders/${id}/receive`, input).then(normalizeOrder);
+}
+
+// Sube una foto de la recepción (incidencia/prueba de estado), atada al pedido y,
+// opcionalmente, a una línea concreta. La imagen ya viene comprimida como data-URL.
+export function uploadStoreOrderAttachment(
+  id: string,
+  input: CreateTransferAttachmentInput,
+): Promise<TransferAttachment> {
+  return api.post<TransferAttachment>(`/store-orders/${id}/attachments`, input);
 }

@@ -21,6 +21,8 @@ vi.mock('../lib/stock.js', () => ({
   sendTransfer: vi.fn(() => Promise.resolve({})),
   receiveTransfer: vi.fn(() => Promise.resolve({})),
   closeTransfer: vi.fn(() => Promise.resolve({})),
+  listTransferAttachments: vi.fn(() => Promise.resolve([])),
+  uploadTransferAttachment: vi.fn(() => Promise.resolve({})),
 }));
 vi.mock('../lib/admin.js', () => ({ listStores: vi.fn(() => Promise.resolve([])) }));
 vi.mock('../lib/products.js', () => ({ listProducts: vi.fn(() => Promise.resolve([])) }));
@@ -245,6 +247,49 @@ describe('TransfersSection v2 — grupos, detalle en línea y ciclo de vida', ()
     fireEvent.click(action);
 
     await waitFor(() => expect(closeTransfer).toHaveBeenCalledWith('t1'));
+  });
+
+  it('muestra «Todo en perfecto estado» cuando la recepción no tuvo incidencias', async () => {
+    vi.mocked(listTransfers).mockResolvedValue([
+      makeTransfer({
+        id: 't1',
+        status: 'RECEIVED',
+        receivedAt: '2026-06-22T09:00:00.000Z',
+        lines: [makeLine({ id: 'l1', quantitySent: '6', quantityReceived: '6', discrepancy: '0' })],
+      }),
+    ]);
+    renderWithClient(<TransfersSection />);
+
+    fireEvent.click(await screen.findByTestId('transfer-row'));
+    const review = await screen.findByTestId('transfer-review');
+    expect(within(review).getByTestId('transfer-review-ok')).toHaveTextContent(
+      'Todo en perfecto estado',
+    );
+  });
+
+  it('lista la incidencia y el comentario por línea en la revisión', async () => {
+    vi.mocked(listTransfers).mockResolvedValue([
+      makeTransfer({
+        id: 't1',
+        status: 'RECEIVED',
+        receivedAt: '2026-06-22T09:00:00.000Z',
+        lines: [
+          makeLine({
+            id: 'l1',
+            quantitySent: '6',
+            quantityReceived: '5',
+            discrepancy: '-1',
+            discrepancyNote: 'Unidad dañada en transporte',
+          }),
+        ],
+      }),
+    ]);
+    renderWithClient(<TransfersSection />);
+
+    fireEvent.click(await screen.findByTestId('transfer-row'));
+    const incidents = await screen.findByTestId('transfer-review-incidents');
+    expect(incidents).toHaveTextContent('Unidad dañada en transporte');
+    expect(incidents).toHaveTextContent('5 / 6');
   });
 
   it('filtra por la vista de estado seleccionada', async () => {

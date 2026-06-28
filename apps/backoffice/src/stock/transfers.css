@@ -443,6 +443,148 @@
   flex-shrink: 0;
 }
 
+/* ─── Revisión de recepción: incidencias/comentarios + fotos ──────────────────── */
+.tr-review {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.tr-review-pending {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ui-text-soft);
+}
+/* Estado «todo perfecto»: píldora verde con tick. */
+.tr-review-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  align-self: flex-start;
+  padding: 0.5rem 0.8rem 0.5rem 0.55rem;
+  border-radius: var(--ui-radius-md);
+  background: color-mix(in srgb, var(--ui-success) 10%, var(--ui-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-success) 28%, transparent);
+  color: var(--ui-success);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.tr-review-tick {
+  display: inline-grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: var(--ui-success);
+  color: #fff;
+  flex-shrink: 0;
+}
+.tr-review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.tr-review-item {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--ui-radius-md);
+  background: color-mix(in srgb, var(--ui-danger) 8%, var(--ui-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-danger) 24%, transparent);
+}
+.tr-review-ico {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  color: var(--ui-danger);
+}
+.tr-review-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.tr-review-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.tr-review-prod {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.tr-review-qty {
+  font-size: 0.77rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+.tr-review-qty.is-short {
+  color: var(--ui-danger);
+  font-weight: 600;
+}
+.tr-review-note {
+  font-size: 0.79rem;
+  color: var(--ui-text-muted);
+}
+
+/* Galería de fotos de la recepción */
+.tr-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.tr-photo {
+  width: 4.5rem;
+  height: 4.5rem;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  overflow: hidden;
+  background: var(--ui-surface);
+  cursor: pointer;
+  transition:
+    transform var(--ui-motion-fast) var(--ui-ease),
+    box-shadow var(--ui-motion-fast) var(--ui-ease);
+}
+.tr-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.tr-photo:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -4px rgb(0 0 0 / 0.25);
+}
+.tr-photo:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.tr-photos-empty {
+  margin: 0;
+  font-size: 0.79rem;
+  color: var(--ui-text-soft);
+}
+/* Lightbox de foto a tamaño grande */
+.tr-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: rgb(0 0 0 / 0.72);
+  cursor: zoom-out;
+}
+.tr-lightbox img {
+  max-width: min(92vw, 60rem);
+  max-height: 88vh;
+  border-radius: var(--ui-radius-md);
+  box-shadow: 0 20px 60px -12px rgb(0 0 0 / 0.6);
+}
+
 /* Línea de tiempo del traspaso */
 .tr-timeline {
   display: flex;
@@ -553,7 +695,8 @@
   .tr-row,
   .tr-clear,
   .tr-group-caret,
-  .tr-row-caret {
+  .tr-row-caret,
+  .tr-photo {
     transition: none;
   }
 }

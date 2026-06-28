@@ -403,6 +403,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/transfers/{id}/send", post(transfers::send))
         .route("/transfers/{id}/receive", post(transfers::receive))
         .route("/transfers/{id}/close", post(transfers::close))
+        .route(
+            "/transfers/{id}/attachments",
+            post(transfers::add_attachment).get(transfers::list_attachments),
+        )
         // Pedidos de tienda (Fase 4, #154): ALIAS de traspasos en otra ruta — el
         // StoreOrdersController de NestJS delega entero en TransfersService con los
         // mismos DTOs. Mismos handlers, mismas reglas de rol.
@@ -414,6 +418,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/store-orders/{id}/send", post(transfers::send))
         .route("/store-orders/{id}/receive", post(transfers::receive))
         .route("/store-orders/{id}/close", post(transfers::close))
+        .route(
+            "/store-orders/{id}/attachments",
+            post(transfers::add_attachment).get(transfers::list_attachments),
+        )
         // Cierre Z (Fase 4, #124): arqueo fiscal diario por tienda. ADMIN/MANAGER.
         .route("/z-report", get(z_report::get))
         // Dashboard de KPIs (Fase 4, #154): solo central (ADMIN/MANAGER), lectura.

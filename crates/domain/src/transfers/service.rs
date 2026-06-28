@@ -16,8 +16,14 @@ use crate::stock::service::{
 };
 use crate::store_access::has_store_access;
 
-use super::input::{CreateTransfer, ReceiveTransfer};
-use super::model::{Transfer, TransferLine, TransferLineRow, TransferStatus, TransferWithLines};
+use super::input::{CreateAttachment, CreateTransfer, ReceiveTransfer};
+use super::model::{
+    Transfer, TransferAttachment, TransferAttachmentRow, TransferLine, TransferLineRow,
+    TransferStatus, TransferWithLines,
+};
+
+const ATTACHMENT_COLS: &str = r#"id, "transferLineId" AS transfer_line_id,
+    "mimeType" AS mime_type, "dataUrl" AS data_url, caption, "createdAt" AS created_at"#;
 
 const TRANSFER_COLS: &str = r#"id, "organizationId" AS organization_id,
     "originStoreId" AS origin_store_id, "destStoreId" AS dest_store_id, status::text AS status,
@@ -346,6 +352,84 @@ pub async fn list(
             out.push(with_lines(tx, t).await?);
         }
         Ok(out)
+    })
+    .await
+}
+
+/// `POST /transfers/:id/attachments` — adjunta una foto a la recepción. Mismas reglas
+/// que recibir (ADMIN/MANAGER/CLERK; CLERK acotado a su tienda destino, SEC-01). La
+/// línea, si se indica, debe pertenecer al traspaso.
+pub async fn add_attachment(
+    pool: &PgPool,
+    org: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
+    transfer_id: Uuid,
+    input: CreateAttachment,
+) -> Result<TransferAttachment, AppError> {
+    let mime = input.validate()?;
+    let result: Result<TransferAttachment, AppError> =
+        with_tenant_tx(pool, org, async move |tx, _after| {
+            let Some(t) = load_transfer(tx, org, transfer_id).await? else {
+                return Ok(Err(AppError::NotFound));
+            };
+            if !is_org_wide && !has_store_access(tx, user_id, t.dest_store_id).await? {
+                return Ok(Err(AppError::Forbidden));
+            }
+            if let Some(line_id) = input.transfer_line_id {
+                let belongs: bool = sqlx::query_scalar(
+                    r#"SELECT EXISTS(SELECT 1 FROM "TransferLine"
+                       WHERE id = $1 AND "transferId" = $2)"#,
+                )
+                .bind(line_id)
+                .bind(transfer_id)
+                .fetch_one(&mut **tx)
+                .await?;
+                if !belongs {
+                    return Ok(Err(AppError::BadRequest));
+                }
+            }
+            let id = Uuid::new_v4();
+            sqlx::query(
+                r#"INSERT INTO "TransferAttachment"
+                   (id, "organizationId", "transferId", "transferLineId", "mimeType", "dataUrl", caption, "createdBy")
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+            )
+            .bind(id)
+            .bind(org)
+            .bind(transfer_id)
+            .bind(input.transfer_line_id)
+            .bind(mime)
+            .bind(&input.data_url)
+            .bind(input.caption.as_deref())
+            .bind(user_id)
+            .execute(&mut **tx)
+            .await?;
+            let sql = format!(
+                r#"SELECT {ATTACHMENT_COLS} FROM "TransferAttachment" WHERE id = $1"#
+            );
+            let row: TransferAttachmentRow =
+                sqlx::query_as(&sql).bind(id).fetch_one(&mut **tx).await?;
+            Ok(Ok(TransferAttachment::from(row)))
+        })
+        .await?;
+    result
+}
+
+/// `GET /transfers/:id/attachments` — fotos del traspaso (más antiguas primero).
+pub async fn list_attachments(
+    pool: &PgPool,
+    org: Uuid,
+    transfer_id: Uuid,
+) -> Result<Vec<TransferAttachment>, AppError> {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        let sql = format!(
+            r#"SELECT {ATTACHMENT_COLS} FROM "TransferAttachment"
+               WHERE "transferId" = $1 ORDER BY "createdAt", id"#
+        );
+        let rows: Vec<TransferAttachmentRow> =
+            sqlx::query_as(&sql).bind(transfer_id).fetch_all(&mut **tx).await?;
+        Ok(rows.into_iter().map(TransferAttachment::from).collect())
     })
     .await
 }

@@ -7,8 +7,8 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 use simpletpv_auth::Role;
-use simpletpv_domain::transfers::model::TransferWithLines;
-use simpletpv_domain::transfers::{service, CreateTransfer, ReceiveTransfer};
+use simpletpv_domain::transfers::model::{TransferAttachment, TransferWithLines};
+use simpletpv_domain::transfers::{service, CreateAttachment, CreateTransfer, ReceiveTransfer};
 use simpletpv_shared::AppError;
 use uuid::Uuid;
 
@@ -89,6 +89,37 @@ pub async fn receive(
     )
     .await?;
     Ok(Json(t))
+}
+
+/// `POST /transfers/:id/attachments` (ADMIN/MANAGER/CLERK) — adjunta una foto de la
+/// recepción. Mismas reglas de acceso que recibir (CLERK acotado a su tienda destino).
+pub async fn add_attachment(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(body): Json<CreateAttachment>,
+) -> Result<(StatusCode, Json<TransferAttachment>), ApiError> {
+    let a = service::add_attachment(
+        state.db(),
+        user.organization_id,
+        user.user_id,
+        user.role.is_org_wide(),
+        id,
+        body,
+    )
+    .await?;
+    Ok((StatusCode::CREATED, Json(a)))
+}
+
+/// `GET /transfers/:id/attachments` — fotos del traspaso (cualquier rol con sesión).
+pub async fn list_attachments(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<TransferAttachment>>, ApiError> {
+    Ok(Json(
+        service::list_attachments(state.db(), user.organization_id, id).await?,
+    ))
 }
 
 /// `POST /transfers/:id/close` (ADMIN/MANAGER).

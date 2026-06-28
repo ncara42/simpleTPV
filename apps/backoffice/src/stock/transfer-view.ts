@@ -345,6 +345,17 @@ export interface DrawerLine {
   /** Recibido por debajo de lo enviado → resaltar en rojo. */
   short: boolean;
 }
+/** Revisión de recepción: incidencia por línea (faltante y/o comentario del empleado). */
+export interface ReviewIncident {
+  product: string;
+  note: string | null;
+  /** "5 / 6" cuando hay recepción; resaltado si falta stock. */
+  qtyLabel: string;
+  short: boolean;
+}
+/** Estado del cuadro de revisión: aún sin recibir · todo perfecto · con incidencias. */
+export type ReviewState = 'pending' | 'perfect' | 'incidents';
+
 export type TimelineTone = 'done' | 'ok' | 'transit' | 'incid' | 'pending';
 export interface TimelineStep {
   tone: TimelineTone;
@@ -369,6 +380,9 @@ export interface TransferDetail {
   unitsLabel: string;
   hasIncidence: boolean;
   incidenceNote: string;
+  /** Cuadro «Revisión de recepción»: estado + incidencias/comentarios por línea. */
+  reviewState: ReviewState;
+  incidents: ReviewIncident[];
   timeline: TimelineStep[];
   action: TransferAction | null;
 }
@@ -461,6 +475,28 @@ export function buildTransferDetail(
     return { id: l.id, name: p.name, sku: p.sku, right, short };
   });
   const missing = u - unitsReceived(t);
+  // Incidencias de la revisión: líneas con faltante y/o comentario del empleado.
+  const incidents: ReviewIncident[] = t.lines.flatMap((l) => {
+    const p = resolveProduct(l.productId);
+    const received = lineReceived(l);
+    const sent = lineSent(l);
+    const short = received != null && received < sent;
+    const note = l.discrepancyNote && l.discrepancyNote.trim() !== '' ? l.discrepancyNote : null;
+    if (!short && !note) return [];
+    return [
+      {
+        product: p.name,
+        note,
+        qtyLabel: received != null ? `${received} / ${sent}` : `${sent}`,
+        short,
+      },
+    ];
+  });
+  const reviewState: ReviewState = !showRecv
+    ? 'pending'
+    : incidents.length > 0
+      ? 'incidents'
+      : 'perfect';
   return {
     id: t.id,
     primary: transferLabel(t, nameOf),
@@ -486,6 +522,8 @@ export function buildTransferDetail(
       meta.key === 'incid'
         ? `Incidencia: faltan ${missing} ${missing === 1 ? 'unidad' : 'unidades'} respecto a lo enviado.`
         : '',
+    reviewState,
+    incidents,
     timeline: buildTimeline(t),
     action: primaryAction(t),
   };

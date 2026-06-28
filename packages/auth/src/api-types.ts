@@ -638,6 +638,23 @@ export type Transfer = Omit<StoreOrder, 'lines'> & { lines: TransferLine[] };
 export type CreateTransferInput = CreateStoreOrderInput;
 export type ReceiveTransferInput = ReceiveStoreOrderInput;
 
+// Adjunto (foto) de la recepción de un traspaso. La imagen viaja como data-URL
+// base64 (`dataUrl`), lista para pintar inline; opcionalmente atada a una línea.
+export interface TransferAttachment {
+  id: string;
+  transferLineId: string | null;
+  mimeType: string;
+  dataUrl: string;
+  caption: string | null;
+  createdAt: string;
+}
+
+export interface CreateTransferAttachmentInput {
+  transferLineId?: string | null;
+  dataUrl: string;
+  caption?: string | null;
+}
+
 export interface OfficialDeviceStatus {
   authorized: boolean;
   device: {

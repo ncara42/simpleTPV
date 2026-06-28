@@ -2,15 +2,23 @@ import { ApiError, type StoreOrder } from '@simpletpv/auth';
 import { Alert, Button, DataTable, Select } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Clock, PackageCheck, X } from 'lucide-react';
+import { Camera, Check, Clock, PackageCheck, X } from 'lucide-react';
 import { useState } from 'react';
 
+import { fileToCompressedDataUrl } from './lib/image.js';
 import { listStores } from './lib/sales.js';
-import { listIncomingStoreOrders, receiveStoreOrder } from './lib/store-orders.js';
+import {
+  listIncomingStoreOrders,
+  receiveStoreOrder,
+  uploadStoreOrderAttachment,
+} from './lib/store-orders.js';
 
 interface LineInput {
   received: string;
   note: string;
+  // Fotos de la recepción ya comprimidas como data-URL, a la espera de subirse al
+  // confirmar (el «todo OK»). Se asocian a la línea (producto) correspondiente.
+  photos: string[];
 }
 
 export function StoreOrderReceivePanel() {
@@ -34,14 +42,31 @@ export function StoreOrderReceivePanel() {
   });
 
   const receiveMutation = useMutation({
-    mutationFn: (t: StoreOrder) =>
-      receiveStoreOrder(t.id, {
+    mutationFn: async (t: StoreOrder) => {
+      const order = await receiveStoreOrder(t.id, {
         lines: t.lines.map((l) => ({
           lineId: l.id,
           quantityReceived: Number(lines[l.id]?.received ?? l.quantitySent),
           ...(lines[l.id]?.note ? { discrepancyNote: lines[l.id]!.note } : {}),
         })),
-      }),
+      });
+      // Subida de fotos tras recibir (best-effort: el stock ya se movió, una foto
+      // fallida no debe revertir la recepción; se registra en consola).
+      for (const l of t.lines) {
+        for (const dataUrl of lines[l.id]?.photos ?? []) {
+          try {
+            await uploadStoreOrderAttachment(t.id, {
+              transferLineId: l.id,
+              dataUrl,
+              caption: l.productName ?? null,
+            });
+          } catch (err) {
+            console.warn('No se pudo subir una foto de la recepción', err);
+          }
+        }
+      }
+      return order;
+    },
     onSuccess: () => {
       setDone(true);
       setSelected(null);
@@ -55,9 +80,53 @@ export function StoreOrderReceivePanel() {
     setSelected(t);
     const init: Record<string, LineInput> = {};
     for (const l of t.lines) {
-      init[l.id] = { received: String(l.quantitySent), note: '' };
+      init[l.id] = { received: String(l.quantitySent), note: '', photos: [] };
     }
     setLines(init);
+  }
+
+  // Parche inmutable de una línea, preservando el resto de campos (cantidad/nota/fotos).
+  function patchLine(id: string, patch: Partial<LineInput>) {
+    setLines((prev) => ({
+      ...prev,
+      [id]: { received: '', note: '', photos: [], ...prev[id], ...patch },
+    }));
+  }
+
+  // Captura de fotos desde el input de cámara/archivo: comprime cada una y la añade
+  // a la línea. Se suben al confirmar la recepción.
+  async function addPhotos(lineId: string, files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const compressed: string[] = [];
+    for (const file of Array.from(files)) {
+      try {
+        compressed.push(await fileToCompressedDataUrl(file));
+      } catch (err) {
+        console.warn('No se pudo procesar una foto', err);
+      }
+    }
+    if (compressed.length === 0) return;
+    setLines((prev) => ({
+      ...prev,
+      [lineId]: {
+        received: '',
+        note: '',
+        ...prev[lineId],
+        photos: [...(prev[lineId]?.photos ?? []), ...compressed],
+      },
+    }));
+  }
+
+  function removePhoto(lineId: string, index: number) {
+    setLines((prev) => ({
+      ...prev,
+      [lineId]: {
+        received: '',
+        note: '',
+        ...prev[lineId],
+        photos: (prev[lineId]?.photos ?? []).filter((_, i) => i !== index),
+      },
+    }));
   }
 
   function bumpScannedLine() {
@@ -75,6 +144,7 @@ export function StoreOrderReceivePanel() {
       [line.id]: {
         received: String(Number(prev[line.id]?.received ?? 0) + 1),
         note: prev[line.id]?.note ?? '',
+        photos: prev[line.id]?.photos ?? [],
       },
     }));
     setScan('');
@@ -247,6 +317,7 @@ export function StoreOrderReceivePanel() {
                       <th className="recv-table__num">Enviado</th>
                       <th className="recv-table__num">Recibido</th>
                       <th>Nota discrepancia</th>
+                      <th className="recv-table__photo">Fotos</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -261,12 +332,7 @@ export function StoreOrderReceivePanel() {
                             type="number"
                             min={0}
                             value={lines[l.id]?.received ?? ''}
-                            onChange={(e) =>
-                              setLines((prev) => ({
-                                ...prev,
-                                [l.id]: { received: e.target.value, note: prev[l.id]?.note ?? '' },
-                              }))
-                            }
+                            onChange={(e) => patchLine(l.id, { received: e.target.value })}
                             data-testid="store-order-received-input"
                             className="recv-input recv-input--num"
                           />
@@ -276,18 +342,42 @@ export function StoreOrderReceivePanel() {
                             type="text"
                             placeholder="(opcional)"
                             value={lines[l.id]?.note ?? ''}
-                            onChange={(e) =>
-                              setLines((prev) => ({
-                                ...prev,
-                                [l.id]: {
-                                  received: prev[l.id]?.received ?? '',
-                                  note: e.target.value,
-                                },
-                              }))
-                            }
+                            onChange={(e) => patchLine(l.id, { note: e.target.value })}
                             data-testid="store-order-note-input"
                             className="recv-input"
                           />
+                        </td>
+                        <td className="recv-table__photo">
+                          <div className="recv-photos">
+                            {(lines[l.id]?.photos ?? []).map((src, i) => (
+                              <span className="recv-photo-thumb" key={i}>
+                                <img src={src} alt="" />
+                                <button
+                                  type="button"
+                                  className="recv-photo-del"
+                                  onClick={() => removePhoto(l.id, i)}
+                                  aria-label="Quitar foto"
+                                >
+                                  <X size={11} aria-hidden="true" />
+                                </button>
+                              </span>
+                            ))}
+                            <label className="recv-photo-add" title="Añadir foto">
+                              <Camera size={15} aria-hidden="true" />
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                multiple
+                                hidden
+                                onChange={(e) => {
+                                  void addPhotos(l.id, e.target.files);
+                                  e.target.value = '';
+                                }}
+                                data-testid="store-order-photo-input"
+                              />
+                            </label>
+                          </div>
                         </td>
                       </tr>
                     ))}
