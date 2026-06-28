@@ -1,60 +1,6 @@
-/* Asistente flotante del dashboard. Se abre desde un FAB (abajo-derecha) como panel glass
-   anclado arriba-derecha, por encima del dashboard y del lienzo libre. Sigue el design system
-   (tokens --ui-*). Animaciones solo sobre transform/opacity. */
-
-/* ── FAB (cerrado) ─────────────────────────────────────────────────────────────── */
-
-.chat-fab {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 45;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 54px;
-  height: 54px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-pill);
-  background: var(--ui-primary);
-  color: var(--ui-primary-fg);
-  box-shadow: var(--ui-shadow-lg);
-  cursor: pointer;
-  transition:
-    transform var(--ui-motion-fast) var(--ui-ease),
-    background var(--ui-motion-fast) var(--ui-ease);
-}
-
-.chat-fab:hover {
-  background: var(--ui-primary-hover);
-  transform: translateY(-1px);
-}
-
-.chat-fab:focus-visible {
-  outline: 2px solid var(--ui-focus);
-  outline-offset: 2px;
-}
-
-/* ── Panel flotante (abierto) ──────────────────────────────────────────────────── */
-
-.chat-panel {
-  position: fixed;
-  top: 68px; /* mismo margen superior que el cluster Cuadrícula/Libre */
-  right: 16px;
-  bottom: 16px;
-  width: clamp(360px, 30vw, 440px);
-  z-index: 45; /* > 35 del lienzo libre */
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-xl);
-  background: color-mix(in srgb, var(--ui-surface) 68%, transparent);
-  backdrop-filter: blur(12px);
-  box-shadow: var(--ui-shadow-lg);
-  overflow: hidden;
-  transform-origin: bottom right;
-  animation: chat-panel-in var(--ui-motion-medium) var(--ui-ease);
-}
+/* Estilos compartidos del asistente (mensajes, composer, contexto, cabecera, etc.). El CONTENEDOR
+   —ventana flotante movible/redimensionable— vive en assistant-drawer.css; aquí van las piezas
+   internas reutilizables. Animaciones solo sobre transform/opacity. */
 
 @keyframes chat-panel-in {
   from {
@@ -64,15 +10,6 @@
   to {
     opacity: 1;
     transform: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .chat-fab {
-    transition: none;
-  }
-  .chat-panel {
-    animation: none;
   }
 }
 
@@ -992,94 +929,26 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   font-size: var(--ui-text-2xs);
 }
 
-/* ── Móvil: el panel ocupa casi toda la pantalla ───────────────────────────────── */
-
-@media (max-width: 767px) {
-  .chat-panel {
-    top: 60px;
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
-    width: auto;
-    border-radius: var(--ui-radius-lg);
-  }
-  .chat-fab {
-    right: 12px;
-    bottom: 12px;
-  }
-}
-
 /* ════════════════════════════════════════════════════════════════════════════════
-   Dock inferior del asistente (rediseño): barra única `[+ herramientas] [input] [↑]`
-   con la forma del PromptInput de ai-elements, más un popover de conversación encima.
-   Sustituye al panel lateral (FAB + glass). Anclado abajo-centro dentro del lienzo.
+   Contenedor del asistente. La GEOMETRÍA (ventana flotante movible/redimensionable,
+   overlay `position: fixed`) vive en assistant-drawer.css. Aquí quedan solo las reglas
+   base que el contenedor comparte: capa que deja pasar el ratón (sus hijos sí capturan)
+   y el backdrop transparente que cierra al clicar fuera.
    ════════════════════════════════════════════════════════════════════════════════ */
 
 .chat-dock {
   position: fixed;
-  bottom: 1rem;
-  /* El dock vive dentro de .app-content, que el sidebar fijo despeja con `margin-left`. Como el
-     dock es position:fixed, NO hereda ese margen → su borde izquierdo arranca en el ancho del
-     sidebar para CENTRAR en el área de contenido (no en el viewport). Así la píldora se re-centra
-     al desplegar/contraer el sidebar, en sincronía con el contenido (misma var y duración). */
-  left: var(--sidebar-current-width);
-  right: 0;
-  transition: left 0.15s var(--ui-ease, ease);
-  /* El dock vive en el shell (sibling del lienzo, position:fixed inset:0 z-35). Debe quedar POR
-     ENCIMA del lienzo en todas las views; bajo el cuerpo del sidebar (z-40), con el que no solapa
-     (dock abajo-centro, sidebar a la izquierda). Banda a todo el ancho que CENTRA su contenido por
-     flex, así la píldora se re-centra sola al cambiar de ancho. */
   z-index: 39;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.6rem;
-  /* La banda deja pasar el ratón al contenido/lienzo; solo el panel y la barra capturan clics. */
+  /* La capa deja pasar el ratón al contenido; solo el panel y el backdrop capturan clics. */
   pointer-events: none;
-  /* Morph en DOS tiempos para que colapsar/expandir se lea como un gesto, no como un escalado:
-       EXPANDIR → primero se ensancha y se redondea (fase ANCHO, sin retardo), y casi al final sube
-                  (fase ALTO, con `--morph-stagger`).
-       COLAPSAR → primero baja (fase ALTO, sin retardo) y al final encoge a píldora (fase ANCHO).
-     Los retardos invertidos por dirección viven en `.is-collapsed …` (más abajo). Rápido, con un
-     pequeño solape entre fases para que no se sienta secuencial-robótico. */
-  /* COLAPSAR: quint-out (cola plana) → encoge rápido y «asienta» suave; se siente bien. */
-  --morph-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  /* EXPANDIR: ease-in-out sin cola plana → el ancho crece UNIFORME, sin el «llega de golpe y luego
-     arrastra» que producía el quint-out al agrandar (se percibía como un parón). */
-  --morph-ease-expand: cubic-bezier(0.65, 0, 0.35, 1);
-  --morph-w-dur: 0.28s; /* fase ancho */
-  --morph-h-dur: 0.26s; /* fase alto */
-  --morph-stagger: 0.16s; /* desfase entre fases (con solape) */
 }
 .chat-dock > * {
   pointer-events: auto;
 }
 
-/* Sidebar contraído a rail: el contenido se reajusta al ancho del rail (ver .app-content); el dock
-   sigue el mismo borde para no descentrarse. El dock cuelga de .app-content (hermano del sidebar),
-   así que la selección estructural lo alcanza sin depender del tema. */
-.sidebar.collapsed ~ .app-content .chat-dock {
-  left: var(--sidebar-width-rail);
-}
-
-/* Móvil: el sidebar es off-canvas y el contenido no lleva sangrado lateral → el dock ocupa todo
-   el ancho y se centra en el viewport, como el resto de la app. */
-@media (max-width: 767px) {
-  .chat-dock,
-  .sidebar.collapsed ~ .app-content .chat-dock {
-    left: 0;
-  }
-}
-
-/* Con el panel abierto, el dock sube POR ENCIMA de toda la app (sidebar z40, topbar z30, lienzo z35,
-   etc.) para que su backdrop pueda capturar cualquier clic fuera del chat. */
-.chat-dock.is-panel-open {
-  z-index: 50;
-}
-
 /* Backdrop: cubre TODA la ventana mientras el chat está abierto. Un clic aquí (cualquier zona que no
-   sea el panel ni el composer) SOLO cierra el chat — el evento aterriza en el backdrop, no en el
-   botón/elemento de debajo, así que NO se activa. Invisible (sin oscurecer). */
+   sea el panel) SOLO cierra el chat — el evento aterriza en el backdrop, no en el elemento de debajo,
+   así que NO se activa. Invisible (sin oscurecer). */
 .chat-dock__backdrop {
   position: fixed;
   inset: 0;
@@ -1094,14 +963,8 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   z-index: 1;
 }
 
-/* Modo héroe (Dashboard) — DORMIDO: AssistantDock ya no opta a él (el dock se ancla abajo en todas
-   las views), pero la regla se conserva por si se reactiva. */
-.chat-dock--hero .chat-dock__panel {
-  max-height: min(62dvh, 640px);
-}
-
-/* Popover de conversación: se despliega ENCIMA del input. Ancho propio (el dock es una banda
-   centradora a todo el ancho, ya no lo constriñe). */
+/* Cuerpo del asistente: el cristal (borde, radio, fondo, sombra) lo conserva la ventana flotante;
+   la geometría (tamaño/posición/animación) la fija assistant-drawer.css. */
 .chat-dock__panel {
   width: min(680px, calc(100vw - 2rem));
   display: flex;
@@ -1113,25 +976,6 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   background: color-mix(in srgb, var(--ui-surface) 68%, transparent);
   backdrop-filter: blur(12px);
   box-shadow: 0 16px 44px rgb(0 0 0 / 0.2);
-  transform-origin: bottom center;
-  animation: chat-panel-in var(--ui-motion-medium) var(--ui-ease);
-}
-
-/* Cierre simétrico: el popover se pliega con la animación inversa. La presencia animada (JS)
-   lo mantiene montado mientras dura, así no desaparece de golpe. */
-.chat-dock__panel.is-closing {
-  animation: chat-panel-out var(--ui-motion-medium) var(--ui-ease) forwards;
-}
-
-@keyframes chat-panel-out {
-  from {
-    opacity: 1;
-    transform: none;
-  }
-  to {
-    opacity: 0;
-    transform: translateY(8px) scale(0.98);
-  }
 }
 
 /* ── Composer (PromptInput) ──────────────────────────────────────────────────────── */
@@ -1152,14 +996,7 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
   backdrop-filter: blur(12px);
   box-shadow: 0 6px 20px rgb(0 0 0 / 0.08);
-  /* Morph sobre propiedades REALES (no escala): el texto no se deforma y el encoger es natural.
-     Al EXPANDIR: ANCHO (max-width + border-radius) arranca ya; el ALTO (gap, padding, y el
-     pie/textarea más abajo) entra con `--morph-stagger`, así primero llega a su anchura y luego sube. */
   transition:
-    max-width var(--morph-w-dur) var(--morph-ease-expand),
-    border-radius var(--morph-w-dur) var(--morph-ease-expand),
-    gap var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger),
-    padding var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger),
     border-color var(--ui-motion-fast) var(--ui-ease),
     box-shadow var(--ui-motion-fast) var(--ui-ease);
 }
@@ -1198,14 +1035,6 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   font-size: var(--ui-text-md);
   line-height: 1.6;
   color: var(--ui-text);
-  /* El morph mueve min/max-height, line-height y padding; al TECLEAR esos valores NO cambian (solo el
-     alto USADO por field-sizing), así crecer al escribir es instantáneo y solo el morph se anima. El
-     textarea es fase ALTO → al expandir entra con `--morph-stagger`, en sincronía con el pie. */
-  transition:
-    min-height var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger),
-    max-height var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger),
-    line-height var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger),
-    padding var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger);
 }
 
 .prompt-input__textarea:focus {
@@ -1239,12 +1068,6 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   gap: 0.5rem;
   /* `overflow` visible (default); 2.4rem deja sitio de sobra a los botones (≈34px). */
   max-height: 2.4rem;
-  /* El pie es fase ALTO: al expandir entra tras el ancho (`--morph-stagger`) y aparece con un fade.
-     El ancho se neutraliza aparte (width:0 colapsado) para que no ensanche la píldora. */
-  transition:
-    max-height var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger),
-    padding var(--morph-h-dur) var(--morph-ease-expand) var(--morph-stagger),
-    opacity var(--ui-motion-fast) var(--ui-ease) var(--morph-stagger);
 }
 
 .prompt-input__tools {
@@ -1298,85 +1121,6 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   to {
     transform: rotate(360deg);
   }
-}
-
-/* ── Dock COLAPSADO ───────────────────────────────────────────────────────────────────
-   Fuera del dashboard y sin foco, el composer se reduce a una píldora redonda solo-input: el pie se
-   pliega y la píldora se ciñe al texto. El cambio de ancho/alto/forma lo anima la transición nativa
-   de `.prompt-input` (propiedades reales). Aquí solo van los estados DESTINO. */
-.chat-dock.is-collapsed .prompt-input {
-  /* Píldora minimizada: el ancho lo capa `max-width` (numérico) a una banda fija que abraza el
-     placeholder constante («Tengo una pregunta»); el texto se centra dentro. `width` sigue fijo
-     arriba, así solo max-width hace el morph. En viewports estrechos, cede al ancho disponible. */
-  max-width: min(12rem, calc(100vw - 2rem));
-  /* Pill por GEOMETRÍA, no por un radio gigante: la píldora colapsada mide ~45px de alto, así que
-     22px ya redondea los extremos por completo. Evita interpolar 999px→12px (que dejaba las esquinas
-     casi-pill casi toda la animación y luego "saltaba"): de 22px→12px la transición es corta y limpia. */
-  border-radius: 22px;
-  /* Padding horizontal SIMÉTRICO → el placeholder queda centrado en la píldora. */
-  padding: 0.28rem 0.95rem;
-  /* Contorno algo más grueso en el color de empresa para destacar la píldora minimizada. */
-  border-color: var(--ui-brand);
-  border-width: 2px;
-  /* El pie se pliega a 0, pero el `gap` flex seguiría reservando 0.5rem bajo el texto (cola muerta
-     que descentra la píldora). Lo cerramos también — animado, va en la transición del morph. */
-  gap: 0;
-  /* Al COLAPSAR se invierte el orden: el ALTO (gap/padding) baja YA; el ANCHO (max-width + radius)
-     encoge con `--morph-stagger`, de modo que primero baja y al final se ciñe a píldora. */
-  transition:
-    max-width var(--morph-w-dur) var(--morph-ease) var(--morph-stagger),
-    border-radius var(--morph-w-dur) var(--morph-ease) var(--morph-stagger),
-    gap var(--morph-h-dur) var(--morph-ease),
-    padding var(--morph-h-dur) var(--morph-ease),
-    border-color var(--ui-motion-fast) var(--ui-ease),
-    box-shadow var(--ui-motion-fast) var(--ui-ease);
-}
-
-.chat-dock.is-collapsed .prompt-input__textarea {
-  min-height: 32px;
-  max-height: 32px;
-  /* Centrado VERTICAL de la única línea: un <textarea> alinea su texto arriba, así que igualamos
-     line-height a la altura de la caja y quitamos el padding (lo horizontal lo da la píldora). */
-  line-height: 32px;
-  padding: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-align: center;
-  /* El textarea se ciñe a su contenido (el placeholder) → la píldora mide justo lo que el texto.
-     (field-sizing: Chromium; donde no haya soporte cae al ancho intrínseco del textarea.) Se centra
-     en la píldora también MIENTRAS esta es más ancha (durante la transición de ancho). */
-  field-sizing: content;
-  width: auto;
-  min-width: 0;
-  align-self: center;
-  /* Fase ALTO al colapsar: encoge YA (sin retardo), antes de que el ancho se ciña a píldora. */
-  transition:
-    min-height var(--morph-h-dur) var(--morph-ease),
-    max-height var(--morph-h-dur) var(--morph-ease),
-    line-height var(--morph-h-dur) var(--morph-ease),
-    padding var(--morph-h-dur) var(--morph-ease);
-}
-
-.chat-dock.is-collapsed .prompt-input__queue {
-  display: none;
-}
-
-/* Pie plegado EN FLUJO: su `max-height` baja a 0 con la curva del morph → arrastra el alto de la
-   píldora de forma natural (sin saltos). `width:0` + overflow hidden anula su aportación al ANCHO
-   (si no, los botones —más anchos que el placeholder— ensancharían la píldora). Fade por opacidad. */
-.chat-dock.is-collapsed .prompt-input__footer {
-  max-height: 0;
-  width: 0;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-  /* Fase ALTO al colapsar: el pie se pliega y se desvanece YA (sin retardo), antes de encoger ancho. */
-  transition:
-    max-height var(--morph-h-dur) var(--morph-ease),
-    padding var(--morph-h-dur) var(--morph-ease),
-    opacity var(--ui-motion-fast) var(--ui-ease);
 }
 
 /* ── Menú «+» de herramientas del lienzo ─────────────────────────────────────────── */
@@ -1647,35 +1391,7 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   left: 0;
 }
 
-/* Botón de mostrar/ocultar la conversación (junto al «+»). */
-.chat-dock__history-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid transparent;
-  border-radius: var(--ui-radius-pill);
-  background: transparent;
-  color: var(--ui-text-muted);
-  cursor: pointer;
-  transition:
-    background var(--ui-motion-fast) var(--ui-ease),
-    color var(--ui-motion-fast) var(--ui-ease);
-}
-
-.chat-dock__history-toggle:hover,
-.chat-dock__history-toggle.is-active {
-  background: var(--ui-surface-subtle);
-  color: var(--ui-text);
-}
-
-.chat-dock__history-toggle:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus);
-}
-
-/* Cabecera del popover (solo título + acciones; el modelo/esfuerzo se movió al composer). */
+/* Cabecera del asistente (solo título + acciones; el modelo/esfuerzo se movió al composer). */
 .chat-header__title {
   flex: 1;
   font-size: var(--ui-text-sm);
@@ -1692,25 +1408,9 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 
 @media (prefers-reduced-motion: reduce) {
   .chat-dock__panel,
-  .chat-dock__panel.is-closing,
   .canvas-tools__menu,
   .canvas-tools__menu.is-closing {
     animation: none;
-  }
-  /* Colapso/expansión sin animación. `!important` para ganar también a los estados `.is-collapsed`
-     (más específicos), que ahora definen sus propias transiciones escalonadas. */
-  .chat-dock,
-  .chat-dock .prompt-input,
-  .chat-dock .prompt-input__textarea,
-  .chat-dock .prompt-input__footer {
-    transition: none !important;
-  }
-}
-
-@media (max-width: 767px) {
-  .chat-dock {
-    bottom: 0.75rem;
-    width: calc(100vw - 1.25rem);
   }
 }
 

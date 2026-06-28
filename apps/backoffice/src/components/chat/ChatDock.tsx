@@ -3,6 +3,7 @@ import './assistant-drawer.css';
 
 import { useEffect, useRef, useState } from 'react';
 
+import { RESIZE_DIRS, useFloatingWindow } from '../../hooks/use-floating-window.js';
 import { useAssistantStore } from '../../lib/assistant-store.js';
 import type { CanvasOp } from '../../lib/chat.js';
 import { ChatConversationList } from './ChatConversationList.js';
@@ -25,15 +26,15 @@ export interface ChatDockProps {
   view: ViewContext;
 }
 
-/** Selector del lanzador en la TopBar; se le devuelve el foco al cerrar el drawer (a11y). */
+/** Selector del lanzador en la TopBar; se le devuelve el foco al cerrar la ventana (a11y). */
 const LAUNCHER_SELECTOR = '[data-testid="assistant-launcher"]';
 
 /**
- * Asistente como DRAWER lateral derecho. Una única superficie flotante (`position: fixed`,
- * overlay) que comparten el Dashboard y el resto de views: el lanzador ✦ de la isla la togglea
- * (useAssistantStore). Al abrirse NO reflowa el lienzo —se superpone sobre el borde derecho—, así
- * que NUNCA reescala widgets ni tablas. El panel está siempre montado y desliza por `transform`;
- * cerrado queda fuera de pantalla (`inert`), abierto lleva el foco al composer y un backdrop
+ * Asistente como VENTANA FLOTANTE libre. Una superficie overlay (`position: fixed`) movible por toda
+ * la pantalla (se arrastra desde la cabecera) y redimensionable desde bordes/esquinas; su geometría
+ * vive en el store (rect x/y/w/h) y se aplica como estilo inline. Al ser overlay NO reflowa el
+ * lienzo → moverla/agrandarla nunca reescala widgets ni tablas. La togglea el lanzador 🤖 de la
+ * isla. Cerrada queda fuera del árbol a11y (`inert`); abierta lleva el foco al composer y un backdrop
  * transparente cierra al clicar fuera.
  */
 export function ChatDock({
@@ -45,7 +46,11 @@ export function ChatDock({
 }: ChatDockProps) {
   const open = useAssistantStore((s) => s.open);
   const setOpen = useAssistantStore((s) => s.setOpen);
+  const rect = useAssistantStore((s) => s.rect);
+  const setRect = useAssistantStore((s) => s.setRect);
   const [showHistory, setShowHistory] = useState(false);
+
+  const { startMove, startResize } = useFloatingWindow(rect, setRect);
 
   const panelRef = useRef<HTMLElement>(null);
   const prevOpen = useRef(open);
@@ -59,7 +64,7 @@ export function ChatDock({
     view: { id: view.id, label: view.label },
   });
 
-  // Escape cierra el drawer.
+  // Escape cierra la ventana.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent): void => {
@@ -106,8 +111,8 @@ export function ChatDock({
       data-testid="chat-dock"
       aria-hidden={!open}
     >
-      {/* Backdrop: con el drawer abierto, un clic fuera del panel SOLO cierra el chat y NO activa
-          lo que haya debajo (el clic aterriza aquí). Transparente: no oscurece el lienzo. */}
+      {/* Backdrop: con la ventana abierta, un clic fuera SOLO cierra el chat y NO activa lo que haya
+          debajo (el clic aterriza aquí). Transparente: no oscurece el lienzo. */}
       {open && (
         <div
           className="chat-dock__backdrop"
@@ -121,16 +126,22 @@ export function ChatDock({
         ref={panelRef}
         role="dialog"
         aria-label="Asistente de IA"
-        // Cerrado = fuera de pantalla: `inert` lo saca del orden de tabulación y del árbol a11y.
+        // Geometría libre desde el store: posición y tamaño en px de viewport.
+        style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}
+        // Cerrada = fuera del árbol a11y / sin tabulación.
         inert={!open}
         data-testid="chat-panel"
       >
-        <ChatHeader
-          showHistory={showHistory}
-          onToggleHistory={() => setShowHistory((v) => !v)}
-          onNewConversation={handleNewConversation}
-          onClose={() => setOpen(false)}
-        />
+        {/* Cabecera = asa de arrastre: mover la ventana por toda la pantalla (los botones internos
+            no arrastran; ver useFloatingWindow). */}
+        <div className="chat-dock__drag" onPointerDown={startMove} data-testid="chat-drag-handle">
+          <ChatHeader
+            showHistory={showHistory}
+            onToggleHistory={() => setShowHistory((v) => !v)}
+            onNewConversation={handleNewConversation}
+            onClose={() => setOpen(false)}
+          />
+        </div>
 
         {chat.error && (
           <div className="chat-error" role="alert">
@@ -204,6 +215,17 @@ export function ChatDock({
             collapsed={false}
           />
         </div>
+
+        {/* Asas de redimensión: 4 bordes + 4 esquinas. Cambian ancho/alto sin límite superior. */}
+        {RESIZE_DIRS.map((dir) => (
+          <div
+            key={dir}
+            className={`chat-dock__resize chat-dock__resize--${dir}`}
+            onPointerDown={startResize(dir)}
+            data-testid={`chat-resize-${dir}`}
+            aria-hidden="true"
+          />
+        ))}
       </aside>
     </div>
   );
