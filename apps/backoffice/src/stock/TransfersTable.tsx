@@ -22,9 +22,6 @@ interface TransfersTableProps {
   groups: TransferGroup[];
   nameOf: StoreNameResolver;
   resolveProduct: ProductResolver;
-  count: number;
-  sortDesc: boolean;
-  onToggleSort: () => void;
   onAction: (kind: TransferActionKind, transfer: Transfer) => void;
   /** id del traspaso con una mutación en vuelo (deshabilita su acción). */
   pendingId: string | null;
@@ -35,9 +32,6 @@ export function TransfersTable({
   groups,
   nameOf,
   resolveProduct,
-  count,
-  sortDesc,
-  onToggleSort,
   onAction,
   pendingId,
   empty,
@@ -57,85 +51,68 @@ export function TransfersTable({
   const isEmpty = groups.length === 0;
 
   return (
-    <div className="tr-main">
-      <div className="tr-tablebar">
-        <span className="tr-count" data-testid="transfers-count">
-          {count} {count === 1 ? 'traspaso' : 'traspasos'}
-        </span>
-        <button
-          type="button"
-          className="tr-sort"
-          onClick={onToggleSort}
-          data-testid="transfers-sort"
-        >
-          {sortDesc ? 'Recientes ↓' : 'Antiguos ↑'}
-        </button>
-      </div>
-
-      <ScrollShadowCell className="tr-scroll" data-testid="transfers-table">
-        {isEmpty ? (
-          <div className="tr-empty" data-testid="transfers-empty">
-            {empty}
-          </div>
-        ) : (
-          <table className="tr-table">
-            <colgroup>
-              <col />
-              <col />
-              <col className="tr-col-lines" />
-              <col className="tr-col-created" />
-              <col className="tr-col-units" />
-            </colgroup>
-            <thead className="tr-thead">
-              <tr>
-                <th className="tr-th-name">Traspaso</th>
-                <th>Ruta</th>
-                <th className="tr-th-num">Líneas</th>
-                <th>Creado</th>
-                <th className="tr-th-num">Unidades</th>
-              </tr>
-            </thead>
-            {groups.map((group) => {
-              const isCollapsed = collapsed.has(group.key);
-              return (
-                <tbody key={group.key}>
-                  <tr className="tr-group-head" onClick={() => toggleGroup(group.key)}>
-                    <td className="tr-group-cell" colSpan={5}>
-                      <div className="tr-group-inner">
-                        <ChevronDown
-                          size={14}
-                          className={`tr-group-caret${isCollapsed ? ' is-collapsed' : ''}`}
-                          aria-hidden="true"
-                        />
-                        <span className={`tr-group-dot tr-dot--${group.tone}`} aria-hidden="true" />
-                        <span className="tr-group-name">{group.label}</span>
-                        <span className="tr-group-count">
-                          · {group.count} {group.count === 1 ? 'traspaso' : 'traspasos'}
-                        </span>
-                        <span className="tr-group-units">{group.unitsLabel}</span>
-                      </div>
-                    </td>
-                  </tr>
-                  {!isCollapsed &&
-                    group.rows.map((transfer) => (
-                      <TransferRow
-                        key={transfer.id}
-                        transfer={transfer}
-                        nameOf={nameOf}
-                        resolveProduct={resolveProduct}
-                        expanded={expandedId === transfer.id}
-                        onToggle={() => toggleExpand(transfer.id)}
-                        onAction={onAction}
-                        pending={pendingId === transfer.id}
+    <ScrollShadowCell className="tr-main" data-testid="transfers-table">
+      {isEmpty ? (
+        <div className="tr-empty" data-testid="transfers-empty">
+          {empty}
+        </div>
+      ) : (
+        <table className="tr-table">
+          <colgroup>
+            <col />
+            <col />
+            <col className="tr-col-lines" />
+            <col className="tr-col-created" />
+            <col className="tr-col-units" />
+          </colgroup>
+          <thead className="tr-thead">
+            <tr>
+              <th className="tr-th-name">Traspaso</th>
+              <th>Ruta</th>
+              <th className="tr-th-num">Líneas</th>
+              <th>Creado</th>
+              <th className="tr-th-num">Unidades</th>
+            </tr>
+          </thead>
+          {groups.map((group) => {
+            const isCollapsed = collapsed.has(group.key);
+            return (
+              <tbody key={group.key}>
+                <tr className="tr-group-head" onClick={() => toggleGroup(group.key)}>
+                  <td className="tr-group-cell" colSpan={5}>
+                    <div className="tr-group-inner">
+                      <ChevronDown
+                        size={15}
+                        className={`tr-group-caret${isCollapsed ? ' is-collapsed' : ''}`}
+                        aria-hidden="true"
                       />
-                    ))}
-                </tbody>
-              );
-            })}
-          </table>
-        )}
-      </ScrollShadowCell>
-    </div>
+                      <span className="tr-group-name">{group.label}</span>
+                      <span className="tr-group-count">
+                        · {group.count} {group.count === 1 ? 'traspaso' : 'traspasos'}
+                      </span>
+                      <span className="tr-group-units">{group.unitsLabel}</span>
+                    </div>
+                  </td>
+                </tr>
+                {!isCollapsed &&
+                  group.rows.map((transfer) => (
+                    <TransferRow
+                      key={transfer.id}
+                      transfer={transfer}
+                      nameOf={nameOf}
+                      resolveProduct={resolveProduct}
+                      expanded={expandedId === transfer.id}
+                      onToggle={() => toggleExpand(transfer.id)}
+                      onAction={onAction}
+                      pending={pendingId === transfer.id}
+                    />
+                  ))}
+              </tbody>
+            );
+          })}
+        </table>
+      )}
+    </ScrollShadowCell>
   );
 }
 

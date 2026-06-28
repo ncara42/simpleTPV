@@ -54,7 +54,6 @@ export function TransfersSection() {
   const [view, setView] = useState<TransferView>('all');
   const [origins, setOrigins] = useState<ReadonlySet<string>>(new Set());
   const [dests, setDests] = useState<ReadonlySet<string>>(new Set());
-  const [sortDesc, setSortDesc] = useState(true);
 
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ['transfers'],
@@ -88,9 +87,11 @@ export function TransfersSection() {
     [transfers, search, nameOf],
   );
   const afterView = useMemo(() => applyView(afterSearch, view), [afterSearch, view]);
+  // Orden fijo: más recientes primero (la tabla ya no expone toggle de orden; la
+  // barra recuento+orden se retiró para igualar la tabla de Inventario/Catálogo).
   const sorted = useMemo(
-    () => sortTransfers(applyStoreFacets(afterView, origins, dests), sortDesc),
-    [afterView, origins, dests, sortDesc],
+    () => sortTransfers(applyStoreFacets(afterView, origins, dests), true),
+    [afterView, origins, dests],
   );
   const groups = useMemo(() => groupTransfers(sorted), [sorted]);
   const viewCounts = useMemo(() => computeViewCounts(afterSearch), [afterSearch]);
@@ -294,9 +295,6 @@ export function TransfersSection() {
               groups={groups}
               nameOf={nameOf}
               resolveProduct={resolveProduct}
-              count={sorted.length}
-              sortDesc={sortDesc}
-              onToggleSort={() => setSortDesc((d) => !d)}
               onAction={runAction}
               pendingId={pendingId}
               empty={emptyNode}
