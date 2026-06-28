@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -38,8 +38,12 @@ vi.mock('../../lib/dashboard.js', () => ({
   getSalesKpis: vi.fn(() => Promise.resolve(SALES)),
   getMarginKpis: vi.fn(() => Promise.resolve(MARGIN)),
   getStockoutKpis: vi.fn(() => Promise.resolve(STOCK)),
+  // Ventanas históricas (scrub): devuelven una serie pasada cualquiera.
+  getSalesKpisRange: vi.fn(() => Promise.resolve({ ...SALES, avgTicket: 70 })),
+  getMarginKpisRange: vi.fn(() => Promise.resolve(MARGIN)),
 }));
 
+import { getSalesKpisRange } from '../../lib/dashboard.js';
 import { ITEM_SPECS } from '../../lib/dashboard-layout.js';
 import { GALLERY_ENTRIES } from '../gallery-catalog.js';
 import { WIDGET_LABELS } from '../registry.js';
@@ -75,6 +79,29 @@ describe('Widgets de panel · Sección 01 (KPIs)', () => {
     expect(screen.getByText('Beneficio')).toBeInTheDocument();
     expect(screen.getByText('Venta perdida est.')).toBeInTheDocument();
     expect(screen.getByText('9 roturas')).toBeInTheDocument();
+  });
+
+  it('scrub histórico: ArrowLeft retrocede una ventana, aparece el botón de reinicio y vuelve al ahora', async () => {
+    renderWidget(<ConnectedKpiGrid period="month" store={undefined} />);
+    await screen.findByText('762 tickets');
+
+    // En el periodo actual no hay botón de reinicio.
+    expect(screen.queryByRole('button', { name: 'Volver al periodo actual' })).toBeNull();
+
+    // Foco en la celda "Ticket medio" y una flecha izquierda → una ventana atrás.
+    const cell = screen.getByRole('slider', { name: /Ticket medio/ });
+    expect(cell).toHaveAttribute('aria-valuenow', '0');
+    cell.focus();
+    fireEvent.keyDown(cell, { key: 'ArrowLeft' });
+
+    const reset = await screen.findByRole('button', { name: 'Volver al periodo actual' });
+    expect(getSalesKpisRange).toHaveBeenCalled();
+    expect(cell).toHaveAttribute('aria-valuenow', '1');
+
+    // El reinicio devuelve la card al periodo actual (desaparece el botón, valor vuelve a 0).
+    fireEvent.click(reset);
+    expect(screen.queryByRole('button', { name: 'Volver al periodo actual' })).toBeNull();
+    expect(cell).toHaveAttribute('aria-valuenow', '0');
   });
 
   it('la tarjeta clásica pinta Facturación con su cifra', async () => {

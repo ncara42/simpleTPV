@@ -105,6 +105,16 @@ const periodQuery = (period: DashboardPeriod, storeId?: string): Record<string, 
   ...(storeId ? { storeId } : {}),
 });
 
+// Rango cerrado [from, to] (ISO 'YYYY-MM-DD') vía el periodo `custom` del backend. Lo usa el
+// scrub histórico de la rejilla de KPIs para traer ventanas pasadas (mes/semana/día anterior…)
+// reutilizando exactamente el mismo cálculo de serie que el periodo en vivo (mismo bucketing).
+const rangeQuery = (from: string, to: string, storeId?: string): Record<string, string> => ({
+  period: 'custom',
+  from,
+  to,
+  ...(storeId ? { storeId } : {}),
+});
+
 export function getSalesToday(
   storeId?: string,
   compare: SalesCompareMode = 'day',
@@ -176,6 +186,20 @@ export function getSalesKpis(period: DashboardPeriod, storeId?: string): Promise
 
 export function getMarginKpis(period: DashboardPeriod, storeId?: string): Promise<MarginKpis> {
   return api.get<MarginKpis>('/dashboard/margin-kpis', periodQuery(period, storeId));
+}
+
+// Variantes por rango cerrado (ventana histórica del scrub de KPIs). El backend bucketiza por
+// hora (≤36 h → ventanas de día) o por día (rango mayor → ventanas de semana/mes/año).
+export function getSalesKpisRange(from: string, to: string, storeId?: string): Promise<SalesKpis> {
+  return api.get<SalesKpis>('/dashboard/sales-kpis', rangeQuery(from, to, storeId));
+}
+
+export function getMarginKpisRange(
+  from: string,
+  to: string,
+  storeId?: string,
+): Promise<MarginKpis> {
+  return api.get<MarginKpis>('/dashboard/margin-kpis', rangeQuery(from, to, storeId));
 }
 
 export function getStockoutKpis(period: DashboardPeriod, storeId?: string): Promise<StockoutKpis> {

@@ -75,6 +75,138 @@
   display: block;
 }
 
+/* ── Scrub temporal (sección 01·b): arrastrar a la izquierda sobre una celda con sparkline recorre
+   ventanas pasadas (mes/semana/día anterior…). El botón de reinicio y la etiqueta de la ventana
+   aparecen en la esquina superior derecha solo cuando NO estás en el periodo actual. ── */
+.kw-cell--scrub {
+  position: relative;
+  cursor: ew-resize;
+  touch-action: pan-y; /* el gesto horizontal es nuestro; el scroll vertical sigue siendo del navegador */
+  user-select: none;
+  transition: background var(--ui-dur-fast, 140ms) ease;
+}
+.kw-cell--scrub:hover {
+  background: var(--ui-surface-subtle);
+}
+.kw-cell--scrub.is-dragging {
+  cursor: grabbing;
+}
+.kw-cell--scrub.is-historic {
+  background: color-mix(in srgb, var(--ui-brand) 4%, var(--ui-surface));
+}
+/* Cargando una ventana nueva: atenúa el dato heredado para no leerlo junto a la etiqueta destino. */
+.kw-cell--scrub.is-fetching .kw-value,
+.kw-cell--scrub.is-fetching .kw-chip,
+.kw-cell--scrub.is-fetching .kw-spark {
+  opacity: 0.4;
+  transition: opacity var(--ui-dur-fast, 140ms) ease;
+}
+.kw-cell--scrub:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: -2px;
+}
+
+/* Pista de afordancia: aparece al pasar el ratón cuando estás en el periodo actual; ocupa el mismo
+   rincón que luego tomará la etiqueta de la ventana → continuidad visual. */
+.kw-scrub-hint {
+  position: absolute;
+  top: 11px;
+  right: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+  opacity: 0;
+  transform: translateX(3px);
+  transition:
+    opacity var(--ui-dur-fast, 140ms) ease,
+    transform var(--ui-dur-fast, 140ms) ease;
+  pointer-events: none;
+}
+.kw-cell--scrub:hover .kw-scrub-hint,
+.kw-cell--scrub:focus-visible .kw-scrub-hint {
+  opacity: 0.7;
+  transform: none;
+}
+
+/* Etiqueta de la ventana + botón de reinicio (modo histórico). */
+.kw-when {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  animation: kw-when-in var(--ui-dur-fast, 140ms) ease;
+}
+@keyframes kw-when-in {
+  from {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+}
+.kw-when-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ui-brand);
+  white-space: nowrap;
+}
+.kw-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-surface);
+  color: var(--ui-text-soft);
+  cursor: pointer;
+  transition:
+    background var(--ui-dur-fast, 140ms) ease,
+    color var(--ui-dur-fast, 140ms) ease,
+    border-color var(--ui-dur-fast, 140ms) ease;
+}
+.kw-reset:hover {
+  background: var(--ui-brand);
+  border-color: var(--ui-brand);
+  color: var(--ui-on-brand, #fff);
+}
+.kw-reset:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: 2px;
+}
+
+/* Ventana sin datos: ocupa el mismo alto que el sparkline para no saltar el layout. */
+.kw-spark--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(100% + 36px);
+  margin: 8px -18px 0;
+  height: 38px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+  background: var(--ui-surface-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kw-cell--scrub,
+  .kw-scrub-hint,
+  .kw-when,
+  .kw-reset {
+    transition: none;
+    animation: none;
+  }
+}
+
 /* ── Tarjeta clásica (tratamiento A): altura natural (sin fill), compacta ── */
 .kw-card {
   background: var(--ui-surface);
