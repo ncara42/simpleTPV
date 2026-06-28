@@ -29,9 +29,9 @@ export interface TopBarProps {
   pageActions?: React.ReactNode;
   /** Sub-navegación de la vista activa (pestañas Catálogo/Familias…): columna izquierda. */
   pageNav?: React.ReactNode;
-  /** Lanzador de búsqueda (⌘K): vive DENTRO de la isla (barra de navegación). */
+  /** Lanzador de búsqueda (⌘K): botón independiente en el clúster derecho, junto al robot. */
   search?: React.ReactNode;
-  /** Slot extra al final de la isla, tras la búsqueda (p. ej. lanzador del asistente de IA). */
+  /** Slot extra en el clúster derecho, junto a la búsqueda (p. ej. lanzador del asistente de IA). */
   islandEnd?: React.ReactNode;
   /** Slot extra al final del clúster derecho (p. ej. conmutador de modo del dashboard). */
   endSlot?: React.ReactNode;
@@ -197,16 +197,10 @@ export function TopBar({
         <h1 className="topbar-title" data-testid={titleTestId} title={title}>
           {title}
         </h1>
-        {(search || islandEnd) && (
-          <div className="topbar-island-actions">
-            {search}
-            {islandEnd}
-          </div>
-        )}
       </div>
 
-      {/* Clúster derecho: acciones de vista · campana · conmutador de modo · cuenta. */}
-      {(pageActions || onNotifications || endSlot || account) && (
+      {/* Clúster derecho: acciones de vista · campana · búsqueda · robot · extras · cuenta. */}
+      {(pageActions || onNotifications || search || islandEnd || endSlot || account) && (
         <div className="topbar-right">
           {pageActions && <div className="topbar-page-actions">{pageActions}</div>}
           {onNotifications && (
@@ -231,6 +225,8 @@ export function TopBar({
               )}
             </button>
           )}
+          {search}
+          {islandEnd}
           {endSlot}
           {account && <AccountMenu account={account} />}
         </div>
