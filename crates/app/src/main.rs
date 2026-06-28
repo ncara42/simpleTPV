@@ -465,6 +465,11 @@ async fn run_migrations(pool: &sqlx::PgPool) -> anyhow::Result<()> {
             20260628130000,
             "transfer_message"
         ),
+        m!(
+            "../migrations/20260628140000_transfer_incident_resolved.sql",
+            20260628140000,
+            "transfer_incident_resolved"
+        ),
     ];
 
     for m in migrations {
