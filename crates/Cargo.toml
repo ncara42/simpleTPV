@@ -76,6 +76,13 @@ jsonwebtoken = { version = "10", default-features = false, features = ["rust_cry
 bcrypt = "0.15"
 # Hash encadenado de los registros VeriFactu (#152/#155): SHA-256.
 sha2 = "0.10"
+# QR de cotejo VERI*FACTU en el ticket (#156): render SVG. `default-features=false`
+# para NO arrastrar la pesada crate `image` (solo necesitamos SVG, nivel M).
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+# Parseo del XML de respuesta del servicio web VERI*FACTU de la AEAT (#156).
+quick-xml = "0.40"
+# Cifrado en reposo del certificado de cliente PEM (#156, Fase 8): AES-256-GCM.
+aes-gcm = "0.11"
 # HTTP cliente para las llamadas a los providers LLM (OpenAI, Anthropic) — streaming SSE.
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
 # SSE generado en Rust (elevado desde http crate que lo tenía como dep local).

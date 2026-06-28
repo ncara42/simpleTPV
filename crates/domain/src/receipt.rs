@@ -65,30 +65,22 @@ fn payment_label(method: PaymentMethod) -> String {
     }
 }
 
-/// Codifica un valor en `application/x-www-form-urlencoded` (paridad con
-/// `URLSearchParams`): alfanumérico y `*-._` literales, espacio → `+`, resto
-/// percent-encoded. Para valores limpios (NIF, nº de ticket) es la identidad.
-fn form_encode(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'*' | b'-' | b'.' | b'_' => {
-                out.push(b as char)
-            }
-            b' ' => out.push('+'),
-            _ => out.push_str(&format!("%{b:02X}")),
-        }
+/// Genera el `<svg>` del código QR de cotejo VERI\*FACTU. La norma técnica de la
+/// AEAT exige un QR ISO/IEC 18004 con **nivel de corrección M**; el tamaño físico
+/// (30–40 mm) lo fija el CSS del recibo. Devuelve cadena vacía si la generación
+/// falla: el ticket nunca debe dejar de emitirse por el QR.
+fn build_qr_svg(qr_data: &str) -> String {
+    use qrcode::render::svg;
+    use qrcode::{EcLevel, QrCode};
+    match QrCode::with_error_correction_level(qr_data, EcLevel::M) {
+        Ok(code) => code
+            .render()
+            .min_dimensions(132, 132)
+            .dark_color(svg::Color("#000000"))
+            .light_color(svg::Color("#ffffff"))
+            .build(),
+        Err(_) => String::new(),
     }
-    out
-}
-
-fn build_cotejo_url(nif: Option<&str>, ticket_number: &str, total: Decimal) -> String {
-    format!(
-        "{}?nif={}&numserie={}&importe={total:.2}",
-        crate::verifactu::hash::cotejo_base_url(),
-        form_encode(nif.unwrap_or("")),
-        form_encode(ticket_number),
-    )
 }
 
 fn render_line_rows(lines: &[TicketLine]) -> String {
@@ -195,6 +187,10 @@ const RECEIPT_STYLE: &str = r#"<style>
     word-break: break-all;
   }
   footer.cotejo a { color: var(--brand); }
+  .vf-qr { margin: 0 auto 8px; width: 35mm; }
+  .vf-qr svg { width: 35mm; height: 35mm; display: block; margin: 0 auto; }
+  .vf-mark { font-weight: 700; letter-spacing: 0.12em; color: var(--ink); font-size: 12px; }
+  .vf-legend { margin-bottom: 6px; color: var(--ink); }
   @media print {
     body { padding: 0; font-size: 12px; }
     .receipt { max-width: none; }
@@ -206,12 +202,38 @@ const RECEIPT_STYLE: &str = r#"<style>
 /// Autocontenido: lleva sus propios estilos (pantalla + impresión).
 pub fn render_receipt_html(data: &TicketData) -> String {
     let is_cash = data.payment_method == PaymentMethod::Cash;
-    let cotejo_url = build_cotejo_url(
-        data.organization.nif.as_deref(),
-        &data.ticket_number,
-        data.total,
-    );
-    let cotejo_esc = escape_html(&cotejo_url);
+    // Bloque de cotejo VERI\*FACTU: QR escaneable + leyenda oficial. Solo se emite
+    // si la organización tiene NIF (sin NIF no hay registro fiscal que cotejar). El
+    // QR codifica la URL oficial de la AEAT con los parámetros en el ORDEN de la
+    // spec (nif, numserie, fecha DD-MM-AAAA, importe) — reutiliza `build_qr_data`.
+    let cotejo_block = match data.organization.nif.as_deref() {
+        Some(nif) if !nif.is_empty() => {
+            let fecha = {
+                let local = data
+                    .created_at
+                    .assume_utc()
+                    .to_timezone(timezones::db::europe::MADRID);
+                crate::verifactu::hash::format_fecha_expedicion(local)
+            };
+            let qr_url = crate::verifactu::hash::build_qr_data(
+                nif,
+                &data.ticket_number,
+                &fecha,
+                data.total,
+            );
+            let qr_svg = build_qr_svg(&qr_url);
+            let qr_url_esc = escape_html(&qr_url);
+            format!(
+                r#"<footer class="cotejo" data-testid="receipt-cotejo">
+    <div class="vf-qr" data-testid="receipt-qr">{qr_svg}</div>
+    <div class="vf-mark">VERI*FACTU</div>
+    <div class="vf-legend">Factura verificable en la sede electrónica de la AEAT</div>
+    <a href="{qr_url_esc}">{qr_url_esc}</a>
+  </footer>"#
+            )
+        }
+        _ => String::new(),
+    };
 
     let nif_line = match &data.organization.nif {
         Some(nif) => format!("<span class=\"org-nif\">NIF {}</span>", escape_html(nif)),
@@ -292,10 +314,7 @@ pub fn render_receipt_html(data: &TicketData) -> String {
     {cash_rows}
   </div>
 
-  <footer class="cotejo" data-testid="receipt-cotejo">
-    <div>VeriFactu · cotejo AEAT</div>
-    <a href="{cotejo_esc}">{cotejo_esc}</a>
-  </footer>
+  {cotejo_block}
 </main>
 </body>
 </html>"#,
@@ -312,7 +331,7 @@ pub fn render_receipt_html(data: &TicketData) -> String {
         tax_rows = render_tax_rows(&data.tax_breakdown),
         pay_label = payment_label(data.payment_method),
         cash_rows = cash_rows,
-        cotejo_esc = cotejo_esc,
+        cotejo_block = cotejo_block,
     ));
     out
 }
@@ -507,14 +526,34 @@ mod tests {
     }
 
     #[test]
-    fn render_enlace_cotejo_verifactu() {
+    fn render_qr_y_leyenda_verifactu() {
         let html = render_receipt_html(&make_data());
-        assert!(html.contains("VeriFactu"));
-        // Ruta del cotejo AEAT (robusta al host pre/producción, configurable por env).
+        // Marca y leyenda OFICIALES exigidas en el documento.
+        assert!(html.contains("VERI*FACTU"));
+        assert!(html.contains("Factura verificable en la sede electrónica de la AEAT"));
+        // QR escaneable embebido (SVG) con su data-testid.
+        assert!(html.contains("data-testid=\"receipt-qr\""));
+        assert!(html.contains("<svg"));
+        // URL de cotejo AEAT con los 4 parámetros oficiales (incl. fecha, que el
+        // enlace antiguo omitía). Host robusto a pre/producción (configurable env).
         assert!(html.contains("/wlpl/TIKE-CONT/ValidarQR"));
         assert!(html.contains("nif=B12345678"));
         assert!(html.contains("numserie=T01-000042"));
+        assert!(html.contains("fecha=02-06-2026"));
         assert!(html.contains("importe=53.90"));
+    }
+
+    #[test]
+    fn render_sin_qr_cuando_falta_nif() {
+        // Sin NIF no hay registro fiscal que cotejar → no se emite QR ni leyenda.
+        let mut d = make_data();
+        d.organization = OrgInfo {
+            name: "Herbolario Verde".into(),
+            nif: None,
+        };
+        let html = render_receipt_html(&d);
+        assert!(!html.contains("data-testid=\"receipt-qr\""));
+        assert!(!html.contains("VERI*FACTU"));
     }
 
     #[test]

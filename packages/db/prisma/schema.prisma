@@ -8,52 +8,55 @@ datasource db {
 }
 
 model Organization {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  nif       String?  @unique
-  country   String   @default("ES")
-  locale    String   @default("es-ES")
-  currency  String   @default("EUR")
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  nif        String?  @unique
+  country    String   @default("ES")
+  locale     String   @default("es-ES")
+  currency   String   @default("EUR")
+  createdAt  DateTime @default(now())
   // U-08: marca corporativa — color primario (#rrggbb) y logo (data-URL acotada).
   brandColor String?
   logoUrl    String?
 
-  stores              Store[]
-  users               User[]
-  products            Product[]
-  productFamilies     ProductFamily[]
-  auditLogs           AuditLog[]
-  sales               Sale[]
-  saleLines           SaleLine[]
-  cashSessions        CashSession[]
-  cashMovements       CashMovement[]
-  officialDevices     OfficialDevice[]
-  timeClockEntries    TimeClockEntry[]
-  returns             Return[]
-  returnLines         ReturnLine[]
-  stock               Stock[]
-  stockBatches        StockBatch[]
-  storePrices         StorePrice[]
-  stockMovements      StockMovement[]
-  stockAlerts         StockAlert[]
-  transfers           Transfer[]
-  transferLines       TransferLine[]
-  suppliers           Supplier[]
-  purchaseOrders      PurchaseOrder[]
-  purchaseOrderLines  PurchaseOrderLine[]
-  verifactuRecords    VerifactuRecord[]
-  salesExports        SalesExport[]
-  userPreferences     UserPreference[]
-  customers           Customer[]
-  priceLists          PriceList[]
-  priceListItems      PriceListItem[]
-  wholesaleOrders     WholesaleOrder[]
-  wholesaleOrderLines WholesaleOrderLine[]
-  apiKeys             ApiKey[]
-  featureFlags        FeatureFlag[]
-  promotions          Promotion[]
-  supplierPrices      SupplierPrice[]
+  stores                Store[]
+  users                 User[]
+  products              Product[]
+  productFamilies       ProductFamily[]
+  auditLogs             AuditLog[]
+  sales                 Sale[]
+  saleLines             SaleLine[]
+  cashSessions          CashSession[]
+  cashMovements         CashMovement[]
+  officialDevices       OfficialDevice[]
+  timeClockEntries      TimeClockEntry[]
+  returns               Return[]
+  returnLines           ReturnLine[]
+  stock                 Stock[]
+  stockBatches          StockBatch[]
+  storePrices           StorePrice[]
+  stockMovements        StockMovement[]
+  stockAlerts           StockAlert[]
+  transfers             Transfer[]
+  transferLines         TransferLine[]
+  suppliers             Supplier[]
+  purchaseOrders        PurchaseOrder[]
+  purchaseOrderLines    PurchaseOrderLine[]
+  verifactuRecords      VerifactuRecord[]
+  verifactuConfig       VerifactuConfig?
+  verifactuCertificates VerifactuCertificate[]
+  verifactuSubmissions  VerifactuSubmission[]
+  salesExports          SalesExport[]
+  userPreferences       UserPreference[]
+  customers             Customer[]
+  priceLists            PriceList[]
+  priceListItems        PriceListItem[]
+  wholesaleOrders       WholesaleOrder[]
+  wholesaleOrderLines   WholesaleOrderLine[]
+  apiKeys               ApiKey[]
+  featureFlags          FeatureFlag[]
+  promotions            Promotion[]
+  supplierPrices        SupplierPrice[]
 }
 
 // Personalización por usuario (IT-16): preferencias clave-valor (JSON) por usuario.
@@ -76,13 +79,13 @@ model UserPreference {
 }
 
 model Store {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @db.Uuid
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
   name           String
   address        String?
-  active         Boolean  @default(true)
+  active         Boolean   @default(true)
   code           String
-  ticketCounter  Int      @default(0)
+  ticketCounter  Int       @default(0)
   // Estado operativo MANUAL persistido (D-10): verificada + nota de incidencia.
   // El estado del dispositivo NO se guarda aquí: lo deriva la API de devices (D-10b).
   opsVerified    Boolean   @default(false)
@@ -92,7 +95,7 @@ model Store {
   // Una sola por organización, garantizada por el índice único parcial
   // `one_central_per_org` definido en SQL en la migración.
   isCentral      Boolean   @default(false)
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
 
   organization     Organization     @relation(fields: [organizationId], references: [id])
   users            UserStore[]
@@ -129,19 +132,19 @@ model User {
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
 
-  organization     Organization     @relation(fields: [organizationId], references: [id])
-  stores           UserStore[]
-  sales            Sale[]
-  cashSessions     CashSession[]
-  cashMovements    CashMovement[]   @relation("CashMovementUser")
+  organization           Organization     @relation(fields: [organizationId], references: [id])
+  stores                 UserStore[]
+  sales                  Sale[]
+  cashSessions           CashSession[]
+  cashMovements          CashMovement[]   @relation("CashMovementUser")
   // Movimientos de efectivo que este usuario solicitó / revisó (aprobó o denegó) (#146).
-  cashMovementsRequested CashMovement[] @relation("CashMovementRequestedBy")
-  cashMovementsReviewed  CashMovement[] @relation("CashMovementReviewedBy")
-  returns          Return[]
-  stockMovements   StockMovement[]
-  timeClockEntries TimeClockEntry[]
-  refreshTokens    RefreshToken[]
-  preferences      UserPreference[]
+  cashMovementsRequested CashMovement[]   @relation("CashMovementRequestedBy")
+  cashMovementsReviewed  CashMovement[]   @relation("CashMovementReviewedBy")
+  returns                Return[]
+  stockMovements         StockMovement[]
+  timeClockEntries       TimeClockEntry[]
+  refreshTokens          RefreshToken[]
+  preferences            UserPreference[]
 
   @@index([organizationId])
 }
@@ -704,11 +707,74 @@ model VerifactuRecord {
   lastError      String?
   sentAt         DateTime?
   createdAt      DateTime        @default(now())
+  // Transporte AEAT (#156): estado de la remisión al servicio web VERI*FACTU.
+  csv            String? // justificante (CSV) devuelto por la AEAT al aceptar
+  aeatState      String? // EstadoRegistro: Correcto|AceptadoConErrores|Incorrecto
+  errorCode      String? // CodigoErrorRegistro de la AEAT (si lo hay)
+  nextAttemptAt  DateTime? // control de flujo/backoff: no reenviar antes de esta marca
+  subsanacion    Boolean         @default(false) // RegistroAlta de subsanación (Subsanacion=S)
+  rechazoPrevio  Boolean         @default(false) // RechazoPrevio=S (el registro previo fue rechazado)
 
-  organization Organization @relation(fields: [organizationId], references: [id])
+  organization Organization          @relation(fields: [organizationId], references: [id])
+  submissions  VerifactuSubmission[]
 
   @@index([organizationId, status, createdAt])
   @@index([organizationId, createdAt])
+  @@index([status, nextAttemptAt, createdAt]) // worker: PENDING ya vencidos por antigüedad
+}
+
+// Configuración VERI*FACTU por comercio (#156, 1:1 con Organization). Define la
+// modalidad de cumplimiento, la razón social del obligado y el entorno AEAT.
+model VerifactuConfig {
+  organizationId String   @id @db.Uuid
+  mode           String   @default("DISABLED") // DISABLED|ASSISTED|DIRECT_OWN_CERT|COLLAB_SOCIAL
+  razonSocial    String? // NombreRazon del obligado (Cabecera del envío)
+  obligadoTipo   String? // IS|OTHERS (solo para avisos de plazo 2027)
+  exento         Boolean  @default(false) // fuera de ámbito (SII / foral / facturación manual)
+  exentoMotivo   String?
+  environment    String   @default("preprod") // preprod|prod (selección de endpoint AEAT)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// Certificado de cliente del comercio (#156, solo modo DIRECT_OWN_CERT). El PEM
+// (certificado + clave) se guarda CIFRADO (AES-256-GCM); la clave de cifrado vive
+// fuera de la BD (entorno). El material en claro nunca se persiste.
+model VerifactuCertificate {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  encBlob        Bytes // PEM cifrado: nonce(12) || ciphertext+tag
+  subject        String?
+  validFrom      DateTime?
+  validTo        DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, validTo])
+}
+
+// Traza APPEND-ONLY de cada envío a la AEAT (#156): prueba de remisión + diagnóstico.
+// Una fila por intento; nunca se actualiza ni borra (salvo cascada por el registro).
+model VerifactuSubmission {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  recordId       String   @db.Uuid
+  attemptedAt    DateTime @default(now())
+  endpoint       String?
+  httpStatus     Int?
+  estadoEnvio    String? // Correcto|ParcialmenteCorrecto|Incorrecto
+  estadoRegistro String? // Correcto|AceptadoConErrores|Incorrecto
+  csv            String?
+  errorCode      String?
+  errorDesc      String?
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  record       VerifactuRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@index([recordId, attemptedAt])
 }
 
 // Export asíncrono del historial de ventas a CSV (IT-05). Se pide con unos filtros

@@ -439,6 +439,43 @@
   border: 1px solid var(--ui-warning);
   border-radius: var(--ui-radius-sm);
 }
+/* Mensaje de estado en positivo (espejo de .settings-warning, acento de éxito). */
+.settings-success {
+  display: block;
+  margin: var(--ui-space-2) 0 0;
+  padding: var(--ui-space-2) var(--ui-space-3);
+  font-size: var(--ui-text-sm);
+  line-height: 1.35;
+  color: var(--ui-success, #0e7c6b);
+  background: var(--ui-success-soft, rgba(14, 124, 107, 0.1));
+  border: 1px solid var(--ui-success, #0e7c6b);
+  border-radius: var(--ui-radius-sm);
+}
+/* Área de texto para pegar el certificado PEM (#156). Monospace para legibilidad. */
+.settings-textarea {
+  width: 100%;
+  margin-top: var(--ui-space-2);
+  padding: var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font-family: var(--ui-font-mono, ui-monospace, monospace);
+  font-size: var(--ui-text-sm);
+  line-height: 1.4;
+  resize: vertical;
+}
+/* Fila con checkbox + etiqueta en horizontal (exención). */
+.settings-check-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+.settings-check-row label,
+.settings-check-row span {
+  margin: 0;
+}
 /* Pie de acciones con hairline superior (espejo de .modal--form .modal-foot). */
 .settings-actions {
   display: flex;

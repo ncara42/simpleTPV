@@ -22,6 +22,66 @@ use tracing_subscriber::{fmt, EnvFilter};
 const VERIFACTU_POLL_SECS: u64 = 5;
 /// Registros por ciclo del worker (cota del lote `SKIP LOCKED`).
 const VERIFACTU_BATCH: i64 = 50;
+/// Timeout por defecto (s) de cada petición HTTP a la AEAT.
+const VERIFACTU_HTTP_TIMEOUT_SECS: u64 = 30;
+
+/// Lee un booleano de entorno con valor por defecto.
+fn env_bool(key: &str, default: bool) -> bool {
+    std::env::var(key)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
+}
+
+/// Construye la configuración del worker AEAT desde el entorno. Devuelve `None` si
+/// faltan los datos obligatorios del SIF (`VERIFACTU_SIF_NOMBRE_RAZON`/`_NIF`), para
+/// no arrancar un worker que generaría XML inválido.
+fn aeat_worker_config_from_env() -> Option<simpletpv_domain::verifactu::aeat::AeatWorkerConfig> {
+    use simpletpv_domain::verifactu::aeat::{crypto, AeatWorkerConfig, SistemaInformatico};
+
+    let nombre_razon = std::env::var("VERIFACTU_SIF_NOMBRE_RAZON")
+        .ok()
+        .filter(|s| !s.is_empty())?;
+    let nif = std::env::var("VERIFACTU_SIF_NIF").ok().filter(|s| !s.is_empty())?;
+    let sistema = SistemaInformatico {
+        nombre_razon,
+        nif,
+        nombre_sistema: std::env::var("VERIFACTU_SIF_NOMBRE")
+            .unwrap_or_else(|_| "simpleTPV".to_owned()),
+        id_sistema: std::env::var("VERIFACTU_SIF_ID").unwrap_or_else(|_| "01".to_owned()),
+        version: std::env::var("VERIFACTU_SIF_VERSION")
+            .unwrap_or_else(|_| env!("CARGO_PKG_VERSION").to_owned()),
+        numero_instalacion: std::env::var("VERIFACTU_SIF_INSTALACION")
+            .unwrap_or_else(|_| "001".to_owned()),
+        solo_verifactu: env_bool("VERIFACTU_SIF_SOLO_VERIFACTU", true),
+        multi_ot: env_bool("VERIFACTU_SIF_MULTI_OT", false),
+        indicador_multi_ot: env_bool("VERIFACTU_SIF_INDICADOR_MULTI_OT", false),
+    };
+    // Certificado del fabricante (modo COLLAB_SOCIAL): se lee de fichero al arrancar.
+    let collab_cert_pem = std::env::var("VERIFACTU_COLLAB_CERT_PEM_PATH")
+        .ok()
+        .and_then(|p| {
+            std::fs::read(&p)
+                .map_err(|e| tracing::error!(path = %p, error = %e, "no se pudo leer el certificado COLLAB_SOCIAL"))
+                .ok()
+        });
+    // Clave para descifrar los certificados DIRECT_OWN_CERT guardados en la BD.
+    let cert_key = std::env::var("VERIFACTU_CERT_KEY").ok().and_then(|k| {
+        crypto::key_from_hex(&k)
+            .map_err(|e| tracing::error!(error = %e, "VERIFACTU_CERT_KEY inválida"))
+            .ok()
+    });
+    let timeout_secs = std::env::var("VERIFACTU_HTTP_TIMEOUT_SECS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(VERIFACTU_HTTP_TIMEOUT_SECS);
+    Some(AeatWorkerConfig {
+        sistema,
+        collab_cert_pem,
+        cert_key,
+        timeout_secs,
+    })
+}
 
 fn main() -> anyhow::Result<()> {
     // Sentry se inicializa ANTES del runtime async (doc oficial): su transporte
@@ -128,44 +188,70 @@ async fn run() -> anyhow::Result<()> {
         ai,
     ));
 
-    // Worker de envío VeriFactu (#155): drena la cola de registros PENDING con
-    // `FOR UPDATE SKIP LOCKED` y los envía. SOLO se arranca con el flag explícito
-    // `VERIFACTU_SANDBOX_SEND=true` (H-01): el único proveedor disponible es el
-    // SANDBOX, que marca SENT sin declarar a la AEAT. En PRODUCCIÓN, sin proveedor
-    // certificado, debe quedar APAGADO → los registros se quedan PENDING (no se
-    // marcan SENT falsamente, lo que incumpliría la obligación fiscal). Cuando
-    // exista proveedor real, se inyecta aquí y el flag deja de ser necesario.
-    let sandbox_send = std::env::var("VERIFACTU_SANDBOX_SEND")
-        .ok()
-        .and_then(|v| v.parse::<bool>().ok())
-        .unwrap_or(false);
-    if sandbox_send {
-        tracing::warn!(
-            "VeriFactu: worker de envío SANDBOX ACTIVO — marca SENT sin declarar a la AEAT (solo dev/piloto)"
-        );
-        tokio::spawn(async move {
-            let provider = simpletpv_domain::verifactu::SandboxProvider;
-            let mut tick = tokio::time::interval(Duration::from_secs(VERIFACTU_POLL_SECS));
-            loop {
-                tick.tick().await;
-                match simpletpv_domain::verifactu::process_pending_batch(
-                    &verifactu_db,
-                    &provider,
-                    VERIFACTU_BATCH,
-                    None,
-                )
-                .await
-                {
-                    Ok(n) if n > 0 => tracing::info!(procesados = n, "ciclo de envío VeriFactu"),
-                    Ok(_) => {}
-                    Err(e) => tracing::warn!(error = %e, "ciclo del worker VeriFactu falló"),
+    // Worker de envío VeriFactu (#155/#156): drena la cola de registros PENDING con
+    // `FOR UPDATE SKIP LOCKED`. `VERIFACTU_PROVIDER` elige el destino (fail-safe: por
+    // defecto NO envía, para no marcar SENT en falso, lo que incumpliría la obligación
+    // fiscal):
+    //   - off (def.): no arranca; los registros quedan PENDING.
+    //   - sandbox: marca SENT SIN declarar a la AEAT (solo dev/piloto).
+    //   - aeat: envío real por mTLS al endpoint (preprod/prod) según la config de cada
+    //     comercio (`VerifactuConfig.environment`). Requiere datos del SIF + certificado.
+    let provider = std::env::var("VERIFACTU_PROVIDER").unwrap_or_else(|_| "off".to_owned());
+    match provider.as_str() {
+        "sandbox" => {
+            tracing::warn!(
+                "VeriFactu: worker SANDBOX ACTIVO — marca SENT sin declarar a la AEAT (solo dev/piloto)"
+            );
+            tokio::spawn(async move {
+                let provider = simpletpv_domain::verifactu::SandboxProvider;
+                let mut tick = tokio::time::interval(Duration::from_secs(VERIFACTU_POLL_SECS));
+                loop {
+                    tick.tick().await;
+                    match simpletpv_domain::verifactu::process_pending_batch(
+                        &verifactu_db,
+                        &provider,
+                        VERIFACTU_BATCH,
+                        None,
+                    )
+                    .await
+                    {
+                        Ok(n) if n > 0 => tracing::info!(procesados = n, "ciclo VeriFactu sandbox"),
+                        Ok(_) => {}
+                        Err(e) => tracing::warn!(error = %e, "ciclo sandbox VeriFactu falló"),
+                    }
                 }
+            });
+        }
+        "aeat" => match aeat_worker_config_from_env() {
+            Some(cfg) => {
+                tracing::info!(
+                    "VeriFactu: worker AEAT ACTIVO (mTLS); el entorno (preprod/prod) lo fija cada comercio"
+                );
+                tokio::spawn(async move {
+                    let mut tick = tokio::time::interval(Duration::from_secs(VERIFACTU_POLL_SECS));
+                    loop {
+                        tick.tick().await;
+                        match simpletpv_domain::verifactu::aeat::process_aeat_batch(
+                            &verifactu_db,
+                            &cfg,
+                            VERIFACTU_BATCH,
+                        )
+                        .await
+                        {
+                            Ok(n) if n > 0 => tracing::info!(procesados = n, "ciclo VeriFactu AEAT"),
+                            Ok(_) => {}
+                            Err(e) => tracing::warn!(error = %e, "ciclo AEAT VeriFactu falló"),
+                        }
+                    }
+                });
             }
-        });
-    } else {
-        tracing::info!(
-            "VeriFactu: envío deshabilitado (sin proveedor AEAT certificado); los registros quedan PENDING"
-        );
+            None => tracing::error!(
+                "VERIFACTU_PROVIDER=aeat pero falta config del SIF (VERIFACTU_SIF_NOMBRE_RAZON/VERIFACTU_SIF_NIF); worker NO arrancado"
+            ),
+        },
+        _ => tracing::info!(
+            "VeriFactu: envío deshabilitado (VERIFACTU_PROVIDER=off); los registros quedan PENDING"
+        ),
     }
 
     let addr: SocketAddr = config.bind_addr.parse()?;
@@ -469,6 +555,11 @@ async fn run_migrations(pool: &sqlx::PgPool) -> anyhow::Result<()> {
             "../migrations/20260628140000_transfer_incident_resolved.sql",
             20260628140000,
             "transfer_incident_resolved"
+        ),
+        m!(
+            "../migrations/20260628150000_verifactu_transporte.sql",
+            20260628150000,
+            "verifactu_transporte"
         ),
     ];
 

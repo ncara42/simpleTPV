@@ -191,6 +191,18 @@ pub fn build_router(state: AppState) -> Router {
         // El envío real lo procesa el worker de fondo (cola Postgres SKIP LOCKED).
         .route("/verifactu/records", get(verifactu::list))
         .route("/verifactu/records/{id}/retry", post(verifactu::retry))
+        // Config VERI*FACTU por comercio (#156): modalidad, razón social, exención,
+        // entorno AEAT. Solo ADMIN.
+        .route(
+            "/verifactu/config",
+            get(verifactu::config_get).put(verifactu::config_put),
+        )
+        // Certificado de cliente (modo DIRECT_OWN_CERT, #156): subida cifrada + estado.
+        .route(
+            "/verifactu/certificate",
+            get(verifactu::cert_status).put(verifactu::cert_put),
+        )
+        .route("/verifactu/verify", get(verifactu::verify_chain))
         // Catálogo (Fase 2). `/import` y `/barcode/{code}` son estáticas y no
         // colisionan con `/{id}` (axum prioriza el segmento estático).
         .route("/products", get(products::list).post(products::create))

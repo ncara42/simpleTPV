@@ -1,7 +1,7 @@
 import type { VerifactuRecord } from '@simpletpv/auth';
 import { describe, expect, it } from 'vitest';
 
-import { summarizeVerifactu } from './verifactu.js';
+import { daysUntilDeadline, summarizeVerifactu, verifactuDeadline } from './verifactu.js';
 
 // Registro mínimo: solo los campos que summarizeVerifactu lee. El resto se rellena
 // con valores neutros para satisfacer el tipo.
@@ -67,5 +67,27 @@ describe('summarizeVerifactu', () => {
     // Assert
     expect(summary.sentToday).toBe(0);
     expect(summary.lastSentAt).toBeNull();
+  });
+});
+
+describe('verifactuDeadline', () => {
+  it('sociedades (IS) entran el 1-ene-2027', () => {
+    expect(verifactuDeadline('IS')).toBe('2027-01-01');
+  });
+
+  it('el resto (OTHERS o sin definir) entra el 1-jul-2027', () => {
+    expect(verifactuDeadline('OTHERS')).toBe('2027-07-01');
+    expect(verifactuDeadline(null)).toBe('2027-07-01');
+  });
+});
+
+describe('daysUntilDeadline', () => {
+  it('cuenta los días naturales hasta el plazo del tipo de obligado', () => {
+    // De 2026-12-02 a 2027-01-01 (IS) hay 30 días.
+    expect(daysUntilDeadline('IS', '2026-12-02')).toBe(30);
+  });
+
+  it('es negativo cuando el plazo ya pasó', () => {
+    expect(daysUntilDeadline('OTHERS', '2027-07-02')).toBe(-1);
   });
 });
