@@ -24,6 +24,7 @@ import {
   bringToFront,
   DRAW_COLORS,
   DRAW_STROKE_WIDTH,
+  FREE_GAP,
   type FreeDraw,
   type FreeElement,
   type FreeLayout,
@@ -37,6 +38,8 @@ import {
   minimapClickToPan,
   minimapProjection,
   offscreenArrow,
+  type SnapGuide,
+  snapMovingRect,
 } from '../lib/free-geometry.js';
 import { useEnterAnimation } from '../lib/use-enter-animation.js';
 import { FreeMinimap } from './FreeMinimap.js';
@@ -52,6 +55,7 @@ const ZOOM_MAX = 3;
 const ZOOM_STEP = 1.2;
 const PAN_THRESHOLD = 4; // px para distinguir pan de click
 const DRAG_THRESHOLD_PX = 4; // px para distinguir arrastre de un elemento de un click en su contenido
+const SNAP_PX = 8; // radio de imán en px de PANTALLA (se divide por el zoom para pasar a mundo)
 const FIT_PADDING = 48;
 // Tope de zoom al CENTRAR/AJUSTAR la vista al contenido: nunca acercar más del 85%, aunque el
 // contenido sea pequeño y cupiera más grande (deja aire alrededor). El zoom manual sí llega a ZOOM_MAX.
@@ -224,6 +228,13 @@ export function FreeBoard({
   const colorRef = useRef(drawColor);
   colorRef.current = drawColor;
   const dragSnapshot = useRef<FreeElement[] | null>(null);
+  // Estado del arrastre con IMÁN: posición CRUDA (sin snap) acumulada del elemento que se mueve. Se
+  // separa de la posición almacenada (ya con snap) para que el bloque pueda «despegarse» al alejarlo
+  // (si guardáramos la posición con snap, los deltas pequeños se perderían y quedaría pegado). Null
+  // salvo durante un arrastre con ratón; el teclado mueve sin imán.
+  const dragRaw = useRef<{ id: string; x: number; y: number } | null>(null);
+  // Guías de alineación visibles durante el arrastre (se limpian al soltar).
+  const [guides, setGuides] = useState<SnapGuide[]>([]);
   const idCounter = useRef(0);
 
   const newId = useCallback((prefix: string): string => {
@@ -568,8 +579,36 @@ export function FreeBoard({
   const onDragStart = useCallback((): void => {
     dragSnapshot.current = elsRef.current;
   }, []);
+  // Arranca un arrastre con IMÁN (solo ratón): fija la posición cruda inicial del bloque movido.
+  const startMoveEl = useCallback((id: string): void => {
+    const el = elsRef.current.find((e) => e.id === id);
+    if (el) dragRaw.current = { id, x: el.x, y: el.y };
+  }, []);
+
   const moveEl = useCallback((id: string, dx: number, dy: number): void => {
-    setEls((prev) => prev.map((e) => (e.id === id ? { ...e, x: e.x + dx, y: e.y + dy } : e)));
+    const raw = dragRaw.current;
+    // Sin arrastre de ratón activo (p. ej. flechas del teclado): desplazamiento directo, sin imán.
+    if (!raw || raw.id !== id) {
+      setEls((prev) => prev.map((e) => (e.id === id ? { ...e, x: e.x + dx, y: e.y + dy } : e)));
+      return;
+    }
+    // Acumula sobre la posición CRUDA y deriva la posición con imán (alinear/pegar a vecinos).
+    raw.x += dx;
+    raw.y += dy;
+    const el = elsRef.current.find((e) => e.id === id);
+    if (!el) return;
+    const others = elsRef.current
+      .filter((e) => e.id !== id && (e.kind === 'widget' || e.kind === 'note'))
+      .map((e) => ({ x: e.x, y: e.y, w: e.w, h: e.h }));
+    const threshold = SNAP_PX / (zoomRef.current || 1);
+    const res = snapMovingRect(
+      { x: raw.x, y: raw.y, w: el.w, h: el.h },
+      others,
+      FREE_GAP,
+      threshold,
+    );
+    setEls((prev) => prev.map((e) => (e.id === id ? { ...e, x: res.x, y: res.y } : e)));
+    setGuides(res.guides);
   }, []);
   // Redimensiona una nota desde su tirador (esquina inf-derecha). Reusa onDragStart/commitMove
   // para el snapshot de deshacer y la persistencia (mismo ciclo que mover).
@@ -583,6 +622,8 @@ export function FreeBoard({
     );
   }, []);
   const commitMove = useCallback((): void => {
+    dragRaw.current = null;
+    setGuides([]);
     const snap = dragSnapshot.current ?? elsRef.current;
     dragSnapshot.current = null;
     pushHistory(snap);
@@ -895,6 +936,7 @@ export function FreeBoard({
               interactionMode={interactionMode}
               label={labelFor(el)}
               onDragStart={onDragStart}
+              onMoveStart={startMoveEl}
               onMove={moveEl}
               onResize={resizeEl}
               onCommit={commitMove}
@@ -911,6 +953,37 @@ export function FreeBoard({
               ) : null}
             </ElementView>
           ))}
+
+          {/* Guías del IMÁN (alineación/pegado) durante el arrastre. En coords de MUNDO: van dentro
+              de la capa escalada, así que el grosor se compensa con 1/zoom para verse ~1.5px en
+              pantalla a cualquier zoom. */}
+          {guides.map((g, i) =>
+            g.axis === 'x' ? (
+              <div
+                key={`g${i}`}
+                className="dash-free-guide"
+                aria-hidden="true"
+                style={{
+                  left: g.pos,
+                  top: g.start,
+                  width: 1.5 / view.zoom,
+                  height: g.end - g.start,
+                }}
+              />
+            ) : (
+              <div
+                key={`g${i}`}
+                className="dash-free-guide"
+                aria-hidden="true"
+                style={{
+                  left: g.start,
+                  top: g.pos,
+                  height: 1.5 / view.zoom,
+                  width: g.end - g.start,
+                }}
+              />
+            ),
+          )}
 
           {/* Vista previa del elemento en curso de dibujo. */}
           {draft && (
@@ -958,6 +1031,7 @@ interface ElementViewProps {
   interactionMode: InteractionMode;
   label: string;
   onDragStart: () => void;
+  onMoveStart: (id: string) => void;
   onMove: (id: string, dx: number, dy: number) => void;
   onResize: (id: string, dw: number, dh: number) => void;
   onCommit: () => void;
@@ -978,6 +1052,7 @@ const ElementView = memo(function ElementView({
   interactionMode,
   label,
   onDragStart,
+  onMoveStart,
   onMove,
   onResize,
   onCommit,
@@ -1037,6 +1112,7 @@ const ElementView = memo(function ElementView({
       // widget recibe su evento.
       if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < DRAG_THRESHOLD_PX) return;
       onDragStart();
+      onMoveStart(el.id); // activa el imán para este arrastre (posición cruda de partida)
       e.currentTarget.setPointerCapture(e.pointerId); // ahora sí: arrastre real
       d.moved = true;
     }

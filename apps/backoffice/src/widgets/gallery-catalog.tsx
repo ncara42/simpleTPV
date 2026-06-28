@@ -302,6 +302,38 @@ function ThumbLeaderboard(): ReactNode {
   );
 }
 
+// «Rankings» (lista-rankings): pestaña activa arriba + filas con puesto y barra fina proporcional.
+function ThumbRankTabs(): ReactNode {
+  const widths = [98, 72, 52];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <rect x={6} y={6} width={70} height={11} rx={4} fill="var(--ui-surface-subtle)" />
+      <rect x={8} y={8} width={30} height={7} rx={3} fill="var(--ui-brand)" />
+      {widths.map((w, i) => {
+        const y = 28 + i * 12;
+        return (
+          <g key={i}>
+            <rect
+              x={6}
+              y={y}
+              width={6}
+              height={6}
+              rx={1.5}
+              fill={i === 0 ? 'var(--ui-brand)' : SOFT_BLUE}
+            />
+            <rect x={16} y={y + 4} width={w} height={2.5} rx={1.25} fill="var(--ui-brand)" />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 // «Mix por familia» (lista-mix): mapa de área (treemap) con un tile grande y tres menores.
 function ThumbTreemap(): ReactNode {
   return (
@@ -635,24 +667,24 @@ export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
   // Sección 03 · Listas
   {
     id: 'lista-familia',
-    label: 'Reparto por familia',
+    label: 'Ventas por familia',
     category: 'listas',
-    description: 'Cuotas de facturación por familia',
-    thumbnail: <ThumbShareBar />,
-  },
-  {
-    id: 'lista-rankings',
-    label: 'Ranking de productos',
-    category: 'listas',
-    description: 'Top de productos más vendidos',
+    description: 'Ranking de familias con barra y cuota',
     thumbnail: <ThumbLeaderboard />,
   },
   {
-    id: 'lista-mix',
-    label: 'Mix por familia (treemap)',
+    id: 'lista-rankings',
+    label: 'Rankings',
     category: 'listas',
-    description: 'Mapa de área por familia',
-    thumbnail: <ThumbTreemap />,
+    description: 'Top productos por ventas, margen o rotación',
+    thumbnail: <ThumbRankTabs />,
+  },
+  {
+    id: 'lista-mix',
+    label: 'Mix de ventas',
+    category: 'listas',
+    description: 'Barra apilada monocroma por familia',
+    thumbnail: <ThumbShareBar />,
   },
   // Sección 05 · Compactos
   {

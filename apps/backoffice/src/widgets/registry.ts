@@ -27,9 +27,9 @@ export const WIDGET_LABELS: Record<string, string> = {
   'graf-store-bars': 'Ventas por tienda',
   'graf-heatmap': 'Mapa de calor horario',
   // Sección 03 · Listas (rediseño)
-  'lista-familia': 'Reparto por familia',
-  'lista-rankings': 'Ranking de productos',
-  'lista-mix': 'Mix por familia (treemap)',
+  'lista-familia': 'Ventas por familia',
+  'lista-rankings': 'Rankings',
+  'lista-mix': 'Mix de ventas',
   // Sección 05 · Compactos (rediseño)
   'cmp-ribbon': 'Banda compacta de métricas',
   'cmp-donut': 'Donut por familia',

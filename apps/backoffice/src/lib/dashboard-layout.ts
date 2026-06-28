@@ -60,9 +60,9 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'graf-store-bars': { w: 6, h: 2 },
   'graf-heatmap': { w: 6, h: 2 },
   // Sección 03 · Listas (rediseño): reparto por familia, ranking de productos y mix (treemap).
-  'lista-familia': { w: 4, h: 2 },
+  'lista-familia': { w: 4, h: 3 },
   'lista-rankings': { w: 4, h: 3 },
-  'lista-mix': { w: 5, h: 3 },
+  'lista-mix': { w: 4, h: 3 },
   // Sección 05 · Compactos (rediseño): tiles pequeños (ribbon, donut, treemap, top, cifra-héroe).
   'cmp-ribbon': { w: 3, h: 2 },
   'cmp-donut': { w: 3, h: 2 },
@@ -527,6 +527,19 @@ export const FREE_GAP = 16;
 export function freeItemSize(id: string): { w: number; h: number } {
   const spec = ITEM_SPECS[id] ?? DEFAULT_SPEC;
   return { w: spec.w * FREE_COL - FREE_GAP, h: spec.h * FREE_ROW - FREE_GAP };
+}
+
+// INVERSA EXACTA de `freeItemSize`: recupera las unidades enteras de rejilla (columnas/filas) a
+// partir del tamaño en píxeles de un elemento del lienzo. Como el px de mundo es `u·CELDA − GAP`,
+// `round((px + GAP) / CELDA)` devuelve la unidad original sin pérdida para todo lo sembrado desde
+// la rejilla (catálogo y genéricos); para elementos de tamaño libre (notas redimensionadas) cae al
+// número entero de celdas más cercano. Las columnas se clampan a [1, BOARD_COLS]; las filas a ≥1.
+// Es lo que usa el modo CUADRÍCULA para teselar sin huecos sobre una rejilla real de 12 columnas,
+// en vez de aproximar el tramo con umbrales de píxel (que dejaban huecos y no llenaban el ancho).
+export function freeUnitsFromPx(w: number, h: number): { cols: number; rows: number } {
+  const cols = Math.min(BOARD_COLS, Math.max(1, Math.round((w + FREE_GAP) / FREE_COL)));
+  const rows = Math.max(1, Math.round((h + FREE_GAP) / FREE_ROW));
+  return { cols, rows };
 }
 
 // Tamaño por defecto de una nota nueva (px de mundo).
