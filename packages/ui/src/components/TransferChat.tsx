@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { RESIZE_DIRS, useFloatingWindow, type WindowRect } from '../hooks/use-floating-window.js';
 import { fileToCompressedDataUrl } from '../lib/image.js';
 
 // Chat de traspaso entre central ('central', backoffice) y la tienda que recibe
@@ -49,6 +50,8 @@ export function TransferChat({
   const [photo, setPhoto] = useState<string | null>(null);
   const [compressing, setCompressing] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [rect, setRect] = useState<WindowRect>(initialRect);
+  const { startMove, startResize } = useFloatingWindow(rect, setRect);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Autoscroll al fondo al abrir y al llegar mensajes nuevos.
@@ -87,16 +90,19 @@ export function TransferChat({
   }
 
   return (
-    <div
-      className="tc-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      onClick={onClose}
-      data-testid={testId}
-    >
-      <div className="tc-panel" onClick={(e) => e.stopPropagation()}>
-        <header className="tc-head">
+    <div className="tc-root" data-testid={testId}>
+      {/* Backdrop transparente: clic fuera cierra (como el ChatDock); no oscurece la página. */}
+      <div className="tc-backdrop" onClick={onClose} aria-hidden="true" />
+      <aside
+        className="tc-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}
+      >
+        {/* Cabecera = asa de arrastre: mueve la ventana por toda la pantalla (los botones
+            internos no arrastran; lo gestiona useFloatingWindow). */}
+        <header className="tc-head tc-drag" onPointerDown={startMove}>
           <span className="tc-avatar" aria-hidden="true">
             {side === 'central' ? 'T' : 'C'}
           </span>
@@ -204,9 +210,32 @@ export function TransferChat({
             <img src={lightbox} alt="Foto" />
           </div>
         )}
-      </div>
+
+        {/* Asas de redimensión: 4 bordes + 4 esquinas (igual que el ChatDock). */}
+        {RESIZE_DIRS.map((dir) => (
+          <div
+            key={dir}
+            className={`tc-resize tc-resize--${dir}`}
+            onPointerDown={startResize(dir)}
+            aria-hidden="true"
+          />
+        ))}
+      </aside>
     </div>
   );
+}
+
+function initialRect(): WindowRect {
+  const vw = typeof window === 'undefined' ? 1280 : window.innerWidth;
+  const vh = typeof window === 'undefined' ? 800 : window.innerHeight;
+  const w = Math.min(440, vw - 32);
+  const h = Math.min(660, vh - 32);
+  return {
+    w,
+    h,
+    x: Math.max(16, Math.round((vw - w) / 2)),
+    y: Math.max(16, Math.round((vh - h) / 2)),
+  };
 }
 
 function fmtTime(iso: string): string {

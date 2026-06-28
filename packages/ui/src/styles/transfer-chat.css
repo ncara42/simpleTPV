@@ -3,25 +3,36 @@
    chatbot (panel glass, burbujas, composer) con tokens --ui-*. Sin IA.
    ════════════════════════════════════════════════════════════════════════════ */
 
-.tc-overlay {
+/* Contenedor + backdrop transparente: el chat es una VENTANA FLOTANTE (como el
+   ChatDock del asistente); el clic fuera cierra pero no oscurece la página. */
+.tc-root {
   position: fixed;
   inset: 0;
   z-index: 70;
-  display: grid;
-  place-items: center;
-  padding: 1.25rem;
-  background: rgb(0 0 0 / 0.42);
-  animation: tc-fade 0.16s var(--ui-ease, ease) both;
 }
-@keyframes tc-fade {
-  from {
-    opacity: 0;
-  }
+.tc-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+}
+/* Cursor de arrastre en la cabecera + estado global mientras se mueve/redimensiona. */
+.tc-drag {
+  cursor: grab;
+  touch-action: none;
+}
+.tc-drag button {
+  cursor: pointer;
+}
+body.tc-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+body.tc-dragging .tc-panel {
+  transition: none;
 }
 
 .tc-panel {
-  width: min(460px, 96vw);
-  height: min(660px, 88vh);
+  position: fixed;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -323,8 +334,70 @@
   border-radius: var(--ui-radius-md, 10px);
 }
 
+/* ─── Asas de redimensión (4 bordes + 4 esquinas) ─────────────────────────────── */
+.tc-resize {
+  position: absolute;
+  z-index: 4;
+  touch-action: none;
+}
+.tc-resize--n {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: ns-resize;
+}
+.tc-resize--s {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: ns-resize;
+}
+.tc-resize--e {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+}
+.tc-resize--w {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+}
+.tc-resize--ne {
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nesw-resize;
+}
+.tc-resize--nw {
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+}
+.tc-resize--se {
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+}
+.tc-resize--sw {
+  bottom: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nesw-resize;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .tc-overlay,
   .tc-panel,
   .tc-msg {
     animation: none;
