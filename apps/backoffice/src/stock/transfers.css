@@ -179,12 +179,12 @@
   top: 1.95rem;
   z-index: 1;
   background: var(--ui-surface-subtle);
-  /* Borde inferior reforzado (`--ui-border-strong`): el hairline `--ui-border` se
-     fundía con el fondo de las cards/detalle. Así la cabecera de grupo (Borradores,
-     Cerrados…) queda siempre delimitada por abajo. */
+  /* Contorno inferior bien visible: `--ui-border-strong` casi no se distinguía del
+     fondo, así que el borde de abajo usa un hairline oscuro real (theme-aware) para
+     delimitar siempre la cabecera de grupo (Borradores, Cerrados…). */
   box-shadow:
     0 -1px 0 0 var(--ui-border),
-    0 1px 0 0 var(--ui-border-strong);
+    0 1px 0 0 color-mix(in srgb, var(--ui-text) 15%, transparent);
 }
 .tr-group-head:hover .tr-group-cell {
   background: color-mix(in srgb, var(--ui-surface-subtle) 70%, var(--ui-border));
