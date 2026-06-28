@@ -54,7 +54,8 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   // Sección 01 · KPIs (rediseño): rejilla conectada (tarjeta redondeada de 6 KPIs, banda baja) y clásica.
   'kpi-grid-connected': { w: 12, h: 1 },
   'kpi-classic': { w: 3, h: 1 },
-  // Sección 02 · Gráficas (rediseño): tira de mapa de calor horario (ancha, una fila de celdas).
+  // Sección 02 · Gráficas (rediseño): distribución horaria (área a sangre, banda ancha) y mapa de calor.
+  'graf-hour-area': { w: 12, h: 3 },
   'graf-heatmap': { w: 6, h: 2 },
   // Sección 03 · Listas (rediseño): reparto por familia, ranking de productos y mix (treemap).
   'lista-familia': { w: 4, h: 2 },

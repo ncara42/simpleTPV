@@ -1,0 +1,142 @@
+/* Sección 02 · «Distribución horaria» — área horaria a sangre (banda con hairline arriba/abajo),
+   réplica pixel-a-pixel del handoff «Fundación Geist». Todos los colores por token (= los hex del
+   handoff en claro, adaptativos en oscuro). El SVG va a 100% con su viewBox 1100×240 (alto por ratio);
+   el texto (cabecera/KPIs) va sangrado 40px y la serie sangra a los bordes. */
+.ha-panel {
+  background: var(--ui-surface);
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+  padding: 24px 0 20px;
+  display: flex;
+  flex-direction: column;
+}
+.ha-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
+  padding: 0 40px;
+}
+.ha-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--ui-text);
+}
+.ha-sub {
+  font-size: 12.5px;
+  color: var(--ui-text-soft);
+  margin: 3px 0 0;
+}
+/* Conmutador línea / barras: píldora con el activo en blanco y sombra suave. */
+.ha-toggle {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+}
+.ha-toggle button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ui-text-soft);
+  cursor: pointer;
+}
+.ha-toggle button[aria-pressed='true'] {
+  background: var(--ui-surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  color: var(--ui-text);
+}
+.ha-kpis {
+  display: flex;
+  gap: 38px;
+  margin: 14px 0 6px;
+  padding: 0 40px;
+}
+.ha-kpi-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+}
+.ha-kpi-value {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.ha-kpi-value span {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ui-text-soft);
+}
+.ha-chart {
+  position: relative;
+  margin-top: 6px;
+}
+.ha-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+/* Tooltip oscuro del pico, con flecha. Tokens de tooltip → oscuro en claro y adaptado en oscuro. */
+.ha-tip {
+  position: absolute;
+  transform: translate(-50%, 34px);
+  background: var(--ui-chart-tip-bg);
+  color: var(--ui-chart-tip-fg);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.4);
+  z-index: 2;
+  pointer-events: none;
+}
+.ha-tip b {
+  display: block;
+  font-weight: 600;
+}
+.ha-tip span {
+  display: block;
+  margin-top: 1px;
+  color: var(--ui-chart-tip-fg-muted);
+}
+.ha-tip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--ui-chart-tip-bg);
+}
+.ha-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding: 0 16px;
+  font-size: 11px;
+  color: var(--gst-400);
+  font-variant-numeric: tabular-nums;
+}
+.ha-empty {
+  padding: 48px 40px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ui-text-soft);
+}

@@ -186,6 +186,47 @@ function ThumbHeatmap(): ReactNode {
   );
 }
 
+// «Distribución horaria» (graf-hour-area): mini área con su punto de pico relleno.
+function ThumbHourArea(): ReactNode {
+  const pts: ReadonlyArray<readonly [number, number]> = [
+    [10, 40],
+    [32, 24],
+    [54, 26],
+    [76, 16],
+    [98, 34],
+    [122, 28],
+  ];
+  const line = 'M' + pts.map(([x, y]) => `${x},${y}`).join(' L');
+  const area = `${line} L122,58 L10,58 Z`;
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <path d={area} fill={SOFT_BLUE} opacity="0.4" />
+      <path
+        d={line}
+        fill="none"
+        stroke="var(--ui-brand)"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+      <circle
+        cx="76"
+        cy="16"
+        r="3.5"
+        fill="var(--ui-brand)"
+        stroke="var(--ui-surface)"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
 // «Reparto por familia» (lista-familia): riel segmentado en la rampa azul + dos filas de leyenda.
 function ThumbShareBar(): ReactNode {
   const segs = [50, 34, 24, 16]; // anchos en px (suman ~124); intensidad descendente.
@@ -569,6 +610,13 @@ export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
     category: 'graficas',
     description: 'Distribución horaria del día',
     thumbnail: <ThumbHours />,
+  },
+  {
+    id: 'graf-hour-area',
+    label: 'Distribución horaria',
+    category: 'graficas',
+    description: 'Facturación por franja, con pico marcado',
+    thumbnail: <ThumbHourArea />,
   },
   {
     id: 'graf-heatmap',

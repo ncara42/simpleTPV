@@ -18,7 +18,7 @@ vi.mock('../../lib/dashboard.js', () => ({
 import { ITEM_SPECS } from '../../lib/dashboard-layout.js';
 import { GALLERY_ENTRIES } from '../gallery-catalog.js';
 import { WIDGET_LABELS } from '../registry.js';
-import { HourHeatmap } from './graficas.js';
+import { HourArea, HourHeatmap } from './graficas.js';
 import { WIDGET_PANELS } from './index.js';
 
 function renderWidget(node: ReactNode): void {
@@ -42,5 +42,24 @@ describe('Widgets de panel · Sección 02 (Gráficas)', () => {
     expect(screen.getByText('9')).toBeInTheDocument();
     expect(screen.getByText('21')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /intensidad por franja/i })).toBeInTheDocument();
+  });
+
+  it('graf-hour-area está cableado en render, catálogo y galería', () => {
+    expect(WIDGET_PANELS['graf-hour-area']).toBeDefined();
+    expect(ITEM_SPECS['graf-hour-area']).toBeDefined();
+    expect(WIDGET_LABELS['graf-hour-area']).toBeDefined();
+    const graficas = GALLERY_ENTRIES.filter((e) => e.category === 'graficas').map((e) => e.id);
+    expect(graficas).toContain('graf-hour-area');
+  });
+
+  it('la distribución horaria marca el pico y la franja activa', async () => {
+    renderWidget(<HourArea period="month" store={undefined} />);
+
+    // Pico = hora 14 (880 €, 31 tickets); franja activa = de la primera a la última hora con ventas.
+    // El tooltip depende de los datos → se espera con findBy.
+    expect(await screen.findByText('31 tickets · pico del día')).toBeInTheDocument();
+    expect(screen.getByText('Distribución horaria')).toBeInTheDocument();
+    expect(screen.getByText('9 – 21 h')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /facturación por franja/i })).toBeInTheDocument();
   });
 });
