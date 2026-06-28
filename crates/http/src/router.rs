@@ -412,6 +412,10 @@ pub fn build_router(state: AppState) -> Router {
             post(transfers::add_message).get(transfers::list_messages),
         )
         .route(
+            "/transfers/{id}/messages/{messageId}",
+            patch(transfers::update_message).delete(transfers::delete_message),
+        )
+        .route(
             "/transfers/{id}/resolve-incident",
             post(transfers::resolve_incident),
         )
@@ -433,6 +437,10 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/store-orders/{id}/messages",
             post(transfers::add_message).get(transfers::list_messages),
+        )
+        .route(
+            "/store-orders/{id}/messages/{messageId}",
+            patch(transfers::update_message).delete(transfers::delete_message),
         )
         .route(
             "/store-orders/{id}/resolve-incident",

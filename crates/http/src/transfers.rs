@@ -9,7 +9,7 @@ use serde::Deserialize;
 use simpletpv_auth::Role;
 use simpletpv_domain::transfers::model::{TransferAttachment, TransferMessage, TransferWithLines};
 use simpletpv_domain::transfers::{
-    service, CreateAttachment, CreateMessage, CreateTransfer, ReceiveTransfer,
+    service, CreateAttachment, CreateMessage, CreateTransfer, EditMessage, ReceiveTransfer,
 };
 use simpletpv_shared::AppError;
 use uuid::Uuid;
@@ -142,6 +142,44 @@ pub async fn add_message(
     )
     .await?;
     Ok((StatusCode::CREATED, Json(m)))
+}
+
+/// `PATCH /transfers/:id/messages/:messageId` — edita el texto de un mensaje.
+pub async fn update_message(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path((id, message_id)): Path<(Uuid, Uuid)>,
+    Json(body): Json<EditMessage>,
+) -> Result<Json<TransferMessage>, ApiError> {
+    let m = service::update_message(
+        state.db(),
+        user.organization_id,
+        user.user_id,
+        user.role.is_org_wide(),
+        id,
+        message_id,
+        body,
+    )
+    .await?;
+    Ok(Json(m))
+}
+
+/// `DELETE /transfers/:id/messages/:messageId` — borra un mensaje.
+pub async fn delete_message(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path((id, message_id)): Path<(Uuid, Uuid)>,
+) -> Result<StatusCode, ApiError> {
+    service::delete_message(
+        state.db(),
+        user.organization_id,
+        user.user_id,
+        user.role.is_org_wide(),
+        id,
+        message_id,
+    )
+    .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// `POST /transfers/:id/resolve-incident` — marca la incidencia como solucionada.

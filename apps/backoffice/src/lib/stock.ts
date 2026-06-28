@@ -80,6 +80,18 @@ export function postTransferMessage(
   return api.post<TransferMessage>(`/transfers/${id}/messages`, input);
 }
 
+export function editTransferMessage(
+  id: string,
+  messageId: string,
+  body: string,
+): Promise<TransferMessage> {
+  return api.patch<TransferMessage>(`/transfers/${id}/messages/${messageId}`, { body });
+}
+
+export function deleteTransferMessage(id: string, messageId: string): Promise<void> {
+  return api.del(`/transfers/${id}/messages/${messageId}`);
+}
+
 // Marca la incidencia de recepción como solucionada (el traspaso deja de contar como
 // incidencia abierta; el chat se conserva).
 export function resolveTransferIncident(id: string): Promise<Transfer> {

@@ -150,6 +150,24 @@ pub struct CreateMessage {
     pub data_url: Option<String>,
 }
 
+/// Edición de un mensaje del chat (solo el texto).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditMessage {
+    pub body: String,
+}
+
+impl EditMessage {
+    /// El texto editado no puede quedar vacío y respeta el tope de longitud.
+    pub fn validate(&self) -> Result<&str, AppError> {
+        let body = self.body.trim();
+        if body.is_empty() || body.chars().count() > MAX_NOTES_LENGTH {
+            return Err(AppError::BadRequest);
+        }
+        Ok(body)
+    }
+}
+
 impl CreateMessage {
     /// Valida que haya contenido (texto y/o foto), el tope del texto y, si hay foto, el
     /// data-URL. Devuelve el `mimeType` de la foto (None si solo texto).
@@ -221,6 +239,15 @@ mod tests {
         assert_eq!(
             msg(Some("mira"), Some("data:image/png;base64,AAAA")).validate(),
             Ok(Some("image/png"))
+        );
+    }
+
+    #[test]
+    fn edicion_recorta_y_rechaza_vacio() {
+        assert_eq!(EditMessage { body: "  hola  ".into() }.validate(), Ok("hola"));
+        assert_eq!(
+            EditMessage { body: "   ".into() }.validate(),
+            Err(AppError::BadRequest)
         );
     }
 

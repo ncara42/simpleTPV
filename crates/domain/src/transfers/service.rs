@@ -16,7 +16,7 @@ use crate::stock::service::{
 };
 use crate::store_access::has_store_access;
 
-use super::input::{CreateAttachment, CreateMessage, CreateTransfer, ReceiveTransfer};
+use super::input::{CreateAttachment, CreateMessage, CreateTransfer, EditMessage, ReceiveTransfer};
 use super::model::{
     Transfer, TransferAttachment, TransferAttachmentRow, TransferLine, TransferLineRow,
     TransferMessage, TransferMessageRow, TransferStatus, TransferWithLines,
@@ -488,6 +488,92 @@ pub async fn add_message(
             Ok(Ok(TransferMessage::from(row)))
         })
         .await?;
+    result
+}
+
+/// Comprueba el acceso al chat del traspaso (org-wide o tienda destino, SEC-01) y que
+/// el mensaje pertenece al traspaso. Devuelve el traspaso cargado.
+async fn guard_message_access(
+    tx: &mut Transaction<'_, Postgres>,
+    org: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
+    transfer_id: Uuid,
+    message_id: Uuid,
+) -> Result<Result<(), AppError>, sqlx::Error> {
+    let Some(t) = load_transfer(tx, org, transfer_id).await? else {
+        return Ok(Err(AppError::NotFound));
+    };
+    if !is_org_wide && !has_store_access(tx, user_id, t.dest_store_id).await? {
+        return Ok(Err(AppError::Forbidden));
+    }
+    let belongs: bool = sqlx::query_scalar(
+        r#"SELECT EXISTS(SELECT 1 FROM "TransferMessage" WHERE id = $1 AND "transferId" = $2)"#,
+    )
+    .bind(message_id)
+    .bind(transfer_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    if !belongs {
+        return Ok(Err(AppError::NotFound));
+    }
+    Ok(Ok(()))
+}
+
+/// `PATCH /transfers/:id/messages/:messageId` — edita el texto de un mensaje del chat.
+pub async fn update_message(
+    pool: &PgPool,
+    org: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
+    transfer_id: Uuid,
+    message_id: Uuid,
+    input: EditMessage,
+) -> Result<TransferMessage, AppError> {
+    let body = input.validate()?.to_string();
+    let result: Result<TransferMessage, AppError> =
+        with_tenant_tx(pool, org, async move |tx, _after| {
+            if let Err(e) =
+                guard_message_access(tx, org, user_id, is_org_wide, transfer_id, message_id).await?
+            {
+                return Ok(Err(e));
+            }
+            let sql = format!(
+                r#"UPDATE "TransferMessage" SET body = $2 WHERE id = $1 RETURNING {MESSAGE_COLS}"#
+            );
+            let row: TransferMessageRow = sqlx::query_as(&sql)
+                .bind(message_id)
+                .bind(&body)
+                .fetch_one(&mut **tx)
+                .await?;
+            Ok(Ok(TransferMessage::from(row)))
+        })
+        .await?;
+    result
+}
+
+/// `DELETE /transfers/:id/messages/:messageId` — borra un mensaje del chat.
+pub async fn delete_message(
+    pool: &PgPool,
+    org: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
+    transfer_id: Uuid,
+    message_id: Uuid,
+) -> Result<(), AppError> {
+    let result: Result<(), AppError> = with_tenant_tx(pool, org, async move |tx, _after| {
+        if let Err(e) =
+            guard_message_access(tx, org, user_id, is_org_wide, transfer_id, message_id).await?
+        {
+            return Ok(Err(e));
+        }
+        sqlx::query(r#"DELETE FROM "TransferMessage" WHERE id = $1"#)
+            .bind(message_id)
+            .execute(&mut **tx)
+            .await?;
+        Ok(Ok(()))
+    })
+    .await?;
     result
 }
 

@@ -38,10 +38,11 @@ body.tc-dragging .tc-panel {
   overflow: hidden;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-xl, 16px);
-  background: color-mix(in srgb, var(--ui-surface) 88%, transparent);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 20px 56px -12px rgb(0 0 0 / 0.34);
+  /* Mismo cristal que el panel del chatbot (.chat-dock__panel): surface 68% + blur 12px. */
+  background: color-mix(in srgb, var(--ui-surface) 68%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 16px 44px rgb(0 0 0 / 0.2);
   animation: tc-pop 0.18s var(--ui-ease, ease) both;
 }
 @keyframes tc-pop {
@@ -245,6 +246,99 @@ body.tc-dragging .tc-panel {
   padding: 0 0.2rem;
 }
 
+/* Acciones por mensaje (copiar/editar/borrar): visibles al hover, como el chatbot. La
+   hora va siempre visible; solo los botones aparecen al pasar el ratón. */
+.tc-msg-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+.tc-msg--own .tc-msg-tools {
+  flex-direction: row-reverse;
+}
+.tc-msg-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  border-radius: var(--ui-radius-sm, 8px);
+  background: transparent;
+  color: var(--ui-text-soft);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    opacity 0.12s ease;
+}
+.tc-msg:hover .tc-msg-act,
+.tc-msg:focus-within .tc-msg-act {
+  opacity: 1;
+}
+.tc-msg-act:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+.tc-msg-act--danger:hover {
+  color: var(--ui-danger);
+}
+
+/* Edición en línea de un mensaje. */
+.tc-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+}
+.tc-edit-area {
+  width: 100%;
+  resize: none;
+  field-sizing: content;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 40%, var(--ui-border));
+  border-radius: var(--ui-radius-md, 10px);
+  background: var(--ui-surface);
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--ui-text);
+}
+.tc-edit-area:focus {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.tc-edit-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+.tc-edit-cancel,
+.tc-edit-save {
+  height: 1.9rem;
+  padding: 0 0.85rem;
+  border-radius: 9999px;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tc-edit-cancel {
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+}
+.tc-edit-save {
+  border: none;
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg, #fff);
+}
+.tc-edit-save:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ─── Composer ─────────────────────────────────────────────────────────────── */
 .tc-composer {
   flex-shrink: 0;
@@ -299,13 +393,14 @@ body.tc-dragging .tc-panel {
   border-color: color-mix(in srgb, var(--ui-primary) 45%, var(--ui-border));
   box-shadow: 0 4px 16px rgb(0 0 0 / 0.08);
 }
+/* Adjuntar (clip): hover con radio cuadrado-redondeado estilo Vercel, no círculo. */
 .tc-attach {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 2.1rem;
   height: 2.1rem;
-  border-radius: 50%;
+  border-radius: var(--ui-radius-sm, 8px);
   color: var(--ui-text-muted);
   cursor: pointer;
   flex-shrink: 0;
