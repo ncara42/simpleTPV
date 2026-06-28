@@ -41,6 +41,7 @@ import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-route
 
 import { B2bPage } from './B2bPage.js';
 import { AssistantDock } from './components/chat/AssistantDock.js';
+import { AssistantLauncher } from './components/chat/AssistantLauncher.js';
 import { CanvasToolsMenu } from './components/chat/CanvasToolsMenu.js';
 import { viewContextFor } from './components/chat/view-context.js';
 import { DashboardAddWidget } from './components/DashboardAddWidget.js';
@@ -294,6 +295,9 @@ function Home() {
                 notificationCount={notificationCount}
                 notificationsActive={tab === 'notifications'}
                 search={<FunctionSearch onNavigate={navigateTo} />}
+                // Lanzador del asistente de IA: ✦ en la isla, tras el buscador ⌘K. Togglea el drawer
+                // lateral (useAssistantStore). Presente en TODAS las views, incluido el Dashboard.
+                islandEnd={<AssistantLauncher />}
                 pageActions={<PageActionsSlot />}
                 pageNav={
                   // En el lienzo del dashboard, las herramientas (Editar/Mover/Goma) viven DENTRO
@@ -375,18 +379,15 @@ function Home() {
                   {tab === 'help' && <HelpPage />}
                 </main>
               </div>
-              {/* Asistente unificado a nivel de shell: input + (en el Dashboard) menú «+» de
-              herramientas del lienzo. Presente en todas las views MENOS Inventario, Ventas,
-              Clientes B2B y Promociones: en Inventario la franja inferior queda reservada para la
-              barra de acciones de selección; Ventas y Clientes B2B son ledgers facetados a pantalla
-              completa (3 columnas) que ocupan todo el alto; en Promociones el dock se oculta a
-              propósito (la vista gestiona reglas a pantalla completa). En todos esos casos el acceso
-              al asistente se reubicará más adelante. El binding del lienzo lo registra DashboardPage
-              vía canvas-bridge. La vista activa define su saludo, sugerencias y el contexto que
-              viaja al backend. */}
-              {tab !== 'inventory' && tab !== 'sales' && tab !== 'b2b' && tab !== 'promotions' && (
-                <AssistantDock view={viewContextFor(tab)} />
-              )}
+              {/* Asistente unificado a nivel de shell, como DRAWER lateral derecho (overlay
+              `position: fixed`). Presente en TODAS las views —incluidas Inventario, Ventas, Clientes
+              B2B y Promociones, que antes quedaban sin asistente porque la antigua barra inferior
+              chocaba con su franja inferior / layout a pantalla completa—. Al ser overlay no reflowa
+              el lienzo: se superpone al borde derecho sin reescalar widgets ni tablas. Por defecto
+              arranca ABIERTO en las views de trabajo y cerrado en el Dashboard; se togglea con el
+              lanzador ✦ de la isla (ver AssistantDock). La vista activa define su saludo, sugerencias
+              y el contexto que viaja al backend. */}
+              <AssistantDock view={viewContextFor(tab)} />
             </PageHeaderProvider>
           </div>
         </div>

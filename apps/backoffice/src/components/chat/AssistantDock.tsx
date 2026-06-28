@@ -1,3 +1,6 @@
+import { useEffect } from 'react';
+
+import { useAssistantStore } from '../../lib/assistant-store.js';
 import type { CanvasOp, ViewActionName } from '../../lib/chat.js';
 import {
   buildCanvasSnapshot,
@@ -29,8 +32,17 @@ const undoCanvasOps = (ops: CanvasOp[]): void => {
 };
 
 export function AssistantDock({ view }: { view: ViewContext }) {
-  // La barra de herramientas del lienzo vive ahora ARRIBA en el DashboardPage (no en el dock); el
-  // dock es chat puro en todas las views. Por eso ya no consume el canvas-bridge.
+  const setOpen = useAssistantStore((s) => s.setOpen);
+  // El asistente se MUESTRA abierto por defecto en todas las views de trabajo (overlay sobre el
+  // borde derecho → el lienzo conserva su ancho, no se reescala nada). En el Dashboard —que es el
+  // propio «Asistente de IA» a pantalla completa— arranca cerrado para no tapar el lienzo; ahí se
+  // abre con el lanzador ✦ de la isla. El efecto se dispara en cada cambio de view.
+  useEffect(() => {
+    setOpen(view.id !== 'dashboard');
+  }, [view.id, setOpen]);
+
+  // La barra de herramientas del lienzo vive ARRIBA en el DashboardPage (no en el dock); el dock es
+  // chat puro en todas las views. Por eso ya no consume el canvas-bridge.
   return (
     <ChatDock
       onCanvasOp={applyCanvasOp}
@@ -38,10 +50,6 @@ export function AssistantDock({ view }: { view: ViewContext }) {
       getCanvasState={buildCanvasSnapshot}
       onViewAction={(action, args) => executeViewAction(action as ViewActionName, args)}
       view={view}
-      // El dock se ancla SIEMPRE abajo-centro (barra inferior), también en el Dashboard. Antes el
-      // Dashboard usaba el modo «héroe» (composer grande centrado en el viewport), pero el input
-      // debe vivir abajo como en el resto de views. (El modo héroe sigue disponible en ChatDock por
-      // si se reactiva; aquí no se opta a él.)
     />
   );
 }

@@ -1,9 +1,9 @@
 import './chat.css';
+import './assistant-drawer.css';
 
-import { MessageSquare } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import { useAnimatedPresence } from '../../hooks/use-animated-presence.js';
+import { useAssistantStore } from '../../lib/assistant-store.js';
 import type { CanvasOp } from '../../lib/chat.js';
 import { ChatConversationList } from './ChatConversationList.js';
 import { ChatHeader } from './ChatHeader.js';
@@ -12,9 +12,6 @@ import { Context } from './Context.js';
 import { PromptComposer } from './PromptComposer.js';
 import { type CanvasApplyResult, useChat } from './useChat.js';
 import type { ViewContext } from './view-context.js';
-
-/** Duración (ms) de la entrada/salida del popover de conversación; coincide con `--ui-motion-medium`. */
-const PANEL_MOTION_MS = 180;
 
 export interface ChatDockProps {
   /** Aplica un canvas_op en el lienzo y devuelve el resultado para el feedback loop. */
@@ -26,19 +23,18 @@ export interface ChatDockProps {
   onViewAction?: (action: string, args: unknown) => void;
   /** Vista activa del backoffice: define saludo, sugerencias y el contexto enviado al backend. */
   view: ViewContext;
-  /**
-   * En el Dashboard («Asistente de IA») el composer es el HÉROE: el panel (conversación o
-   * saludo + sugerencias) y el input se muestran grandes y centrados. Fuera del Dashboard es la
-   * barra compacta anclada abajo. El morph entre ambos estados lo anima `.chat-dock` por transform.
-   */
-  hero?: boolean;
 }
 
+/** Selector del lanzador en la TopBar; se le devuelve el foco al cerrar el drawer (a11y). */
+const LAUNCHER_SELECTOR = '[data-testid="assistant-launcher"]';
+
 /**
- * Dock inferior del dashboard: una única barra `[+ herramientas] [input] [enviar]` con la
- * forma del PromptInput de ai-elements, más un popover de conversación que se despliega ENCIMA
- * del input. Sustituye al antiguo panel lateral (FAB + glass) del asistente — primer paso de la
- * migración progresiva del chatbot a la barra inferior.
+ * Asistente como DRAWER lateral derecho. Una única superficie flotante (`position: fixed`,
+ * overlay) que comparten el Dashboard y el resto de views: el lanzador ✦ de la isla la togglea
+ * (useAssistantStore). Al abrirse NO reflowa el lienzo —se superpone sobre el borde derecho—, así
+ * que NUNCA reescala widgets ni tablas. El panel está siempre montado y desliza por `transform`;
+ * cerrado queda fuera de pantalla (`inert`), abierto lleva el foco al composer y un backdrop
+ * transparente cierra al clicar fuera.
  */
 export function ChatDock({
   onCanvasOp,
@@ -46,22 +42,13 @@ export function ChatDock({
   getCanvasState,
   onViewAction,
   view,
-  hero = false,
 }: ChatDockProps) {
-  const [panelOpen, setPanelOpen] = useState(false);
+  const open = useAssistantStore((s) => s.open);
+  const setOpen = useAssistantStore((s) => s.setOpen);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Fuera del dashboard, y mientras el popover esté cerrado, el dock se reduce a una píldora
-  // redonda solo-input; al enfocarlo (panelOpen → true) o al volver al dashboard recupera su
-  // tamaño y forma originales y reaparecen los botones (todo animado por CSS).
-  const isDashboard = view.id === 'dashboard';
-  const collapsed = !isDashboard && !panelOpen;
-
-  // El popover se mantiene montado mientras dura su animación de salida → cierre simétrico.
-  const { isMounted: panelMounted, isClosing: panelClosing } = useAnimatedPresence(
-    panelOpen,
-    PANEL_MOTION_MS,
-  );
+  const panelRef = useRef<HTMLElement>(null);
+  const prevOpen = useRef(open);
 
   const chat = useChat({
     enabled: true,
@@ -72,28 +59,38 @@ export function ChatDock({
     view: { id: view.id, label: view.label },
   });
 
-  // Cierra el popover de conversación con Escape. El clic FUERA lo gestiona el backdrop (ver render):
-  // captura el clic para SOLO cerrar el chat, sin activar lo que haya debajo (botones, sidebar, lienzo).
+  // Escape cierra el drawer.
   useEffect(() => {
-    if (!panelOpen) return;
+    if (!open) return;
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setPanelOpen(false);
+      if (e.key === 'Escape') setOpen(false);
     };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
     };
-  }, [panelOpen]);
+  }, [open, setOpen]);
+
+  // Gestión de foco SOLO en transiciones (no en el render inicial, para no robar el foco al cargar):
+  // al abrir → foco al composer; al cerrar → foco de vuelta al lanzador de la TopBar.
+  useEffect(() => {
+    if (open && !prevOpen.current) {
+      panelRef.current?.querySelector<HTMLTextAreaElement>('.prompt-input__textarea')?.focus();
+    } else if (!open && prevOpen.current) {
+      document.querySelector<HTMLButtonElement>(LAUNCHER_SELECTOR)?.focus();
+    }
+    prevOpen.current = open;
+  }, [open]);
 
   const handleSend = (text: string): void => {
     chat.send(text);
-    setPanelOpen(true);
+    setOpen(true);
   };
 
   const handleNewConversation = (): void => {
     chat.newConversation();
     setShowHistory(false);
-    setPanelOpen(true);
+    setOpen(true);
   };
 
   const handleSelect = (id: string): void => {
@@ -103,132 +100,111 @@ export function ChatDock({
 
   const noAi = chat.modelsLoaded && chat.models.length === 0;
 
-  const leading = (
-    <>
-      <button
-        type="button"
-        className={`chat-dock__history-toggle${panelOpen ? ' is-active' : ''}`}
-        onClick={() => setPanelOpen((v) => !v)}
-        aria-label={panelOpen ? 'Ocultar conversación' : 'Mostrar conversación'}
-        aria-pressed={panelOpen}
-        title="Conversación"
-        data-testid="chat-toggle-panel"
-      >
-        <MessageSquare size={17} aria-hidden="true" />
-      </button>
-    </>
-  );
-
   return (
     <div
-      className={`chat-dock${hero ? ' chat-dock--hero' : ''}${collapsed ? ' is-collapsed' : ''}${
-        panelOpen ? ' is-panel-open' : ''
-      }`}
+      className={`chat-dock chat-dock--drawer${open ? ' is-open' : ''}`}
       data-testid="chat-dock"
-      data-hero={hero ? '' : undefined}
+      aria-hidden={!open}
     >
-      {/* Backdrop: con el chat abierto, un clic fuera del panel/composer SOLO cierra el chat y NO
-          activa lo que haya debajo (el clic aterriza aquí, no en el botón). */}
-      {panelOpen && (
+      {/* Backdrop: con el drawer abierto, un clic fuera del panel SOLO cierra el chat y NO activa
+          lo que haya debajo (el clic aterriza aquí). Transparente: no oscurece el lienzo. */}
+      {open && (
         <div
           className="chat-dock__backdrop"
-          onClick={() => setPanelOpen(false)}
+          onClick={() => setOpen(false)}
           data-testid="chat-backdrop"
           aria-hidden="true"
         />
       )}
-      {(hero || panelMounted) && (
-        <aside
-          className={`chat-dock__panel${panelClosing ? ' is-closing' : ''}`}
-          role="dialog"
-          aria-label="Asistente"
-          data-testid="chat-panel"
-        >
-          <ChatHeader
-            showHistory={showHistory}
-            onToggleHistory={() => setShowHistory((v) => !v)}
-            onNewConversation={handleNewConversation}
-            // En hero el panel no se cierra (es permanente): se oculta la X.
-            onClose={hero ? undefined : () => setPanelOpen(false)}
-          />
-
-          {chat.error && (
-            <div className="chat-error" role="alert">
-              <span>{chat.error}</span>
-              <button type="button" onClick={chat.dismissError} aria-label="Descartar error">
-                ×
-              </button>
-            </div>
-          )}
-
-          {showHistory ? (
-            <div className="chat-panel__history">
-              <ChatConversationList
-                conversations={chat.conversations}
-                activeId={chat.activeId}
-                onSelect={handleSelect}
-                onDelete={chat.removeConversation}
-              />
-            </div>
-          ) : (
-            <ChatMessages
-              messages={chat.messages}
-              loading={chat.loadingMessages}
-              streaming={chat.streaming}
-              streamingText={chat.streamingText}
-              streamingReasoning={chat.streamingReasoning}
-              streamingToolCalls={chat.streamingToolCalls}
-              onRegenerate={chat.regenerate}
-              onEditAndResend={chat.editAndResend}
-              onSuggest={handleSend}
-              greeting={view.greeting}
-              suggestions={view.suggestions}
-            />
-          )}
-
-          {noAi && (
-            <div className="chat-notice" role="status" data-testid="chat-no-ai">
-              <p className="chat-notice__title">El asistente de IA no está configurado</p>
-              <p className="chat-notice__body">
-                Define <code>OPENAI_API_KEY</code> o <code>ANTHROPIC_API_KEY</code> en el backend
-                para activarlo.
-              </p>
-            </div>
-          )}
-
-          {chat.usage && (
-            <footer className="chat-footer">
-              <span>Esta conversación</span>
-              <Context
-                inputTokens={chat.usage.total.inputTokens}
-                outputTokens={chat.usage.total.outputTokens}
-                costEur={chat.usage.total.costEur}
-              />
-            </footer>
-          )}
-        </aside>
-      )}
-
-      <div className="chat-dock__bar">
-        <PromptComposer
-          status={
-            !chat.streaming
-              ? 'ready'
-              : chat.streamingText || chat.streamingReasoning
-                ? 'streaming'
-                : 'submitted'
-          }
-          disabled={noAi || !chat.model}
-          queueLength={chat.queueLength}
-          onSend={handleSend}
-          onStop={chat.stop}
-          onFocus={() => setPanelOpen(true)}
-          collapsed={collapsed}
-          // En hero el panel (con su cabecera: historial/nueva) es permanente, así que el toggle
-          // del input sobra. En barra compacta sí lo mostramos para abrir/cerrar la conversación.
-          leading={hero ? undefined : leading}
+      <aside
+        className="chat-dock__panel"
+        ref={panelRef}
+        role="dialog"
+        aria-label="Asistente de IA"
+        // Cerrado = fuera de pantalla: `inert` lo saca del orden de tabulación y del árbol a11y.
+        inert={!open}
+        data-testid="chat-panel"
+      >
+        <ChatHeader
+          showHistory={showHistory}
+          onToggleHistory={() => setShowHistory((v) => !v)}
+          onNewConversation={handleNewConversation}
+          onClose={() => setOpen(false)}
         />
-      </div>
+
+        {chat.error && (
+          <div className="chat-error" role="alert">
+            <span>{chat.error}</span>
+            <button type="button" onClick={chat.dismissError} aria-label="Descartar error">
+              ×
+            </button>
+          </div>
+        )}
+
+        {showHistory ? (
+          <div className="chat-panel__history">
+            <ChatConversationList
+              conversations={chat.conversations}
+              activeId={chat.activeId}
+              onSelect={handleSelect}
+              onDelete={chat.removeConversation}
+            />
+          </div>
+        ) : (
+          <ChatMessages
+            messages={chat.messages}
+            loading={chat.loadingMessages}
+            streaming={chat.streaming}
+            streamingText={chat.streamingText}
+            streamingReasoning={chat.streamingReasoning}
+            streamingToolCalls={chat.streamingToolCalls}
+            onRegenerate={chat.regenerate}
+            onEditAndResend={chat.editAndResend}
+            onSuggest={handleSend}
+            greeting={view.greeting}
+            suggestions={view.suggestions}
+          />
+        )}
+
+        {noAi && (
+          <div className="chat-notice" role="status" data-testid="chat-no-ai">
+            <p className="chat-notice__title">El asistente de IA no está configurado</p>
+            <p className="chat-notice__body">
+              Define <code>OPENAI_API_KEY</code> o <code>ANTHROPIC_API_KEY</code> en el backend para
+              activarlo.
+            </p>
+          </div>
+        )}
+
+        {chat.usage && (
+          <footer className="chat-footer">
+            <span>Esta conversación</span>
+            <Context
+              inputTokens={chat.usage.total.inputTokens}
+              outputTokens={chat.usage.total.outputTokens}
+              costEur={chat.usage.total.costEur}
+            />
+          </footer>
+        )}
+
+        <div className="chat-dock__bar">
+          <PromptComposer
+            status={
+              !chat.streaming
+                ? 'ready'
+                : chat.streamingText || chat.streamingReasoning
+                  ? 'streaming'
+                  : 'submitted'
+            }
+            disabled={noAi || !chat.model}
+            queueLength={chat.queueLength}
+            onSend={handleSend}
+            onStop={chat.stop}
+            onFocus={() => setOpen(true)}
+            collapsed={false}
+          />
+        </div>
+      </aside>
     </div>
   );
 }

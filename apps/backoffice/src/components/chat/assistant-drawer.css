@@ -1,0 +1,125 @@
+/* ════════════════════════════════════════════════════════════════════════════════
+   Asistente como DRAWER lateral derecho (overlay). Re-ancla el `.chat-dock` —que de
+   base es una banda inferior centradora— a una tarjeta flotante pegada al borde
+   derecho, bajo la topbar.
+
+   CLAVE (condición del producto): es overlay `position: fixed` con stacking context
+   propio. El lienzo (`.bo-main--canvas` / `.bo-main--surface`) conserva su ancho con
+   el drawer abierto o cerrado → abrir el asistente NUNCA reflowa ni reescala widgets
+   ni tablas. No hay ninguna regla que cambie el ancho del main al abrir.
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+/* Capa raíz: cubre el viewport pero deja pasar el ratón (pointer-events:none); solo el
+   backdrop y el panel capturan clics. `overflow:hidden` recorta el panel cuando está
+   fuera de pantalla (cerrado) para que no genere scroll horizontal. */
+.chat-dock.chat-dock--drawer {
+  inset: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  padding: 0;
+  gap: 0;
+  display: block;
+  align-items: initial;
+  overflow: hidden;
+  pointer-events: none;
+  /* El deslizamiento lo gobierna el `transform` del panel; matamos la transición de
+     `left` heredada de la banda. */
+  transition: none;
+}
+
+/* Sidebar en rail: la banda base reposiciona `left`; en drawer la raíz es full-viewport,
+   así que neutralizamos ese desplazamiento (mayor especificidad que la regla base). */
+.sidebar.collapsed ~ .app-content .chat-dock.chat-dock--drawer {
+  left: 0;
+}
+
+/* Abierto: por encima del sidebar (z40) y la topbar (z30) para que el backdrop capture
+   cualquier clic fuera. Cerrado hereda z39 (irrelevante: el panel está fuera de pantalla). */
+.chat-dock--drawer.is-open {
+  z-index: 50;
+}
+
+/* Backdrop a todo el viewport (transparente, no oscurece): un clic aquí cierra el chat. */
+.chat-dock--drawer .chat-dock__backdrop {
+  position: fixed;
+  inset: 0;
+}
+
+/* El panel = tarjeta flotante anclada arriba-derecha, bajo la topbar (60px + holgura).
+   Conserva el cristal del `.chat-dock__panel` base (fondo, blur, borde, sombra) y solo
+   redefine geometría + animación: deja de ser popover inferior y pasa a drawer de alto
+   completo. */
+.chat-dock--drawer .chat-dock__panel {
+  position: absolute;
+  top: 64px;
+  right: 16px;
+  bottom: 16px;
+  left: auto;
+  width: clamp(340px, 32vw, 460px);
+  max-width: calc(100vw - 32px);
+  height: auto; /* top + bottom fijan el alto */
+  max-height: none; /* anula el tope de popover */
+  border-radius: var(--ui-radius-xl);
+  transform-origin: right center;
+  /* Desliza desde la derecha. Solo `transform`/`opacity` (compositor-friendly). */
+  animation: none; /* anula `chat-panel-in` del modo popover */
+  transform: translateX(calc(100% + 24px));
+  opacity: 0;
+  transition:
+    transform var(--ui-motion-medium, 0.18s) var(--ui-ease, ease),
+    opacity var(--ui-motion-medium, 0.18s) var(--ui-ease, ease);
+  will-change: transform;
+}
+
+.chat-dock--drawer.is-open .chat-dock__panel {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* Cerrado: sin interacción (refuerza el atributo `inert` del JSX para teclado/SR). */
+.chat-dock--drawer:not(.is-open) .chat-dock__panel {
+  pointer-events: none;
+}
+
+/* El cuerpo scrollea dentro del alto del drawer (min-height:0 para que el flex encoja). */
+.chat-dock--drawer .chat-messages,
+.chat-dock--drawer .chat-panel__history {
+  min-height: 0;
+}
+
+/* Composer al pie del drawer, separado por un filete; a todo el ancho del panel (anula el
+   `min/max-width: 680px` que tenía en el modo barra inferior). */
+.chat-dock--drawer .chat-dock__bar {
+  padding: var(--ui-space-3, 0.75rem);
+  border-top: 1px solid var(--ui-border);
+}
+.chat-dock--drawer .prompt-input {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Móvil: el drawer ocupa toda la pantalla (sin márgenes), deslizando igual desde la derecha. */
+@media (max-width: 767px) {
+  .chat-dock--drawer .chat-dock__panel {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0;
+  }
+}
+
+/* Reduced-motion: aparece/desaparece sin deslizamiento (solo se oculta). */
+@media (prefers-reduced-motion: reduce) {
+  .chat-dock--drawer .chat-dock__panel,
+  .chat-dock--drawer.is-open .chat-dock__panel {
+    transition: none;
+    transform: none;
+  }
+  .chat-dock--drawer:not(.is-open) .chat-dock__panel {
+    visibility: hidden;
+  }
+}
