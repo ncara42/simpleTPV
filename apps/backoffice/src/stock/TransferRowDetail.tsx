@@ -74,11 +74,13 @@ export function TransferRowDetail({
                 Todo en perfecto estado
               </div>
             ) : (
-              <div className="tr-review-bad" data-testid="transfer-review-incidents">
-                <TriangleAlert size={14} aria-hidden="true" />
-                <span>
-                  {incidents} {incidents === 1 ? 'incidencia' : 'incidencias'}
-                </span>
+              <div className="tr-review-row">
+                <div className="tr-review-bad" data-testid="transfer-review-incidents">
+                  <TriangleAlert size={14} aria-hidden="true" />
+                  <span>
+                    {incidents} {incidents === 1 ? 'incidencia' : 'incidencias'}
+                  </span>
+                </div>
                 <button
                   type="button"
                   className="tr-review-chat"

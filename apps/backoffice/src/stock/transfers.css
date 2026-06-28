@@ -554,12 +554,18 @@
 .tr-review-bad svg {
   flex-shrink: 0;
 }
+/* Fila: la píldora de incidencias + el botón de mensajes a su lado (fuera de la píldora). */
+.tr-review-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
 /* Botón «Ver N mensajes» junto al recuento de incidencias: abre el chat. */
 .tr-review-chat {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  margin-left: 0.35rem;
   padding: 0.25rem 0.6rem;
   border: 1px solid color-mix(in srgb, var(--ui-danger) 30%, var(--ui-border));
   border-radius: var(--ui-radius-sm);
