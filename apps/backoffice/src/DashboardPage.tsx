@@ -213,6 +213,7 @@ export function DashboardPage({
     canRedo: false,
     drawOpen: false,
     mode: 'select',
+    zoomPct: 100,
   });
   // Registra/actualiza el binding SOLO en modo libre: la barra de herramientas del lienzo (dibujo,
   // pan, goma, deshacer/rehacer) solo aplica al FreeBoard. En modo rejilla se limpia para que el

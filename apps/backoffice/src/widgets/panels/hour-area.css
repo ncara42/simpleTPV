@@ -1,13 +1,12 @@
-/* Sección 02 · «Distribución horaria» — área horaria a sangre (banda con hairline arriba/abajo),
-   réplica pixel-a-pixel del handoff «Fundación Geist». Todos los colores por token (= los hex del
-   handoff en claro, adaptativos en oscuro). El SVG va a 100% con su viewBox 1100×240 (alto por ratio);
-   el texto (cabecera/KPIs) va sangrado 40px y la serie sangra a los bordes. */
+/* Sección 02 · «Distribución horaria» — área horaria a sangre, formato COMPACTO (tile 6×2, igual que el
+   heatmap). Las 24 horas caben en el ancho del tile (sin scroll); el SVG escala con el contenedor. El
+   tooltip vive en .ha-chart-wrap (posición relativa) para poder desbordar sin recortarse. */
 .ha-panel {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg);
   overflow: hidden;
-  padding: 24px 0 20px;
+  padding: 18px 0 4px;
   display: flex;
   flex-direction: column;
 }
@@ -15,77 +14,45 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 4px;
-  padding: 0 40px;
+  gap: 12px;
+  margin-bottom: 6px;
+  padding: 0 20px;
 }
 .ha-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.01em;
   margin: 0;
   color: var(--ui-text);
 }
-.ha-sub {
-  font-size: 12.5px;
-  color: var(--ui-text-soft);
-  margin: 3px 0 0;
-}
-/* Conmutador línea / barras: píldora con el activo en blanco y sombra suave. */
-.ha-toggle {
-  display: inline-flex;
-  padding: 3px;
-  gap: 2px;
-  background: var(--ui-surface-subtle);
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
-}
-.ha-toggle button {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ui-text-soft);
-  cursor: pointer;
-}
-.ha-toggle button[aria-pressed='true'] {
-  background: var(--ui-surface);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-  color: var(--ui-text);
-}
-.ha-kpis {
-  display: flex;
-  gap: 38px;
-  margin: 14px 0 6px;
-  padding: 0 40px;
-}
-.ha-kpi-label {
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--ui-text-soft);
-}
-.ha-kpi-value {
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  margin-top: 4px;
-  color: var(--ui-text);
-  font-variant-numeric: tabular-nums;
-}
-.ha-kpi-value span {
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0;
-  color: var(--ui-text-soft);
-}
-.ha-chart {
+/* Zona de gráfico: crece para ocupar el alto restante del tile. Relativo → ancla el tooltip absoluto. */
+.ha-chart-wrap {
   position: relative;
-  margin-top: 6px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+/* Carril desplazable. El padding lateral deja respirar al primer/último punto en los extremos del
+   scroll (en el medio el gráfico va a sangre porque el padding queda fuera de vista al desplazar). */
+.ha-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: none;
+  padding: 0 18px;
+}
+.ha-scroll::-webkit-scrollbar {
+  display: none;
+}
+/* Tira interna (SVG + eje): min-width fijo → las 24 horas se rotulan a tamaño legible, desborda y se
+   desplaza. Es además el objetivo del rebote (se traslada con transform). El viewBox achatado mantiene
+   el alto renderizado compacto (≈ min-width·VB_H/1100). */
+.ha-strip {
+  width: 100%;
+  min-width: 1300px;
+  will-change: transform;
 }
 .ha-svg {
   display: block;
@@ -93,18 +60,56 @@
   height: auto;
   overflow: visible;
 }
-/* Tooltip oscuro del pico, con flecha. Tokens de tooltip → oscuro en claro y adaptado en oscuro. */
-.ha-tip {
+/* Eje de horas: ocupa todo el ancho de la tira; cada etiqueta se posiciona (left %) sobre la X de su
+   punto y se centra con translate → alineada con el dato (no repartida con space-between). */
+.ha-axis {
+  position: relative;
+  width: 100%;
+  height: 14px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--gst-400);
+  font-variant-numeric: tabular-nums;
+}
+.ha-axis span {
   position: absolute;
-  transform: translate(-50%, 34px);
+  top: 50%;
+  transform: translate(-50%, -50%);
+  line-height: 1;
+}
+/* Barra de scroll personalizada: pista + thumb (posición/ancho calculados en JS). Se oculta si cabe. */
+.ha-track {
+  position: relative;
+  height: 3px;
+  margin: 6px 0 0;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ui-border) 55%, transparent);
+  transition: opacity 150ms ease;
+}
+.ha-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  border-radius: 3px;
+  background: var(--ui-brand);
+}
+/* Tooltip dinámico: vive en un PORTAL a <body>, por eso es position: fixed con coords de viewport
+   (left/top inyectadas por JS). translate(-50%) lo centra sobre el punto/guía; 10px de offset abajo.
+   Al estar fuera del card puede sobresalir en los extremos sin recortarse. Si no hay sitio debajo
+   (punto bajo), JS añade .ha-tip--above y se voltea encima del punto con la flecha invertida. */
+.ha-tip {
+  position: fixed;
+  transform: translate(-50%, 10px);
   background: var(--ui-chart-tip-bg);
   color: var(--ui-chart-tip-fg);
   border-radius: 8px;
-  padding: 7px 10px;
-  font-size: 11.5px;
+  padding: 6px 9px;
+  font-size: 11px;
   white-space: nowrap;
   box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.4);
-  z-index: 2;
+  z-index: 90; /* portal a <body>: por encima del chrome del dashboard (≤60), por debajo de modales (1000) */
   pointer-events: none;
 }
 .ha-tip b {
@@ -116,6 +121,11 @@
   margin-top: 1px;
   color: var(--ui-chart-tip-fg-muted);
 }
+/* Volteado encima del punto: el tooltip sube su propio alto + el hueco; la flecha pasa abajo. */
+.ha-tip--above {
+  transform: translate(-50%, calc(-100% - 10px));
+}
+/* Flecha apuntando hacia arriba (al punto), centrada con el cuerpo (que ya va centrado sobre la guía). */
 .ha-tip::after {
   content: '';
   position: absolute;
@@ -126,18 +136,17 @@
   transform: translateX(-50%) rotate(45deg);
   background: var(--ui-chart-tip-bg);
 }
-.ha-axis {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 10px;
-  padding: 0 16px;
-  font-size: 11px;
-  color: var(--gst-400);
-  font-variant-numeric: tabular-nums;
+/* En modo «arriba» la flecha cuelga del borde inferior, apuntando hacia abajo al punto. */
+.ha-tip--above::after {
+  top: auto;
+  bottom: -4px;
 }
 .ha-empty {
-  padding: 48px 40px;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 24px 20px;
   text-align: center;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--ui-text-soft);
 }

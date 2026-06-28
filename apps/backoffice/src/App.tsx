@@ -314,6 +314,7 @@ function Home() {
                       canRedo={canvasBinding.canvasMeta.canRedo}
                       drawActive={canvasBinding.canvasMeta.drawOpen}
                       mode={canvasBinding.canvasMeta.mode}
+                      zoomPct={canvasBinding.canvasMeta.zoomPct}
                     />
                   ) : (
                     <PageNavSlot />

@@ -1,15 +1,4 @@
-import {
-  ArrowUpRight,
-  Circle,
-  Maximize2,
-  Minus,
-  MousePointer2,
-  Pencil,
-  Plus,
-  Slash,
-  Square,
-  X,
-} from 'lucide-react';
+import { ArrowUpRight, Circle, MousePointer2, Pencil, Slash, Square, X } from 'lucide-react';
 import {
   memo,
   type ReactNode,
@@ -112,6 +101,8 @@ export interface CanvasMeta {
   drawOpen: boolean;
   /** Modo de interacción activo (select/pan/erase) → la barra resalta el botón. */
   mode: InteractionMode;
+  /** Porcentaje de zoom actual (ej. 100 = 100%). */
+  zoomPct: number;
 }
 
 /** API imperativa del lienzo expuesta a la barra inferior (el dock del dashboard). Las
@@ -129,6 +120,10 @@ export interface FreeBoardHandle {
   setMode: (mode: InteractionMode) => void;
   /** Snapshot de los widgets de catálogo disponibles para añadir (no presentes). */
   listWidgets: () => { id: string; label: string }[];
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetZoom: () => void;
+  fitZoom: () => void;
 }
 
 interface FreeBoardProps {
@@ -744,8 +739,25 @@ export function FreeBoard({
       setMode: onSetMode,
       listWidgets: () =>
         availableWidgets(elsRef.current).map((id) => ({ id, label: itemLabel(id) })),
+      zoomIn: () => zoomAtCenter(ZOOM_STEP),
+      zoomOut: () => zoomAtCenter(1 / ZOOM_STEP),
+      resetZoom: reset100,
+      fitZoom: fitToContent,
     }),
-    [onAddWidget, onAddNote, onAddText, toggleDraw, undo, redo, onArrange, onSetMode, itemLabel],
+    [
+      onAddWidget,
+      onAddNote,
+      onAddText,
+      toggleDraw,
+      undo,
+      redo,
+      onArrange,
+      onSetMode,
+      itemLabel,
+      zoomAtCenter,
+      reset100,
+      fitToContent,
+    ],
   );
   useEffect(() => {
     onCanvasMeta?.({
@@ -753,8 +765,9 @@ export function FreeBoard({
       canRedo: future.length > 0,
       drawOpen,
       mode: interactionMode,
+      zoomPct,
     });
-  }, [past.length, future.length, drawOpen, interactionMode, onCanvasMeta]);
+  }, [past.length, future.length, drawOpen, interactionMode, zoomPct, onCanvasMeta]);
 
   // Entrada con rebote escalonado de los bloques (widget/nota) recién añadidos —a mano o por el
   // agente—. Las formas/dibujos/textos a mano se quedan donde se trazan (sin rebote).
@@ -934,32 +947,6 @@ export function FreeBoard({
         {projection && (
           <FreeMinimap projection={projection} size={MINIMAP_SIZE} onNavigate={onMinimapNavigate} />
         )}
-
-        {/* Controles de zoom (abajo a la derecha del lienzo). */}
-        <div className="dash-free-zoom" data-testid="dash-free-zoom">
-          <button
-            type="button"
-            onClick={() => zoomAtCenter(1 / ZOOM_STEP)}
-            aria-label="Alejar"
-            title="Alejar"
-          >
-            <Minus size={16} aria-hidden="true" />
-          </button>
-          <button type="button" onClick={reset100} className="dash-free-zoom-pct" title="Zoom 100%">
-            {zoomPct}%
-          </button>
-          <button
-            type="button"
-            onClick={() => zoomAtCenter(ZOOM_STEP)}
-            aria-label="Acercar"
-            title="Acercar"
-          >
-            <Plus size={16} aria-hidden="true" />
-          </button>
-          <button type="button" onClick={() => fitToContent()} aria-label="Ajustar" title="Ajustar">
-            <Maximize2 size={15} aria-hidden="true" />
-          </button>
-        </div>
       </div>
     </div>
   );

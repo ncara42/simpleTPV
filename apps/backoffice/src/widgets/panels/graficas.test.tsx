@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -68,15 +68,18 @@ describe('Widgets de panel · Sección 02 (Gráficas)', () => {
     expect(graficas).toContain('graf-hour-area');
   });
 
-  it('la distribución horaria marca el pico y la franja activa', async () => {
+  it('la distribución horaria pinta la línea y revela el tooltip al pasar el cursor', async () => {
     renderWidget(<HourArea period="month" store={undefined} />);
 
-    // Pico = hora 14 (880 €, 31 tickets); franja activa = de la primera a la última hora con ventas.
-    // El tooltip depende de los datos → se espera con findBy.
-    expect(await screen.findByText('31 tickets · pico del día')).toBeInTheDocument();
+    // Ya no hay caption ni conmutador: sólo el título y el gráfico de línea (a sangre, 24 h).
+    expect(await screen.findByRole('img', { name: /facturación por franja/i })).toBeInTheDocument();
     expect(screen.getByText('Distribución horaria')).toBeInTheDocument();
-    expect(screen.getByText('9 – 21 h')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /facturación por franja/i })).toBeInTheDocument();
+
+    // El tooltip sólo aparece al pasar el cursor por la línea/punto (no por defecto).
+    const svg = screen.getByRole('img', { name: /facturación por franja/i });
+    expect(document.querySelector('.ha-tip')).toBeNull();
+    fireEvent.mouseMove(svg, { clientX: 40, clientY: 40 });
+    expect(document.querySelector('.ha-tip')).not.toBeNull();
   });
 
   it('graf-store-bars está cableado en render, catálogo y galería', () => {

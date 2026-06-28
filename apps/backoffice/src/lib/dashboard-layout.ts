@@ -55,9 +55,10 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'kpi-grid-connected': { w: 12, h: 1 },
   'kpi-classic': { w: 3, h: 1 },
   // Sección 02 · Gráficas (rediseño): distribución horaria (área), ventas por tienda (barras) y heatmap.
-  'graf-hour-area': { w: 12, h: 3 },
-  'graf-store-bars': { w: 12, h: 2 },
-  'graf-heatmap': { w: 12, h: 2 },
+  // La distribución horaria comparte tamaño con el heatmap (6×2): contenido compacto, sin scroll.
+  'graf-hour-area': { w: 6, h: 2 },
+  'graf-store-bars': { w: 6, h: 2 },
+  'graf-heatmap': { w: 6, h: 2 },
   // Sección 03 · Listas (rediseño): reparto por familia, ranking de productos y mix (treemap).
   'lista-familia': { w: 4, h: 2 },
   'lista-rankings': { w: 4, h: 3 },
@@ -650,9 +651,17 @@ export function reconcileFreeLayout(saved: readonly unknown[], preset: PresetDef
   if (migrated.length === 0) return buildDefaultFreeLayout(preset);
   // Notas/formas/trazos/textos se conservan siempre; los widgets se conservan si son del catálogo
   // (en ITEM_SPECS) o genéricos (`gen:*`). Solo se descartan ids de catálogo obsoletos.
-  return migrated.filter(
-    (e) => e.kind !== 'widget' || e.widgetId in ITEM_SPECS || e.widgetId.startsWith('gen:'),
-  );
+  // Los widgets del catálogo se re-dimensionan al tamaño actual de ITEM_SPECS: el usuario no puede
+  // redimensionarlos (solo las notas tienen handles de resize), así que el tamaño guardado puede
+  // quedar desfasado cuando cambia ITEM_SPECS.
+  return migrated
+    .filter((e) => e.kind !== 'widget' || e.widgetId in ITEM_SPECS || e.widgetId.startsWith('gen:'))
+    .map((e) => {
+      if (e.kind !== 'widget' || !(e.widgetId in ITEM_SPECS)) return e;
+      const size = freeItemSize(e.widgetId);
+      if (e.w === size.w && e.h === size.h) return e;
+      return { ...e, w: size.w, h: size.h };
+    });
 }
 
 // Siguiente `z` (encima de todo).

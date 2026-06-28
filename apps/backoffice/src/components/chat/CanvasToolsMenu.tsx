@@ -2,6 +2,9 @@ import {
   Eraser,
   Hand,
   LayoutDashboard,
+  Maximize2,
+  Minus,
+  Plus,
   Redo2,
   Shapes,
   SquarePen,
@@ -30,6 +33,8 @@ interface CanvasToolsMenuProps {
   drawActive: boolean;
   /** Modo de interacción activo (resalta Mover/Goma). */
   mode: InteractionMode;
+  /** Porcentaje de zoom actual del lienzo (ej. 100 = 100%). */
+  zoomPct: number;
 }
 
 /**
@@ -51,6 +56,7 @@ export function CanvasToolsMenu({
   canRedo,
   drawActive,
   mode,
+  zoomPct,
 }: CanvasToolsMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -219,6 +225,49 @@ export function CanvasToolsMenu({
         onClick={() => canvasRef.current?.redo()}
       >
         <Redo2 size={16} aria-hidden="true" />
+      </button>
+
+      <span className="canvas-tools__vdivider" aria-hidden="true" />
+
+      <button
+        type="button"
+        className="canvas-tools__mode"
+        data-testid="dash-free-zoom-out"
+        aria-label="Alejar"
+        title="Alejar"
+        onClick={() => canvasRef.current?.zoomOut()}
+      >
+        <Minus size={16} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className="canvas-tools__mode canvas-tools__zoom-pct"
+        data-testid="dash-free-zoom"
+        aria-label="Restablecer zoom al 100%"
+        title="Zoom 100%"
+        onClick={() => canvasRef.current?.resetZoom()}
+      >
+        {zoomPct}%
+      </button>
+      <button
+        type="button"
+        className="canvas-tools__mode"
+        data-testid="dash-free-zoom-in"
+        aria-label="Acercar"
+        title="Acercar"
+        onClick={() => canvasRef.current?.zoomIn()}
+      >
+        <Plus size={16} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className="canvas-tools__mode"
+        data-testid="dash-free-zoom-fit"
+        aria-label="Ajustar al contenido"
+        title="Ajustar al contenido"
+        onClick={() => canvasRef.current?.fitZoom()}
+      >
+        <Maximize2 size={15} aria-hidden="true" />
       </button>
 
       {paletteOpen && (

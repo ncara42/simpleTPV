@@ -5,7 +5,7 @@ import { fileToCompressedDataUrl } from '../lib/image.js';
 
 // Chat de traspaso entre central ('central', backoffice) y la tienda que recibe
 // ('store', el dependiente). Réplica del lenguaje visual del chatbot (panel glass,
-// burbujas, composer, acciones por mensaje copiar/editar/borrar) SIN nada de IA.
+// burbujas, composer) SIN nada de IA.
 // Compartido por backoffice y TPV: cada app le pasa `side`, los mensajes y los handlers.
 
 export type TransferChatSide = 'store' | 'central';
@@ -25,10 +25,6 @@ export interface TransferChatProps {
   side: TransferChatSide;
   messages: TransferChatMessage[];
   onSend: (input: { body?: string; dataUrl?: string }) => void | Promise<void>;
-  /** Edita el texto de un mensaje (omitir para ocultar el botón Editar). */
-  onEdit?: ((id: string, body: string) => void) | undefined;
-  /** Borra un mensaje (omitir para ocultar el botón Borrar). */
-  onDelete?: ((id: string) => void) | undefined;
   title?: string;
   subtitle?: string | undefined;
   loading?: boolean;
@@ -45,8 +41,6 @@ export function TransferChat({
   side,
   messages,
   onSend,
-  onEdit,
-  onDelete,
   title = 'Conversación',
   subtitle,
   loading = false,
@@ -59,9 +53,6 @@ export function TransferChat({
   const [photo, setPhoto] = useState<string | null>(null);
   const [compressing, setCompressing] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState('');
   const [rect, setRect] = useState<WindowRect>(initialRect);
   const { startMove, startResize } = useFloatingWindow(rect, setRect);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -99,23 +90,6 @@ export function TransferChat({
     await onSend(input);
     setText('');
     setPhoto(null);
-  }
-
-  function copy(id: string, body: string): void {
-    void navigator.clipboard?.writeText(body);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1200);
-  }
-
-  function startEdit(m: TransferChatMessage): void {
-    setEditId(m.id);
-    setEditDraft(m.body ?? '');
-  }
-
-  function saveEdit(): void {
-    const body = editDraft.trim();
-    if (editId && body && onEdit) onEdit(editId, body);
-    setEditId(null);
   }
 
   return (
@@ -161,41 +135,6 @@ export function TransferChat({
                   <span>{fmtDayTime(m.createdAt)}</span>
                 </div>
               ) : null;
-              if (editId === m.id) {
-                return (
-                  <Fragment key={m.id}>
-                    {day}
-                    <div className={`tc-msg ${own ? 'tc-msg--own' : 'tc-msg--peer'}`}>
-                      <div className="tc-edit">
-                        <textarea
-                          className="tc-edit-area"
-                          value={editDraft}
-                          onChange={(e) => setEditDraft(e.target.value)}
-                          rows={Math.min(6, Math.max(2, editDraft.split('\n').length))}
-                          autoFocus
-                        />
-                        <div className="tc-edit-actions">
-                          <button
-                            type="button"
-                            className="tc-edit-cancel"
-                            onClick={() => setEditId(null)}
-                          >
-                            Cancelar
-                          </button>
-                          <button
-                            type="button"
-                            className="tc-edit-save"
-                            onClick={saveEdit}
-                            disabled={editDraft.trim() === ''}
-                          >
-                            Guardar
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </Fragment>
-                );
-              }
               return (
                 <Fragment key={m.id}>
                   {day}
@@ -215,41 +154,6 @@ export function TransferChat({
                         </button>
                       )}
                       {m.body && <span className="tc-text">{m.body}</span>}
-                    </div>
-                    <div className="tc-msg-tools">
-                      {m.body && (
-                        <button
-                          type="button"
-                          className="tc-msg-act"
-                          onClick={() => copy(m.id, m.body!)}
-                          title="Copiar"
-                          aria-label="Copiar"
-                        >
-                          {copiedId === m.id ? <IconCheck /> : <IconCopy />}
-                        </button>
-                      )}
-                      {m.body && onEdit && (
-                        <button
-                          type="button"
-                          className="tc-msg-act"
-                          onClick={() => startEdit(m)}
-                          title="Editar"
-                          aria-label="Editar"
-                        >
-                          <IconPencil />
-                        </button>
-                      )}
-                      {onDelete && (
-                        <button
-                          type="button"
-                          className="tc-msg-act"
-                          onClick={() => onDelete(m.id)}
-                          title="Borrar"
-                          aria-label="Borrar"
-                        >
-                          <IconTrash />
-                        </button>
-                      )}
                     </div>
                   </div>
                 </Fragment>
@@ -418,42 +322,6 @@ function IconSend() {
   return (
     <Svg size={17}>
       <path d="M12 19V5M5 12l7-7 7 7" />
-    </Svg>
-  );
-}
-
-function IconCopy() {
-  return (
-    <Svg size={14}>
-      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-    </Svg>
-  );
-}
-
-function IconCheck() {
-  return (
-    <Svg size={14}>
-      <path d="M20 6 9 17l-5-5" />
-    </Svg>
-  );
-}
-
-function IconPencil() {
-  return (
-    <Svg size={14}>
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </Svg>
-  );
-}
-
-function IconTrash() {
-  return (
-    <Svg size={14}>
-      <path d="M3 6h18" />
-      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-      <path d="M10 11v6M14 11v6" />
     </Svg>
   );
 }

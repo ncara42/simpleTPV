@@ -1128,15 +1128,13 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  height: 34px;
+  height: 30px;
   padding: 0 0.8rem;
   border: 1px solid var(--ui-border);
-  /* Botón flotante individual (8px Vercel + sombra sutil), no dentro de un contenedor pill. */
   border-radius: var(--ui-radius-sm);
-  background: var(--ui-surface);
-  box-shadow:
-    0 1px 3px rgb(0 0 0 / 0.05),
-    0 6px 14px -6px rgb(0 0 0 / 0.1);
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
   color: var(--ui-text);
   font: inherit;
   font-size: var(--ui-text-sm);
@@ -1149,7 +1147,7 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 }
 
 .canvas-tools__trigger:hover {
-  background: var(--ui-surface-subtle);
+  background: color-mix(in srgb, var(--ui-surface-subtle) 70%, transparent);
   color: var(--ui-text);
   border-color: var(--ui-border-strong, var(--ui-border));
 }
@@ -1293,14 +1291,13 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-sm);
-  background: var(--ui-surface);
-  box-shadow:
-    0 1px 3px rgb(0 0 0 / 0.05),
-    0 6px 14px -6px rgb(0 0 0 / 0.1);
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
   color: var(--ui-text-muted);
   cursor: pointer;
   transition:
@@ -1309,7 +1306,7 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
     border-color var(--ui-motion-fast) var(--ui-ease);
 }
 .canvas-tools__mode:hover:not(:disabled) {
-  background: var(--ui-surface-subtle);
+  background: color-mix(in srgb, var(--ui-surface-subtle) 70%, transparent);
   color: var(--ui-text);
   border-color: var(--ui-border-strong, var(--ui-border));
 }
@@ -1369,6 +1366,22 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   height: 1px;
   margin: 0.25rem 0.2rem;
   background: var(--ui-border);
+}
+
+.canvas-tools__vdivider {
+  width: 1px;
+  height: 16px;
+  background: var(--ui-border);
+  margin: 0 0.1rem;
+  flex: none;
+}
+
+.canvas-tools__zoom-pct {
+  min-width: 3rem;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  width: auto;
 }
 
 /* La paleta de widgets, abierta desde «Editar», cuelga hacia ABAJO igual que el menú. */

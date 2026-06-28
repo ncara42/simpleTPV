@@ -2,38 +2,55 @@
    réplica pixel-a-pixel del handoff «Fundación Geist». Las 3 primeras en acento, el resto en azul suave;
    valor encima de cada barra y nombre debajo. Área de barras flexible (crece con el alto del tile). */
 .sb-panel {
+  position: relative;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg);
   overflow: hidden;
-  padding: 24px 0 20px;
+  padding: 18px 0 4px;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  width: 100%;
 }
 .sb-title {
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
   margin: 0;
-  padding: 0 40px;
+  padding: 0 20px;
   color: var(--ui-text);
 }
-.sb-sub {
-  font-size: 12.5px;
-  color: var(--ui-text-soft);
-  margin: 3px 0 0;
-  padding: 0 40px;
+/* Carril desplazable. El padding lateral deja respirar a la primera/última barra en los extremos del
+   scroll (en el medio las barras van a sangre, porque el padding queda fuera de vista al desplazar). */
+.sb-scroll {
+  position: relative;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  touch-action: pan-x;
+  user-select: none;
+}
+.sb-scroll::-webkit-scrollbar {
+  display: none;
+}
+/* Tira interna (barras + etiquetas): objetivo del rubber-band (se traslada con transform). El ancho es
+   max(100% del carril, ancho intrínseco de las barras) → rellena cuando las tiendas son pocas y desborda
+   con scroll cuando son muchas. */
+.sb-strip {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
 }
 .sb-bars {
-  flex: 1;
+  /* Altura fija: es la referencia definida para .sb-col { height: 100% } y .sb-bar { height: N% }.
+     No puede ser flex:1 + min-height porque min-height no es "altura definida" en CSS y los % colapsan. */
+  height: 200px;
   display: flex;
   align-items: flex-end;
   gap: 14px;
-  margin-top: 26px;
-  padding: 0 24px 2px;
+  margin-top: 14px;
+  padding: 0 20px;
   border-bottom: 1px solid var(--ui-border-strong);
-  min-height: 170px;
 }
 .sb-col {
   flex: 1;
@@ -74,13 +91,38 @@
   display: flex;
   gap: 14px;
   margin-top: 9px;
-  padding: 0 24px;
+  padding: 0 20px;
 }
 .sb-label {
   flex: 1;
+  min-width: 0;
   text-align: center;
   font-size: 11px;
   color: var(--ui-text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Barra de scroll personalizada: pista anclada al fondo del panel (igual que en el heatmap).
+   Posición/ancho del thumb calculados en JS. Se oculta con opacity:0 si todo el contenido cabe. */
+.sb-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  height: 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ui-border) 55%, transparent);
+  transition: opacity var(--ui-dur-fast, 150ms) ease;
+}
+.sb-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  border-radius: 3px;
+  background: var(--ui-brand);
 }
 .sb-empty {
   flex: 1;

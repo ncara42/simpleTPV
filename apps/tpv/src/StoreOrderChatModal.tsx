@@ -3,8 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import {
-  deleteStoreOrderMessage,
-  editStoreOrderMessage,
   listStoreOrderMessages,
   postStoreOrderMessage,
   resolveStoreOrderIncident,
@@ -48,18 +46,6 @@ export function StoreOrderChatModal({
       void qc.invalidateQueries({ queryKey: ['incoming-store-orders'] });
     },
   });
-  const invalidateThread = () =>
-    void qc.invalidateQueries({ queryKey: ['store-order-messages', orderId] });
-  const edit = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: string }) =>
-      editStoreOrderMessage(orderId, id, body),
-    onSuccess: invalidateThread,
-  });
-  const remove = useMutation({
-    mutationFn: (id: string) => deleteStoreOrderMessage(orderId, id),
-    onSuccess: invalidateThread,
-  });
-
   const banner = justResolved ? (
     <div className="tc-banner tc-banner--done">Incidencia marcada como solucionada ✓</div>
   ) : incidentOpen ? (
@@ -88,8 +74,6 @@ export function StoreOrderChatModal({
       loading={isLoading}
       sending={send.isPending}
       onSend={(input) => send.mutate(input)}
-      onEdit={(id, body) => edit.mutate({ id, body })}
-      onDelete={(id) => remove.mutate(id)}
       banner={banner}
       testId="store-order-chat"
     />

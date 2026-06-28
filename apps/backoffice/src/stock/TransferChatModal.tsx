@@ -3,8 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import {
-  deleteTransferMessage,
-  editTransferMessage,
   listTransferMessages,
   postTransferMessage,
   resolveTransferIncident,
@@ -49,18 +47,6 @@ export function TransferChatModal({
       void qc.invalidateQueries({ queryKey: ['transfers'] });
     },
   });
-  const invalidateThread = () =>
-    void qc.invalidateQueries({ queryKey: ['transfer-messages', transferId] });
-  const edit = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: string }) =>
-      editTransferMessage(transferId, id, body),
-    onSuccess: invalidateThread,
-  });
-  const remove = useMutation({
-    mutationFn: (id: string) => deleteTransferMessage(transferId, id),
-    onSuccess: invalidateThread,
-  });
-
   const banner = justResolved ? (
     <div className="tc-banner tc-banner--done" data-testid="transfer-chat-resolved">
       Incidencia marcada como solucionada ✓
@@ -91,8 +77,6 @@ export function TransferChatModal({
       loading={isLoading}
       sending={send.isPending}
       onSend={(input) => send.mutate(input)}
-      onEdit={(id, body) => edit.mutate({ id, body })}
-      onDelete={(id) => remove.mutate(id)}
       banner={banner}
       testId="transfer-chat"
     />

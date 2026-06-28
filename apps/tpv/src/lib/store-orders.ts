@@ -49,18 +49,6 @@ export function postStoreOrderMessage(
   return api.post<TransferMessage>(`/store-orders/${id}/messages`, input);
 }
 
-export function editStoreOrderMessage(
-  id: string,
-  messageId: string,
-  body: string,
-): Promise<TransferMessage> {
-  return api.patch<TransferMessage>(`/store-orders/${id}/messages/${messageId}`, { body });
-}
-
-export function deleteStoreOrderMessage(id: string, messageId: string): Promise<void> {
-  return api.del(`/store-orders/${id}/messages/${messageId}`);
-}
-
 // Marca la incidencia de la recepción como solucionada (el hilo se conserva).
 export function resolveStoreOrderIncident(id: string): Promise<StoreOrder> {
   return api.post<StoreOrder>(`/store-orders/${id}/resolve-incident`).then(normalizeOrder);

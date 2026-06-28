@@ -53,29 +53,6 @@ describe('TransferChat', () => {
     expect(onSend).toHaveBeenCalledWith({ body: 'Hola central' });
   });
 
-  it('expone editar y borrar por mensaje cuando se pasan los handlers', () => {
-    const onEdit = vi.fn();
-    const onDelete = vi.fn();
-    render(
-      <TransferChat
-        open
-        onClose={() => {}}
-        side="central"
-        messages={MSGS}
-        onSend={() => {}}
-        onEdit={onEdit}
-        onDelete={onDelete}
-      />,
-    );
-    // Una papelera por mensaje (borrar disponible para ambas partes).
-    expect(screen.getAllByLabelText('Borrar')).toHaveLength(MSGS.length);
-    fireEvent.click(screen.getAllByLabelText('Editar')[0]!);
-    const area = screen.getByDisplayValue('Falta una unidad');
-    fireEvent.change(area, { target: { value: 'Faltan dos' } });
-    fireEvent.click(screen.getByText('Guardar'));
-    expect(onEdit).toHaveBeenCalledWith('1', 'Faltan dos');
-  });
-
   it('muestra el estado vacío cuando no hay mensajes', () => {
     render(
       <TransferChat
