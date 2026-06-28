@@ -11,21 +11,22 @@
   background: transparent;
 }
 
-/* ── Rejilla conectada (a sangre): gap de 1px sobre fondo hairline = divisores ── */
+/* ── Rejilla conectada (tarjeta redondeada estilo Vercel): borde completo + radio + overflow hidden;
+   el gap de 1px sobre fondo hairline hace de divisores entre celdas. ── */
 .kw-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 1px;
   background: var(--ui-border);
-  border-top: 1px solid var(--ui-border);
-  border-bottom: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
   overflow: hidden;
   height: 100%;
 }
 .kw-cell {
   background: var(--ui-surface);
-  padding: 16px 18px 0;
-  min-height: 138px;
+  padding: 14px 18px 0;
+  min-height: 132px;
   display: flex;
   flex-direction: column;
 }
@@ -66,10 +67,12 @@
   background: var(--ui-danger-soft);
   color: var(--ui-danger);
 }
+/* Sparkline a 100% del ancho de la celda: rompe el padding lateral (sin sangría ni márgenes) y se
+   pega al fondo. La rejilla recorta con su radio (las celdas de las esquinas redondean el sparkline). */
 .kw-spark {
-  width: 100%;
-  height: 42px;
-  margin-top: auto;
+  width: calc(100% + 36px);
+  margin: auto -18px 0;
+  height: 40px;
   display: block;
 }
 
