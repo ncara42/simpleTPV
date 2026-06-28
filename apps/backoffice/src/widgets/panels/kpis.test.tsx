@@ -77,11 +77,10 @@ describe('Widgets de panel · Sección 01 (KPIs)', () => {
     expect(screen.getByText('9 roturas')).toBeInTheDocument();
   });
 
-  it('la tarjeta clásica pinta Facturación con su etiqueta de esquina', async () => {
+  it('la tarjeta clásica pinta Facturación con su cifra', async () => {
     renderWidget(<ClassicKpiCard period="month" store={undefined} />);
 
     expect(await screen.findByText('762 tickets')).toBeInTheDocument();
-    expect(screen.getByText('A · Clásica')).toBeInTheDocument();
     expect(screen.getByText('Facturación')).toBeInTheDocument();
   });
 });

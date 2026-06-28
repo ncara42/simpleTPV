@@ -208,8 +208,8 @@ export function ConnectedKpiGrid({ period, store }: PanelProps): ReactElement {
   );
 }
 
-// Sección 01 · Tarjeta clásica (tratamiento A) — borde + radio, etiqueta de esquina «A · CLÁSICA»,
-// cifra grande y chip. Facturación del periodo (sin serie diaria → sin sparkline; ver nota arriba).
+// Sección 01 · Tarjeta clásica (tratamiento A) — borde + radio, cifra grande y chip. Facturación del
+// periodo (sin serie diaria → sin sparkline; ver nota arriba).
 export function ClassicKpiCard({ period, store }: PanelProps): ReactElement {
   const sales = useQuery({
     queryKey: ['dash-sales-kpis', period, store],
@@ -219,9 +219,8 @@ export function ClassicKpiCard({ period, store }: PanelProps): ReactElement {
   const s = sales.data;
 
   return (
-    <PanelShell id="kpi-classic" fill bare>
+    <PanelShell id="kpi-classic" bare>
       <div className="kw-card">
-        <span className="kw-corner">A · Clásica</span>
         <span className="kw-label">Facturación</span>
         <span className="kw-value">{eur(s?.revenue)}</span>
         {s ? (

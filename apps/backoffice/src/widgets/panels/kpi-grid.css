@@ -75,27 +75,15 @@
   display: block;
 }
 
-/* ── Tarjeta clásica (tratamiento A) ── */
+/* ── Tarjeta clásica (tratamiento A): altura natural (sin fill), compacta ── */
 .kw-card {
-  position: relative;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-radius: 12px;
+  border-radius: var(--ui-radius-lg);
   padding: 18px 20px;
-  min-height: 150px;
-  height: 100%;
+  min-height: 118px;
   display: flex;
   flex-direction: column;
-}
-.kw-corner {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--gst-400);
 }
 .kw-card .kw-value {
   font-size: 30px;
@@ -105,10 +93,4 @@
   font-size: 12px;
   padding: 3px 8px;
   margin-top: 10px;
-}
-.kw-card .kw-spark {
-  height: 46px;
-  margin-left: -20px;
-  margin-right: -20px;
-  width: calc(100% + 40px);
 }
