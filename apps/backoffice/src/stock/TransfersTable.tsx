@@ -211,6 +211,9 @@ function TransferRow({
               detail={buildTransferDetail(transfer, nameOf, resolveProduct)}
               onAction={(kind) => onAction(kind, transfer)}
               pending={pending}
+              onOpenChat={() =>
+                onOpenChat({ id: transfer.id, title: row.ref, subtitle: row.route })
+              }
             />
           </td>
         </tr>

@@ -554,6 +554,36 @@
 .tr-review-bad svg {
   flex-shrink: 0;
 }
+/* Botón «Ver N mensajes» junto al recuento de incidencias: abre el chat. */
+.tr-review-chat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--ui-danger) 30%, var(--ui-border));
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-danger);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    border-color var(--ui-motion-fast) var(--ui-ease);
+}
+.tr-review-chat:hover {
+  background: color-mix(in srgb, var(--ui-danger) 10%, var(--ui-surface));
+  border-color: color-mix(in srgb, var(--ui-danger) 45%, var(--ui-border));
+}
+.tr-review-chat:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.tr-review-chat svg {
+  flex-shrink: 0;
+}
 .tr-review-list {
   list-style: none;
   margin: 0;

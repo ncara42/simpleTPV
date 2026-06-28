@@ -1,5 +1,7 @@
-import { Check, TriangleAlert } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Check, MessageCircle, TriangleAlert } from 'lucide-react';
 
+import { listTransferMessages } from '../lib/stock.js';
 import type { TransferActionKind, TransferDetail } from './transfer-view.js';
 
 // Panel de detalle EN LÍNEA de un traspaso (acordeón): meta en rejilla, productos
@@ -11,10 +13,23 @@ interface TransferRowDetailProps {
   detail: TransferDetail;
   onAction: (kind: TransferActionKind) => void;
   pending: boolean;
+  /** Abre el chat (pop-up) de comentarios de este traspaso. */
+  onOpenChat: () => void;
 }
 
-export function TransferRowDetail({ detail, onAction, pending }: TransferRowDetailProps) {
+export function TransferRowDetail({
+  detail,
+  onAction,
+  pending,
+  onOpenChat,
+}: TransferRowDetailProps) {
   const incidents = detail.incidents.length;
+  // Recuento de mensajes para el botón «Ver N mensajes» (solo si hay incidencias).
+  const { data: messages = [] } = useQuery({
+    queryKey: ['transfer-messages', detail.id],
+    queryFn: () => listTransferMessages(detail.id),
+    enabled: detail.reviewState === 'incidents',
+  });
 
   return (
     <div className="tr-detail" data-testid="transfer-detail">
@@ -61,8 +76,18 @@ export function TransferRowDetail({ detail, onAction, pending }: TransferRowDeta
             ) : (
               <div className="tr-review-bad" data-testid="transfer-review-incidents">
                 <TriangleAlert size={14} aria-hidden="true" />
-                {incidents} {incidents === 1 ? 'incidencia' : 'incidencias'} · revísalas en
-                comentarios
+                <span>
+                  {incidents} {incidents === 1 ? 'incidencia' : 'incidencias'}
+                </span>
+                <button
+                  type="button"
+                  className="tr-review-chat"
+                  onClick={onOpenChat}
+                  data-testid="transfer-review-chat"
+                >
+                  <MessageCircle size={13} aria-hidden="true" />
+                  Ver {messages.length} {messages.length === 1 ? 'mensaje' : 'mensajes'}
+                </button>
               </div>
             )}
           </section>
