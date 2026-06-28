@@ -8,6 +8,7 @@ import {
   useDashboardStore,
 } from '../../lib/dashboard-store.js';
 import { ChatDock } from './ChatDock.js';
+import { DashboardChatDock } from './DashboardChatDock.js';
 import { executeViewAction } from './view-actions.js';
 import type { ViewContext } from './view-context.js';
 
@@ -33,18 +34,25 @@ const undoCanvasOps = (ops: CanvasOp[]): void => {
 
 export function AssistantDock({ view }: { view: ViewContext }) {
   const setOpen = useAssistantStore((s) => s.setOpen);
-  // El asistente se MUESTRA abierto por defecto en todas las views de trabajo (overlay sobre el
-  // borde derecho → el lienzo conserva su ancho, no se reescala nada). En el Dashboard —que es el
-  // propio «Asistente de IA» a pantalla completa— arranca cerrado para no tapar el lienzo; ahí se
-  // abre con el lanzador ✦ de la isla. El efecto se dispara en cada cambio de view.
+  const isDashboard = view.id === 'dashboard';
+
+  // Estado abierto/cerrado por defecto al cambiar de view:
+  //   · Views de trabajo → ventana flotante ABIERTA (overlay sobre el borde derecho → el lienzo
+  //     conserva su ancho, no se reescala nada).
+  //   · Dashboard → barra inferior SIEMPRE visible, pero su popover de conversación arranca CERRADO
+  //     para no tapar el lienzo; se abre con el robot 🤖 de la isla, el botón 💬 o al enfocar.
   useEffect(() => {
-    setOpen(view.id !== 'dashboard');
-  }, [view.id, setOpen]);
+    setOpen(!isDashboard);
+  }, [isDashboard, setOpen]);
 
   // La barra de herramientas del lienzo vive ARRIBA en el DashboardPage (no en el dock); el dock es
   // chat puro en todas las views. Por eso ya no consume el canvas-bridge.
+  //
+  // El Dashboard usa su BARRA INFERIOR propia ({@link DashboardChatDock}); el resto de views, la
+  // VENTANA FLOTANTE ({@link ChatDock}). Ambas comparten el mismo `useChat` y handlers de canvas.
+  const Dock = isDashboard ? DashboardChatDock : ChatDock;
   return (
-    <ChatDock
+    <Dock
       onCanvasOp={applyCanvasOp}
       onUndoCanvasOps={undoCanvasOps}
       getCanvasState={buildCanvasSnapshot}
