@@ -543,7 +543,9 @@
   align-items: center;
   gap: 0.5rem;
   align-self: flex-start;
-  padding: 0.5rem 0.8rem;
+  /* Misma altura que el CTA «Nuevo traspaso» de la topbar (Button md = h-9 = 2.25rem). */
+  height: 2.25rem;
+  padding: 0 0.8rem;
   border-radius: var(--ui-radius-md);
   background: color-mix(in srgb, var(--ui-danger) 9%, var(--ui-surface));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-danger) 28%, transparent);
@@ -566,7 +568,9 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.25rem 0.6rem;
+  /* Misma altura que la píldora de incidencias y que el CTA «Nuevo traspaso» (2.25rem). */
+  height: 2.25rem;
+  padding: 0 0.7rem;
   border: 1px solid color-mix(in srgb, var(--ui-danger) 30%, var(--ui-border));
   border-radius: var(--ui-radius-sm);
   background: var(--ui-surface);
