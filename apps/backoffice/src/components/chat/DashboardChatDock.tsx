@@ -11,6 +11,7 @@ import type { ChatDockProps } from './ChatDock.js';
 import { ChatHeader } from './ChatHeader.js';
 import { ChatMessages } from './ChatMessages.js';
 import { Context } from './Context.js';
+import { ModelEffortMenu } from './ModelEffortMenu.js';
 import { PromptComposer } from './PromptComposer.js';
 import { useChat } from './useChat.js';
 
@@ -201,6 +202,17 @@ export function DashboardChatDock({
           onFocus={() => setPanelOpen(true)}
           collapsed={false}
           leading={leading}
+          trailing={
+            !noAi && chat.models.length > 0 ? (
+              <ModelEffortMenu
+                models={chat.models}
+                model={chat.model}
+                onModelChange={chat.setModel}
+                effort={chat.effort}
+                onEffortChange={chat.setEffort}
+              />
+            ) : undefined
+          }
         />
       </div>
     </div>
