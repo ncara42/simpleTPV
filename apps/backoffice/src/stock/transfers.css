@@ -455,13 +455,14 @@
 }
 
 /* ─── Revisión de recepción: incidencias/comentarios + fotos ──────────────────── */
-/* Vive bajo «Productos del traspaso» (misma columna): margen corto, no el hueco
-   grande del flex del detalle. */
+/* Vive bajo «Productos del traspaso» (misma columna). Separación superior generosa
+   (alineada con el ritmo vertical del detalle) para que NO quede pegado a los
+   productos y se lea como un bloque propio. */
 .tr-review {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  margin-top: 0.9rem;
+  margin-top: 1.35rem;
 }
 .tr-review-pending {
   margin: 0;
