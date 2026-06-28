@@ -312,6 +312,7 @@ export function TransfersSection() {
           transferId={chat.id}
           title={chat.title}
           subtitle={chat.subtitle}
+          incidentOpen={chat.incidentOpen}
           onClose={() => setChat(null)}
         />
       )}

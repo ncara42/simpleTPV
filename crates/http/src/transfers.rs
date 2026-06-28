@@ -144,6 +144,23 @@ pub async fn add_message(
     Ok((StatusCode::CREATED, Json(m)))
 }
 
+/// `POST /transfers/:id/resolve-incident` — marca la incidencia como solucionada.
+pub async fn resolve_incident(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<TransferWithLines>, ApiError> {
+    let t = service::resolve_incident(
+        state.db(),
+        user.organization_id,
+        user.user_id,
+        user.role.is_org_wide(),
+        id,
+    )
+    .await?;
+    Ok(Json(t))
+}
+
 /// `GET /transfers/:id/messages` — hilo del chat (cualquier rol con sesión).
 pub async fn list_messages(
     State(state): State<AppState>,

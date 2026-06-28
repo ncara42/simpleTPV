@@ -48,3 +48,8 @@ export function postStoreOrderMessage(
 ): Promise<TransferMessage> {
   return api.post<TransferMessage>(`/store-orders/${id}/messages`, input);
 }
+
+// Marca la incidencia de la recepción como solucionada (el hilo se conserva).
+export function resolveStoreOrderIncident(id: string): Promise<StoreOrder> {
+  return api.post<StoreOrder>(`/store-orders/${id}/resolve-incident`).then(normalizeOrder);
+}

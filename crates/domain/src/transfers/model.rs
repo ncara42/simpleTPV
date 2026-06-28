@@ -34,6 +34,8 @@ pub struct Transfer {
     pub received_at: Option<PrimitiveDateTime>,
     #[serde(serialize_with = "crate::serde_helpers::iso_opt_utc")]
     pub closed_at: Option<PrimitiveDateTime>,
+    #[serde(serialize_with = "crate::serde_helpers::iso_opt_utc")]
+    pub incident_resolved_at: Option<PrimitiveDateTime>,
 }
 
 /// Fila plana de línea (con datos del producto) para mapear a [`TransferLine`].

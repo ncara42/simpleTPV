@@ -97,6 +97,18 @@ export function StoreOrderReceivePanel() {
     return `${dd}/${mm} ${hh}:${min}`;
   }
 
+  // ¿Incidencia abierta? Recibido/cerrado con faltante o nota y aún sin resolver.
+  function orderIncidentOpen(o: StoreOrder): boolean {
+    const showRecv = o.status === 'RECEIVED' || o.status === 'CLOSED';
+    if (!showRecv || o.incidentResolvedAt) return false;
+    return o.lines.some((l) => {
+      const recv = l.quantityReceived == null ? null : Number(l.quantityReceived);
+      const short = recv != null && recv < Number(l.quantitySent);
+      const note = (l.discrepancyNote ?? '').trim() !== '';
+      return short || note;
+    });
+  }
+
   // Filtro de la cabecera: por texto (origen/fecha/nº líneas) y por estado.
   const term = search.trim().toLowerCase();
   const visibleOrders = orders.filter((t) => {
@@ -341,6 +353,7 @@ export function StoreOrderReceivePanel() {
           orderId={chatOrder.id}
           title="Comentarios con central"
           subtitle={`Central · ${fmt(chatOrder.sentAt ?? chatOrder.createdAt)}`}
+          incidentOpen={orderIncidentOpen(chatOrder)}
           onClose={() => setChatOrder(null)}
         />
       )}

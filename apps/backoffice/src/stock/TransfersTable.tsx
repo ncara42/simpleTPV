@@ -7,12 +7,15 @@ export interface TransferChatTarget {
   id: string;
   title: string;
   subtitle: string;
+  /** Hay incidencia abierta → el chat ofrece marcarla como solucionada. */
+  incidentOpen: boolean;
 }
 
 import { ScrollShadowCell } from '../components/ScrollShadowCell.js';
 import {
   buildRow,
   buildTransferDetail,
+  isIncidentOpen,
   type ProductResolver,
   type StoreNameResolver,
   type TransferActionKind,
@@ -194,7 +197,12 @@ function TransferRow({
             className={`tr-chat-btn${row.incident ? ' is-incid' : ''}`}
             onClick={(e) => {
               e.stopPropagation();
-              onOpenChat({ id: transfer.id, title: row.ref, subtitle: row.route });
+              onOpenChat({
+                id: transfer.id,
+                title: row.ref,
+                subtitle: row.route,
+                incidentOpen: isIncidentOpen(transfer),
+              });
             }}
             title="Comentarios"
             aria-label="Abrir comentarios"
@@ -212,7 +220,12 @@ function TransferRow({
               onAction={(kind) => onAction(kind, transfer)}
               pending={pending}
               onOpenChat={() =>
-                onOpenChat({ id: transfer.id, title: row.ref, subtitle: row.route })
+                onOpenChat({
+                  id: transfer.id,
+                  title: row.ref,
+                  subtitle: row.route,
+                  incidentOpen: isIncidentOpen(transfer),
+                })
               }
             />
           </td>

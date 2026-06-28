@@ -23,6 +23,7 @@ vi.mock('../lib/stock.js', () => ({
   closeTransfer: vi.fn(() => Promise.resolve({})),
   listTransferMessages: vi.fn(() => Promise.resolve([])),
   postTransferMessage: vi.fn(() => Promise.resolve({})),
+  resolveTransferIncident: vi.fn(() => Promise.resolve({})),
 }));
 vi.mock('../lib/admin.js', () => ({ listStores: vi.fn(() => Promise.resolve([])) }));
 vi.mock('../lib/products.js', () => ({ listProducts: vi.fn(() => Promise.resolve([])) }));
@@ -289,6 +290,25 @@ describe('TransfersSection v2 — grupos, detalle en línea y ciclo de vida', ()
     fireEvent.click(await screen.findByTestId('transfer-row'));
     const incidents = await screen.findByTestId('transfer-review-incidents');
     expect(incidents).toHaveTextContent('1 incidencia');
+  });
+
+  it('marca como «Solucionado» una incidencia ya resuelta', async () => {
+    vi.mocked(listTransfers).mockResolvedValue([
+      makeTransfer({
+        id: 't1',
+        status: 'RECEIVED',
+        receivedAt: '2026-06-22T09:00:00.000Z',
+        incidentResolvedAt: '2026-06-22T10:00:00.000Z',
+        lines: [
+          makeLine({ id: 'l1', quantitySent: '6', quantityReceived: '5', discrepancy: '-1' }),
+        ],
+      }),
+    ]);
+    renderWithClient(<TransfersSection />);
+
+    fireEvent.click(await screen.findByTestId('transfer-row'));
+    expect(await screen.findByTestId('transfer-review-resolved')).toHaveTextContent('Solucionado');
+    expect(screen.queryByTestId('transfer-review-incidents')).not.toBeInTheDocument();
   });
 
   it('abre el chat de comentarios desde el botón de la fila', async () => {

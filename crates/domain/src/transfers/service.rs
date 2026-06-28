@@ -31,7 +31,8 @@ const MESSAGE_COLS: &str = r#"id, author, body, "mimeType" AS mime_type,
 const TRANSFER_COLS: &str = r#"id, "organizationId" AS organization_id,
     "originStoreId" AS origin_store_id, "destStoreId" AS dest_store_id, status::text AS status,
     notes, "createdBy" AS created_by, "createdAt" AS created_at, "sentAt" AS sent_at,
-    "receivedAt" AS received_at, "closedAt" AS closed_at"#;
+    "receivedAt" AS received_at, "closedAt" AS closed_at,
+    "incidentResolvedAt" AS incident_resolved_at"#;
 
 const LINE_SELECT: &str = r#"SELECT tl.id, tl."transferId" AS transfer_id, tl."productId" AS product_id,
     tl."quantitySent" AS quantity_sent, tl."quantityReceived" AS quantity_received,
@@ -485,6 +486,39 @@ pub async fn add_message(
             let row: TransferMessageRow =
                 sqlx::query_as(&sql).bind(id).fetch_one(&mut **tx).await?;
             Ok(Ok(TransferMessage::from(row)))
+        })
+        .await?;
+    result
+}
+
+/// `POST /transfers/:id/resolve-incident` — marca la incidencia como solucionada
+/// (`incidentResolvedAt = now()`, idempotente: respeta la primera marca). El hilo de
+/// chat se conserva. Acceso como recibir/mensajes (org-wide o tienda destino).
+pub async fn resolve_incident(
+    pool: &PgPool,
+    org: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
+    id: Uuid,
+) -> Result<TransferWithLines, AppError> {
+    let result: Result<TransferWithLines, AppError> =
+        with_tenant_tx(pool, org, async move |tx, _after| {
+            let Some(t) = load_transfer(tx, org, id).await? else {
+                return Ok(Err(AppError::NotFound));
+            };
+            if !is_org_wide && !has_store_access(tx, user_id, t.dest_store_id).await? {
+                return Ok(Err(AppError::Forbidden));
+            }
+            sqlx::query(
+                r#"UPDATE "Transfer" SET "incidentResolvedAt" = now()
+                   WHERE id = $1 AND "organizationId" = $2 AND "incidentResolvedAt" IS NULL"#,
+            )
+            .bind(id)
+            .bind(org)
+            .execute(&mut **tx)
+            .await?;
+            let t2 = load_transfer(tx, org, id).await?.expect("resuelto");
+            Ok(Ok(with_lines(tx, t2).await?))
         })
         .await?;
     result

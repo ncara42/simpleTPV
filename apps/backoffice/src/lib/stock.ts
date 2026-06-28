@@ -80,6 +80,12 @@ export function postTransferMessage(
   return api.post<TransferMessage>(`/transfers/${id}/messages`, input);
 }
 
+// Marca la incidencia de recepción como solucionada (el traspaso deja de contar como
+// incidencia abierta; el chat se conserva).
+export function resolveTransferIncident(id: string): Promise<Transfer> {
+  return api.post<Transfer>(`/transfers/${id}/resolve-incident`);
+}
+
 export function adjustStock(input: AdjustStockInput): Promise<unknown> {
   return api.post('/stock/adjust', input);
 }

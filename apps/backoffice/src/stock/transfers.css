@@ -571,24 +571,27 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  /* Misma altura (2.25rem) y radio (--ui-radius-sm) compartido con la píldora. */
+  /* Misma altura (2.25rem) y radio (--ui-radius-sm) compartido con la píldora. Color
+     neutro: vale tanto para incidencias (rojo al lado) como para «Solucionado» (verde). */
   height: 2.25rem;
   padding: 0 0.85rem;
-  border: 1px solid color-mix(in srgb, var(--ui-danger) 30%, var(--ui-border));
+  border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-sm);
   background: var(--ui-surface);
-  color: var(--ui-danger);
+  color: var(--ui-text-muted);
   font: inherit;
   font-size: 0.76rem;
   font-weight: 600;
   cursor: pointer;
   transition:
     background var(--ui-motion-fast) var(--ui-ease),
-    border-color var(--ui-motion-fast) var(--ui-ease);
+    border-color var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
 }
 .tr-review-chat:hover {
-  background: color-mix(in srgb, var(--ui-danger) 10%, var(--ui-surface));
-  border-color: color-mix(in srgb, var(--ui-danger) 45%, var(--ui-border));
+  border-color: var(--ui-brand);
+  color: var(--ui-brand);
+  background: var(--ui-brand-soft);
 }
 .tr-review-chat:focus-visible {
   outline: none;

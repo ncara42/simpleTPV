@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { RESIZE_DIRS, useFloatingWindow, type WindowRect } from '../hooks/use-floating-window.js';
 import { fileToCompressedDataUrl } from '../lib/image.js';
@@ -30,6 +30,8 @@ export interface TransferChatProps {
   loading?: boolean;
   sending?: boolean;
   emptyHint?: string;
+  /** Franja opcional bajo la cabecera (p. ej. «¿Solucionado? Sí»). */
+  banner?: ReactNode;
   testId?: string;
 }
 
@@ -44,6 +46,7 @@ export function TransferChat({
   loading = false,
   sending = false,
   emptyHint = 'Sin mensajes todavía. Escribe el primero.',
+  banner,
   testId,
 }: TransferChatProps) {
   const [text, setText] = useState('');
@@ -114,6 +117,8 @@ export function TransferChat({
             <IconX />
           </button>
         </header>
+
+        {banner}
 
         <div className="tc-scroll" ref={scrollRef}>
           {loading ? (

@@ -411,6 +411,10 @@ pub fn build_router(state: AppState) -> Router {
             "/transfers/{id}/messages",
             post(transfers::add_message).get(transfers::list_messages),
         )
+        .route(
+            "/transfers/{id}/resolve-incident",
+            post(transfers::resolve_incident),
+        )
         // Pedidos de tienda (Fase 4, #154): ALIAS de traspasos en otra ruta — el
         // StoreOrdersController de NestJS delega entero en TransfersService con los
         // mismos DTOs. Mismos handlers, mismas reglas de rol.
@@ -429,6 +433,10 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/store-orders/{id}/messages",
             post(transfers::add_message).get(transfers::list_messages),
+        )
+        .route(
+            "/store-orders/{id}/resolve-incident",
+            post(transfers::resolve_incident),
         )
         // Cierre Z (Fase 4, #124): arqueo fiscal diario por tienda. ADMIN/MANAGER.
         .route("/z-report", get(z_report::get))

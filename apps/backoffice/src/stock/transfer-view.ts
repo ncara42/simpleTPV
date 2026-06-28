@@ -120,6 +120,11 @@ export function hasReviewIncidence(t: Transfer): boolean {
     return short || note;
   });
 }
+/** Incidencia ABIERTA: hubo incidencia y aún no se ha marcado como solucionada. Es lo
+ *  que tiñe la fila de rojo y enrojece el badge; al resolverla deja de estar abierta. */
+export function isIncidentOpen(t: Transfer): boolean {
+  return hasReviewIncidence(t) && t.incidentResolvedAt == null;
+}
 
 // ─── Estado mostrado ──────────────────────────────────────────────────────────
 const RAW_TO_KEY: Record<RawStatus, TransferStatusKey> = {
@@ -308,7 +313,7 @@ export function fmtDateTime(iso: string): string {
 /** Tono de la píldora de unidades: el color solo aparece cuando importa. */
 export type UnitsBadgeTone = 'neutral' | 'received' | 'incid';
 export function unitsBadgeTone(t: Transfer): UnitsBadgeTone {
-  if (hasReviewIncidence(t)) return 'incid';
+  if (isIncidentOpen(t)) return 'incid';
   if (t.status === 'RECEIVED') return 'received';
   return 'neutral';
 }
@@ -343,7 +348,7 @@ export function buildRow(t: Transfer, nameOf: StoreNameResolver): TransferRowVM 
     createdLabel: fmtShortDate(t.createdAt),
     unitsLabel: showRecv ? `${unitsReceived(t)} / ${sent}` : `${sent}`,
     badgeTone: unitsBadgeTone(t),
-    incident: hasReviewIncidence(t),
+    incident: isIncidentOpen(t),
   };
 }
 
@@ -368,8 +373,9 @@ export interface ReviewIncident {
   qtyLabel: string;
   short: boolean;
 }
-/** Estado del cuadro de revisión: aún sin recibir · todo perfecto · con incidencias. */
-export type ReviewState = 'pending' | 'perfect' | 'incidents';
+/** Estado del cuadro de revisión: sin recibir · todo perfecto · con incidencias ·
+ *  incidencia solucionada (hubo incidencia pero ya se resolvió desde el chat). */
+export type ReviewState = 'pending' | 'perfect' | 'incidents' | 'resolved';
 
 export type TimelineTone = 'done' | 'ok' | 'transit' | 'incid' | 'pending';
 export interface TimelineStep {
@@ -509,9 +515,11 @@ export function buildTransferDetail(
   });
   const reviewState: ReviewState = !showRecv
     ? 'pending'
-    : incidents.length > 0
-      ? 'incidents'
-      : 'perfect';
+    : incidents.length === 0
+      ? 'perfect'
+      : t.incidentResolvedAt != null
+        ? 'resolved'
+        : 'incidents';
   return {
     id: t.id,
     primary: transferLabel(t, nameOf),

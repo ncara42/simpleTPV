@@ -28,8 +28,20 @@ export function TransferRowDetail({
   const { data: messages = [] } = useQuery({
     queryKey: ['transfer-messages', detail.id],
     queryFn: () => listTransferMessages(detail.id),
-    enabled: detail.reviewState === 'incidents',
+    enabled: detail.reviewState === 'incidents' || detail.reviewState === 'resolved',
   });
+
+  const seeMessages = (
+    <button
+      type="button"
+      className="tr-review-chat"
+      onClick={onOpenChat}
+      data-testid="transfer-review-chat"
+    >
+      <MessageCircle size={13} aria-hidden="true" />
+      Ver {messages.length} {messages.length === 1 ? 'mensaje' : 'mensajes'}
+    </button>
+  );
 
   return (
     <div className="tr-detail" data-testid="transfer-detail">
@@ -73,6 +85,16 @@ export function TransferRowDetail({
                 </span>
                 Todo en perfecto estado
               </div>
+            ) : detail.reviewState === 'resolved' ? (
+              <div className="tr-review-row">
+                <div className="tr-review-ok" data-testid="transfer-review-resolved">
+                  <span className="tr-review-tick" aria-hidden="true">
+                    <Check size={14} strokeWidth={3} />
+                  </span>
+                  Solucionado
+                </div>
+                {seeMessages}
+              </div>
             ) : (
               <div className="tr-review-row">
                 <div className="tr-review-bad" data-testid="transfer-review-incidents">
@@ -81,15 +103,7 @@ export function TransferRowDetail({
                     {incidents} {incidents === 1 ? 'incidencia' : 'incidencias'}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  className="tr-review-chat"
-                  onClick={onOpenChat}
-                  data-testid="transfer-review-chat"
-                >
-                  <MessageCircle size={13} aria-hidden="true" />
-                  Ver {messages.length} {messages.length === 1 ? 'mensaje' : 'mensajes'}
-                </button>
+                {seeMessages}
               </div>
             )}
           </section>

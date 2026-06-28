@@ -618,6 +618,8 @@ export interface StoreOrder {
   sentAt: string | null;
   receivedAt: string | null;
   closedAt: string | null;
+  /** Marca de tiempo en que se resolvió la incidencia de recepción (null si abierta). */
+  incidentResolvedAt: string | null;
   lines: StoreOrderLine[];
 }
 
