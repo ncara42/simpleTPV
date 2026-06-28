@@ -134,7 +134,8 @@ const RAW_TO_KEY: Record<RawStatus, TransferStatusKey> = {
   CLOSED: 'closed',
 };
 export function statusKey(t: Transfer): TransferStatusKey {
-  if (t.status === 'RECEIVED' && hasIncidence(t)) return 'incid';
+  // Solo cuenta como incidencia mientras esté ABIERTA; al resolverla vuelve a su estado.
+  if (t.status === 'RECEIVED' && isIncidentOpen(t)) return 'incid';
   return RAW_TO_KEY[t.status];
 }
 export function statusMeta(t: Transfer): StatusMeta {
@@ -193,7 +194,8 @@ function viewPredicate(view: TransferView): (t: Transfer) => boolean {
     case 'closed':
       return (t) => t.status === 'CLOSED';
     case 'incid':
-      return (t) => hasIncidence(t);
+      // Solo incidencias ABIERTAS; las resueltas salen del filtro y quedan en su estado.
+      return (t) => isIncidentOpen(t);
     default:
       return () => true;
   }

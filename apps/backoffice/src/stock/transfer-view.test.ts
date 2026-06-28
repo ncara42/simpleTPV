@@ -93,6 +93,24 @@ describe('transfer-view · cantidades y estado', () => {
     expect(statusKey(ok)).toBe('received');
     expect(statusKey(short)).toBe('incid');
   });
+
+  it('una incidencia resuelta sale de «Con incidencia» y vuelve a su estado', () => {
+    const open = makeTransfer({
+      id: 'a',
+      status: 'RECEIVED',
+      lines: [line({ quantitySent: '5', quantityReceived: '3' })],
+    });
+    const resolved = makeTransfer({
+      id: 'b',
+      status: 'CLOSED',
+      incidentResolvedAt: '2026-06-22T10:00:00.000Z',
+      lines: [line({ quantitySent: '5', quantityReceived: '3' })],
+    });
+    // El resuelto deja de contar como incidencia abierta.
+    expect(statusKey(resolved)).toBe('closed');
+    expect(applyView([open, resolved], 'incid').map((t) => t.id)).toEqual(['a']);
+    expect(applyView([open, resolved], 'closed').map((t) => t.id)).toEqual(['b']);
+  });
 });
 
 describe('transfer-view · nombre y ruta', () => {
