@@ -79,6 +79,18 @@
   text-overflow: ellipsis;
 }
 
+/* Acciones dentro de la isla (tras el título): separadas del rótulo por un filete vertical, se
+   leen como «atrás · vista ┊ acción». Aloja el lanzador 🤖 del asistente. */
+.topbar-island-actions {
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  gap: 0.1rem;
+  padding-left: 0.3rem;
+  margin-left: 0.15rem;
+  border-left: 1px solid var(--ui-border);
+}
+
 /* ─── Botón-icono (atrás · tema · campana) ─────────────────────────────────────
    Esquina 8px (controles «sharp» del sistema Geist), fantasma en reposo. */
 .topbar-icon-btn {

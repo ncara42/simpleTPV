@@ -2,10 +2,10 @@ import { Bot } from 'lucide-react';
 
 import { useAssistantStore } from '../../lib/assistant-store.js';
 
-// Lanzador del asistente de IA: icon-button 🤖 que vive en la ISLA central de la TopBar, junto al
-// buscador ⌘K (zona «buscar/pedir»). Presente en TODAS las views, incluido el Dashboard. Togglea
-// la ventana flotante (useAssistantStore); el estado `open` se refleja como `is-active` + aria-pressed.
-// Reusa `.topbar-icon-btn` para igualar a los demás controles de la isla (atrás · tema · campana).
+// Lanzador del asistente de IA: icon-button 🤖 que vive DENTRO de la isla central de la TopBar, tras
+// el título de la vista y separado por un filete (← Inventario ┊ 🤖). Presente en TODAS las views,
+// incluido el Dashboard. Togglea el asistente (useAssistantStore); el estado `open` se refleja como
+// `is-active` + aria-pressed. Reusa `.topbar-icon-btn` para igualar a los demás controles de la isla.
 export function AssistantLauncher() {
   const open = useAssistantStore((s) => s.open);
   const toggle = useAssistantStore((s) => s.toggle);

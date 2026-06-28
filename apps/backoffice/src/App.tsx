@@ -295,9 +295,10 @@ function Home() {
                 notificationCount={notificationCount}
                 notificationsActive={tab === 'notifications'}
                 search={<FunctionSearch onNavigate={navigateTo} />}
-                // Lanzador del asistente de IA: ✦ en la isla, tras el buscador ⌘K. Togglea el drawer
-                // lateral (useAssistantStore). Presente en TODAS las views, incluido el Dashboard.
-                islandEnd={<AssistantLauncher />}
+                // Lanzador del asistente de IA: 🤖 DENTRO de la isla central, tras el título y
+                // separado por un filete (← Inventario ┊ 🤖). Togglea el asistente (useAssistantStore).
+                // Presente en TODAS las views, incluido el Dashboard.
+                islandActions={<AssistantLauncher />}
                 pageActions={<PageActionsSlot />}
                 pageNav={
                   // En el lienzo del dashboard, las herramientas (Editar/Mover/Goma) viven DENTRO

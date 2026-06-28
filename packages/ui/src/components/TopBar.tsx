@@ -29,10 +29,11 @@ export interface TopBarProps {
   pageActions?: React.ReactNode;
   /** Sub-navegación de la vista activa (pestañas Catálogo/Familias…): columna izquierda. */
   pageNav?: React.ReactNode;
-  /** Lanzador de búsqueda (⌘K): botón independiente en el clúster derecho, junto al robot. */
+  /** Lanzador de búsqueda (⌘K): botón independiente en el clúster derecho. */
   search?: React.ReactNode;
-  /** Slot extra en el clúster derecho, junto a la búsqueda (p. ej. lanzador del asistente de IA). */
-  islandEnd?: React.ReactNode;
+  /** Acciones DENTRO de la isla central, tras el título (p. ej. lanzador del asistente de IA):
+   * separadas del rótulo por un filete, se leen como «atrás · vista ┊ acción». */
+  islandActions?: React.ReactNode;
   /** Slot extra al final del clúster derecho (p. ej. conmutador de modo del dashboard). */
   endSlot?: React.ReactNode;
   /** Cuenta: botón con menú (cerrar sesión) en el extremo derecho. */
@@ -172,7 +173,7 @@ export function TopBar({
   pageActions,
   pageNav,
   search,
-  islandEnd,
+  islandActions,
   endSlot,
   account,
 }: TopBarProps) {
@@ -197,10 +198,13 @@ export function TopBar({
         <h1 className="topbar-title" data-testid={titleTestId} title={title}>
           {title}
         </h1>
+        {/* Acciones de la isla (p. ej. robot del asistente): tras el título, separadas por un
+            filete vertical → «atrás · vista ┊ acción». */}
+        {islandActions && <div className="topbar-island-actions">{islandActions}</div>}
       </div>
 
-      {/* Clúster derecho: acciones de vista · campana · búsqueda · robot · extras · cuenta. */}
-      {(pageActions || onNotifications || search || islandEnd || endSlot || account) && (
+      {/* Clúster derecho: acciones de vista · campana · búsqueda · extras · cuenta. */}
+      {(pageActions || onNotifications || search || endSlot || account) && (
         <div className="topbar-right">
           {pageActions && <div className="topbar-page-actions">{pageActions}</div>}
           {onNotifications && (
@@ -226,7 +230,6 @@ export function TopBar({
             </button>
           )}
           {search}
-          {islandEnd}
           {endSlot}
           {account && <AccountMenu account={account} />}
         </div>
