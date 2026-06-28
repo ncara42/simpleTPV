@@ -1,8 +1,8 @@
-import type { ImportResult } from '@simpletpv/auth';
-import { Badge, Button, DataTable, type DataTableColumn, Input } from '@simpletpv/ui';
+import type { ImportResult, Transfer } from '@simpletpv/auth';
+import { Button } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Plus, Upload } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeftRight, Download, Plus, Upload } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
@@ -10,102 +10,156 @@ import { listStores } from '../lib/admin.js';
 import { exportRowsToCsv, parseCsvRows } from '../lib/csv.js';
 import { usePageActions } from '../lib/pageActions.js';
 import { listProducts } from '../lib/products.js';
-import { createTransfer, listTransfers, sendTransfer } from '../lib/stock.js';
+import {
+  closeTransfer,
+  createTransfer,
+  listTransfers,
+  receiveTransfer,
+  sendTransfer,
+} from '../lib/stock.js';
 import { CreateTransferModal } from './CreateTransferModal.js';
 import { dt, STATUS_LABEL } from './labels.js';
-import { fallbackTransferName, transferDisplayName } from './transfer-name.js';
+import { fallbackTransferName } from './transfer-name.js';
+import {
+  applyStoreFacets,
+  applyView,
+  buildFullReceiveInput,
+  buildTransferDetail,
+  computeStoreFacets,
+  computeViewCounts,
+  groupTransfers,
+  searchTransfers,
+  sortTransfers,
+  type TransferActionKind,
+  transferLabel,
+  type TransferView,
+} from './transfer-view.js';
+import { TransferDrawer } from './TransferDrawer.js';
+import { TransferFacets } from './TransferFacets.js';
+import { TransfersTable } from './TransfersTable.js';
+
+// Toggle inmutable de una clave en un Set (origen/destino de las facetas).
+function toggleInSet(set: ReadonlySet<string>, key: string): Set<string> {
+  const next = new Set(set);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  return next;
+}
 
 export function TransfersSection() {
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
   // Modal de importación de traspasos en lote por CSV.
   const [importing, setImporting] = useState(false);
-  // Buscador en cliente sobre la lista ya cargada (P102), sin llamada extra a la API.
+  // Filtros del carril (búsqueda + vista + facetas) y orden — en cliente (P102).
   const [search, setSearch] = useState('');
+  const [view, setView] = useState<TransferView>('all');
+  const [origins, setOrigins] = useState<ReadonlySet<string>>(new Set());
+  const [dests, setDests] = useState<ReadonlySet<string>>(new Set());
+  const [sortDesc, setSortDesc] = useState(true);
+  // Ficha lateral abierta (id del traspaso) o null.
+  const [drawerId, setDrawerId] = useState<string | null>(null);
 
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ['transfers'],
     queryFn: () => listTransfers(),
     placeholderData: keepPreviousData,
   });
-  // Catálogos para resolver el CSV de import: código/nombre de tienda → id y SKU → id.
+  // Catálogos para resolver nombres de tienda/producto y el CSV de import.
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
   const { data: products = [] } = useQuery({
     queryKey: ['products'],
     queryFn: () => listProducts(),
   });
 
+  // ─── Resolutores (memo sobre los catálogos) ─────────────────────────────────
+  const nameOf = useMemo(() => {
+    const byId = new Map(stores.map((s) => [s.id, s.name]));
+    return (id: string): string => byId.get(id) ?? id;
+  }, [stores]);
+  const resolveProduct = useMemo(() => {
+    const byId = new Map(products.map((p) => [p.id, p]));
+    return (productId: string): { name: string; sku: string } => {
+      const p = byId.get(productId);
+      return { name: p?.name ?? productId, sku: p?.sku ?? '' };
+    };
+  }, [products]);
+  const storeIds = useMemo(() => stores.map((s) => s.id), [stores]);
+
+  // ─── Derivaciones (búsqueda → vista → facetas → orden → grupos) ──────────────
+  const afterSearch = useMemo(
+    () => searchTransfers(transfers, search, nameOf),
+    [transfers, search, nameOf],
+  );
+  const afterView = useMemo(() => applyView(afterSearch, view), [afterSearch, view]);
+  const sorted = useMemo(
+    () => sortTransfers(applyStoreFacets(afterView, origins, dests), sortDesc),
+    [afterView, origins, dests, sortDesc],
+  );
+  const groups = useMemo(() => groupTransfers(sorted), [sorted]);
+  const viewCounts = useMemo(() => computeViewCounts(afterSearch), [afterSearch]);
+  const originFacets = useMemo(
+    () => computeStoreFacets(afterView, 'origin', storeIds, nameOf),
+    [afterView, storeIds, nameOf],
+  );
+  const destFacets = useMemo(
+    () => computeStoreFacets(afterView, 'dest', storeIds, nameOf),
+    [afterView, storeIds, nameOf],
+  );
+
+  const showClear = search.trim() !== '' || view !== 'all' || origins.size > 0 || dests.size > 0;
+
+  const drawerTransfer = drawerId ? (transfers.find((t) => t.id === drawerId) ?? null) : null;
+  const detail = useMemo(
+    () => (drawerTransfer ? buildTransferDetail(drawerTransfer, nameOf, resolveProduct) : null),
+    [drawerTransfer, nameOf, resolveProduct],
+  );
+
+  // ─── Mutaciones del ciclo (enviar/recibir/cerrar) ───────────────────────────
+  const invalidate = (): void => {
+    void qc.invalidateQueries({ queryKey: ['transfers'] });
+    void qc.invalidateQueries({ queryKey: ['stock-global'] });
+  };
   const sendMutation = useMutation({
-    mutationFn: sendTransfer,
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['transfers'] });
-      void qc.invalidateQueries({ queryKey: ['stock-global'] });
-    },
+    mutationFn: (id: string) => sendTransfer(id),
+    onSuccess: invalidate,
+  });
+  const receiveMutation = useMutation({
+    mutationFn: (t: Transfer) => receiveTransfer(t.id, buildFullReceiveInput(t)),
+    onSuccess: invalidate,
+  });
+  const closeMutation = useMutation({
+    mutationFn: (id: string) => closeTransfer(id),
+    onSuccess: invalidate,
   });
 
-  type TransferRow = (typeof transfers)[number];
+  // Traspaso con una mutación en vuelo (deshabilita su acción en línea / en la ficha).
+  const pendingId: string | null =
+    (sendMutation.isPending && sendMutation.variables) ||
+    (closeMutation.isPending && closeMutation.variables) ||
+    (receiveMutation.isPending && receiveMutation.variables?.id) ||
+    null;
 
-  const storeName = (id: string): string | undefined => stores.find((s) => s.id === id)?.name;
-  // Nombre mostrado: notes si existe, o el fallback "Origen → Destino" (P105).
-  const displayName = (t: TransferRow): string =>
-    transferDisplayName(t.notes, storeName(t.originStoreId), storeName(t.destStoreId));
+  const runAction = (kind: TransferActionKind, t: Transfer): void => {
+    if (kind === 'send') sendMutation.mutate(t.id);
+    else if (kind === 'receive') receiveMutation.mutate(t);
+    else closeMutation.mutate(t.id);
+  };
 
-  // Filtro en cliente por nombre mostrado y por tiendas (P102), case-insensitive.
-  const query = search.trim().toLowerCase();
-  const filtered = query
-    ? transfers.filter((t) =>
-        [displayName(t), storeName(t.originStoreId) ?? '', storeName(t.destStoreId) ?? '']
-          .join(' ')
-          .toLowerCase()
-          .includes(query),
-      )
-    : transfers;
-  const transferColumns: DataTableColumn<TransferRow>[] = [
-    {
-      key: 'name',
-      header: 'Nombre',
-      render: (t) => <span data-testid="transfer-name-cell">{displayName(t)}</span>,
-    },
-    {
-      key: 'date',
-      header: 'Fecha',
-      render: (t) => <span className="muted">{dt.format(new Date(t.createdAt))}</span>,
-    },
-    { key: 'lines', header: 'Líneas', render: (t) => t.lines.length },
-    {
-      key: 'status',
-      header: 'Estado',
-      render: (t) => (
-        <Badge variant="muted" data-testid="transfer-status">
-          {STATUS_LABEL[t.status] ?? t.status}
-        </Badge>
-      ),
-    },
-    {
-      key: 'actions',
-      header: '',
-      align: 'right',
-      render: (t) =>
-        t.status === 'DRAFT' ? (
-          <button
-            type="button"
-            className="link-btn"
-            disabled={sendMutation.isPending}
-            onClick={() => sendMutation.mutate(t.id)}
-            data-testid="transfer-send"
-          >
-            Enviar
-          </button>
-        ) : null,
-    },
-  ];
+  const clearFilters = (): void => {
+    setSearch('');
+    setView('all');
+    setOrigins(new Set());
+    setDests(new Set());
+  };
 
+  // ─── Exportar (CSV de todos los traspasos) ──────────────────────────────────
   const handleExport = (): void => {
     exportRowsToCsv(
       'traspasos.csv',
       ['Nombre', 'Fecha', 'Líneas', 'Estado'],
       transfers.map((t) => [
-        displayName(t),
+        transferLabel(t, nameOf),
         dt.format(new Date(t.createdAt)),
         String(t.lines.length),
         STATUS_LABEL[t.status] ?? t.status,
@@ -114,9 +168,7 @@ export function TransfersSection() {
   };
 
   // Import en lote: CSV con una línea por producto (origen, destino, sku, cantidad).
-  // Se agrupan las filas con el mismo (origen, destino) en un único traspaso BORRADOR.
-  // Resuelve tiendas por código o nombre y productos por SKU contra los catálogos
-  // cargados; las filas no resolubles se reportan como error sin abortar el lote.
+  // Agrupa filas con el mismo (origen, destino) en un único traspaso BORRADOR.
   const onImportCsv = async (csv: string): Promise<ImportResult> => {
     const storeByKey = new Map<string, string>();
     for (const s of stores) {
@@ -126,7 +178,7 @@ export function TransfersSection() {
     const productBySku = new Map(
       products.filter((p) => p.sku).map((p) => [p.sku!.toLowerCase(), p.id] as const),
     );
-    const groups = new Map<
+    const groupsByRoute = new Map<
       string,
       {
         originStoreId: string;
@@ -151,18 +203,19 @@ export function TransfersSection() {
         return void errors.push({ row: rowNum, message: `SKU no encontrado: ${row.sku}` });
       if (!(qty > 0)) return void errors.push({ row: rowNum, message: 'Cantidad inválida' });
       const key = `${origin}|${dest}`;
-      const group = groups.get(key) ?? { originStoreId: origin, destStoreId: dest, lines: [] };
+      const group = groupsByRoute.get(key) ?? {
+        originStoreId: origin,
+        destStoreId: dest,
+        lines: [],
+      };
       group.lines.push({ productId, quantitySent: qty });
-      groups.set(key, group);
+      groupsByRoute.set(key, group);
     });
     let inserted = 0;
-    for (const group of groups.values()) {
+    for (const group of groupsByRoute.values()) {
       try {
         // P104: cada traspaso importado recibe el auto-nombre "Origen → Destino".
-        const notes = fallbackTransferName(
-          storeName(group.originStoreId),
-          storeName(group.destStoreId),
-        );
+        const notes = fallbackTransferName(nameOf(group.originStoreId), nameOf(group.destStoreId));
         await createTransfer({ ...group, notes });
         inserted += group.lines.length;
       } catch (e) {
@@ -175,9 +228,17 @@ export function TransfersSection() {
     return { inserted, errors };
   };
 
-  // Export/Import en el clúster flotante (junto al conmutador Backoffice↔TPV).
+  // CTAs de página en la TopBar: Nuevo traspaso (primario) + exportar/importar.
   usePageActions(
     <>
+      <Button
+        type="button"
+        onClick={() => setCreating(true)}
+        data-testid="new-transfer"
+        icon={<Plus size={16} aria-hidden="true" />}
+      >
+        Nuevo traspaso
+      </Button>
       <button
         type="button"
         className="float-action-btn"
@@ -201,45 +262,69 @@ export function TransfersSection() {
     </>,
   );
 
+  const emptyNode = (
+    <>
+      <ArrowLeftRight size={22} aria-hidden="true" />
+      <span className="tr-empty-title">
+        {isLoading
+          ? 'Cargando…'
+          : transfers.length === 0
+            ? 'Sin traspasos todavía.'
+            : 'Sin traspasos para estos filtros'}
+      </span>
+      {showClear && (
+        <button type="button" className="tr-clear" onClick={clearFilters}>
+          Limpiar filtros
+        </button>
+      )}
+    </>
+  );
+
   return (
     <>
-      <div className="table-panel">
-        <DataTable
-          columns={transferColumns}
-          rows={filtered}
-          rowKey={(t) => t.id}
-          loading={isLoading}
-          toolbar={
-            <div className="users-toolbar">
-              <div className="sales-filters">
-                <span className="search-field">
-                  <Input
-                    className="catalog-search"
-                    placeholder="Buscar traspaso"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    aria-label="Buscar traspaso"
-                    data-testid="transfers-search"
-                  />
-                </span>
-              </div>
-              <div className="ui-dt-toolbar-actions">
-                <Button
-                  type="button"
-                  onClick={() => setCreating(true)}
-                  data-testid="new-transfer"
-                  icon={<Plus size={16} aria-hidden="true" />}
-                >
-                  Nuevo traspaso
-                </Button>
-              </div>
-            </div>
-          }
-          rowTestId="transfer-row"
-          emptyState={<span data-testid="transfers-empty">Sin traspasos.</span>}
-          data-testid="transfers-table"
-        />
+      <div className="tr-card">
+        <div className="catalog--faceted">
+          <div className="cat-layout">
+            <TransferFacets
+              search={search}
+              onSearchChange={setSearch}
+              viewCounts={viewCounts}
+              view={view}
+              onView={setView}
+              origins={origins}
+              dests={dests}
+              originFacets={originFacets}
+              destFacets={destFacets}
+              onToggleOrigin={(id) => setOrigins((s) => toggleInSet(s, id))}
+              onToggleDest={(id) => setDests((s) => toggleInSet(s, id))}
+              showClear={showClear}
+              onClear={clearFilters}
+            />
+            <TransfersTable
+              groups={groups}
+              nameOf={nameOf}
+              count={sorted.length}
+              sortDesc={sortDesc}
+              onToggleSort={() => setSortDesc((d) => !d)}
+              onOpen={(t) => setDrawerId(t.id)}
+              onAction={runAction}
+              pendingId={pendingId}
+              empty={emptyNode}
+            />
+          </div>
+        </div>
       </div>
+
+      {detail && (
+        <TransferDrawer
+          detail={detail}
+          onClose={() => setDrawerId(null)}
+          onAction={(kind) => {
+            if (drawerTransfer) runAction(kind, drawerTransfer);
+          }}
+          pending={pendingId === drawerId}
+        />
+      )}
 
       {creating && (
         <CreateTransferModal

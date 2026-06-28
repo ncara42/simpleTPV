@@ -8,6 +8,7 @@ import './catalog.css';
 import './catalog/inventory-card.css';
 import './catalog/families-nav.css';
 import './stock/existences.css';
+import './stock/transfers.css';
 import './sales/ventas.css';
 import './b2b/customers.css';
 import './b2b/pricelists.css';

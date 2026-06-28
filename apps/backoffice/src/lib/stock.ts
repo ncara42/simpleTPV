@@ -2,6 +2,7 @@ import type {
   AdjustStockInput,
   CreateTransferInput,
   ExpiringBatch,
+  ReceiveTransferInput,
   SetMinStockInput,
   StockAlert,
   StockGlobalRow,
@@ -11,7 +12,14 @@ import type {
 
 import { api } from './auth.js';
 
-export type { AdjustStockInput, ExpiringBatch, StockAlert, StockGlobalRow, Transfer };
+export type {
+  AdjustStockInput,
+  ExpiringBatch,
+  ReceiveTransferInput,
+  StockAlert,
+  StockGlobalRow,
+  Transfer,
+};
 
 export function getGlobalStock(): Promise<StockGlobalRow[]> {
   return api.get<StockGlobalRow[]>('/stock/global');
@@ -43,6 +51,18 @@ export function createTransfer(input: CreateTransferInput): Promise<Transfer> {
 
 export function sendTransfer(id: string): Promise<Transfer> {
   return api.post<Transfer>(`/transfers/${id}/send`);
+}
+
+// SENT→RECEIVED: registra lo recibido por línea. El backend descuadra el origen al
+// enviar y abona el destino al recibir; las líneas con `quantityReceived` < enviado
+// generan discrepancia (incidencia) en el traspaso.
+export function receiveTransfer(id: string, input: ReceiveTransferInput): Promise<Transfer> {
+  return api.post<Transfer>(`/transfers/${id}/receive`, input);
+}
+
+// RECEIVED→CLOSED: cierra el traspaso (estado terminal). No mueve stock.
+export function closeTransfer(id: string): Promise<Transfer> {
+  return api.post<Transfer>(`/transfers/${id}/close`);
 }
 
 export function adjustStock(input: AdjustStockInput): Promise<unknown> {
