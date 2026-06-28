@@ -108,6 +108,18 @@ export function hasIncidence(t: Transfer): boolean {
     return r != null && r < lineSent(l);
   });
 }
+/** ¿Incidencia visible en la revisión? Recibido/cerrado con faltante o comentario del
+ *  empleado. Es la condición que tiñe la fila en rojo y enrojece el badge de unidades. */
+export function hasReviewIncidence(t: Transfer): boolean {
+  const showRecv = t.status === 'RECEIVED' || t.status === 'CLOSED';
+  if (!showRecv) return false;
+  return t.lines.some((l) => {
+    const r = lineReceived(l);
+    const short = r != null && r < lineSent(l);
+    const note = (l.discrepancyNote ?? '').trim() !== '';
+    return short || note;
+  });
+}
 
 // ─── Estado mostrado ──────────────────────────────────────────────────────────
 const RAW_TO_KEY: Record<RawStatus, TransferStatusKey> = {
@@ -296,7 +308,7 @@ export function fmtDateTime(iso: string): string {
 /** Tono de la píldora de unidades: el color solo aparece cuando importa. */
 export type UnitsBadgeTone = 'neutral' | 'received' | 'incid';
 export function unitsBadgeTone(t: Transfer): UnitsBadgeTone {
-  if (statusKey(t) === 'incid') return 'incid';
+  if (hasReviewIncidence(t)) return 'incid';
   if (t.status === 'RECEIVED') return 'received';
   return 'neutral';
 }
@@ -311,9 +323,11 @@ export interface TransferRowVM {
   route: string;
   linesLabel: string;
   createdLabel: string;
-  /** "recibidas/enviadas" cuando ya se recibió/cerró; si no, solo enviadas. */
+  /** "recibidas / enviadas" cuando ya se recibió/cerró; si no, solo enviadas. */
   unitsLabel: string;
   badgeTone: UnitsBadgeTone;
+  /** Incidencia en la recepción → la fila se tiñe de rojo. */
+  incident: boolean;
 }
 export function buildRow(t: Transfer, nameOf: StoreNameResolver): TransferRowVM {
   const note = transferNote(t);
@@ -327,8 +341,9 @@ export function buildRow(t: Transfer, nameOf: StoreNameResolver): TransferRowVM 
     route: transferRoute(t, nameOf),
     linesLabel: String(t.lines.length),
     createdLabel: fmtShortDate(t.createdAt),
-    unitsLabel: showRecv ? `${unitsReceived(t)}/${sent}` : `${sent}`,
+    unitsLabel: showRecv ? `${unitsReceived(t)} / ${sent}` : `${sent}`,
     badgeTone: unitsBadgeTone(t),
+    incident: hasReviewIncidence(t),
   };
 }
 

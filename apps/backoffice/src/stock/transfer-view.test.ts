@@ -261,8 +261,9 @@ describe('transfer-view · fila y ficha', () => {
       }),
       nameOf,
     );
-    expect(row.unitsLabel).toBe('7/10');
+    expect(row.unitsLabel).toBe('7 / 10');
     expect(row.badgeTone).toBe('incid');
+    expect(row.incident).toBe(true);
   });
 
   it('deriva una referencia corta y estable del id', () => {

@@ -6,9 +6,10 @@ import { listTransferAttachments } from '../lib/stock.js';
 import type { TransferActionKind, TransferDetail } from './transfer-view.js';
 
 // Panel de detalle EN LÍNEA de un traspaso (acordeón): se despliega bajo la fila al
-// pulsarla. Muestra meta en rejilla, productos (recibido/enviado) + total, la línea de
-// tiempo, el cuadro «Revisión de recepción» (incidencias/comentarios + fotos, o «Todo
-// en perfecto estado» con tick verde) y la acción real disponible.
+// pulsarla. Muestra meta en rejilla, productos (recibido/enviado) + total y, justo
+// debajo de los productos, el cuadro «Revisión de recepción» (incidencias/comentarios
+// + fotos, o «Todo en perfecto estado» con tick verde); a la derecha, la línea de
+// tiempo. Y por último la acción real disponible.
 
 interface TransferRowDetailProps {
   detail: TransferDetail;
@@ -54,6 +55,59 @@ export function TransferRowDetail({ detail, onAction, pending }: TransferRowDeta
               <span className="tr-line-total-value">{detail.unitsLabel}</span>
             </div>
           </div>
+
+          {/* Revisión de recepción, justo debajo de los productos: comentarios/
+              incidencias por línea + fotos; si no hubo nada, «Todo en perfecto
+              estado» con tick verde. */}
+          <section className="tr-review" data-testid="transfer-review">
+            <h4 className="tr-section-title">Revisión de recepción</h4>
+
+            {detail.reviewState === 'pending' ? (
+              <p className="tr-review-pending">Pendiente de recepción.</p>
+            ) : detail.reviewState === 'perfect' ? (
+              <div className="tr-review-ok" data-testid="transfer-review-ok">
+                <span className="tr-review-tick" aria-hidden="true">
+                  <Check size={14} strokeWidth={3} />
+                </span>
+                Todo en perfecto estado
+              </div>
+            ) : (
+              <ul className="tr-review-list" data-testid="transfer-review-incidents">
+                {detail.incidents.map((inc, i) => (
+                  <li className="tr-review-item" key={i}>
+                    <TriangleAlert className="tr-review-ico" size={14} aria-hidden="true" />
+                    <span className="tr-review-body">
+                      <span className="tr-review-head">
+                        <span className="tr-review-prod">{inc.product}</span>
+                        <span className={`tr-review-qty${inc.short ? ' is-short' : ''}`}>
+                          {inc.qtyLabel}
+                        </span>
+                      </span>
+                      {inc.note && <span className="tr-review-note">{inc.note}</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {photos.length > 0 ? (
+              <div className="tr-photos" data-testid="transfer-photos">
+                {photos.map((a) => (
+                  <button
+                    type="button"
+                    className="tr-photo"
+                    key={a.id}
+                    onClick={() => setLightbox(a.dataUrl)}
+                    title={a.caption ?? 'Foto de la recepción'}
+                  >
+                    <img src={a.dataUrl} alt={a.caption ?? 'Foto de la recepción'} loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            ) : detail.reviewState !== 'pending' ? (
+              <p className="tr-photos-empty">Sin fotos adjuntas.</p>
+            ) : null}
+          </section>
         </div>
 
         <div className="tr-detail-col">
@@ -76,59 +130,6 @@ export function TransferRowDetail({ detail, onAction, pending }: TransferRowDeta
           </div>
         </div>
       </div>
-
-      {/* Revisión de recepción: lo que ve el responsable de central tras recibir el
-          empleado. Comentarios/incidencias por línea + fotos; si no hubo nada,
-          «Todo en perfecto estado» con tick verde. */}
-      <section className="tr-review" data-testid="transfer-review">
-        <h4 className="tr-section-title">Revisión de recepción</h4>
-
-        {detail.reviewState === 'pending' ? (
-          <p className="tr-review-pending">Pendiente de recepción.</p>
-        ) : detail.reviewState === 'perfect' ? (
-          <div className="tr-review-ok" data-testid="transfer-review-ok">
-            <span className="tr-review-tick" aria-hidden="true">
-              <Check size={14} strokeWidth={3} />
-            </span>
-            Todo en perfecto estado
-          </div>
-        ) : (
-          <ul className="tr-review-list" data-testid="transfer-review-incidents">
-            {detail.incidents.map((inc, i) => (
-              <li className="tr-review-item" key={i}>
-                <TriangleAlert className="tr-review-ico" size={14} aria-hidden="true" />
-                <span className="tr-review-body">
-                  <span className="tr-review-head">
-                    <span className="tr-review-prod">{inc.product}</span>
-                    <span className={`tr-review-qty${inc.short ? ' is-short' : ''}`}>
-                      {inc.qtyLabel}
-                    </span>
-                  </span>
-                  {inc.note && <span className="tr-review-note">{inc.note}</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {photos.length > 0 ? (
-          <div className="tr-photos" data-testid="transfer-photos">
-            {photos.map((a) => (
-              <button
-                type="button"
-                className="tr-photo"
-                key={a.id}
-                onClick={() => setLightbox(a.dataUrl)}
-                title={a.caption ?? 'Foto de la recepción'}
-              >
-                <img src={a.dataUrl} alt={a.caption ?? 'Foto de la recepción'} loading="lazy" />
-              </button>
-            ))}
-          </div>
-        ) : detail.reviewState !== 'pending' ? (
-          <p className="tr-photos-empty">Sin fotos adjuntas.</p>
-        ) : null}
-      </section>
 
       {detail.action && (
         <div className="tr-detail-actions">

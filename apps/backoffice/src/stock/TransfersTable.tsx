@@ -139,7 +139,7 @@ function TransferRow({
   return (
     <>
       <tr
-        className={`tr-row${expanded ? ' is-expanded' : ''}`}
+        className={`tr-row${row.incident ? ' is-incid' : ''}${expanded ? ' is-expanded' : ''}`}
         data-testid="transfer-row"
         aria-expanded={expanded}
         onClick={onToggle}

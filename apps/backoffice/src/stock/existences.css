@@ -49,10 +49,13 @@
   border-bottom: 1px solid var(--ui-border);
   white-space: nowrap;
 }
-.ex-th-num {
+/* Scope bajo `.ex-thead` (0-2-0) para ganar al base `.ex-thead th` (0-1-1); si no, el
+   shorthand `padding`/`text-align` del base se impondría y desalinearía las cabeceras.
+   Mismo patrón que el Catálogo (.cat-thead .cat-th-name / .cat-th-num). */
+.ex-thead .ex-th-num {
   text-align: right;
 }
-.ex-th-name {
+.ex-thead .ex-th-name {
   /* Mismo sangrado que el Catálogo (.cat-th-name) para alinear columnas entre pestañas. */
   padding-left: 3.3rem;
 }

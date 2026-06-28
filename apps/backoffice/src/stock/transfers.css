@@ -97,7 +97,8 @@
   width: 5.5rem;
 }
 .tr-col-units {
-  width: 5.5rem;
+  /* Algo más ancha: el contador "15 / 16" (con espacios) necesita aire. */
+  width: 6.75rem;
 }
 .tr-thead th {
   position: sticky;
@@ -119,7 +120,9 @@
 .tr-thead th.tr-th-name {
   padding-left: 3.3rem;
 }
-.tr-th-num {
+/* `.tr-thead th.tr-th-num` (0,1,2) gana a `.tr-thead th` (0,1,1) para alinear a la
+   derecha las cabeceras numéricas (Líneas, Unidades) con sus celdas. */
+.tr-thead th.tr-th-num {
   text-align: right;
 }
 
@@ -189,6 +192,14 @@
 }
 .tr-row.is-expanded {
   background: var(--ui-brand-soft);
+}
+/* Fila con incidencia en la recepción: mismo tinte rojo que Existencias
+   (.ex-row.is-out). Va tras hover/expanded para ganar también en esos estados. */
+.tr-row.is-incid {
+  background: color-mix(in srgb, var(--ui-danger-soft) 55%, var(--ui-surface));
+}
+.tr-row.is-incid:hover {
+  background: color-mix(in srgb, var(--ui-danger-soft) 80%, var(--ui-surface));
 }
 .tr-row > td {
   /* Misma altura compacta que las filas de Inventario/Existencias (.cat-row td / .ex-row td). */
@@ -275,7 +286,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 3.4rem;
+  min-width: 3.9rem;
   height: 1.55rem;
   padding: 0 0.5rem;
   border-radius: 7px;
@@ -444,10 +455,13 @@
 }
 
 /* ─── Revisión de recepción: incidencias/comentarios + fotos ──────────────────── */
+/* Vive bajo «Productos del traspaso» (misma columna): margen corto, no el hueco
+   grande del flex del detalle. */
 .tr-review {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  margin-top: 0.9rem;
 }
 .tr-review-pending {
   margin: 0;
