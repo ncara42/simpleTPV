@@ -156,7 +156,8 @@
   border-bottom: 1px solid var(--ui-border);
   white-space: nowrap;
 }
-.tr-th-name {
+/* `th.tr-th-name` gana a `.tr-thead th` para que la cabecera alinee con el texto de fila. */
+.tr-thead th.tr-th-name {
   padding-left: 1.9rem;
 }
 .tr-th-num {
@@ -238,29 +239,34 @@
   border-bottom: 1px solid var(--ui-border);
   color: var(--ui-text);
 }
-.tr-cell-name {
-  /* `position: relative` ancla el caret; SIN `overflow: hidden` aquí (recortaba el caret
-     contra el borde de la columna). La elipsis del nombre la hacen `.tr-ref`/`.tr-note`. */
-  position: relative;
-  padding-left: 1.9rem;
+/* Celda Traspaso: caret + nombre en una fila flex, para que el caret tenga su propio
+   hueco y NUNCA se solape con el texto. (Antes el caret iba en absoluto y la sangría de
+   la celda — `padding-left` de `.tr-cell-name` — la pisaba `.tr-row > td` por mayor
+   especificidad, dejando el caret debajo del texto y sin margen.) El selector con `td`
+   gana a `.tr-row > td` para fijar la sangría. */
+.tr-row > td.tr-cell-name {
+  padding-left: 0.6rem;
+}
+.tr-cell-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
 }
 .tr-row-caret {
-  position: absolute;
-  left: 0.6rem;
-  top: 50%;
-  transform: translateY(-50%);
-  flex-shrink: 0;
+  flex: 0 0 auto;
   color: var(--ui-text-soft);
   transition: transform 0.15s ease;
 }
 .tr-row-caret.is-expanded {
-  transform: translateY(-50%) rotate(90deg);
+  transform: rotate(90deg);
 }
 .tr-name-wrap {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   line-height: 1.25;
-  min-width: 0;
 }
 .tr-ref {
   font-size: 0.85rem;

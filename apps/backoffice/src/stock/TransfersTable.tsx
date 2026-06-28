@@ -168,20 +168,22 @@ function TransferRow({
         onClick={onToggle}
       >
         <td className="tr-cell-name">
-          <ChevronRight
-            size={13}
-            className={`tr-row-caret${expanded ? ' is-expanded' : ''}`}
-            aria-hidden="true"
-          />
-          <div className="tr-name-wrap">
-            <span className="tr-ref" data-testid="transfer-ref">
-              {row.ref}
-            </span>
-            {row.hasNote && (
-              <span className="tr-note" data-testid="transfer-note">
-                {row.note}
+          <div className="tr-cell-name-row">
+            <ChevronRight
+              size={13}
+              className={`tr-row-caret${expanded ? ' is-expanded' : ''}`}
+              aria-hidden="true"
+            />
+            <div className="tr-name-wrap">
+              <span className="tr-ref" data-testid="transfer-ref">
+                {row.ref}
               </span>
-            )}
+              {row.hasNote && (
+                <span className="tr-note" data-testid="transfer-note">
+                  {row.note}
+                </span>
+              )}
+            </div>
           </div>
         </td>
         <td className="tr-cell-route" data-testid="transfer-route" title={row.route}>
