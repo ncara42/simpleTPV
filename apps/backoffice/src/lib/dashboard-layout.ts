@@ -96,6 +96,11 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'estado-pasos': { w: 4, h: 1 },
   'estado-operativo': { w: 2, h: 1 },
   'estado-cumplimiento': { w: 3, h: 1 },
+  // Sección 11 · Especializados (rediseño): tarjetas de detalle + banner ejecutivo a todo lo ancho.
+  'esp-proveedores': { w: 4, h: 2 },
+  'esp-matriz': { w: 4, h: 2 },
+  'esp-tiendas': { w: 3, h: 2 },
+  'esp-resumen-ejecutivo': { w: 8, h: 2 },
 };
 
 const DEFAULT_SPEC = { w: 4, h: 2 };

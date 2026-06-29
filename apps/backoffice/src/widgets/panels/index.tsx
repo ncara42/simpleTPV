@@ -9,6 +9,12 @@ import {
   CompactTreemap,
 } from './compactos.js';
 import { DiagnosticActivity } from './diagnostico.js';
+import {
+  ExecutiveSummary,
+  StoreBandMatrix,
+  StoreDirectory,
+  SupplierComparison,
+} from './especializados.js';
 import { ComplianceChecks, OperationalStatus, StepProgress } from './estado.js';
 import { HourArea, HourHeatmap, StoreBars } from './graficas.js';
 import { ClassicKpiCard, ConnectedKpiGrid } from './kpis.js';
@@ -83,6 +89,11 @@ export const WIDGET_PANELS: Record<string, (props: PanelProps) => ReactElement> 
   'estado-pasos': StepProgress,
   'estado-operativo': OperationalStatus,
   'estado-cumplimiento': ComplianceChecks,
+  // Sección 11 · Especializados (esp-embudo y esp-calendario diferidos: sin endpoint honesto)
+  'esp-proveedores': SupplierComparison,
+  'esp-matriz': StoreBandMatrix,
+  'esp-tiendas': StoreDirectory,
+  'esp-resumen-ejecutivo': ExecutiveSummary,
 };
 
 // Ids de los widgets con render (para el test de paridad con el catálogo).

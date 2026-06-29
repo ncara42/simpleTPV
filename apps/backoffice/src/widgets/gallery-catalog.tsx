@@ -1098,6 +1098,129 @@ function ThumbEstadoCompliance(): ReactNode {
   );
 }
 
+// ── Sección 11 · Especializados ──
+
+// Comparativa de proveedores: filas «producto · badge mejor (verde) · badge otro (gris)».
+function ThumbEspSuppliers(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[18, 40].map((y, i) => (
+        <g key={i}>
+          <rect x={8} y={y - 4} width={34} height={6} rx={3} fill={SOFT_BLUE} />
+          <rect x={62} y={y - 7} width={30} height={13} rx={4} fill="var(--ui-success-soft)" />
+          <rect
+            x={62}
+            y={y - 7}
+            width={30}
+            height={13}
+            rx={4}
+            fill="none"
+            stroke="var(--ui-success)"
+            strokeWidth={1}
+            opacity={0.5}
+          />
+          <rect x={98} y={y - 7} width={26} height={13} rx={4} fill="var(--ui-surface-subtle)" />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// Matriz tienda × franja: rejilla de celdas con intensidad azul descendente.
+function ThumbEspMatrix(): ReactNode {
+  const heat = [
+    [0.7, 1, 0.5],
+    [0.3, 0.7, 1],
+    [0.5, 0.4, 0.2],
+  ];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {heat.map((row, r) =>
+        row.map((t, c) => (
+          <rect
+            key={`${r}-${c}`}
+            x={40 + c * 30}
+            y={10 + r * 16}
+            width={26}
+            height={12}
+            rx={3}
+            fill={`color-mix(in oklab, var(--ui-brand) ${Math.round(8 + t * 92)}%, var(--ui-surface))`}
+          />
+        )),
+      )}
+      {[10, 26, 42].map((y, r) => (
+        <rect key={r} x={8} y={y + 3} width={24} height={5} rx={2.5} fill={SOFT_BLUE} />
+      ))}
+    </svg>
+  );
+}
+
+// Tiendas: filas con pin de ubicación + rótulo.
+function ThumbEspStores(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[16, 34, 52].map((y, i) => (
+        <g key={i}>
+          <path
+            d={`M14,${y - 6} a5,5 0 0 1 0,10 a5,5 0 0 1 0,-10 M14,${y + 6} l-4,-5 a5,5 0 1 1 8,0 z`}
+            fill="none"
+            stroke={i < 2 ? 'var(--ui-brand)' : 'var(--ui-text-soft)'}
+            strokeWidth={1.6}
+          />
+          <rect x={28} y={y - 3} width={70} height={6} rx={3} fill={SOFT_BLUE} />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// Resumen ejecutivo: banda de texto + grupo de cifras a la derecha.
+function ThumbEspExec(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <rect x={8} y={12} width={26} height={4} rx={2} fill="var(--ui-brand)" />
+      <rect x={8} y={22} width={62} height={5} rx={2.5} fill={SOFT_BLUE} />
+      <rect x={8} y={32} width={54} height={5} rx={2.5} fill={SOFT_BLUE} />
+      {[82, 104].map((x, i) => (
+        <g key={i}>
+          <rect
+            x={x}
+            y={16}
+            width={20}
+            height={26}
+            rx={3}
+            fill="none"
+            stroke="var(--ui-border)"
+            strokeWidth={1}
+          />
+          <rect x={x + 4} y={22} width={12} height={6} rx={2} fill="var(--ui-brand)" />
+          <rect x={x + 4} y={32} width={12} height={3} rx={1.5} fill={SOFT_BLUE} />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 // Entradas de la galería (se amplía por tandas).
 export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
   // Sección 01 · KPIs
@@ -1367,5 +1490,34 @@ export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
     category: 'estado',
     description: 'Cadena VeriFactu y cajas sin pendientes',
     thumbnail: <ThumbEstadoCompliance />,
+  },
+  // Sección 11 · Especializados (esp-embudo y esp-calendario diferidos: sin endpoint honesto)
+  {
+    id: 'esp-proveedores',
+    label: 'Comparativa de proveedores',
+    category: 'especializados',
+    description: 'Precio por proveedor con el mejor marcado',
+    thumbnail: <ThumbEspSuppliers />,
+  },
+  {
+    id: 'esp-matriz',
+    label: 'Matriz tienda × franja',
+    category: 'especializados',
+    description: 'Intensidad de ventas por tienda y franja horaria',
+    thumbnail: <ThumbEspMatrix />,
+  },
+  {
+    id: 'esp-tiendas',
+    label: 'Tiendas (directorio)',
+    category: 'especializados',
+    description: 'Listado de tiendas con estado operativo',
+    thumbnail: <ThumbEspStores />,
+  },
+  {
+    id: 'esp-resumen-ejecutivo',
+    label: 'Resumen ejecutivo',
+    category: 'especializados',
+    description: 'Banner mensual con prosa y cifras clave',
+    thumbnail: <ThumbEspExec />,
   },
 ];
