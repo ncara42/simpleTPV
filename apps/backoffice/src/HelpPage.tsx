@@ -2,52 +2,15 @@ import './help.css';
 
 import { usePageHeader } from '@simpletpv/ui';
 import { ArrowUp, Loader2, Search, Square, ThumbsDown, ThumbsUp } from 'lucide-react';
-import {
-  type FormEvent,
-  Fragment,
-  type RefObject,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type FormEvent, Fragment, type RefObject, useEffect, useRef, useState } from 'react';
 
 import { ChatMarkdown } from './components/chat/ChatMarkdown.js';
-import { useChat } from './components/chat/useChat.js';
 import { viewContextFor } from './components/chat/view-context.js';
-import type { ChatMessage } from './lib/chat.js';
+import { useSupportChat } from './components/support/useSupportChat.js';
 
-// ── Modelo de presentación: el hilo plano de mensajes → turnos (pregunta + respuesta) ──────
-// La vista de Ayuda lee como un documento, no como un chat: cada pregunta del usuario abre un
-// turno y el texto del asistente se concatena debajo. Los mensajes `tool` no se muestran.
-
-interface Turn {
-  /** Id del mensaje de usuario que abre el turno (clave de React estable). */
-  id: string;
-  question: string;
-  answer: string;
-}
-
-/** Texto visible de un mensaje: solo los bloques `text` (se omite el `thinking`/razonamiento). */
-function textOf(message: ChatMessage): string {
-  return message.content
-    .filter((block) => block.type === 'text')
-    .map((block) => block.text)
-    .join('');
-}
-
-function groupTurns(messages: ChatMessage[]): Turn[] {
-  const turns: Turn[] = [];
-  for (const message of messages) {
-    if (message.role === 'user') {
-      turns.push({ id: message.id, question: textOf(message), answer: '' });
-    } else if (message.role === 'assistant') {
-      const current = turns[turns.length - 1];
-      if (current) current.answer += textOf(message);
-    }
-  }
-  return turns;
-}
+// La vista de Ayuda lee como un documento: cada pregunta del usuario abre un turno y la
+// respuesta (de la IA o, tras escalar, del equipo de soporte) se concatena debajo. El
+// agrupado en turnos vive en `useSupportChat`.
 
 // ── Buscador / composer ────────────────────────────────────────────────────────────────────
 
@@ -138,22 +101,23 @@ function HelpAsk({
 interface HelpTurnProps {
   question: string;
   answer: string;
-  /** True en el turno en vivo: pinta el caret y, sin texto aún, el indicador «Pensando». */
+  /** True en el turno en vivo sin respuesta aún: pinta el indicador «Pensando». */
   streaming: boolean;
 }
 
 function HelpTurn({ question, answer, streaming }: HelpTurnProps) {
   return (
     <article className="help-turn">
-      <p className="help-turn__eyebrow">Tu pregunta</p>
-      <h2 className="help-turn__q">{question}</h2>
-      <hr className="help-rule" />
+      {question ? (
+        <>
+          <p className="help-turn__eyebrow">Tu pregunta</p>
+          <h2 className="help-turn__q">{question}</h2>
+          <hr className="help-rule" />
+        </>
+      ) : null}
       <div className="help-answer" aria-live={streaming ? 'polite' : undefined}>
         {answer ? (
-          <>
-            <ChatMarkdown>{answer}</ChatMarkdown>
-            {streaming && <span className="help-cursor" aria-hidden="true" />}
-          </>
+          <ChatMarkdown>{answer}</ChatMarkdown>
         ) : (
           streaming && (
             <p className="help-thinking" role="status">
@@ -250,25 +214,19 @@ function AnswerFooter({ suggestions, onSuggest }: AnswerFooterProps) {
 export function HelpPage() {
   usePageHeader('Ayuda', 'Centro de ayuda');
 
-  const view = useMemo(() => viewContextFor('help'), []);
-  const chat = useChat({ enabled: true, view: { id: view.id, label: view.label } });
+  const view = viewContextFor('help');
+  const chat = useSupportChat();
 
   const [draft, setDraft] = useState('');
   const barInputRef = useRef<HTMLInputElement>(null);
 
-  const turns = useMemo(() => groupTurns(chat.messages), [chat.messages]);
-  const hasThread = turns.length > 0 || chat.streaming;
-  const noAi = chat.modelsLoaded && chat.models.length === 0;
-  const disabled = noAi || !chat.model;
-  const status: AskStatus = !chat.streaming
-    ? 'ready'
-    : chat.streamingText || chat.streamingReasoning
-      ? 'streaming'
-      : 'submitted';
+  const turns = chat.turns;
+  const hasThread = turns.length > 0 || chat.pending;
+  const status: AskStatus = chat.pending ? 'submitted' : 'ready';
 
   const submit = (): void => {
     const text = draft.trim();
-    if (!text || disabled) return;
+    if (!text) return;
     chat.send(text);
     setDraft('');
   };
@@ -287,6 +245,13 @@ export function HelpPage() {
     </div>
   );
 
+  // Aviso de que una persona de soporte está al cargo (tras escalar).
+  const humanBanner = chat.mode === 'human' && (
+    <p className="help-human" role="status" data-testid="help-human">
+      Estás hablando con nuestro equipo de soporte. Te responderemos por aquí.
+    </p>
+  );
+
   // ── Reposo: landing centrado ──
   if (!hasThread) {
     return (
@@ -295,8 +260,8 @@ export function HelpPage() {
           <p className="help-hero-eyebrow">Centro de ayuda</p>
           <h1 className="help-hero-title">¿En qué podemos ayudarte?</h1>
           <p className="help-hero-subtitle">
-            Pregunta lo que quieras sobre tu TPV y te respondo al momento. Soporte de lunes a
-            viernes, de 9:00 a 19:00.
+            Pregunta lo que quieras sobre tu TPV y te respondo al momento. Si no puedo resolverlo,
+            lo derivo a una persona del equipo. Soporte de lunes a viernes, de 9:00 a 19:00.
           </p>
           <HelpAsk
             variant="hero"
@@ -305,21 +270,15 @@ export function HelpPage() {
             onSubmit={submit}
             onStop={chat.stop}
             status={status}
-            disabled={disabled}
+            disabled={false}
           />
-          {noAi ? (
-            <p className="help-noai" role="status" data-testid="help-no-ai">
-              El asistente no está disponible ahora mismo. Inténtalo de nuevo en unos minutos.
-            </p>
-          ) : (
-            <HelpChips
-              suggestions={view.suggestions}
-              onPick={(text) => {
-                setDraft('');
-                chat.send(text);
-              }}
-            />
-          )}
+          <HelpChips
+            suggestions={view.suggestions}
+            onPick={(text) => {
+              setDraft('');
+              chat.send(text);
+            }}
+          />
           {errorBanner}
         </section>
       </section>
@@ -331,15 +290,15 @@ export function HelpPage() {
     <section className="help-page help-page--reading" data-testid="help-page">
       <div className="help-doc-wrap">
         <div className="help-doc">
+          {humanBanner}
           {errorBanner}
           {turns.map((turn, index) => {
             const isLast = index === turns.length - 1;
-            const live = isLast && chat.streaming;
-            const answer = live ? chat.streamingText : turn.answer;
+            const live = isLast && chat.pending && !turn.answer;
             return (
               <Fragment key={turn.id}>
-                <HelpTurn question={turn.question} answer={answer} streaming={live} />
-                {isLast && !chat.streaming && (
+                <HelpTurn question={turn.question} answer={turn.answer} streaming={live} />
+                {isLast && !chat.pending && chat.mode === 'ai' && (
                   <AnswerFooter
                     suggestions={view.suggestions}
                     onSuggest={(text) => {
@@ -363,7 +322,7 @@ export function HelpPage() {
             onSubmit={submit}
             onStop={chat.stop}
             status={status}
-            disabled={disabled}
+            disabled={false}
           />
         </div>
       </div>
