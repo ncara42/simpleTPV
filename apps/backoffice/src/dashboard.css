@@ -2043,12 +2043,14 @@
 }
 .dash-grid-flow {
   display: grid;
-  /* Rejilla REAL de 12 columnas a ANCHO COMPLETO (sin `max-width` ni centrado): los bloques teselan
-     ocupando sus unidades enteras exactas (recuperadas del tamaño del lienzo) y llenan toda la
-     anchura. `GridBoard` sobrescribe `grid-template-columns` inline con las columnas EFECTIVAS según
-     el ancho disponible (degradación responsive); esto es el fallback de 12 columnas antes de medir.
-     `minmax(0, 1fr)` evita que el contenido (gráficas/tablas) ensanche su columna y rompa el encaje. */
+  /* Rejilla REAL, GRUESA y REGULAR de 12 columnas a ANCHO COMPLETO (sin `max-width` ni centrado): las
+     tallas a medida (rejilla fina) se cuantizan a esta rejilla gruesa en `GridBoard` (`gridCoarseUnits`),
+     así el modo ordenado se ve como una rejilla limpia con gutter. `GridBoard` sobrescribe
+     `grid-template-columns` inline con las columnas EFECTIVAS (degradación responsive); esto es el
+     fallback de 12 antes de medir. `minmax(0, 1fr)` evita que el contenido ensanche su columna. */
   grid-template-columns: repeat(12, minmax(0, 1fr));
+  /* Alto de fila gruesa = GRID_COARSEN×FREE_ROW − gutter ≈ 156px: un tile de `r` filas gruesas mide
+     r×156 + (r−1)×gutter. Con filas gruesas (r pequeño, 1–3) el gutter NO se acumula de forma molesta. */
   grid-auto-rows: 156px;
   /* Las posiciones (columna/fila) las emite `GridBoard` EXPLÍCITAS tras un empaquetado «skyline»
      (compactación vertical sin redimensionar): por eso NO se usa `auto-flow`, que solo rellenaría

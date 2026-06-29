@@ -27,6 +27,8 @@ import {
   type FreeWidget,
   GENERIC_DEFAULT_SIZE,
   GRID_BREAKPOINT_COLS,
+  GRID_COARSE_COLS,
+  gridCoarseUnits,
   ITEM_SPECS,
   migrateFreeLayout,
   NOTE_DEFAULT,
@@ -91,6 +93,20 @@ describe('presetItemIds + ITEM_SPECS', () => {
   });
 });
 
+describe('ITEM_SPECS · tallas a medida por widget (rejilla fina)', () => {
+  it('cada widget del catálogo tiene una talla (w×h) ÚNICA — sin tallas de bloque compartidas', () => {
+    const sizes = Object.values(ITEM_SPECS).map((s) => `${s.w}x${s.h}`);
+    expect(new Set(sizes).size, 'hay tallas duplicadas entre widgets').toBe(sizes.length);
+  });
+
+  it('las tallas usan la resolución FINA, no solo un escalado de la rejilla gruesa anterior', () => {
+    // La rejilla vieja era múltiplos de 100/160 → en unidades finas serían múltiplos de (4,4). Que NO
+    // todas las tallas sean múltiplos de 4 en ambos ejes demuestra que se tallaron a medida del contenido.
+    const allCoarse = Object.values(ITEM_SPECS).every((s) => s.w % 4 === 0 && s.h % 4 === 0);
+    expect(allCoarse).toBe(false);
+  });
+});
+
 describe('WIDGET_SIZE_BOUNDS · límites de tamaño coherentes', () => {
   it('cada widget del catálogo tiene un rango propio (sin caer al genérico)', () => {
     for (const id of Object.keys(ITEM_SPECS)) {
@@ -98,14 +114,14 @@ describe('WIDGET_SIZE_BOUNDS · límites de tamaño coherentes', () => {
     }
   });
 
-  it('todos los rangos son válidos: 1 ≤ minW ≤ maxW ≤ BOARD_COLS y 1 ≤ minH ≤ maxH ≤ 6', () => {
+  it('todos los rangos son válidos: 1 ≤ minW ≤ maxW ≤ BOARD_COLS y 1 ≤ minH ≤ maxH ≤ 24', () => {
     for (const [id, b] of Object.entries(WIDGET_SIZE_BOUNDS)) {
       expect(b.minW, `${id}.minW ≥ 1`).toBeGreaterThanOrEqual(1);
       expect(b.minW, `${id}.minW ≤ maxW`).toBeLessThanOrEqual(b.maxW);
       expect(b.maxW, `${id}.maxW ≤ ${BOARD_COLS}`).toBeLessThanOrEqual(BOARD_COLS);
       expect(b.minH, `${id}.minH ≥ 1`).toBeGreaterThanOrEqual(1);
       expect(b.minH, `${id}.minH ≤ maxH`).toBeLessThanOrEqual(b.maxH);
-      expect(b.maxH, `${id}.maxH ≤ 6`).toBeLessThanOrEqual(6);
+      expect(b.maxH, `${id}.maxH ≤ 24`).toBeLessThanOrEqual(24);
     }
   });
 
@@ -120,51 +136,59 @@ describe('WIDGET_SIZE_BOUNDS · límites de tamaño coherentes', () => {
   });
 
   it('clampWidgetUnits acota a [min,max] tanto por arriba como por abajo', () => {
-    // mini-tiendas: { minW:2, maxW:4, minH:1, maxH:2 }
-    expect(clampWidgetUnits('mini-tiendas', 99, 99)).toEqual({ cols: 4, rows: 2 });
-    expect(clampWidgetUnits('mini-tiendas', 1, 1)).toEqual({ cols: 2, rows: 1 });
-    // dentro de rango → sin cambios
-    expect(clampWidgetUnits('mini-tiendas', 3, 1)).toEqual({ cols: 3, rows: 1 });
+    const b = widgetSizeBounds('mini-tiendas');
+    expect(clampWidgetUnits('mini-tiendas', 999, 999)).toEqual({ cols: b.maxW, rows: b.maxH });
+    expect(clampWidgetUnits('mini-tiendas', 1, 1)).toEqual({ cols: b.minW, rows: b.minH });
+    // la talla de catálogo siempre cae dentro de rango → sin cambios
+    const spec = ITEM_SPECS['mini-tiendas']!;
+    expect(clampWidgetUnits('mini-tiendas', spec.w, spec.h)).toEqual({
+      cols: spec.w,
+      rows: spec.h,
+    });
   });
 
   it('un id desconocido cae al rango genérico (DEFAULT_SIZE_BOUNDS)', () => {
     const b = widgetSizeBounds('id-que-no-existe');
-    expect(b).toEqual({ minW: 2, maxW: 8, minH: 1, maxH: 5 });
+    expect(b).toEqual({ minW: 8, maxW: 32, minH: 4, maxH: 20 });
   });
 
   it('clampWidgetPx convierte px→unidades, acota y vuelve a px (round-trip de la barrera)', () => {
-    // Un tamaño px enorme para cmp-donut (maxW:5, maxH:3) → px del techo.
+    const b = widgetSizeBounds('cmp-donut');
+    // Un tamaño px enorme → px del techo del rango.
     const huge = clampWidgetPx('cmp-donut', 9999, 9999);
-    expect(huge).toEqual({ w: 5 * FREE_COL - FREE_GAP, h: 3 * FREE_ROW - FREE_GAP });
-    // Un tamaño px diminuto → px del suelo (minW:2, minH:1).
+    expect(huge).toEqual({ w: b.maxW * FREE_COL - FREE_GAP, h: b.maxH * FREE_ROW - FREE_GAP });
+    // Un tamaño px diminuto → px del suelo del rango.
     const tiny = clampWidgetPx('cmp-donut', 5, 5);
-    expect(tiny).toEqual({ w: 2 * FREE_COL - FREE_GAP, h: 1 * FREE_ROW - FREE_GAP });
+    expect(tiny).toEqual({ w: b.minW * FREE_COL - FREE_GAP, h: b.minH * FREE_ROW - FREE_GAP });
   });
 
   it('migrateFreeLayout aplica el clamp a tamaños persistidos fuera de rango', () => {
+    const b = widgetSizeBounds('mini-tiendas');
     // Un widget guardado con un tamaño px absurdo (mini, pedido enorme) sale clampado al techo.
     const [el] = migrateFreeLayout([
       { kind: 'widget', id: 'w1', widgetId: 'mini-tiendas', x: 0, y: 0, w: 5000, h: 5000, z: 0 },
     ]) as FreeWidget[];
-    expect(el!.w).toBe(4 * FREE_COL - FREE_GAP); // maxW:4
-    expect(el!.h).toBe(2 * FREE_ROW - FREE_GAP); // maxH:2
+    expect(el!.w).toBe(b.maxW * FREE_COL - FREE_GAP);
+    expect(el!.h).toBe(b.maxH * FREE_ROW - FREE_GAP);
   });
 });
 
 describe('buildDefaultLayout', () => {
-  it('Ventas: paneles (bars y hour) fluyendo en filas de 12', () => {
+  it('Ventas: paneles (bars y hour) fluyendo en filas de BOARD_COLS', () => {
     const layout = buildDefaultLayout(ventas);
     const byId = Object.fromEntries(layout.map((it) => [it.i, it]));
-    // bars(7) ocupa la primera fila completa.
-    expect(byId['dash-bars']).toEqual({ i: 'dash-bars', x: 0, y: 0, w: 7, h: 2 });
-    // hour(7) no cabe junto a bars (7+7>12): salta a la segunda fila.
-    expect(byId['dash-hour']).toEqual({ i: 'dash-hour', x: 0, y: 2, w: 7, h: 2 });
+    const bars = ITEM_SPECS['dash-bars']!;
+    const hour = ITEM_SPECS['dash-hour']!;
+    // bars ocupa la primera fila.
+    expect(byId['dash-bars']).toEqual({ i: 'dash-bars', x: 0, y: 0, w: bars.w, h: bars.h });
+    // hour no cabe junto a bars (2 gráficas grandes > ancho): salta a la fila siguiente (y = alto de bars).
+    expect(byId['dash-hour']).toEqual({ i: 'dash-hour', x: 0, y: bars.h, w: hour.w, h: hour.h });
   });
 
-  it('ningún elemento se sale de las 12 columnas', () => {
+  it('ningún elemento se sale del ancho del tablero (BOARD_COLS)', () => {
     for (const preset of ALL_PRESETS) {
       for (const it of buildDefaultLayout(preset)) {
-        expect(it.x + it.w).toBeLessThanOrEqual(12);
+        expect(it.x + it.w).toBeLessThanOrEqual(BOARD_COLS);
       }
     }
   });
@@ -185,8 +209,8 @@ describe('reconcileLayout', () => {
     const result = reconcileLayout(saved, ['dash-bars', 'dash-hour']);
     expect(result).toHaveLength(2);
     const added = result.find((it) => it.i === 'dash-hour')!;
-    // dash-hour = {w:7,h:2} en ITEM_SPECS.
-    expect(added).toMatchObject({ w: 7, h: 2 });
+    const hour = ITEM_SPECS['dash-hour']!;
+    expect(added).toMatchObject({ w: hour.w, h: hour.h });
     expect(added.y).toBeGreaterThanOrEqual(2);
   });
 
@@ -211,22 +235,22 @@ describe('reconcileLayout', () => {
 
 describe('freeItemSize', () => {
   it('traduce el tamaño de rejilla a píxeles (col×FREE_COL − gap, fila×FREE_ROW − gap)', () => {
-    // dash-bars = {w:7,h:2}
+    const bars = ITEM_SPECS['dash-bars']!;
     expect(freeItemSize('dash-bars')).toEqual({
-      w: 7 * FREE_COL - FREE_GAP,
-      h: 2 * FREE_ROW - FREE_GAP,
+      w: bars.w * FREE_COL - FREE_GAP,
+      h: bars.h * FREE_ROW - FREE_GAP,
     });
-    // dash-hour = {w:7,h:2}
+    const hour = ITEM_SPECS['dash-hour']!;
     expect(freeItemSize('dash-hour')).toEqual({
-      w: 7 * FREE_COL - FREE_GAP,
-      h: 2 * FREE_ROW - FREE_GAP,
+      w: hour.w * FREE_COL - FREE_GAP,
+      h: hour.h * FREE_ROW - FREE_GAP,
     });
   });
 
-  it('cae al tamaño por defecto para ids desconocidos', () => {
+  it('cae al tamaño por defecto (DEFAULT_SPEC = 16×8) para ids desconocidos', () => {
     expect(freeItemSize('no-existe')).toEqual({
-      w: 4 * FREE_COL - FREE_GAP,
-      h: 2 * FREE_ROW - FREE_GAP,
+      w: 16 * FREE_COL - FREE_GAP,
+      h: 8 * FREE_ROW - FREE_GAP,
     });
   });
 });
@@ -259,8 +283,30 @@ describe('freeUnitsFromPx', () => {
   });
 
   it('redondea al entero de celdas más cercano para tamaños libres (notas)', () => {
-    // NOTE_DEFAULT = 240×180 → round((240+16)/100)=3 col, round((180+16)/160)=1 fila.
-    expect(freeUnitsFromPx(NOTE_DEFAULT.w, NOTE_DEFAULT.h)).toEqual({ cols: 3, rows: 1 });
+    // NOTE_DEFAULT = 240×180 → round((240+16)/25)=10 col, round((180+16)/40)=5 fila.
+    expect(freeUnitsFromPx(NOTE_DEFAULT.w, NOTE_DEFAULT.h)).toEqual({ cols: 10, rows: 5 });
+  });
+});
+
+describe('gridCoarseUnits · cuantización a la rejilla gruesa del modo Cuadrícula', () => {
+  it('divide las unidades finas por GRID_COARSEN (≈÷4), redondea y capa a GRID_COARSE_COLS', () => {
+    expect(gridCoarseUnits(48, 8)).toEqual({ cols: GRID_COARSE_COLS, rows: 2 }); // banda ancha → 12×2
+    expect(gridCoarseUnits(16, 8)).toEqual({ cols: 4, rows: 2 }); // tabla → 4×2
+    expect(gridCoarseUnits(29, 9)).toEqual({ cols: 7, rows: 2 }); // gráfica grande → 7×2
+  });
+
+  it('nunca baja de 1×1 y no excede GRID_COARSE_COLS de ancho', () => {
+    expect(gridCoarseUnits(1, 1)).toEqual({ cols: 1, rows: 1 });
+    expect(gridCoarseUnits(999, 999).cols).toBe(GRID_COARSE_COLS);
+  });
+
+  it('toda talla de catálogo cuantiza a una rejilla válida (1..GRID_COARSE_COLS col, ≥1 fila)', () => {
+    for (const [id, s] of Object.entries(ITEM_SPECS)) {
+      const u = gridCoarseUnits(s.w, s.h);
+      expect(u.cols, `${id} cols ≥ 1`).toBeGreaterThanOrEqual(1);
+      expect(u.cols, `${id} cols ≤ ${GRID_COARSE_COLS}`).toBeLessThanOrEqual(GRID_COARSE_COLS);
+      expect(u.rows, `${id} rows ≥ 1`).toBeGreaterThanOrEqual(1);
+    }
   });
 });
 
@@ -575,10 +621,10 @@ describe('GENERIC_DEFAULT_SIZE', () => {
       expect(size.w).toBeGreaterThan(0);
       expect(size.h).toBeGreaterThan(0);
     }
-    // Valores clave del plan.
-    expect(GENERIC_DEFAULT_SIZE.table).toEqual({ w: 6, h: 3 });
-    expect(GENERIC_DEFAULT_SIZE.pie).toEqual({ w: 4, h: 3 });
-    expect(GENERIC_DEFAULT_SIZE.kpi).toEqual({ w: 2, h: 1 });
+    // Valores clave del plan (rejilla fina, ×4 respecto a la rejilla gruesa anterior).
+    expect(GENERIC_DEFAULT_SIZE.table).toEqual({ w: 24, h: 12 });
+    expect(GENERIC_DEFAULT_SIZE.pie).toEqual({ w: 16, h: 12 });
+    expect(GENERIC_DEFAULT_SIZE.kpi).toEqual({ w: 8, h: 4 });
   });
 });
 
@@ -588,14 +634,14 @@ describe('addWidgetToGrid', () => {
     expect(result.lg).toEqual([{ i: 'gen:abc', x: 0, y: 0, w: 6, h: 2 }]);
   });
 
-  it('top-right ancla el widget al borde derecho de las 12 columnas', () => {
+  it('top-right ancla el widget al borde derecho de las BOARD_COLS columnas', () => {
     const result = addWidgetToGrid({}, 'geist-stat-today', { w: 2, h: 1 }, 'top-right');
-    expect(result.lg).toEqual([{ i: 'geist-stat-today', x: 10, y: 0, w: 2, h: 1 }]);
+    expect(result.lg).toEqual([{ i: 'geist-stat-today', x: BOARD_COLS - 2, y: 0, w: 2, h: 1 }]);
   });
 
   it('top-center centra el widget', () => {
     const result = addWidgetToGrid({}, 'w', { w: 4, h: 2 }, 'top-center');
-    expect(result.lg![0]).toMatchObject({ x: 4, w: 4 });
+    expect(result.lg![0]).toMatchObject({ x: Math.floor((BOARD_COLS - 4) / 2), w: 4 });
   });
 
   it('bottom-left lo coloca bajo lo existente', () => {
@@ -606,11 +652,11 @@ describe('addWidgetToGrid', () => {
   });
 
   it('clampa el ancho a las columnas de cada breakpoint presente', () => {
-    // sm tiene 6 columnas: un widget de w:8 se clampa a 6.
+    // sm tiene 24 columnas: un widget de w:30 se clampa a 24; en lg (48) cabe entero.
     const base = { lg: [], sm: [] };
-    const result = addWidgetToGrid(base, 'wide', { w: 8, h: 2 }, 'top-left');
-    expect(result.lg![0]!.w).toBe(8); // lg = 12 cols → cabe
-    expect(result.sm![0]!.w).toBe(GRID_BREAKPOINT_COLS.sm); // 6 → clampado
+    const result = addWidgetToGrid(base, 'wide', { w: 30, h: 2 }, 'top-left');
+    expect(result.lg![0]!.w).toBe(30); // lg = 48 cols → cabe
+    expect(result.sm![0]!.w).toBe(GRID_BREAKPOINT_COLS.sm); // 24 → clampado
   });
 
   it('reemplaza el widget si ya estaba (no lo duplica)', () => {
@@ -636,7 +682,7 @@ describe('addWidgetToGrid', () => {
   });
 
   it('apila en la fila siguiente cuando la primera está llena (F4.2)', () => {
-    const base = { lg: [{ i: 'a', x: 0, y: 0, w: 12, h: 2 }] };
+    const base = { lg: [{ i: 'a', x: 0, y: 0, w: BOARD_COLS, h: 2 }] };
     const result = addWidgetToGrid(base, 'b', { w: 6, h: 2 }, 'top-left');
     const added = result.lg!.find((it) => it.i === 'b')!;
     expect(added).toEqual({ i: 'b', x: 0, y: 2, w: 6, h: 2 });
