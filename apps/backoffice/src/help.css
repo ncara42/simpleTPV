@@ -798,7 +798,26 @@
   background: var(--ui-danger, #ef4444);
 }
 
-/* ── Pie de mensaje: hora + estado (solo último mensaje) ────────────────────────── */
+/* ── Separador de fecha/hora ─────────────────────────────────────────────────────── */
+.ticket-daydiv {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+  color: var(--ui-text-soft);
+  font-size: 0.68rem;
+  font-weight: 500;
+  user-select: none;
+}
+.ticket-daydiv::before,
+.ticket-daydiv::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--ui-border);
+}
+
+/* ── Estado del último mensaje enviado ───────────────────────────────────────────── */
 .ticket-msg-meta {
   display: flex;
   align-items: center;
@@ -807,15 +826,6 @@
 }
 .ticket-msg--user .ticket-msg-meta {
   justify-content: flex-end;
-}
-.ticket-msg-time {
-  font-size: 0.6875rem;
-  line-height: 1;
-  user-select: none;
-  color: var(--ui-text-muted);
-}
-.ticket-msg--user .ticket-msg-time {
-  color: rgba(255, 255, 255, 0.5);
 }
 .ticket-msg-status {
   font-size: 0.6875rem;
