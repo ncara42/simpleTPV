@@ -43,6 +43,31 @@ export const WIDGET_LABELS: Record<string, string> = {
   'kpi-area': 'KPI con área',
   'kpi-alerta': 'KPI de alerta',
   'kpi-7dias': 'KPI 7 días',
+  // Sección 08 · Mini gráficas (rediseño)
+  'mini-tiendas': 'Mini · barras por tienda',
+  'mini-tendencia': 'Mini · línea de tendencia',
+  'mini-acumulado': 'Mini · área acumulada',
+  'mini-donut': 'Mini · donut de familias',
+  'mini-gauge': 'Mini · gauge de margen',
+  'mini-familias': 'Mini · top familias',
+  'mini-heatmap': 'Mini · heatmap horario',
+  'mini-columnas': 'Mini · columnas por hora',
+  // Sección 09 · Listas y tablas (rediseño)
+  'tabla-simple': 'Ventas por tienda (lista)',
+  'tabla-avatar': 'Vendedores (con avatar)',
+  'tabla-estado': 'Estado de stock',
+  'tabla-variacion': 'Variación por tienda',
+  'tabla-ranking': 'Ranking de productos (tabla)',
+  'tabla-tareas': 'Tareas de reposición',
+  // Sección 10 · Estado y progreso (rediseño)
+  'estado-pasos': 'Pasos de un pedido',
+  'estado-operativo': 'Estado operativo de tiendas',
+  'estado-cumplimiento': 'Cumplimiento (VeriFactu/cajas)',
+  // Sección 11 · Especializados (rediseño)
+  'esp-proveedores': 'Comparativa de proveedores',
+  'esp-matriz': 'Matriz tienda × franja',
+  'esp-tiendas': 'Tiendas (directorio)',
+  'esp-resumen-ejecutivo': 'Resumen ejecutivo',
 };
 
 // Tipo de widget en el registry. Los del catálogo son 'kpi' o 'panel' (su render lo posee

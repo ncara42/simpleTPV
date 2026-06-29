@@ -1,0 +1,165 @@
+/* Mini gráficas (rediseño · sección 08 «Mini gráficas» del handoff «Fundación Geist»): visualizaciones
+   de bolsillo para rejillas densas. RÉPLICA EXACTA del handoff — toda superficie/color por token
+   (`--ui-*`), de modo que en claro valen los hex del handoff (#e8e8eb, #0070f3, #71717a, #f4f4f5…) y en
+   oscuro siguen el tema. La rampa azul clara se deriva por `color-mix` del propio acento (sin hex). */
+
+/* Tarjeta del tile: el handoff usa fondo #fff, borde 1px #e8e8eb, radio 12px y padding 16px 18px.
+   Altura NATURAL (como la tarjeta clásica de KPIs): el panel va `bare` (sin chrome) y las visualizaciones
+   llevan alto fijo (64px), de modo que la tarjeta mide su contenido sin depender de que el tile propague
+   altura — evita que los contenedores en `%` colapsen. */
+.mw-card {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+}
+.mw-card--row {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+}
+
+.mw-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+  margin-bottom: 14px;
+}
+.mw-label--mb13 {
+  margin-bottom: 13px;
+}
+.mw-label--bare {
+  margin-bottom: 0;
+}
+
+/* ── Barras · tiendas: barras a fondo, las 3 primeras en acento, el resto en azul suave ── */
+.mw-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+  height: 64px;
+}
+.mw-bars > span {
+  flex: 1;
+  border-radius: 3px;
+  background: var(--ui-brand);
+}
+.mw-bars > span.is-soft {
+  background: color-mix(in oklab, var(--ui-brand) 28%, var(--ui-surface));
+}
+
+/* ── Línea / Área: sparkline de alto fijo (64px), como en el handoff ── */
+.mw-svg {
+  width: 100%;
+  height: 64px;
+  display: block;
+}
+
+/* ── Donut · mix: tarjeta en fila (rótulo+valor a la izquierda, anillo a la derecha) ── */
+.mw-donut-value {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 6px;
+  color: var(--ui-text);
+}
+.mw-donut-ring {
+  flex: none;
+  margin-left: auto;
+  width: 64px;
+  height: 64px;
+}
+
+/* ── Gauge · margen: semicírculo de capacidad con la cifra al pie ── */
+.mw-gauge {
+  position: relative;
+  width: 110px;
+  height: 62px;
+  margin: 8px auto 0;
+}
+.mw-gauge svg {
+  width: 110px;
+  height: 60px;
+  display: block;
+}
+.mw-gauge-value {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ui-text);
+}
+
+/* ── Top familias: rótulo + riel proporcional por familia ── */
+.mw-fam {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.mw-fam-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mw-fam-name {
+  font-size: 11.5px;
+  width: 64px;
+  color: var(--ui-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mw-fam-track {
+  flex: 1;
+  height: 6px;
+  background: var(--ui-surface-subtle);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.mw-fam-fill {
+  display: block;
+  height: 100%;
+  background: var(--ui-brand);
+}
+
+/* ── Heatmap · horas: tira de 11 celdas, intensidad por facturación ── */
+.mw-heat {
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  gap: 3px;
+}
+.mw-heat > span {
+  aspect-ratio: 1;
+  border-radius: 3px;
+}
+.mw-heat-foot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9.5px;
+  color: var(--ui-text-muted);
+  margin-top: 7px;
+}
+
+/* ── Columnas · hora: columnas a fondo; la hora punta en acento, el resto en azul muy suave ── */
+.mw-cols {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 64px;
+}
+.mw-cols > span {
+  flex: 1;
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--ui-brand) 15%, var(--ui-surface));
+}
+.mw-cols > span.is-peak {
+  background: var(--ui-brand);
+}

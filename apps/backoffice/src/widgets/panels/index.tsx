@@ -9,10 +9,35 @@ import {
   CompactTreemap,
 } from './compactos.js';
 import { DiagnosticActivity } from './diagnostico.js';
+import {
+  ExecutiveSummary,
+  StoreBandMatrix,
+  StoreDirectory,
+  SupplierComparison,
+} from './especializados.js';
+import { ComplianceChecks, OperationalStatus, StepProgress } from './estado.js';
 import { HourArea, HourHeatmap, StoreBars } from './graficas.js';
 import { ClassicKpiCard, ConnectedKpiGrid } from './kpis.js';
 import { AlertKpi, AreaKpi, DualKpi, SevenDayKpi } from './kpis-formatos.js';
 import { FamilyShare, ProductRanking, SalesMix } from './listas.js';
+import {
+  MiniCumulativeArea,
+  MiniFamilyDonut,
+  MiniHourColumns,
+  MiniHourHeatmap,
+  MiniMarginGauge,
+  MiniStoreBars,
+  MiniTopFamilies,
+  MiniTrendLine,
+} from './mini.js';
+import {
+  AvatarList,
+  RankingList,
+  SimpleList,
+  StatusList,
+  TaskList,
+  VariationList,
+} from './tabla.js';
 import type { PanelProps } from './types.js';
 
 // Registro de RENDER de los widgets del rediseño. Una entrada por widget; se amplía por tandas (cada
@@ -44,6 +69,31 @@ export const WIDGET_PANELS: Record<string, (props: PanelProps) => ReactElement> 
   'kpi-area': AreaKpi,
   'kpi-alerta': AlertKpi,
   'kpi-7dias': SevenDayKpi,
+  // Sección 08 · Mini gráficas
+  'mini-tiendas': MiniStoreBars,
+  'mini-tendencia': MiniTrendLine,
+  'mini-acumulado': MiniCumulativeArea,
+  'mini-donut': MiniFamilyDonut,
+  'mini-gauge': MiniMarginGauge,
+  'mini-familias': MiniTopFamilies,
+  'mini-heatmap': MiniHourHeatmap,
+  'mini-columnas': MiniHourColumns,
+  // Sección 09 · Listas y tablas
+  'tabla-simple': SimpleList,
+  'tabla-avatar': AvatarList,
+  'tabla-estado': StatusList,
+  'tabla-variacion': VariationList,
+  'tabla-ranking': RankingList,
+  'tabla-tareas': TaskList,
+  // Sección 10 · Estado y progreso
+  'estado-pasos': StepProgress,
+  'estado-operativo': OperationalStatus,
+  'estado-cumplimiento': ComplianceChecks,
+  // Sección 11 · Especializados (esp-embudo y esp-calendario diferidos: sin endpoint honesto)
+  'esp-proveedores': SupplierComparison,
+  'esp-matriz': StoreBandMatrix,
+  'esp-tiendas': StoreDirectory,
+  'esp-resumen-ejecutivo': ExecutiveSummary,
 };
 
 // Ids de los widgets con render (para el test de paridad con el catálogo).

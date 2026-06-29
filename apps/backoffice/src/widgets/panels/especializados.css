@@ -1,0 +1,183 @@
+/* Sección 11 · Especializados (rediseño «Fundación Geist»). Tarjetas a medida del handoff:
+   comparativa de proveedores, matriz tienda×franja, lista de tiendas y banner ejecutivo.
+   Cada tarjeta trae su propio borde/radio (PanelShell bare). Color/forma por token (--ui-*). */
+
+.sp-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 20px 22px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+}
+.sp-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.sp-sub {
+  margin: 4px 0 14px;
+  font-size: 12px;
+  color: var(--ui-text-soft);
+}
+/* Título sin subtítulo (p. ej. «Tiendas»): aporta el aire inferior que da el subtítulo. */
+.sp-title--gap {
+  margin-bottom: 14px;
+}
+
+/* ── Comparativa de proveedores ────────────────────────────────────────── */
+.sp-prov-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--ui-border) 65%, var(--ui-surface));
+}
+.sp-prov-row:last-child {
+  border-bottom: none;
+}
+.sp-prov-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--ui-text);
+}
+.sp-badge {
+  font-size: 11.5px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.sp-badge--best {
+  font-weight: 600;
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+  border: 1px solid color-mix(in oklab, var(--ui-success) 35%, var(--ui-surface));
+}
+.sp-badge--other {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-soft);
+}
+
+/* ── Matriz tienda × franja ────────────────────────────────────────────── */
+.sp-matrix {
+  display: grid;
+  grid-template-columns: 74px repeat(3, 1fr);
+  gap: 5px;
+  align-items: center;
+}
+.sp-matrix-head {
+  font-size: 10px;
+  text-align: center;
+  color: color-mix(in oklab, var(--ui-text-soft) 80%, var(--ui-surface));
+}
+.sp-matrix-rowlabel {
+  font-size: 11.5px;
+  color: var(--ui-text-muted);
+}
+.sp-matrix-cell {
+  height: 22px;
+  border-radius: 4px;
+}
+
+/* ── Lista de tiendas ──────────────────────────────────────────────────── */
+.sp-store-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--ui-border) 65%, var(--ui-surface));
+}
+.sp-store-row:last-child {
+  border-bottom: none;
+}
+.sp-store-pin {
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.sp-store-pin--on {
+  color: var(--ui-brand);
+}
+.sp-store-pin--off {
+  color: var(--ui-text-soft);
+}
+.sp-store-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--ui-text);
+}
+.sp-store-status {
+  font-size: 11px;
+  font-weight: 600;
+}
+.sp-store-status--on {
+  color: var(--ui-success);
+}
+.sp-store-status--off {
+  color: var(--ui-text-soft);
+}
+
+/* ── Banner: resumen ejecutivo ─────────────────────────────────────────── */
+.sp-exec {
+  flex-direction: row;
+  align-items: center;
+  gap: 30px;
+  flex-wrap: wrap;
+  padding: 24px 26px;
+}
+.sp-exec-prose {
+  flex: 1;
+  min-width: 200px;
+}
+.sp-exec-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-brand);
+}
+.sp-exec-text {
+  margin-top: 8px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ui-text-muted);
+}
+.sp-exec-text strong {
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.sp-exec-text strong.sp-neg {
+  color: var(--ui-danger);
+}
+.sp-exec-stats {
+  display: flex;
+  gap: 1px;
+  background: var(--ui-border);
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.sp-exec-stat {
+  background: var(--ui-surface);
+  padding: 14px 20px;
+  text-align: center;
+}
+.sp-exec-stat-val {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ui-text);
+}
+.sp-exec-stat-val--pos {
+  color: var(--ui-success);
+}
+.sp-exec-stat-val--neg {
+  color: var(--ui-danger);
+}
+.sp-exec-stat-lbl {
+  margin-top: 3px;
+  font-size: 10.5px;
+  color: var(--ui-text-soft);
+}

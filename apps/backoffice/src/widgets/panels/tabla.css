@@ -1,0 +1,151 @@
+/* Listas y tablas (rediseño · sección 09 «Listas y tablas» del handoff «Fundación Geist»): tarjetas de
+   filas (ranking, estado, tareas, datos tabulares). RÉPLICA del handoff — superficie/colores por token
+   (`--ui-*`): en claro valen los hex del handoff (#fff, #e8e8eb, #f0f0f2, semánticos…), en oscuro siguen
+   el tema. Altura natural; el panel va `bare`. */
+
+.tl-card {
+  height: 100%;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  padding: 18px 20px;
+}
+.tl-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ui-text);
+  margin-bottom: 14px;
+}
+
+/* Fila con divisor (lista simple / estado / variación): separador fino entre filas, no en la última.
+   El divisor del handoff (#f0f0f2) es más claro que el borde de tarjeta → se aclara por color-mix. */
+.tl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 11px;
+  padding: 9px 0;
+  font-size: 13px;
+  color: var(--ui-text);
+  border-bottom: 1px solid color-mix(in oklab, var(--ui-border) 65%, var(--ui-surface));
+}
+.tl-row:last-child {
+  border-bottom: 0;
+}
+/* Fila sin divisor (avatar / ranking / tareas): solo padding vertical. */
+.tl-row--plain {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--ui-text);
+}
+
+.tl-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tl-value {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Avatar de iniciales: el 1º tintado de acento, el resto gris. */
+.tl-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex: none;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.tl-avatar--brand {
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-ink);
+}
+
+/* Chip de puesto (ranking): nº1 tintado de acento, resto gris. */
+.tl-rank {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex: none;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.tl-rank--top {
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-ink);
+}
+
+/* Badge de estado (Agotado / Bajo / OK). */
+.tl-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.tl-badge--danger {
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+}
+.tl-badge--warning {
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
+}
+.tl-badge--success {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+
+/* Variación con flecha (▲ verde sube / ▼ rojo baja). */
+.tl-delta {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tl-delta--up {
+  color: var(--ui-success);
+}
+.tl-delta--down {
+  color: var(--ui-danger);
+}
+
+/* Checkbox de tareas: hecha = acento + check blanco; pendiente = borde. */
+.tl-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.tl-check--done {
+  background: var(--ui-brand);
+}
+.tl-check--todo {
+  border: 1.5px solid var(--ui-border-strong);
+}
+.tl-task {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tl-task--done {
+  color: var(--ui-text-muted);
+  text-decoration: line-through;
+}

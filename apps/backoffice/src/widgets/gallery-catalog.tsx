@@ -611,6 +611,616 @@ function ThumbKpi7d(): ReactNode {
   );
 }
 
+// ── Sección 08 · Mini gráficas: miniaturas de bolsillo (mismas viz, en pequeño) ──
+
+// «Mini · barras por tienda»: 5 barras, las 3 primeras en acento, el resto suaves.
+function ThumbMiniStoreBars(): ReactNode {
+  const bars = [100, 94, 90, 78, 75];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {bars.map((h, i) => (
+        <rect
+          key={i}
+          x={8 + i * 24}
+          y={60 - (h / 100) * 52}
+          width={16}
+          height={(h / 100) * 52}
+          rx={2.5}
+          fill={i < 3 ? 'var(--ui-brand)' : SOFT_BLUE}
+        />
+      ))}
+    </svg>
+  );
+}
+
+// «Mini · línea de tendencia»: polilínea con punto al final.
+function ThumbMiniTrend(): ReactNode {
+  const line = 'M6,50 L26,38 L46,42 L66,26 L86,40 L106,22 L126,30';
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <path
+        d={line}
+        fill="none"
+        stroke="var(--ui-brand)"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+      <circle cx={126} cy={30} r={3.5} fill="var(--ui-brand)" />
+    </svg>
+  );
+}
+
+// «Mini · área acumulada»: área ascendente (acumulado siempre creciente).
+function ThumbMiniArea(): ReactNode {
+  const line = 'M6,52 L46,42 L86,28 L126,12';
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <path d={`${line} L126,60 L6,60 Z`} fill="var(--ui-brand-soft)" />
+      <path
+        d={line}
+        fill="none"
+        stroke="var(--ui-brand)"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
+// «Mini · donut de familias»: rótulo a la izquierda + anillo segmentado a la derecha.
+function ThumbMiniDonut(): ReactNode {
+  const R = 18;
+  const C = 2 * Math.PI * R;
+  const segs = [0.46, 0.28, 0.16, 0.1];
+  let acc = 0;
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <rect x={10} y={20} width={26} height={4} rx={2} fill={SOFT_BLUE} />
+      <rect x={10} y={30} width={40} height={11} rx={2} fill="var(--ui-brand)" />
+      <g transform="translate(102,32) rotate(-90)">
+        {segs.map((f, i) => {
+          const len = f * C;
+          const node = (
+            <circle
+              key={i}
+              r={R}
+              fill="none"
+              strokeWidth={9}
+              stroke={`color-mix(in oklab, var(--ui-brand) ${100 - i * 24}%, var(--ui-surface))`}
+              strokeDasharray={`${len} ${C - len}`}
+              strokeDashoffset={-acc}
+            />
+          );
+          acc += len;
+          return node;
+        })}
+      </g>
+    </svg>
+  );
+}
+
+// «Mini · gauge de margen»: semicírculo de capacidad con la cifra al pie.
+function ThumbMiniGauge(): ReactNode {
+  const arc = 'M18,52 A40,40 0 0 1 114,52';
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <path
+        d={arc}
+        fill="none"
+        stroke="var(--ui-surface-subtle)"
+        strokeWidth={10}
+        strokeLinecap="round"
+      />
+      <path
+        d={arc}
+        fill="none"
+        stroke="var(--ui-brand)"
+        strokeWidth={10}
+        strokeLinecap="round"
+        strokeDasharray="92 160"
+      />
+    </svg>
+  );
+}
+
+// «Mini · top familias»: tres filas (rótulo + riel proporcional).
+function ThumbMiniTopFam(): ReactNode {
+  const widths = [108, 96, 78];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {widths.map((w, i) => {
+        const y = 12 + i * 18;
+        return (
+          <g key={i}>
+            <rect x={6} y={y} width={18} height={6} rx={3} fill={SOFT_BLUE} />
+            <rect x={28} y={y} width={6} height={6} rx={3} fill="var(--ui-surface-subtle)" />
+            <rect x={28} y={y} width={w - 30} height={6} rx={3} fill="var(--ui-brand)" />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// «Mini · heatmap horario»: tira de 11 celdas con intensidad variable.
+function ThumbMiniHeatmap(): ReactNode {
+  const heat = [0.24, 0.46, 0.62, 0.9, 1, 0.72, 0.5, 0.62, 0.58, 0.6, 0.34];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {heat.map((t, i) => (
+        <rect
+          key={i}
+          x={6 + i * 11.2}
+          y={24}
+          width={9.5}
+          height={16}
+          rx={2.5}
+          fill={`color-mix(in oklab, var(--ui-brand) ${Math.round(8 + t * 92)}%, var(--ui-surface))`}
+        />
+      ))}
+    </svg>
+  );
+}
+
+// «Mini · columnas por hora»: columnas con la hora punta en acento.
+function ThumbMiniColumns(): ReactNode {
+  const heights = [61, 95, 95, 100, 75, 79, 87, 75, 77, 76, 92];
+  const peak = heights.indexOf(Math.max(...heights));
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {heights.map((h, i) => (
+        <rect
+          key={i}
+          x={6 + i * 11.2}
+          y={58 - (h / 100) * 50}
+          width={9}
+          height={(h / 100) * 50}
+          rx={2}
+          fill={
+            i === peak
+              ? 'var(--ui-brand)'
+              : `color-mix(in oklab, var(--ui-brand) 15%, var(--ui-surface))`
+          }
+        />
+      ))}
+    </svg>
+  );
+}
+
+// ── Sección 09 · Listas y tablas: miniaturas de filas (rótulo + valor / badge / chip / checkbox) ──
+
+// Tres filas «rótulo … valor» con divisor fino.
+function ThumbTblSimple(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[14, 32, 50].map((y, i) => (
+        <g key={i}>
+          <rect x={8} y={y - 4} width={52} height={6} rx={3} fill={SOFT_BLUE} />
+          <rect x={98} y={y - 4} width={26} height={6} rx={3} fill="var(--ui-brand)" />
+          {i < 2 ? (
+            <line x1={8} y1={y + 9} x2={124} y2={y + 9} stroke="var(--ui-border)" strokeWidth={1} />
+          ) : null}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// Tres filas con avatar cuadrado (el 1º en acento) + rótulo + valor.
+function ThumbTblAvatar(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[12, 30, 48].map((y, i) => (
+        <g key={i}>
+          <rect
+            x={8}
+            y={y}
+            width={14}
+            height={14}
+            rx={4}
+            fill={i === 0 ? 'var(--ui-brand)' : SOFT_BLUE}
+          />
+          <rect x={28} y={y + 4} width={60} height={6} rx={3} fill={SOFT_BLUE} />
+          <rect x={108} y={y + 4} width={16} height={6} rx={3} fill="var(--ui-brand)" />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// Tres filas con rótulo + badge de estado (danger / warning / success).
+function ThumbTblStatus(): ReactNode {
+  const tones = ['var(--ui-danger)', 'var(--ui-warning)', 'var(--ui-success)'];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[14, 32, 50].map((y, i) => (
+        <g key={i}>
+          <rect x={8} y={y - 4} width={48} height={6} rx={3} fill={SOFT_BLUE} />
+          <rect x={92} y={y - 6} width={32} height={12} rx={6} fill={tones[i]} opacity={0.9} />
+          {i < 2 ? (
+            <line x1={8} y1={y + 9} x2={124} y2={y + 9} stroke="var(--ui-border)" strokeWidth={1} />
+          ) : null}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// Tres filas con rótulo + variación con flecha (▲ verde / ▲ verde / ▼ roja).
+function ThumbTblVariation(): ReactNode {
+  const rows = [
+    { c: 'var(--ui-success)', up: true },
+    { c: 'var(--ui-success)', up: true },
+    { c: 'var(--ui-danger)', up: false },
+  ];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {rows.map((r, i) => {
+        const y = 14 + i * 18;
+        const tri = r.up
+          ? `${100},${y + 2} ${106},${y - 5} ${112},${y + 2}`
+          : `${100},${y - 5} ${106},${y + 2} ${112},${y - 5}`;
+        return (
+          <g key={i}>
+            <rect x={8} y={y - 4} width={56} height={6} rx={3} fill={SOFT_BLUE} />
+            <polygon points={tri} fill={r.c} />
+            <rect x={116} y={y - 4} width={10} height={5} rx={2.5} fill={r.c} />
+            {i < 2 ? (
+              <line
+                x1={8}
+                y1={y + 9}
+                x2={124}
+                y2={y + 9}
+                stroke="var(--ui-border)"
+                strokeWidth={1}
+              />
+            ) : null}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// Tres filas con chip de puesto (1 en acento) + rótulo + valor.
+function ThumbTblRanking(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[12, 30, 48].map((y, i) => (
+        <g key={i}>
+          <rect
+            x={8}
+            y={y}
+            width={13}
+            height={13}
+            rx={3.5}
+            fill={i === 0 ? 'var(--ui-brand)' : SOFT_BLUE}
+          />
+          <rect x={28} y={y + 4} width={58} height={6} rx={3} fill={SOFT_BLUE} />
+          <rect x={104} y={y + 4} width={20} height={6} rx={3} fill="var(--ui-brand)" />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// Tres filas con checkbox (1ª hecha = acento) + rótulo (1º tachado).
+function ThumbTblTasks(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[12, 30, 48].map((y, i) => (
+        <g key={i}>
+          <rect
+            x={8}
+            y={y}
+            width={13}
+            height={13}
+            rx={3.5}
+            fill={i === 0 ? 'var(--ui-brand)' : 'none'}
+            stroke={i === 0 ? 'none' : 'var(--ui-border-strong)'}
+            strokeWidth={1.5}
+          />
+          <rect
+            x={28}
+            y={y + 4}
+            width={84}
+            height={6}
+            rx={3}
+            fill={i === 0 ? 'var(--ui-surface-subtle)' : SOFT_BLUE}
+          />
+          {i === 0 ? (
+            <line
+              x1={28}
+              y1={y + 7}
+              x2={112}
+              y2={y + 7}
+              stroke="var(--ui-text-muted)"
+              strokeWidth={1.5}
+            />
+          ) : null}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// ── Sección 10 · Estado y progreso ──
+
+// Stepper de 4 pasos: 2 hechos (acento + check), 1 actual (contorno) y 1 pendiente (gris).
+function ThumbEstadoSteps(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <line x1={16} y1={32} x2={52} y2={32} stroke="var(--ui-brand)" strokeWidth={2.5} />
+      <line x1={52} y1={32} x2={88} y2={32} stroke="var(--ui-border)" strokeWidth={2.5} />
+      <line x1={88} y1={32} x2={116} y2={32} stroke="var(--ui-border)" strokeWidth={2.5} />
+      <circle cx={16} cy={32} r={9} fill="var(--ui-brand)" />
+      <circle cx={52} cy={32} r={9} fill="var(--ui-brand)" />
+      <circle
+        cx={88}
+        cy={32}
+        r={9}
+        fill="var(--ui-surface)"
+        stroke="var(--ui-brand)"
+        strokeWidth={2.5}
+      />
+      <circle cx={116} cy={32} r={9} fill="var(--ui-surface-subtle)" />
+      <path d="M12,32 l3,3 l6,-7" fill="none" stroke="var(--ui-primary-fg)" strokeWidth={2} />
+      <path d="M48,32 l3,3 l6,-7" fill="none" stroke="var(--ui-primary-fg)" strokeWidth={2} />
+    </svg>
+  );
+}
+
+// Estado operativo: disco verde con check centrado + rótulo «N/N».
+function ThumbEstadoOperational(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <circle cx={66} cy={25} r={15} fill="var(--ui-success-soft)" />
+      <path
+        d="M59,25 l5,5 l10,-11"
+        fill="none"
+        stroke="var(--ui-success)"
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect x={51} y={48} width={30} height={5} rx={2.5} fill={SOFT_BLUE} />
+    </svg>
+  );
+}
+
+// Checklist de cumplimiento: dos filas con disco verde + check y un rótulo.
+function ThumbEstadoCompliance(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[23, 45].map((y, i) => (
+        <g key={i}>
+          <circle cx={18} cy={y} r={9} fill="var(--ui-success-soft)" />
+          <path
+            d={`M13,${y} l3,3 l6,-7`}
+            fill="none"
+            stroke="var(--ui-success)"
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <rect x={34} y={y - 3} width={74} height={6} rx={3} fill={SOFT_BLUE} />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// ── Sección 11 · Especializados ──
+
+// Comparativa de proveedores: filas «producto · badge mejor (verde) · badge otro (gris)».
+function ThumbEspSuppliers(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[18, 40].map((y, i) => (
+        <g key={i}>
+          <rect x={8} y={y - 4} width={34} height={6} rx={3} fill={SOFT_BLUE} />
+          <rect x={62} y={y - 7} width={30} height={13} rx={4} fill="var(--ui-success-soft)" />
+          <rect
+            x={62}
+            y={y - 7}
+            width={30}
+            height={13}
+            rx={4}
+            fill="none"
+            stroke="var(--ui-success)"
+            strokeWidth={1}
+            opacity={0.5}
+          />
+          <rect x={98} y={y - 7} width={26} height={13} rx={4} fill="var(--ui-surface-subtle)" />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// Matriz tienda × franja: rejilla de celdas con intensidad azul descendente.
+function ThumbEspMatrix(): ReactNode {
+  const heat = [
+    [0.7, 1, 0.5],
+    [0.3, 0.7, 1],
+    [0.5, 0.4, 0.2],
+  ];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {heat.map((row, r) =>
+        row.map((t, c) => (
+          <rect
+            key={`${r}-${c}`}
+            x={40 + c * 30}
+            y={10 + r * 16}
+            width={26}
+            height={12}
+            rx={3}
+            fill={`color-mix(in oklab, var(--ui-brand) ${Math.round(8 + t * 92)}%, var(--ui-surface))`}
+          />
+        )),
+      )}
+      {[10, 26, 42].map((y, r) => (
+        <rect key={r} x={8} y={y + 3} width={24} height={5} rx={2.5} fill={SOFT_BLUE} />
+      ))}
+    </svg>
+  );
+}
+
+// Tiendas: filas con pin de ubicación + rótulo.
+function ThumbEspStores(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[16, 34, 52].map((y, i) => (
+        <g key={i}>
+          <path
+            d={`M14,${y - 6} a5,5 0 0 1 0,10 a5,5 0 0 1 0,-10 M14,${y + 6} l-4,-5 a5,5 0 1 1 8,0 z`}
+            fill="none"
+            stroke={i < 2 ? 'var(--ui-brand)' : 'var(--ui-text-soft)'}
+            strokeWidth={1.6}
+          />
+          <rect x={28} y={y - 3} width={70} height={6} rx={3} fill={SOFT_BLUE} />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// Resumen ejecutivo: banda de texto + grupo de cifras a la derecha.
+function ThumbEspExec(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <rect x={8} y={12} width={26} height={4} rx={2} fill="var(--ui-brand)" />
+      <rect x={8} y={22} width={62} height={5} rx={2.5} fill={SOFT_BLUE} />
+      <rect x={8} y={32} width={54} height={5} rx={2.5} fill={SOFT_BLUE} />
+      {[82, 104].map((x, i) => (
+        <g key={i}>
+          <rect
+            x={x}
+            y={16}
+            width={20}
+            height={26}
+            rx={3}
+            fill="none"
+            stroke="var(--ui-border)"
+            strokeWidth={1}
+          />
+          <rect x={x + 4} y={22} width={12} height={6} rx={2} fill="var(--ui-brand)" />
+          <rect x={x + 4} y={32} width={12} height={3} rx={1.5} fill={SOFT_BLUE} />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 // Entradas de la galería (se amplía por tandas).
 export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
   // Sección 01 · KPIs
@@ -758,5 +1368,156 @@ export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
     category: 'kpis-formatos',
     description: 'Cifra con mini-barras recientes',
     thumbnail: <ThumbKpi7d />,
+  },
+  // Sección 08 · Mini gráficas
+  {
+    id: 'mini-tiendas',
+    label: 'Mini · barras por tienda',
+    category: 'mini',
+    description: 'Facturación de hoy por tienda',
+    thumbnail: <ThumbMiniStoreBars />,
+  },
+  {
+    id: 'mini-tendencia',
+    label: 'Mini · línea de tendencia',
+    category: 'mini',
+    description: 'Tendencia del ticket medio',
+    thumbnail: <ThumbMiniTrend />,
+  },
+  {
+    id: 'mini-acumulado',
+    label: 'Mini · área acumulada',
+    category: 'mini',
+    description: 'Beneficio acumulado del periodo',
+    thumbnail: <ThumbMiniArea />,
+  },
+  {
+    id: 'mini-donut',
+    label: 'Mini · donut de familias',
+    category: 'mini',
+    description: 'Reparto por familia, en anillo',
+    thumbnail: <ThumbMiniDonut />,
+  },
+  {
+    id: 'mini-gauge',
+    label: 'Mini · gauge de margen',
+    category: 'mini',
+    description: '% de margen como capacidad',
+    thumbnail: <ThumbMiniGauge />,
+  },
+  {
+    id: 'mini-familias',
+    label: 'Mini · top familias',
+    category: 'mini',
+    description: 'Las 3 familias top, en riel',
+    thumbnail: <ThumbMiniTopFam />,
+  },
+  {
+    id: 'mini-heatmap',
+    label: 'Mini · heatmap horario',
+    category: 'mini',
+    description: 'Intensidad por hora (7h→17h)',
+    thumbnail: <ThumbMiniHeatmap />,
+  },
+  {
+    id: 'mini-columnas',
+    label: 'Mini · columnas por hora',
+    category: 'mini',
+    description: 'Ventas por hora; punta en acento',
+    thumbnail: <ThumbMiniColumns />,
+  },
+  // Sección 09 · Listas y tablas
+  {
+    id: 'tabla-simple',
+    label: 'Ventas por tienda (lista)',
+    category: 'listas-tablas',
+    description: 'Facturación de hoy por tienda',
+    thumbnail: <ThumbTblSimple />,
+  },
+  {
+    id: 'tabla-avatar',
+    label: 'Vendedores (con avatar)',
+    category: 'listas-tablas',
+    description: 'Vendedores con iniciales y tickets',
+    thumbnail: <ThumbTblAvatar />,
+  },
+  {
+    id: 'tabla-estado',
+    label: 'Estado de stock',
+    category: 'listas-tablas',
+    description: 'Productos con badge Agotado/Bajo/OK',
+    thumbnail: <ThumbTblStatus />,
+  },
+  {
+    id: 'tabla-variacion',
+    label: 'Variación por tienda',
+    category: 'listas-tablas',
+    description: 'Tiendas con ▲/▼ frente a ayer',
+    thumbnail: <ThumbTblVariation />,
+  },
+  {
+    id: 'tabla-ranking',
+    label: 'Ranking de productos (tabla)',
+    category: 'listas-tablas',
+    description: 'Top de productos con puesto y €',
+    thumbnail: <ThumbTblRanking />,
+  },
+  {
+    id: 'tabla-tareas',
+    label: 'Tareas de reposición',
+    category: 'listas-tablas',
+    description: 'Checklist de reposición por alertas',
+    thumbnail: <ThumbTblTasks />,
+  },
+  // Sección 10 · Estado y progreso
+  {
+    id: 'estado-pasos',
+    label: 'Pasos de un pedido',
+    category: 'estado',
+    description: 'Ciclo de un pedido de compra (Pedido→Recib.)',
+    thumbnail: <ThumbEstadoSteps />,
+  },
+  {
+    id: 'estado-operativo',
+    label: 'Estado operativo de tiendas',
+    category: 'estado',
+    description: 'Tiendas activas verificadas y sin incidencia',
+    thumbnail: <ThumbEstadoOperational />,
+  },
+  {
+    id: 'estado-cumplimiento',
+    label: 'Cumplimiento (VeriFactu/cajas)',
+    category: 'estado',
+    description: 'Cadena VeriFactu y cajas sin pendientes',
+    thumbnail: <ThumbEstadoCompliance />,
+  },
+  // Sección 11 · Especializados (esp-embudo y esp-calendario diferidos: sin endpoint honesto)
+  {
+    id: 'esp-proveedores',
+    label: 'Comparativa de proveedores',
+    category: 'especializados',
+    description: 'Precio por proveedor con el mejor marcado',
+    thumbnail: <ThumbEspSuppliers />,
+  },
+  {
+    id: 'esp-matriz',
+    label: 'Matriz tienda × franja',
+    category: 'especializados',
+    description: 'Intensidad de ventas por tienda y franja horaria',
+    thumbnail: <ThumbEspMatrix />,
+  },
+  {
+    id: 'esp-tiendas',
+    label: 'Tiendas (directorio)',
+    category: 'especializados',
+    description: 'Listado de tiendas con estado operativo',
+    thumbnail: <ThumbEspStores />,
+  },
+  {
+    id: 'esp-resumen-ejecutivo',
+    label: 'Resumen ejecutivo',
+    category: 'especializados',
+    description: 'Banner mensual con prosa y cifras clave',
+    thumbnail: <ThumbEspExec />,
   },
 ];

@@ -76,6 +76,31 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'kpi-area': { w: 3, h: 2 },
   'kpi-alerta': { w: 3, h: 2 },
   'kpi-7dias': { w: 3, h: 2 },
+  // Sección 08 · Mini gráficas (rediseño): tiles de bolsillo (rejilla de 5 en el handoff).
+  'mini-tiendas': { w: 3, h: 1 },
+  'mini-tendencia': { w: 3, h: 1 },
+  'mini-acumulado': { w: 3, h: 1 },
+  'mini-donut': { w: 3, h: 1 },
+  'mini-gauge': { w: 3, h: 1 },
+  'mini-familias': { w: 3, h: 1 },
+  'mini-heatmap': { w: 3, h: 1 },
+  'mini-columnas': { w: 3, h: 1 },
+  // Sección 09 · Listas y tablas (rediseño): tarjetas de filas (hasta 6 filas → tile medio).
+  'tabla-simple': { w: 4, h: 2 },
+  'tabla-avatar': { w: 4, h: 2 },
+  'tabla-estado': { w: 4, h: 2 },
+  'tabla-variacion': { w: 4, h: 2 },
+  'tabla-ranking': { w: 4, h: 2 },
+  'tabla-tareas': { w: 4, h: 2 },
+  // Sección 10 · Estado y progreso (rediseño): stepper ancho, estado compacto y checklist.
+  'estado-pasos': { w: 4, h: 1 },
+  'estado-operativo': { w: 2, h: 1 },
+  'estado-cumplimiento': { w: 3, h: 1 },
+  // Sección 11 · Especializados (rediseño): tarjetas de detalle + banner ejecutivo a todo lo ancho.
+  'esp-proveedores': { w: 4, h: 2 },
+  'esp-matriz': { w: 4, h: 2 },
+  'esp-tiendas': { w: 3, h: 2 },
+  'esp-resumen-ejecutivo': { w: 8, h: 2 },
 };
 
 const DEFAULT_SPEC = { w: 4, h: 2 };

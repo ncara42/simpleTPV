@@ -3452,11 +3452,29 @@
   display: block;
   padding: 0.55rem 0.7rem;
   border: 1px dashed var(--ui-border);
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-md);
   background: var(--ui-surface-subtle);
   font-variant-numeric: tabular-nums;
   color: var(--ui-brand);
   font-weight: 600;
+}
+
+/* ─── Estilo Vercel: radio único en TODO el modal de producto ───
+   Todos los elementos del ProductFormModal comparten el mismo radio
+   (--ui-radius-md = 12px en el tema Geist): panel, inputs, select,
+   tarjeta de margen y botones (Cancelar crudo + Guardar <Button>).
+   Se de-pildoran los botones SOLO aquí; el <Button> compartido y el
+   resto de la app/TPV conservan su forma. Reglas sin @layer, así que
+   ganan a las utilidades Tailwind (rounded-full / rounded-[10px]) de
+   <Button>/<Input>, que viven en una capa de menor prioridad. */
+.modal.product-form-modal {
+  border-radius: var(--ui-radius-md);
+}
+.product-form-modal .ui-input,
+.product-form-modal .ui-select-trigger,
+.product-form-modal .modal-foot button:not(.ui-btn),
+.product-form-modal .modal-foot .ui-btn {
+  border-radius: var(--ui-radius-md);
 }
 
 /* ── Paleta de color e icono del form de familia (I-14) ── */
