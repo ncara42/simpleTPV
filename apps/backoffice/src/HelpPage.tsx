@@ -339,13 +339,15 @@ export function HelpPage() {
                     const isFirstInBlock = i === 0 || threadMessages[i - 1]?.author !== m.author;
                     let msgStatus: MsgStatus | undefined;
                     if (m.author === 'user') {
-                      if (m.id.startsWith('local-')) {
+                      const hasReply = threadMessages
+                        .slice(i + 1)
+                        .some((msg) => msg.author === 'ai' || msg.author === 'agent');
+                      if (hasReply) {
+                        msgStatus = 'seen';
+                      } else if (m.id.startsWith('local-') && s.pending) {
                         msgStatus = 'sending';
                       } else {
-                        const hasReply = threadMessages
-                          .slice(i + 1)
-                          .some((msg) => msg.author === 'ai' || msg.author === 'agent');
-                        msgStatus = hasReply ? 'seen' : 'received';
+                        msgStatus = 'received';
                       }
                     }
                     return (

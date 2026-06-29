@@ -980,7 +980,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-4);
+  gap: 3px;
   padding: var(--ui-space-4) var(--ui-space-1) 4rem;
   scrollbar-width: none;
   -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 4rem), transparent 100%);
@@ -1000,6 +1000,15 @@
   flex-direction: column;
   gap: var(--ui-space-1);
   max-width: 80%;
+}
+/* Espaciado mayor cuando cambia el autor */
+.ticket-msg--user + .ticket-msg--ai,
+.ticket-msg--user + .ticket-msg--agent,
+.ticket-msg--ai + .ticket-msg--user,
+.ticket-msg--agent + .ticket-msg--user,
+.ticket-msg--ai + .ticket-msg--agent,
+.ticket-msg--agent + .ticket-msg--ai {
+  margin-top: var(--ui-space-4);
 }
 .ticket-msg--user {
   align-self: flex-end;
@@ -1043,6 +1052,47 @@
   border: 0;
   border-radius: 0;
   font-size: 1rem;
+  color: var(--ui-text);
+}
+
+/* Markdown dentro de burbujas del asistente / agente */
+.ticket-msg--ai .ticket-msg-body p,
+.ticket-msg--agent .ticket-msg-body p {
+  margin: 0 0 0.6rem;
+}
+.ticket-msg--ai .ticket-msg-body p:last-child,
+.ticket-msg--agent .ticket-msg-body p:last-child {
+  margin-bottom: 0;
+}
+.ticket-msg--ai .ticket-msg-body ul,
+.ticket-msg--agent .ticket-msg-body ul,
+.ticket-msg--ai .ticket-msg-body ol,
+.ticket-msg--agent .ticket-msg-body ol {
+  margin: 0 0 0.6rem;
+  padding-left: 1.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.ticket-msg--ai .ticket-msg-body ul:last-child,
+.ticket-msg--agent .ticket-msg-body ul:last-child,
+.ticket-msg--ai .ticket-msg-body ol:last-child,
+.ticket-msg--agent .ticket-msg-body ol:last-child {
+  margin-bottom: 0;
+}
+.ticket-msg--ai .ticket-msg-body strong,
+.ticket-msg--agent .ticket-msg-body strong {
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.ticket-msg--ai .ticket-msg-body code,
+.ticket-msg--agent .ticket-msg-body code {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 0.85em;
+  padding: 0.07em 0.38em;
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
   color: var(--ui-text);
 }
 
