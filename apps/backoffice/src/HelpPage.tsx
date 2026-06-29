@@ -2,7 +2,7 @@ import './help.css';
 
 import { usePageHeader } from '@simpletpv/ui';
 import { ArrowUp, History, Loader2, Lock, Paperclip, Plus, X } from 'lucide-react';
-import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, Fragment, type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { ChatMarkdown } from './components/chat/ChatMarkdown.js';
@@ -113,12 +113,37 @@ function Composer({
   );
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-ES', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
+// ── Separador de fecha/hora entre bloques de mensajes ────────────────────────────
+
+const MONTHS_ES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+function fmtDayTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getDate()} de ${MONTHS_ES[d.getMonth()]}, ${hh}:${mm}`;
+}
+
+function needsDivider(prevIso: string, curIso: string): boolean {
+  const a = new Date(prevIso);
+  const b = new Date(curIso);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return false;
+  if (a.toDateString() !== b.toDateString()) return true;
+  return b.getTime() - a.getTime() > 60 * 60 * 1000;
 }
 
 // ── Burbuja de mensaje ───────────────────────────────────────────────────────────
@@ -150,12 +175,9 @@ function Bubble({
       <div className="ticket-msg-body">
         {mine ? message.body : <ChatMarkdown>{message.body}</ChatMarkdown>}
       </div>
-      {isLast && (
+      {isLast && mine && statusLabel && (
         <div className="ticket-msg-meta">
-          <span className="ticket-msg-time">{formatTime(message.createdAt)}</span>
-          {mine && statusLabel && (
-            <span className={`ticket-msg-status ticket-msg-status--${status}`}>{statusLabel}</span>
-          )}
+          <span className={`ticket-msg-status ticket-msg-status--${status}`}>{statusLabel}</span>
         </div>
       )}
     </div>
@@ -392,6 +414,8 @@ export function HelpPage() {
                   {threadMessages.map((m, i) => {
                     const isLast = i === threadMessages.length - 1;
                     const isFirstInBlock = i === 0 || threadMessages[i - 1]?.author !== m.author;
+                    const prev = threadMessages[i - 1];
+                    const showDivider = !prev || needsDivider(prev.createdAt, m.createdAt);
                     let msgStatus: MsgStatus | undefined;
                     if (isLast && m.author === 'user') {
                       const hasReply = threadMessages
@@ -406,13 +430,19 @@ export function HelpPage() {
                       }
                     }
                     return (
-                      <Bubble
-                        key={m.id}
-                        message={m}
-                        isFirstInBlock={isFirstInBlock}
-                        isLast={isLast}
-                        {...(msgStatus !== undefined && { status: msgStatus })}
-                      />
+                      <Fragment key={m.id}>
+                        {showDivider && (
+                          <div className="ticket-daydiv">
+                            <span>{fmtDayTime(m.createdAt)}</span>
+                          </div>
+                        )}
+                        <Bubble
+                          message={m}
+                          isFirstInBlock={isFirstInBlock}
+                          isLast={isLast}
+                          {...(msgStatus !== undefined && { status: msgStatus })}
+                        />
+                      </Fragment>
                     );
                   })}
                   {thinking && (
