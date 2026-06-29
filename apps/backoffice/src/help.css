@@ -803,7 +803,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: var(--ui-space-2);
+  margin-top: var(--ui-space-1);
 }
 .ticket-msg--user .ticket-msg-meta {
   justify-content: flex-end;
