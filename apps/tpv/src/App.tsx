@@ -1,4 +1,5 @@
 import '@simpletpv/ui/alert.css';
+import '@simpletpv/ui/datatable.css';
 import '@simpletpv/ui/login.css';
 import '@simpletpv/ui/select.css';
 import '@simpletpv/ui/topbar.css';

@@ -178,6 +178,9 @@ export function TicketsPanel({ storeId }: { storeId: string | null }) {
                   { value: '', label: 'Todos los métodos' },
                   { value: 'CASH', label: 'Efectivo' },
                   { value: 'CARD', label: 'Tarjeta' },
+                  { value: 'DIRECT_DEBIT', label: 'Débito directo' },
+                  { value: 'TRANSFER', label: 'Transferencia' },
+                  { value: 'BIZUM', label: 'Bizum' },
                 ]}
               />
             </div>
@@ -231,10 +234,16 @@ export function TicketsPanel({ storeId }: { storeId: string | null }) {
   );
 }
 
+const METHOD_LABELS: Record<string, string> = {
+  CASH: 'Efectivo',
+  CARD: 'Tarjeta',
+  DIRECT_DEBIT: 'Débito directo',
+  TRANSFER: 'Transferencia',
+  BIZUM: 'Bizum',
+};
+
 function methodLabel(method: string): string {
-  if (method === 'CASH') return 'Efectivo';
-  if (method === 'CARD') return 'Tarjeta';
-  return method;
+  return METHOD_LABELS[method] ?? method;
 }
 
 function statusBadge(status: string) {

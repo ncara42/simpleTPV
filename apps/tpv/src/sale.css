@@ -363,6 +363,22 @@
   overflow: hidden;
 }
 
+.modal-head {
+  padding: 1rem 1.4rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.modal-head h3 {
+  margin: 0;
+  font-size: var(--ui-text-base);
+  font-weight: 600;
+  color: var(--ui-text);
+}
+
+.modal-body {
+  padding: 1rem 1.4rem;
+}
+
 .modal-foot {
   display: flex;
   justify-content: flex-end;
@@ -2282,6 +2298,17 @@
   background: var(--ui-surface);
   overflow: hidden;
   box-shadow: var(--ui-shadow-sm);
+}
+
+/* Cuando un DataTable (@simpletpv/ui) vive DENTRO de un .table-panel, su raíz
+   .ui-dt reintroduce su propio marco (borde + radio + fondo) → doble marco /
+   esquinas anidadas. El panel exterior ya aporta el chrome: la tabla interior
+   cede el suyo para que toolbar + cabecera + filas se lean como UNA sola
+   superficie continua. Mismo reset que el backoffice (catalog.css). */
+.table-panel > .ui-dt {
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .catalog-table {
