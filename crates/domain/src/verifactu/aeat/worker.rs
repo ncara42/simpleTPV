@@ -16,7 +16,7 @@ use simpletpv_shared::AppError;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::client::{AeatClient, AeatEndpoint, TransportError};
+use super::client::{AeatEndpoint, AeatTransport, TransportError};
 use super::response::{parse_respuesta, Outcome};
 use super::xml::{
     build_envelope, registro_alta_xml, registro_anulacion_xml, registro_factura_wrap,
@@ -116,6 +116,8 @@ fn descripcion(kind: &str) -> &'static str {
 const CLAIM_LEASE_SECS: i64 = 300;
 
 /// Procesa un lote de envío a la AEAT. Devuelve cuántos registros se reclamaron.
+/// `only_org`: `None` procesa todos los tenants (worker); `Some` lo acota (tests).
+/// `transport` es la costura de red ([`super::RealTransport`] en producción).
 ///
 /// Tres fases para NO retener locks de BD durante la red (un fallo de la AEAT podría
 /// tardar segundos):
@@ -123,12 +125,14 @@ const CLAIM_LEASE_SECS: i64 = 300;
 ///     (`nextAttemptAt` futuro); el COMMIT libera los locks.
 ///  2. Sin tx: construye el sobre y envía por mTLS.
 ///  3. TX corta por comercio: persiste el resultado (SENT/FAILED/reintento) + traza.
-pub async fn process_aeat_batch(
+pub async fn process_aeat_batch<T: AeatTransport>(
     admin: &PgPool,
     cfg: &AeatWorkerConfig,
+    transport: &T,
     limit: i64,
+    only_org: Option<Uuid>,
 ) -> Result<usize, AppError> {
-    let claimed = claim_and_lease(admin, limit).await?;
+    let claimed = claim_and_lease(admin, limit, only_org).await?;
     let processed = claimed.len();
 
     // Agrupa por org (las filas vienen ordenadas por organizationId).
@@ -144,7 +148,7 @@ pub async fn process_aeat_batch(
     // arrendados y vencerán para reintentarse.
     for group in groups {
         let org = group[0].org;
-        if let Err(e) = process_org_group(admin, cfg, group).await {
+        if let Err(e) = process_org_group(admin, cfg, transport, group).await {
             tracing::warn!(%org, error = %e, "envío VeriFactu de un comercio falló");
         }
     }
@@ -153,7 +157,11 @@ pub async fn process_aeat_batch(
 
 /// Fase 1: TX corta que reclama y arrienda los registros PENDING vencidos de comercios
 /// en modalidad de envío (no exentos). Devuelve los reclamados ya parseados.
-async fn claim_and_lease(admin: &PgPool, limit: i64) -> Result<Vec<Claimed>, AppError> {
+async fn claim_and_lease(
+    admin: &PgPool,
+    limit: i64,
+    only_org: Option<Uuid>,
+) -> Result<Vec<Claimed>, AppError> {
     let mut tx = admin.begin().await.map_err(|e| classify(&e))?;
     let rows: Vec<ClaimedRow> = sqlx::query_as(
         r#"SELECT r.id AS id, r."organizationId" AS org, r.type::text AS kind,
@@ -164,6 +172,7 @@ async fn claim_and_lease(admin: &PgPool, limit: i64) -> Result<Vec<Claimed>, App
            JOIN "VerifactuConfig" c ON c."organizationId" = r."organizationId"
            WHERE r.status = 'PENDING'::"VerifactuStatus"
              AND (r."nextAttemptAt" IS NULL OR r."nextAttemptAt" <= now())
+             AND ($2::uuid IS NULL OR r."organizationId" = $2)
              AND c.exento = false
              AND c.mode IN ('DIRECT_OWN_CERT', 'COLLAB_SOCIAL')
            ORDER BY r."organizationId", r."createdAt"
@@ -171,6 +180,7 @@ async fn claim_and_lease(admin: &PgPool, limit: i64) -> Result<Vec<Claimed>, App
            LIMIT $1"#,
     )
     .bind(limit)
+    .bind(only_org)
     .fetch_all(&mut *tx)
     .await
     .map_err(|e| classify(&e))?;
@@ -218,9 +228,10 @@ async fn claim_and_lease(admin: &PgPool, limit: i64) -> Result<Vec<Claimed>, App
 
 /// Fases 2 y 3 para un comercio: construye el sobre, lo envía (sin tx) y persiste el
 /// resultado en una TX corta atómica.
-async fn process_org_group(
+async fn process_org_group<T: AeatTransport>(
     admin: &PgPool,
     cfg: &AeatWorkerConfig,
+    transport: &T,
     group: Vec<Claimed>,
 ) -> Result<(), AppError> {
     let org = group[0].org;
@@ -236,28 +247,27 @@ async fn process_org_group(
     let Some(identity_pem) = identity_pem else {
         // Sin certificado: backoff sin marcar SENT (fail-safe).
         for c in &group {
-            defer_record(admin, c.id, "sin certificado configurado para el envío VERI*FACTU").await?;
+            defer_record(
+                admin,
+                c.id,
+                "sin certificado configurado para el envío VERI*FACTU",
+            )
+            .await?;
         }
         return Ok(());
     };
 
     let endpoint = AeatEndpoint::from_config(&environment);
-    let client = match AeatClient::new(&identity_pem, endpoint, cfg.timeout_secs) {
-        Ok(c) => c,
-        Err(e) => {
-            for c in &group {
-                defer_record(admin, c.id, &format!("certificado inválido: {e}")).await?;
-            }
-            return Ok(());
-        }
-    };
+    let endpoint_url = endpoint.url();
 
     // Obligado (Cabecera): razón social (config) o nombre de la organización; NIF del
     // emisor (del propio registro).
     let nif_emisor = num_emisor(&group[0]);
     let nombre_razon = match &group[0].razon_social {
         Some(r) if !r.is_empty() => r.clone(),
-        _ => org_name(admin, org).await?.unwrap_or_else(|| nif_emisor.clone()),
+        _ => org_name(admin, org)
+            .await?
+            .unwrap_or_else(|| nif_emisor.clone()),
     };
     let obligado = Persona {
         nombre_razon: nombre_razon.clone(),
@@ -284,10 +294,21 @@ async fn process_org_group(
         registros_xml.push(registro_factura_wrap(&reg));
     }
     let envelope = build_envelope(&obligado, None, &registros_xml);
-    let endpoint_url = client.endpoint_url();
 
     // Fase 2: llamada de red SIN transacción abierta (no se retienen locks de BD).
-    let send = client.send_soap(&envelope).await;
+    let send = transport
+        .submit(&identity_pem, endpoint, cfg.timeout_secs, &envelope)
+        .await;
+
+    // Identidad/certificado inválido (`TransportError::Build`): es configuración
+    // incorrecta, no un fallo de la AEAT → se difiere sin gastar intentos (fail-safe),
+    // igual que la ausencia de certificado.
+    if let Err(TransportError::Build(msg)) = &send {
+        for c in &group {
+            defer_record(admin, c.id, &format!("certificado inválido: {msg}")).await?;
+        }
+        return Ok(());
+    }
 
     // Fase 3: TX corta que persiste el resultado del grupo de forma atómica.
     let mut tx = admin.begin().await.map_err(|e| classify(&e))?;
@@ -300,13 +321,26 @@ async fn process_org_group(
                     None
                 }
             };
-            apply_response(&mut tx, &group, parsed, endpoint_url, res.http_status as i32).await?;
+            apply_response(
+                &mut tx,
+                &group,
+                parsed,
+                endpoint_url,
+                res.http_status as i32,
+            )
+            .await?;
         }
         Err(TransportError::Status { code, .. }) => {
             tracing::warn!(%org, code, "la AEAT devolvió HTTP no 2xx");
             for c in &group {
-                record_transport_failure(&mut tx, c, endpoint_url, Some(code as i32), "HTTP no 2xx de la AEAT")
-                    .await?;
+                record_transport_failure(
+                    &mut tx,
+                    c,
+                    endpoint_url,
+                    Some(code as i32),
+                    "HTTP no 2xx de la AEAT",
+                )
+                .await?;
             }
         }
         Err(e) => {
@@ -329,11 +363,12 @@ fn num_emisor(c: &Claimed) -> String {
 }
 
 async fn org_name(admin: &PgPool, org: Uuid) -> Result<Option<String>, AppError> {
-    let name: Option<String> = sqlx::query_scalar(r#"SELECT name FROM "Organization" WHERE id = $1"#)
-        .bind(org)
-        .fetch_optional(admin)
-        .await
-        .map_err(|e| classify(&e))?;
+    let name: Option<String> =
+        sqlx::query_scalar(r#"SELECT name FROM "Organization" WHERE id = $1"#)
+            .bind(org)
+            .fetch_optional(admin)
+            .await
+            .map_err(|e| classify(&e))?;
     Ok(name)
 }
 
@@ -406,13 +441,20 @@ async fn apply_response(
     endpoint: &str,
     http_status: i32,
 ) -> Result<(), AppError> {
-    let lineas = parsed.as_ref().map(|p| p.lineas.clone()).unwrap_or_default();
+    let lineas = parsed
+        .as_ref()
+        .map(|p| p.lineas.clone())
+        .unwrap_or_default();
     let estado_envio = parsed.as_ref().map(|p| p.estado_envio.clone());
     for c in group {
         let serie = num_serie_of(c);
-        let linea = lineas.iter().find(|l| l.num_serie.as_deref() == Some(serie.as_str()));
+        let linea = lineas
+            .iter()
+            .find(|l| l.num_serie.as_deref() == Some(serie.as_str()));
         match linea {
-            Some(l) => mark_outcome(tx, c, l, endpoint, http_status, estado_envio.as_deref()).await?,
+            Some(l) => {
+                mark_outcome(tx, c, l, endpoint, http_status, estado_envio.as_deref()).await?
+            }
             None => {
                 // La AEAT no devolvió línea para este registro: ambiguo → reintentar.
                 record_transport_failure(
@@ -512,7 +554,18 @@ async fn record_transport_failure(
     .execute(&mut **tx)
     .await
     .map_err(|e| classify(&e))?;
-    insert_submission(tx, c, endpoint, http_status, None, None, None, None, Some(err)).await
+    insert_submission(
+        tx,
+        c,
+        endpoint,
+        http_status,
+        None,
+        None,
+        None,
+        None,
+        Some(err),
+    )
+    .await
 }
 
 /// Programa un reintento sin contarlo como fallo de la AEAT (p.ej. falta certificado).

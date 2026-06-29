@@ -20,7 +20,9 @@ pub mod response;
 pub mod worker;
 pub mod xml;
 
-pub use client::{AeatClient, AeatEndpoint, TransportError, TransportResult};
+pub use client::{
+    AeatClient, AeatEndpoint, AeatTransport, RealTransport, TransportError, TransportResult,
+};
 pub use response::{parse_respuesta, EstadoRegistro, LineaRespuesta, Outcome, RespuestaAeat};
 pub use worker::{process_aeat_batch, AeatWorkerConfig};
 pub use xml::{

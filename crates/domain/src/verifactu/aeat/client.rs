@@ -132,17 +132,58 @@ impl AeatClient {
     }
 }
 
+/// Costura de transporte hacia la AEAT. Aísla la llamada de red del worker para poder
+/// inyectar un doble en los tests de integración (sin tocar la red ni necesitar un
+/// certificado real). La implementación de producción es [`RealTransport`].
+pub trait AeatTransport: Send + Sync {
+    /// Construye la identidad mTLS desde `identity_pem` y envía el sobre SOAP al
+    /// `endpoint`. Equivale a `AeatClient::new(...)?.send_soap(...)`.
+    fn submit(
+        &self,
+        identity_pem: &[u8],
+        endpoint: AeatEndpoint,
+        timeout_secs: u64,
+        soap_xml: &str,
+    ) -> impl std::future::Future<Output = Result<TransportResult, TransportError>> + Send;
+}
+
+/// Transporte real: construye un [`AeatClient`] (valida la identidad PEM) y envía por
+/// mTLS. Una identidad inválida produce `TransportError::Build`, que el worker trata
+/// como configuración incorrecta (difiere sin gastar intentos), no como fallo de la AEAT.
+#[derive(Clone, Copy, Default)]
+pub struct RealTransport;
+
+impl AeatTransport for RealTransport {
+    async fn submit(
+        &self,
+        identity_pem: &[u8],
+        endpoint: AeatEndpoint,
+        timeout_secs: u64,
+        soap_xml: &str,
+    ) -> Result<TransportResult, TransportError> {
+        let client = AeatClient::new(identity_pem, endpoint, timeout_secs)?;
+        client.send_soap(soap_xml).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn endpoint_urls_oficiales() {
-        assert!(AeatEndpoint::Prod.url().starts_with("https://www1.agenciatributaria.gob.es/"));
-        assert!(AeatEndpoint::Preprod.url().starts_with("https://prewww1.aeat.es/"));
+        assert!(AeatEndpoint::Prod
+            .url()
+            .starts_with("https://www1.agenciatributaria.gob.es/"));
+        assert!(AeatEndpoint::Preprod
+            .url()
+            .starts_with("https://prewww1.aeat.es/"));
         assert_eq!(AeatEndpoint::from_config("prod"), AeatEndpoint::Prod);
         assert_eq!(AeatEndpoint::from_config("preprod"), AeatEndpoint::Preprod);
-        assert_eq!(AeatEndpoint::from_config("cualquier-otra"), AeatEndpoint::Preprod);
+        assert_eq!(
+            AeatEndpoint::from_config("cualquier-otra"),
+            AeatEndpoint::Preprod
+        );
     }
 
     #[test]

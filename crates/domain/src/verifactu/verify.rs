@@ -105,8 +105,8 @@ pub async fn verify_chain(pool: &PgPool, org: Uuid) -> Result<ChainReport, AppEr
         }
 
         // 2) Integridad: recomputar la huella desde el payload + previousHash.
-        let payload: serde_json::Value = serde_json::from_str(&payload_text)
-            .map_err(|_| AppError::Internal)?;
+        let payload: serde_json::Value =
+            serde_json::from_str(&payload_text).map_err(|_| AppError::Internal)?;
         let recomputed = recompute(&kind, &payload, previous_hash.as_deref());
         if recomputed != hash {
             return Ok(ChainReport {

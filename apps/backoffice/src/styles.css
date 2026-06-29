@@ -326,8 +326,35 @@
   }
 }
 
-/* ─── U-08: Ajustes — sección Marca ─────────────────────────────────────── */
-/* El cuerpo vive dentro de una card del sistema (.help-section, de catalog.css);
+/* ─── U-08: Ajustes — secciones Marca + Integraciones ───────────────────── */
+/* Cada sección vive dentro de una card del sistema (.help-section, de help.css);
+   la página las apila con aire entre ellas. */
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-6);
+}
+/* Embed de "Claves API" (ApiKeysSection) dentro de la card de Integraciones: el
+   .table-panel interior cede su marco para no doblar borde/sombra con la card. */
+.integrations-embed .table-panel {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+.integrations-embed .apikey-banner,
+.integrations-embed .apikey-revoked {
+  margin: var(--ui-space-4) 0 0;
+}
+.integrations-embed .table-panel > .users-toolbar {
+  min-height: 0;
+  padding: 0 0 var(--ui-space-4);
+  background: transparent;
+  border-bottom: none;
+}
+
+/* El cuerpo vive dentro de una card del sistema (.help-section, de help.css);
    aquí solo el layout interno de la sección Marca. */
 .settings-grid {
   display: grid;

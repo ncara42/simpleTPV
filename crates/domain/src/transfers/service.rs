@@ -431,8 +431,10 @@ pub async fn list_attachments(
             r#"SELECT {ATTACHMENT_COLS} FROM "TransferAttachment"
                WHERE "transferId" = $1 ORDER BY "createdAt", id"#
         );
-        let rows: Vec<TransferAttachmentRow> =
-            sqlx::query_as(&sql).bind(transfer_id).fetch_all(&mut **tx).await?;
+        let rows: Vec<TransferAttachmentRow> = sqlx::query_as(&sql)
+            .bind(transfer_id)
+            .fetch_all(&mut **tx)
+            .await?;
         Ok(rows.into_iter().map(TransferAttachment::from).collect())
     })
     .await
@@ -621,8 +623,10 @@ pub async fn list_messages(
             r#"SELECT {MESSAGE_COLS} FROM "TransferMessage"
                WHERE "transferId" = $1 ORDER BY "createdAt", id"#
         );
-        let rows: Vec<TransferMessageRow> =
-            sqlx::query_as(&sql).bind(transfer_id).fetch_all(&mut **tx).await?;
+        let rows: Vec<TransferMessageRow> = sqlx::query_as(&sql)
+            .bind(transfer_id)
+            .fetch_all(&mut **tx)
+            .await?;
         Ok(rows.into_iter().map(TransferMessage::from).collect())
     })
     .await

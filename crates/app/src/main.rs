@@ -42,7 +42,9 @@ fn aeat_worker_config_from_env() -> Option<simpletpv_domain::verifactu::aeat::Ae
     let nombre_razon = std::env::var("VERIFACTU_SIF_NOMBRE_RAZON")
         .ok()
         .filter(|s| !s.is_empty())?;
-    let nif = std::env::var("VERIFACTU_SIF_NIF").ok().filter(|s| !s.is_empty())?;
+    let nif = std::env::var("VERIFACTU_SIF_NIF")
+        .ok()
+        .filter(|s| !s.is_empty())?;
     let sistema = SistemaInformatico {
         nombre_razon,
         nif,
@@ -234,7 +236,9 @@ async fn run() -> anyhow::Result<()> {
                         match simpletpv_domain::verifactu::aeat::process_aeat_batch(
                             &verifactu_db,
                             &cfg,
+                            &simpletpv_domain::verifactu::aeat::RealTransport,
                             VERIFACTU_BATCH,
+                            None,
                         )
                         .await
                         {

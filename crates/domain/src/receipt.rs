@@ -215,12 +215,8 @@ pub fn render_receipt_html(data: &TicketData) -> String {
                     .to_timezone(timezones::db::europe::MADRID);
                 crate::verifactu::hash::format_fecha_expedicion(local)
             };
-            let qr_url = crate::verifactu::hash::build_qr_data(
-                nif,
-                &data.ticket_number,
-                &fecha,
-                data.total,
-            );
+            let qr_url =
+                crate::verifactu::hash::build_qr_data(nif, &data.ticket_number, &fecha, data.total);
             let qr_svg = build_qr_svg(&qr_url);
             let qr_url_esc = escape_html(&qr_url);
             format!(

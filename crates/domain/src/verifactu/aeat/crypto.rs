@@ -25,8 +25,7 @@ pub fn key_from_hex(s: &str) -> Result<[u8; 32], String> {
 
 /// Cifra `plaintext` → `nonce || ciphertext`. Nonce aleatorio por operación (OS RNG).
 pub fn seal(plaintext: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, String> {
-    let cipher =
-        Aes256Gcm::new_from_slice(key).map_err(|_| "clave AES-256 inválida".to_owned())?;
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| "clave AES-256 inválida".to_owned())?;
     let nonce = Nonce::<Aes256Gcm>::generate();
     let ct = cipher
         .encrypt(&nonce, plaintext)
@@ -44,13 +43,12 @@ pub fn open(blob: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, String> {
         return Err("blob de certificado demasiado corto".to_owned());
     }
     let (nonce_bytes, ct) = blob.split_at(NONCE_LEN);
-    let cipher =
-        Aes256Gcm::new_from_slice(key).map_err(|_| "clave AES-256 inválida".to_owned())?;
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| "clave AES-256 inválida".to_owned())?;
     let nonce = Nonce::<Aes256Gcm>::try_from(nonce_bytes)
         .map_err(|_| "nonce inválido en el blob".to_owned())?;
-    cipher
-        .decrypt(&nonce, ct)
-        .map_err(|_| "fallo al descifrar el certificado (clave incorrecta o datos alterados)".to_owned())
+    cipher.decrypt(&nonce, ct).map_err(|_| {
+        "fallo al descifrar el certificado (clave incorrecta o datos alterados)".to_owned()
+    })
 }
 
 #[cfg(test)]
@@ -75,7 +73,10 @@ mod tests {
         let k = key();
         let a = seal(b"x", &k).unwrap();
         let b = seal(b"x", &k).unwrap();
-        assert_ne!(a, b, "dos sellados del mismo dato difieren (nonce aleatorio)");
+        assert_ne!(
+            a, b,
+            "dos sellados del mismo dato difieren (nonce aleatorio)"
+        );
     }
 
     #[test]
@@ -98,6 +99,9 @@ mod tests {
     #[test]
     fn clave_hex_invalida() {
         assert!(key_from_hex("corta").is_err());
-        assert!(key_from_hex("zz112233445566778899aabbccddeeff00112233445566778899aabbccddeeff").is_err());
+        assert!(
+            key_from_hex("zz112233445566778899aabbccddeeff00112233445566778899aabbccddeeff")
+                .is_err()
+        );
     }
 }
