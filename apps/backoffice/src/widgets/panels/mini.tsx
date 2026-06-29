@@ -114,24 +114,43 @@ export function MiniTrendLine({ period, store }: PanelProps): ReactElement {
   );
 }
 
-// ── 3 · Área · acumulado (suma acumulada de la serie diaria de beneficio de getMarginKpis) ───────
+// ── 3 · Área · acumulado ─────────────────────────────────────────────────────────────────────────
+// Reescrito de cero copiando el markup EXACTO del handoff (sección 08 «Mini gráficas»): área a sangre con
+// degradado vertical del acento (.2 → 0), baseline al pie (y=80) y trazo de 2.5px no escalado con punta
+// redonda. La serie es la suma ACUMULADA del beneficio diario (getMarginKpis.realMarginSeries); los puntos
+// se reparten uniformemente en el viewBox 240×80 y se normalizan a y∈[70,8] (igual que el handoff: arranca
+// abajo-izquierda y sube a arriba-derecha). Cálculo propio del trazado, sin el helper de la línea.
 export function MiniCumulativeArea({ period, store }: PanelProps): ReactElement {
   const q = useQuery({
     queryKey: ['dash-margin', period, store],
     queryFn: () => getMarginKpis(period, store),
     placeholderData: keepPreviousData,
   });
-  const daily = (q.data?.realMarginSeries ?? []).filter(ok);
+
+  // Suma acumulada del beneficio diario → curva monótona creciente.
   let acc = 0;
-  const cum = daily.map((v) => (acc += v));
-  const path = linePath(cum);
+  const cumulative = (q.data?.realMarginSeries ?? []).filter(ok).map((v) => (acc += v));
+
+  // Trazado al estilo del handoff: viewBox 240×80, la línea va de y=70 (abajo-izq) a y=8 (arriba-der).
+  const X = 240;
+  const Y_BASE = 70;
+  const Y_TOP = 8;
+  const min = Math.min(...cumulative);
+  const max = Math.max(...cumulative);
+  const span = max - min || 1;
+  const points = cumulative.map((v, i) => {
+    const x = (i / (cumulative.length - 1)) * X;
+    const y = Y_BASE - ((v - min) / span) * (Y_BASE - Y_TOP);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const line = points.length >= 2 ? `M${points.join(' L')}` : '';
 
   return (
     <PanelShell id="mini-acumulado" bare>
       <div className="mw-card">
         <div className="mw-label">Área · acumulado</div>
         <svg className="mw-svg" viewBox="0 0 240 80" preserveAspectRatio="none" aria-hidden="true">
-          {path ? (
+          {line ? (
             <>
               <defs>
                 <linearGradient id="mw-acc-grad" x1="0" y1="0" x2="0" y2="1">
@@ -139,9 +158,11 @@ export function MiniCumulativeArea({ period, store }: PanelProps): ReactElement 
                   <stop offset="1" stopColor="var(--ui-brand)" stopOpacity="0" />
                 </linearGradient>
               </defs>
-              <path d={`${path.line} L240,80 L0,80 Z`} fill="url(#mw-acc-grad)" />
+              {/* Relleno: línea + cierre al pie (baseline y=80). */}
+              <path d={`${line} L${X},80 L0,80 Z`} fill="url(#mw-acc-grad)" />
+              {/* Trazo del acento. */}
               <path
-                d={path.line}
+                d={line}
                 fill="none"
                 stroke="var(--ui-brand)"
                 strokeWidth="2.5"
