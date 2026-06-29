@@ -225,9 +225,12 @@ pub async fn stream(
         ai_config, pool_clone, org, uid, conv_id, req, is_admin, model,
     );
 
-    Ok(Sse::new(sse_stream)
+    let mut response = Sse::new(sse_stream)
         .keep_alive(KeepAlive::default())
-        .into_response())
+        .into_response();
+    // Evita que Cloudflare/Nginx bufericen el stream (si no, no llega en vivo).
+    crate::events::apply_sse_no_buffer(response.headers_mut());
+    Ok(response)
 }
 
 // Bucle agente: hasta MAX_TOOL_ROUNDS iteraciones de LLM → tools → LLM.
