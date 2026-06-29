@@ -4,12 +4,21 @@ use uuid::Uuid;
 
 // Columnas camelCase (convención del repo). `SELECT *`/`RETURNING *` ⇒ `FromRow`
 // necesita `#[sqlx(rename)]` para casar snake_case con la columna.
+// Una fila de support_conversation = un TICKET de soporte.
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct SupportConversationRow {
     pub id: Uuid,
     #[serde(rename = "organizationId")]
     #[sqlx(rename = "organizationId")]
     pub organization_id: Uuid,
+    /// Número de ticket secuencial dentro de la organización (#1, #2, …).
+    pub number: Option<i32>,
+    /// Título del ticket (= primer mensaje del usuario).
+    pub title: Option<String>,
+    /// Usuario que abrió el ticket (la lista de tickets se filtra por él).
+    #[serde(rename = "authorUserId")]
+    #[sqlx(rename = "authorUserId")]
+    pub author_user_id: Option<Uuid>,
     #[serde(rename = "telegramTopicId")]
     #[sqlx(rename = "telegramTopicId")]
     pub telegram_topic_id: Option<i64>,
@@ -21,6 +30,9 @@ pub struct SupportConversationRow {
     #[serde(rename = "updatedAt")]
     #[sqlx(rename = "updatedAt")]
     pub updated_at: PrimitiveDateTime,
+    #[serde(rename = "closedAt")]
+    #[sqlx(rename = "closedAt")]
+    pub closed_at: Option<PrimitiveDateTime>,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
