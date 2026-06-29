@@ -2,10 +2,12 @@ import { X } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 
 import {
-  BOARD_COLS,
   type FreeElement,
   type FreeLayout,
   freeUnitsFromPx,
+  GRID_COARSE_COLS,
+  GRID_COARSE_COLS_NARROW,
+  gridCoarseUnits,
 } from '../lib/dashboard-layout.js';
 import { packGridTiles } from '../lib/grid-pack.js';
 import { useEnterAnimation } from '../lib/use-enter-animation.js';
@@ -20,30 +22,29 @@ import { FreeNote } from './FreeNote.js';
 // las formas/dibujos/textos sueltos son anotaciones espaciales propias del lienzo libre y no caben
 // en una rejilla de flujo, así que se omiten (siguen visibles al volver al lienzo).
 //
-// CLAVE (encaje perfecto sin huecos): el tamaño en píxeles de cada elemento del lienzo CODIFICA su
-// número entero de unidades de rejilla (px = u·CELDA − GAP). En vez de aproximar el tramo con
-// umbrales de píxel (lo anterior: dejaba huecos y no llenaba el ancho), recuperamos esas unidades
-// EXACTAS con `freeUnitsFromPx` y COMPACTAMOS los bloques con un empaquetado «skyline» (ver
-// `grid-pack.ts`): cada uno cae en el escalón más bajo donde cabe a lo ancho, así un bloque posterior
-// rellena el hueco que deja uno alto SIN redimensionar a nadie. Las posiciones (columna/fila) se
-// emiten EXPLÍCITAS sobre `repeat(N, 1fr)` a ancho completo; no se usa `auto-flow` (la compactación
-// la hace el packer, no el navegador, que solo rellenaría celdas vacías triviales).
+// CLAVE (rejilla regular y limpia): el tamaño en píxeles de cada elemento del lienzo CODIFICA su número
+// entero de unidades FINAS (px = u·CELDA − GAP). Recuperamos esas unidades con `freeUnitsFromPx` y las
+// CUANTIZAMOS a la rejilla GRUESA regular (`gridCoarseUnits`, 12 col): así el modo ordenado se ve como
+// una rejilla bonita con gutter, no como un mosaico irregular de tallas a medida. Luego COMPACTAMOS con
+// un empaquetado «skyline» (ver `grid-pack.ts`): cada bloque cae en el escalón más bajo donde cabe a lo
+// ancho, así un bloque posterior rellena el hueco que deja uno alto SIN redimensionar a nadie. Las
+// posiciones (columna/fila) se emiten EXPLÍCITAS sobre `repeat(N, 1fr)`; no se usa `auto-flow` (la
+// compactación la hace el packer, no el navegador, que solo rellenaría celdas vacías triviales).
 const GRID_KINDS = new Set<FreeElement['kind']>(['widget', 'note']);
 
-// Columnas efectivas según el ancho disponible. Se mantienen las 12 unidades de diseño en cuanto hay
-// sitio (tablet+escritorio) porque 12 TESELA limpio con los anchos del catálogo (3/4/5/6/7/12: p. ej.
-// 4+4+4, 3+3+3+3, 7+5, 6+6); los recuentos intermedios como 8 ó 6 dejan muchos huecos (un w4 ó w5 no
-// completa la fila). En pantallas estrechas se cae a 3 columnas: como todos los bloques miden ≥3, se
-// apilan a fila completa → encaje perfecto sin huecos. Cada span se capa a este número → nada desborda.
+// Columnas efectivas según el ancho disponible. El modo Cuadrícula tesela en la rejilla GRUESA regular
+// (GRID_COARSE_COLS = 12) en cuanto hay sitio: 12 encaja limpio con los anchos cuantizados (3+3+3+3,
+// 4+4+4, 7+5, 6+6) y da una rejilla bonita con gutter. En pantallas estrechas cae a 3 columnas: como los
+// bloques miden ≥2 gruesas, se apilan a fila casi completa. Cada span se capa a este número → nada desborda.
 function colsForWidth(width: number): number {
-  if (width >= 480) return BOARD_COLS; // 12 — tablet/escritorio: máxima fidelidad y mejor teselado
-  return 3; // móvil: los bloques (todos ≥3) pasan a fila completa, apilados sin huecos
+  if (width >= 480) return GRID_COARSE_COLS; // 12 — tablet/escritorio: rejilla regular y limpia
+  return GRID_COARSE_COLS_NARROW; // 3 — móvil: bloques a fila completa, apilados sin huecos
 }
 
 // Mide el ancho del contenedor de flujo (vía ResizeObserver) y deriva las columnas efectivas. Por
 // defecto 12 hasta la primera medida (coincide con el fallback del CSS, sin parpadeo en escritorio).
 function useEffectiveCols(ref: React.RefObject<HTMLElement | null>): number {
-  const [cols, setCols] = useState(BOARD_COLS);
+  const [cols, setCols] = useState(GRID_COARSE_COLS);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -103,7 +104,8 @@ export function GridBoard({
   // sin huecos a ancho completo. Se recalcula cuando cambian las columnas efectivas o los elementos.
   const placed = packGridTiles(
     items.map((e) => {
-      const u = freeUnitsFromPx(e.w, e.h);
+      const f = freeUnitsFromPx(e.w, e.h);
+      const u = gridCoarseUnits(f.cols, f.rows);
       return { id: e.id, cols: u.cols, rows: u.rows };
     }),
     effectiveCols,

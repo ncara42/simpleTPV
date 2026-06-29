@@ -73,20 +73,19 @@ export const SLOT_PIECES: Record<SlotName, ReadonlySet<PieceId>> = {
   ]),
 };
 
-// Tamaño por defecto (unidades de grid, BOARD_COLS=12) por receta. Sustituye el `default_size` libre
-// del agente: la receta dicta la geometría. El agente nunca emite w/h.
+// Tamaño por defecto (unidades de rejilla fina, BOARD_COLS=48) por receta. Sustituye el `default_size`
+// libre del agente: la receta dicta la geometría. El agente nunca emite w/h.
 // Anchos RECIPE-AWARE (grid responsive, no muro de tarjetas idénticas): los paneles compactos van a
-// MEDIA anchura (w:6) → tilean 2-up como el grid de Tremor (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`)
+// MEDIA anchura (w:24) → tilean 2-up como el grid de Tremor (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`)
 // y dan jerarquía/ritmo (Carbon: priorizar por importancia + white space); los internamente densos
 // (2 gráficas, hero+stats) ocupan el ANCHO COMPLETO. La mezcla ancho/medio crea composición bento.
 export const RECIPE_SIZE: Record<RecipeId, { w: number; h: number }> = {
-  kpiRow: { w: 6, h: 1 }, // banda de KPIs (1-4 tiles) → media anchura
-  'kpiRow+oneChart': { w: 6, h: 3 }, // KPIs + 1 gráfica → tarjeta media (2-up)
-  // Gráficas COMPACTAS (estilo widget "Ventas", h:2): banda KPI (~1 fila) + ~2 filas de gráfica.
-  // Antes h:5 → las gráficas se estiraban demasiado a lo alto (feedback del usuario).
-  'kpiRow+twoCharts': { w: 12, h: 3 }, // 2 gráficas en paralelo → ancho completo
-  'heroChart+sideStats': { w: 12, h: 3 }, // gráfica hero + stats (split 2fr/1fr) → ancho completo
-  tableFull: { w: 6, h: 4 }, // ranking/tabla → media anchura (BarList se lee bien medio)
+  kpiRow: { w: 24, h: 4 }, // banda de KPIs (1-4 tiles) → media anchura
+  'kpiRow+oneChart': { w: 24, h: 12 }, // KPIs + 1 gráfica → tarjeta media (2-up)
+  // Gráficas COMPACTAS (estilo widget "Ventas"): banda KPI (~1 fila) + ~2 filas de gráfica.
+  'kpiRow+twoCharts': { w: 48, h: 12 }, // 2 gráficas en paralelo → ancho completo
+  'heroChart+sideStats': { w: 48, h: 12 }, // gráfica hero + stats (split 2fr/1fr) → ancho completo
+  tableFull: { w: 24, h: 16 }, // ranking/tabla → media anchura (BarList se lee bien medio)
 };
 
 export const PIECE_FORMATS: readonly PieceFormat[] = [
@@ -160,12 +159,12 @@ export function recipeChartColumns(recipe: RecipeId): 1 | 2 {
   return recipe === 'kpiRow+twoCharts' ? 2 : 1;
 }
 
-// Tamaños (grid 12-col) de cada pieza al SEPARAR un panel en widgets sueltos: KPI estrecho como una
-// card de catálogo; listas/tablas algo más altas; gráficas media anchura.
+// Tamaños (rejilla fina, 48-col) de cada pieza al SEPARAR un panel en widgets sueltos: KPI estrecho
+// como una card de catálogo; listas/tablas algo más altas; gráficas media anchura.
 const PIECE_SOLO_SIZE = {
-  kpi: { w: 2, h: 1 },
-  list: { w: 5, h: 3 },
-  chart: { w: 5, h: 2 },
+  kpi: { w: 8, h: 4 },
+  list: { w: 20, h: 12 },
+  chart: { w: 20, h: 8 },
 } as const;
 const LIST_PIECES: ReadonlySet<PieceId> = new Set<PieceId>([
   'rankBarList',

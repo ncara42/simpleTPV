@@ -41,140 +41,107 @@ export function defaultPanelOrder(preset: PresetDef): string[] {
   return PANEL_CANON.filter((id) => inPreset.has(id));
 }
 
-// Tamaño por defecto (en unidades de rejilla de 12 columnas) de cada elemento. Las
-// tarjetas KPI ocupan 2 columnas y 1 fila; los paneles heredan su ancho histórico
-// (span 5/7/12) y un alto que encaja su contenido (gráfico ~200px o lista con scroll).
-export const BOARD_COLS = 12;
+// Tamaño por defecto de cada widget, en UNIDADES de una rejilla FINA (2026-06-29): la celda mide
+// FREE_COL×FREE_ROW px (25×40) en vez del bloque grueso anterior (100×160). Con la celda fina cada
+// widget declara un ancho y un alto PROPIOS, tallados a su contenido y a su modo `fit` (ver
+// PanelShell): los que ESTIRAN (tablas/listas/gráficas) piden el alto de su nº natural de filas; los
+// que CENTRAN una figura (donut, gauge, cifra-héroe) piden una proporción que la abraza sin banda
+// blanca. Ya NO hay tallas «de bloque» compartidas por sección: los 41 widgets tienen medidas únicas.
+// La rejilla fina conserva el ENGANCHE (snap) y el teselado del modo Cuadrícula; el ancho de diseño
+// (BOARD_COLS×FREE_COL = 48×25 = 1200) es el mismo de siempre, así que la maquetación macro no cambia.
+export const BOARD_COLS = 48;
 export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
-  // Únicos widgets del catálogo: «Ventas» y «Ventas por hora».
-  'dash-bars': { w: 7, h: 2 },
-  // "Ventas por hora": gráfico + barra fina de navegación. El gráfico llena el alto del tile
-  // (dash-panel--fill), así que 2 filas bastan sin dejar hueco inferior.
-  'dash-hour': { w: 7, h: 2 },
-  // Sección 01 · KPIs (rediseño): rejilla conectada (tarjeta redondeada de 6 KPIs, banda baja) y clásica.
-  'kpi-grid-connected': { w: 12, h: 1 },
-  'kpi-classic': { w: 3, h: 1 },
-  // Sección 02 · Gráficas (rediseño): distribución horaria (área), ventas por tienda (barras) y heatmap.
-  // La distribución horaria comparte tamaño con el heatmap (6×2): contenido compacto, sin scroll.
-  'graf-hour-area': { w: 6, h: 2 },
-  'graf-store-bars': { w: 6, h: 2 },
-  'graf-heatmap': { w: 6, h: 2 },
-  // Sección 03 · Listas (rediseño): reparto por familia, ranking de productos y mix (treemap).
-  'lista-familia': { w: 4, h: 3 },
-  'lista-rankings': { w: 4, h: 3 },
-  'lista-mix': { w: 4, h: 3 },
-  // Sección 05 · Compactos (rediseño): tiles pequeños (ribbon, donut, treemap, top, cifra-héroe).
-  'cmp-ribbon': { w: 3, h: 2 },
-  'cmp-donut': { w: 3, h: 2 },
-  // Treemap «Mix por familia»: el handoff lo dibuja ancho (1.7fr) → necesita ancho para que las áreas y
-  // los nombres respiren (a w:3 se aprietan). Por eso arranca más ancho que el resto de compactos.
-  'cmp-treemap': { w: 5, h: 2 },
-  'cmp-leaderboard': { w: 3, h: 3 },
-  'cmp-hero': { w: 5, h: 2 },
-  // Sección 06 · Diagnóstico (rediseño): feed de actividad (lista alta).
-  'diag-actividad': { w: 4, h: 3 },
-  // Sección 07 · KPIs · más formatos (rediseño): tarjetas KPI (dual, área, alerta, 7 días).
-  'kpi-dual': { w: 3, h: 2 },
-  'kpi-area': { w: 3, h: 2 },
-  'kpi-alerta': { w: 3, h: 2 },
-  'kpi-7dias': { w: 3, h: 2 },
-  // Sección 08 · Mini gráficas (rediseño): tiles de bolsillo (rejilla de 5 en el handoff).
-  'mini-tiendas': { w: 3, h: 1 },
-  'mini-tendencia': { w: 3, h: 1 },
-  'mini-acumulado': { w: 3, h: 1 },
-  'mini-donut': { w: 3, h: 1 },
-  'mini-gauge': { w: 3, h: 1 },
-  'mini-familias': { w: 3, h: 1 },
-  'mini-heatmap': { w: 3, h: 1 },
-  'mini-columnas': { w: 3, h: 1 },
-  // Sección 09 · Listas y tablas (rediseño): tarjetas de filas (hasta 6 filas → tile medio).
-  'tabla-simple': { w: 4, h: 2 },
-  'tabla-avatar': { w: 4, h: 2 },
-  'tabla-estado': { w: 4, h: 2 },
-  'tabla-variacion': { w: 4, h: 2 },
-  'tabla-ranking': { w: 4, h: 2 },
-  'tabla-tareas': { w: 4, h: 2 },
-  // Sección 10 · Estado y progreso (rediseño): stepper ancho, estado compacto y checklist.
-  'estado-pasos': { w: 4, h: 1 },
-  'estado-operativo': { w: 2, h: 1 },
-  'estado-cumplimiento': { w: 3, h: 1 },
-  // Sección 11 · Especializados (rediseño): tarjetas de detalle + banner ejecutivo a todo lo ancho.
-  'esp-proveedores': { w: 4, h: 2 },
-  'esp-matriz': { w: 4, h: 2 },
-  'esp-tiendas': { w: 3, h: 2 },
-  'esp-resumen-ejecutivo': { w: 8, h: 2 },
+  // Clásicos: gráficas grandes (necesitan ancho para barras/eje y alto para respirar).
+  'dash-bars': { w: 29, h: 9 },
+  // "Ventas por hora": gráfico + barra fina de navegación; el gráfico llena el alto (dash-panel--fill).
+  'dash-hour': { w: 29, h: 8 },
+  // Sección 01 · KPIs (rediseño): banda conectada a todo lo ancho (baja) y tarjeta clásica compacta.
+  'kpi-grid-connected': { w: 48, h: 5 },
+  'kpi-classic': { w: 13, h: 5 },
+  // Sección 02 · Gráficas (rediseño): área horaria, barras por tienda y heatmap (tira ancha-baja).
+  'graf-hour-area': { w: 23, h: 8 },
+  'graf-store-bars': { w: 24, h: 8 },
+  'graf-heatmap': { w: 25, h: 6 },
+  // Sección 03 · Listas (rediseño): ranking con barra (alto), pestañas+filas y mix apilado (más bajo).
+  'lista-familia': { w: 16, h: 11 },
+  'lista-rankings': { w: 17, h: 11 },
+  'lista-mix': { w: 15, h: 9 },
+  // Sección 05 · Compactos (rediseño): banda, donut (≈cuadrado), treemap (ancho), top y cifra-héroe.
+  'cmp-ribbon': { w: 13, h: 7 },
+  'cmp-donut': { w: 12, h: 7 },
+  // Treemap: áreas 2D + nombres → ancho y medio-alto para que respiren.
+  'cmp-treemap': { w: 20, h: 7 },
+  'cmp-leaderboard': { w: 14, h: 11 },
+  'cmp-hero': { w: 20, h: 6 }, // cifra gigante + área: ancha y baja.
+  // Sección 06 · Diagnóstico (rediseño): feed de alertas (lista alta, muchas filas).
+  'diag-actividad': { w: 15, h: 12 },
+  // Sección 07 · KPIs · más formatos (rediseño): tarjetas cifra+sparkline, cada una con su talla.
+  'kpi-dual': { w: 13, h: 6 }, // dos métricas apiladas → la más alta.
+  'kpi-area': { w: 14, h: 6 }, // cifra + área al pie → algo más ancha.
+  'kpi-alerta': { w: 12, h: 6 },
+  'kpi-7dias': { w: 15, h: 5 }, // 7 mini-barras → ancha y baja.
+  // Sección 08 · Mini gráficas (rediseño): tiles de bolsillo; cada viz pide su proporción.
+  'mini-tiendas': { w: 10, h: 4 },
+  'mini-tendencia': { w: 9, h: 4 }, // solo una línea → la más estrecha.
+  'mini-acumulado': { w: 11, h: 4 },
+  'mini-donut': { w: 12, h: 5 }, // rótulo + anillo.
+  'mini-gauge': { w: 11, h: 3 }, // semicírculo → la más baja.
+  'mini-familias': { w: 10, h: 5 }, // 3 filas de riel.
+  'mini-heatmap': { w: 12, h: 3 }, // tira de 11 celdas: ancha-baja.
+  'mini-columnas': { w: 12, h: 4 },
+  // Sección 09 · Listas y tablas (rediseño): tarjetas de filas; ancho/alto según columnas y nº de filas.
+  'tabla-simple': { w: 16, h: 8 },
+  'tabla-avatar': { w: 18, h: 8 }, // avatar + nombre + valor → la más ancha.
+  'tabla-estado': { w: 16, h: 9 },
+  'tabla-variacion': { w: 17, h: 8 },
+  'tabla-ranking': { w: 17, h: 9 },
+  'tabla-tareas': { w: 18, h: 9 },
+  // Sección 10 · Estado y progreso (rediseño): stepper ancho-bajo, badge pequeño y checklist.
+  'estado-pasos': { w: 18, h: 3 }, // 4 pasos en horizontal → muy bajo.
+  'estado-operativo': { w: 8, h: 4 }, // disco + N/N → el más pequeño.
+  'estado-cumplimiento': { w: 13, h: 4 },
+  // Sección 11 · Especializados (rediseño): comparativa, matriz 2D, directorio (alto) y banner ancho.
+  'esp-proveedores': { w: 19, h: 9 },
+  'esp-matriz': { w: 19, h: 8 },
+  'esp-tiendas': { w: 14, h: 10 },
+  'esp-resumen-ejecutivo': { w: 37, h: 6 }, // banner ejecutivo a (casi) todo lo ancho.
 };
 
-const DEFAULT_SPEC = { w: 4, h: 2 };
+const DEFAULT_SPEC = { w: 16, h: 8 };
 
-// ── Límites de tamaño por widget (auditoría 2026-06-29) ───────────────────────────────────────────
+// ── Límites de tamaño por widget (rejilla fina, 2026-06-29) ─────────────────────────────────────────
 // Aunque los widgets son responsivos (llenan su tile vía el contrato `fit`), su TILE debe mantener un
-// tamaño coherente con lo que el widget ES. Estos rangos (en UNIDADES de rejilla de 12 col) acotan el
-// tamaño: una mini-gráfica no crece a media pantalla, una tabla no queda en 1×1 ilegible, un donut no se
-// deforma a ancho completo, etc. El tamaño de catálogo (`ITEM_SPECS`) SIEMPRE cae dentro de su rango
-// (verificado por test). Se aplican al cargar/migrar cualquier layout (`migrateFreeElement`).
+// tamaño coherente con lo que el widget ES: una mini no crece a media pantalla, una tabla no queda
+// ilegible, un donut no se deforma a ancho completo. Como ahora cada widget tiene su talla PROPIA
+// (`ITEM_SPECS`), su rango se DERIVA de esa talla con una banda fija alrededor (en vez de mantener 41
+// rangos a mano): así el rango es único por widget y el tamaño de catálogo SIEMPRE cae dentro de él por
+// construcción (verificado por test). Se aplican al cargar/migrar cualquier layout (`migrateFreeElement`).
 export interface SizeBounds {
   minW: number;
   maxW: number;
   minH: number;
   maxH: number;
 }
-// Suelo/techo genérico (widgets sin rango propio: genéricos/compuestos del compositor IA).
-export const DEFAULT_SIZE_BOUNDS: SizeBounds = { minW: 2, maxW: 8, minH: 1, maxH: 5 };
-export const WIDGET_SIZE_BOUNDS: Record<string, SizeBounds> = {
-  // Clásicos (gráficas grandes)
-  'dash-bars': { minW: 4, maxW: 12, minH: 2, maxH: 4 },
-  'dash-hour': { minW: 4, maxW: 12, minH: 2, maxH: 4 },
-  // 01 · KPIs
-  'kpi-grid-connected': { minW: 6, maxW: 12, minH: 1, maxH: 2 }, // tira ancha de 6 celdas
-  'kpi-classic': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
-  // 02 · Gráficas medias (necesitan ancho para el eje X)
-  'graf-hour-area': { minW: 4, maxW: 8, minH: 2, maxH: 4 },
-  'graf-store-bars': { minW: 4, maxW: 8, minH: 2, maxH: 4 },
-  'graf-heatmap': { minW: 4, maxW: 8, minH: 2, maxH: 4 },
-  // 03 · Listas (leyenda + barras de altura ~fija → maxH menor que tabla)
-  'lista-familia': { minW: 3, maxW: 6, minH: 2, maxH: 4 },
-  'lista-rankings': { minW: 3, maxW: 6, minH: 2, maxH: 4 },
-  'lista-mix': { minW: 3, maxW: 6, minH: 2, maxH: 4 },
-  // 05 · Compactos
-  'cmp-ribbon': { minW: 2, maxW: 5, minH: 1, maxH: 3 },
-  'cmp-donut': { minW: 2, maxW: 5, minH: 1, maxH: 3 }, // figura ~cuadrada, sin ancho completo
-  'cmp-treemap': { minW: 4, maxW: 8, minH: 2, maxH: 4 }, // áreas 2D → ancho
-  'cmp-leaderboard': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
-  'cmp-hero': { minW: 3, maxW: 8, minH: 1, maxH: 3 }, // ancha y baja
-  // 06 · Diagnóstico (feed de items)
-  'diag-actividad': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
-  // 07 · KPIs · más formatos (cifra + sparkline)
-  'kpi-dual': { minW: 2, maxW: 5, minH: 1, maxH: 3 },
-  'kpi-area': { minW: 2, maxW: 5, minH: 1, maxH: 3 },
-  'kpi-alerta': { minW: 2, maxW: 5, minH: 1, maxH: 3 },
-  'kpi-7dias': { minW: 2, maxW: 5, minH: 1, maxH: 3 },
-  // 08 · Mini gráficas (de bolsillo)
-  'mini-tiendas': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
-  'mini-tendencia': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
-  'mini-acumulado': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
-  'mini-donut': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
-  'mini-gauge': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
-  'mini-familias': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
-  'mini-heatmap': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
-  'mini-columnas': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
-  // 09 · Listas y tablas (hasta 6 filas → alto generoso)
-  'tabla-simple': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
-  'tabla-avatar': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
-  'tabla-estado': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
-  'tabla-variacion': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
-  'tabla-ranking': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
-  'tabla-tareas': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
-  // 10 · Estado y progreso
-  'estado-pasos': { minW: 3, maxW: 6, minH: 1, maxH: 2 }, // stepper ancho-bajo
-  'estado-operativo': { minW: 2, maxW: 3, minH: 1, maxH: 2 }, // badge pequeño
-  'estado-cumplimiento': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
-  // 11 · Especializados
-  'esp-proveedores': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
-  'esp-matriz': { minW: 3, maxW: 6, minH: 2, maxH: 4 },
-  'esp-tiendas': { minW: 2, maxW: 5, minH: 2, maxH: 5 },
-  'esp-resumen-ejecutivo': { minW: 6, maxW: 12, minH: 1, maxH: 3 }, // banner a todo lo ancho
-};
+// Suelo/techo genérico (widgets sin talla de catálogo: genéricos/compuestos del compositor IA).
+export const DEFAULT_SIZE_BOUNDS: SizeBounds = { minW: 8, maxW: 32, minH: 4, maxH: 20 };
+
+// Banda alrededor de la talla de catálogo (unidades de rejilla fina). Asimétrica: deja crecer algo
+// más de lo que deja encoger, con suelos/techos que evitan tiles inservibles o desbordados.
+const BOUND_SLACK = { wMinus: 4, wPlus: 8, hMinus: 2, hPlus: 5 } as const;
+const MIN_BOUND_W = 6;
+const MIN_BOUND_H = 3;
+const MAX_BOUND_H = 24;
+function deriveSizeBounds(w: number, h: number): SizeBounds {
+  return {
+    minW: Math.max(MIN_BOUND_W, w - BOUND_SLACK.wMinus),
+    maxW: Math.min(BOARD_COLS, w + BOUND_SLACK.wPlus),
+    minH: Math.max(MIN_BOUND_H, h - BOUND_SLACK.hMinus),
+    maxH: Math.min(MAX_BOUND_H, h + BOUND_SLACK.hPlus),
+  };
+}
+export const WIDGET_SIZE_BOUNDS: Record<string, SizeBounds> = Object.fromEntries(
+  Object.entries(ITEM_SPECS).map(([id, s]) => [id, deriveSizeBounds(s.w, s.h)]),
+);
 
 // Rango de un widget (cae al genérico si no tiene propio).
 export function widgetSizeBounds(id: string): SizeBounds {
@@ -401,16 +368,16 @@ export interface PieceSpec {
 // Tamaño por defecto (unidades de grid) por tipo de widget genérico. El agente puede
 // sobreescribirlo en `GenericSpec.defaultSize`.
 export const GENERIC_DEFAULT_SIZE: Record<GenericWidgetType, { w: number; h: number }> = {
-  table: { w: 6, h: 3 },
-  bar: { w: 6, h: 2 },
-  line: { w: 6, h: 2 },
-  area: { w: 6, h: 2 },
-  stacked: { w: 6, h: 2 },
-  pie: { w: 4, h: 3 },
-  donut: { w: 4, h: 3 },
-  kpi: { w: 2, h: 1 },
-  insight: { w: 5, h: 2 },
-  composite: { w: 8, h: 5 },
+  table: { w: 24, h: 12 },
+  bar: { w: 24, h: 8 },
+  line: { w: 24, h: 8 },
+  area: { w: 24, h: 8 },
+  stacked: { w: 24, h: 8 },
+  pie: { w: 16, h: 12 },
+  donut: { w: 16, h: 12 },
+  kpi: { w: 8, h: 4 },
+  insight: { w: 20, h: 8 },
+  composite: { w: 32, h: 20 },
 };
 
 // Preferencia de layout: preset activo, modo, tipo de gráfico por card, colocación 2D del
@@ -527,11 +494,11 @@ export function reconcileLayout(saved: LayoutCoords[], itemIds: string[]): Layou
 // ── Inserción en la rejilla (D-22, chatbot #188) ──
 // Columnas por breakpoint del tablero RGL (espejo de `BOARD_COLS_BY_BP` en DashboardPage).
 export const GRID_BREAKPOINT_COLS: Record<string, number> = {
-  lg: 12,
-  md: 12,
-  sm: 6,
-  xs: 4,
-  xxs: 2,
+  lg: 48,
+  md: 48,
+  sm: 24,
+  xs: 16,
+  xxs: 8,
 };
 
 // Posición semántica donde el agente quiere colocar un widget en la rejilla.
@@ -629,11 +596,12 @@ export function addWidgetToGrid(
 }
 
 // ── Lienzo libre (D-20) ──
-// Traducción de unidades de rejilla a píxeles de mundo para sembrar el lienzo. Cada celda
-// mide FREE_COL×FREE_ROW e incluye un hueco (FREE_GAP) descontado del tamaño del item, de
-// modo que la disposición inicial replica la del grid pero a píxel.
-export const FREE_COL = 100;
-export const FREE_ROW = 160;
+// Traducción de unidades de rejilla a píxeles de mundo para sembrar el lienzo. La celda es FINA
+// (FREE_COL×FREE_ROW = 25×40 px) para que cada widget pueda tener una talla A MEDIDA y aun así
+// ENGANCHE (snap) a una rejilla regular. Cada item descuenta un hueco (FREE_GAP, el gutter) de su
+// tamaño, de modo que la disposición inicial replica la del grid pero a píxel.
+export const FREE_COL = 25;
+export const FREE_ROW = 40;
 export const FREE_GAP = 16;
 
 // Tamaño a píxel de un elemento en el lienzo libre (derivado de su tamaño de rejilla).
@@ -662,6 +630,27 @@ export function clampWidgetPx(id: string, w: number, h: number): { w: number; h:
   const { cols, rows } = freeUnitsFromPx(w, h);
   const c = clampWidgetUnits(id, cols, rows);
   return { w: c.cols * FREE_COL - FREE_GAP, h: c.rows * FREE_ROW - FREE_GAP };
+}
+
+// ── Modo CUADRÍCULA: rejilla GRUESA y regular ────────────────────────────────────────────────────
+// El lienzo libre usa las tallas A MEDIDA (rejilla fina 48 col / 40px fila). El modo Cuadrícula, en
+// cambio, debe verse como una REJILLA limpia y regular (con gutter), no como un mosaico irregular. Por
+// eso CUANTIZA las tallas finas a una rejilla gruesa: 1 unidad gruesa = GRID_COARSEN finas (×4). Resulta
+// la misma rejilla regular de 12 columnas / filas de ~156px de siempre, pero alimentada por las tallas
+// a medida (cada widget redondea a su nº entero de celdas gruesas). Free = a medida; grid = ordenado.
+export const GRID_COARSEN = 4;
+export const GRID_COARSE_COLS = BOARD_COLS / GRID_COARSEN; // 12
+export const GRID_COARSE_COLS_NARROW = 3; // móvil: bloques (todos ≥2 gruesas) a fila completa, apilados
+// Cuantiza una talla en unidades FINAS a unidades GRUESAS (redondeo al entero de celda más cercano,
+// mínimo 1, ancho capado a GRID_COARSE_COLS). Lo usa GridBoard para teselar regular.
+export function gridCoarseUnits(
+  fineCols: number,
+  fineRows: number,
+): { cols: number; rows: number } {
+  return {
+    cols: Math.max(1, Math.min(GRID_COARSE_COLS, Math.round(fineCols / GRID_COARSEN))),
+    rows: Math.max(1, Math.round(fineRows / GRID_COARSEN)),
+  };
 }
 
 // Tamaño por defecto de una nota nueva (px de mundo).

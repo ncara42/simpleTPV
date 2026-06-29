@@ -257,7 +257,7 @@ describe('normalizeGenericSpec — composite (#189)', () => {
     const spec = lastGenericSpec();
     expect(spec.type).toBe('composite');
     expect(spec.endpoint).toBe('');
-    expect(spec.defaultSize).toEqual({ w: 8, h: 5 });
+    expect(spec.defaultSize).toEqual({ w: 32, h: 20 });
     expect(spec.root?.kind).toBe('stack');
     if (spec.root?.kind === 'stack') {
       expect(spec.root.dir).toBe('row');
@@ -428,7 +428,7 @@ describe('normalizeGenericSpec — panel v2 (#204): REPARA en vez de podar', () 
     expect(spec.density).toBe('comfortable');
     expect(spec.slots?.kpis).toHaveLength(1);
     expect(spec.slots?.charts?.[0]?.piece).toBe('comparisonBars');
-    expect(spec.defaultSize).toEqual({ w: 6, h: 3 }); // RECIPE_SIZE (kpiRow+oneChart, media anchura)
+    expect(spec.defaultSize).toEqual({ w: 24, h: 12 }); // RECIPE_SIZE (kpiRow+oneChart, media anchura)
   });
 
   it('REUBICA una pieza en el slot equivocado (no la descarta) y lo reporta en reason', () => {
