@@ -798,11 +798,27 @@
   background: var(--ui-danger, #ef4444);
 }
 
-/* ── Checks de estado del mensaje ────────────────────────────────────────────────── */
+/* ── Pie de mensaje: hora + tick ─────────────────────────────────────────────────── */
+.ticket-msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.ticket-msg--user .ticket-msg-meta {
+  justify-content: flex-end;
+}
+.ticket-msg-time {
+  font-size: 0.6875rem;
+  line-height: 1;
+  user-select: none;
+  color: var(--ui-text-muted);
+}
+.ticket-msg--user .ticket-msg-time {
+  color: rgba(255, 255, 255, 0.5);
+}
 .msg-status {
   display: block;
   flex: none;
-  margin-top: 2px;
 }
 .msg-status--sending {
   color: rgba(255, 255, 255, 0.35);

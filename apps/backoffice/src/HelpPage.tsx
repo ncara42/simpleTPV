@@ -86,6 +86,14 @@ function Composer({ value, onChange, onSubmit, pending, placeholder, autoFocus }
   );
 }
 
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('es-ES', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
 // ── Burbuja de mensaje ───────────────────────────────────────────────────────────
 
 function Bubble({
@@ -105,7 +113,10 @@ function Bubble({
       <div className="ticket-msg-body">
         {mine ? message.body : <ChatMarkdown>{message.body}</ChatMarkdown>}
       </div>
-      {mine && status !== undefined && <MsgStatusIcon status={status} />}
+      <div className="ticket-msg-meta">
+        <span className="ticket-msg-time">{formatTime(message.createdAt)}</span>
+        {mine && status !== undefined && <MsgStatusIcon status={status} />}
+      </div>
     </div>
   );
 }
