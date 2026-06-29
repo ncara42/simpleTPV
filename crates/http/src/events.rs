@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use tokio::sync::broadcast;
@@ -162,13 +162,27 @@ pub async fn stream(State(state): State<AppState>, user: AuthUser) -> Response {
         }
     };
 
-    Sse::new(body)
+    let mut response = Sse::new(body)
         .keep_alive(
             KeepAlive::new()
                 .interval(Duration::from_secs(HEARTBEAT_SECS))
                 .text("ping"),
         )
-        .into_response()
+        .into_response();
+    apply_sse_no_buffer(response.headers_mut());
+    response
+}
+
+/// Cabeceras para que proxies/CDN (Cloudflare, Nginx) NO buffericen ni transformen
+/// el stream SSE. Sin esto, el CDN retiene los eventos y el cliente no los recibe en
+/// vivo (solo al recargar, leyendo de BD). `no-transform` desactiva la compresión de
+/// Cloudflare (la causa del buffering); `X-Accel-Buffering: no` lo honra Nginx.
+pub(crate) fn apply_sse_no_buffer(headers: &mut HeaderMap) {
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-cache, no-transform"),
+    );
+    headers.insert("x-accel-buffering", HeaderValue::from_static("no"));
 }
 
 #[cfg(test)]
