@@ -92,7 +92,9 @@ impl TelegramClient {
                 .ok_or_else(|| TelegramError::Api("respuesta ok sin result".to_owned()))
         } else {
             Err(TelegramError::Api(
-                parsed.description.unwrap_or_else(|| "error desconocido".to_owned()),
+                parsed
+                    .description
+                    .unwrap_or_else(|| "error desconocido".to_owned()),
             ))
         }
     }
@@ -207,7 +209,10 @@ impl IncomingMessage {
     /// Texto del mensaje recortado (None si vacío). Evita persistir mensajes sin
     /// cuerpo (fotos, stickers, eventos de servicio del foro).
     pub fn text_trimmed(&self) -> Option<&str> {
-        self.text.as_deref().map(str::trim).filter(|s| !s.is_empty())
+        self.text
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
     }
 
     /// True si lo envió el propio bot (eco de nuestros `sendMessage`): se ignora
