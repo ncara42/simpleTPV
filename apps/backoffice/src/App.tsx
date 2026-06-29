@@ -6,6 +6,7 @@ import '@simpletpv/ui/select.css';
 import '@simpletpv/ui/topbar.css';
 import '@simpletpv/ui/transfer-chat.css';
 import './catalog.css';
+import './help.css';
 import './catalog/inventory-card.css';
 import './catalog/families-nav.css';
 import './stock/existences.css';

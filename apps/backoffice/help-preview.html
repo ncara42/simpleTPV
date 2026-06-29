@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ayuda · modo lectura (maqueta dirección A)</title>
+<style>
+/* Fuente real vendorizada del repo (rutas absolutas para file://). */
+@font-face { font-family:'Geist'; font-weight:400; font-display:swap; src:url('/home/marcoga/ia/simpleTPV/packages/ui/src/styles/fonts/geist-400.woff2') format('woff2'); }
+@font-face { font-family:'Geist'; font-weight:500; font-display:swap; src:url('/home/marcoga/ia/simpleTPV/packages/ui/src/styles/fonts/geist-500.woff2') format('woff2'); }
+@font-face { font-family:'Geist'; font-weight:600; font-display:swap; src:url('/home/marcoga/ia/simpleTPV/packages/ui/src/styles/fonts/geist-600.woff2') format('woff2'); }
+@font-face { font-family:'Geist'; font-weight:700; font-display:swap; src:url('/home/marcoga/ia/simpleTPV/packages/ui/src/styles/fonts/geist-700.woff2') format('woff2'); }
+@font-face { font-family:'Geist Mono'; font-weight:500; font-display:swap; src:url('/home/marcoga/ia/simpleTPV/packages/ui/src/styles/fonts/geist-mono-500.woff2') format('woff2'); }
+
+:root{
+  --gst-50:#fafafa; --gst-100:#f4f4f5; --gst-150:#ededef; --gst-200:#e8e8eb;
+  --gst-300:#d6d6da; --gst-400:#a1a1aa; --gst-500:#71717a; --gst-600:#52525b;
+  --gst-700:#3f3f46; --gst-800:#27272a; --gst-900:#18181b;
+  --gst-blue:#0070f3; --gst-blue-hover:#005bd3; --gst-blue-ink:#0061d1;
+  --gst-blue-soft:rgba(0,112,243,.08); --gst-blue-soft-2:rgba(0,112,243,.16);
+
+  --ui-bg:var(--gst-50); --ui-surface:#fff; --ui-surface-subtle:var(--gst-100);
+  --ui-border:var(--gst-200); --ui-border-strong:var(--gst-300);
+  --ui-text:var(--gst-900); --ui-text-muted:var(--gst-600); --ui-text-soft:var(--gst-500);
+  --ui-brand:var(--gst-blue); --ui-brand-ink:var(--gst-blue-ink);
+  --ui-success:#117a3b;
+  --ui-radius-pill:999px;
+  --ui-focus:0 0 0 3px rgba(0,112,243,.32);
+  --ui-shadow-sm:0 1px 2px rgb(0 0 0 / .05);
+  --ui-shadow-md:0 4px 16px -6px rgb(0 0 0 / .12);
+  --ui-ease:cubic-bezier(.2,0,0,1);
+}
+
+*{box-sizing:border-box;}
+html{ -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+body{
+  margin:0; background:var(--ui-bg); color:var(--ui-text);
+  font-family:'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+.mono{ font-family:'Geist Mono', ui-monospace, monospace; }
+
+/* Anotación de maqueta (NO forma parte del diseño). */
+.note{
+  max-width:52rem; margin:0 auto; padding:2.25rem 1.5rem .5rem;
+  font-size:.75rem; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--gst-400); font-weight:600;
+}
+.note b{ color:var(--gst-600); }
+.frame{ padding-bottom:1.5rem; }
+
+/* ════════ Estado REPOSO (landing centrado) ════════ */
+.hero{
+  max-width:52rem; margin:0 auto; padding:clamp(2.5rem,1.4rem + 5vw,4.5rem) 1.5rem;
+  display:flex; flex-direction:column; align-items:center; text-align:center; gap:1.25rem;
+}
+.eyebrow{
+  margin:0; font-size:.8125rem; font-weight:600; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ui-brand-ink);
+}
+.hero h1{
+  margin:0; font-size:clamp(2.25rem,1.1rem + 4.4vw,3.25rem); font-weight:700;
+  line-height:1.04; letter-spacing:-.03em; max-width:18ch; text-wrap:balance;
+}
+.hero p.sub{
+  margin:0; max-width:34rem; font-size:1.0625rem; line-height:1.5;
+  color:var(--ui-text-muted); text-wrap:balance;
+}
+
+/* Buscador grande (composer en reposo). */
+.ask{
+  position:relative; width:100%; max-width:40rem; margin-top:.25rem;
+}
+.ask input{
+  width:100%; height:3.5rem; padding:0 3.5rem 0 3rem; font:inherit; font-size:1.0625rem;
+  color:var(--ui-text); background:var(--ui-surface); border:1px solid var(--ui-border);
+  border-radius:14px; box-shadow:var(--ui-shadow-sm);
+}
+.ask input::placeholder{ color:var(--ui-text-soft); }
+.ask .lupa{ position:absolute; left:1.1rem; top:50%; transform:translateY(-50%); color:var(--ui-text-soft); }
+.ask .send{
+  position:absolute; right:.6rem; top:50%; transform:translateY(-50%);
+  width:2.25rem; height:2.25rem; display:grid; place-items:center; border:0; cursor:pointer;
+  background:var(--ui-brand); color:#fff; border-radius:10px;
+}
+.chips{ display:flex; flex-wrap:wrap; gap:.5rem; justify-content:center; margin-top:.25rem; }
+.chip{
+  white-space:nowrap; padding:.45rem .85rem; border:1px solid var(--ui-border);
+  border-radius:var(--ui-radius-pill); background:var(--ui-surface); color:var(--ui-text);
+  font:inherit; font-size:.875rem; cursor:pointer;
+}
+.chip:hover{ background:var(--ui-surface-subtle); border-color:color-mix(in srgb,var(--ui-brand) 40%,var(--ui-border)); }
+
+/* ════════ Estado LECTURA (al preguntar) ════════ */
+.read-wrap{ padding-top:1rem; }
+
+/* Ask bar anclada arriba */
+.askbar-outer{
+  position:sticky; top:0; z-index:5;
+  background:color-mix(in srgb, var(--ui-bg) 82%, transparent);
+  backdrop-filter:saturate(1.4) blur(8px);
+  border-bottom:1px solid var(--ui-border);
+}
+.askbar{ max-width:46rem; margin:0 auto; padding:.85rem 1.5rem; position:relative; }
+.askbar input{
+  width:100%; height:3rem; padding:0 3.25rem 0 2.85rem; font:inherit; font-size:1rem;
+  color:var(--ui-text); background:var(--ui-surface); border:1px solid var(--ui-border);
+  border-radius:12px; box-shadow:var(--ui-shadow-sm);
+}
+.askbar .lupa{ position:absolute; left:2.4rem; top:50%; transform:translateY(-50%); color:var(--ui-text-soft); }
+.askbar .send{
+  position:absolute; right:1.95rem; top:50%; transform:translateY(-50%);
+  width:2rem; height:2rem; display:grid; place-items:center; border:0; cursor:pointer;
+  background:var(--ui-brand); color:#fff; border-radius:9px;
+}
+
+/* Lienzo de lectura: ancho de documento, sin "hoja de papel" */
+.doc{ max-width:46rem; margin:0 auto; padding:1.75rem 1.5rem 0; }
+.q-eyebrow{
+  margin:0 0 .4rem; font-size:.75rem; font-weight:600; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--ui-text-soft);
+}
+.q-title{
+  margin:0; font-size:1.75rem; line-height:1.18; font-weight:600; letter-spacing:-.02em;
+}
+.hr{ height:1px; background:var(--ui-border); border:0; margin:1.4rem 0; }
+
+/* Respuesta (markdown) — modo documento, 16px */
+.answer{ font-size:1rem; line-height:1.62; color:var(--gst-800); }
+.answer p{ margin:0 0 1rem; }
+.answer strong{ color:var(--ui-text); font-weight:600; }
+.answer ol{ margin:0 0 1rem; padding-left:1.25rem; display:flex; flex-direction:column; gap:.55rem; }
+.answer li{ padding-left:.25rem; }
+.answer li::marker{ color:var(--ui-text-soft); font-variant-numeric:tabular-nums; }
+.answer code{
+  font-family:'Geist Mono',ui-monospace,monospace; font-size:.86em;
+  background:var(--ui-surface-subtle); border:1px solid var(--ui-border);
+  padding:.08em .4em; border-radius:6px; color:var(--gst-700);
+}
+/* Bloque "ojo": consejo destacado con barra azul */
+.callout{
+  display:flex; gap:.7rem; padding:.85rem 1rem; margin:0 0 1rem;
+  background:var(--gst-blue-soft); border:1px solid var(--gst-blue-soft-2);
+  border-left:3px solid var(--ui-brand); border-radius:10px;
+  font-size:.9375rem; color:var(--gst-700);
+}
+
+/* Caret parpadeante (idéntico a chat.css) */
+.cursor{
+  display:inline-block; width:6px; height:1.05em; margin-left:2px; border-radius:1px;
+  vertical-align:text-bottom; background:var(--ui-brand);
+  animation:blink 1s steps(2,start) infinite;
+}
+@keyframes blink{ to{ visibility:hidden; } }
+
+/* Acción contextual: "Llévame allí" (view-action / deep-link) */
+.goto{
+  display:inline-flex; align-items:center; gap:.5rem; margin:.25rem 0 0;
+  padding:.55rem .85rem .55rem .95rem; border-radius:10px; cursor:pointer;
+  background:var(--ui-surface); border:1px solid var(--ui-border-strong);
+  font:inherit; font-size:.9375rem; font-weight:500; color:var(--ui-brand-ink);
+}
+.goto:hover{ background:var(--gst-blue-soft); border-color:color-mix(in srgb,var(--ui-brand) 45%,var(--ui-border)); }
+.goto .arrow{ color:var(--ui-brand); }
+
+/* Pie: feedback + escalado + follow-ups */
+.foot{ padding-bottom:2.25rem; }
+.foot-row{ display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+.helpful{ display:flex; align-items:center; gap:.6rem; font-size:.9375rem; color:var(--ui-text-muted); }
+.vote{
+  width:2.1rem; height:2.1rem; display:grid; place-items:center; cursor:pointer;
+  background:var(--ui-surface); border:1px solid var(--ui-border); border-radius:9px; font-size:1rem;
+}
+.vote:hover{ background:var(--ui-surface-subtle); }
+.support{
+  display:inline-flex; align-items:center; gap:.45rem; font-size:.9375rem; font-weight:500;
+  color:var(--ui-text); text-decoration:none;
+}
+.support .dot{ width:.5rem; height:.5rem; border-radius:50%; background:var(--ui-success); box-shadow:0 0 0 3px var(--gst-blue-soft); }
+.followups{ margin-top:1.4rem; }
+.followups .lbl{ font-size:.8125rem; font-weight:600; letter-spacing:.04em; color:var(--ui-text-soft); margin:0 0 .6rem; text-transform:uppercase; }
+.followups .row{ display:flex; gap:.5rem; flex-wrap:wrap; }
+.fu{
+  display:inline-flex; align-items:center; gap:.45rem; padding:.5rem .8rem; cursor:pointer;
+  border:1px solid var(--ui-border); border-radius:var(--ui-radius-pill);
+  background:var(--ui-surface); font:inherit; font-size:.875rem; color:var(--ui-text);
+}
+.fu:hover{ background:var(--ui-surface-subtle); border-color:color-mix(in srgb,var(--ui-brand) 40%,var(--ui-border)); }
+.fu .plus{ color:var(--ui-text-soft); }
+.divider-band{ height:1px; background:var(--ui-border); max-width:46rem; margin:0 auto; }
+</style>
+</head>
+<body>
+
+<!-- ░░░░░░░░ ESTADO 1 · REPOSO ░░░░░░░░ -->
+<div class="note">Maqueta · dirección A — <b>reposo</b> (landing)</div>
+<section class="frame">
+  <div class="hero">
+    <p class="eyebrow">Centro de ayuda</p>
+    <h1>¿En qué podemos ayudarte?</h1>
+    <p class="sub">Pregunta lo que quieras sobre tu TPV y te respondo al momento. Soporte de lunes a viernes, de 9:00 a 19:00.</p>
+    <div class="ask">
+      <svg class="lupa" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input placeholder="Escribe tu pregunta…" />
+      <button class="send" aria-label="Enviar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+    </div>
+    <div class="chips">
+      <button class="chip">¿Cómo hago un arqueo de caja?</button>
+      <button class="chip">Crear una promoción</button>
+      <button class="chip">Dar de alta un producto</button>
+      <button class="chip">Ventas por hora</button>
+    </div>
+  </div>
+</section>
+
+<div class="divider-band"></div>
+
+<!-- ░░░░░░░░ ESTADO 2 · LECTURA (respuesta escribiéndose) ░░░░░░░░ -->
+<div class="note">Maqueta · dirección A — <b>al preguntar</b> · la respuesta se escribe en tiempo real</div>
+<section class="frame read-wrap">
+  <div class="askbar-outer">
+    <div class="askbar">
+      <svg class="lupa" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input value="¿Cómo hago un arqueo de caja al cierre?" />
+      <button class="send" aria-label="Enviar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+    </div>
+  </div>
+
+  <article class="doc">
+    <p class="q-eyebrow">Tu pregunta</p>
+    <h2 class="q-title">¿Cómo hago un arqueo de caja al cierre?</h2>
+    <hr class="hr" />
+
+    <div class="answer">
+      <p>Para hacer el <strong>arqueo de caja</strong> al cerrar el turno en simpleTPV:</p>
+      <ol>
+        <li>Abre <strong>Caja → Arqueo</strong> desde el menú lateral del TPV.</li>
+        <li>Pulsa <strong>Cerrar caja</strong>: se calcula el <em>efectivo esperado</em> a partir de las ventas y los movimientos del turno.</li>
+        <li>Cuenta el dinero físico e introduce el importe en <code>Efectivo contado</code>.</li>
+        <li>Si hay diferencia, el sistema marca el <strong>descuadre</strong><span class="cursor"></span></li>
+      </ol>
+      <div class="callout">
+        <span>💡</span>
+        <span>El arqueo cierra el turno y bloquea nuevas ventas hasta abrir caja de nuevo. Genera el <strong>informe Z</strong> automáticamente.</span>
+      </div>
+      <button class="goto">Llévame a Caja <span class="arrow" aria-hidden="true">→</span></button>
+    </div>
+
+    <hr class="hr" />
+
+    <div class="foot">
+      <div class="foot-row">
+        <div class="helpful">
+          ¿Te ha resultado útil?
+          <button class="vote" aria-label="Sí">👍</button>
+          <button class="vote" aria-label="No">👎</button>
+        </div>
+        <a class="support" href="#"><span class="dot"></span> Hablar con soporte →</a>
+      </div>
+      <div class="followups">
+        <p class="lbl">Sigue preguntando</p>
+        <div class="row">
+          <button class="fu"><span class="plus">+</span> ¿Y un cierre Z?</button>
+          <button class="fu"><span class="plus">+</span> ¿Qué hago si hay descuadre?</button>
+          <button class="fu"><span class="plus">+</span> Arqueo ciego vs. normal</button>
+        </div>
+      </div>
+    </div>
+  </article>
+</section>
+
+</body>
+</html>

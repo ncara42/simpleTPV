@@ -973,17 +973,25 @@ mod tests {
 
     #[test]
     fn canvas_result_note_solo_surfacea_rechazo_o_reparacion() {
-        assert!(canvas_result_note(&serde_json::json!({ "accepted": false, "reason": "endpoint fuera de allowlist" }))
-            .unwrap()
-            .contains("RECHAZÓ"));
-        assert!(canvas_result_note(&serde_json::json!({ "accepted": false, "reason": null }))
-            .unwrap()
-            .contains("RECHAZÓ"));
-        assert!(canvas_result_note(&serde_json::json!({ "accepted": true, "reason": "receta reubicada" }))
-            .unwrap()
-            .contains("reparó"));
+        assert!(canvas_result_note(
+            &serde_json::json!({ "accepted": false, "reason": "endpoint fuera de allowlist" })
+        )
+        .unwrap()
+        .contains("RECHAZÓ"));
+        assert!(
+            canvas_result_note(&serde_json::json!({ "accepted": false, "reason": null }))
+                .unwrap()
+                .contains("RECHAZÓ")
+        );
+        assert!(canvas_result_note(
+            &serde_json::json!({ "accepted": true, "reason": "receta reubicada" })
+        )
+        .unwrap()
+        .contains("reparó"));
         // Aceptado sin reparar → nada que corregir.
-        assert!(canvas_result_note(&serde_json::json!({ "accepted": true, "reason": null })).is_none());
+        assert!(
+            canvas_result_note(&serde_json::json!({ "accepted": true, "reason": null })).is_none()
+        );
         // Fila sin forma de canvas-result → ignorada.
         assert!(canvas_result_note(&serde_json::json!({ "foo": 1 })).is_none());
     }
@@ -991,12 +999,18 @@ mod tests {
     #[test]
     fn build_chat_messages_anexa_resultado_del_lienzo_al_assistant_sin_emitir_tool() {
         let rows = vec![
-            row("user", serde_json::json!([{ "type": "text", "text": "muéstrame ventas" }])),
+            row(
+                "user",
+                serde_json::json!([{ "type": "text", "text": "muéstrame ventas" }]),
+            ),
             row(
                 "assistant",
                 serde_json::json!([{ "type": "text", "text": "Te he montado el panel." }]),
             ),
-            row("tool", serde_json::json!({ "accepted": false, "reason": "endpoint no permitido" })),
+            row(
+                "tool",
+                serde_json::json!({ "accepted": false, "reason": "endpoint no permitido" }),
+            ),
         ];
         let msgs = build_chat_messages(&rows);
         // No se emite ningún mensaje role:"tool" → emparejamiento estricto del gateway intacto.
@@ -1013,8 +1027,14 @@ mod tests {
     #[test]
     fn build_chat_messages_aceptado_limpio_no_modifica_al_assistant() {
         let rows = vec![
-            row("assistant", serde_json::json!([{ "type": "text", "text": "Listo." }])),
-            row("tool", serde_json::json!({ "accepted": true, "reason": null })),
+            row(
+                "assistant",
+                serde_json::json!([{ "type": "text", "text": "Listo." }]),
+            ),
+            row(
+                "tool",
+                serde_json::json!({ "accepted": true, "reason": null }),
+            ),
         ];
         let msgs = build_chat_messages(&rows);
         assert_eq!(msgs.len(), 1);

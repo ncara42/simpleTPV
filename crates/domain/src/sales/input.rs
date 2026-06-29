@@ -154,11 +154,8 @@ impl CreateSale {
 
 /// Parsea una fecha de vencimiento de cobro `YYYY-MM-DD`.
 fn parse_due_date(s: &str) -> Result<Date, AppError> {
-    Date::parse(
-        s,
-        time::macros::format_description!("[year]-[month]-[day]"),
-    )
-    .map_err(|_| AppError::BadRequest)
+    Date::parse(s, time::macros::format_description!("[year]-[month]-[day]"))
+        .map_err(|_| AppError::BadRequest)
 }
 
 /// `POST /sales/ticket-block`: reserva un bloque de números de ticket.

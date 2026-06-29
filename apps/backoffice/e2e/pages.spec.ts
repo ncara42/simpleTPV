@@ -690,15 +690,11 @@ test('Traspasos: modal de nuevo traspaso con el patrón estándar (UX)', async (
   await expect(page.getByTestId('transfer-qty')).toBeVisible();
 });
 
-test('Ayuda: canales de contacto y FAQ (IT-20)', async ({ page }) => {
+test('Ayuda: hero del centro de ayuda (IT-20)', async ({ page }) => {
   await navTo(page, 'help');
   await expect(page.getByTestId('help-page')).toBeVisible();
-  await expect(page.getByTestId('help-whatsapp')).toHaveAttribute('href', /^https:\/\/wa\.me\//);
-  await expect(page.getByTestId('help-email')).toHaveAttribute('href', /^mailto:/);
-  await expect(page.getByTestId('help-phone')).toHaveAttribute('href', /^tel:/);
-  const first = page.getByTestId('faq-item').first();
-  await first.locator('summary').click();
-  await expect(first).toHaveJSProperty('open', true);
+  await expect(page.getByRole('heading', { name: '¿En qué podemos ayudarte?' })).toBeVisible();
+  await expect(page.getByTestId('help-search')).toBeVisible();
 });
 
 test('Confirmación: borrar cliente usa el diálogo del design system (IT-19)', async ({ page }) => {
@@ -729,11 +725,11 @@ test('Modal: accesible (role dialog) y se cierra con Escape (IT-19)', async ({ p
   await expect(form).toHaveCount(0);
 });
 
-test('API Keys (en Ayuda → Integraciones): lista, alta y banner de un solo uso (IT-18)', async ({
+test('API Keys (en Ajustes → Integraciones): lista, alta y banner de un solo uso (IT-18)', async ({
   page,
 }) => {
-  await navTo(page, 'help');
-  await expect(page.getByTestId('help-integrations')).toBeVisible();
+  await navTo(page, 'settings');
+  await expect(page.getByTestId('settings-integrations')).toBeVisible();
   await expect(page.getByTestId('apikeys-page')).toBeVisible();
   // Sin keys la tabla puede no existir (estado vacío): al crear una debe aparecer.
   const keyName = `Key E2E ${Date.now()}`;

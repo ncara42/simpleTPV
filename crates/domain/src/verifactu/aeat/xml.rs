@@ -63,7 +63,9 @@ pub enum Encadenamiento {
 /// Escapa texto para nodo XML (`&`, `<`, `>`). Los valores fiscales no llevan
 /// comillas en posición de atributo, así que basta con estos tres.
 fn esc(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 /// `<sf:Name>valor</sf:Name>` con el valor escapado.
@@ -169,7 +171,9 @@ pub fn registro_alta_xml(
         el(
             &mut out,
             "NombreRazon",
-            dest.get("nombreRazon").and_then(|v| v.as_str()).unwrap_or(""),
+            dest.get("nombreRazon")
+                .and_then(|v| v.as_str())
+                .unwrap_or(""),
         );
         el(
             &mut out,
@@ -194,7 +198,9 @@ pub fn registro_alta_xml(
             el(
                 &mut out,
                 "TipoImpositivo",
-                d.get("tipoImpositivo").and_then(|v| v.as_str()).unwrap_or(""),
+                d.get("tipoImpositivo")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(""),
             );
             el(
                 &mut out,
@@ -206,7 +212,9 @@ pub fn registro_alta_xml(
             el(
                 &mut out,
                 "CuotaRepercutida",
-                d.get("cuotaRepercutida").and_then(|v| v.as_str()).unwrap_or(""),
+                d.get("cuotaRepercutida")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(""),
             );
             out.push_str("</sf:DetalleDesglose>");
         }

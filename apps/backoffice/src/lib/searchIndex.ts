@@ -258,20 +258,21 @@ const SEARCH_INDEX: SearchEntry[] = [
     synonyms: ['logo', 'imagen de marca'],
   },
 
+  {
+    label: 'Integraciones · Claves API',
+    tab: 'settings',
+    group: 'Organización',
+    hint: 'Dentro de Ajustes',
+    synonyms: ['api keys', 'claves', 'integracion', 'token api'],
+  },
+
   // ── Soporte ──────────────────────────────────────────────────────────────
   {
     label: 'Ayuda',
     tab: 'help',
     group: 'Soporte',
-    hint: 'FAQ y contacto',
-    synonyms: ['soporte', 'faq', 'contacto', 'documentacion'],
-  },
-  {
-    label: 'Integraciones · Claves API',
-    tab: 'help',
-    group: 'Soporte',
-    hint: 'Dentro de Ayuda',
-    synonyms: ['api keys', 'claves', 'integracion', 'token api'],
+    hint: 'Centro de ayuda',
+    synonyms: ['soporte', 'documentacion', 'centro de ayuda'],
   },
 ];
 
