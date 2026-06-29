@@ -16,6 +16,9 @@
 .kw-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
+  /* La fila crece con el tile (panel `fit=stretch`): así las celdas llenan el alto en vez de dejar una
+     banda del color de fondo (= borde) debajo. El suelo mantiene la altura legible en tiles cortos. */
+  grid-auto-rows: minmax(118px, 1fr);
   gap: 1px;
   background: var(--ui-border);
   border: 1px solid var(--ui-border);
@@ -216,6 +219,9 @@
   min-height: 118px;
   display: flex;
   flex-direction: column;
+  /* La tarjeta llena el tile (panel `fit=stretch`); centra la cifra en vertical en vez de pegarla
+     arriba dejando hueco. */
+  justify-content: center;
 }
 .kw-card .kw-value {
   font-size: 30px;

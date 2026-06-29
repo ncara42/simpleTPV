@@ -58,7 +58,7 @@ export const WIDGET_LABELS: Record<string, string> = {
   'tabla-estado': 'Estado de stock',
   'tabla-variacion': 'Variación por tienda',
   'tabla-ranking': 'Ranking de productos (tabla)',
-  'tabla-tareas': 'Tareas de reposición',
+  'tabla-tareas': 'Reposición de stock',
   // Sección 10 · Estado y progreso (rediseño)
   'estado-pasos': 'Pasos de un pedido',
   'estado-operativo': 'Estado operativo de tiendas',

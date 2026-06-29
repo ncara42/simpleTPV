@@ -5,16 +5,24 @@
 
 .tl-card {
   height: 100%;
+  display: flex;
+  flex-direction: column;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg);
   padding: 18px 20px;
 }
 .tl-title {
+  flex: none;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--ui-text);
   margin-bottom: 14px;
+}
+/* Las filas se reparten para llenar el alto del tile (sin banda blanca al crecer). */
+.tl-row,
+.tl-row--plain {
+  flex: 1 1 auto;
 }
 
 /* Fila con divisor (lista simple / estado / variación): separador fino entre filas, no en la última.
@@ -121,31 +129,4 @@
 }
 .tl-delta--down {
   color: var(--ui-danger);
-}
-
-/* Checkbox de tareas: hecha = acento + check blanco; pendiente = borde. */
-.tl-check {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  flex: none;
-  display: grid;
-  place-items: center;
-}
-.tl-check--done {
-  background: var(--ui-brand);
-}
-.tl-check--todo {
-  border: 1.5px solid var(--ui-border-strong);
-}
-.tl-task {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tl-task--done {
-  color: var(--ui-text-muted);
-  text-decoration: line-through;
 }

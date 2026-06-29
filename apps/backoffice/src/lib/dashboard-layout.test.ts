@@ -13,6 +13,8 @@ import {
   bringToFront,
   buildDefaultFreeLayout,
   buildDefaultLayout,
+  clampWidgetPx,
+  clampWidgetUnits,
   defaultPanelOrder,
   FREE_COL,
   FREE_GAP,
@@ -36,6 +38,8 @@ import {
   reconcileLayout,
   removeElement,
   TEXT_DEFAULT,
+  WIDGET_SIZE_BOUNDS,
+  widgetSizeBounds,
 } from './dashboard-layout.js';
 
 // F0 (#174) dejó «personalizado» como único preset real (lienzo vacío). Las
@@ -84,6 +88,66 @@ describe('presetItemIds + ITEM_SPECS', () => {
         expect(ITEM_SPECS[id], `falta ITEM_SPECS para ${id}`).toBeDefined();
       }
     }
+  });
+});
+
+describe('WIDGET_SIZE_BOUNDS · límites de tamaño coherentes', () => {
+  it('cada widget del catálogo tiene un rango propio (sin caer al genérico)', () => {
+    for (const id of Object.keys(ITEM_SPECS)) {
+      expect(WIDGET_SIZE_BOUNDS[id], `falta WIDGET_SIZE_BOUNDS para ${id}`).toBeDefined();
+    }
+  });
+
+  it('todos los rangos son válidos: 1 ≤ minW ≤ maxW ≤ BOARD_COLS y 1 ≤ minH ≤ maxH ≤ 6', () => {
+    for (const [id, b] of Object.entries(WIDGET_SIZE_BOUNDS)) {
+      expect(b.minW, `${id}.minW ≥ 1`).toBeGreaterThanOrEqual(1);
+      expect(b.minW, `${id}.minW ≤ maxW`).toBeLessThanOrEqual(b.maxW);
+      expect(b.maxW, `${id}.maxW ≤ ${BOARD_COLS}`).toBeLessThanOrEqual(BOARD_COLS);
+      expect(b.minH, `${id}.minH ≥ 1`).toBeGreaterThanOrEqual(1);
+      expect(b.minH, `${id}.minH ≤ maxH`).toBeLessThanOrEqual(b.maxH);
+      expect(b.maxH, `${id}.maxH ≤ 6`).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it('el tamaño de catálogo (ITEM_SPECS) SIEMPRE cae dentro de su rango', () => {
+    for (const [id, spec] of Object.entries(ITEM_SPECS)) {
+      const b = widgetSizeBounds(id);
+      expect(spec.w, `${id}: w=${spec.w} ∈ [${b.minW},${b.maxW}]`).toBeGreaterThanOrEqual(b.minW);
+      expect(spec.w, `${id}: w=${spec.w} ∈ [${b.minW},${b.maxW}]`).toBeLessThanOrEqual(b.maxW);
+      expect(spec.h, `${id}: h=${spec.h} ∈ [${b.minH},${b.maxH}]`).toBeGreaterThanOrEqual(b.minH);
+      expect(spec.h, `${id}: h=${spec.h} ∈ [${b.minH},${b.maxH}]`).toBeLessThanOrEqual(b.maxH);
+    }
+  });
+
+  it('clampWidgetUnits acota a [min,max] tanto por arriba como por abajo', () => {
+    // mini-tiendas: { minW:2, maxW:4, minH:1, maxH:2 }
+    expect(clampWidgetUnits('mini-tiendas', 99, 99)).toEqual({ cols: 4, rows: 2 });
+    expect(clampWidgetUnits('mini-tiendas', 1, 1)).toEqual({ cols: 2, rows: 1 });
+    // dentro de rango → sin cambios
+    expect(clampWidgetUnits('mini-tiendas', 3, 1)).toEqual({ cols: 3, rows: 1 });
+  });
+
+  it('un id desconocido cae al rango genérico (DEFAULT_SIZE_BOUNDS)', () => {
+    const b = widgetSizeBounds('id-que-no-existe');
+    expect(b).toEqual({ minW: 2, maxW: 8, minH: 1, maxH: 5 });
+  });
+
+  it('clampWidgetPx convierte px→unidades, acota y vuelve a px (round-trip de la barrera)', () => {
+    // Un tamaño px enorme para cmp-donut (maxW:5, maxH:3) → px del techo.
+    const huge = clampWidgetPx('cmp-donut', 9999, 9999);
+    expect(huge).toEqual({ w: 5 * FREE_COL - FREE_GAP, h: 3 * FREE_ROW - FREE_GAP });
+    // Un tamaño px diminuto → px del suelo (minW:2, minH:1).
+    const tiny = clampWidgetPx('cmp-donut', 5, 5);
+    expect(tiny).toEqual({ w: 2 * FREE_COL - FREE_GAP, h: 1 * FREE_ROW - FREE_GAP });
+  });
+
+  it('migrateFreeLayout aplica el clamp a tamaños persistidos fuera de rango', () => {
+    // Un widget guardado con un tamaño px absurdo (mini, pedido enorme) sale clampado al techo.
+    const [el] = migrateFreeLayout([
+      { kind: 'widget', id: 'w1', widgetId: 'mini-tiendas', x: 0, y: 0, w: 5000, h: 5000, z: 0 },
+    ]) as FreeWidget[];
+    expect(el!.w).toBe(4 * FREE_COL - FREE_GAP); // maxW:4
+    expect(el!.h).toBe(2 * FREE_ROW - FREE_GAP); // maxH:2
   });
 });
 

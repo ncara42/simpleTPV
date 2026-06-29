@@ -86,7 +86,9 @@ describe('Widgets de panel · Sección 05 (Compactos)', () => {
     renderWidget(<CompactTreemap period="month" store={undefined} />);
 
     expect(await screen.findByText('Bebidas')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Reparto por área' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: 'Reparto de la facturación por familia' }),
+    ).toBeInTheDocument();
   });
 
   it('top vendedores: nombre y pista de tickets por puesto', async () => {

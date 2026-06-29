@@ -264,6 +264,31 @@
   flex: 1;
   min-height: 0;
 }
+
+/* ── Contrato responsivo del rediseño (plan 2026-06-29) ──────────────────────────────────────────
+   El panel SIEMPRE llena el tile (`.dash-free-item-body > *` lo estira a 100%×100%). `fit` decide cómo
+   se comporta el contenido para que no quede banda blanca a tamaños distintos del natural:
+   - stretch (= alias `--fill`, ya cubierto arriba): el contenido crece para llenar.
+   - center: figura intrínseca centrada (el espacio sobrante = aire equilibrado).
+   - natural: alto de contenido, centrado en vertical. */
+.dash-panel--fit-center,
+.dash-panel--fit-natural {
+  display: flex;
+  flex-direction: column;
+}
+.dash-panel--fit-center > .dash-widget-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+.dash-panel--fit-natural > .dash-widget-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
 /* Contenedor de sparkline a sangre (área/barras): la molécula mide al 100% de este alto. */
 .dash-widget-spark {
   width: 100%;

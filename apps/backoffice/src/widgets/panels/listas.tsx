@@ -6,6 +6,10 @@ import { type ReactElement, useState } from 'react';
 import { getProductRankings, getSalesByFamily } from '../../lib/dashboard.js';
 import { PanelShell } from './PanelShell.js';
 import type { PanelProps } from './types.js';
+import { useFitCount } from './useFitCount.js';
+
+// Alto aprox. de una fila (cabecera + barra) para el conteo adaptativo de filas según la altura del tile.
+const LIST_ROW_H = 36;
 
 const EUR0 = new Intl.NumberFormat('es-ES', {
   style: 'currency',
@@ -17,7 +21,6 @@ const pct1 = (x: number): string => `${x.toFixed(1).replace('.', ',')}%`;
 
 // Sección 03 · «Ventas por familia» — fila por familia con chip de puesto, cifra, cuota y barra
 // proporcional al líder. Comparte el queryKey 'dash-family' con «Mix de ventas» → caché compartida.
-const FAMILY_ROWS = 5;
 
 export function FamilyShare({ period, store }: PanelProps): ReactElement {
   const q = useQuery({
@@ -27,15 +30,18 @@ export function FamilyShare({ period, store }: PanelProps): ReactElement {
   });
   const all = q.data ?? [];
   const total = all.reduce((s, f) => s + f.total, 0);
-  const fams = [...all].sort((a, b) => b.total - a.total).slice(0, FAMILY_ROWS);
+  const sorted = [...all].sort((a, b) => b.total - a.total);
+  // Nº de familias visibles ADAPTADO a la altura del tile (más en tiles altos, menos en bajos).
+  const { ref, count } = useFitCount(LIST_ROW_H, { gap: 14, min: 3, max: sorted.length || 1 });
+  const fams = sorted.slice(0, count);
   const maxTotal = Math.max(1, ...fams.map((f) => f.total));
 
   return (
-    <PanelShell id="lista-familia" bare>
+    <PanelShell id="lista-familia" fit="stretch" bare>
       <div className="lc-card">
         <h3 className="lc-title">Ventas por familia</h3>
         <p className="lc-sub">Este mes</p>
-        <div className="fam-list">
+        <div className="fam-list" ref={ref}>
           {fams.map((f, i) => (
             <div key={f.familyId ?? f.familyName}>
               <div className="fam-head">
@@ -63,7 +69,6 @@ const RANK_TABS: ReadonlyArray<{ key: RankTab; label: string }> = [
   { key: 'margin', label: 'Top margen' },
   { key: 'rotation', label: 'Peor rotación' },
 ];
-const RANK_ROWS = 5;
 
 interface RankRow {
   id: string;
@@ -81,7 +86,7 @@ export function ProductRanking({ period, store }: PanelProps): ReactElement {
   });
   const d = q.data;
 
-  const rows: RankRow[] = (
+  const allRows: RankRow[] =
     tab === 'sales'
       ? (d?.topSales ?? []).map((p) => ({
           id: p.productId,
@@ -101,12 +106,14 @@ export function ProductRanking({ period, store }: PanelProps): ReactElement {
             name: p.name,
             value: p.units,
             display: `${p.units} uds`,
-          }))
-  ).slice(0, RANK_ROWS);
+          }));
+  // Nº de filas del ranking ADAPTADO a la altura del tile.
+  const { ref, count } = useFitCount(LIST_ROW_H, { gap: 13, min: 3, max: allRows.length || 1 });
+  const rows = allRows.slice(0, count);
   const maxV = Math.max(1, ...rows.map((r) => r.value));
 
   return (
-    <PanelShell id="lista-rankings" bare>
+    <PanelShell id="lista-rankings" fit="stretch" bare>
       <div className="lc-card">
         <div className="rk-head">
           <h3 className="lc-title">Rankings</h3>
@@ -126,7 +133,7 @@ export function ProductRanking({ period, store }: PanelProps): ReactElement {
             </button>
           ))}
         </div>
-        <div className="rk-list">
+        <div className="rk-list" ref={ref}>
           {rows.map((r, i) => (
             <div key={r.id}>
               <div className="rk-head-row">
@@ -169,7 +176,7 @@ export function SalesMix({ period, store }: PanelProps): ReactElement {
   const legRest = Math.max(0, 100 - legTop.reduce((s, f) => s + share(f.total), 0));
 
   return (
-    <PanelShell id="lista-mix" bare>
+    <PanelShell id="lista-mix" fit="stretch" bare>
       <div className="lc-card">
         <h3 className="lc-title">
           Mix de ventas<span className="lc-badge">ALT</span>

@@ -158,7 +158,7 @@ describe('Widgets de panel · Sección 09 (Listas y tablas)', () => {
     expect(container.querySelectorAll('.tl-rank--top')).toHaveLength(1);
   });
 
-  it('tareas: las resueltas salen tachadas (hechas)', async () => {
+  it('reposición: cada fila muestra su estado (Pendiente/Repuesto)', async () => {
     const { container } = render(
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
@@ -167,6 +167,8 @@ describe('Widgets de panel · Sección 09 (Listas y tablas)', () => {
       </QueryClientProvider>,
     );
     expect(await screen.findByText('Prueba')).toBeInTheDocument();
-    expect(container.querySelectorAll('.tl-task--done')).toHaveLength(1); // solo la resuelta
+    // La alerta resuelta sale como «Repuesto» (success); las pendientes como «Pendiente» (warning).
+    expect(container.querySelectorAll('.tl-badge--success')).toHaveLength(1);
+    expect(await screen.findByText('Repuesto')).toBeInTheDocument();
   });
 });

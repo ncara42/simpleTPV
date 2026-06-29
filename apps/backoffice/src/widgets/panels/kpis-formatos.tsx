@@ -29,7 +29,7 @@ export function DualKpi({ period, store }: PanelProps): ReactElement {
   const m = margin.data;
 
   return (
-    <PanelShell id="kpi-dual">
+    <PanelShell id="kpi-dual" fit="stretch" bare>
       <KpiDual
         corner="Dual"
         top={{ label: 'Facturación', value: s?.revenue ?? null, format: 'eur' }}
@@ -50,7 +50,7 @@ export function AreaKpi({ period, store }: PanelProps): ReactElement {
   const st = loadState(margin);
 
   return (
-    <PanelShell id="kpi-area">
+    <PanelShell id="kpi-area" fit="stretch" bare>
       <KpiStat
         variant="card"
         corner="Área"
@@ -75,7 +75,7 @@ export function AlertKpi({ period, store }: PanelProps): ReactElement {
   const st = loadState(stockout);
 
   return (
-    <PanelShell id="kpi-alerta">
+    <PanelShell id="kpi-alerta" fit="stretch" bare>
       <KpiStat
         variant="card"
         tone="danger"
@@ -102,7 +102,7 @@ export function SevenDayKpi({ period, store }: PanelProps): ReactElement {
   const bars = m?.realMarginSeries ? m.realMarginSeries.slice(-7) : undefined;
 
   return (
-    <PanelShell id="kpi-7dias">
+    <PanelShell id="kpi-7dias" fit="stretch" bare>
       <KpiStat
         variant="card"
         corner="7 días"

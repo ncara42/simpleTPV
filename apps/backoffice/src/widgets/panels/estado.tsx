@@ -54,26 +54,30 @@ export function StepProgress(_props: PanelProps): ReactElement {
   const current = tracked ? PO_CURRENT[tracked.status] : -1;
 
   return (
-    <PanelShell id="estado-pasos" bare>
+    <PanelShell id="estado-pasos" fit="stretch" bare>
       <div className="st-card">
         <div className="st-label">Pasos</div>
-        <div className="st-steps">
-          {STEP_LABELS.map((label, i) => {
-            const state = i < current ? 'done' : i === current ? 'current' : 'todo';
-            return (
-              <Fragment key={label}>
-                {i > 0 ? <span className={`st-bar st-bar--${i < current ? 'on' : 'off'}`} /> : null}
-                <span className={`st-dot st-dot--${state}`}>
-                  {state === 'done' ? <CheckIcon size={12} width={3.5} /> : i + 1}
-                </span>
-              </Fragment>
-            );
-          })}
-        </div>
-        <div className="st-step-labels">
-          {STEP_LABELS.map((label) => (
-            <span key={label}>{label}</span>
-          ))}
+        <div className="st-fill">
+          <div className="st-steps">
+            {STEP_LABELS.map((label, i) => {
+              const state = i < current ? 'done' : i === current ? 'current' : 'todo';
+              return (
+                <Fragment key={label}>
+                  {i > 0 ? (
+                    <span className={`st-bar st-bar--${i < current ? 'on' : 'off'}`} />
+                  ) : null}
+                  <span className={`st-dot st-dot--${state}`}>
+                    {state === 'done' ? <CheckIcon size={12} width={3.5} /> : i + 1}
+                  </span>
+                </Fragment>
+              );
+            })}
+          </div>
+          <div className="st-step-labels">
+            {STEP_LABELS.map((label) => (
+              <span key={label}>{label}</span>
+            ))}
+          </div>
         </div>
       </div>
     </PanelShell>
@@ -94,7 +98,7 @@ export function OperationalStatus(_props: PanelProps): ReactElement {
     q.data === undefined ? 'muted' : online === total && total > 0 ? 'success' : 'warning';
 
   return (
-    <PanelShell id="estado-operativo" bare>
+    <PanelShell id="estado-operativo" fit="stretch" bare>
       <div className="st-card st-card--center">
         <span className={`st-op-badge st-tone-${tone}`}>
           {tone === 'success' ? <CheckIcon size={22} /> : <AlertIcon size={22} />}
@@ -138,7 +142,7 @@ export function ComplianceChecks(_props: PanelProps): ReactElement {
   ];
 
   return (
-    <PanelShell id="estado-cumplimiento" bare>
+    <PanelShell id="estado-cumplimiento" fit="stretch" bare>
       <div className="st-card">
         <div className="st-label">Cumplimiento</div>
         <div className="st-checks">
