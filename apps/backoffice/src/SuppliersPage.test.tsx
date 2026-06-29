@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 // Libs de datos mockeadas para renderizar sin red. Smoke test del orquestador
@@ -27,9 +28,15 @@ vi.mock('./lib/supplier-prices.js', () => ({
   importSupplierPricesCsv: vi.fn(),
 }));
 
+import { PageNavProvider, usePageNavValue } from './lib/pageNav.js';
 import { listSuppliers } from './lib/purchases.js';
 import { compareSupplierPrices } from './lib/supplier-prices.js';
 import { SuppliersPage } from './SuppliersPage.js';
+
+// Las subpestañas se inyectan en la TopBar vía usePageNav; este outlet las pinta en el DOM de test.
+function PageNavOutlet(): ReactNode {
+  return <>{usePageNavValue()}</>;
+}
 
 type RenderOpts = {
   initialSection?: 'suppliers' | 'prices' | 'orders' | 'suggest' | null;
@@ -43,10 +50,13 @@ function renderPage(opts: RenderOpts = {}): void {
   if (opts.prefs) qc.setQueryData(['preferences'], opts.prefs);
   render(
     <QueryClientProvider client={qc}>
-      <SuppliersPage
-        initialSection={opts.initialSection ?? null}
-        initialPricesView={opts.initialPricesView ?? null}
-      />
+      <PageNavProvider>
+        <PageNavOutlet />
+        <SuppliersPage
+          initialSection={opts.initialSection ?? null}
+          initialPricesView={opts.initialPricesView ?? null}
+        />
+      </PageNavProvider>
     </QueryClientProvider>,
   );
 }
@@ -66,7 +76,7 @@ describe('SuppliersPage', () => {
     await waitFor(() => expect(screen.getByTestId('suppliers-empty')).toBeInTheDocument());
   });
 
-  it('clic en un proveedor abre la vista detalle y "← Volver" regresa (I-18)', async () => {
+  it('clic en un proveedor despliega su detalle EN LÍNEA; «Editar» abre la vista completa (I-18)', async () => {
     vi.mocked(listSuppliers).mockResolvedValue([
       {
         id: 'sup1',
@@ -80,8 +90,13 @@ describe('SuppliersPage', () => {
     ]);
     renderPage();
     await waitFor(() => expect(screen.getAllByTestId('supplier-row')).toHaveLength(1));
+    // Clic en la fila → acordeón EN LÍNEA (rediseño tipo Traspasos); aún NO navega a
+    // la vista completa.
     fireEvent.click(screen.getAllByTestId('supplier-row')[0]!);
-    // Todo lo del proveedor en una vista: datos editables + tarifa + pedidos.
+    expect(screen.getByTestId('supplier-detail-inline')).toBeInTheDocument();
+    expect(screen.queryByTestId('supplier-detail')).not.toBeInTheDocument();
+    // «Editar proveedor» abre la vista completa: datos editables + tarifa + pedidos.
+    fireEvent.click(screen.getByTestId('supplier-edit'));
     expect(screen.getByTestId('supplier-detail')).toBeInTheDocument();
     expect(screen.getByTestId('sd-name')).toHaveValue('Distribuciones Norte');
     await waitFor(() => expect(screen.getByTestId('sp-empty')).toBeInTheDocument());

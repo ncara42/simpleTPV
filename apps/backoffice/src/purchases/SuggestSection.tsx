@@ -1,7 +1,7 @@
 import { Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sparkles } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { useState } from 'react';
 
 import { listStores } from '../lib/admin.js';
 import {
@@ -11,7 +11,7 @@ import {
   suggestPurchase,
 } from '../lib/purchases.js';
 
-export function SuggestSection({ tabs }: { tabs?: ReactNode }) {
+export function SuggestSection() {
   const qc = useQueryClient();
   const { data: stores = [] } = useQuery({ queryKey: ['stores'], queryFn: listStores });
   const { data: suppliers = [] } = useQuery({ queryKey: ['suppliers'], queryFn: listSuppliers });
@@ -45,7 +45,6 @@ export function SuggestSection({ tabs }: { tabs?: ReactNode }) {
           rowKey={(r) => r.productId}
           header={
             <div className="dt-header-row">
-              {tabs}
               <div className="users-toolbar">
                 <div className="sales-filters">
                   <Select

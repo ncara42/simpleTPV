@@ -585,8 +585,8 @@
 }
 .cat-selbar-slot__inner {
   display: flex;
-  /* Opciones alineadas a la derecha (no centradas). */
-  justify-content: flex-end;
+  /* Opciones alineadas a la izquierda (no centradas). */
+  justify-content: flex-start;
   min-height: 0;
   /* Clipa el contenido mientras el slot está colapsado/animando; cuando el popover «Mover
      familia» está abierto, libera el overflow para que el menú (que abre hacia arriba) no se
@@ -610,9 +610,9 @@
   align-items: center;
   gap: 0.5rem;
   margin: 0.85rem 0 0;
-  /* Aparición pulida: sube + escala desde la esquina inferior derecha (donde queda anclada),
+  /* Aparición pulida: sube + escala desde la esquina inferior izquierda (donde queda anclada),
      con ease-out-expo, sincronizada con el revelado del slot. */
-  transform-origin: bottom right;
+  transform-origin: bottom left;
   transform: translateY(0.8rem) scale(0.98);
   opacity: 0;
   transition:

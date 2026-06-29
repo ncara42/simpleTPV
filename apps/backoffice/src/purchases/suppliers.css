@@ -1,0 +1,835 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   PROVEEDORES — carril facetado + tabla agrupada con detalle EN LÍNEA (acordeón).
+   Hermano visual de Traspasos (stock/transfers.css) y del Catálogo facetado
+   (catalog/inventory-card.css): MISMOS márgenes, sangrados (3.3rem), altura de fila
+   (2.75rem), thead compacto y cabecera de grupo plegable sticky. Cada fila lleva el
+   proveedor + lead time, fiabilidad, pedidos abiertos, volumen 12m y estado; al
+   pulsarla se despliega su detalle bajo ella (datos, pedidos recientes, tarifa,
+   aprovisionamiento, actividad y acciones). Paleta vía tokens --ui-* (dark-aware).
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Encaje en el área de contenido (card full-height, igual que Traspasos) ──── */
+.bo-main--surface:has(.suppliers-shell) {
+  padding: 0.4rem 1.25rem 1.5rem;
+}
+/* La sección `.catalog` impone un ancho máximo centrado (y posible padding); el shell
+   facetado lo anula para ocupar todo el alto/ancho disponible y que el card quede a ras
+   del topbar, igual que Traspasos (mismo recurso que `.catalog--faceted`). */
+.catalog:has(.suppliers-shell) {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+.suppliers-shell {
+  /* Offset = topbar (60px) + padding-top (0.4rem) + padding-bottom (1.5rem). */
+  height: calc(100dvh - 60px - 1.9rem);
+  display: flex;
+  flex-direction: column;
+}
+.sup-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.04),
+    0 4px 24px -8px rgb(0 0 0 / 0.1);
+  /* `clip` aísla el overflow de los scrollers internos sin crear un scroller de página. */
+  overflow: clip;
+}
+
+/* Las subpestañas de página (Proveedores/Tarifas/Pedidos/Propuesta) ya NO van en una banda de
+   cabecera dentro de la card: se inyectan como botones `.inv-nav-tab` en la columna izquierda de la
+   TopBar (SuppliersPage + usePageNav), igual que las views de Inventario y B2B. Las acciones
+   (export/import/alta) también viven en la TopBar vía usePageActions. */
+
+/* ─── Cuerpo facetado: carril + tabla (mismo grid que el Catálogo) ───────────── */
+.sup-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 15.75rem minmax(0, 1fr);
+}
+
+/* ─── Carril de facetas (espejo de `.cat-rail`) ──────────────────────────────── */
+.sup-rail {
+  display: flex;
+  flex-direction: column;
+  padding: 1.15rem 1.1rem 1.5rem;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: none;
+}
+.sup-rail::-webkit-scrollbar {
+  display: none;
+}
+.sup-rail-search {
+  position: relative;
+  display: flex;
+  width: 100%;
+  margin-bottom: 1.35rem;
+}
+.sup-rail-search svg {
+  position: absolute;
+  left: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--ui-text-soft);
+}
+.sup-rail-input {
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  padding: 0 0.8rem 0 2.4rem;
+  font: inherit;
+  font-size: 0.86rem;
+  color: var(--ui-text);
+  outline: none;
+}
+.sup-rail-input:focus {
+  border-color: var(--ui-primary);
+  box-shadow: var(--ui-focus);
+}
+.sup-facet {
+  margin-bottom: 1.45rem;
+}
+.sup-facet:last-child {
+  margin-bottom: 0;
+}
+.sup-facet-title {
+  margin: 0 0 0.5rem;
+  padding-left: 0.12rem;
+  font-size: 0.69rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ui-text-soft);
+}
+
+/* Vistas guardadas: fila botón con contador; activa = azul pleno, texto claro. */
+.sup-view {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.42rem 0.6rem;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 0.86rem;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+.sup-view:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+.sup-view.is-active {
+  background: var(--ui-primary);
+  color: #fff;
+  font-weight: 550;
+}
+.sup-view-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sup-view-count {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+.sup-view.is-active .sup-view-count {
+  color: rgb(255 255 255 / 0.62);
+}
+
+/* Opción de faceta: píldora seleccionable (marca + etiqueta + contador). */
+.sup-facet-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.42rem 0.6rem;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 0.86rem;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+.sup-facet-opt:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+.sup-facet-opt.is-checked {
+  background: var(--ui-brand-soft);
+}
+.sup-facet-opt.is-checked:hover {
+  background: var(--ui-brand-soft-2);
+}
+.sup-check {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  display: grid;
+  place-items: center;
+  color: var(--ui-primary);
+}
+.sup-facet-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sup-facet-opt.is-checked .sup-facet-label {
+  font-weight: 550;
+  color: var(--ui-text);
+}
+.sup-facet-count {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+.sup-facet-opt.is-checked .sup-facet-count {
+  color: var(--ui-primary);
+}
+.sup-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 2.1rem;
+  margin-top: 0.4rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color var(--ui-motion-fast) var(--ui-ease),
+    border-color var(--ui-motion-fast) var(--ui-ease);
+}
+.sup-clear:hover {
+  color: var(--ui-danger);
+  border-color: color-mix(in srgb, var(--ui-danger) 40%, var(--ui-border));
+}
+.sup-clear:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* ─── Tabla: scroller a pantalla completa (mismo patrón que `.cat-main`/`.tr-main`) ── */
+.sup-main {
+  position: relative;
+  overflow-y: auto;
+  min-height: 0;
+  border-left: 1px solid var(--ui-border);
+  scrollbar-width: none;
+}
+.sup-main::-webkit-scrollbar {
+  display: none;
+}
+.sup-table {
+  width: 100%;
+  /* Floor modesto: por debajo el scroller hace scroll horizontal en vez de recortar
+     columnas (la columna Estado nunca queda cortada por el `clip` de la card). */
+  min-width: 34rem;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  table-layout: fixed;
+}
+/* Proveedor es flexible (sin width): ocupa el espacio restante. Solo las columnas
+   numéricas / de estado llevan ancho fijo (anchos del mockup). */
+.sup-col-lead {
+  width: 6.5rem;
+}
+.sup-col-ontime {
+  width: 6.5rem;
+}
+.sup-col-open {
+  width: 6rem;
+}
+.sup-col-bought {
+  width: 9rem;
+}
+.sup-col-state {
+  width: 7.5rem;
+}
+
+.sup-thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--ui-surface);
+  padding: 0.55rem 0.9rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ui-text-soft);
+  text-align: left;
+  border-bottom: 1px solid var(--ui-border);
+  white-space: nowrap;
+}
+/* Mismo sangrado que Catálogo/Traspasos para igualar columnas entre vistas. */
+.sup-thead th.sup-th-name {
+  padding-left: 3.3rem;
+}
+.sup-thead th.sup-th-num {
+  text-align: right;
+}
+
+/* Cabecera de grupo (Activos · Inactivos): nombre · nº · total de abiertos. Plegable.
+   Sticky sobre el <td> (top ≈ alto del thead), caret en el canalón izquierdo (1.05rem)
+   y contenido sangrado a 3.3rem — idéntico a Traspasos/Catálogo. */
+.sup-group-head {
+  cursor: pointer;
+}
+.sup-group-cell {
+  padding: 0;
+  position: sticky;
+  top: 1.95rem;
+  z-index: 1;
+  background: var(--ui-surface-subtle);
+  box-shadow:
+    0 -1px 0 0 var(--ui-border),
+    0 1px 0 0 color-mix(in srgb, var(--ui-text) 15%, transparent);
+}
+.sup-group-head:hover .sup-group-cell {
+  background: color-mix(in srgb, var(--ui-surface-subtle) 70%, var(--ui-border));
+}
+.sup-group-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.1rem 0.5rem 3.3rem;
+}
+.sup-group-caret {
+  position: absolute;
+  left: 1.05rem;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-shrink: 0;
+  color: var(--ui-text-soft);
+  transition: transform var(--ui-motion-fast) var(--ui-ease);
+}
+.sup-group-caret.is-collapsed {
+  transform: translateY(-50%) rotate(-90deg);
+}
+.sup-group-name {
+  font-size: 0.9rem;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+}
+.sup-group-count {
+  font-size: 0.82rem;
+  color: var(--ui-text-soft);
+  letter-spacing: -0.01em;
+}
+.sup-group-total {
+  margin-left: auto;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+
+/* ─── Filas (misma altura y sangrado que Traspasos/Existencias) ──────────────── */
+.sup-row {
+  cursor: pointer;
+  transition: background var(--ui-motion-fast) var(--ui-ease);
+}
+.sup-row:hover {
+  background: var(--ui-surface-subtle);
+}
+.sup-row.is-expanded {
+  background: var(--ui-brand-soft);
+}
+.sup-row > td {
+  height: 2.75rem;
+  padding: 0 0.9rem;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text);
+}
+/* Celda Proveedor: caret de expansión en el canalón izquierdo (1.05rem) y contenido a
+   3.3rem — mismo borde izquierdo común que la cabecera de grupo y el thead. */
+.sup-row > td.sup-cell-name {
+  position: relative;
+  padding-left: 3.3rem;
+}
+.sup-cell-name-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.sup-row-caret {
+  position: absolute;
+  left: 1.05rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ui-text-soft);
+  transition: transform 0.15s ease;
+}
+.sup-row-caret.is-expanded {
+  transform: translateY(-50%) rotate(90deg);
+}
+.sup-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sup-cell-lead {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+  font-size: 0.85rem;
+}
+.sup-cell-ontime {
+  text-align: right;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+}
+.sup-ontime--good {
+  color: var(--ui-success);
+}
+.sup-ontime--mid {
+  color: var(--ui-warning);
+}
+.sup-ontime--bad {
+  color: var(--ui-danger);
+}
+.sup-ontime--none {
+  color: var(--ui-text-soft);
+}
+.sup-cell-open {
+  text-align: right;
+}
+.sup-cell-bought {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text);
+  font-size: 0.85rem;
+}
+
+/* Píldora de pedidos abiertos: color SOLO cuando hay algo abierto. */
+.sup-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  height: 1.55rem;
+  padding: 0 0.5rem;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sup-badge--neutral {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.sup-badge--open {
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-ink);
+}
+
+/* Estado: píldora con punto (Activo verde · Inactivo neutro). */
+.sup-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+.sup-state-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+.sup-state--active {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.sup-state--inactive {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-soft);
+}
+
+/* Estado vacío */
+.sup-empty {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  font-size: 0.92rem;
+  color: var(--ui-text-soft);
+}
+
+/* ─── Detalle en línea (acordeón bajo la fila) — espejo de `.tr-detail` ───────── */
+.sup-detail-cell {
+  padding: 0;
+  background: var(--ui-surface-subtle);
+  border-bottom: 1px solid var(--ui-border);
+}
+.sup-detail {
+  padding: 1.15rem 1.5rem;
+  border-left: 3px solid var(--ui-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+.sup-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.85rem 1.1rem;
+}
+.sup-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.sup-meta-label {
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-soft);
+}
+.sup-meta-value {
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sup-detail-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1.1rem 1.6rem;
+  align-items: start;
+}
+.sup-detail-col {
+  min-width: 0;
+}
+.sup-section-title {
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-soft);
+  margin: 0 0 0.5rem;
+}
+.sup-section-title--spaced {
+  margin-top: 1.15rem;
+}
+
+/* Listas (pedidos recientes · tarifa) — espejo de `.tr-lines`. */
+.sup-list {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  overflow: hidden;
+  background: var(--ui-surface);
+}
+.sup-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.sup-list-row:last-child {
+  border-bottom: none;
+}
+.sup-list-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  min-width: 0;
+}
+.sup-list-name {
+  font-size: 0.81rem;
+  font-weight: 600;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sup-list-name--plain {
+  font-weight: 500;
+}
+.sup-list-sub {
+  font-size: 0.71rem;
+  color: var(--ui-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+.sup-list-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.sup-list-value {
+  font-size: 0.81rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 3rem;
+  text-align: right;
+  color: var(--ui-text);
+}
+.sup-mini-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.sup-mini-badge--ok {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.sup-mini-badge--warn {
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
+}
+.sup-list-empty {
+  padding: 0.6rem 0.75rem;
+  font-size: 0.78rem;
+  color: var(--ui-text-soft);
+}
+
+/* Aprovisionamiento: tres KPIs + barra de avance. */
+.sup-prov {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  padding: 0.85rem 0.9rem;
+}
+.sup-prov-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.7rem;
+  margin-bottom: 0.8rem;
+}
+.sup-prov-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.sup-prov-label {
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-soft);
+}
+.sup-prov-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text);
+}
+.sup-prov-value--sm {
+  font-size: 0.84rem;
+}
+.sup-prov-bar {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--ui-surface-subtle);
+  overflow: hidden;
+}
+.sup-prov-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ui-success);
+}
+.sup-prov-note {
+  display: block;
+  margin-top: 0.45rem;
+  font-size: 0.72rem;
+  color: var(--ui-text-soft);
+}
+
+/* Línea de tiempo de actividad — espejo de `.tr-timeline`. */
+.sup-timeline {
+  display: flex;
+  flex-direction: column;
+}
+.sup-tl-step {
+  display: flex;
+  gap: 0.7rem;
+}
+.sup-tl-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+}
+.sup-tl-dot {
+  display: inline-grid;
+  place-items: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.sup-tl-dot--ok {
+  background: var(--ui-success);
+  color: #fff;
+}
+.sup-tl-dot--done {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-success) 30%, transparent);
+}
+.sup-tl-dot--transit {
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-warning) 30%, transparent);
+}
+.sup-tl-dot--pending {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-soft);
+  box-shadow: inset 0 0 0 1px var(--ui-border);
+}
+.sup-tl-line {
+  width: 2px;
+  flex: 1;
+  min-height: 0.85rem;
+  background: var(--ui-border);
+}
+.sup-tl-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  padding-bottom: 0.75rem;
+}
+.sup-tl-label {
+  font-size: 0.81rem;
+  font-weight: 500;
+  color: var(--ui-text);
+}
+.sup-tl-when {
+  font-size: 0.71rem;
+  color: var(--ui-text-soft);
+}
+
+/* Acciones del detalle (Editar / Borrar) — espejo de `.tr-detail-actions`. */
+.sup-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.sup-detail-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.3rem;
+  padding: 0 0.95rem;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-primary);
+  color: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--ui-motion-fast) var(--ui-ease);
+}
+.sup-detail-btn:hover {
+  background: var(--ui-primary-hover, var(--ui-primary));
+}
+.sup-detail-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.sup-detail-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.sup-detail-btn--danger {
+  background: var(--ui-surface);
+  color: var(--ui-danger);
+  border-color: var(--ui-border-strong);
+  font-weight: 500;
+}
+.sup-detail-btn--danger:hover {
+  background: var(--ui-danger-soft);
+  border-color: color-mix(in srgb, var(--ui-danger) 40%, var(--ui-border));
+}
+
+.sup-detail-loading {
+  padding: 0.4rem 0;
+  font-size: 0.82rem;
+  color: var(--ui-text-soft);
+}
+
+/* En pantallas estrechas el carril pasa arriba (igual que Catálogo/Traspasos). */
+@media (max-width: 860px) {
+  .sup-body {
+    grid-template-columns: 1fr;
+  }
+  .sup-rail {
+    border-bottom: 1px solid var(--ui-border);
+  }
+  .sup-main {
+    border-left: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sup-row,
+  .sup-view,
+  .sup-facet-opt,
+  .sup-group-caret,
+  .sup-row-caret,
+  .sup-clear {
+    transition: none;
+  }
+}

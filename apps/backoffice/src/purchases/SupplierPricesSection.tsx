@@ -31,11 +31,9 @@ import {
 export function SupplierPricesSection({
   fixedSupplierId,
   initialView,
-  tabs,
 }: {
   fixedSupplierId?: string;
   initialView?: 'tarifas' | 'comparativa';
-  tabs?: ReactNode;
 } = {}) {
   const qc = useQueryClient();
   const [view, setView] = useState<'tarifas' | 'comparativa'>(initialView ?? 'tarifas');
@@ -207,12 +205,9 @@ export function SupplierPricesSection({
     ) : null,
   );
 
-  // Cabecera de la card: pestañas de página (Proveedores/Tarifas/…) + las sub-vistas
-  // de tarifas (por proveedor / comparativa), apiladas DENTRO del panel en vez de
-  // flotar sobre el lienzo. En la vista detalle de proveedor (fixedSupplierId) no hay
-  // ni pestañas de página ni sub-vistas → null (sin cabecera).
-  // Sub-navegación de vistas (Tarifas por proveedor / Comparativa): va en la MISMA línea
-  // de cabecera, junto a las pestañas de página y las herramientas.
+  // Sub-navegación de vistas de tarifas (Tarifas por proveedor / Comparativa). Las pestañas de
+  // PÁGINA (Proveedores/Tarifas/Pedidos/Propuesta) ya no viven aquí: se inyectan en la TopBar
+  // desde SuppliersPage. En la vista detalle de proveedor (fixedSupplierId) no hay sub-vistas.
   const subViewNav = (
     <nav className="bo-tabs" data-testid="sp-view-tabs">
       <button
@@ -231,9 +226,8 @@ export function SupplierPricesSection({
       </button>
     </nav>
   );
-  // Cabecera de card en UNA sola línea: pestañas de página + sub-navegación de vistas +
-  // herramientas (filtro/CTA), todo en la misma fila. En la vista detalle (fixedSupplierId)
-  // no hay pestañas ni sub-nav: solo la fila de herramientas (si las hay).
+  // Cabecera de card en UNA sola línea: sub-navegación de vistas + herramientas (filtro/CTA).
+  // En la vista detalle (fixedSupplierId) no hay sub-nav: solo la fila de herramientas (si las hay).
   const renderHeader = (tools: ReactNode) =>
     fixedSupplierId ? (
       tools ? (
@@ -241,7 +235,6 @@ export function SupplierPricesSection({
       ) : null
     ) : (
       <div className="dt-header-row">
-        {tabs}
         {subViewNav}
         {tools}
       </div>
