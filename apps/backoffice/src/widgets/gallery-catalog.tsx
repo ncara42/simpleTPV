@@ -1017,6 +1017,87 @@ function ThumbTblTasks(): ReactNode {
   );
 }
 
+// ── Sección 10 · Estado y progreso ──
+
+// Stepper de 4 pasos: 2 hechos (acento + check), 1 actual (contorno) y 1 pendiente (gris).
+function ThumbEstadoSteps(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <line x1={16} y1={32} x2={52} y2={32} stroke="var(--ui-brand)" strokeWidth={2.5} />
+      <line x1={52} y1={32} x2={88} y2={32} stroke="var(--ui-border)" strokeWidth={2.5} />
+      <line x1={88} y1={32} x2={116} y2={32} stroke="var(--ui-border)" strokeWidth={2.5} />
+      <circle cx={16} cy={32} r={9} fill="var(--ui-brand)" />
+      <circle cx={52} cy={32} r={9} fill="var(--ui-brand)" />
+      <circle
+        cx={88}
+        cy={32}
+        r={9}
+        fill="var(--ui-surface)"
+        stroke="var(--ui-brand)"
+        strokeWidth={2.5}
+      />
+      <circle cx={116} cy={32} r={9} fill="var(--ui-surface-subtle)" />
+      <path d="M12,32 l3,3 l6,-7" fill="none" stroke="var(--ui-primary-fg)" strokeWidth={2} />
+      <path d="M48,32 l3,3 l6,-7" fill="none" stroke="var(--ui-primary-fg)" strokeWidth={2} />
+    </svg>
+  );
+}
+
+// Estado operativo: disco verde con check centrado + rótulo «N/N».
+function ThumbEstadoOperational(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <circle cx={66} cy={25} r={15} fill="var(--ui-success-soft)" />
+      <path
+        d="M59,25 l5,5 l10,-11"
+        fill="none"
+        stroke="var(--ui-success)"
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect x={51} y={48} width={30} height={5} rx={2.5} fill={SOFT_BLUE} />
+    </svg>
+  );
+}
+
+// Checklist de cumplimiento: dos filas con disco verde + check y un rótulo.
+function ThumbEstadoCompliance(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[23, 45].map((y, i) => (
+        <g key={i}>
+          <circle cx={18} cy={y} r={9} fill="var(--ui-success-soft)" />
+          <path
+            d={`M13,${y} l3,3 l6,-7`}
+            fill="none"
+            stroke="var(--ui-success)"
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <rect x={34} y={y - 3} width={74} height={6} rx={3} fill={SOFT_BLUE} />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 // Entradas de la galería (se amplía por tandas).
 export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
   // Sección 01 · KPIs
@@ -1264,5 +1345,27 @@ export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
     category: 'listas-tablas',
     description: 'Checklist de reposición por alertas',
     thumbnail: <ThumbTblTasks />,
+  },
+  // Sección 10 · Estado y progreso
+  {
+    id: 'estado-pasos',
+    label: 'Pasos de un pedido',
+    category: 'estado',
+    description: 'Ciclo de un pedido de compra (Pedido→Recib.)',
+    thumbnail: <ThumbEstadoSteps />,
+  },
+  {
+    id: 'estado-operativo',
+    label: 'Estado operativo de tiendas',
+    category: 'estado',
+    description: 'Tiendas activas verificadas y sin incidencia',
+    thumbnail: <ThumbEstadoOperational />,
+  },
+  {
+    id: 'estado-cumplimiento',
+    label: 'Cumplimiento (VeriFactu/cajas)',
+    category: 'estado',
+    description: 'Cadena VeriFactu y cajas sin pendientes',
+    thumbnail: <ThumbEstadoCompliance />,
   },
 ];

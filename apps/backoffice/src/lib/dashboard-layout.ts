@@ -92,6 +92,10 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'tabla-variacion': { w: 4, h: 2 },
   'tabla-ranking': { w: 4, h: 2 },
   'tabla-tareas': { w: 4, h: 2 },
+  // Sección 10 · Estado y progreso (rediseño): stepper ancho, estado compacto y checklist.
+  'estado-pasos': { w: 4, h: 1 },
+  'estado-operativo': { w: 2, h: 1 },
+  'estado-cumplimiento': { w: 3, h: 1 },
 };
 
 const DEFAULT_SPEC = { w: 4, h: 2 };

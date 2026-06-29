@@ -9,6 +9,7 @@ import {
   CompactTreemap,
 } from './compactos.js';
 import { DiagnosticActivity } from './diagnostico.js';
+import { ComplianceChecks, OperationalStatus, StepProgress } from './estado.js';
 import { HourArea, HourHeatmap, StoreBars } from './graficas.js';
 import { ClassicKpiCard, ConnectedKpiGrid } from './kpis.js';
 import { AlertKpi, AreaKpi, DualKpi, SevenDayKpi } from './kpis-formatos.js';
@@ -78,6 +79,10 @@ export const WIDGET_PANELS: Record<string, (props: PanelProps) => ReactElement> 
   'tabla-variacion': VariationList,
   'tabla-ranking': RankingList,
   'tabla-tareas': TaskList,
+  // Sección 10 · Estado y progreso
+  'estado-pasos': StepProgress,
+  'estado-operativo': OperationalStatus,
+  'estado-cumplimiento': ComplianceChecks,
 };
 
 // Ids de los widgets con render (para el test de paridad con el catálogo).

@@ -1,0 +1,137 @@
+/* Sección 10 · Estado y progreso (rediseño «Fundación Geist»). Tarjetas a medida del handoff:
+   stepper de pasos, estado operativo centrado y checklist de cumplimiento. Cada tarjeta trae su
+   propio borde/radio (se monta con PanelShell bare). Color/forma por token (--ui-*). */
+
+.st-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 18px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+}
+.st-card--center {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0;
+}
+
+/* Rótulo en versalitas (idéntico al handoff: 11px, +letter-spacing, mayúsculas). */
+.st-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+}
+
+/* ── Pasos (stepper) ───────────────────────────────────────────────────── */
+.st-steps {
+  display: flex;
+  align-items: center;
+  margin-top: 16px;
+}
+.st-dot {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  box-sizing: border-box;
+  font-size: 11px;
+  font-weight: 700;
+}
+.st-dot--done {
+  background: var(--ui-brand);
+  color: var(--ui-primary-fg);
+}
+.st-dot--current {
+  background: var(--ui-surface);
+  border: 2px solid var(--ui-brand);
+  color: var(--ui-brand);
+}
+.st-dot--todo {
+  background: var(--ui-surface-subtle);
+  color: color-mix(in oklab, var(--ui-text-soft) 80%, var(--ui-surface));
+}
+.st-bar {
+  flex: 1;
+  height: 2px;
+}
+.st-bar--on {
+  background: var(--ui-brand);
+}
+.st-bar--off {
+  background: var(--ui-border);
+}
+.st-step-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 10px;
+  color: color-mix(in oklab, var(--ui-text-soft) 80%, var(--ui-surface));
+}
+
+/* ── Operativo (estado centrado) ───────────────────────────────────────── */
+.st-op-badge {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+}
+.st-op-title {
+  margin-top: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.st-op-sub {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--ui-text-soft);
+}
+
+/* ── Cumplimiento (checklist) ──────────────────────────────────────────── */
+.st-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin-top: 10px;
+}
+.st-check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.st-check-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+}
+.st-check-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ui-text);
+}
+
+/* Tonos de los badges (Operativo + Cumplimiento), el color del icono = currentColor. */
+.st-tone-success {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.st-tone-warning {
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
+}
+.st-tone-muted {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-soft);
+}

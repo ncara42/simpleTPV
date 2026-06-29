@@ -59,6 +59,10 @@ export const WIDGET_LABELS: Record<string, string> = {
   'tabla-variacion': 'Variación por tienda',
   'tabla-ranking': 'Ranking de productos (tabla)',
   'tabla-tareas': 'Tareas de reposición',
+  // Sección 10 · Estado y progreso (rediseño)
+  'estado-pasos': 'Pasos de un pedido',
+  'estado-operativo': 'Estado operativo de tiendas',
+  'estado-cumplimiento': 'Cumplimiento (VeriFactu/cajas)',
 };
 
 // Tipo de widget en el registry. Los del catálogo son 'kpi' o 'panel' (su render lo posee
