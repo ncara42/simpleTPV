@@ -170,6 +170,8 @@ async fn run() -> anyhow::Result<()> {
     // Mismo pool admin (BYPASSRLS) para el worker de envío VeriFactu (#155), que
     // drena la cola PENDING de todos los tenants. Se clona antes de mover `admin`.
     let verifactu_db = admin.clone();
+    // Pool admin para el barrido de auto-cierre de tickets de soporte (cross-tenant).
+    let support_db = admin.clone();
     let auth = AuthService::new(admin, auth_config);
     // Cookie `Secure` configurable en runtime (COOKIE_SECURE); por defecto activo
     // en release. Permite release-tras-proxy-http (off) y dev-sobre-https (on).
@@ -215,6 +217,28 @@ async fn run() -> anyhow::Result<()> {
         ai,
         telegram,
     ));
+
+    // Auto-cierre de tickets de soporte por inactividad (24h). Barrido periódico
+    // cross-tenant por el pool admin (BYPASSRLS).
+    {
+        const SWEEP_SECS: u64 = 900; // cada 15 min
+        const INACTIVITY_HOURS: i32 = 24;
+        let pool = support_db;
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(Duration::from_secs(SWEEP_SECS));
+            loop {
+                tick.tick().await;
+                match simpletpv_domain::support::close_stale_tickets(&pool, INACTIVITY_HOURS).await
+                {
+                    Ok(n) if n > 0 => {
+                        tracing::info!(cerrados = n, "auto-cierre de tickets de soporte")
+                    }
+                    Ok(_) => {}
+                    Err(e) => tracing::error!(error = %e, "fallo en el auto-cierre de tickets"),
+                }
+            }
+        });
+    }
 
     // Worker de envío VeriFactu (#155/#156): drena la cola de registros PENDING con
     // `FOR UPDATE SKIP LOCKED`. `VERIFACTU_PROVIDER` elige el destino (fail-safe: por
@@ -595,6 +619,11 @@ async fn run_migrations(pool: &sqlx::PgPool) -> anyhow::Result<()> {
             "../migrations/20260629120000_support.sql",
             20260629120000,
             "support"
+        ),
+        m!(
+            "../migrations/20260629170000_support_tickets.sql",
+            20260629170000,
+            "support_tickets"
         ),
     ];
 

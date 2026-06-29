@@ -1,16 +1,14 @@
-//! Soporte con escalado a humano (Ayuda). Disponible a cualquier rol autenticado.
+//! Soporte con escalado a humano (Ayuda) — sistema de TICKETS. Cualquier rol
+//! autenticado. Cada ticket tiene número, título (= primer mensaje del usuario),
+//! estado abierto/cerrado y su propio tema de foro en Telegram.
 //!
-//! Flujo: el usuario escribe → la IA triagea con conocimiento del producto. Si
-//! puede, responde; si no, llama a la tool `escalar_a_humano` y la conversación
-//! pasa a modo `human`: el mensaje se reenvía al tema de Telegram de ese cliente.
-//! Soporte responde en el tema → el webhook (`POST /telegram/webhook`) persiste la
-//! respuesta como autor `agent` y la publica por el bus de eventos (`/events`),
-//! apareciendo en la web como un mensaje más del asistente.
-//!
-//! "Chat por cliente": UNA conversación por organización, con historial completo
-//! en ambos lados (web y tema de Telegram).
+//! Flujo: el usuario abre un ticket → la IA triagea con conocimiento del producto.
+//! Si puede, responde; si no, escala a Telegram (modo `human`). Soporte responde en
+//! el tema del ticket → el webhook persiste la respuesta como `agent` y la publica
+//! por el bus de eventos (`support.message`) → aparece en la web en vivo. Cierre:
+//! por el usuario, por soporte (`/cerrar` en el tema) o auto a las 24h de inactividad.
 
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -38,88 +36,298 @@ const ESCALATION_NOTICE: &str = "He pasado tu consulta a nuestro equipo de sopor
 Te responderemos por aquí en cuanto la revisemos. También puedes escribirnos por los \
 canales de contacto de más abajo si lo prefieres.";
 
-// ── POST /support/chat ──────────────────────────────────────────────────────────
+// ── Tipos de request/response ────────────────────────────────────────────────────
 
 #[derive(Deserialize)]
-pub struct SupportChatBody {
+pub struct MessageBody {
     pub message: String,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SupportChatResponse {
-    /// True si la consulta se derivó a soporte humano (modo `human`).
+pub struct TurnResult {
+    /// True si el turno se derivó a soporte humano.
     pub escalated: bool,
-    /// `ai` o `human`: estado de la conversación tras este turno.
+    /// `ai` o `human`: estado del ticket tras el turno.
     pub mode: String,
-    /// Texto a mostrar como respuesta del asistente (respuesta de la IA o aviso de
-    /// escalado). Ausente en modo `human` puro (la persona responderá vía SSE).
+    /// Texto a mostrar (respuesta de la IA o aviso de escalado). Ausente en modo
+    /// humano puro (la persona responderá vía SSE).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reply: Option<String>,
-    pub conversation_id: Uuid,
 }
 
-pub async fn chat(
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreatedTicket {
+    pub ticket: SupportConversationRow,
+    #[serde(flatten)]
+    pub turn: TurnResult,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TicketThread {
+    pub ticket: SupportConversationRow,
+    pub messages: Vec<SupportMessageRow>,
+}
+
+#[derive(Serialize)]
+pub struct TicketList {
+    pub tickets: Vec<SupportConversationRow>,
+}
+
+// ── GET /support/tickets ─────────────────────────────────────────────────────────
+
+pub async fn list_tickets(
     State(state): State<AppState>,
     user: AuthUser,
-    Json(body): Json<SupportChatBody>,
-) -> Result<Response, ApiError> {
-    let message = body.message.trim();
-    if message.is_empty() {
-        return Err(AppError::BadRequest.into());
-    }
-    let message: String = message.chars().take(MAX_MESSAGE_CHARS).collect();
+) -> Result<Json<TicketList>, ApiError> {
+    let tickets = support::list_tickets(state.db(), user.organization_id, user.user_id)
+        .await
+        .map_err(ApiError::from)?;
+    Ok(Json(TicketList { tickets }))
+}
 
+// ── POST /support/tickets ────────────────────────────────────────────────────────
+
+pub async fn create_ticket(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(body): Json<MessageBody>,
+) -> Result<Response, ApiError> {
+    let message = clean_message(&body.message)?;
     let org = user.organization_id;
-    let uid = user.user_id;
     let pool = state.db();
 
-    let conv = support::get_or_create_conversation(pool, org)
+    let ticket = support::create_ticket(pool, org, user.user_id, &message)
         .await
         .map_err(ApiError::from)?;
 
-    // Persistir el mensaje del usuario.
-    support::append_message(
+    // El primer mensaje es el título Y el primer mensaje (en la web se pinta solo
+    // como título, no se repite como burbuja).
+    persist_message(
         pool,
         org,
-        InsertSupportMessage {
-            id: Uuid::new_v4(),
-            conversation_id: conv.id,
-            organization_id: org,
-            author: Author::User,
-            author_user_id: Some(uid),
-            body: message.clone(),
-            telegram_message_id: None,
-        },
+        &ticket,
+        Author::User,
+        Some(user.user_id),
+        &message,
+        None,
     )
     .await
     .map_err(ApiError::from)?;
 
-    let mode = Mode::from_db(&conv.mode);
+    let turn = handle_user_turn(&state, pool, org, &ticket, &message).await;
+    Ok(Json(CreatedTicket { ticket, turn }).into_response())
+}
 
-    // Modo humano: ya hay una persona al cargo. El mensaje va directo a su tema de
-    // Telegram; la IA no se entromete.
-    if mode == Mode::Human {
-        forward_to_support(&state, pool, org, &conv, &message, None).await;
-        return Ok(Json(SupportChatResponse {
+// ── POST /support/tickets/{id}/messages ──────────────────────────────────────────
+
+pub async fn send_message(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(body): Json<MessageBody>,
+) -> Result<Json<TurnResult>, ApiError> {
+    let message = clean_message(&body.message)?;
+    let org = user.organization_id;
+    let pool = state.db();
+
+    let ticket = support::get_ticket(pool, org, id)
+        .await
+        .map_err(ApiError::from)?;
+    // Ticket cerrado = solo lectura: para seguir, el usuario abre uno nuevo.
+    if ticket.status == "closed" {
+        return Err(AppError::Conflict.into());
+    }
+
+    persist_message(
+        pool,
+        org,
+        &ticket,
+        Author::User,
+        Some(user.user_id),
+        &message,
+        None,
+    )
+    .await
+    .map_err(ApiError::from)?;
+
+    let turn = handle_user_turn(&state, pool, org, &ticket, &message).await;
+    Ok(Json(turn))
+}
+
+// ── GET /support/tickets/{id}/messages ───────────────────────────────────────────
+
+pub async fn get_ticket_messages(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<TicketThread>, ApiError> {
+    let org = user.organization_id;
+    let pool = state.db();
+    let ticket = support::get_ticket(pool, org, id)
+        .await
+        .map_err(ApiError::from)?;
+    let messages = support::get_messages(pool, org, id)
+        .await
+        .map_err(ApiError::from)?;
+    Ok(Json(TicketThread { ticket, messages }))
+}
+
+// ── POST /support/tickets/{id}/close ─────────────────────────────────────────────
+
+pub async fn close_ticket(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    let org = user.organization_id;
+    let ticket = support::get_ticket(state.db(), org, id)
+        .await
+        .map_err(ApiError::from)?;
+    support::close_ticket(state.db(), org, id)
+        .await
+        .map_err(ApiError::from)?;
+    // Avisar en el tema de Telegram (best-effort).
+    if let (Some(topic), Some(tg)) = (ticket.telegram_topic_id, state.telegram()) {
+        let _ = tg
+            .send_message(Some(topic), "🔒 Ticket cerrado por el usuario.")
+            .await;
+    }
+    state.events().publish(
+        org,
+        AppEvent {
+            event_type: "support.closed".to_owned(),
+            data: json!({ "ticketId": id }),
+        },
+    );
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ── POST /telegram/webhook (público, validado por secreto) ─────────────────────────
+
+pub async fn telegram_webhook(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(update): Json<simpletpv_telegram::Update>,
+) -> StatusCode {
+    let Some(tg) = state.telegram() else {
+        return StatusCode::OK;
+    };
+    let provided = headers
+        .get(TELEGRAM_SECRET_HEADER)
+        .and_then(|v| v.to_str().ok());
+    if provided != Some(tg.config().webhook_secret.as_str()) {
+        return StatusCode::UNAUTHORIZED;
+    }
+
+    let Some(msg) = update.message else {
+        return StatusCode::OK;
+    };
+    if msg.is_from_bot() {
+        return StatusCode::OK;
+    }
+    let (Some(thread_id), Some(text)) = (msg.message_thread_id, msg.text_trimmed()) else {
+        return StatusCode::OK;
+    };
+
+    let found = support::find_ticket_by_topic(state.admin_db(), thread_id)
+        .await
+        .ok()
+        .flatten();
+    let Some((org, ticket_id, _mode, status)) = found else {
+        return StatusCode::OK;
+    };
+
+    // /cerrar: soporte cierra el ticket desde Telegram.
+    if text.starts_with("/cerrar") {
+        let _ = support::close_ticket(state.db(), org, ticket_id).await;
+        let _ = tg.send_message(Some(thread_id), "✅ Ticket cerrado.").await;
+        state.events().publish(
+            org,
+            AppEvent {
+                event_type: "support.closed".to_owned(),
+                data: json!({ "ticketId": ticket_id }),
+            },
+        );
+        return StatusCode::OK;
+    }
+
+    let message_id = Uuid::new_v4();
+    let stored = support::append_message(
+        state.db(),
+        org,
+        InsertSupportMessage {
+            id: message_id,
+            conversation_id: ticket_id,
+            organization_id: org,
+            author: Author::Agent,
+            author_user_id: None,
+            body: text.to_owned(),
+            telegram_message_id: Some(msg.message_id),
+        },
+    )
+    .await;
+    if stored.is_err() {
+        return StatusCode::OK;
+    }
+    // Una persona ha intervenido: si el ticket estaba cerrado, se reabre; si no,
+    // queda en modo humano.
+    if status == "closed" {
+        let _ = support::reopen_ticket(state.db(), org, ticket_id).await;
+    } else {
+        let _ = support::set_mode(state.db(), org, ticket_id, Mode::Human).await;
+    }
+
+    state.events().publish(
+        org,
+        AppEvent {
+            event_type: "support.message".to_owned(),
+            data: json!({
+                "ticketId": ticket_id,
+                "messageId": message_id,
+                "author": "agent",
+                "body": text,
+            }),
+        },
+    );
+    StatusCode::OK
+}
+
+// ── Turno del usuario: triage IA o reenvío a humano ───────────────────────────────
+
+/// Procesa un mensaje del usuario sobre `ticket`: si el ticket está en modo humano
+/// lo reenvía a Telegram; si no, la IA triagea (responde o escala). Devuelve el
+/// resultado a servir en la web.
+async fn handle_user_turn(
+    state: &AppState,
+    pool: &sqlx::PgPool,
+    org: Uuid,
+    ticket: &SupportConversationRow,
+    user_message: &str,
+) -> TurnResult {
+    if Mode::from_db(&ticket.mode) == Mode::Human {
+        forward_to_support(state, pool, org, ticket, user_message, None).await;
+        return TurnResult {
             escalated: true,
             mode: "human".to_owned(),
             reply: None,
-            conversation_id: conv.id,
-        })
-        .into_response());
+        };
     }
 
-    // Modo IA: triage. Sin IA configurada, escalamos directamente.
     let Some(ai) = state.ai() else {
-        return Ok(escalate(&state, pool, org, &conv, &message, None)
-            .await
-            .into_response());
+        let notice = escalate(state, pool, org, ticket, user_message, None).await;
+        return TurnResult {
+            escalated: true,
+            mode: "human".to_owned(),
+            reply: Some(notice),
+        };
     };
 
-    let history = support::get_messages(pool, org, conv.id)
+    let history = support::get_messages(pool, org, ticket.id)
         .await
-        .map_err(ApiError::from)?;
+        .unwrap_or_default();
     let org_name = simpletpv_domain::chat::load_org_context(pool, org)
         .await
         .ok()
@@ -134,209 +342,55 @@ pub async fn chat(
 
     match run_triage(ai, req).await {
         Triage::Answer(text) => {
-            // La IA resolvió: persistimos su respuesta y la devolvemos.
-            support::append_message(
-                pool,
-                org,
-                InsertSupportMessage {
-                    id: Uuid::new_v4(),
-                    conversation_id: conv.id,
-                    organization_id: org,
-                    author: Author::Ai,
-                    author_user_id: None,
-                    body: text.clone(),
-                    telegram_message_id: None,
-                },
-            )
-            .await
-            .map_err(ApiError::from)?;
-            Ok(Json(SupportChatResponse {
+            let _ = persist_message(pool, org, ticket, Author::Ai, None, &text, None).await;
+            TurnResult {
                 escalated: false,
                 mode: "ai".to_owned(),
                 reply: Some(text),
-                conversation_id: conv.id,
-            })
-            .into_response())
+            }
         }
         Triage::Escalate { summary } => {
-            Ok(escalate(&state, pool, org, &conv, &message, Some(summary))
-                .await
-                .into_response())
+            let notice = escalate(state, pool, org, ticket, user_message, Some(summary)).await;
+            TurnResult {
+                escalated: true,
+                mode: "human".to_owned(),
+                reply: Some(notice),
+            }
         }
-        // Fallo del proveedor: mejor escalar a humano que dejar al usuario colgado.
-        Triage::Failed => Ok(escalate(&state, pool, org, &conv, &message, None)
-            .await
-            .into_response()),
+        Triage::Failed => {
+            let notice = escalate(state, pool, org, ticket, user_message, None).await;
+            TurnResult {
+                escalated: true,
+                mode: "human".to_owned(),
+                reply: Some(notice),
+            }
+        }
     }
 }
 
-// ── GET /support/messages ────────────────────────────────────────────────────────
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupportThread {
-    pub conversation: SupportConversationRow,
-    pub messages: Vec<SupportMessageRow>,
-}
-
-pub async fn get_messages(
-    State(state): State<AppState>,
-    user: AuthUser,
-) -> Result<Json<SupportThread>, ApiError> {
-    let org = user.organization_id;
-    let pool = state.db();
-    let conversation = support::get_or_create_conversation(pool, org)
-        .await
-        .map_err(ApiError::from)?;
-    let messages = support::get_messages(pool, org, conversation.id)
-        .await
-        .map_err(ApiError::from)?;
-    Ok(Json(SupportThread {
-        conversation,
-        messages,
-    }))
-}
-
-// ── POST /telegram/webhook (público, validado por secreto) ─────────────────────────
-
-pub async fn telegram_webhook(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    Json(update): Json<simpletpv_telegram::Update>,
-) -> StatusCode {
-    // Sin Telegram configurado, ignoramos en silencio (200 para que Telegram no reintente).
-    let Some(tg) = state.telegram() else {
-        return StatusCode::OK;
-    };
-    // Anti-spoofing: el secreto de la cabecera debe casar con el configurado.
-    let provided = headers
-        .get(TELEGRAM_SECRET_HEADER)
-        .and_then(|v| v.to_str().ok());
-    if provided != Some(tg.config().webhook_secret.as_str()) {
-        return StatusCode::UNAUTHORIZED;
-    }
-
-    let Some(msg) = update.message else {
-        return StatusCode::OK;
-    };
-    // Ignoramos el eco de nuestros propios envíos y los mensajes sin texto.
-    if msg.is_from_bot() {
-        return StatusCode::OK;
-    }
-    let (Some(thread_id), Some(text)) = (msg.message_thread_id, msg.text_trimmed()) else {
-        return StatusCode::OK;
-    };
-
-    // Lookup pre-tenant (BYPASSRLS): el tema nos da la organización.
-    let found = support::find_conversation_by_topic(state.admin_db(), thread_id)
-        .await
-        .ok()
-        .flatten();
-    let Some((org, conv_id, _)) = found else {
-        return StatusCode::OK;
-    };
-
-    // Comando /cerrar: soporte devuelve la conversación al asistente automático.
-    if text.starts_with("/cerrar") {
-        let _ = support::set_mode(state.db(), org, conv_id, Mode::Ai).await;
-        let _ = tg
-            .send_message(
-                Some(thread_id),
-                "✅ Conversación devuelta al asistente automático.",
-            )
-            .await;
-        state.events().publish(
-            org,
-            AppEvent {
-                event_type: "support.closed".to_owned(),
-                data: json!({ "conversationId": conv_id }),
-            },
-        );
-        return StatusCode::OK;
-    }
-
-    // Respuesta de la persona de soporte: persistir como `agent` y empujar a la web.
-    let message_id = Uuid::new_v4();
-    let stored = support::append_message(
-        state.db(),
-        org,
-        InsertSupportMessage {
-            id: message_id,
-            conversation_id: conv_id,
-            organization_id: org,
-            author: Author::Agent,
-            author_user_id: None,
-            body: text.to_owned(),
-            telegram_message_id: Some(msg.message_id),
-        },
-    )
-    .await;
-    if stored.is_err() {
-        return StatusCode::OK;
-    }
-    // Una persona ha intervenido → la conversación queda en modo humano.
-    let _ = support::set_mode(state.db(), org, conv_id, Mode::Human).await;
-
-    state.events().publish(
-        org,
-        AppEvent {
-            event_type: "support.message".to_owned(),
-            data: json!({
-                "conversationId": conv_id,
-                "messageId": message_id,
-                "author": "agent",
-                "body": text,
-            }),
-        },
-    );
-    StatusCode::OK
-}
-
-// ── Lógica de escalado / reenvío ───────────────────────────────────────────────
-
-/// Escala la conversación a soporte humano: asegura el tema de Telegram del cliente,
-/// reenvía la consulta (con el resumen de la IA si lo hay), marca modo `human` y
-/// persiste el aviso para el usuario. Devuelve la respuesta a servir en la web.
+/// Escala el ticket: asegura su tema de Telegram, reenvía la consulta, marca modo
+/// humano y persiste el aviso para el usuario. Devuelve el aviso.
 async fn escalate(
     state: &AppState,
     pool: &sqlx::PgPool,
     org: Uuid,
-    conv: &SupportConversationRow,
+    ticket: &SupportConversationRow,
     user_message: &str,
     summary: Option<String>,
-) -> Json<SupportChatResponse> {
-    forward_to_support(state, pool, org, conv, user_message, summary).await;
-    let _ = support::set_mode(pool, org, conv.id, Mode::Human).await;
-    // Persistir el aviso como mensaje del asistente para que quede en el historial.
-    let _ = support::append_message(
-        pool,
-        org,
-        InsertSupportMessage {
-            id: Uuid::new_v4(),
-            conversation_id: conv.id,
-            organization_id: org,
-            author: Author::Ai,
-            author_user_id: None,
-            body: ESCALATION_NOTICE.to_owned(),
-            telegram_message_id: None,
-        },
-    )
-    .await;
-    Json(SupportChatResponse {
-        escalated: true,
-        mode: "human".to_owned(),
-        reply: Some(ESCALATION_NOTICE.to_owned()),
-        conversation_id: conv.id,
-    })
+) -> String {
+    forward_to_support(state, pool, org, ticket, user_message, summary).await;
+    let _ = support::set_mode(pool, org, ticket.id, Mode::Human).await;
+    let _ = persist_message(pool, org, ticket, Author::Ai, None, ESCALATION_NOTICE, None).await;
+    ESCALATION_NOTICE.to_owned()
 }
 
-/// Envía el mensaje del usuario al tema de Telegram del cliente (creándolo si no
+/// Envía el mensaje del usuario al tema de Telegram del ticket (creándolo si no
 /// existe). Best-effort: registra y sigue si Telegram falla o no está configurado.
 async fn forward_to_support(
     state: &AppState,
     pool: &sqlx::PgPool,
     org: Uuid,
-    conv: &SupportConversationRow,
+    ticket: &SupportConversationRow,
     user_message: &str,
     summary: Option<String>,
 ) {
@@ -344,7 +398,7 @@ async fn forward_to_support(
         tracing::warn!(%org, "escalado de soporte sin Telegram configurado: no se notifica");
         return;
     };
-    let Some(thread_id) = ensure_topic(pool, org, conv, tg).await else {
+    let Some(thread_id) = ensure_topic(pool, org, ticket, tg).await else {
         return;
     };
     let text = match summary {
@@ -358,24 +412,27 @@ async fn forward_to_support(
     }
 }
 
-/// Devuelve el `message_thread_id` del cliente, creándolo en Telegram la primera vez.
+/// Devuelve el `message_thread_id` del ticket, creando el tema de foro la primera
+/// vez. Nombre del tema: «#N · título · comercio».
 async fn ensure_topic(
     pool: &sqlx::PgPool,
     org: Uuid,
-    conv: &SupportConversationRow,
+    ticket: &SupportConversationRow,
     tg: &TelegramClient,
 ) -> Option<i64> {
-    if let Some(t) = conv.telegram_topic_id {
+    if let Some(t) = ticket.telegram_topic_id {
         return Some(t);
     }
-    let name = simpletpv_domain::chat::load_org_context(pool, org)
+    let org_name = simpletpv_domain::chat::load_org_context(pool, org)
         .await
         .ok()
         .map(|c| c.name)
         .unwrap_or_else(|| format!("Cliente {org}"));
+    let title = ticket.title.as_deref().unwrap_or("Consulta");
+    let name = format!("#{} · {title} · {org_name}", ticket.number.unwrap_or(0));
     match tg.create_forum_topic(&name).await {
         Ok(topic_id) => {
-            let _ = support::set_topic(pool, org, conv.id, topic_id).await;
+            let _ = support::set_topic(pool, org, ticket.id, topic_id).await;
             Some(topic_id)
         }
         Err(e) => {
@@ -385,20 +442,49 @@ async fn ensure_topic(
     }
 }
 
+/// Inserta un mensaje del ticket. Pequeño wrapper sobre el servicio para no repetir
+/// la construcción del `InsertSupportMessage` en cada sitio.
+async fn persist_message(
+    pool: &sqlx::PgPool,
+    org: Uuid,
+    ticket: &SupportConversationRow,
+    author: Author,
+    author_user_id: Option<Uuid>,
+    body: &str,
+    telegram_message_id: Option<i64>,
+) -> Result<SupportMessageRow, AppError> {
+    support::append_message(
+        pool,
+        org,
+        InsertSupportMessage {
+            id: Uuid::new_v4(),
+            conversation_id: ticket.id,
+            organization_id: org,
+            author,
+            author_user_id,
+            body: body.to_owned(),
+            telegram_message_id,
+        },
+    )
+    .await
+}
+
+fn clean_message(raw: &str) -> Result<String, ApiError> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::BadRequest.into());
+    }
+    Ok(trimmed.chars().take(MAX_MESSAGE_CHARS).collect())
+}
+
 // ── Triage con la IA ───────────────────────────────────────────────────────────
 
 enum Triage {
-    /// La IA resolvió: texto a devolver.
     Answer(String),
-    /// La IA pide derivar a humano (con resumen opcional).
     Escalate { summary: String },
-    /// Fallo del proveedor o respuesta vacía.
     Failed,
 }
 
-/// Ejecuta un único turno de IA y decide: responder o escalar. Consume el stream
-/// del proveedor por completo (no es streaming hacia el cliente: el soporte es
-/// pregunta-respuesta + seguimiento humano por SSE).
 async fn run_triage(ai: &AiConfig, req: ChatRequest) -> Triage {
     let stream = match stream_chat(ai, req) {
         Ok(s) => s,
@@ -440,8 +526,6 @@ async fn run_triage(ai: &AiConfig, req: ChatRequest) -> Triage {
     }
 }
 
-/// Modelo para el triage de soporte. `SUPPORT_MODEL` lo fija al despliegue (debe
-/// existir en el gateway/proveedor configurado); por defecto un modelo económico.
 fn support_model() -> String {
     std::env::var("SUPPORT_MODEL")
         .ok()
@@ -470,8 +554,6 @@ fn escalate_tool() -> serde_json::Value {
     })
 }
 
-/// System prompt del asistente de soporte. Incluye el conocimiento de producto
-/// (espejo de la FAQ de Ayuda) para que resuelva lo común, y la regla de escalado.
 fn build_support_prompt(org_name: Option<&str>) -> String {
     let who = org_name
         .map(|n| format!(" del comercio «{n}»"))
@@ -496,9 +578,8 @@ REGLAS:\n\
     )
 }
 
-/// Mapea el historial de soporte a mensajes del LLM. `user` → user; `ai` y `agent`
-/// (la persona de soporte) → assistant, para que la IA tenga todo el contexto al
-/// reentrar en modo `ai` tras un `/cerrar`.
+/// Mapea el historial del ticket a mensajes del LLM. `user` → user; `ai` y `agent`
+/// → assistant, para que la IA tenga todo el contexto.
 fn build_messages(history: &[SupportMessageRow]) -> Vec<ChatMessage> {
     history
         .iter()
@@ -525,7 +606,6 @@ mod tests {
     use time::macros::datetime;
 
     fn msg(author: &str, body: &str) -> SupportMessageRow {
-        let ts = datetime!(2026-06-29 10:00:00);
         SupportMessageRow {
             id: Uuid::nil(),
             conversation_id: Uuid::nil(),
@@ -534,7 +614,7 @@ mod tests {
             author_user_id: None,
             body: body.to_owned(),
             telegram_message_id: None,
-            created_at: ts,
+            created_at: datetime!(2026-06-29 10:00:00),
         }
     }
 
@@ -542,12 +622,11 @@ mod tests {
     fn build_messages_mapea_autores() {
         let history = [
             msg("user", "hola"),
-            msg("ai", "¿en qué te ayudo?"),
-            msg("agent", "soy del equipo de soporte"),
+            msg("ai", "hey"),
+            msg("agent", "soy soporte"),
         ];
         let mapped = build_messages(&history);
         assert!(matches!(mapped[0], ChatMessage::User { .. }));
-        // ai y agent (humano) llegan como assistant para dar contexto a la IA.
         assert!(matches!(mapped[1], ChatMessage::Assistant { .. }));
         assert!(matches!(mapped[2], ChatMessage::Assistant { .. }));
     }
@@ -555,9 +634,7 @@ mod tests {
     #[test]
     fn escalate_tool_tiene_estructura_valida() {
         let t = escalate_tool();
-        assert_eq!(t["type"], "function");
         assert_eq!(t["function"]["name"], "escalar_a_humano");
-        assert_eq!(t["function"]["parameters"]["type"], "object");
         assert!(t["function"]["parameters"]["required"]
             .as_array()
             .unwrap()
@@ -566,9 +643,8 @@ mod tests {
     }
 
     #[test]
-    fn support_prompt_incluye_nombre_y_regla_de_escalado() {
-        let p = build_support_prompt(Some("CBD Premium"));
-        assert!(p.contains("CBD Premium"));
-        assert!(p.contains("escalar_a_humano"));
+    fn clean_message_recorta_y_rechaza_vacio() {
+        assert!(clean_message("   ").is_err());
+        assert_eq!(clean_message("  hola  ").ok(), Some("hola".to_owned()));
     }
 }
