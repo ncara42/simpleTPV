@@ -528,10 +528,18 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/chat/models", get(chat::list_models))
         .route("/chat/usage", get(chat::get_org_usage))
-        // Soporte con escalado a humano (Ayuda): cualquier rol autenticado. La IA
-        // triagea y, si no puede, escala al tema de Telegram del cliente.
-        .route("/support/chat", post(support::chat))
-        .route("/support/messages", get(support::get_messages))
+        // Soporte (Ayuda): sistema de tickets. Cualquier rol autenticado; cada
+        // usuario ve los suyos. La IA triagea y, si no puede, escala al tema de
+        // Telegram del ticket.
+        .route(
+            "/support/tickets",
+            get(support::list_tickets).post(support::create_ticket),
+        )
+        .route(
+            "/support/tickets/{id}/messages",
+            get(support::get_ticket_messages).post(support::send_message),
+        )
+        .route("/support/tickets/{id}/close", post(support::close_ticket))
         // Eventos en tiempo real (Fase 4, #32): stream SSE filtrado por tenant del
         // JWT. Cualquier rol; tope de conexiones por usuario (SEC-03).
         .route("/events", get(events::stream))

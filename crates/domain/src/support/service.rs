@@ -1,8 +1,8 @@
-//! Persistencia del soporte (Ayuda). Igual que el resto del dominio, las
-//! lecturas/escrituras por tenant pasan por [`with_tenant_tx`] (RLS). La única
-//! excepción es [`find_conversation_by_topic`]: el webhook de Telegram no conoce
-//! la organización hasta resolver el tema, así que ese lookup va por el pool
-//! `app_admin` (BYPASSRLS), como el lookup pre-tenant de API keys.
+//! Persistencia del soporte (Ayuda) — sistema de tickets. Las lecturas/escrituras
+//! por tenant pasan por [`with_tenant_tx`] (RLS). Excepciones que van por el pool
+//! `app_admin` (BYPASSRLS) porque no hay contexto de organización: el lookup del
+//! webhook de Telegram ([`find_ticket_by_topic`]) y el barrido de auto-cierre
+//! cross-tenant ([`close_stale_tickets`]).
 
 use simpletpv_db::with_tenant_tx;
 use simpletpv_shared::AppError;
@@ -11,25 +11,99 @@ use uuid::Uuid;
 
 use super::model::{InsertSupportMessage, Mode, SupportConversationRow, SupportMessageRow};
 
-/// Devuelve la (única) conversación de soporte de la organización, creándola si no
-/// existía. El `UNIQUE("organizationId")` sostiene el upsert.
-pub async fn get_or_create_conversation(
+/// Crea un ticket nuevo con número secuencial por organización. `title` = primer
+/// mensaje del usuario (el handler persiste ese mensaje aparte).
+pub async fn create_ticket(
     pool: &PgPool,
     org: Uuid,
+    author_user_id: Uuid,
+    title: &str,
 ) -> Result<SupportConversationRow, AppError> {
+    let title = title.to_owned();
     with_tenant_tx(pool, org, async move |tx, _after| {
         sqlx::query_as::<_, SupportConversationRow>(
             r#"INSERT INTO "support_conversation"
-                   ("id","organizationId","mode","status","createdAt","updatedAt")
-               VALUES ($1,$2,'ai','open',NOW(),NOW())
-               ON CONFLICT ("organizationId")
-                   DO UPDATE SET "updatedAt" = NOW()
+                   ("id","organizationId","number","title","authorUserId",
+                    "mode","status","createdAt","updatedAt")
+               VALUES ($1,$2,
+                   (SELECT COALESCE(MAX("number"),0)+1 FROM "support_conversation"),
+                   $3,$4,'ai','open',NOW(),NOW())
                RETURNING *"#,
         )
         .bind(Uuid::new_v4())
         .bind(org)
+        .bind(&title)
+        .bind(author_user_id)
         .fetch_one(&mut **tx)
         .await
+    })
+    .await
+}
+
+/// Tickets del usuario (sidebar), recientes primero.
+pub async fn list_tickets(
+    pool: &PgPool,
+    org: Uuid,
+    user_id: Uuid,
+) -> Result<Vec<SupportConversationRow>, AppError> {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        sqlx::query_as::<_, SupportConversationRow>(
+            r#"SELECT * FROM "support_conversation"
+               WHERE "authorUserId"=$1 ORDER BY "updatedAt" DESC LIMIT 100"#,
+        )
+        .bind(user_id)
+        .fetch_all(&mut **tx)
+        .await
+    })
+    .await
+}
+
+pub async fn get_ticket(
+    pool: &PgPool,
+    org: Uuid,
+    id: Uuid,
+) -> Result<SupportConversationRow, AppError> {
+    let result: Result<Result<SupportConversationRow, AppError>, AppError> =
+        with_tenant_tx(pool, org, async move |tx, _after| {
+            sqlx::query_as::<_, SupportConversationRow>(
+                r#"SELECT * FROM "support_conversation" WHERE id=$1"#,
+            )
+            .bind(id)
+            .fetch_optional(&mut **tx)
+            .await
+            .map(|opt| opt.ok_or(AppError::NotFound))
+        })
+        .await;
+    result?
+}
+
+pub async fn close_ticket(pool: &PgPool, org: Uuid, id: Uuid) -> Result<(), AppError> {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        sqlx::query(
+            r#"UPDATE "support_conversation"
+               SET "status"='closed',"closedAt"=NOW(),"updatedAt"=NOW() WHERE id=$1"#,
+        )
+        .bind(id)
+        .execute(&mut **tx)
+        .await
+        .map(|_| ())
+    })
+    .await
+}
+
+/// Reabre un ticket (lo usa el webhook cuando soporte responde a uno cerrado) y lo
+/// pone en modo humano.
+pub async fn reopen_ticket(pool: &PgPool, org: Uuid, id: Uuid) -> Result<(), AppError> {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        sqlx::query(
+            r#"UPDATE "support_conversation"
+               SET "status"='open',"closedAt"=NULL,"mode"='human',"updatedAt"=NOW()
+               WHERE id=$1"#,
+        )
+        .bind(id)
+        .execute(&mut **tx)
+        .await
+        .map(|_| ())
     })
     .await
 }
@@ -73,7 +147,8 @@ pub async fn append_message(
         .bind(input.telegram_message_id)
         .fetch_one(&mut **tx)
         .await?;
-        // Toca la conversación para ordenar por actividad reciente.
+        // Toca el ticket para ordenar por actividad reciente (reinicia el reloj de
+        // auto-cierre por inactividad).
         sqlx::query(r#"UPDATE "support_conversation" SET "updatedAt"=NOW() WHERE id=$1"#)
             .bind(input.conversation_id)
             .execute(&mut **tx)
@@ -121,20 +196,35 @@ pub async fn set_mode(
     .await
 }
 
-/// Conversación referenciada por un tema de Telegram. Lookup PRE-TENANT (el webhook
-/// no tiene contexto de organización): va por el pool `app_admin` (BYPASSRLS).
-/// Devuelve `(organizationId, conversationId, Mode)`.
-pub async fn find_conversation_by_topic(
+/// Ticket referenciado por un tema de Telegram. Lookup PRE-TENANT (el webhook no
+/// tiene contexto de organización): pool `app_admin` (BYPASSRLS). Devuelve
+/// `(organizationId, ticketId, Mode, status)`.
+pub async fn find_ticket_by_topic(
     admin_pool: &PgPool,
     topic_id: i64,
-) -> Result<Option<(Uuid, Uuid, Mode)>, AppError> {
-    let row: Option<(Uuid, Uuid, String)> = sqlx::query_as(
-        r#"SELECT "organizationId", id, mode FROM "support_conversation"
+) -> Result<Option<(Uuid, Uuid, Mode, String)>, AppError> {
+    let row: Option<(Uuid, Uuid, String, String)> = sqlx::query_as(
+        r#"SELECT "organizationId", id, mode, status FROM "support_conversation"
            WHERE "telegramTopicId"=$1"#,
     )
     .bind(topic_id)
     .fetch_optional(admin_pool)
     .await
     .map_err(|_| AppError::Internal)?;
-    Ok(row.map(|(org, id, mode)| (org, id, Mode::from_db(&mode))))
+    Ok(row.map(|(org, id, mode, status)| (org, id, Mode::from_db(&mode), status)))
+}
+
+/// Cierra los tickets abiertos sin actividad desde hace `hours` horas. Barrido
+/// cross-tenant por el pool `app_admin` (BYPASSRLS). Devuelve cuántos cerró.
+pub async fn close_stale_tickets(admin_pool: &PgPool, hours: i32) -> Result<u64, AppError> {
+    let res = sqlx::query(
+        r#"UPDATE "support_conversation"
+           SET "status"='closed',"closedAt"=NOW()
+           WHERE "status"='open' AND "updatedAt" < NOW() - make_interval(hours => $1)"#,
+    )
+    .bind(hours)
+    .execute(admin_pool)
+    .await
+    .map_err(|_| AppError::Internal)?;
+    Ok(res.rows_affected())
 }

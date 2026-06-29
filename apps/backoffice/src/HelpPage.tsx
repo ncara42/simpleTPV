@@ -1,331 +1,292 @@
 import './help.css';
 
 import { usePageHeader } from '@simpletpv/ui';
-import { ArrowUp, Loader2, Search, Square, ThumbsDown, ThumbsUp } from 'lucide-react';
-import { type FormEvent, Fragment, type RefObject, useEffect, useRef, useState } from 'react';
+import { ArrowUp, LifeBuoy, Loader2, Lock, Plus } from 'lucide-react';
+import { type KeyboardEvent, useState } from 'react';
 
 import { ChatMarkdown } from './components/chat/ChatMarkdown.js';
 import { viewContextFor } from './components/chat/view-context.js';
-import { useSupportChat } from './components/support/useSupportChat.js';
+import { useSupportTickets } from './components/support/useSupportTickets.js';
+import type { SupportMessage, Ticket } from './lib/support.js';
 
-// La vista de Ayuda lee como un documento: cada pregunta del usuario abre un turno y la
-// respuesta (de la IA o, tras escalar, del equipo de soporte) se concatena debajo. El
-// agrupado en turnos vive en `useSupportChat`.
+// ── Composer (textarea + enviar) ─────────────────────────────────────────────────
 
-// ── Buscador / composer ────────────────────────────────────────────────────────────────────
-
-type AskStatus = 'ready' | 'submitted' | 'streaming';
-
-interface HelpAskProps {
-  variant: 'hero' | 'bar';
+interface ComposerProps {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (v: string) => void;
   onSubmit: () => void;
-  onStop: () => void;
-  status: AskStatus;
-  disabled: boolean;
-  inputRef?: RefObject<HTMLInputElement | null>;
+  pending: boolean;
+  placeholder: string;
+  autoFocus?: boolean;
 }
 
-/**
- * Buscador de Ayuda: input grande centrado en reposo (`hero`) o anclado arriba en modo lectura
- * (`bar`). Es un `<form>` para que Enter envíe de forma nativa y accesible. Mientras el asistente
- * responde, el botón de enviar se convierte en «detener».
- */
-function HelpAsk({
-  variant,
-  value,
-  onChange,
-  onSubmit,
-  onStop,
-  status,
-  disabled,
-  inputRef,
-}: HelpAskProps) {
-  const busy = status !== 'ready';
-  const canSend = value.trim().length > 0 && !disabled;
-
-  const handleSubmit = (event: FormEvent): void => {
-    event.preventDefault();
-    if (canSend) onSubmit();
+function Composer({ value, onChange, onSubmit, pending, placeholder, autoFocus }: ComposerProps) {
+  const canSend = value.trim().length > 0 && !pending;
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (canSend) onSubmit();
+    }
   };
-
   return (
-    <form className={`help-ask help-ask--${variant}`} onSubmit={handleSubmit} role="search">
-      <Search className="help-ask__icon" size={variant === 'hero' ? 20 : 18} aria-hidden="true" />
-      <input
-        ref={inputRef}
-        className="help-ask__input"
-        type="text"
+    <div className="ticket-composer">
+      <textarea
+        className="ticket-input"
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={variant === 'hero' ? 'Escribe tu pregunta…' : 'Pregunta otra cosa…'}
-        aria-label="Escribe tu pregunta"
-        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        rows={1}
+        placeholder={placeholder}
+        disabled={pending}
+        autoFocus={autoFocus}
         data-testid="help-search"
         enterKeyHint="send"
       />
-      {busy ? (
-        <button
-          type="button"
-          className="help-ask__send help-ask__send--stop"
-          onClick={onStop}
-          aria-label="Detener"
-          title="Detener"
-          data-testid="help-stop"
-        >
-          {status === 'submitted' ? (
-            <Loader2 size={16} className="help-ask__spin" aria-hidden="true" />
-          ) : (
-            <Square size={15} aria-hidden="true" />
-          )}
-        </button>
-      ) : (
-        <button
-          type="submit"
-          className="help-ask__send"
-          disabled={!canSend}
-          aria-label="Enviar"
-          title="Enviar"
-          data-testid="help-send"
-        >
-          <ArrowUp size={variant === 'hero' ? 18 : 16} aria-hidden="true" />
-        </button>
-      )}
-    </form>
+      <button
+        type="button"
+        className="ticket-send"
+        onClick={onSubmit}
+        disabled={!canSend}
+        aria-label="Enviar"
+        data-testid="help-send"
+      >
+        {pending ? (
+          <Loader2 size={16} className="ticket-spin" aria-hidden="true" />
+        ) : (
+          <ArrowUp size={16} aria-hidden="true" />
+        )}
+      </button>
+    </div>
   );
 }
 
-// ── Un turno (pregunta + respuesta en modo documento) ───────────────────────────────────────
+// ── Burbuja de mensaje ───────────────────────────────────────────────────────────
 
-interface HelpTurnProps {
-  question: string;
-  answer: string;
-  /** True en el turno en vivo sin respuesta aún: pinta el indicador «Pensando». */
-  streaming: boolean;
+function Bubble({ message }: { message: SupportMessage }) {
+  const mine = message.author === 'user';
+  const who = message.author === 'agent' ? 'Soporte' : message.author === 'ai' ? 'Asistente' : 'Tú';
+  return (
+    <div className={`ticket-msg ticket-msg--${mine ? 'user' : message.author}`}>
+      {!mine && <span className="ticket-msg-author">{who}</span>}
+      <div className="ticket-msg-body">
+        {mine ? message.body : <ChatMarkdown>{message.body}</ChatMarkdown>}
+      </div>
+    </div>
+  );
 }
 
-function HelpTurn({ question, answer, streaming }: HelpTurnProps) {
+// ── Sidebar: lista de tickets ──────────────────────────────────────────────────────
+
+interface SidebarProps {
+  tickets: Ticket[];
+  selectedId: string | null;
+  unread: ReadonlySet<string>;
+  onSelect: (id: string) => void;
+  onNew: () => void;
+}
+
+function Sidebar({ tickets, selectedId, unread, onSelect, onNew }: SidebarProps) {
   return (
-    <article className="help-turn">
-      {question ? (
-        <>
-          <p className="help-turn__eyebrow">Tu pregunta</p>
-          <h2 className="help-turn__q">{question}</h2>
-          <hr className="help-rule" />
-        </>
-      ) : null}
-      <div className="help-answer" aria-live={streaming ? 'polite' : undefined}>
-        {answer ? (
-          <ChatMarkdown>{answer}</ChatMarkdown>
+    <aside className="ticket-sidebar" data-testid="ticket-sidebar">
+      <button type="button" className="ticket-new-btn" onClick={onNew} data-testid="ticket-new">
+        <Plus size={16} aria-hidden="true" /> Nueva consulta
+      </button>
+      <div className="ticket-list">
+        {tickets.length === 0 ? (
+          <p className="ticket-empty">Aún no tienes consultas de soporte.</p>
         ) : (
-          streaming && (
-            <p className="help-thinking" role="status">
-              <span className="help-thinking__dots" aria-hidden="true">
-                <i />
-                <i />
-                <i />
+          tickets.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className={`ticket-item${t.id === selectedId ? ' is-active' : ''}`}
+              onClick={() => onSelect(t.id)}
+            >
+              <span className="ticket-item-top">
+                <span className="ticket-item-num">#{t.number ?? '—'}</span>
+                <span className={`ticket-badge ticket-badge--${t.status}`}>
+                  {t.status === 'open' ? 'Abierto' : 'Cerrado'}
+                </span>
+                {unread.has(t.id) && (
+                  <span className="ticket-unread" aria-label="Mensajes nuevos" />
+                )}
               </span>
-              Pensando…
-            </p>
-          )
+              <span className="ticket-item-title">{t.title ?? 'Consulta'}</span>
+            </button>
+          ))
         )}
       </div>
-    </article>
+    </aside>
   );
 }
 
-// ── Chips de pregunta (arranque y seguimiento), envolventes ─────────────────────────────────
-
-interface HelpChipsProps {
-  suggestions: string[];
-  onPick: (text: string) => void;
-}
-
-function HelpChips({ suggestions, onPick }: HelpChipsProps) {
-  return (
-    <div className="help-chips">
-      {suggestions.map((suggestion) => (
-        <button
-          key={suggestion}
-          type="button"
-          className="help-chip"
-          onClick={() => onPick(suggestion)}
-        >
-          {suggestion}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ── Pie tras una respuesta cerrada: utilidad + seguir preguntando ───────────────────────────
-
-interface AnswerFooterProps {
-  suggestions: string[];
-  onSuggest: (text: string) => void;
-}
-
-function AnswerFooter({ suggestions, onSuggest }: AnswerFooterProps) {
-  // Voto local (aún sin endpoint de persistencia): agradece y se queda marcado en la sesión.
-  const [vote, setVote] = useState<'up' | 'down' | null>(null);
-
-  return (
-    <div className="help-foot">
-      <div className="help-foot__row">
-        {vote ? (
-          <p className="help-helpful help-helpful--done" role="status">
-            ¡Gracias por tu opinión!
-          </p>
-        ) : (
-          <p className="help-helpful">
-            ¿Te ha resultado útil?
-            <button
-              type="button"
-              className="help-vote"
-              onClick={() => setVote('up')}
-              aria-label="Sí, útil"
-            >
-              <ThumbsUp size={15} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="help-vote"
-              onClick={() => setVote('down')}
-              aria-label="No, poco útil"
-            >
-              <ThumbsDown size={15} aria-hidden="true" />
-            </button>
-          </p>
-        )}
-      </div>
-      {suggestions.length > 0 && (
-        <div className="help-followups">
-          <p className="help-followups__lbl">Sigue preguntando</p>
-          <HelpChips suggestions={suggestions} onPick={onSuggest} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Página ───────────────────────────────────────────────────────────────────────────────────
+// ── Página ───────────────────────────────────────────────────────────────────────
 
 export function HelpPage() {
-  usePageHeader('Ayuda', 'Centro de ayuda');
+  usePageHeader('Ayuda', 'Soporte');
 
   const view = viewContextFor('help');
-  const chat = useSupportChat();
-
+  const s = useSupportTickets();
   const [draft, setDraft] = useState('');
-  const barInputRef = useRef<HTMLInputElement>(null);
-
-  const turns = chat.turns;
-  const hasThread = turns.length > 0 || chat.pending;
-  const status: AskStatus = chat.pending ? 'submitted' : 'ready';
 
   const submit = (): void => {
     const text = draft.trim();
     if (!text) return;
-    chat.send(text);
+    s.send(text);
     setDraft('');
   };
 
-  // Al pasar a modo lectura, el foco salta a la barra anclada para seguir preguntando sin ratón.
-  useEffect(() => {
-    if (hasThread) barInputRef.current?.focus();
-  }, [hasThread]);
+  const pickSuggestion = (text: string): void => {
+    s.send(text);
+    setDraft('');
+  };
 
-  const errorBanner = chat.error && (
+  const errorBanner = s.error && (
     <div className="help-error" role="alert">
-      <span>{chat.error}</span>
-      <button type="button" onClick={chat.dismissError} aria-label="Descartar error">
+      <span>{s.error}</span>
+      <button type="button" onClick={s.dismissError} aria-label="Descartar error">
         ×
       </button>
     </div>
   );
 
-  // Aviso de que una persona de soporte está al cargo (tras escalar).
-  const humanBanner = chat.mode === 'human' && (
-    <p className="help-human" role="status" data-testid="help-human">
-      Estás hablando con nuestro equipo de soporte. Te responderemos por aquí.
-    </p>
-  );
+  // Mensajes a pintar: se omite el PRIMERO (es el título del ticket, ya mostrado en
+  // la cabecera, para no repetir el texto).
+  const threadMessages = s.messages.slice(1);
+  const open = s.selected?.status === 'open';
+  // Turno en vivo: tras enviar, el último mensaje es del usuario y esperamos respuesta.
+  const thinking =
+    s.pending && s.messages.length > 0 && s.messages[s.messages.length - 1]?.author === 'user';
 
-  // ── Reposo: landing centrado ──
-  if (!hasThread) {
-    return (
-      <section className="help-page" data-testid="help-page">
-        <section className="help-hero">
-          <p className="help-hero-eyebrow">Centro de ayuda</p>
-          <h1 className="help-hero-title">¿En qué podemos ayudarte?</h1>
-          <p className="help-hero-subtitle">
-            Pregunta lo que quieras sobre tu TPV y te respondo al momento. Si no puedo resolverlo,
-            lo derivo a una persona del equipo. Soporte de lunes a viernes, de 9:00 a 19:00.
-          </p>
-          <HelpAsk
-            variant="hero"
-            value={draft}
-            onChange={setDraft}
-            onSubmit={submit}
-            onStop={chat.stop}
-            status={status}
-            disabled={false}
-          />
-          <HelpChips
-            suggestions={view.suggestions}
-            onPick={(text) => {
-              setDraft('');
-              chat.send(text);
-            }}
-          />
-          {errorBanner}
-        </section>
-      </section>
-    );
-  }
-
-  // ── Lectura: documento + barra anclada abajo ──
   return (
-    <section className="help-page help-page--reading" data-testid="help-page">
-      <div className="help-doc-wrap">
-        <div className="help-doc">
-          {humanBanner}
-          {errorBanner}
-          {turns.map((turn, index) => {
-            const isLast = index === turns.length - 1;
-            const live = isLast && chat.pending && !turn.answer;
-            return (
-              <Fragment key={turn.id}>
-                <HelpTurn question={turn.question} answer={turn.answer} streaming={live} />
-                {isLast && !chat.pending && chat.mode === 'ai' && (
-                  <AnswerFooter
-                    suggestions={view.suggestions}
-                    onSuggest={(text) => {
-                      setDraft('');
-                      chat.send(text);
-                    }}
-                  />
+    <section className="help-tickets" data-testid="help-page">
+      <Sidebar
+        tickets={s.tickets}
+        selectedId={s.selectedId}
+        unread={s.unread}
+        onSelect={s.selectTicket}
+        onNew={() => {
+          s.startNew();
+          setDraft('');
+        }}
+      />
+
+      <main className="ticket-main">
+        {s.selectedId === null ? (
+          // ── Nueva consulta ──
+          <section className="ticket-hero">
+            <p className="ticket-hero-eyebrow">
+              <LifeBuoy size={16} aria-hidden="true" /> Centro de ayuda
+            </p>
+            <h1 className="ticket-hero-title">¿En qué podemos ayudarte?</h1>
+            <p className="ticket-hero-subtitle">
+              Cuéntanos tu consulta. Te respondo al momento y, si no puedo resolverlo, lo derivo a
+              una persona del equipo. Tu primer mensaje será el título del ticket.
+            </p>
+            {errorBanner}
+            <Composer
+              value={draft}
+              onChange={setDraft}
+              onSubmit={submit}
+              pending={s.pending}
+              placeholder="Escribe tu consulta…"
+              autoFocus
+            />
+            <div className="ticket-chips">
+              {view.suggestions.map((sug) => (
+                <button
+                  key={sug}
+                  type="button"
+                  className="ticket-chip"
+                  onClick={() => pickSuggestion(sug)}
+                  disabled={s.pending}
+                >
+                  {sug}
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : (
+          // ── Ticket seleccionado ──
+          <section className="ticket-view">
+            <header className="ticket-view-head">
+              <div className="ticket-view-title">
+                <span className="ticket-view-num">#{s.selected?.number ?? '—'}</span>
+                <h2>{s.selected?.title ?? 'Consulta'}</h2>
+              </div>
+              <div className="ticket-view-actions">
+                <span className={`ticket-badge ticket-badge--${s.selected?.status ?? 'open'}`}>
+                  {open ? 'Abierto' : 'Cerrado'}
+                </span>
+                {open && (
+                  <button
+                    type="button"
+                    className="ticket-close-btn"
+                    onClick={s.closeSelected}
+                    data-testid="ticket-close"
+                  >
+                    Cerrar ticket
+                  </button>
                 )}
-              </Fragment>
-            );
-          })}
-        </div>
-      </div>
-      <div className="help-askbar-outer">
-        <div className="help-askbar">
-          <HelpAsk
-            variant="bar"
-            inputRef={barInputRef}
-            value={draft}
-            onChange={setDraft}
-            onSubmit={submit}
-            onStop={chat.stop}
-            status={status}
-            disabled={false}
-          />
-        </div>
-      </div>
+              </div>
+            </header>
+
+            <div className="ticket-thread" data-testid="ticket-thread">
+              {s.loadingThread ? (
+                <p className="ticket-loading">
+                  <Loader2 size={16} className="ticket-spin" aria-hidden="true" /> Cargando…
+                </p>
+              ) : (
+                <>
+                  {threadMessages.map((m) => (
+                    <Bubble key={m.id} message={m} />
+                  ))}
+                  {thinking && (
+                    <div className="ticket-msg ticket-msg--ai">
+                      <span className="ticket-msg-author">Asistente</span>
+                      <div className="ticket-msg-body ticket-thinking" role="status">
+                        <span className="ticket-thinking-dots" aria-hidden="true">
+                          <i />
+                          <i />
+                          <i />
+                        </span>
+                        Pensando…
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {errorBanner}
+
+            {open ? (
+              <Composer
+                value={draft}
+                onChange={setDraft}
+                onSubmit={submit}
+                pending={s.pending}
+                placeholder="Escribe un mensaje…"
+              />
+            ) : (
+              <div className="ticket-closed-note" data-testid="ticket-closed-note">
+                <Lock size={15} aria-hidden="true" />
+                <span>Este ticket está cerrado.</span>
+                <button
+                  type="button"
+                  className="ticket-closed-new"
+                  onClick={() => {
+                    s.startNew();
+                    setDraft('');
+                  }}
+                >
+                  Abrir una consulta nueva
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+      </main>
     </section>
   );
 }
