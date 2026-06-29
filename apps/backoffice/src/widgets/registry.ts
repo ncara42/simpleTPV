@@ -52,6 +52,13 @@ export const WIDGET_LABELS: Record<string, string> = {
   'mini-familias': 'Mini · top familias',
   'mini-heatmap': 'Mini · heatmap horario',
   'mini-columnas': 'Mini · columnas por hora',
+  // Sección 09 · Listas y tablas (rediseño)
+  'tabla-simple': 'Ventas por tienda (lista)',
+  'tabla-avatar': 'Vendedores (con avatar)',
+  'tabla-estado': 'Estado de stock',
+  'tabla-variacion': 'Variación por tienda',
+  'tabla-ranking': 'Ranking de productos (tabla)',
+  'tabla-tareas': 'Tareas de reposición',
 };
 
 // Tipo de widget en el registry. Los del catálogo son 'kpi' o 'panel' (su render lo posee

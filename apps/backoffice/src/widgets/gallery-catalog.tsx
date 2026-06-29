@@ -830,6 +830,193 @@ function ThumbMiniColumns(): ReactNode {
   );
 }
 
+// ── Sección 09 · Listas y tablas: miniaturas de filas (rótulo + valor / badge / chip / checkbox) ──
+
+// Tres filas «rótulo … valor» con divisor fino.
+function ThumbTblSimple(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[14, 32, 50].map((y, i) => (
+        <g key={i}>
+          <rect x={8} y={y - 4} width={52} height={6} rx={3} fill={SOFT_BLUE} />
+          <rect x={98} y={y - 4} width={26} height={6} rx={3} fill="var(--ui-brand)" />
+          {i < 2 ? (
+            <line x1={8} y1={y + 9} x2={124} y2={y + 9} stroke="var(--ui-border)" strokeWidth={1} />
+          ) : null}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// Tres filas con avatar cuadrado (el 1º en acento) + rótulo + valor.
+function ThumbTblAvatar(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[12, 30, 48].map((y, i) => (
+        <g key={i}>
+          <rect
+            x={8}
+            y={y}
+            width={14}
+            height={14}
+            rx={4}
+            fill={i === 0 ? 'var(--ui-brand)' : SOFT_BLUE}
+          />
+          <rect x={28} y={y + 4} width={60} height={6} rx={3} fill={SOFT_BLUE} />
+          <rect x={108} y={y + 4} width={16} height={6} rx={3} fill="var(--ui-brand)" />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// Tres filas con rótulo + badge de estado (danger / warning / success).
+function ThumbTblStatus(): ReactNode {
+  const tones = ['var(--ui-danger)', 'var(--ui-warning)', 'var(--ui-success)'];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[14, 32, 50].map((y, i) => (
+        <g key={i}>
+          <rect x={8} y={y - 4} width={48} height={6} rx={3} fill={SOFT_BLUE} />
+          <rect x={92} y={y - 6} width={32} height={12} rx={6} fill={tones[i]} opacity={0.9} />
+          {i < 2 ? (
+            <line x1={8} y1={y + 9} x2={124} y2={y + 9} stroke="var(--ui-border)" strokeWidth={1} />
+          ) : null}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// Tres filas con rótulo + variación con flecha (▲ verde / ▲ verde / ▼ roja).
+function ThumbTblVariation(): ReactNode {
+  const rows = [
+    { c: 'var(--ui-success)', up: true },
+    { c: 'var(--ui-success)', up: true },
+    { c: 'var(--ui-danger)', up: false },
+  ];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {rows.map((r, i) => {
+        const y = 14 + i * 18;
+        const tri = r.up
+          ? `${100},${y + 2} ${106},${y - 5} ${112},${y + 2}`
+          : `${100},${y - 5} ${106},${y + 2} ${112},${y - 5}`;
+        return (
+          <g key={i}>
+            <rect x={8} y={y - 4} width={56} height={6} rx={3} fill={SOFT_BLUE} />
+            <polygon points={tri} fill={r.c} />
+            <rect x={116} y={y - 4} width={10} height={5} rx={2.5} fill={r.c} />
+            {i < 2 ? (
+              <line
+                x1={8}
+                y1={y + 9}
+                x2={124}
+                y2={y + 9}
+                stroke="var(--ui-border)"
+                strokeWidth={1}
+              />
+            ) : null}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// Tres filas con chip de puesto (1 en acento) + rótulo + valor.
+function ThumbTblRanking(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[12, 30, 48].map((y, i) => (
+        <g key={i}>
+          <rect
+            x={8}
+            y={y}
+            width={13}
+            height={13}
+            rx={3.5}
+            fill={i === 0 ? 'var(--ui-brand)' : SOFT_BLUE}
+          />
+          <rect x={28} y={y + 4} width={58} height={6} rx={3} fill={SOFT_BLUE} />
+          <rect x={104} y={y + 4} width={20} height={6} rx={3} fill="var(--ui-brand)" />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// Tres filas con checkbox (1ª hecha = acento) + rótulo (1º tachado).
+function ThumbTblTasks(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {[12, 30, 48].map((y, i) => (
+        <g key={i}>
+          <rect
+            x={8}
+            y={y}
+            width={13}
+            height={13}
+            rx={3.5}
+            fill={i === 0 ? 'var(--ui-brand)' : 'none'}
+            stroke={i === 0 ? 'none' : 'var(--ui-border-strong)'}
+            strokeWidth={1.5}
+          />
+          <rect
+            x={28}
+            y={y + 4}
+            width={84}
+            height={6}
+            rx={3}
+            fill={i === 0 ? 'var(--ui-surface-subtle)' : SOFT_BLUE}
+          />
+          {i === 0 ? (
+            <line
+              x1={28}
+              y1={y + 7}
+              x2={112}
+              y2={y + 7}
+              stroke="var(--ui-text-muted)"
+              strokeWidth={1.5}
+            />
+          ) : null}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 // Entradas de la galería (se amplía por tandas).
 export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
   // Sección 01 · KPIs
@@ -1034,5 +1221,48 @@ export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
     category: 'mini',
     description: 'Ventas por hora; punta en acento',
     thumbnail: <ThumbMiniColumns />,
+  },
+  // Sección 09 · Listas y tablas
+  {
+    id: 'tabla-simple',
+    label: 'Ventas por tienda (lista)',
+    category: 'listas-tablas',
+    description: 'Facturación de hoy por tienda',
+    thumbnail: <ThumbTblSimple />,
+  },
+  {
+    id: 'tabla-avatar',
+    label: 'Vendedores (con avatar)',
+    category: 'listas-tablas',
+    description: 'Vendedores con iniciales y tickets',
+    thumbnail: <ThumbTblAvatar />,
+  },
+  {
+    id: 'tabla-estado',
+    label: 'Estado de stock',
+    category: 'listas-tablas',
+    description: 'Productos con badge Agotado/Bajo/OK',
+    thumbnail: <ThumbTblStatus />,
+  },
+  {
+    id: 'tabla-variacion',
+    label: 'Variación por tienda',
+    category: 'listas-tablas',
+    description: 'Tiendas con ▲/▼ frente a ayer',
+    thumbnail: <ThumbTblVariation />,
+  },
+  {
+    id: 'tabla-ranking',
+    label: 'Ranking de productos (tabla)',
+    category: 'listas-tablas',
+    description: 'Top de productos con puesto y €',
+    thumbnail: <ThumbTblRanking />,
+  },
+  {
+    id: 'tabla-tareas',
+    label: 'Tareas de reposición',
+    category: 'listas-tablas',
+    description: 'Checklist de reposición por alertas',
+    thumbnail: <ThumbTblTasks />,
   },
 ];

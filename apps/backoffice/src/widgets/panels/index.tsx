@@ -23,6 +23,14 @@ import {
   MiniTopFamilies,
   MiniTrendLine,
 } from './mini.js';
+import {
+  AvatarList,
+  RankingList,
+  SimpleList,
+  StatusList,
+  TaskList,
+  VariationList,
+} from './tabla.js';
 import type { PanelProps } from './types.js';
 
 // Registro de RENDER de los widgets del rediseño. Una entrada por widget; se amplía por tandas (cada
@@ -63,6 +71,13 @@ export const WIDGET_PANELS: Record<string, (props: PanelProps) => ReactElement> 
   'mini-familias': MiniTopFamilies,
   'mini-heatmap': MiniHourHeatmap,
   'mini-columnas': MiniHourColumns,
+  // Sección 09 · Listas y tablas
+  'tabla-simple': SimpleList,
+  'tabla-avatar': AvatarList,
+  'tabla-estado': StatusList,
+  'tabla-variacion': VariationList,
+  'tabla-ranking': RankingList,
+  'tabla-tareas': TaskList,
 };
 
 // Ids de los widgets con render (para el test de paridad con el catálogo).

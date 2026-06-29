@@ -85,6 +85,13 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'mini-familias': { w: 3, h: 1 },
   'mini-heatmap': { w: 3, h: 1 },
   'mini-columnas': { w: 3, h: 1 },
+  // Sección 09 · Listas y tablas (rediseño): tarjetas de filas (hasta 6 filas → tile medio).
+  'tabla-simple': { w: 4, h: 2 },
+  'tabla-avatar': { w: 4, h: 2 },
+  'tabla-estado': { w: 4, h: 2 },
+  'tabla-variacion': { w: 4, h: 2 },
+  'tabla-ranking': { w: 4, h: 2 },
+  'tabla-tareas': { w: 4, h: 2 },
 };
 
 const DEFAULT_SPEC = { w: 4, h: 2 };
