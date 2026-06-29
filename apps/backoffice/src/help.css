@@ -20,22 +20,45 @@
   flex-direction: column;
   gap: var(--ui-space-10);
 }
-/* En modo lectura el askbar va pegado arriba: sin separación de página. */
+
+/* En reposo, el HERO ocupa toda la pantalla EXACTAMENTE como la card de Catálogo/Inventario:
+   misma reducción del padding de la superficie (sin reservar los 6rem del dock del asistente)
+   y misma altura explícita anclada al viewport. Así Ayuda y las tablas de Catálogo llegan a
+   los mismos bordes. Scopeado con `:has` para no tocar otras vistas ni el modo lectura. */
+/* Reposo: padding reducido + altura fija como Catálogo */
+.bo-main--surface:has(> .help-page:not(.help-page--reading)) {
+  padding: 0.4rem 1.25rem 1.5rem;
+}
+.help-page:not(.help-page--reading) {
+  /* Offset = topbar (60px) + padding-top (0.4rem) + padding-bottom (1.5rem) = 1.9rem. */
+  height: calc(100dvh - 60px - 1.9rem);
+}
+/* Lectura: misma superficie y altura para que el sticky bottom funcione */
+.bo-main--surface:has(> .help-page--reading) {
+  padding: 0.4rem 1.25rem 1.5rem;
+}
 .help-page--reading {
+  height: calc(100dvh - 60px - 1.9rem);
+  display: flex;
+  flex-direction: column;
   gap: 0;
 }
 
 /* ── Hero recesado (estado de reposo) ──────────────────────────────────────── */
 .help-hero {
+  /* Estira para llenar `.help-page` (que a su vez llena el área de contenido), de modo
+     que la card ocupe toda la pantalla; el contenido queda centrado en vertical. */
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   text-align: center;
   gap: var(--ui-space-5);
   padding: clamp(2.5rem, 1.4rem + 5vw, 5rem) var(--ui-space-6);
   background: var(--ui-surface-subtle);
   border: 1px solid var(--ui-border);
-  border-radius: 24px;
+  border-radius: var(--ui-radius-xl);
 }
 
 .help-hero-eyebrow {
@@ -102,7 +125,7 @@
 .help-ask--hero .help-ask__input {
   height: 3.75rem;
   padding: 0 3.75rem 0 3.25rem;
-  font-size: var(--ui-text-md);
+  font-size: var(--ui-text-lg);
   border-radius: 14px;
 }
 .help-ask--bar .help-ask__input {
@@ -209,25 +232,35 @@
   box-shadow: var(--ui-focus);
 }
 
-/* ── Modo lectura: barra anclada + documento ───────────────────────────────── */
+/* ── Modo lectura: documento arriba, barra anclada abajo ──────────────────── */
+/* El scroll y el fade viven en el wrapper para que la máscara cubra el área
+   visible completa y el contenido desaparezca justo antes del input. */
+.help-doc-wrap {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  /* Gradiente de fade en los últimos 4rem: el texto se desvanece hacia el input */
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 4rem), transparent 100%);
+  mask-image: linear-gradient(to bottom, black calc(100% - 4rem), transparent 100%);
+}
+.help-doc {
+  width: 100%;
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: var(--ui-space-7) 0 var(--ui-space-8);
+}
 .help-askbar-outer {
   position: sticky;
-  top: 0;
+  bottom: 0;
   z-index: 5;
   padding-block: var(--ui-space-3);
   background: color-mix(in srgb, var(--ui-bg) 85%, transparent);
   backdrop-filter: blur(8px) saturate(1.4);
-  border-bottom: 1px solid var(--ui-border);
+  border-top: 1px solid var(--ui-border);
 }
 .help-askbar {
   max-width: 46rem;
   margin: 0 auto;
-}
-.help-doc {
-  width: 100%;
-  max-width: 46rem; /* ~72ch: medida de línea cómoda para lectura larga */
-  margin: 0 auto;
-  padding-top: var(--ui-space-7);
 }
 
 /* ── Un turno (pregunta + respuesta) ───────────────────────────────────────── */

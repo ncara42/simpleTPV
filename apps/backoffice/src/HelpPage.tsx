@@ -326,9 +326,33 @@ export function HelpPage() {
     );
   }
 
-  // ── Lectura: barra anclada + respuesta como documento ──
+  // ── Lectura: documento + barra anclada abajo ──
   return (
     <section className="help-page help-page--reading" data-testid="help-page">
+      <div className="help-doc-wrap">
+        <div className="help-doc">
+          {errorBanner}
+          {turns.map((turn, index) => {
+            const isLast = index === turns.length - 1;
+            const live = isLast && chat.streaming;
+            const answer = live ? chat.streamingText : turn.answer;
+            return (
+              <Fragment key={turn.id}>
+                <HelpTurn question={turn.question} answer={answer} streaming={live} />
+                {isLast && !chat.streaming && (
+                  <AnswerFooter
+                    suggestions={view.suggestions}
+                    onSuggest={(text) => {
+                      setDraft('');
+                      chat.send(text);
+                    }}
+                  />
+                )}
+              </Fragment>
+            );
+          })}
+        </div>
+      </div>
       <div className="help-askbar-outer">
         <div className="help-askbar">
           <HelpAsk
@@ -342,28 +366,6 @@ export function HelpPage() {
             disabled={disabled}
           />
         </div>
-      </div>
-      <div className="help-doc">
-        {errorBanner}
-        {turns.map((turn, index) => {
-          const isLast = index === turns.length - 1;
-          const live = isLast && chat.streaming;
-          const answer = live ? chat.streamingText : turn.answer;
-          return (
-            <Fragment key={turn.id}>
-              <HelpTurn question={turn.question} answer={answer} streaming={live} />
-              {isLast && !chat.streaming && (
-                <AnswerFooter
-                  suggestions={view.suggestions}
-                  onSuggest={(text) => {
-                    setDraft('');
-                    chat.send(text);
-                  }}
-                />
-              )}
-            </Fragment>
-          );
-        })}
       </div>
     </section>
   );
