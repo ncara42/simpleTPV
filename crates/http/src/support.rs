@@ -133,9 +133,7 @@ pub async fn send_message(
     let org = user.organization_id;
     let pool = state.db();
 
-    let ticket = support::get_ticket(pool, org, id)
-        .await
-        .map_err(ApiError::from)?;
+    let ticket = get_owned_ticket(pool, org, user.user_id, id).await?;
     // Ticket cerrado = solo lectura: para seguir, el usuario abre uno nuevo.
     if ticket.status == "closed" {
         return Err(AppError::Conflict.into());
@@ -166,9 +164,7 @@ pub async fn get_ticket_messages(
 ) -> Result<Json<TicketThread>, ApiError> {
     let org = user.organization_id;
     let pool = state.db();
-    let ticket = support::get_ticket(pool, org, id)
-        .await
-        .map_err(ApiError::from)?;
+    let ticket = get_owned_ticket(pool, org, user.user_id, id).await?;
     let messages = support::get_messages(pool, org, id)
         .await
         .map_err(ApiError::from)?;
@@ -183,9 +179,7 @@ pub async fn close_ticket(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     let org = user.organization_id;
-    let ticket = support::get_ticket(state.db(), org, id)
-        .await
-        .map_err(ApiError::from)?;
+    let ticket = get_owned_ticket(state.db(), org, user.user_id, id).await?;
     support::close_ticket(state.db(), org, id)
         .await
         .map_err(ApiError::from)?;
@@ -467,6 +461,25 @@ async fn persist_message(
         },
     )
     .await
+}
+
+/// Obtiene un ticket comprobando que pertenece al usuario (tickets por usuario): un
+/// usuario no puede ver/escribir/cerrar tickets de otro de su misma organización. Si
+/// el ticket es de otro, responde 404 (no se filtra su existencia). `author_user_id`
+/// None = legacy: se permite dentro de la organización.
+async fn get_owned_ticket(
+    pool: &sqlx::PgPool,
+    org: Uuid,
+    user_id: Uuid,
+    id: Uuid,
+) -> Result<SupportConversationRow, ApiError> {
+    let ticket = support::get_ticket(pool, org, id)
+        .await
+        .map_err(ApiError::from)?;
+    if ticket.author_user_id.is_some_and(|a| a != user_id) {
+        return Err(AppError::NotFound.into());
+    }
+    Ok(ticket)
 }
 
 fn clean_message(raw: &str) -> Result<String, ApiError> {
