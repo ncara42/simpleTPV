@@ -66,7 +66,9 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   // Sección 05 · Compactos (rediseño): tiles pequeños (ribbon, donut, treemap, top, cifra-héroe).
   'cmp-ribbon': { w: 3, h: 2 },
   'cmp-donut': { w: 3, h: 2 },
-  'cmp-treemap': { w: 3, h: 2 },
+  // Treemap «Mix por familia»: el handoff lo dibuja ancho (1.7fr) → necesita ancho para que las áreas y
+  // los nombres respiren (a w:3 se aprietan). Por eso arranca más ancho que el resto de compactos.
+  'cmp-treemap': { w: 5, h: 2 },
   'cmp-leaderboard': { w: 3, h: 3 },
   'cmp-hero': { w: 5, h: 2 },
   // Sección 06 · Diagnóstico (rediseño): feed de actividad (lista alta).
@@ -104,6 +106,92 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
 };
 
 const DEFAULT_SPEC = { w: 4, h: 2 };
+
+// ── Límites de tamaño por widget (auditoría 2026-06-29) ───────────────────────────────────────────
+// Aunque los widgets son responsivos (llenan su tile vía el contrato `fit`), su TILE debe mantener un
+// tamaño coherente con lo que el widget ES. Estos rangos (en UNIDADES de rejilla de 12 col) acotan el
+// tamaño: una mini-gráfica no crece a media pantalla, una tabla no queda en 1×1 ilegible, un donut no se
+// deforma a ancho completo, etc. El tamaño de catálogo (`ITEM_SPECS`) SIEMPRE cae dentro de su rango
+// (verificado por test). Se aplican al cargar/migrar cualquier layout (`migrateFreeElement`).
+export interface SizeBounds {
+  minW: number;
+  maxW: number;
+  minH: number;
+  maxH: number;
+}
+// Suelo/techo genérico (widgets sin rango propio: genéricos/compuestos del compositor IA).
+export const DEFAULT_SIZE_BOUNDS: SizeBounds = { minW: 2, maxW: 8, minH: 1, maxH: 5 };
+export const WIDGET_SIZE_BOUNDS: Record<string, SizeBounds> = {
+  // Clásicos (gráficas grandes)
+  'dash-bars': { minW: 4, maxW: 12, minH: 2, maxH: 4 },
+  'dash-hour': { minW: 4, maxW: 12, minH: 2, maxH: 4 },
+  // 01 · KPIs
+  'kpi-grid-connected': { minW: 6, maxW: 12, minH: 1, maxH: 2 }, // tira ancha de 6 celdas
+  'kpi-classic': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
+  // 02 · Gráficas medias (necesitan ancho para el eje X)
+  'graf-hour-area': { minW: 4, maxW: 8, minH: 2, maxH: 4 },
+  'graf-store-bars': { minW: 4, maxW: 8, minH: 2, maxH: 4 },
+  'graf-heatmap': { minW: 4, maxW: 8, minH: 2, maxH: 4 },
+  // 03 · Listas (leyenda + barras de altura ~fija → maxH menor que tabla)
+  'lista-familia': { minW: 3, maxW: 6, minH: 2, maxH: 4 },
+  'lista-rankings': { minW: 3, maxW: 6, minH: 2, maxH: 4 },
+  'lista-mix': { minW: 3, maxW: 6, minH: 2, maxH: 4 },
+  // 05 · Compactos
+  'cmp-ribbon': { minW: 2, maxW: 5, minH: 1, maxH: 3 },
+  'cmp-donut': { minW: 2, maxW: 5, minH: 1, maxH: 3 }, // figura ~cuadrada, sin ancho completo
+  'cmp-treemap': { minW: 4, maxW: 8, minH: 2, maxH: 4 }, // áreas 2D → ancho
+  'cmp-leaderboard': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
+  'cmp-hero': { minW: 3, maxW: 8, minH: 1, maxH: 3 }, // ancha y baja
+  // 06 · Diagnóstico (feed de items)
+  'diag-actividad': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
+  // 07 · KPIs · más formatos (cifra + sparkline)
+  'kpi-dual': { minW: 2, maxW: 5, minH: 1, maxH: 3 },
+  'kpi-area': { minW: 2, maxW: 5, minH: 1, maxH: 3 },
+  'kpi-alerta': { minW: 2, maxW: 5, minH: 1, maxH: 3 },
+  'kpi-7dias': { minW: 2, maxW: 5, minH: 1, maxH: 3 },
+  // 08 · Mini gráficas (de bolsillo)
+  'mini-tiendas': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
+  'mini-tendencia': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
+  'mini-acumulado': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
+  'mini-donut': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
+  'mini-gauge': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
+  'mini-familias': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
+  'mini-heatmap': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
+  'mini-columnas': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
+  // 09 · Listas y tablas (hasta 6 filas → alto generoso)
+  'tabla-simple': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
+  'tabla-avatar': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
+  'tabla-estado': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
+  'tabla-variacion': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
+  'tabla-ranking': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
+  'tabla-tareas': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
+  // 10 · Estado y progreso
+  'estado-pasos': { minW: 3, maxW: 6, minH: 1, maxH: 2 }, // stepper ancho-bajo
+  'estado-operativo': { minW: 2, maxW: 3, minH: 1, maxH: 2 }, // badge pequeño
+  'estado-cumplimiento': { minW: 2, maxW: 4, minH: 1, maxH: 2 },
+  // 11 · Especializados
+  'esp-proveedores': { minW: 3, maxW: 6, minH: 2, maxH: 5 },
+  'esp-matriz': { minW: 3, maxW: 6, minH: 2, maxH: 4 },
+  'esp-tiendas': { minW: 2, maxW: 5, minH: 2, maxH: 5 },
+  'esp-resumen-ejecutivo': { minW: 6, maxW: 12, minH: 1, maxH: 3 }, // banner a todo lo ancho
+};
+
+// Rango de un widget (cae al genérico si no tiene propio).
+export function widgetSizeBounds(id: string): SizeBounds {
+  return WIDGET_SIZE_BOUNDS[id] ?? DEFAULT_SIZE_BOUNDS;
+}
+// Clampa un tamaño en UNIDADES de rejilla al rango coherente del widget.
+export function clampWidgetUnits(
+  id: string,
+  cols: number,
+  rows: number,
+): { cols: number; rows: number } {
+  const b = widgetSizeBounds(id);
+  return {
+    cols: Math.min(b.maxW, Math.max(b.minW, Math.round(cols))),
+    rows: Math.min(b.maxH, Math.max(b.minH, Math.round(rows))),
+  };
+}
 
 // Ids (cards + paneles) de un preset, en orden canónico de colocación.
 export function presetItemIds(preset: PresetDef): string[] {
@@ -567,6 +655,15 @@ export function freeUnitsFromPx(w: number, h: number): { cols: number; rows: num
   return { cols, rows };
 }
 
+// Clampa un tamaño en PÍXELES del lienzo al rango coherente del widget: pasa a unidades de rejilla
+// (`freeUnitsFromPx`), acota a [minW,maxW]×[minH,maxH] (`clampWidgetUnits`) y vuelve a píxeles de mundo.
+// Es la barrera que aplica los límites a CUALQUIER tamaño que entre por un layout guardado/compuesto.
+export function clampWidgetPx(id: string, w: number, h: number): { w: number; h: number } {
+  const { cols, rows } = freeUnitsFromPx(w, h);
+  const c = clampWidgetUnits(id, cols, rows);
+  return { w: c.cols * FREE_COL - FREE_GAP, h: c.rows * FREE_ROW - FREE_GAP };
+}
+
 // Tamaño por defecto de una nota nueva (px de mundo).
 export const NOTE_DEFAULT = { w: 240, h: 180 };
 
@@ -660,14 +757,20 @@ function migrateFreeElement(raw: unknown, index: number): FreeElement | null {
   const widgetId =
     typeof o.widgetId === 'string' ? o.widgetId : typeof o.i === 'string' ? o.i : null;
   if (!widgetId) return null;
+  // Tamaño persistido → clamp a los límites coherentes del widget. Un tamaño ausente/0 cae a su tamaño
+  // de catálogo (`freeItemSize`) antes de clampar, así nunca queda invisible (w/h=0).
+  const def = freeItemSize(widgetId);
+  const rawW = toFiniteNumber(o.w, 0);
+  const rawH = toFiniteNumber(o.h, 0);
+  const sized = clampWidgetPx(widgetId, rawW > 0 ? rawW : def.w, rawH > 0 ? rawH : def.h);
   return {
     kind: 'widget',
     id: typeof o.id === 'string' ? o.id : widgetId,
     widgetId,
     x,
     y,
-    w: toFiniteNumber(o.w, 0),
-    h: toFiniteNumber(o.h, 0),
+    w: sized.w,
+    h: sized.h,
     z,
   };
 }

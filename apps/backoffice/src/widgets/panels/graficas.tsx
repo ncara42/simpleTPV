@@ -76,7 +76,7 @@ export function HourHeatmap({ store }: PanelProps): ReactElement {
   const hoveredData = hoveredHour !== null ? byHour.get(hoveredHour) : undefined;
 
   return (
-    <PanelShell id="graf-heatmap" bare>
+    <PanelShell id="graf-heatmap" fit="stretch" bare>
       <div className="hm-panel" ref={panelRef}>
         <div className="hm-head">
           <h3 className="hm-title">Mapa de calor horario</h3>
@@ -257,7 +257,7 @@ export function HourArea({ store }: PanelProps): ReactElement {
   const hoveredPoint = hoveredIdx !== null ? (points[hoveredIdx] ?? null) : null;
 
   return (
-    <PanelShell id="graf-hour-area" bare>
+    <PanelShell id="graf-hour-area" fit="stretch" bare>
       <div className="ha-panel">
         <div className="ha-head">
           <h3 className="ha-title">Distribución horaria</h3>

@@ -1254,9 +1254,18 @@
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-md);
   overflow: hidden;
+  /* Llena el tile cuando el panel lo estira (`fit=stretch`): así las dos métricas reparten el alto a
+     partes iguales en vez de quedar arriba con un hueco enorme debajo. Si el contenedor no tiene alto
+     definido (galería), `height:100%` resuelve a `auto` y no cambia nada. */
+  height: 100%;
 }
 .dv-kpidual-cell {
   padding: 16px 18px;
+  /* Cada celda toma la mitad del alto disponible y centra su contenido en vertical. */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 .dv-kpidual-cell + .dv-kpidual-cell {
   border-top: 1px solid var(--ui-border);

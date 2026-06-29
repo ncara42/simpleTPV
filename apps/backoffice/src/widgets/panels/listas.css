@@ -6,6 +6,12 @@
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg);
   padding: 20px 22px;
+  /* La tarjeta es la superficie (panel `bare`): debe LLENAR el tile (sin área transparente alrededor)
+     y repartir su contenido en columna; la lista/barra de abajo crece con `flex:1`. */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
 }
 .lc-title {
   font-size: 15px;
@@ -36,6 +42,11 @@
   flex-direction: column;
   gap: 14px;
   margin-top: 16px;
+  /* Llena el alto de la tarjeta; el nº de filas lo ajusta `useFitCount` (espaciado natural, sin filas
+     a medias). `overflow:hidden` evita derrames si el conteo se pasa por 1px. */
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 .fam-head {
   display: flex;
@@ -95,13 +106,14 @@
 .rk-head {
   margin-bottom: 14px;
 }
+/* Control segmentado: el track sutil (`--ui-surface-subtle`) ya lo define; sin borde gris propio para
+   no sumar una línea dentro del marco de `.lc-card`. */
 .rk-tabs {
   display: inline-flex;
   gap: 2px;
   padding: 3px;
   margin-bottom: 16px;
   background: var(--ui-surface-subtle);
-  border: 1px solid var(--ui-border);
   border-radius: 8px;
 }
 .rk-tab {
@@ -124,6 +136,10 @@
   display: flex;
   flex-direction: column;
   gap: 13px;
+  /* Llena el alto; el nº de filas lo ajusta `useFitCount` (espaciado natural, sin filas a medias). */
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 .rk-head-row {
   display: flex;
@@ -175,6 +191,9 @@
   display: flex;
   flex-direction: column;
   gap: 11px;
+  /* Reparte la leyenda en el alto restante de la tarjeta (sin hueco al fondo en tiles altos). */
+  flex: 1;
+  justify-content: space-between;
 }
 .mix-leg-row {
   display: flex;

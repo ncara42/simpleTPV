@@ -41,7 +41,8 @@
   display: flex;
   align-items: flex-end;
   gap: 7px;
-  height: 64px;
+  flex: 1;
+  min-height: 48px;
 }
 .mw-bars > span {
   flex: 1;
@@ -55,7 +56,8 @@
 /* ── Línea / Área: sparkline de alto fijo (64px), como en el handoff ── */
 .mw-svg {
   width: 100%;
-  height: 64px;
+  flex: 1;
+  min-height: 48px;
   display: block;
 }
 
@@ -79,7 +81,9 @@
   position: relative;
   width: 110px;
   height: 62px;
-  margin: 8px auto 0;
+  /* `auto` en los 4 lados → centra el semicírculo en el espacio libre de la tarjeta llena (panel
+     `fit=stretch`), sin pegarlo arriba (evitaba el hueco inferior). */
+  margin: auto;
 }
 .mw-gauge svg {
   width: 110px;
@@ -102,6 +106,8 @@
 .mw-fam {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  justify-content: space-between;
   gap: 9px;
 }
 .mw-fam-row {
@@ -133,12 +139,16 @@
 /* ── Heatmap · horas: tira de 11 celdas, intensidad por facturación ── */
 .mw-heat {
   display: grid;
-  grid-template-columns: repeat(11, 1fr);
-  gap: 3px;
+  /* 6 columnas fijas → las 11 horas SIEMPRE caen en 2 filas equilibradas (6 + 5), a cualquier ancho.
+     Las celdas reparten el alto (`1fr`) para llenar la tarjeta (panel `fit=stretch`) sin banda blanca. */
+  grid-template-columns: repeat(6, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 5px;
+  flex: 1;
+  min-height: 0;
 }
 .mw-heat > span {
-  aspect-ratio: 1;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 .mw-heat-foot {
   display: flex;
@@ -153,7 +163,8 @@
   display: flex;
   align-items: flex-end;
   gap: 4px;
-  height: 64px;
+  flex: 1;
+  min-height: 48px;
 }
 .mw-cols > span {
   flex: 1;

@@ -68,7 +68,7 @@ export function SupplierComparison(_props: PanelProps): ReactElement {
   const rows = (q.data ?? []).filter((r) => r.best && r.prices.length > 1).slice(0, MAX_ROWS);
 
   return (
-    <PanelShell id="esp-proveedores" bare>
+    <PanelShell id="esp-proveedores" fit="stretch" bare>
       <div className="sp-card">
         <div className="sp-title">Comparativa de proveedores</div>
         <div className="sp-sub">Mejor precio marcado</div>
@@ -133,7 +133,7 @@ export function StoreBandMatrix({ store }: PanelProps): ReactElement {
   const max = Math.max(1, ...rows.flatMap((r) => r.bands));
 
   return (
-    <PanelShell id="esp-matriz" bare>
+    <PanelShell id="esp-matriz" fit="stretch" bare>
       <div className="sp-card">
         <div className="sp-title">Matriz tienda × franja</div>
         <div className="sp-sub">Intensidad de ventas (hoy)</div>
@@ -172,7 +172,7 @@ export function StoreDirectory(_props: PanelProps): ReactElement {
   const stores = (q.data ?? []).filter((s) => s.active).slice(0, MAX_ROWS);
 
   return (
-    <PanelShell id="esp-tiendas" bare>
+    <PanelShell id="esp-tiendas" fit="stretch" bare>
       <div className="sp-card">
         <div className="sp-title sp-title--gap">Tiendas</div>
         {stores.map((s) => {
@@ -254,7 +254,7 @@ export function ExecutiveSummary(_props: PanelProps): ReactElement {
   const down = deltaPct !== null && deltaPct < 0;
 
   return (
-    <PanelShell id="esp-resumen-ejecutivo" bare>
+    <PanelShell id="esp-resumen-ejecutivo" fit="stretch" bare>
       <div className="sp-card sp-exec">
         <div className="sp-exec-prose">
           <div className="sp-exec-eyebrow">Resumen ejecutivo · {monthName}</div>

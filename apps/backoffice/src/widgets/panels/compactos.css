@@ -1,0 +1,187 @@
+/* cmp-treemap «Mix por familia» — RÉPLICA A MEDIDA del handoff «Fundación Geist» (sección 05 · Compactos).
+   Toda superficie/color por token (`--ui-*`), de modo que en claro valen los hex del handoff
+   (#fff, #e8e8eb, #0070f3, #71717a) y en oscuro siguen el tema. El fondo de cada tile y su tinta van
+   inline (dependen del puesto en la rampa). */
+.ct-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  padding: 22px 24px;
+}
+.ct-title {
+  flex: none;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+}
+/* Etiqueta «TREEMAP»: acento al 10% sobre la superficie (handoff: rgba(0,112,243,.10)). */
+.ct-badge {
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ui-brand);
+  background: color-mix(in oklab, var(--ui-brand) 10%, var(--ui-surface));
+}
+.ct-sub {
+  flex: none;
+  margin: 3px 0 16px;
+  font-size: 12.5px;
+  color: var(--ui-text-soft);
+}
+/* Rejilla del treemap: crece con el tile (panel `fit=stretch`). Sin min-height rígido → no desborda. */
+.ct-grid {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ct-row {
+  display: flex;
+  gap: 4px;
+  flex-basis: 0;
+  min-height: 0;
+}
+/* Tile: el área (flexGrow) la pone el componente; texto anclado abajo, nombre envuelve (sin truncar). */
+.ct-tile {
+  flex-basis: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 13px 14px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.ct-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.ct-note {
+  margin-top: 2px;
+  font-size: 12px;
+  opacity: 0.85;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+/* «Top vendedores» (cmp-leaderboard) — lista de ranking vertical a medida. Tarjeta `bare` que LLENA el
+   tile; cabecera fija + lista que reparte filas compactas (2 líneas: nombre/cifra y barra/tickets). El
+   nº de filas lo decide `useFitCount` según el alto. */
+.lb-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  padding: 20px 22px;
+}
+.lb-head {
+  flex: none;
+  margin-bottom: 16px;
+}
+.lb-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+}
+.lb-sub {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: var(--ui-text-soft);
+}
+.lb-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+}
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.lb-rank {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.lb-rank--top {
+  background: color-mix(in oklab, var(--ui-brand) 16%, var(--ui-surface));
+  color: var(--ui-brand);
+}
+.lb-main {
+  flex: 1;
+  min-width: 0;
+}
+.lb-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.lb-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lb-value {
+  flex: none;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.lb-foot {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 6px;
+}
+.lb-bar {
+  flex: 1;
+  height: 3px;
+  background: var(--ui-surface-subtle);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.lb-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+}
+.lb-tickets {
+  flex: none;
+  font-size: 11px;
+  color: var(--ui-text-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

@@ -1464,9 +1464,9 @@ export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
   },
   {
     id: 'tabla-tareas',
-    label: 'Tareas de reposición',
+    label: 'Reposición de stock',
     category: 'listas-tablas',
-    description: 'Checklist de reposición por alertas',
+    description: 'Estado de reposición por alertas de stock',
     thumbnail: <ThumbTblTasks />,
   },
   // Sección 10 · Estado y progreso

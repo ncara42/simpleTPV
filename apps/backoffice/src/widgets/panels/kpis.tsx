@@ -329,7 +329,7 @@ export function ConnectedKpiGrid({ period, store }: PanelProps): ReactElement {
   const so = stockout.data;
 
   return (
-    <PanelShell id="kpi-grid-connected" bare>
+    <PanelShell id="kpi-grid-connected" fit="stretch" bare>
       <div className="kw-grid">
         <Cell
           label="Facturación"
@@ -398,7 +398,7 @@ export function ClassicKpiCard({ period, store }: PanelProps): ReactElement {
   const s = sales.data;
 
   return (
-    <PanelShell id="kpi-classic" bare>
+    <PanelShell id="kpi-classic" fit="stretch" bare>
       <div className="kw-card">
         <span className="kw-label">Facturación</span>
         <span className="kw-value">{eur(s?.revenue)}</span>

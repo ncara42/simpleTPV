@@ -13,11 +13,13 @@
   background: var(--ui-surface);
 }
 .sp-title {
+  flex: none;
   font-size: 13px;
   font-weight: 600;
   color: var(--ui-text);
 }
 .sp-sub {
+  flex: none;
   margin: 4px 0 14px;
   font-size: 12px;
   color: var(--ui-text-soft);
@@ -29,6 +31,7 @@
 
 /* ── Comparativa de proveedores ────────────────────────────────────────── */
 .sp-prov-row {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -62,8 +65,11 @@
 
 /* ── Matriz tienda × franja ────────────────────────────────────────────── */
 .sp-matrix {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 74px repeat(3, 1fr);
+  grid-auto-rows: minmax(22px, 1fr);
   gap: 5px;
   align-items: center;
 }
@@ -77,12 +83,14 @@
   color: var(--ui-text-muted);
 }
 .sp-matrix-cell {
-  height: 22px;
+  height: 100%;
+  min-height: 22px;
   border-radius: 4px;
 }
 
 /* ── Lista de tiendas ──────────────────────────────────────────────────── */
 .sp-store-row {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   gap: 11px;
@@ -151,11 +159,12 @@
 .sp-exec-text strong.sp-neg {
   color: var(--ui-danger);
 }
+/* Tira de 4 stats: los divisores entre celdas salen del gap:1px sobre el fondo `--ui-border`. Sin
+   borde exterior propio (lo aporta `.sp-card`): evita el doble marco «caja dentro de caja». */
 .sp-exec-stats {
   display: flex;
   gap: 1px;
   background: var(--ui-border);
-  border: 1px solid var(--ui-border);
   border-radius: 10px;
   overflow: hidden;
 }

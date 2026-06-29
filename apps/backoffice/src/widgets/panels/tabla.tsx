@@ -32,15 +32,6 @@ function initials(name: string): string {
   return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
 }
 
-// Check (✓) blanco reutilizado por las tareas hechas.
-function CheckIcon(): ReactElement {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M5 12l5 5L20 6" stroke="var(--ui-primary-fg)" strokeWidth="3.5" />
-    </svg>
-  );
-}
-
 // ── 1 · Lista simple (facturación de hoy por tienda) ─────────────────────────────────────────────
 export function SimpleList({ store }: PanelProps): ReactElement {
   const q = useQuery({
@@ -51,7 +42,7 @@ export function SimpleList({ store }: PanelProps): ReactElement {
   const rows = [...(q.data?.byStore ?? [])].sort((a, b) => b.today - a.today).slice(0, MAX_ROWS);
 
   return (
-    <PanelShell id="tabla-simple" bare>
+    <PanelShell id="tabla-simple" fit="stretch" bare>
       <div className="tl-card">
         <div className="tl-title">Ventas por tienda</div>
         {rows.map((r) => (
@@ -75,7 +66,7 @@ export function AvatarList({ period, store }: PanelProps): ReactElement {
   const rows = [...(q.data ?? [])].sort((a, b) => b.salesCount - a.salesCount).slice(0, MAX_ROWS);
 
   return (
-    <PanelShell id="tabla-avatar" bare>
+    <PanelShell id="tabla-avatar" fit="stretch" bare>
       <div className="tl-card">
         <div className="tl-title">Vendedores</div>
         {rows.map((r, i) => (
@@ -109,7 +100,7 @@ export function StatusList({ store }: PanelProps): ReactElement {
   const rows = (q.data ?? []).slice(0, MAX_ROWS);
 
   return (
-    <PanelShell id="tabla-estado" bare>
+    <PanelShell id="tabla-estado" fit="stretch" bare>
       <div className="tl-card">
         <div className="tl-title">Estado de stock</div>
         {rows.map((a) => {
@@ -139,7 +130,7 @@ export function VariationList({ store }: PanelProps): ReactElement {
     .slice(0, MAX_ROWS);
 
   return (
-    <PanelShell id="tabla-variacion" bare>
+    <PanelShell id="tabla-variacion" fit="stretch" bare>
       <div className="tl-card">
         <div className="tl-title">Variación por tienda</div>
         {rows.map((r) => {
@@ -168,7 +159,7 @@ export function RankingList({ period, store }: PanelProps): ReactElement {
   const rows = (q.data?.topSales ?? []).slice(0, MAX_ROWS);
 
   return (
-    <PanelShell id="tabla-ranking" bare>
+    <PanelShell id="tabla-ranking" fit="stretch" bare>
       <div className="tl-card">
         <div className="tl-title">Ranking de productos</div>
         {rows.map((p, i) => (
@@ -183,28 +174,30 @@ export function RankingList({ period, store }: PanelProps): ReactElement {
   );
 }
 
-// ── 6 · Tareas de reposición (alertas: resueltas = hechas/tachadas; abiertas = pendientes) ────────
+// ── 6 · Reposición de stock (alertas: estado Pendiente / Repuesto) ────────────────────────────────
+// Es un REFLEJO de estado, no un checklist accionable: las alertas se resuelven solas en el backend
+// (`reevaluate_alert`) al reponer stock; no hay endpoint para marcarlas a mano. Por eso mostramos una
+// píldora de estado (Pendiente/Repuesto), no una casilla clicable. Pendientes primero.
 export function TaskList({ store }: PanelProps): ReactElement {
   const q = useQuery({
     queryKey: ['dash-alerts', store],
     queryFn: () => listAlerts(store),
     placeholderData: keepPreviousData,
   });
-  // Pendientes primero (lo accionable arriba), luego las ya resueltas.
   const rows = [...(q.data ?? [])]
     .sort((a, b) => Number(a.resolved) - Number(b.resolved))
     .slice(0, MAX_ROWS);
 
   return (
-    <PanelShell id="tabla-tareas" bare>
+    <PanelShell id="tabla-tareas" fit="stretch" bare>
       <div className="tl-card">
-        <div className="tl-title">Tareas de reposición</div>
+        <div className="tl-title">Reposición de stock</div>
         {rows.map((a) => (
-          <div className="tl-row--plain" key={a.id}>
-            <span className={`tl-check tl-check--${a.resolved ? 'done' : 'todo'}`}>
-              {a.resolved ? <CheckIcon /> : null}
+          <div className="tl-row" key={a.id}>
+            <span className="tl-name">{a.productName}</span>
+            <span className={`tl-badge tl-badge--${a.resolved ? 'success' : 'warning'}`}>
+              {a.resolved ? 'Repuesto' : 'Pendiente'}
             </span>
-            <span className={`tl-task${a.resolved ? ' tl-task--done' : ''}`}>{a.productName}</span>
           </div>
         ))}
       </div>

@@ -63,7 +63,7 @@ export function MiniStoreBars({ store }: PanelProps): ReactElement {
   const max = Math.max(1, ...rows.map((r) => r.today));
 
   return (
-    <PanelShell id="mini-tiendas" bare>
+    <PanelShell id="mini-tiendas" fit="stretch" bare>
       <div className="mw-card">
         <div className="mw-label">Barras · tiendas</div>
         <div className="mw-bars">
@@ -91,10 +91,10 @@ export function MiniTrendLine({ period, store }: PanelProps): ReactElement {
   const path = linePath(q.data?.series?.avgTicket ?? []);
 
   return (
-    <PanelShell id="mini-tendencia" bare>
+    <PanelShell id="mini-tendencia" fit="stretch" bare>
       <div className="mw-card">
         <div className="mw-label">Línea · tendencia</div>
-        <svg className="mw-svg" viewBox="0 0 240 80" aria-hidden="true">
+        <svg className="mw-svg" viewBox="0 0 240 80" preserveAspectRatio="none" aria-hidden="true">
           {path ? (
             <>
               <path
@@ -104,6 +104,7 @@ export function MiniTrendLine({ period, store }: PanelProps): ReactElement {
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
               />
               <circle cx={path.lastX} cy={path.lastY} r="3.5" fill="var(--ui-brand)" />
             </>
@@ -146,7 +147,7 @@ export function MiniCumulativeArea({ period, store }: PanelProps): ReactElement 
   const line = points.length >= 2 ? `M${points.join(' L')}` : '';
 
   return (
-    <PanelShell id="mini-acumulado" bare>
+    <PanelShell id="mini-acumulado" fit="stretch" bare>
       <div className="mw-card">
         <div className="mw-label">Área · acumulado</div>
         <svg className="mw-svg" viewBox="0 0 240 80" preserveAspectRatio="none" aria-hidden="true">
@@ -197,7 +198,7 @@ export function MiniFamilyDonut({ period, store }: PanelProps): ReactElement {
   });
 
   return (
-    <PanelShell id="mini-donut" bare>
+    <PanelShell id="mini-donut" fit="stretch" bare>
       <div className="mw-card mw-card--row">
         <div>
           <div className="mw-label mw-label--bare">Donut · mix</div>
@@ -235,7 +236,7 @@ export function MiniMarginGauge({ period, store }: PanelProps): ReactElement {
   const fill = pct == null ? 0 : pct * ARC;
 
   return (
-    <PanelShell id="mini-gauge" bare>
+    <PanelShell id="mini-gauge" fit="stretch" bare>
       <div className="mw-card">
         <div className="mw-label mw-label--bare">Gauge · margen</div>
         <div className="mw-gauge">
@@ -274,7 +275,7 @@ export function MiniTopFamilies({ period, store }: PanelProps): ReactElement {
   const max = Math.max(1, ...data.map((f) => f.total));
 
   return (
-    <PanelShell id="mini-familias" bare>
+    <PanelShell id="mini-familias" fit="stretch" bare>
       <div className="mw-card">
         <div className="mw-label mw-label--mb13">Top familias</div>
         <div className="mw-fam">
@@ -315,7 +316,7 @@ export function MiniHourHeatmap({ store }: PanelProps): ReactElement {
   const max = Math.max(1, ...revs);
 
   return (
-    <PanelShell id="mini-heatmap" bare>
+    <PanelShell id="mini-heatmap" fit="stretch" bare>
       <div className="mw-card">
         <div className="mw-label">Heatmap · horas</div>
         <div className="mw-heat">
@@ -339,7 +340,7 @@ export function MiniHourColumns({ store }: PanelProps): ReactElement {
   const peak = revs.indexOf(Math.max(...revs));
 
   return (
-    <PanelShell id="mini-columnas" bare>
+    <PanelShell id="mini-columnas" fit="stretch" bare>
       <div className="mw-card">
         <div className="mw-label">Columnas · hora</div>
         <div className="mw-cols">

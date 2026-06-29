@@ -5,6 +5,10 @@ import type { ReactElement } from 'react';
 import { listAlerts } from '../../lib/stock.js';
 import { PanelShell } from './PanelShell.js';
 import type { PanelProps } from './types.js';
+import { useFitCount } from './useFitCount.js';
+
+// Alto aprox. de un hito del feed (título + meta + separación) para el conteo adaptativo.
+const FEED_ROW_H = 50;
 
 // Hora local 'HH:MM' de un ISO; cadena vacía si no parsea.
 function hhmm(iso: string): string {
@@ -22,7 +26,7 @@ export function DiagnosticActivity({ store }: PanelProps): ReactElement {
     queryFn: () => listAlerts(store),
     placeholderData: keepPreviousData,
   });
-  const items = (q.data ?? []).slice(0, 8).map((a) => {
+  const allItems = (q.data ?? []).map((a) => {
     const tone: 'success' | 'danger' | 'warning' = a.resolved
       ? 'success'
       : a.severity === 'critical'
@@ -38,10 +42,15 @@ export function DiagnosticActivity({ store }: PanelProps): ReactElement {
       tone,
     };
   });
+  // Nº de hitos visibles ADAPTADO a la altura del tile (más en tiles altos, menos en bajos).
+  const { ref, count } = useFitCount(FEED_ROW_H, { min: 3, max: allItems.length || 1 });
+  const items = allItems.slice(0, count);
 
   return (
     <PanelShell id="diag-actividad" fill>
-      <ActivityFeed items={items} isLoading={q.isLoading} isError={q.isError} />
+      <div ref={ref} style={{ height: '100%' }}>
+        <ActivityFeed items={items} isLoading={q.isLoading} isError={q.isError} />
+      </div>
     </PanelShell>
   );
 }
