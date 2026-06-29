@@ -133,6 +133,12 @@ jobs:
       - name: Seed contractual
         run: pnpm --filter @simpletpv/db db:seed
 
+      # xmllint (libxml2-utils) para validar el XML VERI*FACTU contra el XSD oficial
+      # de la AEAT (test verifactu_xsd_validation). Si los XSD no están en
+      # crates/domain/tests/fixtures/verifactu/xsd/ el test se OMITE (no rompe el gate).
+      - name: Install xmllint (validación XSD VERI*FACTU)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libxml2-utils
+
       - name: cargo test --workspace
         working-directory: crates
         run: cargo test --workspace
