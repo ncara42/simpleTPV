@@ -632,6 +632,115 @@
 .ui-dt-header > .bo-tabs .bo-tab.active {
   background: var(--ui-surface-subtle);
 }
+
+/* Cabecera de tabla en UNA sola fila: pestañas a la IZQUIERDA + búsqueda y acción
+   primaria (CTA "Nuevo …") a la DERECHA, en la misma banda (en vez de pestañas y
+   toolbar en dos filas). La fila aporta el filete inferior y el padding; las pestañas
+   recuperan su tamaño natural y la .users-toolbar reclama el resto (search a la
+   izquierda de su zona, CTA fijado a la derecha por su space-between). */
+.dt-header-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.dt-header-row > .bo-tabs {
+  width: auto;
+  flex: none;
+  padding: 0;
+  border: none;
+  background: none;
+}
+.dt-header-row > .bo-tabs .bo-tab.active {
+  background: var(--ui-surface-subtle);
+}
+/* Búsqueda + CTA agrupados JUNTOS a la derecha de la fila (variante "tools" plana,
+   p. ej. Proveedores: buscador + botón como hijos directos). */
+.dt-header-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+/* Variante que PRESERVA la .users-toolbar / SectionToolbar de cada sección dentro de la
+   fila de cabecera: la agrupa a la derecha (búsqueda/filtros + CTA juntos) en vez de su
+   space-between por defecto, sin aplanar su markup. */
+.dt-header-row > .users-toolbar {
+  margin-left: auto;
+  width: auto;
+  flex: 0 0 auto;
+  margin-bottom: 0;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+.dt-header-row > .users-toolbar > .sales-filters {
+  flex: 0 1 auto;
+}
+.dt-header-row > .users-toolbar > .ui-dt-toolbar-actions {
+  margin-left: 0;
+}
+/* Controles de la cabecera (buscador, filtros <Select> y CTA "Nuevo …"): misma altura
+   (36px = botones de acción de la topbar: .csv-action / .float-action-btn) y mismo radio
+   Geist/Vercel (--ui-radius-md = 12px, no pill), para que se lean como un set homogéneo. */
+.dt-header-row input.catalog-search,
+.dt-header-row .ui-select-trigger,
+.dt-header-row .ui-btn {
+  height: 36px;
+  border-radius: var(--ui-radius-md);
+}
+/* El velo de desvanecido del buscador redondea su esquina derecha al mismo radio que
+   el input (si no, sobresaldría de la esquina al dejar de ser pill). */
+.dt-header-row .search-field::after {
+  border-radius: 0 var(--ui-radius-md) var(--ui-radius-md) 0;
+}
+
+/* Mismas dimensiones de control (36px + radio Geist 12px) en las cards SIN pestañas,
+   donde la toolbar vive en su slot propio (.ui-dt-toolbar) o como cabecera del panel
+   (.table-toolbar): Catálogo, Usuarios, Promociones, Traspasos, Stock, Ventas, Familias.
+   El layout NO cambia (búsqueda izquierda · CTA derecha); solo se homogeneízan los
+   controles para que todo el backoffice comparta buscador/filtros/CTA idénticos. */
+.ui-dt-toolbar input.catalog-search,
+.ui-dt-toolbar .ui-select-trigger,
+.ui-dt-toolbar .ui-btn,
+.table-toolbar input.catalog-search,
+.table-toolbar .ui-select-trigger,
+.table-toolbar .ui-btn {
+  height: 36px;
+  border-radius: var(--ui-radius-md);
+}
+.ui-dt-toolbar .search-field::after,
+.table-toolbar .search-field::after {
+  border-radius: 0 var(--ui-radius-md) var(--ui-radius-md) 0;
+}
+
+/* UNA sola línea por cabecera: ni las pestañas, ni la sub-navegación, ni el buscador, ni
+   los filtros, ni los botones parten a una segunda fila. Si en una pantalla estrecha no
+   cupiera todo, la banda hace scroll horizontal (los <Select> abren en portal, no se
+   recortan) en vez de romper a dos filas. */
+.dt-header-row,
+.dt-header-row .users-toolbar,
+.dt-header-row .sales-filters,
+.dt-header-row .ui-dt-toolbar-actions,
+.dt-header-row .dt-header-tools,
+.table-panel .ui-dt-toolbar,
+.table-panel .ui-dt-toolbar .users-toolbar,
+.table-panel .ui-dt-toolbar .sales-filters,
+.table-toolbar,
+.table-toolbar .sales-filters,
+.inventory-header,
+.inventory-header .sales-filters {
+  flex-wrap: nowrap;
+}
+/* Si el contenido excede el ancho, la banda externa hace scroll horizontal (fino) en vez
+   de partir a dos filas o recortar el CTA. */
+.dt-header-row,
+.table-panel .ui-dt-toolbar,
+.table-toolbar,
+.inventory-header {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
 /* Fila de subtabs con acción a la derecha (Stock → Traspasos). */
 .stock-tabs-row {
   display: flex;
@@ -674,11 +783,66 @@
    Familias / Existencias) se centra sobre el contenido y se separa de la página
    montada debajo (cada vista trae su propio contenedor `.catalog`). */
 .inventory-page {
-  max-width: 75rem;
-  margin: 0 auto;
 }
 .inventory-views {
   margin-bottom: 1.25rem;
+}
+/* Inventario: las sub-pestañas (Catálogo/Familias/Existencias), el filtro compartido
+   (búsqueda + familia) y la TOOLBAR de la sub-vista activa (filtros propios + CTA, portada
+   al slot) comparten UNA sola fila — pestañas a la izquierda, todo lo demás a la derecha —
+   en vez de apilarse en bandas flotantes. Es el shell (no una card), así que NO lleva el
+   filete de cabecera; solo alinea y homogeneíza controles. */
+.inventory-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.inventory-header > .inventory-views {
+  margin-bottom: 0;
+}
+/* Filtro compartido + toolbar portada de la sub-vista, agrupados a la derecha. */
+.inventory-header-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: nowrap;
+}
+.inventory-header-tools > .inventory-filters {
+  margin-bottom: 0;
+}
+.inventory-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: nowrap;
+}
+/* La toolbar portada de la sub-vista pierde su ancho completo / space-between y fluye en
+   línea dentro del slot, junto al filtro compartido. */
+.inventory-header-actions .users-toolbar,
+.inventory-header-actions .table-toolbar {
+  width: auto;
+  margin-bottom: 0;
+  gap: 0.6rem;
+  flex-wrap: nowrap;
+}
+.inventory-header-actions .sales-filters {
+  margin-bottom: 0;
+  flex-wrap: nowrap;
+}
+.inventory-header-actions .ui-dt-toolbar-actions {
+  margin-left: 0;
+}
+/* Controles de toda la cabecera (compartido + slot) a 36px y radio 12px, como el resto. */
+.inventory-header input.catalog-search,
+.inventory-header .ui-select-trigger,
+.inventory-header .ui-btn {
+  height: 36px;
+  border-radius: var(--ui-radius-md);
+}
+.inventory-header .search-field::after {
+  border-radius: 0 var(--ui-radius-md) var(--ui-radius-md) 0;
 }
 
 /* La acción "Nuevo traspaso" se ancla al extremo derecho de la cabecera. */
@@ -1990,6 +2154,36 @@
   background: none;
   color: inherit;
 }
+
+/* Catálogo · señal de stock (Geist). El nivel rojo/ámbar/verde se calculaba y
+   se descartaba (stock-tag lo neutraliza). Aquí se recupera con criterio: el
+   color es semántico, no decorativo. Stock sano → tinta neutra, sin punto, sin
+   ruido; bajo (≤5) → ámbar; agotado (0) → rojo. El punto-señal solo aparece en
+   los dos estados que importan. Cifra tabular y flush a la derecha. */
+.cat-stock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.cat-stock-green {
+  color: var(--ui-text);
+}
+.cat-stock-yellow {
+  color: var(--ui-warning);
+}
+.cat-stock-red {
+  color: var(--ui-danger);
+}
+.cat-stock-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: var(--ui-radius-pill);
+  background: currentColor;
+  flex-shrink: 0;
+}
 /* Anti-rotura por arquetipo (IT-13): nota de que hay sustituto en la familia →
    la rotura está degradada (no crítica). */
 .alert-substitute {
@@ -2123,12 +2317,28 @@
 /* Panel que enmarca la toolbar de filtros + la tabla (espejo de .dash-panel).
    Marco común de Stock, Usuarios y Catálogo: superficie blanca, borde fino y
    esquinas redondeadas (sin doble borde con la tabla interior). */
+/* Chrome de card de tabla. Alineado al lenguaje Geist (cards PLANAS: solo
+   hairline, sin sombra; la sombra se reserva a overlays) y a los MISMOS tokens
+   que `.ui-dt` (radio --ui-radius-lg = 12px en Geist), en vez de hardcodear
+   18px + --ui-shadow-sm. Token-driven: el tema (claro/oscuro) decide el valor. */
 .table-panel {
   border: 1px solid var(--ui-border);
-  border-radius: 18px;
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
   overflow: hidden;
-  box-shadow: var(--ui-shadow-sm);
+  box-shadow: var(--ui-shadow-panel);
+}
+
+/* Cuando un DataTable vive DENTRO de un .table-panel, su raíz .ui-dt reintroduce su
+   propio marco (borde + radio + fondo) bajo la cabecera → doble marco / esquinas
+   redondeadas anidadas. El panel exterior ya aporta el chrome (borde, radio 18px,
+   sombra): la tabla interior cede su marco para que cabecera + toolbar + filas se lean
+   como UNA sola superficie continua. Unifica el radio de toda card de tabla del
+   backoffice y evita el doble filete (antes el reset estaba scopeado solo a .b2b-page). */
+.table-panel > .ui-dt {
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 /* Banda de acciones de "andamiaje" de la tabla (Columnas + CSV), por ENCIMA de la
@@ -2189,9 +2399,9 @@
   display: inline-flex;
   align-items: center;
   gap: 0;
-  height: 36px;
-  max-width: 36px;
-  padding: 0 9px;
+  height: 30px;
+  max-width: 30px;
+  padding: 0 7px;
   overflow: hidden;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-md);
@@ -2244,6 +2454,43 @@
       background 0.12s,
       color 0.12s;
   }
+}
+/* Botón-icono cuadrado de la banda de acciones de vista (.topbar-page-actions):
+   "Columnas" (ajustar columnas de la tabla), Exportar/Importar de tablas sin texto.
+   Mismo acabado en reposo que .csv-action (30px, borde, radio-md, superficie, texto
+   apagado) para que toda la banda case; .is-active marca el toggle de columnas abierto
+   (aria-expanded), igual que .topbar-icon-btn.is-active. */
+.float-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+.float-action-btn:hover,
+.float-action-btn.is-active {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
+.float-action-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.float-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 /* Variante para paneles de CONTENIDO libre (no tabla): Ayuda, etc. La base
    .table-panel no lleva padding porque en las tablas lo aportan la cabecera y las
@@ -2347,7 +2594,7 @@
 .promo-discount {
   display: inline-block;
   padding: 0.12rem 0.55rem;
-  border-radius: 999px;
+  border-radius: var(--ui-radius-xs);
   font-size: 0.8rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -2472,19 +2719,8 @@
 
 /* ── B2B mayorista (IT-17) ──────────────────────────────────────────────────
    Fila de alta de precio (tarifa) y de línea de pedido: selector + número +
-   acción, alineados horizontalmente. */
-
-/* En las 3 sub-pestañas de B2B (Clientes/Tarifas/Pedidos) la toolbar (SectionToolbar)
-   se renderiza como HERMANA del DataTable dentro del .table-panel, así que el .ui-dt
-   reintroduce su propio marco redondeado bajo la banda → "fase intermedia" con esquinas
-   redondeadas (doble marco). El panel exterior ya aporta el redondeo: la tabla interior
-   cede su borde y su radio para que toolbar + tabla se lean como una sola superficie
-   continua con esquinas rectas en la junta. Scopeado a .b2b-page; no afecta a otras pages. */
-.b2b-page .table-panel > .ui-dt {
-  border: none;
-  border-radius: 0;
-  background: transparent;
-}
+   acción, alineados horizontalmente. (El reset del doble marco .table-panel > .ui-dt
+   vive ahora junto a .table-panel, generalizado a todo el backoffice.) */
 
 .b2b-item-form {
   display: flex;
@@ -2554,304 +2790,8 @@
   max-width: 26rem;
 }
 
-/* ── Centro de ayuda / soporte (IT-20) ──────────────────────────────────────
-   Rediseño al lenguaje de la dashboard: superficies limpias (.dash-panel),
-   espaciado generoso, radios/sombras sutiles y jerarquía tipográfica. Se
-   elimina el exceso de bordes "encajonados" (border:1px por cada card/FAQ) a
-   favor de superficies + separadores hairline solo donde aportan. */
-
-/* La página apila secciones-panel con mucho aire entre ellas (ritmo dashboard). */
-.help-page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-8);
-}
-
-/* Cada sección es un panel-superficie igual que .dash-panel (sin doble marco con
-   la tabla interior de API keys). */
-.help-section {
-  padding: var(--ui-space-6) var(--ui-space-6);
-  border: 1px solid var(--ui-border);
-  border-radius: 18px;
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-sm);
-}
-
-/* Cabecera de sección: título + subtítulo muted (espejo de .dash-panel-head). */
-.help-section-head {
-  margin-bottom: var(--ui-space-6);
-}
-.help-title {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-2);
-  margin: 0;
-  font-size: var(--ui-text-lg);
-  font-weight: 600;
-  letter-spacing: -0.016em;
-  color: var(--ui-text);
-}
-.help-title svg {
-  color: var(--ui-text-soft);
-}
-.help-intro {
-  margin: var(--ui-space-2) 0 0;
-  font-size: var(--ui-text-base);
-  color: var(--ui-text-muted);
-}
-
-/* ── Canales de contacto ──────────────────────────────────────────────────── */
-/* Grid con aire (gap cómodo) que reflowa sin overflow. */
-.help-channels {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: var(--ui-space-5);
-}
-/* Tarjeta-superficie estilo .dash-card: borde sutil + sombra + radio amplio, con
-   padding cómodo. Sin acento agresivo en hover. */
-.help-channel {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--ui-space-2);
-  padding: var(--ui-space-5);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-xl);
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-sm);
-  color: var(--ui-text);
-  text-decoration: none;
-  transition:
-    border-color 0.18s var(--ui-ease),
-    transform 0.18s var(--ui-ease);
-}
-.help-channel svg {
-  color: var(--ui-text-soft);
-}
-.help-channel:hover {
-  border-color: var(--ui-border-strong);
-  transform: translateY(-1px);
-}
-.help-channel:focus-visible {
-  outline: none;
-  border-color: var(--ui-border-strong);
-  box-shadow: var(--ui-focus);
-}
-.help-channel-label {
-  font-weight: 600;
-}
-.help-channel-value {
-  font-size: var(--ui-text-sm);
-  color: var(--ui-text-muted);
-}
-
-/* ── Chat de soporte (Ayuda) ──────────────────────────────────────────────── */
-/* Mismo lenguaje-superficie que el resto de .help-section. El log es una zona con
-   scroll propio; el composer queda anclado debajo. */
-.support-log {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-4);
-  max-height: 22rem;
-  overflow-y: auto;
-  padding: var(--ui-space-2);
-}
-.support-empty {
-  margin: var(--ui-space-6) 0;
-  text-align: center;
-  color: var(--ui-text-muted);
-}
-.support-msg {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-1);
-  max-width: 82%;
-}
-/* El usuario a la derecha; asistente y soporte a la izquierda (jerarquía clara de
-   quién habla, sin uniformar todas las burbujas). */
-.support-msg--user {
-  align-self: flex-end;
-  align-items: flex-end;
-}
-.support-msg--ai,
-.support-msg--agent {
-  align-self: flex-start;
-}
-.support-msg-author {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ui-space-1);
-  font-size: var(--ui-text-xs);
-  font-weight: 600;
-  color: var(--ui-text-soft);
-}
-.support-msg-body {
-  padding: var(--ui-space-3) var(--ui-space-4);
-  border-radius: var(--ui-radius-xl);
-  border: 1px solid var(--ui-border);
-  background: var(--ui-surface);
-  font-size: var(--ui-text-base);
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-.support-msg--user .support-msg-body {
-  background: var(--ui-accent-soft, var(--ui-surface));
-  border-color: var(--ui-border-strong);
-}
-/* La respuesta de una persona de soporte se distingue con un acento lateral. */
-.support-msg--agent .support-msg-body {
-  border-left: 3px solid var(--ui-accent, var(--ui-border-strong));
-}
-.support-msg-body > :first-child {
-  margin-top: 0;
-}
-.support-msg-body > :last-child {
-  margin-bottom: 0;
-}
-.support-error {
-  margin: var(--ui-space-2) 0 0;
-  font-size: var(--ui-text-sm);
-  color: var(--ui-danger, #c0392b);
-}
-.support-composer {
-  display: flex;
-  gap: var(--ui-space-3);
-  align-items: flex-end;
-  margin-top: var(--ui-space-5);
-}
-.support-input {
-  flex: 1;
-  resize: none;
-  min-height: 2.75rem;
-  max-height: 8rem;
-  padding: var(--ui-space-3) var(--ui-space-4);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-xl);
-  background: var(--ui-surface);
-  color: var(--ui-text);
-  font: inherit;
-  line-height: 1.4;
-}
-.support-input:focus-visible {
-  outline: none;
-  border-color: var(--ui-border-strong);
-  box-shadow: var(--ui-focus);
-}
-.support-send {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  flex: 0 0 auto;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-xl);
-  background: var(--ui-accent, var(--ui-text));
-  color: var(--ui-on-accent, #fff);
-  cursor: pointer;
-  transition:
-    transform 0.18s var(--ui-ease),
-    opacity 0.18s var(--ui-ease);
-}
-.support-send:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-.support-send:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.support-send:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus);
-}
-
-/* ── FAQ (acordeón) ───────────────────────────────────────────────────────── */
-/* Un solo bloque: las preguntas se separan con hairlines sutiles (no una caja por
-   cada ítem). El indicador de abierto/cerrado es un chevron rotatorio, no la caja. */
-.help-faq {
-  display: flex;
-  flex-direction: column;
-}
-.help-faq-item {
-  border-bottom: 1px solid var(--ui-border);
-}
-.help-faq-item:first-child {
-  border-top: 1px solid var(--ui-border);
-}
-.help-faq-item > summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ui-space-3);
-  cursor: pointer;
-  padding: var(--ui-space-4) 0;
-  font-weight: 500;
-  color: var(--ui-text);
-  /* Quita el marcador nativo (lo sustituye el chevron ::after). */
-  list-style: none;
-}
-.help-faq-item > summary::-webkit-details-marker {
-  display: none;
-}
-.help-faq-item > summary:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus);
-  border-radius: var(--ui-radius-sm);
-}
-/* Chevron como indicador de estado: rota 90° al abrir. */
-.help-faq-item > summary::after {
-  content: '';
-  flex: none;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-right: 1.5px solid var(--ui-text-soft);
-  border-bottom: 1.5px solid var(--ui-text-soft);
-  transform: rotate(-45deg);
-  transition: transform 0.18s var(--ui-ease);
-}
-.help-faq-item[open] > summary::after {
-  transform: rotate(45deg);
-}
-.help-faq-item > p {
-  margin: 0 0 var(--ui-space-4);
-  color: var(--ui-text-muted);
-  font-size: var(--ui-text-base);
-  line-height: 1.6;
-}
-@media (prefers-reduced-motion: reduce) {
-  .help-channel,
-  .help-faq-item > summary::after {
-    transition: none;
-  }
-}
-
-/* ── Integraciones · Claves API ───────────────────────────────────────────── */
-/* La sección de API keys queda integrada en el mismo lenguaje visual: sin su
-   marco duro propio. El .table-panel interior cede su superficie al panel de la
-   sección (sin doble borde/sombra) y solo conserva sus separadores internos. */
-.help-integrations-body .table-panel {
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  overflow: visible;
-}
-/* El banner y la lista de revocadas usaban márgenes pensados para el panel con
-   padding 0; aquí el panel ya da el aire, así que basta separación vertical. */
-.help-integrations-body .apikey-banner,
-.help-integrations-body .apikey-revoked {
-  margin: var(--ui-space-4) 0 0;
-}
-/* La toolbar interna ya no necesita su banda de chrome separada por hairline:
-   se integra con el resto del contenido de la sección. SectionToolbar renderiza
-   `.users-toolbar`, que en .table-panel recibe la banda de cabecera; aquí la
-   neutralizamos para que fluya dentro del panel de la sección. */
-.help-integrations-body .table-panel > .users-toolbar {
-  min-height: 0;
-  padding: 0 0 var(--ui-space-4);
-  background: transparent;
-  border-bottom: none;
-}
+/* El Centro de ayuda (.help-*) vive ahora en su propia hoja: ./help.css.
+   Aquí solo queda lo demás del catálogo/stock. */
 
 /* ── Stock: filtros (búsqueda + familia + rotación + tienda) + lista por tienda ─── */
 .stock-filters {
@@ -3206,19 +3146,23 @@
 }
 /* Cada aviso es una tarjeta con aire: acento a la izquierda, fondo semántico
    suave, padding cómodo y columnas alineadas (producto · tienda · tipo). */
+/* Roturas (Geist): se aplanan los bloques crema saturados. La severidad vive
+   SOLO en la barra de la izquierda (ámbar = con sustituto, rojo = crítica); el
+   relleno pasa a un lift neutro (surface-subtle) + hairline, más denso. Lista
+   silenciosa con jerarquía, no muro de color. */
 .stock-alert-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: var(--ui-space-4);
-  padding: var(--ui-space-3) var(--ui-space-4);
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border: 1px solid var(--ui-border);
   border-left: 3px solid var(--ui-warning);
-  border-radius: var(--ui-radius-md);
-  background: var(--ui-warning-soft);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-subtle);
 }
 .stock-alert-item.sev-critical {
   border-left-color: var(--ui-danger);
-  background: var(--ui-danger-soft);
 }
 .stock-alert-name {
   font-weight: 600;

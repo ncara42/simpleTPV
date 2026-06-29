@@ -1,9 +1,10 @@
 import { Button, evaluateBrandColor, Input } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Palette } from 'lucide-react';
+import { Check, Palette, Plug } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
+import { ApiKeysSection } from './ApiKeysSection.js';
 import { getBranding, updateBranding } from './lib/branding.js';
 import { formErrorMessage } from './lib/form-error.js';
 import { readThemeSurfaces } from './lib/theme-surfaces.js';
@@ -17,7 +18,7 @@ const DEFAULT_BRAND = '#0e7c6b';
 // como tema (tokens --ui-brand*/--ui-primary*) en TODA la app (backoffice y TPV)
 // vía useBranding al arrancar; aquí además hay preview en vivo del par color+logo.
 export function SettingsPage() {
-  usePageHeader('Ajustes', 'Marca de la organización: color corporativo y logo');
+  usePageHeader('Ajustes', 'Marca de la organización e integraciones');
   const qc = useQueryClient();
   const { data: branding } = useQuery({ queryKey: ['org-branding'], queryFn: getBranding });
 
@@ -183,6 +184,21 @@ export function SettingsPage() {
             Restaurar por defecto
           </Button>
         </div>
+      </div>
+
+      {/* Integraciones · Claves API. Reubicada desde Ayuda: la gestión de claves
+          API (acceso externo de solo lectura al stock) vive ahora en Ajustes. */}
+      <div className="help-section" data-testid="settings-integrations">
+        <div className="help-section-head">
+          <h3 className="help-title">
+            <Plug size={18} aria-hidden="true" /> Integraciones · Claves API
+          </h3>
+          <p className="help-intro">
+            Acceso externo de solo lectura al stock para integraciones (webs, ERPs…). La clave se
+            muestra una sola vez y es revocable.
+          </p>
+        </div>
+        <ApiKeysSection />
       </div>
     </section>
   );

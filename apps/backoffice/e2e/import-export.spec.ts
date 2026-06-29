@@ -53,8 +53,12 @@ test('B-04: Catálogo importa CSV y XLSX y exporta, vía el modal único', async
   expect(download.suggestedFilename()).toBe('catalogo.xlsx');
 
   // ── Los dos productos importados aparecen en el catálogo ─────────────────
+  // El Catálogo facetado renderiza TODAS las filas (sin paginación), así que en una BD
+  // no reseteada pueden coexistir varios «Producto E2E CSV» de ejecuciones previas (el
+  // import usa nombre fijo y no limpia). `.first()` confirma que el importado aparece sin
+  // chocar con el modo estricto por duplicados de entorno (en CI, con seed limpio, hay uno).
   await page.getByRole('button', { name: 'Cerrar' }).click();
   await page.goto('/inventario?vista=catalogo');
-  await expect(page.getByText('Producto E2E CSV')).toBeVisible({ timeout: 15000 });
-  await expect(page.getByText('Producto E2E XLSX')).toBeVisible();
+  await expect(page.getByText('Producto E2E CSV').first()).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('Producto E2E XLSX').first()).toBeVisible();
 });

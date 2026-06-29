@@ -1,0 +1,800 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   VENTAS — ledger de cobro de 3 columnas (carril de facetas · lista · ficha).
+   Rediseño de la vista Ventas: reutiliza el carril y el lenguaje visual facetado
+   del Catálogo/Existencias (clases `.cat-*`) y añade la lista de tickets con su
+   split de cobro, la ficha con desglose + seguimiento del cobro, las píldoras de
+   estado y los avatares. Paleta vía tokens --ui-* (mapeo 1:1 con el prototipo:
+   success=Pagada, warning=Pendiente, danger=Vencida, brand/chart-accent=canales).
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Encaje en el área de contenido (superficie tipo card, full-height) ──────── */
+.bo-main--surface:has(.ventas-page) {
+  padding: 0.4rem 1.25rem 1.5rem;
+}
+.ventas-page {
+  /* Offset = topbar (60px) + padding-top (0.4rem) + padding-bottom (1.5rem). */
+  height: calc(100dvh - 60px - 1.9rem);
+  display: flex;
+  flex-direction: column;
+}
+.ventas-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.04),
+    0 4px 24px -8px rgb(0 0 0 / 0.1);
+  /* `clip` (no `hidden`): aísla por completo el scrollable-overflow de los scrollers internos
+     (lista/carril, overflow:auto). Con `hidden`, Chromium propagaba ese overflow al `<html>` y
+     la página scrolleaba en vacío ~283px con Mes/Año; `clip` no crea contenedor de scroll y
+     corta la propagación. `contain: paint` refuerza el aislamiento del subárbol de la card. */
+  overflow: clip;
+  contain: paint;
+}
+
+/* ─── Rejilla de 3 columnas: carril · lista · ficha ───────────────────────────── */
+.ventas-layout {
+  display: grid;
+  grid-template-columns: 15.75rem 24rem minmax(0, 1fr);
+  /* `minmax(0, 1fr)` (no `1fr` a secas): el `1fr` tiene mínimo implícito `auto` = min-content,
+     así que el contenido de la fila (filas de la lista, facetas del carril) la INFLA en vez de
+     hacer scroll interno → desbordaba el documento con Mes/Año. `minmax(0, 1fr)` fuerza mínimo 0
+     y la fila queda acotada a la altura de la card; cada columna scrollea por dentro. */
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+/* El carril ocupa ambas filas. `min-height: 0` es CLAVE: como grid-item, su `min-height`
+   por defecto es `auto`, así que el carril se niega a encoger por debajo de su contenido y,
+   cuando las facetas son muchas (Mes/Año → muchas tiendas/vendedores/canales), infla el grid
+   más allá de la card → scroll de PÁGINA. Con `min-height: 0` queda acotado a la altura de la
+   card y hace scroll interno (ya tiene `overflow-y: auto`). Sin esto solo desbordaba en los
+   periodos con muchas ventas; en Hoy/Ayer/Semana el carril cabía. */
+/* El carril va envuelto en `.scroll-shadow-cell` (host NO scrollable de la sombra de
+   scroll, ver styles/scroll-shadow.css): el shell toma la celda del grid y ocupa ambas
+   filas; `.cat-rail` scrollea dentro. `min-height: 0` es CLAVE igual que antes para que se
+   acote a la card en vez de inflar el grid (ver nota de `.ventas-layout`). */
+.ventas-layout > .scroll-shadow-cell {
+  grid-row: 1 / 3;
+}
+
+/* El carril reutiliza `.cat-rail` (de inventory-card.css). Punto de color de las
+   facetas de cobro/canal: pequeño círculo a la izquierda de la etiqueta. */
+.ventas-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ventas-dot[data-cobro='paid'] {
+  background: var(--ui-success);
+}
+.ventas-dot[data-cobro='pending'] {
+  background: var(--ui-warning);
+}
+.ventas-dot[data-cobro='overdue'] {
+  background: var(--ui-danger);
+}
+.ventas-dot[data-cobro='void'] {
+  background: var(--ui-text-soft);
+}
+.ventas-dot[data-channel='TPV'] {
+  background: var(--ui-brand);
+}
+.ventas-dot[data-channel='ONLINE'] {
+  background: var(--ui-chart-accent);
+}
+.ventas-dot[data-channel='B2B'] {
+  background: var(--ui-warning);
+}
+
+/* Botón «Limpiar filtros» al pie del carril. */
+.ventas-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 2.1rem;
+  /* `flex-shrink: 0`: como hijo flex del carril con `height` explícito, el flex lo comprimía
+     por debajo de su altura cuando había muchas facetas (Mes/Año) → el botón se veía más bajo
+     que en Hoy/Ayer/Semana. Con shrink 0 conserva su altura y el carril hace scroll. */
+  flex-shrink: 0;
+  margin-top: 0.4rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color var(--ui-motion-fast) var(--ui-ease),
+    border-color var(--ui-motion-fast) var(--ui-ease);
+}
+.ventas-clear:hover {
+  color: var(--ui-danger);
+  border-color: color-mix(in srgb, var(--ui-danger) 40%, var(--ui-border));
+}
+
+/* ─── Columna central: lista de ventas ───────────────────────────────────────── */
+.ventas-list {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: 1 / 3;
+  min-height: 0;
+  border-left: 1px solid var(--ui-border);
+  border-right: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+.ventas-list-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* Sombra de scroll (styles/scroll-shadow.css): la lista se difumina a su propio fondo. */
+  --scroll-shadow-bg: var(--ui-surface-subtle);
+}
+
+/* Chips Cobrado / Pendiente / Vencido. */
+.ventas-summary {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--ui-border);
+  flex: 0 0 auto;
+}
+.ventas-chip {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--ui-radius-md);
+}
+.ventas-chip[data-tone='paid'] {
+  background: color-mix(in srgb, var(--ui-success) 10%, var(--ui-surface));
+  color: var(--ui-success);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-success) 30%, transparent);
+}
+.ventas-chip[data-tone='pending'] {
+  background: color-mix(in srgb, var(--ui-warning) 10%, var(--ui-surface));
+  color: var(--ui-warning);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-warning) 30%, transparent);
+}
+.ventas-chip[data-tone='overdue'] {
+  background: color-mix(in srgb, var(--ui-danger) 10%, var(--ui-surface));
+  color: var(--ui-danger);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-danger) 30%, transparent);
+}
+.ventas-chip-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.ventas-chip-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* Cabecera de la lista: «N ventas» + orden. */
+.ventas-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--ui-border);
+  flex: 0 0 auto;
+}
+.ventas-list-count {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+}
+.ventas-list-sort {
+  font: inherit;
+  font-size: 0.74rem;
+  color: var(--ui-text-soft);
+  background: none;
+  border: 0;
+  padding: 0.15rem 0.4rem;
+  margin: -0.15rem -0.4rem;
+  border-radius: var(--ui-radius-sm);
+  cursor: pointer;
+  transition:
+    color var(--ui-motion-fast) var(--ui-ease),
+    background var(--ui-motion-fast) var(--ui-ease);
+}
+.ventas-list-sort:hover {
+  color: var(--ui-text);
+  background: var(--ui-surface-subtle);
+}
+.ventas-list-sort:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+.ventas-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  /* Inset uniforme de 1rem en los cuatro lados: las filas quedan al ancho exacto de las
+     3 cards de resumen y la última fila guarda la misma distancia al borde inferior que
+     los chips al superior → márgenes simétricos en toda la columna. */
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  scrollbar-width: none;
+}
+.ventas-list-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Pie «Cargar más»: acumula la siguiente página de 100 ventas. */
+.ventas-list-more {
+  display: flex;
+  justify-content: center;
+  padding: 0.7rem 0 0.3rem;
+}
+.ventas-list-more .ventas-btn {
+  font-size: 0.78rem;
+  height: 2.1rem;
+}
+
+/* Tarjeta de venta. */
+.ventas-row {
+  display: grid;
+  grid-template-columns: 2.1rem 1fr auto;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-md);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--ui-motion-fast) var(--ui-ease);
+}
+.ventas-row:hover {
+  background: color-mix(in srgb, var(--ui-surface) 60%, transparent);
+}
+.ventas-row.is-selected {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+}
+.ventas-row:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* Avatar (iniciales). Tono neutro o color categórico vía variable inline. */
+.ventas-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 9px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--avatar-bg, var(--ui-text-soft));
+}
+.ventas-avatar--lg {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: var(--ui-radius-md);
+  font-size: 0.8rem;
+}
+
+.ventas-row-main {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  min-width: 0;
+}
+.ventas-row-name {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ventas-row-sub {
+  font-size: 0.72rem;
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+}
+.ventas-ticket {
+  font-variant-numeric: tabular-nums;
+}
+.ventas-row-end {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+.ventas-row-total {
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text);
+}
+.ventas-row-total.is-void {
+  color: var(--ui-text-soft);
+  text-decoration: line-through;
+}
+
+/* Píldora de estado de cobro. */
+.ventas-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 1.15rem;
+  padding: 0 0.45rem;
+  border-radius: 4px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ventas-pill--lg {
+  height: 1.3rem;
+  padding: 0 0.6rem;
+  font-size: 0.7rem;
+}
+.ventas-pill[data-cobro='paid'] {
+  background: color-mix(in srgb, var(--ui-success) 10%, var(--ui-surface));
+  color: var(--ui-success);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-success) 30%, transparent);
+}
+.ventas-pill[data-cobro='pending'] {
+  background: color-mix(in srgb, var(--ui-warning) 10%, var(--ui-surface));
+  color: var(--ui-warning);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-warning) 30%, transparent);
+}
+.ventas-pill[data-cobro='overdue'] {
+  background: color-mix(in srgb, var(--ui-danger) 10%, var(--ui-surface));
+  color: var(--ui-danger);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-danger) 30%, transparent);
+}
+.ventas-pill[data-cobro='void'] {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-text-muted) 30%, transparent);
+}
+
+/* Estado vacío de la lista. */
+.ventas-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--ui-text-soft);
+}
+.ventas-empty-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+
+/* ─── Columna derecha: ficha de detalle ──────────────────────────────────────── */
+.ventas-detail {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: 1 / 3;
+  min-width: 0;
+  min-height: 0;
+  background: var(--ui-surface);
+}
+
+.ventas-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding: 0 1.5rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.ventas-detail-id {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0;
+}
+.ventas-detail-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+.ventas-detail-name {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+}
+.ventas-detail-meta-line {
+  font-size: 0.78rem;
+  line-height: 1.2;
+  color: var(--ui-text-soft);
+}
+.ventas-detail-amount {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+
+.ventas-cobro-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ventas-cobro-icon[data-cobro='paid'] {
+  background: var(--ui-success);
+  color: #fff;
+}
+.ventas-cobro-icon[data-cobro='pending'] {
+  background: var(--ui-warning);
+}
+.ventas-cobro-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #fff;
+}
+.ventas-cobro-icon[data-cobro='overdue'] {
+  background: var(--ui-danger);
+  color: #fff;
+}
+.ventas-cobro-icon[data-cobro='void'] {
+  background: var(--ui-text-muted);
+  color: #fff;
+}
+.ventas-detail-total {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.ventas-detail-total.is-void {
+  color: var(--ui-text-soft);
+  text-decoration: line-through;
+}
+
+.ventas-detail-body {
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 1.25rem 1.5rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+  max-width: 44rem;
+}
+.ventas-detail-body::-webkit-scrollbar {
+  display: none;
+}
+
+/* Grid de metadatos (Fecha, Canal, Tienda, Vendedor, Método, Artículos). */
+.ventas-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem 0.75rem;
+}
+.ventas-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.ventas-meta-label {
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-soft);
+}
+.ventas-meta-value {
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--ui-text);
+}
+
+/* Sección con título tipo «overline». */
+.ventas-section-title {
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-soft);
+  margin: 0 0 0.5rem;
+}
+
+/* Desglose (líneas). */
+.ventas-breakdown {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  overflow: hidden;
+}
+.ventas-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.ventas-line:last-of-type {
+  border-bottom: none;
+}
+.ventas-line-main {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  min-width: 0;
+}
+.ventas-line-name {
+  font-size: 0.82rem;
+  color: var(--ui-text);
+}
+.ventas-line-qty {
+  font-size: 0.72rem;
+  color: var(--ui-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+.ventas-line-amount {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.ventas-line-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 0.8rem;
+  background: var(--ui-surface-subtle);
+  border-top: 1px solid var(--ui-border);
+}
+.ventas-line-total-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.ventas-line-total-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.ventas-breakdown-loading {
+  padding: 1rem 0.8rem;
+  font-size: 0.8rem;
+  color: var(--ui-text-soft);
+}
+
+/* Seguimiento del cobro (timeline). */
+.ventas-timeline {
+  display: flex;
+  flex-direction: column;
+}
+.ventas-tl-item {
+  display: flex;
+  gap: 0.7rem;
+}
+.ventas-tl-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+}
+.ventas-tl-dot {
+  display: inline-grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.ventas-tl-dot[data-tone='done'] {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+  border: 1px solid color-mix(in srgb, var(--ui-success) 30%, transparent);
+}
+.ventas-tl-dot[data-tone='ok'] {
+  background: var(--ui-success);
+  color: #fff;
+}
+.ventas-tl-dot[data-tone='pending'] {
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
+  border: 1px solid color-mix(in srgb, var(--ui-warning) 30%, transparent);
+}
+.ventas-tl-dot[data-tone='overdue'] {
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+  border: 1px solid color-mix(in srgb, var(--ui-danger) 30%, transparent);
+}
+.ventas-tl-dot[data-tone='void'] {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.ventas-tl-line {
+  width: 2px;
+  flex: 1;
+  min-height: 1rem;
+  background: var(--ui-border);
+}
+.ventas-tl-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  padding-bottom: 0.85rem;
+}
+.ventas-tl-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ui-text);
+}
+.ventas-tl-when {
+  font-size: 0.72rem;
+  color: var(--ui-text-soft);
+}
+
+/* Acciones de la ficha. */
+.ventas-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.ventas-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.35rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    border-color var(--ui-motion-fast) var(--ui-ease);
+}
+.ventas-btn:hover {
+  background: var(--ui-surface-subtle);
+  border-color: var(--ui-border-strong);
+}
+.ventas-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.ventas-btn--primary {
+  background: var(--ap-blue, var(--ui-primary));
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+}
+.ventas-btn--primary:hover {
+  filter: brightness(0.95);
+  background: var(--ap-blue, var(--ui-primary));
+  color: #fff;
+}
+.ventas-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Estado «sin selección» de la ficha. Ocupa AMBAS filas del subgrid (no solo la fila 1,
+   donde iría el head): así no infla la fila del header —que estiraría las chips de la
+   lista— y el placeholder se centra en toda la altura de la columna de detalle. */
+.ventas-detail-blank {
+  grid-row: 1 / -1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 2.5rem;
+  text-align: center;
+}
+.ventas-detail-blank-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.ventas-detail-blank-text {
+  font-size: 0.78rem;
+  color: var(--ui-text-soft);
+  max-width: 16rem;
+}
+
+/* El filtro de periodo (PeriodSegmented) adopta el lenguaje de las pestañas flotantes
+   del topbar de Inventario (.inv-nav-tab): píldoras individuales de cristal con borde
+   hairline + radio `sm`, en vez de la píldora-contenedor redonda de .bo-tabs. La activa
+   pasa a azul sólido. Override scoped a .period-seg → no afecta a .bo-tabs en otras vistas. */
+.period-seg.bo-tabs {
+  gap: 0.3rem;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+.period-seg .bo-tab {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  padding: 0 0.82rem;
+  letter-spacing: -0.01em;
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.2s ease;
+}
+.period-seg .bo-tab:hover {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+}
+.period-seg .bo-tab.active {
+  background: var(--ap-blue, var(--ui-primary));
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: none;
+}
+.period-seg .bo-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ventas-row,
+  .ventas-btn,
+  .ventas-clear,
+  .period-seg .bo-tab {
+    transition: none;
+  }
+}
+
+/* En pantallas estrechas la ficha pasa debajo (carril + lista arriba). */
+@media (max-width: 1100px) {
+  .ventas-layout {
+    grid-template-columns: 14rem minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+  }
+  .ventas-layout > .scroll-shadow-cell {
+    grid-row: 1 / 4;
+  }
+  .ventas-list {
+    grid-row: 1 / 3;
+  }
+  .ventas-detail {
+    grid-column: 2 / 3;
+    grid-row: 3;
+    border-top: 1px solid var(--ui-border);
+  }
+}

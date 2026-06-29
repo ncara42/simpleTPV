@@ -58,6 +58,7 @@ import { fmtMinutes, hhmm, listHistoryAll, msToMin } from './lib/time-clock.js';
 import { useModeTransition } from './lib/use-mode-transition.js';
 import { STATUS_LABEL } from './purchases/labels.js';
 import { ALERT_LABEL, df, EXPIRY_LABEL, expiryDaysText } from './stock/labels.js';
+import { WIDGET_PANELS } from './widgets/panels/index.js';
 import { getWidgetLabel, getWidgetSpec } from './widgets/registry.js';
 
 // Subtítulo de panel según el periodo seleccionado (más claro que "Periodo actual").
@@ -212,6 +213,7 @@ export function DashboardPage({
     canRedo: false,
     drawOpen: false,
     mode: 'select',
+    zoomPct: 100,
   });
   // Registra/actualiza el binding SOLO en modo libre: la barra de herramientas del lienzo (dibujo,
   // pan, goma, deshacer/rehacer) solo aplica al FreeBoard. En modo rejilla se limpia para que el
@@ -1089,6 +1091,9 @@ export function DashboardPage({
     if (id.startsWith('gen:')) {
       return getWidgetSpec(id)?.render?.() ?? null;
     }
+    // Widgets del rediseño: cada uno consulta sus datos al montarse (recibe period/store).
+    const Panel = WIDGET_PANELS[id];
+    if (Panel) return <Panel period={period} store={store} />;
     const card = cardDefs.find((c) => c.id === id);
     return card ? card.node : (renderPanel(id)?.node ?? null);
   };

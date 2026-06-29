@@ -4,8 +4,12 @@
 
 use rust_decimal::Decimal;
 use serde::Serialize;
-use time::PrimitiveDateTime;
+use time::{Date, PrimitiveDateTime};
 use uuid::Uuid;
+
+// El cobro mayorista reutiliza el enum del ledger retail (PENDING/PAID): un pedido
+// nace PENDING (a crédito) y se marca PAID al cobrar. VENCIDO es virtual.
+pub use crate::sales::model::PaymentStatus;
 
 pg_text_enum! {
     pub enum WholesaleOrderStatus {
@@ -50,6 +54,11 @@ pub struct WholesaleOrderCreated {
     #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
     pub total: Decimal,
     pub notes: Option<String>,
+    pub payment_status: PaymentStatus,
+    #[serde(serialize_with = "crate::serde_helpers::iso_opt_date")]
+    pub due_date: Option<Date>,
+    #[serde(serialize_with = "crate::serde_helpers::iso_opt_utc")]
+    pub paid_at: Option<PrimitiveDateTime>,
     #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
     pub created_at: PrimitiveDateTime,
     #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
@@ -101,6 +110,11 @@ pub struct WholesaleOrderDetail {
     #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
     pub total: Decimal,
     pub notes: Option<String>,
+    pub payment_status: PaymentStatus,
+    #[serde(serialize_with = "crate::serde_helpers::iso_opt_date")]
+    pub due_date: Option<Date>,
+    #[serde(serialize_with = "crate::serde_helpers::iso_opt_utc")]
+    pub paid_at: Option<PrimitiveDateTime>,
     #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
     pub created_at: PrimitiveDateTime,
     #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
@@ -120,6 +134,11 @@ pub struct WholesaleOrderListItem {
     #[serde(serialize_with = "crate::serde_helpers::decimal_str")]
     pub total: Decimal,
     pub line_count: i64,
+    pub payment_status: PaymentStatus,
+    #[serde(serialize_with = "crate::serde_helpers::iso_opt_date")]
+    pub due_date: Option<Date>,
+    #[serde(serialize_with = "crate::serde_helpers::iso_opt_utc")]
+    pub paid_at: Option<PrimitiveDateTime>,
     #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
     pub created_at: PrimitiveDateTime,
 }

@@ -26,7 +26,14 @@ export {
   type StackedBarDatum,
   type StackedSegment,
 } from './components/StackedBarChart.js';
+export { Tooltip, type TooltipProps } from './components/Tooltip.js';
 export { TopBar, type TopBarProps } from './components/TopBar.js';
+export {
+  TransferChat,
+  type TransferChatMessage,
+  type TransferChatProps,
+  type TransferChatSide,
+} from './components/TransferChat.js';
 export { applyBrandColor, type Branding, relativeLuminance } from './lib/brand.js';
 export { cn } from './lib/cn.js';
 export { initials } from './lib/initials.js';

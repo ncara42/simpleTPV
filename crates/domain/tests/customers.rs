@@ -79,6 +79,10 @@ fn new_customer(name: &str, price_list: Option<Uuid>) -> CreateCustomer {
         phone: None,
         address: None,
         price_list_id: price_list,
+        tags: Some(vec!["VIP".into(), "HORECA".into()]),
+        payment_terms: Some(30),
+        sales_rep: Some("Ana Pérez".into()),
+        credit_limit: None,
         active: None,
     }
 }
@@ -98,6 +102,11 @@ async fn crud_clientes_y_tarifa_anidada() {
     );
     assert!(created.active); // default true
     assert_eq!(created.email.as_deref(), Some("b2b@cliente.test"));
+    // Campos CRM/cartera persistidos en el alta.
+    assert_eq!(created.tags, vec!["VIP".to_string(), "HORECA".to_string()]);
+    assert_eq!(created.payment_terms, Some(30));
+    assert_eq!(created.sales_rep.as_deref(), Some("Ana Pérez"));
+    assert!(created.credit_limit.is_none());
 
     // Listado.
     let all = service::list(&c.app, c.org).await.unwrap();
@@ -124,6 +133,10 @@ async fn crud_clientes_y_tarifa_anidada() {
             phone: None,
             address: None,
             price_list_id: Some(None),
+            tags: None,
+            payment_terms: None,
+            sales_rep: None,
+            credit_limit: None,
             active: None,
         },
     )
@@ -133,6 +146,9 @@ async fn crud_clientes_y_tarifa_anidada() {
     assert_eq!(updated.price_list_id, None);
     assert!(updated.price_list.is_none());
     assert_eq!(updated.email.as_deref(), Some("b2b@cliente.test")); // conservado
+                                                                    // El PATCH sin tocar CRM conserva los campos (COALESCE con NULL).
+    assert_eq!(updated.payment_terms, Some(30));
+    assert_eq!(updated.sales_rep.as_deref(), Some("Ana Pérez"));
 
     // PATCH de cliente inexistente → NotFound.
     assert_eq!(
@@ -147,6 +163,10 @@ async fn crud_clientes_y_tarifa_anidada() {
                 phone: None,
                 address: None,
                 price_list_id: None,
+                tags: None,
+                payment_terms: None,
+                sales_rep: None,
+                credit_limit: None,
                 active: None,
             },
         )

@@ -34,6 +34,8 @@ pub struct Transfer {
     pub received_at: Option<PrimitiveDateTime>,
     #[serde(serialize_with = "crate::serde_helpers::iso_opt_utc")]
     pub closed_at: Option<PrimitiveDateTime>,
+    #[serde(serialize_with = "crate::serde_helpers::iso_opt_utc")]
+    pub incident_resolved_at: Option<PrimitiveDateTime>,
 }
 
 /// Fila plana de línea (con datos del producto) para mapear a [`TransferLine`].
@@ -101,4 +103,80 @@ pub struct TransferWithLines {
     #[serde(flatten)]
     pub transfer: Transfer,
     pub lines: Vec<TransferLine>,
+}
+
+/// Fila plana de un adjunto de traspaso (foto de recepción).
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct TransferAttachmentRow {
+    pub id: Uuid,
+    pub transfer_line_id: Option<Uuid>,
+    pub mime_type: String,
+    pub data_url: String,
+    pub caption: Option<String>,
+    pub created_at: PrimitiveDateTime,
+}
+
+/// Adjunto de traspaso (salida JSON). `data_url` es el data-URL base64 listo para
+/// pintar inline con `<img src=…>` (mismo enfoque que el logo de marca).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferAttachment {
+    pub id: Uuid,
+    pub transfer_line_id: Option<Uuid>,
+    pub mime_type: String,
+    pub data_url: String,
+    pub caption: Option<String>,
+    #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
+    pub created_at: PrimitiveDateTime,
+}
+
+impl From<TransferAttachmentRow> for TransferAttachment {
+    fn from(r: TransferAttachmentRow) -> Self {
+        TransferAttachment {
+            id: r.id,
+            transfer_line_id: r.transfer_line_id,
+            mime_type: r.mime_type,
+            data_url: r.data_url,
+            caption: r.caption,
+            created_at: r.created_at,
+        }
+    }
+}
+
+/// Fila plana de un mensaje del chat de traspaso.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct TransferMessageRow {
+    pub id: Uuid,
+    pub author: String,
+    pub body: Option<String>,
+    pub data_url: Option<String>,
+    pub mime_type: Option<String>,
+    pub created_at: PrimitiveDateTime,
+}
+
+/// Mensaje del chat de traspaso (salida JSON). `author` = 'store' (la tienda que recibe)
+/// o 'central' (backoffice). Lleva texto y/o una foto en `data_url` (data-URL base64).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferMessage {
+    pub id: Uuid,
+    pub author: String,
+    pub body: Option<String>,
+    pub data_url: Option<String>,
+    pub mime_type: Option<String>,
+    #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
+    pub created_at: PrimitiveDateTime,
+}
+
+impl From<TransferMessageRow> for TransferMessage {
+    fn from(r: TransferMessageRow) -> Self {
+        TransferMessage {
+            id: r.id,
+            author: r.author,
+            body: r.body,
+            data_url: r.data_url,
+            mime_type: r.mime_type,
+            created_at: r.created_at,
+        }
+    }
 }

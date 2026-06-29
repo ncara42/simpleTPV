@@ -6,4 +6,4 @@ pub mod model;
 pub mod service;
 
 pub use input::{CreateCustomer, UpdateCustomer};
-pub use model::{Customer, PriceListRef};
+pub use model::{Customer, CustomerLedgerRow, PriceListRef};

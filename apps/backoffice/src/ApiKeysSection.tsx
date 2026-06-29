@@ -63,8 +63,8 @@ interface CreateForm {
 
 const EMPTY_FORM: CreateForm = { name: '', priceListId: '' };
 
-// Sección embebible en Ayuda → "Integraciones" (D-09b): API Keys dejó de ser una
-// page del menú; esta sección conserva sus testids (apikeys-*) y su flujo.
+// Sección embebible en Ajustes → "Integraciones": API Keys no es una page del
+// menú; vive como bloque de Ajustes y conserva sus testids (apikeys-*) y su flujo.
 export function ApiKeysSection() {
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -104,7 +104,7 @@ export function ApiKeysSection() {
   const revoked = keys.filter((k) => k.revokedAt);
 
   return (
-    <div className="help-integrations-body" data-testid="apikeys-page">
+    <div className="integrations-embed" data-testid="apikeys-page">
       <div className="table-panel">
         <SectionToolbar
           actionLabel="Nueva API key"

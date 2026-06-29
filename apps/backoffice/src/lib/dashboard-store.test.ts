@@ -110,9 +110,9 @@ describe('addWidget (catálogo)', () => {
     // El preset «personalizado» deriva su lista de widgets de freeLayouts, así que
     // el alta del agente cae en el lienzo libre (fuente de la lista de widgets del preset). Antes
     // escribía en el grid layout, que el render del preset no mira, y el widget no aparecía.
-    const r = store().addWidget('kpi-today');
+    const r = store().addWidget('dash-bars');
     expect(r.accepted).toBe(true);
-    expect(freeOf().some((e) => e.kind === 'widget' && e.widgetId === 'kpi-today')).toBe(true);
+    expect(freeOf().some((e) => e.kind === 'widget' && e.widgetId === 'dash-bars')).toBe(true);
   });
 
   it('coloca un widget en una posición semántica del lienzo', () => {
@@ -139,7 +139,7 @@ describe('addWidget (catálogo)', () => {
   it('escalona en el lienzo libre dos widgets distintos en la misma ancla (anti-solape)', () => {
     store().hydrate({});
     store().addWidget('dash-bars', 'center');
-    store().addWidget('dash-family', 'center');
+    store().addWidget('dash-hour', 'center');
     const els = freeOf().filter((e) => e.kind === 'widget');
     expect(els).toHaveLength(2);
     // No quedan exactamente en la misma posición (offset diagonal aplicado).
@@ -646,54 +646,6 @@ describe('normalizeGenericSpec — panel v2 (#204): REPARA en vez de podar', () 
   });
 });
 
-describe('bloques pre-cableados (#205): add_widget block:<id>', () => {
-  it('coloca un bloque entero con UNA llamada y lo registra (E2E)', () => {
-    const r = store().applyCanvasOp({
-      op: 'add_widget',
-      position: 'center',
-      elementId: 'blk-1',
-      widgetId: 'block:sales-overview',
-      period: 'month',
-    });
-    expect(r.accepted).toBe(true);
-    const id = genericElementId('blk-1');
-    expect(id).toBe('gen:blk-1');
-    const spec = store().layout.genericWidgets?.[id];
-    expect(spec).toBeDefined();
-    expect(spec!.kind).toBe('panel');
-    expect(spec!.recipe).toBe('kpiRow+oneChart');
-    // params heredados en las hojas
-    expect(spec!.slots?.kpis?.[0]?.period).toBe('month');
-    // registrado y renderizable
-    expect(getWidgetSpec(id)).toBeDefined();
-    expect(typeof getWidgetSpec(id)!.render).toBe('function');
-    // y colocado en el lienzo libre
-    expect(freeOf().some((e) => e.id === id)).toBe(true);
-  });
-
-  it('el undo elimina el bloque por su id', () => {
-    store().applyCanvasOp({
-      op: 'add_widget',
-      position: 'center',
-      elementId: 'blk-2',
-      widgetId: 'block:stock-risk',
-    });
-    const id = genericElementId('blk-2');
-    expect(store().layout.genericWidgets?.[id]).toBeDefined();
-    const undo = store().removeElement(id);
-    expect(undo.accepted).toBe(true);
-    expect(store().layout.genericWidgets?.[id]).toBeUndefined();
-    expect(getWidgetSpec(id)).toBeUndefined();
-    expect(freeOf().some((e) => e.id === id)).toBe(false);
-  });
-
-  it('un bloque desconocido se rechaza', () => {
-    const r = store().applyCanvasOp({ op: 'add_widget', widgetId: 'block:no-existe' });
-    expect(r.accepted).toBe(false);
-    expect(r.reason).toMatch(/bloque desconocido/);
-  });
-});
-
 // Cuenta hojas de un árbol composite normalizado (para aserciones de poda).
 function countLeaves(node: CompositeNode | undefined): number {
   if (!node) return 0;
@@ -721,15 +673,15 @@ describe('remove / clear / arrange', () => {
   // handleUndoCanvasOps en App.tsx (op.elementId ?? op.widgetId → removeElement).
   it('add_widget → undo (por widgetId) → re-add no duplica el widget en el lienzo', () => {
     const count = () =>
-      freeOf().filter((e) => e.kind === 'widget' && e.widgetId === 'kpi-today').length;
-    store().applyCanvasOp({ op: 'add_widget', widgetId: 'kpi-today' });
+      freeOf().filter((e) => e.kind === 'widget' && e.widgetId === 'dash-bars').length;
+    store().applyCanvasOp({ op: 'add_widget', widgetId: 'dash-bars' });
     expect(count()).toBe(1);
     // Undo: el CanvasOp persistido lleva widgetId (no elementId) para widgets de catálogo, y el
     // elemento libre usa el widgetId como id, así que removeElement(widgetId) lo encuentra.
-    store().removeElement('kpi-today');
+    store().removeElement('dash-bars');
     expect(count()).toBe(0);
     // Reenvío del turno corregido: vuelve a añadirse una sola vez.
-    store().applyCanvasOp({ op: 'add_widget', widgetId: 'kpi-today' });
+    store().applyCanvasOp({ op: 'add_widget', widgetId: 'dash-bars' });
     expect(count()).toBe(1);
   });
 
@@ -754,7 +706,7 @@ describe('remove / clear / arrange', () => {
   it('arrange reorganiza el lienzo libre', () => {
     store().hydrate({});
     store().addWidget('dash-bars', 'bottom-right');
-    store().addWidget('dash-family', 'bottom-right');
+    store().addWidget('dash-hour', 'bottom-right');
     const r = store().arrange();
     expect(r.accepted).toBe(true);
     // autoArrangeFree coloca el primero en el origen del flujo.
@@ -765,7 +717,7 @@ describe('remove / clear / arrange', () => {
 describe('applyCanvasOp (despacho)', () => {
   it('despacha cada tipo de operación', () => {
     store().hydrate({});
-    expect(store().applyCanvasOp({ op: 'add_widget', widgetId: 'kpi-today' }).accepted).toBe(true);
+    expect(store().applyCanvasOp({ op: 'add_widget', widgetId: 'dash-bars' }).accepted).toBe(true);
     expect(store().applyCanvasOp({ op: 'add_shape', kind: 'arrow' }).accepted).toBe(true);
     expect(store().applyCanvasOp({ op: 'add_text', text: 'hi' }).accepted).toBe(true);
     expect(store().applyCanvasOp({ op: 'add_note', text: 'n' }).accepted).toBe(true);
@@ -796,11 +748,11 @@ describe('buildCanvasSnapshot (para el system prompt, F5)', () => {
   });
 
   it('lista widgets con id y label humano', () => {
-    store().addWidget('kpi-today', 'top-left');
+    store().addWidget('dash-bars', 'top-left');
     const snap = buildCanvasSnapshot();
-    const el = snap.elements.find((e) => e.id === 'kpi-today');
+    const el = snap.elements.find((e) => e.id === 'dash-bars');
     expect(el).toBeDefined();
-    expect(el!.label).toBe('Facturación hoy');
+    expect(el!.label).toBe('Ventas');
     expect(typeof el!.x).toBe('number');
   });
 

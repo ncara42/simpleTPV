@@ -27,8 +27,13 @@ export interface TopBarProps {
   notificationsActive?: boolean | undefined;
   /** Acciones de la vista activa (export/import…): clúster derecho, antes de la búsqueda. */
   pageActions?: React.ReactNode;
-  /** Lanzador de búsqueda (⌘K): vive DENTRO de la isla (barra de navegación). */
+  /** Sub-navegación de la vista activa (pestañas Catálogo/Familias…): columna izquierda. */
+  pageNav?: React.ReactNode;
+  /** Lanzador de búsqueda (⌘K): botón independiente en el clúster derecho. */
   search?: React.ReactNode;
+  /** Acciones DENTRO de la isla central, tras el título (p. ej. lanzador del asistente de IA):
+   * separadas del rótulo por un filete, se leen como «atrás · vista ┊ acción». */
+  islandActions?: React.ReactNode;
   /** Slot extra al final del clúster derecho (p. ej. conmutador de modo del dashboard). */
   endSlot?: React.ReactNode;
   /** Cuenta: botón con menú (cerrar sesión) en el extremo derecho. */
@@ -166,12 +171,16 @@ export function TopBar({
   notificationCount = 0,
   notificationsActive = false,
   pageActions,
+  pageNav,
   search,
+  islandActions,
   endSlot,
   account,
 }: TopBarProps) {
   return (
     <header className="topbar" data-testid="topbar">
+      {/* Columna izquierda: sub-navegación de la vista activa (pestañas Catálogo/Familias…). */}
+      {pageNav && <div className="topbar-page-nav">{pageNav}</div>}
       {/* Isla central: atrás · título (centrado) · tema · campana. */}
       <div className="topbar-island">
         {onBack && (
@@ -189,11 +198,13 @@ export function TopBar({
         <h1 className="topbar-title" data-testid={titleTestId} title={title}>
           {title}
         </h1>
-        {search && <div className="topbar-island-actions">{search}</div>}
+        {/* Acciones de la isla (p. ej. robot del asistente): tras el título, separadas por un
+            filete vertical → «atrás · vista ┊ acción». */}
+        {islandActions && <div className="topbar-island-actions">{islandActions}</div>}
       </div>
 
-      {/* Clúster derecho: acciones de vista · campana · conmutador de modo · cuenta. */}
-      {(pageActions || onNotifications || endSlot || account) && (
+      {/* Clúster derecho: acciones de vista · campana · búsqueda · extras · cuenta. */}
+      {(pageActions || onNotifications || search || endSlot || account) && (
         <div className="topbar-right">
           {pageActions && <div className="topbar-page-actions">{pageActions}</div>}
           {onNotifications && (
@@ -218,6 +229,7 @@ export function TopBar({
               )}
             </button>
           )}
+          {search}
           {endSlot}
           {account && <AccountMenu account={account} />}
         </div>

@@ -16,13 +16,23 @@ use crate::stock::service::{
 };
 use crate::store_access::has_store_access;
 
-use super::input::{CreateTransfer, ReceiveTransfer};
-use super::model::{Transfer, TransferLine, TransferLineRow, TransferStatus, TransferWithLines};
+use super::input::{CreateAttachment, CreateMessage, CreateTransfer, EditMessage, ReceiveTransfer};
+use super::model::{
+    Transfer, TransferAttachment, TransferAttachmentRow, TransferLine, TransferLineRow,
+    TransferMessage, TransferMessageRow, TransferStatus, TransferWithLines,
+};
+
+const ATTACHMENT_COLS: &str = r#"id, "transferLineId" AS transfer_line_id,
+    "mimeType" AS mime_type, "dataUrl" AS data_url, caption, "createdAt" AS created_at"#;
+
+const MESSAGE_COLS: &str = r#"id, author, body, "mimeType" AS mime_type,
+    "dataUrl" AS data_url, "createdAt" AS created_at"#;
 
 const TRANSFER_COLS: &str = r#"id, "organizationId" AS organization_id,
     "originStoreId" AS origin_store_id, "destStoreId" AS dest_store_id, status::text AS status,
     notes, "createdBy" AS created_by, "createdAt" AS created_at, "sentAt" AS sent_at,
-    "receivedAt" AS received_at, "closedAt" AS closed_at"#;
+    "receivedAt" AS received_at, "closedAt" AS closed_at,
+    "incidentResolvedAt" AS incident_resolved_at"#;
 
 const LINE_SELECT: &str = r#"SELECT tl.id, tl."transferId" AS transfer_id, tl."productId" AS product_id,
     tl."quantitySent" AS quantity_sent, tl."quantityReceived" AS quantity_received,
@@ -346,6 +356,278 @@ pub async fn list(
             out.push(with_lines(tx, t).await?);
         }
         Ok(out)
+    })
+    .await
+}
+
+/// `POST /transfers/:id/attachments` — adjunta una foto a la recepción. Mismas reglas
+/// que recibir (ADMIN/MANAGER/CLERK; CLERK acotado a su tienda destino, SEC-01). La
+/// línea, si se indica, debe pertenecer al traspaso.
+pub async fn add_attachment(
+    pool: &PgPool,
+    org: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
+    transfer_id: Uuid,
+    input: CreateAttachment,
+) -> Result<TransferAttachment, AppError> {
+    let mime = input.validate()?;
+    let result: Result<TransferAttachment, AppError> =
+        with_tenant_tx(pool, org, async move |tx, _after| {
+            let Some(t) = load_transfer(tx, org, transfer_id).await? else {
+                return Ok(Err(AppError::NotFound));
+            };
+            if !is_org_wide && !has_store_access(tx, user_id, t.dest_store_id).await? {
+                return Ok(Err(AppError::Forbidden));
+            }
+            if let Some(line_id) = input.transfer_line_id {
+                let belongs: bool = sqlx::query_scalar(
+                    r#"SELECT EXISTS(SELECT 1 FROM "TransferLine"
+                       WHERE id = $1 AND "transferId" = $2)"#,
+                )
+                .bind(line_id)
+                .bind(transfer_id)
+                .fetch_one(&mut **tx)
+                .await?;
+                if !belongs {
+                    return Ok(Err(AppError::BadRequest));
+                }
+            }
+            let id = Uuid::new_v4();
+            sqlx::query(
+                r#"INSERT INTO "TransferAttachment"
+                   (id, "organizationId", "transferId", "transferLineId", "mimeType", "dataUrl", caption, "createdBy")
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+            )
+            .bind(id)
+            .bind(org)
+            .bind(transfer_id)
+            .bind(input.transfer_line_id)
+            .bind(mime)
+            .bind(&input.data_url)
+            .bind(input.caption.as_deref())
+            .bind(user_id)
+            .execute(&mut **tx)
+            .await?;
+            let sql = format!(
+                r#"SELECT {ATTACHMENT_COLS} FROM "TransferAttachment" WHERE id = $1"#
+            );
+            let row: TransferAttachmentRow =
+                sqlx::query_as(&sql).bind(id).fetch_one(&mut **tx).await?;
+            Ok(Ok(TransferAttachment::from(row)))
+        })
+        .await?;
+    result
+}
+
+/// `GET /transfers/:id/attachments` — fotos del traspaso (más antiguas primero).
+pub async fn list_attachments(
+    pool: &PgPool,
+    org: Uuid,
+    transfer_id: Uuid,
+) -> Result<Vec<TransferAttachment>, AppError> {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        let sql = format!(
+            r#"SELECT {ATTACHMENT_COLS} FROM "TransferAttachment"
+               WHERE "transferId" = $1 ORDER BY "createdAt", id"#
+        );
+        let rows: Vec<TransferAttachmentRow> = sqlx::query_as(&sql)
+            .bind(transfer_id)
+            .fetch_all(&mut **tx)
+            .await?;
+        Ok(rows.into_iter().map(TransferAttachment::from).collect())
+    })
+    .await
+}
+
+/// `POST /transfers/:id/messages` — añade un mensaje al chat. El autor lo decide el
+/// rol: org-wide → 'central'; el resto (CLERK) → 'store' (acotado a su tienda destino,
+/// SEC-01). Lleva texto y/o foto.
+pub async fn add_message(
+    pool: &PgPool,
+    org: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
+    transfer_id: Uuid,
+    input: CreateMessage,
+) -> Result<TransferMessage, AppError> {
+    input.validate()?;
+    let author = if is_org_wide { "central" } else { "store" };
+    let body = input
+        .body
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let data_url = input.data_url.as_deref().filter(|s| !s.is_empty());
+    let mime = data_url.and_then(|u| super::input::validate_image_data_url(u).ok());
+    let result: Result<TransferMessage, AppError> =
+        with_tenant_tx(pool, org, async move |tx, _after| {
+            let Some(t) = load_transfer(tx, org, transfer_id).await? else {
+                return Ok(Err(AppError::NotFound));
+            };
+            if !is_org_wide && !has_store_access(tx, user_id, t.dest_store_id).await? {
+                return Ok(Err(AppError::Forbidden));
+            }
+            let id = Uuid::new_v4();
+            sqlx::query(
+                r#"INSERT INTO "TransferMessage"
+                   (id, "organizationId", "transferId", author, body, "dataUrl", "mimeType", "createdBy")
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+            )
+            .bind(id)
+            .bind(org)
+            .bind(transfer_id)
+            .bind(author)
+            .bind(body)
+            .bind(data_url)
+            .bind(mime)
+            .bind(user_id)
+            .execute(&mut **tx)
+            .await?;
+            let sql = format!(r#"SELECT {MESSAGE_COLS} FROM "TransferMessage" WHERE id = $1"#);
+            let row: TransferMessageRow =
+                sqlx::query_as(&sql).bind(id).fetch_one(&mut **tx).await?;
+            Ok(Ok(TransferMessage::from(row)))
+        })
+        .await?;
+    result
+}
+
+/// Comprueba el acceso al chat del traspaso (org-wide o tienda destino, SEC-01) y que
+/// el mensaje pertenece al traspaso. Devuelve el traspaso cargado.
+async fn guard_message_access(
+    tx: &mut Transaction<'_, Postgres>,
+    org: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
+    transfer_id: Uuid,
+    message_id: Uuid,
+) -> Result<Result<(), AppError>, sqlx::Error> {
+    let Some(t) = load_transfer(tx, org, transfer_id).await? else {
+        return Ok(Err(AppError::NotFound));
+    };
+    if !is_org_wide && !has_store_access(tx, user_id, t.dest_store_id).await? {
+        return Ok(Err(AppError::Forbidden));
+    }
+    let belongs: bool = sqlx::query_scalar(
+        r#"SELECT EXISTS(SELECT 1 FROM "TransferMessage" WHERE id = $1 AND "transferId" = $2)"#,
+    )
+    .bind(message_id)
+    .bind(transfer_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    if !belongs {
+        return Ok(Err(AppError::NotFound));
+    }
+    Ok(Ok(()))
+}
+
+/// `PATCH /transfers/:id/messages/:messageId` — edita el texto de un mensaje del chat.
+pub async fn update_message(
+    pool: &PgPool,
+    org: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
+    transfer_id: Uuid,
+    message_id: Uuid,
+    input: EditMessage,
+) -> Result<TransferMessage, AppError> {
+    let body = input.validate()?.to_string();
+    let result: Result<TransferMessage, AppError> =
+        with_tenant_tx(pool, org, async move |tx, _after| {
+            if let Err(e) =
+                guard_message_access(tx, org, user_id, is_org_wide, transfer_id, message_id).await?
+            {
+                return Ok(Err(e));
+            }
+            let sql = format!(
+                r#"UPDATE "TransferMessage" SET body = $2 WHERE id = $1 RETURNING {MESSAGE_COLS}"#
+            );
+            let row: TransferMessageRow = sqlx::query_as(&sql)
+                .bind(message_id)
+                .bind(&body)
+                .fetch_one(&mut **tx)
+                .await?;
+            Ok(Ok(TransferMessage::from(row)))
+        })
+        .await?;
+    result
+}
+
+/// `DELETE /transfers/:id/messages/:messageId` — borra un mensaje del chat.
+pub async fn delete_message(
+    pool: &PgPool,
+    org: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
+    transfer_id: Uuid,
+    message_id: Uuid,
+) -> Result<(), AppError> {
+    let result: Result<(), AppError> = with_tenant_tx(pool, org, async move |tx, _after| {
+        if let Err(e) =
+            guard_message_access(tx, org, user_id, is_org_wide, transfer_id, message_id).await?
+        {
+            return Ok(Err(e));
+        }
+        sqlx::query(r#"DELETE FROM "TransferMessage" WHERE id = $1"#)
+            .bind(message_id)
+            .execute(&mut **tx)
+            .await?;
+        Ok(Ok(()))
+    })
+    .await?;
+    result
+}
+
+/// `POST /transfers/:id/resolve-incident` — marca la incidencia como solucionada
+/// (`incidentResolvedAt = now()`, idempotente: respeta la primera marca). El hilo de
+/// chat se conserva. Acceso como recibir/mensajes (org-wide o tienda destino).
+pub async fn resolve_incident(
+    pool: &PgPool,
+    org: Uuid,
+    user_id: Uuid,
+    is_org_wide: bool,
+    id: Uuid,
+) -> Result<TransferWithLines, AppError> {
+    let result: Result<TransferWithLines, AppError> =
+        with_tenant_tx(pool, org, async move |tx, _after| {
+            let Some(t) = load_transfer(tx, org, id).await? else {
+                return Ok(Err(AppError::NotFound));
+            };
+            if !is_org_wide && !has_store_access(tx, user_id, t.dest_store_id).await? {
+                return Ok(Err(AppError::Forbidden));
+            }
+            sqlx::query(
+                r#"UPDATE "Transfer" SET "incidentResolvedAt" = now()
+                   WHERE id = $1 AND "organizationId" = $2 AND "incidentResolvedAt" IS NULL"#,
+            )
+            .bind(id)
+            .bind(org)
+            .execute(&mut **tx)
+            .await?;
+            let t2 = load_transfer(tx, org, id).await?.expect("resuelto");
+            Ok(Ok(with_lines(tx, t2).await?))
+        })
+        .await?;
+    result
+}
+
+/// `GET /transfers/:id/messages` — hilo del chat (cronológico).
+pub async fn list_messages(
+    pool: &PgPool,
+    org: Uuid,
+    transfer_id: Uuid,
+) -> Result<Vec<TransferMessage>, AppError> {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        let sql = format!(
+            r#"SELECT {MESSAGE_COLS} FROM "TransferMessage"
+               WHERE "transferId" = $1 ORDER BY "createdAt", id"#
+        );
+        let rows: Vec<TransferMessageRow> = sqlx::query_as(&sql)
+            .bind(transfer_id)
+            .fetch_all(&mut **tx)
+            .await?;
+        Ok(rows.into_iter().map(TransferMessage::from).collect())
     })
     .await
 }

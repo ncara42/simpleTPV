@@ -1,0 +1,764 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   INVENTARIO — card unificada (cabecera + pestañas) + Catálogo facetado y agrupado.
+   Rediseño de la vista Catálogo: carril de facetas a la izquierda y tabla agrupada
+   por familia a la derecha, dentro de UNA sola superficie. Lenguaje visual Geist
+   (azul único de acento, neutros fríos, hairline + radios 12px) vía tokens --ui-*.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Paleta de texto para etiquetas de familia (Radix UI paso 11, dark-aware) ── */
+/* Light: colores calibrados para texto sobre fondo claro (WCAG AA ≥ 4.5:1).
+   Dark:  equivalentes del modo oscuro de Radix, más claros para el fondo oscuro. */
+:root {
+  --fam-c-0: #0D74CE; /* Blue    */
+  --fam-c-1: #6550B9; /* Violet  */
+  --fam-c-2: #CB1D63; /* Crimson */
+  --fam-c-3: #008573; /* Teal    */
+  --fam-c-4: #AD5700; /* Amber   */
+  --fam-c-5: #218358; /* Green   */
+  --fam-c-6: #BD4B00; /* Orange  */
+  --fam-c-7: #9C2BAD; /* Plum    */
+}
+:root[data-theme='dark'] {
+  --fam-c-0: #70B8FF;
+  --fam-c-1: #BAA7FF;
+  --fam-c-2: #FF92AD;
+  --fam-c-3: #0BD8B6;
+  --fam-c-4: #FFB224;
+  --fam-c-5: #46A758;
+  --fam-c-6: #FF8B3E;
+  --fam-c-7: #DF74FF;
+}
+
+/* ─── Card contenedora ─────────────────────────────────────────────────────── */
+/* Cuando el inventario ocupa la vista, la card sube hasta casi pegar con el topbar
+   (padding-top 0.4rem, a la altura del primer botón del sidebar) y se alinea en horizontal
+   con el contenido del topbar (1.25rem laterales). El padding-bottom queda en 1.5rem (el 6rem
+   original reservaba el dock del asistente; aquí no se necesita). */
+.bo-main--surface:has(.inventory-page) {
+  padding: 0.4rem 1.25rem 1.5rem;
+}
+.inventory-page {
+  /* Offset = topbar (60px) + padding-top (0.4rem) + padding-bottom (1.5rem). */
+  height: calc(100dvh - 60px - 1.9rem);
+  display: flex;
+  flex-direction: column;
+}
+.inv-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.04), 0 4px 24px -8px rgb(0 0 0 / 0.10);
+  overflow: hidden;
+}
+
+
+/* ─── Pestañas flotantes independientes en la TopBar (slot pageNav) ─────────── */
+.inv-nav-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+/* Botón: glass translúcido + borde siempre visible → radio siempre perceptible. */
+.inv-nav-tab {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 0.82rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+  /* Sin sombra: plano como el resto del topbar (cristal + borde). */
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.2s ease;
+}
+.inv-nav-tab:hover {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+}
+/* Pestaña activa: azul sólido, sin sombra (plano como el resto del topbar). */
+.inv-nav-tab.is-active {
+  background: var(--ap-blue, var(--ui-primary));
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+}
+.inv-nav-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inv-nav-tab {
+    transition: none;
+  }
+  .inv-nav-tick {
+    transition: none;
+  }
+}
+
+/* ─── Cuerpo ────────────────────────────────────────────────────────────────── */
+/* Sin border-top: el header fue eliminado; el thead ya tiene su propio border-bottom
+   que separa visualmente las columnas de los datos. Añadir border-top aquí creaba
+   un borde doble visible en la parte superior de la card. */
+.inv-card-body {
+  flex: 1;
+  min-height: 0;
+}
+/* Catálogo y Existencias comparten el mismo esqueleto facetado (carril + tabla en una
+   sola superficie, ocupando todo el alto de la card). */
+.inv-card-body--catalogo,
+.inv-card-body--existencias {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Familias conserva su disposición de dos columnas (árbol+panel), sensible al ancho:
+   el cuerpo solo respira en vertical, SIN padding horizontal que reduzca el ancho. */
+.inv-card-body--familias {
+  padding: 0.85rem 0 1.25rem;
+}
+
+/* La toolbar (CTA / acciones de selección) vive en la cabecera de la card; sin slot
+   (uso autónomo) cae a una banda propia sobre el cuerpo. */
+.cat-inline-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 1.65rem 0.9rem;
+}
+
+/* ═══════════════════ CATÁLOGO FACETADO ═══════════════════════════════════════ */
+.catalog--faceted {
+  max-width: none;
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cat-layout {
+  display: grid;
+  grid-template-columns: 15.75rem minmax(0, 1fr);
+  flex: 1;
+  min-height: 24rem;
+}
+
+/* ─── Carril de facetas ────────────────────────────────────────────────────── */
+.cat-rail {
+  display: flex;
+  flex-direction: column;
+  padding: 1.15rem 1.1rem 1.5rem;
+  overflow-y: auto;
+  /* Barra de scroll oculta (el scroll sigue activo: rueda/trackpad/teclado). */
+  scrollbar-width: none;
+}
+.cat-rail-search {
+  margin-bottom: 1.35rem;
+}
+/* Búsqueda del carril: input Geist (alto 36, radio 8) en vez de la píldora por defecto. */
+.cat-rail .catalog-search {
+  height: 36px;
+  width: 100%;
+  border-radius: var(--ui-radius-sm);
+  border: 1px solid var(--ui-border-strong);
+}
+.cat-rail .search-field {
+  display: flex;
+  width: 100%;
+}
+.cat-rail .search-field::after {
+  border-radius: 0 var(--ui-radius-sm) var(--ui-radius-sm) 0;
+}
+
+.cat-facet {
+  margin-bottom: 1.45rem;
+}
+.cat-facet:last-child {
+  margin-bottom: 0;
+}
+.cat-facet-title {
+  margin: 0 0 0.5rem;
+  padding-left: 0.12rem;
+  font-size: 0.69rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ui-text-soft);
+}
+
+/* Vistas guardadas: fila botón con contador; activa = tinta plena (negra), texto claro. */
+.cat-view {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.42rem 0.6rem;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-size: 0.86rem;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+.cat-view:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+.cat-view.is-active {
+  background: var(--ap-blue, var(--ui-primary));
+  color: #fff;
+  font-weight: 550;
+}
+.cat-view-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cat-view-count {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+.cat-view.is-active .cat-view-count {
+  color: rgba(255 255 255 / 0.62);
+}
+
+/* Opción de faceta: píldora seleccionable (marca azul + etiqueta + contador).
+   Tipografía alineada con .cat-view (Vistas guardadas): 0.86rem, color muted,
+   activo en peso 550. Seleccionada → fondo azul claro, tinta plena y contador azul. */
+.cat-facet-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.42rem 0.6rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.86rem;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+  /* Sin selección de texto: permite arrastrar el ratón para «pintar» la selección. */
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+.cat-facet-opt:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+.cat-facet-opt.is-checked {
+  background: var(--ui-brand-soft);
+}
+.cat-facet-opt.is-checked:hover {
+  background: var(--ui-brand-soft-2);
+}
+/* Seleccionadas contiguas → un solo bloque continuo: se aplanan las esquinas que se tocan. */
+.cat-facet-opt.is-checked:has(+ .cat-facet-opt.is-checked) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.cat-facet-opt.is-checked + .cat-facet-opt.is-checked {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+/* Anillo de foco sobre toda la píldora (en vez de solo la marca). */
+.cat-facet-opt:has(.cat-facet-input:focus-visible) {
+  box-shadow: var(--ui-focus);
+}
+/* Checkbox nativo accesible pero oculto: la marca la pinta .cat-check. */
+.cat-facet-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* Marca de verificación azul, sin caja; reserva su hueco cuando está inactiva.
+   Usa máscara para que el color salga de --ui-primary (combina en claro/oscuro). */
+.cat-check {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  transition: opacity var(--ui-motion-fast) var(--ui-ease);
+}
+.cat-facet-input:checked + .cat-check {
+  background-color: var(--ui-primary);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E")
+    center / 1.1rem 1.1rem no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E")
+    center / 1.1rem 1.1rem no-repeat;
+}
+.cat-facet-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Activo: mismo realce que .cat-view.is-active (peso 550, tinta plena), no negrita dura. */
+.cat-facet-opt.is-checked .cat-facet-label {
+  font-weight: 550;
+  color: var(--ui-text);
+}
+.cat-facet-count {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+.cat-facet-opt.is-checked .cat-facet-count {
+  color: var(--ui-primary);
+}
+
+/* ─── Tabla agrupada ───────────────────────────────────────────────────────── */
+.cat-main {
+  position: relative;
+  overflow-y: auto;
+  border-left: 1px solid var(--ui-border);
+  /* Barra de scroll oculta (el scroll sigue activo: rueda/trackpad/teclado). */
+  scrollbar-width: none;
+}
+/* WebKit/Blink (Chrome/Safari/Edge): oculta la barra de ambos contenedores con scroll. */
+.cat-rail::-webkit-scrollbar,
+.cat-main::-webkit-scrollbar {
+  display: none;
+}
+.cat-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.cat-col-sku {
+  width: 7.5rem;
+}
+.cat-col-pvp {
+  width: 6.5rem;
+}
+.cat-col-margin {
+  width: 5.5rem;
+}
+.cat-col-stock {
+  width: 5.5rem;
+}
+
+.cat-thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--ui-surface);
+  /* Cabecera de columnas compacta, igual que el thead de Existencias (.ex-thead th). */
+  padding: 0.55rem 0.9rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ui-text-soft);
+  text-align: left;
+  border-bottom: 1px solid var(--ui-border);
+  white-space: nowrap;
+}
+.cat-thead .cat-th-num {
+  text-align: right;
+}
+/* Sangrado FIJO de la primera columna (3.3rem): aloja el checkbox-overlay de las filas
+   y deja la cabecera "Producto" alineada con los nombres y con el título del grupo a
+   cualquier ancho. Antes había una columna-checkbox de ancho automático que variaba con el
+   viewport y desalineaba la cabecera respecto a las filas.
+   NOTA: este sangrado, el padding-left de .cat-group-inner y el left de .cat-row-check se
+   mueven JUNTOS (mismo delta) para conservar el borde izquierdo común y el aire respecto al
+   carril de facetas. */
+.cat-thead .cat-th-name {
+  padding-left: 3.3rem;
+}
+
+/* Cabecera de grupo: familia · nº productos · total de unidades (plegable).
+   Sticky sobre el <td> (no el <tr>) para que quede confinada al <tbody> del grupo:
+   el header de una familia se pega mientras el usuario está en sus filas y desaparece
+   al entrar en la siguiente familia. top ≈ alto del <thead> (padding 1.05rem + contenido
+   ~0.85rem + borde 1px ≈ 1.95rem). */
+.cat-group-head {
+  cursor: pointer;
+}
+.cat-group-cell {
+  padding: 0;
+  position: sticky;
+  top: 1.95rem;
+  z-index: 1;
+  background: var(--ui-surface-subtle);
+  /* border-collapse: collapse elimina los border en celdas sticky; box-shadow
+     se pinta sobre el stacking context y siempre aparece en ambos bordes. */
+  box-shadow:
+    0 -1px 0 0 var(--ui-border),
+    0 1px 0 0 var(--ui-border);
+}
+.cat-group-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* Sin punto de familia: el nombre arranca al MISMO sangrado que los nombres de producto
+     (3.3rem) y el caret va en absoluto dentro del canalón izquierdo (alineado con el
+     checkbox-overlay de las filas). Así familia y productos comparten borde izquierdo.
+     Padding vertical compacto (0.5rem), igual que la cabecera de grupo de Existencias. */
+  padding: 0.5rem 1.1rem 0.5rem 3.3rem;
+}
+.cat-group-caret {
+  position: absolute;
+  left: 1.05rem;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-shrink: 0;
+  color: var(--ui-text-soft);
+  transition: transform var(--ui-motion-fast) var(--ui-ease);
+}
+.cat-group-caret.is-collapsed {
+  transform: translateY(-50%) rotate(-90deg);
+}
+.cat-group-name {
+  font-size: 0.9rem;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+}
+.cat-group-count {
+  font-size: 0.82rem;
+  color: var(--ui-text-soft);
+  letter-spacing: -0.01em;
+}
+.cat-group-units {
+  margin-left: auto;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+
+/* Filas de producto: sin líneas internas (look limpio del mockup); hover y selección
+   por relleno. Clic en la fila abre el detalle; el checkbox solo aparece al hover. */
+.cat-row {
+  cursor: pointer;
+  transition: background var(--ui-motion-fast) var(--ui-ease);
+}
+.cat-row:hover {
+  background: var(--ui-surface-subtle);
+}
+.cat-row.is-selected {
+  background: var(--ui-brand-soft);
+}
+.cat-row td {
+  /* Misma altura compacta que las filas de Existencias (.ex-row td). */
+  height: 2.75rem;
+  padding: 0 0.9rem;
+  vertical-align: middle;
+  color: var(--ui-text);
+  border-bottom: 1px solid var(--ui-border);
+}
+/* Checkbox-overlay: posicionado en el sangrado izquierdo de la celda de nombre (no es
+   una columna propia). Aparece al hover/selección sin reflujo del texto. */
+.cat-row-check {
+  position: absolute;
+  left: 1.05rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--ui-primary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--ui-motion-fast) var(--ui-ease);
+}
+.cat-row:hover .cat-row-check,
+.cat-row.is-selected .cat-row-check,
+.cat-row-check:checked,
+.cat-row-check:focus-visible {
+  opacity: 1;
+}
+/* `.cat-row .cat-cell-name` (0-2-0) gana al base `.cat-row td` (0-1-1) para fijar el
+   sangrado en 3.3rem; `position: relative` ancla el checkbox-overlay. */
+.cat-row .cat-cell-name {
+  position: relative;
+  padding-left: 3.3rem;
+  letter-spacing: -0.012em;
+}
+.cat-cell-sku {
+  color: var(--ui-text-soft);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.cat-cell-pvp {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.012em;
+}
+.cat-cell-margin,
+.cat-cell-stock {
+  text-align: right;
+}
+.cat-margin {
+  font-size: 0.85rem;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+.cat-margin-ok {
+  color: var(--ui-success);
+}
+.cat-margin-low {
+  color: var(--ui-warning);
+}
+.cat-margin-none {
+  color: var(--ui-text-soft);
+}
+.cat-stock-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.95rem;
+  height: 1.55rem;
+  padding: 0 0.5rem;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.cat-stock-ok {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.cat-stock-low {
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
+}
+.cat-stock-out {
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+}
+
+.cat-empty {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  font-size: 0.92rem;
+  color: var(--ui-text-soft);
+}
+
+/* ─── Barra de selección (píldora oscura, FUERA del card, empuja al card hacia arriba) ───
+   La monta CatalogPage (CatalogSelectionBar) portalizada en .inv-selbar-host (hermano de
+   .inv-card dentro de .inventory-page). NO vive dentro del card de productos: al aparecer, su
+   slot reserva alto y reduce la altura del card (flex), revelándose con grid-template-rows
+   0fr→1fr + deslizamiento. */
+
+/* Host del portal: hermano del card. flex-shrink:0 para que su alto (el slot) no se comprima;
+   al crecer, el card (flex:1) encoge. */
+.inv-selbar-host {
+  flex-shrink: 0;
+}
+.cat-selbar-slot {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.cat-selbar-slot.is-open {
+  grid-template-rows: 1fr;
+}
+.cat-selbar-slot__inner {
+  display: flex;
+  /* Opciones alineadas a la izquierda (no centradas). */
+  justify-content: flex-start;
+  min-height: 0;
+  /* Clipa el contenido mientras el slot está colapsado/animando; cuando el popover «Mover
+     familia» está abierto, libera el overflow para que el menú (que abre hacia arriba) no se
+     recorte. La visibilidad se retrasa al cierre para no cortar la animación de salida. */
+  overflow: hidden;
+  visibility: hidden;
+  transition: visibility 0s 0.34s;
+}
+.cat-selbar-slot.is-open .cat-selbar-slot__inner {
+  visibility: visible;
+  transition: visibility 0s 0s;
+}
+.cat-selbar-slot__inner:has(.cat-selbar__pop) {
+  overflow: visible;
+}
+/* Fila de botones FLOTANTES (sin píldora contenedora): vive FUERA del card, en
+   .inv-selbar-host. Aire arriba para separarse del card; el hueco inferior lo da el padding
+   del área de contenido (.bo-main--surface). Desliza+aparece con el revelado del slot. */
+.cat-selbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.85rem 0 0;
+  /* Aparición pulida: sube + escala desde la esquina inferior izquierda (donde queda anclada),
+     con ease-out-expo, sincronizada con el revelado del slot. */
+  transform-origin: bottom left;
+  transform: translateY(0.8rem) scale(0.98);
+  opacity: 0;
+  transition:
+    transform 0.34s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.24s ease;
+}
+.cat-selbar-slot.is-open .cat-selbar {
+  transform: none;
+  opacity: 1;
+}
+
+/* Chip de conteo y botones: mismo lenguaje que los controles del topbar / pestañas
+   .inv-nav-tab — alto 34px, cristal translúcido, borde hairline, radio 8px, SIN sombra. */
+.cat-selbar__count,
+.cat-selbar__btn {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 0.82rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+/* Chip de conteo: no interactivo, texto atenuado. */
+.cat-selbar__count {
+  font-weight: 550;
+  color: var(--ui-text-soft);
+}
+.cat-selbar__btn {
+  gap: 0.4rem;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.2s ease;
+}
+.cat-selbar__btn:hover {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+}
+.cat-selbar__btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+/* Borrar: misma forma flotante, acento de peligro (texto/icono rojos; cristal rojizo al hover). */
+.cat-selbar__btn--danger {
+  color: var(--ui-danger);
+}
+.cat-selbar__btn--danger:hover {
+  border-color: var(--ui-danger);
+  color: var(--ui-danger);
+  background: color-mix(in srgb, var(--ui-danger-soft) 80%, transparent);
+}
+
+/* Popover «Mover familia»: menú claro de familias sobre el botón (la barra está abajo). */
+.cat-selbar__move {
+  position: relative;
+  display: inline-flex;
+}
+.cat-selbar__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  border: none;
+  background: none;
+  cursor: default;
+}
+.cat-selbar__pop {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  min-width: 13rem;
+  max-height: 16rem;
+  overflow-y: auto;
+  padding: 0.3rem;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 16px 40px -12px rgb(0 0 0 / 0.28);
+  scrollbar-width: none;
+}
+.cat-selbar__pop::-webkit-scrollbar {
+  display: none;
+}
+.cat-selbar__pop-item {
+  display: block;
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-size: 0.85rem;
+  text-align: left;
+  white-space: nowrap;
+  color: var(--ui-text);
+  cursor: pointer;
+  transition: background 0.12s var(--ui-ease, ease);
+}
+.cat-selbar__pop-item:hover {
+  background: var(--ui-surface-subtle);
+}
+.cat-selbar__pop-empty {
+  display: block;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.84rem;
+  color: var(--ui-text-soft);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cat-selbar-slot,
+  .cat-selbar-slot__inner,
+  .cat-selbar {
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cat-view,
+  .cat-facet-opt,
+  .cat-check,
+  .cat-group-caret,
+  .cat-row,
+  .cat-row-check {
+    transition: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .cat-layout {
+    grid-template-columns: 1fr;
+  }
+  .cat-rail {
+    border-bottom: 1px solid var(--ui-border);
+  }
+  .cat-main {
+    border-left: none;
+  }
+}

@@ -247,6 +247,29 @@
 .dash-panel--fill .dash-hour-track {
   height: 100%;
 }
+
+/* ─── Widgets de panel (rediseño): cuerpo que envuelve la molécula dataviz ─── */
+/* El cuerpo del panel envuelve la molécula. Con `fill` (treemap, leaderboard, área, feed) crece para
+   llenar el tile y la molécula se estira; sin `fill` ocupa su alto natural (KPIs, donut, calor). */
+.dash-widget-body {
+  min-width: 0;
+}
+.dash-panel--fill > .dash-widget-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dash-panel--fill > .dash-widget-body > * {
+  flex: 1;
+  min-height: 0;
+}
+/* Contenedor de sparkline a sangre (área/barras): la molécula mide al 100% de este alto. */
+.dash-widget-spark {
+  width: 100%;
+  min-height: 96px;
+}
+
 .dash-hour-scroll {
   overflow-x: auto;
   overflow-y: hidden;
@@ -1089,7 +1112,9 @@
   background-image: radial-gradient(var(--dot-shoulder) 2px, transparent 2.15px);
   background-size: var(--dots-size) var(--dots-size);
   background-position: var(--dots-pos-x) var(--dots-pos-y);
-  will-change: mask-image, -webkit-mask-image;
+  will-change:
+    mask-image,
+    -webkit-mask-image;
   /* Banda F−28%…F−4% (meseta F−20%…F−10%). */
   -webkit-mask-image: linear-gradient(
     225deg,
@@ -1118,7 +1143,9 @@
   background-image: radial-gradient(var(--dot-peak) 2.6px, transparent 2.75px);
   background-size: var(--dots-size) var(--dots-size);
   background-position: var(--dots-pos-x) var(--dots-pos-y);
-  will-change: mask-image, -webkit-mask-image;
+  will-change:
+    mask-image,
+    -webkit-mask-image;
   /* Banda F−15%…F+1% (meseta F−7%…F−3%). */
   -webkit-mask-image: linear-gradient(
     225deg,
@@ -1141,11 +1168,15 @@
    note de verdad. La ola va por su cuenta; el cierre del morph la espera (no se corta). */
 .dash-free-dots--reveal {
   animation: dash-dots-reveal 1200ms cubic-bezier(0.65, 0, 0.35, 1) both;
-  will-change: mask-image, -webkit-mask-image;
+  will-change:
+    mask-image,
+    -webkit-mask-image;
 }
 .dash-free-dots--conceal {
   animation: dash-dots-conceal 900ms cubic-bezier(0.65, 0, 0.35, 1) both;
-  will-change: mask-image, -webkit-mask-image;
+  will-change:
+    mask-image,
+    -webkit-mask-image;
 }
 @keyframes dash-dots-reveal {
   from {
@@ -1172,6 +1203,15 @@
   z-index: 1;
   transform-origin: 0 0;
   will-change: transform;
+}
+/* Guía del IMÁN: línea fina de acento que aparece al alinear/pegar un bloque con otro durante el
+   arrastre. Vive en la capa de mundo (escalada); no intercepta el puntero. */
+.dash-free-guide {
+  position: absolute;
+  background: var(--ui-accent, #2563eb);
+  z-index: 50;
+  pointer-events: none;
+  border-radius: 2px;
 }
 /* Card del lienzo: posicionada por translate en px de MUNDO; el scale del mundo la escala.
    El contenido es inerte para que el arrastre funcione sobre los gráficos. */
@@ -1216,9 +1256,11 @@
   gap: 0.1rem;
   padding: 0.25rem;
   border: 1px solid var(--ui-border);
-  border-radius: 9999px;
+  border-radius: 8px;
   background: var(--ui-surface);
-  box-shadow: 0 2px 10px rgb(0 0 0 / 0.08);
+  box-shadow:
+    0 1px 4px rgb(0 0 0 / 0.06),
+    0 4px 16px rgb(0 0 0 / 0.06);
 }
 .dash-free-zoom button {
   display: inline-flex;
@@ -1229,7 +1271,7 @@
   padding: 0 0.4rem;
   border: none;
   background: none;
-  border-radius: 9999px;
+  border-radius: 6px;
   font-size: 0.78rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -1270,7 +1312,10 @@
   padding: 0.4rem 0.7rem;
   border: 1px solid var(--ui-border);
   border-radius: 9999px;
-  background: var(--ui-surface);
+  /* Cristal translúcido (70%, igual que el chat y el topbar). */
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--ui-text);
@@ -1281,7 +1326,8 @@
     box-shadow 0.12s ease;
 }
 .dash-free-tool:hover {
-  background: var(--ui-surface-subtle);
+  /* Feedback translúcido, sin saltar a opaco. */
+  background: color-mix(in srgb, var(--ui-surface-subtle) 70%, transparent);
   border-color: var(--ui-border-strong, var(--ui-border));
 }
 .dash-free-tool:active {
@@ -1885,7 +1931,8 @@
   padding: 0.4rem 0.5rem;
   border: 1px solid var(--ui-border);
   border-radius: 9999px;
-  background: color-mix(in srgb, var(--ui-surface) 84%, transparent);
+  /* Cristal translúcido (70%, igual que el chat y el topbar). */
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
   box-shadow: 0 8px 26px rgb(0 0 0 / 0.14);
   backdrop-filter: blur(12px);
 }
@@ -1933,14 +1980,10 @@
   left: 0;
 }
 
-/* Barra de herramientas del lienzo «Asistente de IA» (Editar→despliega + Mover + Goma). Vive en la
-   sub-barra del shell (.topbar-subbar), por DEBAJO del topbar. Tratamiento un escalón inferior:
-   relleno sutil (surface-subtle) en vez de cristal y sin sombra de elevación → jerarquía secundaria. */
-.dash-canvas-toolbar {
-  /* SIN contenedor propio: los botones del lienzo flotan individualmente (cada uno con su
-     superficie + sombra, ver .canvas-tools__trigger/__mode). display:contents elimina la caja. */
-  display: contents;
-}
+/* La barra de herramientas del lienzo «Asistente de IA» (Editar→despliega + Mover + Goma) vive
+   DENTRO del topbar, en la columna izquierda (slot `pageNav` → .topbar-page-nav), a la altura de
+   la isla central de navegación. Su aspecto lo dan .canvas-tools* (chat.css); aquí no hace falta
+   posicionado propio. */
 
 /* Pill de dibujo flotando justo encima del dock inferior (centrado). El dock (input del
    asistente + menú «+») ocupa la franja inferior, así que el pill se eleva para no chocar. */
@@ -1975,14 +2018,18 @@
 }
 .dash-grid-flow {
   display: grid;
-  /* Celda base más pequeña → tablero más denso y compacto (antes 248×172 inflaba cada tile). */
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  /* Rejilla REAL de 12 columnas a ANCHO COMPLETO (sin `max-width` ni centrado): los bloques teselan
+     ocupando sus unidades enteras exactas (recuperadas del tamaño del lienzo) y llenan toda la
+     anchura. `GridBoard` sobrescribe `grid-template-columns` inline con las columnas EFECTIVAS según
+     el ancho disponible (degradación responsive); esto es el fallback de 12 columnas antes de medir.
+     `minmax(0, 1fr)` evita que el contenido (gráficas/tablas) ensanche su columna y rompa el encaje. */
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-auto-rows: 156px;
-  grid-auto-flow: row dense;
+  /* Las posiciones (columna/fila) las emite `GridBoard` EXPLÍCITAS tras un empaquetado «skyline»
+     (compactación vertical sin redimensionar): por eso NO se usa `auto-flow`, que solo rellenaría
+     celdas vacías triviales y dejaría los escalones bajo los bloques altos. */
   gap: 0.85rem;
   align-content: start;
-  max-width: 1600px;
-  margin: 0 auto;
 }
 .dash-grid-tile {
   position: relative;
@@ -2038,6 +2085,20 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* El texto de los widgets no se selecciona (igual que en el lienzo libre, .dash-free-item-body):
+     estorba al arrastrar/redimensionar el tile. Las notas y campos editables se reactivan abajo. */
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Excepción: el contenido editable (nota TipTap, inputs) SÍ debe poder seleccionarse/escribirse. */
+.dash-free-item-body [contenteditable='true'],
+.dash-free-item-body input,
+.dash-free-item-body textarea,
+.dash-grid-tile-body [contenteditable='true'],
+.dash-grid-tile-body input,
+.dash-grid-tile-body textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 /* El contenido (panel/KPI/nota) llena el tile. */
 .dash-grid-tile-body > * {
@@ -2092,10 +2153,11 @@
    de la fila de acciones (lupa/home/campana) para no taparlas. */
 .dashboard-mode-toggle {
   /* Conmutador cuadrícula ↔ lienzo: vive arriba a la DERECHA del topbar (clúster derecho).
-     Radio de sistema (8px, estilo Vercel) y elevación sutil como las demás pastillas. */
+     Radio de sistema (8px, estilo Vercel) y elevación sutil como las demás pastillas.
+     Altura total 30px (= logo sidebar): 26px botones + 2px padding × 2. */
   display: inline-flex;
   gap: 2px;
-  padding: 3px;
+  padding: 2px;
   border-radius: var(--ui-radius-sm);
   border: 1px solid var(--ui-border);
   background: color-mix(in srgb, var(--ui-surface) 92%, transparent);
@@ -2109,8 +2171,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* Un poco más anchos que altos (segmentos cómodos); la altura mantiene el toggle en 38px
-     totales, igual que los botones redondos de la topbar. */
+  /* Un poco más anchos que altos (segmentos cómodos); la altura mantiene el toggle en 30px
+     totales (= logo sidebar), igual que los botones del clúster derecho. */
   width: 38px;
   height: 26px;
   border: none;

@@ -23,12 +23,18 @@ describe('fmtEur', () => {
   });
 
   it('formatea en euros con coma decimal y símbolo €', () => {
-    // El espaciado/agrupación exactos dependen de la versión de ICU, así que se
-    // comprueban las invariantes estables: decimal con coma y símbolo €.
     const out = fmtEur(1234.5);
     expect(out).toContain('€');
     expect(out).toContain(',50');
     expect(fmtEur(0)).toContain('0,00');
+  });
+
+  it('agrupa los miles incluso en cifras de 4 dígitos (useGrouping always)', () => {
+    // El español tiene minimumGroupingDigits: 2 en CLDR, que sin 'always' omitiría el punto
+    // en cifras de 4 dígitos (3080,28 en vez de 3.080,28). Con la agrupación forzada el
+    // separador de miles es determinista y estable entre versiones de ICU.
+    expect(fmtEur(3080.28)).toContain('3.080,28');
+    expect(fmtEur(1234567.5)).toContain('1.234.567,50');
   });
 });
 

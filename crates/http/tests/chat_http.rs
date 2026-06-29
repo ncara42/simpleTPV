@@ -131,7 +131,7 @@ async fn seed_conversation(admin: &PgPool, org: Uuid, user: Uuid) -> (Uuid, Uuid
     .bind(Uuid::new_v4()).bind(conv_id).bind(org)
     .bind(serde_json::json!([{ "type": "text", "text": "añado el widget" }]))
     .bind(serde_json::json!([
-        { "name": "add_widget", "args": { "element_id": "e1", "widget_id": "kpi-today" } },
+        { "name": "add_widget", "args": { "element_id": "e1", "widget_id": "dash-bars" } },
         { "name": "clear_canvas", "args": {} }
     ]))
     .execute(admin).await.unwrap();

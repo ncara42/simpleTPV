@@ -1,0 +1,318 @@
+/* Chrome de la página GALERÍA de widgets (#264). Reproduce la maqueta "Resumen, reinventado":
+   contenedor de 1340px, cabeceras de sección numeradas, bandas full-bleed y tarjetas con hairline.
+   Las piezas de dato (KpiStat, HeatStrip, Treemap, DonutStat, BulletMeter, Leaderboard, ActivityFeed)
+   traen su propio diseño desde @simpletpv/ui/dataviz.css. */
+
+.gw-root {
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  min-height: 100vh;
+  padding-bottom: 96px;
+}
+.gw-container {
+  max-width: 1340px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* ── Header ── */
+.gw-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+  flex-wrap: wrap;
+  padding-top: 56px;
+}
+.gw-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ui-brand);
+  margin-bottom: 14px;
+}
+.gw-title {
+  font-size: 42px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+  margin: 0 0 16px;
+}
+.gw-lede {
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--ui-text-muted);
+  margin: 0;
+  max-width: 640px;
+}
+.gw-lede strong {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+.gw-head-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+.gw-segment {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+}
+.gw-segment button {
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ui-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--ui-radius-xs);
+  cursor: pointer;
+}
+.gw-segment button.is-active {
+  font-weight: 600;
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.gw-themetoggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ui-text);
+  cursor: pointer;
+}
+
+.gw-palette {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 30px;
+  flex-wrap: wrap;
+}
+.gw-palette-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--gst-400, #a1a1aa);
+  margin-right: 6px;
+}
+.gw-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-pill);
+  font-size: 11.5px;
+  color: var(--ui-text-muted);
+}
+.gw-chip span {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+}
+.gw-rule {
+  height: 1px;
+  background: var(--ui-border);
+  margin-top: 40px;
+}
+
+/* ── Section header ── */
+.gw-section {
+  padding-top: 52px;
+}
+.gw-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+.gw-section-num {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ui-brand);
+  font-variant-numeric: tabular-nums;
+}
+.gw-section-title {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.gw-section-sub {
+  font-size: 14px;
+  color: var(--ui-text-soft);
+  margin: 0;
+  max-width: 560px;
+}
+
+/* ── Bands & cards ── */
+.gw-band {
+  margin-top: 22px;
+}
+.gw-grid {
+  display: grid;
+  gap: 18px;
+  margin-top: 22px;
+}
+.gw-grid--2 {
+  grid-template-columns: 1.7fr 1fr;
+  align-items: stretch;
+}
+.gw-grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (max-width: 900px) {
+  .gw-grid--2,
+  .gw-grid--3 {
+    grid-template-columns: 1fr;
+  }
+}
+.gw-card {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+}
+.gw-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.gw-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gw-card-sub {
+  font-size: 12.5px;
+  color: var(--ui-text-soft);
+  margin: 3px 0 0;
+}
+.gw-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ui-brand);
+  background: var(--ui-brand-soft-2);
+  padding: 2px 7px;
+  border-radius: var(--ui-radius-xs);
+  letter-spacing: 0.02em;
+}
+.gw-card--bleed {
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  padding-left: 40px;
+  padding-right: 40px;
+}
+
+/* ── Lote 2: rejillas densas, mini-gráficas, fila de stats ── */
+.gw-grid--5 {
+  grid-template-columns: repeat(5, 1fr);
+}
+@media (max-width: 1100px) {
+  .gw-grid--5 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .gw-grid--5 {
+    grid-template-columns: 1fr;
+  }
+}
+.gw-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-top: 22px;
+}
+@media (max-width: 1100px) {
+  .gw-mini-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .gw-mini-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.gw-mini {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  padding: 16px 18px;
+}
+.gw-mini-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+  margin-bottom: 14px;
+}
+.gw-mini-sub {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.gw-heat-hours {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9.5px;
+  color: var(--gst-400, #a1a1aa);
+  margin-top: 7px;
+}
+.gw-stats-row {
+  display: flex;
+  gap: 38px;
+  flex-wrap: wrap;
+  margin: 4px 0 14px;
+}
+.gw-stat-k {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+}
+.gw-stat-v {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.gw-legend-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ui-text-muted);
+}

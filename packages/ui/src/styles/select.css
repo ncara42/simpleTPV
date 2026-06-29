@@ -89,6 +89,7 @@
   top: calc(100% + 6px);
   left: 0;
   min-width: 100%;
+  max-width: min(90vw, 22rem);
   max-height: 18rem;
   overflow-y: auto;
   margin: 0;

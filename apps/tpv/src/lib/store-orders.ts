@@ -1,8 +1,13 @@
-import type { ReceiveStoreOrderInput, StoreOrder } from '@simpletpv/auth';
+import type {
+  CreateTransferMessageInput,
+  ReceiveStoreOrderInput,
+  StoreOrder,
+  TransferMessage,
+} from '@simpletpv/auth';
 
 import { api } from './auth.js';
 
-export type { StoreOrder };
+export type { StoreOrder, TransferMessage };
 
 function normalizeOrder(order: StoreOrder): StoreOrder {
   return {
@@ -30,4 +35,21 @@ export async function listIncomingStoreOrders(destStoreId: string): Promise<Stor
 
 export function receiveStoreOrder(id: string, input: ReceiveStoreOrderInput): Promise<StoreOrder> {
   return api.post<StoreOrder>(`/store-orders/${id}/receive`, input).then(normalizeOrder);
+}
+
+// Chat del pedido/traspaso: el dependiente habla con central (texto y/o foto).
+export function listStoreOrderMessages(id: string): Promise<TransferMessage[]> {
+  return api.get<TransferMessage[]>(`/store-orders/${id}/messages`);
+}
+
+export function postStoreOrderMessage(
+  id: string,
+  input: CreateTransferMessageInput,
+): Promise<TransferMessage> {
+  return api.post<TransferMessage>(`/store-orders/${id}/messages`, input);
+}
+
+// Marca la incidencia de la recepción como solucionada (el hilo se conserva).
+export function resolveStoreOrderIncident(id: string): Promise<StoreOrder> {
+  return api.post<StoreOrder>(`/store-orders/${id}/resolve-incident`).then(normalizeOrder);
 }

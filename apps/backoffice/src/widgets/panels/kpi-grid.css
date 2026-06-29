@@ -1,0 +1,228 @@
+/* KPIs (rediseño · sección 01 del handoff «Fundación Geist»): RÉPLICA EXACTA de la rejilla conectada
+   por hairline (estilo Vercel Analytics) y la tarjeta clásica. Todos los colores por token → pixel-
+   perfect en claro (= valores del handoff) y correcto en oscuro. */
+
+/* Panel sin chrome: la rejilla va a sangre (sus propias hairlines) y la tarjeta trae su borde propio.
+   Mayor especificidad que `.dash-panel` para ganar sin depender del orden de import. */
+.dash-panel.dash-panel--bare {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* ── Rejilla conectada (tarjeta redondeada estilo Vercel): borde completo + radio + overflow hidden;
+   el gap de 1px sobre fondo hairline hace de divisores entre celdas. ── */
+.kw-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--ui-border);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  overflow: hidden;
+}
+.kw-cell {
+  background: var(--ui-surface);
+  padding: 13px 18px 0;
+  min-height: 118px;
+  display: flex;
+  flex-direction: column;
+}
+.kw-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+}
+.kw-value {
+  font-size: 25px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  color: var(--ui-text);
+  margin-top: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.kw-chip {
+  align-self: flex-start;
+  margin-top: 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.kw-chip--neutral {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.kw-chip--success {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.kw-chip--danger {
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+}
+/* Sparkline a 100% del ancho de la celda: rompe el padding lateral (sin sangría ni márgenes) y se
+   pega al fondo. La rejilla recorta con su radio (las celdas de las esquinas redondean el sparkline). */
+.kw-spark {
+  width: calc(100% + 36px);
+  margin: 8px -18px 0;
+  height: 38px;
+  display: block;
+}
+
+/* ── Scrub temporal (sección 01·b): arrastrar a la izquierda sobre una celda con sparkline recorre
+   ventanas pasadas (mes/semana/día anterior…). El botón de reinicio y la etiqueta de la ventana
+   aparecen en la esquina superior derecha solo cuando NO estás en el periodo actual. ── */
+.kw-cell--scrub {
+  position: relative;
+  cursor: ew-resize;
+  touch-action: pan-y; /* el gesto horizontal es nuestro; el scroll vertical sigue siendo del navegador */
+  user-select: none;
+  transition: background var(--ui-dur-fast, 140ms) ease;
+}
+.kw-cell--scrub:hover {
+  background: var(--ui-surface-subtle);
+}
+.kw-cell--scrub.is-dragging {
+  cursor: grabbing;
+}
+.kw-cell--scrub.is-historic {
+  background: color-mix(in srgb, var(--ui-brand) 4%, var(--ui-surface));
+}
+/* Cargando una ventana nueva: atenúa el dato heredado para no leerlo junto a la etiqueta destino. */
+.kw-cell--scrub.is-fetching .kw-value,
+.kw-cell--scrub.is-fetching .kw-chip,
+.kw-cell--scrub.is-fetching .kw-spark {
+  opacity: 0.4;
+  transition: opacity var(--ui-dur-fast, 140ms) ease;
+}
+.kw-cell--scrub:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: -2px;
+}
+
+/* Pista de afordancia: aparece al pasar el ratón cuando estás en el periodo actual; ocupa el mismo
+   rincón que luego tomará la etiqueta de la ventana → continuidad visual. */
+.kw-scrub-hint {
+  position: absolute;
+  top: 11px;
+  right: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+  opacity: 0;
+  transform: translateX(3px);
+  transition:
+    opacity var(--ui-dur-fast, 140ms) ease,
+    transform var(--ui-dur-fast, 140ms) ease;
+  pointer-events: none;
+}
+.kw-cell--scrub:hover .kw-scrub-hint,
+.kw-cell--scrub:focus-visible .kw-scrub-hint {
+  opacity: 0.7;
+  transform: none;
+}
+
+/* Etiqueta de la ventana + botón de reinicio (modo histórico). */
+.kw-when {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  animation: kw-when-in var(--ui-dur-fast, 140ms) ease;
+}
+@keyframes kw-when-in {
+  from {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+}
+.kw-when-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ui-brand);
+  white-space: nowrap;
+}
+.kw-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-surface);
+  color: var(--ui-text-soft);
+  cursor: pointer;
+  transition:
+    background var(--ui-dur-fast, 140ms) ease,
+    color var(--ui-dur-fast, 140ms) ease,
+    border-color var(--ui-dur-fast, 140ms) ease;
+}
+.kw-reset:hover {
+  background: var(--ui-brand);
+  border-color: var(--ui-brand);
+  color: var(--ui-on-brand, #fff);
+}
+.kw-reset:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: 2px;
+}
+
+/* Ventana sin datos: ocupa el mismo alto que el sparkline para no saltar el layout. */
+.kw-spark--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(100% + 36px);
+  margin: 8px -18px 0;
+  height: 38px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+  background: var(--ui-surface-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kw-cell--scrub,
+  .kw-scrub-hint,
+  .kw-when,
+  .kw-reset {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ── Tarjeta clásica (tratamiento A): altura natural (sin fill), compacta ── */
+.kw-card {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  padding: 18px 20px;
+  min-height: 118px;
+  display: flex;
+  flex-direction: column;
+}
+.kw-card .kw-value {
+  font-size: 30px;
+  margin-top: 12px;
+}
+.kw-card .kw-chip {
+  font-size: 12px;
+  padding: 3px 8px;
+  margin-top: 10px;
+}

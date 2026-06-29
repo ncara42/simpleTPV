@@ -12,13 +12,19 @@ use uuid::Uuid;
 use crate::feature_flags::assert_flag_enabled;
 
 use super::input::{CreateCustomer, UpdateCustomer};
-use super::model::{Customer, CustomerRow};
+use super::model::{Customer, CustomerLedgerRow, CustomerRow};
 
 const CUSTOMER_SELECT: &str = r#"SELECT c.id, c."organizationId" AS organization_id, c.name,
-    c.nif, c.email, c.phone, c.address, c."priceListId" AS price_list_id, c.active,
+    c.nif, c.email, c.phone, c.address, c."priceListId" AS price_list_id,
+    c.tags, c."paymentTerms" AS payment_terms, c."salesRep" AS sales_rep,
+    c."creditLimit" AS credit_limit, c.active,
     c."createdAt" AS created_at, c."updatedAt" AS updated_at,
     pl.id AS pl_id, pl.name AS pl_name
     FROM "Customer" c LEFT JOIN "PriceList" pl ON pl.id = c."priceListId""#;
+
+/// Expresión SQL de "hoy" en la zona horaria del negocio (Europe/Madrid), igual
+/// que el ledger de ventas retail. Centralizada para el cálculo de vencido.
+const TODAY_MADRID_SQL: &str = "(now() AT TIME ZONE 'Europe/Madrid')::date";
 
 /// La tarifa referenciada debe pertenecer al tenant (requireOwned → 400).
 async fn assert_price_list_in_org(
@@ -67,6 +73,42 @@ pub async fn list(pool: &PgPool, org: Uuid) -> Result<Vec<Customer>, AppError> {
     .await
 }
 
+/// Agregado de cartera por cliente (saldo, vencido, facturado 12m, nº pedidos,
+/// último pedido). Una sola query con `LEFT JOIN`: los clientes sin pedidos
+/// aparecen con ceros / `last_order_at` nulo. Los pedidos CANCELLED no cuentan.
+pub async fn ledger(pool: &PgPool, org: Uuid) -> Result<Vec<CustomerLedgerRow>, AppError> {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        let rows: Vec<CustomerLedgerRow> = sqlx::query_as(&format!(
+            r#"SELECT
+                 c.id AS customer_id,
+                 count(o.id) AS order_count,
+                 max(o."createdAt") AS last_order_at,
+                 COALESCE(SUM(o.total) FILTER (
+                   WHERE o."createdAt" >= now() - INTERVAL '12 months'
+                 ), 0) AS billed12m,
+                 COALESCE(SUM(o.total) FILTER (
+                   WHERE o."paymentStatus" = 'PENDING'::"PaymentStatus"
+                 ), 0) AS balance,
+                 COALESCE(SUM(o.total) FILTER (
+                   WHERE o."paymentStatus" = 'PENDING'::"PaymentStatus"
+                     AND o."dueDate" < {TODAY_MADRID_SQL}
+                 ), 0) AS overdue
+               FROM "Customer" c
+               LEFT JOIN "WholesaleOrder" o
+                 ON o."customerId" = c.id
+                 AND o."organizationId" = $1
+                 AND o.status <> 'CANCELLED'::"WholesaleOrderStatus"
+               WHERE c."organizationId" = $1
+               GROUP BY c.id"#
+        ))
+        .bind(org)
+        .fetch_all(&mut **tx)
+        .await?;
+        Ok(rows)
+    })
+    .await
+}
+
 pub async fn create(pool: &PgPool, org: Uuid, input: CreateCustomer) -> Result<Customer, AppError> {
     input.validate()?;
     // Gate del módulo B2B (#127 B), fuera de la tx (paridad con `assertEnabled`).
@@ -79,8 +121,10 @@ pub async fn create(pool: &PgPool, org: Uuid, input: CreateCustomer) -> Result<C
         }
         let id: Uuid = sqlx::query_scalar(
             r#"INSERT INTO "Customer"
-                 (id, "organizationId", name, nif, email, phone, address, "priceListId", active, "updatedAt")
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, true), now())
+                 (id, "organizationId", name, nif, email, phone, address, "priceListId",
+                  tags, "paymentTerms", "salesRep", "creditLimit", active, "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
+                       $9, $10, $11, $12, COALESCE($13, true), now())
                RETURNING id"#,
         )
         .bind(Uuid::new_v4())
@@ -91,6 +135,10 @@ pub async fn create(pool: &PgPool, org: Uuid, input: CreateCustomer) -> Result<C
         .bind(input.phone.as_deref())
         .bind(input.address.as_deref())
         .bind(input.price_list_id)
+        .bind(input.tags.as_deref().unwrap_or(&[]))
+        .bind(input.payment_terms)
+        .bind(input.sales_rep.as_deref())
+        .bind(input.credit_limit)
         .bind(input.active)
         .fetch_one(&mut **tx)
         .await?;
@@ -128,7 +176,11 @@ pub async fn update(
                  phone = COALESCE($6, phone),
                  address = COALESCE($7, address),
                  "priceListId" = CASE WHEN $8 THEN $9 ELSE "priceListId" END,
-                 active = COALESCE($10, active),
+                 tags = COALESCE($10, tags),
+                 "paymentTerms" = COALESCE($11, "paymentTerms"),
+                 "salesRep" = COALESCE($12, "salesRep"),
+                 "creditLimit" = COALESCE($13, "creditLimit"),
+                 active = COALESCE($14, active),
                  "updatedAt" = now()
                WHERE id = $1 AND "organizationId" = $2"#,
         )
@@ -141,6 +193,10 @@ pub async fn update(
         .bind(input.address)
         .bind(set_pl)
         .bind(new_pl)
+        .bind(input.tags)
+        .bind(input.payment_terms)
+        .bind(input.sales_rep)
+        .bind(input.credit_limit)
         .bind(input.active)
         .execute(&mut **tx)
         .await?

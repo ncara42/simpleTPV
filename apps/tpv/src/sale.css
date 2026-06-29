@@ -2530,6 +2530,46 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ─── Acciones de la fila de pedido (recibir + chat de comentarios) ───────────── */
+.store-order-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+.store-order-chat-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    color 0.12s,
+    background 0.12s;
+}
+.store-order-chat-btn:hover {
+  border-color: var(--ui-brand);
+  color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+}
+.store-order-chat-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* Aviso en el modal de recepción: dirige las incidencias con foto al chat. */
+.recv-hint {
+  margin: 0.75rem 0 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-soft);
+}
+
 .recv-error {
   margin: 0;
   font-size: var(--ui-text-sm);

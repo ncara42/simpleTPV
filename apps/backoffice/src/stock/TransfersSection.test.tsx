@@ -1,18 +1,29 @@
-import type { Store, Transfer } from '@simpletpv/auth';
+import type { Store, Transfer, TransferLine } from '@simpletpv/auth';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { listStores } from '../lib/admin.js';
-import { createTransfer, listTransfers } from '../lib/stock.js';
+import {
+  closeTransfer,
+  createTransfer,
+  listTransfers,
+  receiveTransfer,
+  sendTransfer,
+} from '../lib/stock.js';
 import { CreateTransferModal } from './CreateTransferModal.js';
 import { TransfersSection } from './TransfersSection.js';
 
 vi.mock('../lib/stock.js', () => ({
   listTransfers: vi.fn(() => Promise.resolve([])),
   createTransfer: vi.fn(() => Promise.resolve({ id: 't-new' })),
-  sendTransfer: vi.fn(),
+  sendTransfer: vi.fn(() => Promise.resolve({})),
+  receiveTransfer: vi.fn(() => Promise.resolve({})),
+  closeTransfer: vi.fn(() => Promise.resolve({})),
+  listTransferMessages: vi.fn(() => Promise.resolve([])),
+  postTransferMessage: vi.fn(() => Promise.resolve({})),
+  resolveTransferIncident: vi.fn(() => Promise.resolve({})),
 }));
 vi.mock('../lib/admin.js', () => ({ listStores: vi.fn(() => Promise.resolve([])) }));
 vi.mock('../lib/products.js', () => ({ listProducts: vi.fn(() => Promise.resolve([])) }));
@@ -21,6 +32,19 @@ const STORES: Store[] = [
   { id: 's-centro', code: 'CEN', name: 'Centro' } as Store,
   { id: 's-norte', code: 'NOR', name: 'Norte' } as Store,
 ];
+
+function makeLine(over: Partial<TransferLine> = {}): TransferLine {
+  return {
+    id: 'l1',
+    transferId: 't1',
+    productId: 'p1',
+    quantitySent: '5',
+    quantityReceived: null,
+    discrepancy: null,
+    discrepancyNote: null,
+    ...over,
+  } as TransferLine;
+}
 
 function makeTransfer(over: Partial<Transfer>): Transfer {
   return {
@@ -112,18 +136,19 @@ describe('CreateTransferModal — campo Nombre y notes', () => {
   });
 });
 
-describe('TransfersSection — columna, buscador y fallback', () => {
-  it('muestra el nombre (notes) y el fallback "Origen → Destino" en la columna', async () => {
+describe('TransfersSection — nombre, buscador y fallback', () => {
+  it('muestra la nota como subtítulo y la ruta en su propia columna', async () => {
     vi.mocked(listTransfers).mockResolvedValue([
       makeTransfer({ id: 't1', notes: 'Pedido semanal' }),
       makeTransfer({ id: 't2', notes: null }),
     ]);
     renderWithClient(<TransfersSection />);
 
-    const cells = await screen.findAllByTestId('transfer-name-cell');
-    const texts = cells.map((c) => c.textContent);
-    expect(texts).toContain('Pedido semanal');
-    expect(texts).toContain('Centro → Norte');
+    // La nota del usuario aparece como subtítulo (solo en la fila con nota).
+    expect(await screen.findByTestId('transfer-note')).toHaveTextContent('Pedido semanal');
+    // La ruta va en su propia columna, en ambas filas (con y sin nota).
+    const routes = screen.getAllByTestId('transfer-route').map((c) => c.textContent);
+    expect(routes).toEqual(['Centro → Norte', 'Centro → Norte']);
   });
 
   it('filtra la lista por el buscador (data-testid transfers-search)', async () => {
@@ -142,5 +167,177 @@ describe('TransfersSection — columna, buscador y fallback', () => {
     await waitFor(() => expect(within(table).getAllByTestId('transfer-row')).toHaveLength(1));
     expect(within(table).getByText('Pedido semanal')).toBeInTheDocument();
     expect(within(table).queryByText('Devoluciones')).not.toBeInTheDocument();
+  });
+});
+
+describe('TransfersSection v2 — grupos, detalle en línea y ciclo de vida', () => {
+  it('agrupa por estado y despliega el detalle en línea al pulsar una fila', async () => {
+    vi.mocked(listTransfers).mockResolvedValue([
+      makeTransfer({ id: 't1', notes: 'Pedido semanal', status: 'DRAFT', lines: [makeLine()] }),
+    ]);
+    renderWithClient(<TransfersSection />);
+
+    await screen.findByText('Pedido semanal');
+    // "Borradores" aparece como vista del carril y como cabecera de grupo; acotamos a la tabla.
+    expect(
+      within(screen.getByTestId('transfers-table')).getByText('Borradores'),
+    ).toBeInTheDocument();
+    // El detalle no está montado hasta desplegar la fila.
+    expect(screen.queryByTestId('transfer-detail')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('transfer-row'));
+
+    const detail = await screen.findByTestId('transfer-detail');
+    expect(within(detail).getByText('Traspaso creado')).toBeInTheDocument();
+  });
+
+  it('envía un borrador desde la acción del detalle desplegado', async () => {
+    vi.mocked(listTransfers).mockResolvedValue([
+      makeTransfer({ id: 't1', status: 'DRAFT', lines: [makeLine()] }),
+    ]);
+    renderWithClient(<TransfersSection />);
+
+    fireEvent.click(await screen.findByTestId('transfer-row'));
+    const action = await screen.findByTestId('transfer-action');
+    expect(action).toHaveTextContent('Enviar');
+
+    fireEvent.click(action);
+
+    await waitFor(() => expect(sendTransfer).toHaveBeenCalledWith('t1'));
+  });
+
+  it('recibe un traspaso en tránsito con todas sus líneas', async () => {
+    vi.mocked(listTransfers).mockResolvedValue([
+      makeTransfer({
+        id: 't1',
+        status: 'SENT',
+        sentAt: '2026-06-21T09:00:00.000Z',
+        lines: [makeLine({ id: 'l1', quantitySent: '6' })],
+      }),
+    ]);
+    renderWithClient(<TransfersSection />);
+
+    fireEvent.click(await screen.findByTestId('transfer-row'));
+    const action = await screen.findByTestId('transfer-action');
+    expect(action).toHaveTextContent('Recibir');
+
+    fireEvent.click(action);
+
+    await waitFor(() =>
+      expect(receiveTransfer).toHaveBeenCalledWith('t1', {
+        lines: [{ lineId: 'l1', quantityReceived: 6 }],
+      }),
+    );
+  });
+
+  it('cierra un traspaso recibido', async () => {
+    vi.mocked(listTransfers).mockResolvedValue([
+      makeTransfer({
+        id: 't1',
+        status: 'RECEIVED',
+        receivedAt: '2026-06-22T09:00:00.000Z',
+        lines: [makeLine({ id: 'l1', quantitySent: '6', quantityReceived: '6' })],
+      }),
+    ]);
+    renderWithClient(<TransfersSection />);
+
+    fireEvent.click(await screen.findByTestId('transfer-row'));
+    const action = await screen.findByTestId('transfer-action');
+    expect(action).toHaveTextContent('Cerrar');
+
+    fireEvent.click(action);
+
+    await waitFor(() => expect(closeTransfer).toHaveBeenCalledWith('t1'));
+  });
+
+  it('muestra «Todo en perfecto estado» cuando la recepción no tuvo incidencias', async () => {
+    vi.mocked(listTransfers).mockResolvedValue([
+      makeTransfer({
+        id: 't1',
+        status: 'RECEIVED',
+        receivedAt: '2026-06-22T09:00:00.000Z',
+        lines: [makeLine({ id: 'l1', quantitySent: '6', quantityReceived: '6', discrepancy: '0' })],
+      }),
+    ]);
+    renderWithClient(<TransfersSection />);
+
+    fireEvent.click(await screen.findByTestId('transfer-row'));
+    const review = await screen.findByTestId('transfer-review');
+    expect(within(review).getByTestId('transfer-review-ok')).toHaveTextContent(
+      'Todo en perfecto estado',
+    );
+  });
+
+  it('resume las incidencias en el detalle (el detalle por línea vive en el chat)', async () => {
+    vi.mocked(listTransfers).mockResolvedValue([
+      makeTransfer({
+        id: 't1',
+        status: 'RECEIVED',
+        receivedAt: '2026-06-22T09:00:00.000Z',
+        lines: [
+          makeLine({
+            id: 'l1',
+            quantitySent: '6',
+            quantityReceived: '5',
+            discrepancy: '-1',
+            discrepancyNote: 'Unidad dañada en transporte',
+          }),
+        ],
+      }),
+    ]);
+    renderWithClient(<TransfersSection />);
+
+    fireEvent.click(await screen.findByTestId('transfer-row'));
+    const incidents = await screen.findByTestId('transfer-review-incidents');
+    expect(incidents).toHaveTextContent('1 incidencia');
+  });
+
+  it('marca como «Solucionado» una incidencia ya resuelta', async () => {
+    vi.mocked(listTransfers).mockResolvedValue([
+      makeTransfer({
+        id: 't1',
+        status: 'RECEIVED',
+        receivedAt: '2026-06-22T09:00:00.000Z',
+        incidentResolvedAt: '2026-06-22T10:00:00.000Z',
+        lines: [
+          makeLine({ id: 'l1', quantitySent: '6', quantityReceived: '5', discrepancy: '-1' }),
+        ],
+      }),
+    ]);
+    renderWithClient(<TransfersSection />);
+
+    fireEvent.click(await screen.findByTestId('transfer-row'));
+    expect(await screen.findByTestId('transfer-review-resolved')).toHaveTextContent('Solucionado');
+    expect(screen.queryByTestId('transfer-review-incidents')).not.toBeInTheDocument();
+  });
+
+  it('abre el chat de comentarios desde el botón de la fila', async () => {
+    vi.mocked(listTransfers).mockResolvedValue([
+      makeTransfer({ id: 't1', status: 'RECEIVED', lines: [makeLine({ id: 'l1' })] }),
+    ]);
+    renderWithClient(<TransfersSection />);
+
+    await screen.findByTestId('transfer-row');
+    expect(screen.queryByTestId('transfer-chat')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('transfer-chat-open'));
+    expect(await screen.findByTestId('transfer-chat')).toBeInTheDocument();
+  });
+
+  it('filtra por la vista de estado seleccionada', async () => {
+    vi.mocked(listTransfers).mockResolvedValue([
+      makeTransfer({ id: 't1', notes: 'Borrador A', status: 'DRAFT', lines: [makeLine()] }),
+      makeTransfer({ id: 't2', notes: 'Tránsito B', status: 'SENT', lines: [makeLine()] }),
+    ]);
+    renderWithClient(<TransfersSection />);
+
+    await screen.findByText('Borrador A');
+    const table = screen.getByTestId('transfers-table');
+    expect(within(table).getAllByTestId('transfer-row')).toHaveLength(2);
+
+    fireEvent.click(screen.getByTestId('transfers-view-sent'));
+
+    await waitFor(() => expect(within(table).getAllByTestId('transfer-row')).toHaveLength(1));
+    expect(within(table).getByText('Tránsito B')).toBeInTheDocument();
+    expect(within(table).queryByText('Borrador A')).not.toBeInTheDocument();
   });
 });

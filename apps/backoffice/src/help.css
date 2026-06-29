@@ -1,0 +1,615 @@
+/* ════════════════════════════════════════════════════════════════════
+   CENTRO DE AYUDA — buscador conversacional (Fundación Geist)
+   ────────────────────────────────────────────────────────────────────
+   Dos estados de una misma página:
+     · REPOSO  → hero centrado (eyebrow + título + buscador grande + chips).
+     · LECTURA → al preguntar, el buscador se ancla arriba y la respuesta del
+                 asistente entra en streaming como un DOCUMENTO (no burbujas),
+                 con el texto escribiéndose en tiempo real (caret azul).
+
+   La respuesta se pinta con <ChatMarkdown> (react-markdown), estilado aquí bajo
+   `.help-answer` para no depender del CSS del dock de chat.
+
+   Aquí viven además unas primitivas de sección compartidas
+   (.help-section / .help-section-head / .help-title / .help-intro) que NO usa
+   esta vista pero sí SettingsPage y VerifactuPage. Se conservan.
+   ════════════════════════════════════════════════════════════════════ */
+
+.help-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-10);
+}
+
+/* En reposo, el HERO ocupa toda la pantalla EXACTAMENTE como la card de Catálogo/Inventario:
+   misma reducción del padding de la superficie (sin reservar los 6rem del dock del asistente)
+   y misma altura explícita anclada al viewport. Así Ayuda y las tablas de Catálogo llegan a
+   los mismos bordes. Scopeado con `:has` para no tocar otras vistas ni el modo lectura. */
+/* Reposo: padding reducido + altura fija como Catálogo */
+.bo-main--surface:has(> .help-page:not(.help-page--reading)) {
+  padding: 0.4rem 1.25rem 1.5rem;
+}
+.help-page:not(.help-page--reading) {
+  /* Offset = topbar (60px) + padding-top (0.4rem) + padding-bottom (1.5rem) = 1.9rem. */
+  height: calc(100dvh - 60px - 1.9rem);
+}
+/* Lectura: misma superficie y altura para que el sticky bottom funcione */
+.bo-main--surface:has(> .help-page--reading) {
+  padding: 0.4rem 1.25rem 1.5rem;
+}
+.help-page--reading {
+  height: calc(100dvh - 60px - 1.9rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Hero recesado (estado de reposo) ──────────────────────────────────────── */
+.help-hero {
+  /* Estira para llenar `.help-page` (que a su vez llena el área de contenido), de modo
+     que la card ocupe toda la pantalla; el contenido queda centrado en vertical. */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--ui-space-5);
+  padding: clamp(2.5rem, 1.4rem + 5vw, 5rem) var(--ui-space-6);
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+}
+
+.help-hero-eyebrow {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-brand-ink);
+}
+
+.help-hero-title {
+  margin: 0;
+  font-size: clamp(2.25rem, 1.1rem + 4.4vw, 3.75rem);
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  color: var(--ui-text);
+  text-wrap: balance;
+}
+
+.help-hero-subtitle {
+  margin: 0;
+  max-width: 38rem;
+  font-size: clamp(1rem, 0.9rem + 0.4vw, 1.1875rem);
+  line-height: 1.5;
+  color: var(--ui-text-muted);
+  text-wrap: balance;
+}
+
+/* ── Buscador / composer (hero grande + barra anclada) ─────────────────────── */
+.help-ask {
+  position: relative;
+  width: 100%;
+}
+.help-ask--hero {
+  max-width: 44rem;
+  margin-top: var(--ui-space-2);
+}
+.help-ask__icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ui-text-soft);
+  pointer-events: none;
+}
+.help-ask--hero .help-ask__icon {
+  left: 1.25rem;
+}
+.help-ask--bar .help-ask__icon {
+  left: 1rem;
+}
+.help-ask__input {
+  width: 100%;
+  font: inherit;
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  box-shadow: var(--ui-shadow-sm);
+  transition:
+    border-color 0.18s var(--ui-ease),
+    box-shadow 0.18s var(--ui-ease);
+}
+.help-ask--hero .help-ask__input {
+  height: 3.75rem;
+  padding: 0 3.75rem 0 3.25rem;
+  font-size: var(--ui-text-lg);
+  border-radius: 14px;
+}
+.help-ask--bar .help-ask__input {
+  height: 3rem;
+  padding: 0 3.25rem 0 2.85rem;
+  font-size: var(--ui-text-base);
+  border-radius: var(--ui-radius-md);
+}
+.help-ask__input::placeholder {
+  color: var(--ui-text-soft);
+}
+.help-ask__input:focus-visible {
+  outline: none;
+  border-color: var(--ui-brand);
+  box-shadow: var(--ui-focus);
+}
+.help-ask__input:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+/* Botón enviar / detener, dentro del input a la derecha. */
+.help-ask__send {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  border: 0;
+  cursor: pointer;
+  color: var(--ui-primary-fg);
+  background: var(--ui-brand);
+  transition:
+    background 0.15s var(--ui-ease),
+    opacity 0.15s var(--ui-ease);
+}
+.help-ask--hero .help-ask__send {
+  right: 0.6rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 10px;
+}
+.help-ask--bar .help-ask__send {
+  right: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9px;
+}
+.help-ask__send:hover:not(:disabled) {
+  background: var(--ui-primary-hover);
+}
+.help-ask__send:disabled {
+  background: var(--ui-border-strong);
+  cursor: not-allowed;
+}
+.help-ask__send:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.help-ask__send--stop {
+  background: var(--ui-text);
+}
+.help-ask__send--stop:hover {
+  background: var(--gst-800);
+}
+.help-ask__spin {
+  animation: help-spin 1s linear infinite;
+}
+@keyframes help-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Chips de pregunta (arranque y seguimiento) ────────────────────────────── */
+.help-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+  justify-content: center;
+}
+.help-followups .help-chips {
+  justify-content: flex-start;
+}
+.help-chip {
+  white-space: nowrap;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+  font-size: var(--ui-text-base);
+  cursor: pointer;
+  transition:
+    background 0.15s var(--ui-ease),
+    border-color 0.15s var(--ui-ease);
+}
+.help-chip:hover {
+  background: var(--ui-surface-subtle);
+  border-color: color-mix(in srgb, var(--ui-brand) 40%, var(--ui-border));
+}
+.help-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* ── Modo lectura: documento arriba, barra anclada abajo ──────────────────── */
+/* El scroll y el fade viven en el wrapper para que la máscara cubra el área
+   visible completa y el contenido desaparezca justo antes del input. */
+.help-doc-wrap {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  /* Gradiente de fade en los últimos 4rem: el texto se desvanece hacia el input */
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 4rem), transparent 100%);
+  mask-image: linear-gradient(to bottom, black calc(100% - 4rem), transparent 100%);
+}
+.help-doc {
+  width: 100%;
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: var(--ui-space-7) 0 var(--ui-space-8);
+}
+.help-askbar-outer {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  padding-block: var(--ui-space-3);
+  background: color-mix(in srgb, var(--ui-bg) 85%, transparent);
+  backdrop-filter: blur(8px) saturate(1.4);
+  border-top: 1px solid var(--ui-border);
+}
+.help-askbar {
+  max-width: 46rem;
+  margin: 0 auto;
+}
+
+/* ── Un turno (pregunta + respuesta) ───────────────────────────────────────── */
+.help-turn + .help-turn {
+  margin-top: var(--ui-space-8);
+  padding-top: var(--ui-space-8);
+  border-top: 1px solid var(--ui-border);
+}
+.help-turn__eyebrow {
+  margin: 0 0 var(--ui-space-2);
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+}
+.help-turn__q {
+  margin: 0;
+  font-size: 1.75rem;
+  line-height: 1.18;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ui-text);
+  text-wrap: balance;
+}
+.help-rule {
+  height: 1px;
+  margin: var(--ui-space-5) 0;
+  background: var(--ui-border);
+  border: 0;
+}
+
+/* ── Respuesta (markdown) en modo documento, 16px ──────────────────────────── */
+.help-answer {
+  font-size: 1rem;
+  line-height: 1.62;
+  color: var(--gst-800);
+}
+.help-answer > :first-child {
+  margin-top: 0;
+}
+.help-answer p {
+  margin: 0 0 1rem;
+}
+.help-answer strong {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+.help-answer a {
+  color: var(--ui-brand-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.help-answer ul,
+.help-answer ol {
+  margin: 0 0 1rem;
+  padding-left: 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.help-answer li {
+  padding-left: 0.2rem;
+}
+.help-answer li::marker {
+  color: var(--ui-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+.help-answer h1,
+.help-answer h2,
+.help-answer h3 {
+  margin: 1.5rem 0 0.6rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+}
+.help-answer h2 {
+  font-size: 1.25rem;
+}
+.help-answer h3 {
+  font-size: 1.0625rem;
+}
+.help-answer code {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 0.86em;
+  padding: 0.08em 0.4em;
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  color: var(--gst-700);
+}
+.help-answer blockquote {
+  margin: 0 0 1rem;
+  padding: 0.2rem 0 0.2rem 1rem;
+  border-left: 3px solid var(--ui-border-strong);
+  color: var(--ui-text-muted);
+}
+.help-answer table {
+  margin: 0 0 1rem;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+.help-answer th,
+.help-answer td {
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--ui-border);
+  text-align: left;
+}
+/* Bloque de código con botón de copiar (estructura .code-block de ChatMarkdown). */
+.help-answer .code-block {
+  position: relative;
+  margin: 0 0 1rem;
+}
+.help-answer .code-block__head {
+  display: flex;
+  justify-content: flex-end;
+}
+.help-answer .code-block__copy {
+  display: grid;
+  place-items: center;
+  padding: 0.3rem;
+  color: var(--ui-text-soft);
+  background: transparent;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  cursor: pointer;
+}
+.help-answer .code-block__copy:hover {
+  color: var(--ui-text);
+  background: var(--ui-surface-subtle);
+}
+.help-answer pre {
+  margin: 0 0 1rem;
+  padding: var(--ui-space-4);
+  overflow: auto;
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 0.85rem;
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+}
+.help-answer pre code {
+  padding: 0;
+  background: none;
+  border: 0;
+}
+
+/* Caret parpadeante: el texto se está escribiendo. */
+.help-cursor {
+  display: inline-block;
+  width: 6px;
+  height: 1.05em;
+  margin-left: 2px;
+  border-radius: 1px;
+  vertical-align: text-bottom;
+  background: var(--ui-brand);
+  animation: help-blink 1s steps(2, start) infinite;
+}
+@keyframes help-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* Indicador «Pensando» antes del primer token. */
+.help-thinking {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  font-size: 1rem;
+  color: var(--ui-text-muted);
+}
+.help-thinking__dots {
+  display: inline-flex;
+  gap: 4px;
+}
+.help-thinking__dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ui-text-soft);
+  animation: help-bounce 1.2s var(--ui-ease) infinite;
+}
+.help-thinking__dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.help-thinking__dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes help-bounce {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* ── Pie tras una respuesta cerrada ────────────────────────────────────────── */
+.help-foot {
+  margin-top: var(--ui-space-6);
+  padding-top: var(--ui-space-5);
+  border-top: 1px solid var(--ui-border);
+}
+.help-foot__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  flex-wrap: wrap;
+}
+.help-helpful {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--ui-text-muted);
+}
+.help-helpful--done {
+  color: var(--ui-success);
+  font-weight: 500;
+}
+.help-vote {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  color: var(--ui-text-muted);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  cursor: pointer;
+  transition:
+    background 0.15s var(--ui-ease),
+    color 0.15s var(--ui-ease),
+    border-color 0.15s var(--ui-ease);
+}
+.help-vote:hover {
+  color: var(--ui-text);
+  background: var(--ui-surface-subtle);
+  border-color: color-mix(in srgb, var(--ui-brand) 40%, var(--ui-border));
+}
+.help-vote:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.help-followups {
+  margin-top: var(--ui-space-5);
+}
+.help-followups__lbl {
+  margin: 0 0 var(--ui-space-3);
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+}
+
+/* ── Avisos (IA no disponible / error) ─────────────────────────────────────── */
+.help-noai {
+  margin: 0;
+  font-size: var(--ui-text-base);
+  color: var(--ui-text-muted);
+}
+.help-error {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  justify-content: space-between;
+  margin-bottom: var(--ui-space-4);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  font-size: var(--ui-text-base);
+  color: var(--ui-danger);
+  background: var(--ui-danger-soft);
+  border: 1px solid color-mix(in srgb, var(--ui-danger) 30%, var(--ui-border));
+  border-radius: var(--ui-radius-md);
+}
+.help-error button {
+  flex: none;
+  padding: 0 0.4rem;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* Aviso de que una persona de soporte está al cargo (tras escalar a Telegram). */
+.help-human {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  margin-bottom: var(--ui-space-4);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  color: var(--ui-text);
+  background: var(--ui-accent-soft, var(--ui-surface));
+  border: 1px solid var(--ui-border-strong);
+  border-left: 3px solid var(--ui-accent, var(--ui-border-strong));
+  border-radius: var(--ui-radius-md);
+}
+
+/* ── Primitivas de sección compartidas (SettingsPage / VerifactuPage) ─────────
+   No las usa esta vista, pero sí esas dos como "panel-superficie" con cabecera. */
+.help-section {
+  padding: var(--ui-space-6) var(--ui-space-6);
+  border: 1px solid var(--ui-border);
+  border-radius: 18px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+}
+.help-section-head {
+  margin-bottom: var(--ui-space-6);
+}
+.help-title {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  margin: 0;
+  font-size: var(--ui-text-lg);
+  font-weight: 600;
+  letter-spacing: -0.016em;
+  color: var(--ui-text);
+}
+.help-title svg {
+  color: var(--ui-text-soft);
+}
+.help-intro {
+  margin: var(--ui-space-2) 0 0;
+  font-size: var(--ui-text-base);
+  color: var(--ui-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .help-ask__input {
+    transition: none;
+  }
+  .help-cursor,
+  .help-thinking__dots i,
+  .help-ask__spin {
+    animation: none;
+  }
+}

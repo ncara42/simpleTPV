@@ -6,7 +6,7 @@
 // Todas las funciones son idempotentes (marker en notes/ticket o upsert).
 // Helpers de fecha duplicados a propósito: cada seed es autocontenido.
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import bcrypt from 'bcryptjs';
 
@@ -16,8 +16,10 @@ import {
   DiscountSource,
   MovementType,
   PaymentMethod,
+  PaymentStatus,
   PrismaClient,
   PurchaseOrderStatus,
+  SaleChannel,
   SalesExportStatus,
   SaleStatus,
   SaleUnit,
@@ -446,6 +448,40 @@ async function seedTransfers(prisma: PrismaClient, orgId: string): Promise<void>
             createdAt: dateDaysAgo(t.receivedDaysAgo!, 11, 0),
           },
         });
+      }
+    }
+
+    // Chat demo de la recepción: si el traspaso recibido trae una incidencia (nota de
+    // discrepancia), sembramos un hilo central ↔ tienda para poblar el pop-up de
+    // comentarios. Idempotente: solo se crea junto al traspaso (rama de alta).
+    const hasIncidentNote = wasReceived && lines.some((l) => l.note);
+    if (hasIncidentNote) {
+      const convo: Array<{ author: 'store' | 'central'; body: string; min: number }> = [
+        {
+          author: 'store',
+          body: 'Buenas, ha llegado el pedido pero una unidad de Pre-roll CBD x3 viene dañada. La aparto.',
+          min: 5,
+        },
+        {
+          author: 'central',
+          body: '¿Puedes hacerle una foto y la registramos como incidencia? Gracias por avisar.',
+          min: 18,
+        },
+        {
+          author: 'store',
+          body: 'Hecho. El resto del pedido, todo correcto. 👍',
+          min: 32,
+        },
+      ];
+      for (const m of convo) {
+        await prisma.$executeRaw`
+          INSERT INTO "TransferMessage"
+            (id, "organizationId", "transferId", author, body, "createdBy", "createdAt")
+          VALUES (
+            ${randomUUID()}::uuid, ${orgId}::uuid, ${transfer.id}::uuid,
+            ${m.author}, ${m.body}, ${admin.id}::uuid,
+            ${dateDaysAgo(t.receivedDaysAgo!, 11, m.min)}
+          )`;
       }
     }
   }
@@ -1084,6 +1120,10 @@ async function seedWholesaleStates(prisma: PrismaClient, orgId: string): Promise
         email: 'pedidos@gardensevilla.es',
         phone: '+34 954 11 22 33',
         address: 'C/ Feria 12, 41003 Sevilla',
+        tags: ['HORECA', 'Nuevo'],
+        paymentTerms: 90,
+        salesRep: 'Jon Arrieta',
+        creditLimit: 2500,
         priceListId: null, // sin tarifa: las líneas congelan el PVP
       },
     });
@@ -1109,6 +1149,7 @@ async function seedWholesaleStates(prisma: PrismaClient, orgId: string): Promise
       customer: herbolario,
       status: WholesaleOrderStatus.DRAFT,
       daysAgo: 0,
+      paid: false,
       items: products
         .slice(0, 2)
         .map((p) => ({ id: p.id, price: Number(p.salePrice) * 0.7, qty: 6 })),
@@ -1118,6 +1159,7 @@ async function seedWholesaleStates(prisma: PrismaClient, orgId: string): Promise
       customer: farmacia,
       status: WholesaleOrderStatus.SHIPPED,
       daysAgo: 6,
+      paid: true, // enviado y ya cobrado → la ficha muestra un pedido "Pagado"
       items: products
         .slice(2, 5)
         .map((p) => ({ id: p.id, price: Number(p.salePrice) * 0.7, qty: 12 })),
@@ -1127,6 +1169,7 @@ async function seedWholesaleStates(prisma: PrismaClient, orgId: string): Promise
       customer: growshop,
       status: WholesaleOrderStatus.CANCELLED,
       daysAgo: 10,
+      paid: false,
       items: products.slice(5, 6).map((p) => ({ id: p.id, price: Number(p.salePrice), qty: 20 })),
     },
   ];
@@ -1145,6 +1188,7 @@ async function seedWholesaleStates(prisma: PrismaClient, orgId: string): Promise
       unitPrice: round2(i.price),
       lineTotal: round2(i.price * i.qty),
     }));
+    const createdAt = dateDaysAgo(spec.daysAgo, 12, 0);
     await prisma.wholesaleOrder.create({
       data: {
         organizationId: orgId,
@@ -1152,7 +1196,9 @@ async function seedWholesaleStates(prisma: PrismaClient, orgId: string): Promise
         status: spec.status,
         notes: spec.marker,
         total: round2(lines.reduce((sum, l) => sum + l.lineTotal, 0)),
-        createdAt: dateDaysAgo(spec.daysAgo, 12, 0),
+        paymentStatus: spec.paid ? 'PAID' : 'PENDING',
+        paidAt: spec.paid ? createdAt : null,
+        createdAt,
         lines: { create: lines },
       },
     });
@@ -1559,6 +1605,66 @@ async function backfillSaleLineCosts(prisma: PrismaClient, orgId: string): Promi
   }
 }
 
+/**
+ * Da variedad de COBRO al ledger de Ventas: convierte un puñado de ventas recientes
+ * en facturas a crédito B2B (unas pendientes, otras vencidas) y un par en ventas de
+ * canal Online, para que el ledger muestre el split Cobrado/Pendiente/Vencido y los
+ * canales TPV/Online/B2B (las anuladas las aporta seedSpecialSales). Los vencimientos
+ * son relativos a HOY (una factura vencida lo sigue estando al re-sembrar). Idempotente:
+ * no toca nada si ya hay ventas con canal distinto de TPV.
+ */
+async function seedCobroLedger(prisma: PrismaClient, orgId: string): Promise<void> {
+  const already = await prisma.sale.count({
+    where: { organizationId: orgId, channel: { not: SaleChannel.TPV } },
+  });
+  if (already > 0) return;
+
+  // Facturas B2B: razón social (nombre de cliente del ledger) + método + vencimiento
+  // relativo a hoy (negativo = vencida; positivo = pendiente).
+  const b2b = [
+    { name: 'Obrador San Blas', method: PaymentMethod.TRANSFER, dueInDays: -3 },
+    { name: 'Cafetería Lluvia', method: PaymentMethod.DIRECT_DEBIT, dueInDays: -9 },
+    { name: 'Bar Quintana', method: PaymentMethod.TRANSFER, dueInDays: 12 },
+    { name: 'Restaurante El Faro', method: PaymentMethod.TRANSFER, dueInDays: 20 },
+    { name: 'Hotel Mar Azul', method: PaymentMethod.TRANSFER, dueInDays: 18 },
+  ];
+
+  // Ventas COMPLETED más recientes (excluye la anulada de seedSpecialSales).
+  const recent = await prisma.sale.findMany({
+    where: { organizationId: orgId, status: SaleStatus.COMPLETED },
+    orderBy: { createdAt: 'desc' },
+    take: b2b.length + 2,
+    select: { id: true },
+  });
+  if (recent.length < b2b.length + 2) return;
+
+  for (let i = 0; i < b2b.length; i += 1) {
+    const due = new Date();
+    due.setHours(0, 0, 0, 0);
+    due.setDate(due.getDate() + b2b[i]!.dueInDays);
+    await prisma.sale.update({
+      where: { id: recent[i]!.id },
+      data: {
+        channel: SaleChannel.B2B,
+        paymentStatus: PaymentStatus.PENDING,
+        paymentMethod: b2b[i]!.method,
+        dueDate: due,
+        paidAt: null,
+        customerName: b2b[i]!.name,
+        customerTaxId: `B${(63000000 + i).toString()}`,
+      },
+    });
+  }
+
+  // Dos ventas de canal Online (cobradas en el acto: se quedan PAID).
+  for (let i = 0; i < 2; i += 1) {
+    await prisma.sale.update({
+      where: { id: recent[b2b.length + i]!.id },
+      data: { channel: SaleChannel.ONLINE },
+    });
+  }
+}
+
 /** Punto de entrada: ejecuta todos los extras en orden de dependencia. */
 export async function seedExtras(prisma: PrismaClient, orgId: string): Promise<void> {
   await seedProductDetails(prisma, orgId);
@@ -1570,6 +1676,7 @@ export async function seedExtras(prisma: PrismaClient, orgId: string): Promise<v
   await seedCashMovements(prisma, orgId);
   await seedTimeClockBreaks(prisma, orgId);
   await seedSpecialSales(prisma, orgId);
+  await seedCobroLedger(prisma, orgId);
   await seedPurchaseOrderStates(prisma, orgId);
   await seedWholesaleStates(prisma, orgId);
   await seedVerifactuStates(prisma, orgId);

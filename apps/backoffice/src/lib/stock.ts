@@ -1,17 +1,28 @@
 import type {
   AdjustStockInput,
   CreateTransferInput,
+  CreateTransferMessageInput,
   ExpiringBatch,
+  ReceiveTransferInput,
   SetMinStockInput,
   StockAlert,
   StockGlobalRow,
   StockMovementsPage,
   Transfer,
+  TransferMessage,
 } from '@simpletpv/auth';
 
 import { api } from './auth.js';
 
-export type { AdjustStockInput, ExpiringBatch, StockAlert, StockGlobalRow, Transfer };
+export type {
+  AdjustStockInput,
+  ExpiringBatch,
+  ReceiveTransferInput,
+  StockAlert,
+  StockGlobalRow,
+  Transfer,
+  TransferMessage,
+};
 
 export function getGlobalStock(): Promise<StockGlobalRow[]> {
   return api.get<StockGlobalRow[]>('/stock/global');
@@ -43,6 +54,36 @@ export function createTransfer(input: CreateTransferInput): Promise<Transfer> {
 
 export function sendTransfer(id: string): Promise<Transfer> {
   return api.post<Transfer>(`/transfers/${id}/send`);
+}
+
+// SENT→RECEIVED: registra lo recibido por línea. El backend descuadra el origen al
+// enviar y abona el destino al recibir; las líneas con `quantityReceived` < enviado
+// generan discrepancia (incidencia) en el traspaso.
+export function receiveTransfer(id: string, input: ReceiveTransferInput): Promise<Transfer> {
+  return api.post<Transfer>(`/transfers/${id}/receive`, input);
+}
+
+// RECEIVED→CLOSED: cierra el traspaso (estado terminal). No mueve stock.
+export function closeTransfer(id: string): Promise<Transfer> {
+  return api.post<Transfer>(`/transfers/${id}/close`);
+}
+
+// Chat del traspaso (hilo entre central y la tienda que recibe).
+export function listTransferMessages(id: string): Promise<TransferMessage[]> {
+  return api.get<TransferMessage[]>(`/transfers/${id}/messages`);
+}
+
+export function postTransferMessage(
+  id: string,
+  input: CreateTransferMessageInput,
+): Promise<TransferMessage> {
+  return api.post<TransferMessage>(`/transfers/${id}/messages`, input);
+}
+
+// Marca la incidencia de recepción como solucionada (el traspaso deja de contar como
+// incidencia abierta; el chat se conserva).
+export function resolveTransferIncident(id: string): Promise<Transfer> {
+  return api.post<Transfer>(`/transfers/${id}/resolve-incident`);
 }
 
 export function adjustStock(input: AdjustStockInput): Promise<unknown> {

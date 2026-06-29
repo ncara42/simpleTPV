@@ -19,14 +19,25 @@ vi.mock('./lib/products.js', () => ({
 
 import { ConfirmProvider } from './components/ConfirmProvider.js';
 import { FamiliesPage } from './FamiliesPage.js';
+import { PageActionsProvider, usePageActionsValue } from './lib/pageActions.js';
+
+// El CTA «Nueva familia» vive en el slot de acciones de la TopBar (usePageActions),
+// no en la card. Montamos el provider + un slot que pinta su valor para poder
+// asertarlo en aislamiento.
+function ActionsSlot() {
+  return <>{usePageActionsValue()}</>;
+}
 
 function renderPage(): void {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <ConfirmProvider>
-        <FamiliesPage />
-      </ConfirmProvider>
+      <PageActionsProvider>
+        <ConfirmProvider>
+          <ActionsSlot />
+          <FamiliesPage />
+        </ConfirmProvider>
+      </PageActionsProvider>
     </QueryClientProvider>,
   );
 }

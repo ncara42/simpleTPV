@@ -68,14 +68,13 @@ async function mockModels(page: import('@playwright/test').Page, models: unknown
   await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 15000 });
 }
 
-test('el dock expone el input y el selector de modelo en el pie', async ({ page }) => {
-  // Con IA configurada (modelos disponibles) la barra muestra el input habilitado, enviar y el
-  // selector de modelo/esfuerzo en línea en el pie (estilo PromptInput de Claude).
+test('el dock expone el input y el botón de enviar en el pie', async ({ page }) => {
+  // Con IA configurada (modelos disponibles) la barra muestra el input habilitado y el botón de
+  // enviar en el pie.
   await mockModels(page, MODELS);
   await expect(page.getByTestId('chat-dock')).toBeVisible();
   await expect(page.getByTestId('chat-input')).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Enviar' })).toBeVisible();
-  await expect(page.getByTestId('chat-model-select')).toBeVisible();
 });
 
 test('sin proveedor de IA configurado, el panel avisa y el input queda deshabilitado', async ({
@@ -245,31 +244,3 @@ test('hace streaming de la respuesta del asistente', async ({ page }) => {
 // (applyCanvasOp añade/valida widgets). No se replican aquí como E2E porque dependen
 // de estado transitorio de streaming y del reload post-turno (asserts propensos a
 // flakiness, desaconsejados por las reglas de testing web).
-
-test('permite cambiar de proveedor/modelo y de esfuerzo', async ({ page }) => {
-  await mockChat(
-    page,
-    sse([
-      {
-        event: 'done',
-        data: {
-          messageId: 'm',
-          conversationId: 'c',
-          usage: { inputTokens: 1, outputTokens: 1, costEur: '0' },
-        },
-      },
-    ]),
-  );
-
-  // El selector modelo/esfuerzo vive en línea en el pie del composer (estilo Claude).
-  // Abrirlo ofrece los modelos de los providers mockeados.
-  await page.getByTestId('chat-model-select').click();
-  await page.getByRole('menuitemradio', { name: 'Claude Opus 4.8' }).click();
-  await expect(page.getByTestId('chat-model-select')).toContainText('Claude Opus 4.8');
-
-  // El esfuerzo se elige en el submenú "Esfuerzo" (Bajo/Medio/Alto).
-  await page.getByTestId('chat-model-select').click();
-  await page.getByTestId('chat-effort-toggle').click();
-  await page.getByRole('menuitemradio', { name: 'Alto' }).click();
-  await expect(page.getByTestId('chat-model-select')).toContainText('Alto');
-});

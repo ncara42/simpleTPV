@@ -1,10 +1,18 @@
 // Helpers de formato puros (testeables con vitest) usados por el dashboard.
 
-const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
+// `useGrouping: 'always'` fuerza el separador de miles también en cifras de 4 dígitos
+// (1000–9999): el español tiene `minimumGroupingDigits: 2` en CLDR, que por defecto omitiría
+// el punto (3080,28 en vez de 3.080,28). Con 'always' la agrupación es coherente y determinista.
+const eur = new Intl.NumberFormat('es-ES', {
+  style: 'currency',
+  currency: 'EUR',
+  useGrouping: 'always',
+});
 const eurCompact = new Intl.NumberFormat('es-ES', {
   style: 'currency',
   currency: 'EUR',
   maximumFractionDigits: 0,
+  useGrouping: 'always',
 });
 
 // Importe en euros: 1234.5 → "1234,50 €". Tolera null/undefined → "—".

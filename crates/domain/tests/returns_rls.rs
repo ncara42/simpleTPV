@@ -120,6 +120,8 @@ async fn sell(c: &Ctx, product: Uuid, qty: i64) -> SaleWithLines {
             ticket_discount_amt: None,
             customer_tax_id: None,
             customer_name: None,
+            channel: None,
+            credit_due_date: None,
         },
     )
     .await

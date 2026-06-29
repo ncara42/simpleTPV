@@ -1,0 +1,337 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   TARIFAS B2B — maestro-detalle de 3 columnas (carril de facetas · lista · ficha),
+   espejo de Clientes B2B. Reutiliza el carril del Catálogo (`.cat-*`), las filas y
+   avatares de Clientes (`.cust-*`) y la ficha de Ventas (`.ventas-*`). Aquí viven
+   solo las piezas propias de tarifas: la rejilla `.pl-*`, la píldora de descuento,
+   la tabla de precios por producto y la mini-lista de clientes. Paleta vía --ui-*.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.bo-main--surface:has(.b2b-pricelists-page) {
+  padding: 0.4rem 1.25rem 1.5rem;
+}
+/* B2bPage envuelve la sección en `.catalog b2b-page` (max-width 75rem, centrado): el
+   maestro-detalle ocupa todo el ancho cuando la sección activa es Tarifas. */
+.catalog.b2b-page:has(.b2b-pricelists-page) {
+  max-width: none;
+  margin: 0;
+}
+.b2b-pricelists-page {
+  /* Offset = topbar (60px) + padding-top (0.4rem) + padding-bottom (1.5rem). */
+  height: calc(100dvh - 60px - 1.9rem);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Rejilla de 3 columnas: carril · lista · ficha ───────────────────────────── */
+.pl-layout {
+  display: grid;
+  /* Mismas anchuras que `.cust-layout`: carril 15.75rem · lista 24rem · ficha 1fr. */
+  grid-template-columns: 15.75rem 24rem minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+/* El carril va envuelto en `.scroll-shadow-cell` (sombra de scroll, ver
+   styles/scroll-shadow.css); `.cat-rail` scrollea dentro. */
+.pl-layout > .scroll-shadow-cell {
+  min-height: 0;
+}
+
+/* ─── Columna central: lista de tarifas ───────────────────────────────────────── */
+.pl-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--ui-border);
+  border-right: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+  /* Sombra de scroll: la lista se difumina a su propio fondo. */
+  --scroll-shadow-bg: var(--ui-surface-subtle);
+}
+.pl-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--ui-border);
+  flex: 0 0 auto;
+}
+.pl-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  /* Igual que `.cust-list-scroll`: inset uniforme de 1rem + gap mínimo entre filas. */
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  scrollbar-width: none;
+}
+.pl-list-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── Columna derecha: ficha de la tarifa ─────────────────────────────────────── */
+.pl-detail {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--ui-surface);
+}
+.pl-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem 1rem;
+  /* Misma banda que las cabeceras de Clientes/Ventas (`.cust-detail-head`,
+     `.ventas-detail-head`, ~5.7rem por su fila de subgrid): aquí la ficha es una
+     columna flex, así que igualamos esa altura con min-height + padding vertical
+     reducido para que el centrado vertical mande. */
+  min-height: 5.7rem;
+  padding: 0.5rem 1.5rem;
+  border-bottom: 1px solid var(--ui-border);
+  flex: 0 0 auto;
+  /* En anchos ajustados el clúster de acciones baja a una segunda línea en vez de
+     aplastar el título a 3 líneas (el nombre necesita reclamar el espacio libre). */
+  flex-wrap: wrap;
+}
+.pl-detail-head .cust-detail-id {
+  flex: 1 1 15rem;
+  min-width: 0;
+}
+.pl-detail-head .cust-detail-actions {
+  margin-left: auto;
+  gap: 0.35rem;
+}
+/* Botones de la cabecera de tarifa (Duplicar · Editar · Añadir producto) más
+   compactos que el `.ventas-btn` base, para que el clúster quepa a la derecha del
+   título en la misma línea en vez de bajar a una segunda fila. */
+.pl-detail-head .cust-detail-actions .ventas-btn {
+  height: 2rem;
+  padding: 0 0.6rem;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+}
+/* Botones solo-icono (Duplicar · Editar · Borrar): cuadrados, sin texto. «Añadir
+   producto» es la excepción y conserva icono + texto. */
+.pl-detail-head .cust-detail-actions .ventas-btn--icon {
+  width: 2rem;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
+}
+.pl-detail-body {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 1.2rem 1.5rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.3rem;
+  max-width: 48rem;
+}
+.pl-detail-body::-webkit-scrollbar {
+  display: none;
+}
+
+/* Tono «descuento» (azul marca) para números tabulares, reutilizado en stats y Δ. */
+.cust-num[data-tone='disc'] {
+  color: var(--ui-brand);
+}
+
+/* Cabecera de sección con nota a la derecha (Precios por producto · Clientes). */
+.pl-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.pl-section-head > .ventas-section-title {
+  margin: 0;
+}
+.pl-section-note {
+  font-size: 0.74rem;
+  color: var(--ui-text-soft);
+}
+
+/* ─── Tabla «Precios por producto» ────────────────────────────────────────────── */
+.pl-products {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  overflow: hidden;
+}
+.pl-products-head,
+.pl-product-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5rem 5.5rem 3.5rem 3.5rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.9rem;
+}
+.pl-products-head {
+  background: var(--ui-surface-subtle);
+  border-bottom: 1px solid var(--ui-border);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+}
+.pl-product-row {
+  border-bottom: 1px solid var(--ui-border);
+  font-size: 0.82rem;
+}
+.pl-product-row:last-child {
+  border-bottom: none;
+}
+.pl-product-row:hover {
+  background: var(--ui-surface-subtle);
+}
+.pl-r {
+  text-align: right;
+  justify-self: end;
+}
+.pl-product-name {
+  min-width: 0;
+  font-weight: 500;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pl-product-price {
+  font-weight: 600;
+}
+.pl-products-empty,
+.pl-cust-empty {
+  padding: 1.4rem 0.95rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--ui-text-soft);
+}
+.pl-cust-empty {
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-md);
+}
+
+/* Acciones por fila (editar / quitar precio): aparecen al pasar el ratón. */
+.pl-product-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.2rem;
+  opacity: 0;
+  transition: opacity var(--ui-motion-fast) var(--ui-ease);
+}
+.pl-product-row:hover .pl-product-actions,
+.pl-product-actions:focus-within {
+  opacity: 1;
+}
+.pl-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border: none;
+  background: none;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-soft);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+.pl-icon-btn:hover {
+  background: color-mix(in srgb, var(--ui-surface) 60%, transparent);
+  color: var(--ui-text);
+}
+.pl-icon-btn--danger:hover {
+  background: color-mix(in srgb, var(--ui-danger) 12%, var(--ui-surface));
+  color: var(--ui-danger);
+}
+
+/* ─── Mini-lista «Clientes con esta tarifa» ───────────────────────────────────── */
+.pl-cust {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  overflow: hidden;
+}
+.pl-cust-row {
+  display: grid;
+  grid-template-columns: 2.1rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.pl-cust-row:last-child {
+  border-bottom: none;
+}
+.pl-cust-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  line-height: 1.3;
+}
+.pl-cust-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pl-cust-sub {
+  font-size: 0.72rem;
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pl-cust-billed {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* Pie del modal de edición: switch «activa» + enlace de borrado (peligro). */
+.pl-form-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.pl-del-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ui-text-soft);
+  cursor: pointer;
+  transition: color var(--ui-motion-fast) var(--ui-ease);
+}
+.pl-del-link:hover {
+  color: var(--ui-danger);
+}
+
+/* ─── Responsive: ficha bajo la lista en pantallas estrechas ──────────────────── */
+@media (max-width: 1150px) {
+  .pl-layout {
+    grid-template-columns: 14rem minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .pl-layout > .scroll-shadow-cell {
+    grid-row: 1 / 3;
+  }
+  .pl-detail {
+    grid-column: 2 / 3;
+    border-top: 1px solid var(--ui-border);
+    max-height: 32rem;
+  }
+  .pl-products-head,
+  .pl-product-row {
+    grid-template-columns: minmax(0, 1fr) 4rem 4.5rem 3rem 3rem;
+    gap: 0.5rem;
+  }
+}

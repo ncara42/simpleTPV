@@ -1,0 +1,103 @@
+/* Sección 02 · «Mapa de calor horario» — celdas cuadradas, intensidad por facturación (banda con
+   hairline arriba/abajo), réplica pixel-a-pixel del handoff «Fundación Geist». Muestra las 24 horas;
+   por defecto se ven 07–17 y el resto se desplaza horizontalmente (11 celdas encajan en el viewport).
+   Colores por token (rampa azul derivada del acento → sigue el tema). */
+.hm-panel {
+  position: relative;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  overflow: hidden;
+  padding: 18px 0 4px;
+  display: flex;
+  flex-direction: column;
+}
+.hm-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 6px;
+  padding: 0 20px;
+}
+.hm-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--ui-text);
+}
+.hm-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+}
+.hm-legend-swatches {
+  display: flex;
+  gap: 3px;
+}
+.hm-legend-swatches span {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+}
+/* Carril desplazable. El padding lateral deja respirar a la primera/última celda en los extremos del
+   scroll (en el medio las celdas van a sangre, porque el padding queda fuera de vista al desplazar). */
+.hm-scroll {
+  position: relative;
+  padding: 6px 18px 14px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  touch-action: pan-x;
+  user-select: none;
+}
+.hm-scroll::-webkit-scrollbar {
+  display: none;
+}
+/* Tira interna: flex de celdas + objetivo del rubber-band (se traslada con transform en los extremos). */
+.hm-strip {
+  display: flex;
+  gap: 8px;
+  width: max-content;
+  will-change: transform;
+}
+/* Scroll horizontal personalizado: pista a todo el ancho justo encima del borde inferior + thumb de
+   color que se desplaza con el contenido (posición/ancho calculados en JS). Se oculta si todo cabe. */
+.hm-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  height: 3px;
+  background: color-mix(in srgb, var(--ui-border) 55%, transparent);
+  transition: opacity var(--ui-dur-fast, 150ms) ease;
+}
+.hm-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  border-radius: 3px;
+  background: var(--ui-brand);
+}
+.hm-cell {
+  flex: 0 0 70px;
+  height: 70px;
+  display: flex;
+  align-items: flex-end;
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.hm-cell--peak {
+  box-shadow:
+    0 0 0 2px var(--ui-brand),
+    0 0 0 4px color-mix(in srgb, var(--ui-brand) 25%, transparent);
+}

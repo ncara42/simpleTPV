@@ -1,7 +1,8 @@
 // Catálogo centralizado de widgets del dashboard.
 // Las etiquetas legibles se usan en la paleta de adición, los aria-labels y el chatbot.
-// El registry mantiene los metadatos (etiqueta, tipo, tamaño) de los 22 widgets fijos y
-// permite registrar widgets genéricos (gen:<uuid>) creados por el agente (#188).
+// El registry mantiene los metadatos (etiqueta, tipo, tamaño) de los widgets fijos del catálogo
+// (Ventas + Ventas por hora + los Geist #264) y permite registrar widgets genéricos (gen:<uuid>)
+// creados por el agente (#188).
 
 import { createElement, type ReactElement } from 'react';
 
@@ -14,32 +15,34 @@ import {
 } from '../lib/dashboard-layout.js';
 import { GenericWidget } from './generic/GenericWidget.js';
 
-// Etiquetas legibles de los 22 widgets del catálogo.
+// Etiquetas legibles del catálogo. Solo conservamos «Ventas» y «Ventas por hora».
 export const WIDGET_LABELS: Record<string, string> = {
-  // Tarjetas KPI
-  'kpi-today': 'Facturación hoy',
-  'kpi-avg-ticket': 'Ticket medio',
-  'kpi-upt': 'UPT',
-  'kpi-margin': '% Margen',
-  'kpi-profit': 'Beneficio',
-  'kpi-discount': 'Tasa descuento',
-  'kpi-return': 'Tasa devolución',
-  'kpi-lost-sales': 'Venta perdida est.',
-  // Paneles
   'dash-bars': 'Ventas',
   'dash-hour': 'Ventas por hora',
-  'dash-family': 'Ventas por familia',
-  'rank-sales': 'Rankings de producto',
-  'rank-margin': 'Rankings de producto',
-  'rank-rotation': 'Rankings de producto',
-  'dash-stockout': 'Roturas de stock',
-  'dash-expiring': 'Lotes por caducar',
-  'dash-purchase-orders': 'Pedidos de compra',
-  'dash-sales-emp': 'Ventas por vendedor',
-  'dash-discount-emp': 'Descuento por empleado',
-  'dash-suppliers': 'Comparativa de proveedores',
-  'dash-rotation': 'Rotación',
-  'dash-timeclock': 'Fichajes de hoy',
+  // Sección 01 · KPIs (rediseño)
+  'kpi-grid-connected': 'KPIs (rejilla conectada)',
+  'kpi-classic': 'KPI (tarjeta clásica)',
+  // Sección 02 · Gráficas (rediseño)
+  'graf-hour-area': 'Distribución horaria',
+  'graf-store-bars': 'Ventas por tienda',
+  'graf-heatmap': 'Mapa de calor horario',
+  // Sección 03 · Listas (rediseño)
+  'lista-familia': 'Ventas por familia',
+  'lista-rankings': 'Rankings',
+  'lista-mix': 'Mix de ventas',
+  // Sección 05 · Compactos (rediseño)
+  'cmp-ribbon': 'Banda compacta de métricas',
+  'cmp-donut': 'Donut por familia',
+  'cmp-treemap': 'Treemap compacto',
+  'cmp-leaderboard': 'Top vendedores',
+  'cmp-hero': 'Cifra-héroe',
+  // Sección 06 · Diagnóstico (rediseño)
+  'diag-actividad': 'Actividad (alertas)',
+  // Sección 07 · KPIs · más formatos (rediseño)
+  'kpi-dual': 'KPI dual',
+  'kpi-area': 'KPI con área',
+  'kpi-alerta': 'KPI de alerta',
+  'kpi-7dias': 'KPI 7 días',
 };
 
 // Tipo de widget en el registry. Los del catálogo son 'kpi' o 'panel' (su render lo posee
@@ -58,10 +61,10 @@ export interface WidgetSpec {
   genericSpec?: GenericSpec;
 }
 
-// Todos los ids de widget del catálogo fijo (22).
+// Todos los ids de widget del catálogo fijo (Ventas + Ventas por hora + los Geist #264).
 export const ALL_WIDGET_IDS: readonly string[] = Object.keys(ITEM_SPECS);
 
-// Registro vivo. Se siembra con los 22 widgets del catálogo (metadatos); los genéricos se
+// Registro vivo. Se siembra con los widgets del catálogo (metadatos); los genéricos se
 // añaden en runtime con `registerGenericWidget`.
 export const WIDGET_REGISTRY = new Map<string, WidgetSpec>(
   ALL_WIDGET_IDS.map((id) => [

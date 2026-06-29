@@ -85,3 +85,16 @@ pub async fn update_status(
         service::update_status(state.db(), user.organization_id, id, body.status).await?,
     ))
 }
+
+/// `POST /wholesale-orders/:id/collect` — registra el cobro de un pedido a crédito
+/// (ADMIN/MANAGER): lo marca PAID y sella `paidAt`. Tesorería, no fiscal.
+pub async fn collect(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<WholesaleOrderDetail>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    Ok(Json(
+        service::collect_order(state.db(), user.organization_id, id).await?,
+    ))
+}

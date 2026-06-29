@@ -8,52 +8,55 @@ datasource db {
 }
 
 model Organization {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  nif       String?  @unique
-  country   String   @default("ES")
-  locale    String   @default("es-ES")
-  currency  String   @default("EUR")
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  nif        String?  @unique
+  country    String   @default("ES")
+  locale     String   @default("es-ES")
+  currency   String   @default("EUR")
+  createdAt  DateTime @default(now())
   // U-08: marca corporativa — color primario (#rrggbb) y logo (data-URL acotada).
   brandColor String?
   logoUrl    String?
 
-  stores              Store[]
-  users               User[]
-  products            Product[]
-  productFamilies     ProductFamily[]
-  auditLogs           AuditLog[]
-  sales               Sale[]
-  saleLines           SaleLine[]
-  cashSessions        CashSession[]
-  cashMovements       CashMovement[]
-  officialDevices     OfficialDevice[]
-  timeClockEntries    TimeClockEntry[]
-  returns             Return[]
-  returnLines         ReturnLine[]
-  stock               Stock[]
-  stockBatches        StockBatch[]
-  storePrices         StorePrice[]
-  stockMovements      StockMovement[]
-  stockAlerts         StockAlert[]
-  transfers           Transfer[]
-  transferLines       TransferLine[]
-  suppliers           Supplier[]
-  purchaseOrders      PurchaseOrder[]
-  purchaseOrderLines  PurchaseOrderLine[]
-  verifactuRecords    VerifactuRecord[]
-  salesExports        SalesExport[]
-  userPreferences     UserPreference[]
-  customers           Customer[]
-  priceLists          PriceList[]
-  priceListItems      PriceListItem[]
-  wholesaleOrders     WholesaleOrder[]
-  wholesaleOrderLines WholesaleOrderLine[]
-  apiKeys             ApiKey[]
-  featureFlags        FeatureFlag[]
-  promotions          Promotion[]
-  supplierPrices      SupplierPrice[]
+  stores                Store[]
+  users                 User[]
+  products              Product[]
+  productFamilies       ProductFamily[]
+  auditLogs             AuditLog[]
+  sales                 Sale[]
+  saleLines             SaleLine[]
+  cashSessions          CashSession[]
+  cashMovements         CashMovement[]
+  officialDevices       OfficialDevice[]
+  timeClockEntries      TimeClockEntry[]
+  returns               Return[]
+  returnLines           ReturnLine[]
+  stock                 Stock[]
+  stockBatches          StockBatch[]
+  storePrices           StorePrice[]
+  stockMovements        StockMovement[]
+  stockAlerts           StockAlert[]
+  transfers             Transfer[]
+  transferLines         TransferLine[]
+  suppliers             Supplier[]
+  purchaseOrders        PurchaseOrder[]
+  purchaseOrderLines    PurchaseOrderLine[]
+  verifactuRecords      VerifactuRecord[]
+  verifactuConfig       VerifactuConfig?
+  verifactuCertificates VerifactuCertificate[]
+  verifactuSubmissions  VerifactuSubmission[]
+  salesExports          SalesExport[]
+  userPreferences       UserPreference[]
+  customers             Customer[]
+  priceLists            PriceList[]
+  priceListItems        PriceListItem[]
+  wholesaleOrders       WholesaleOrder[]
+  wholesaleOrderLines   WholesaleOrderLine[]
+  apiKeys               ApiKey[]
+  featureFlags          FeatureFlag[]
+  promotions            Promotion[]
+  supplierPrices        SupplierPrice[]
 }
 
 // Personalización por usuario (IT-16): preferencias clave-valor (JSON) por usuario.
@@ -76,13 +79,13 @@ model UserPreference {
 }
 
 model Store {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @db.Uuid
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
   name           String
   address        String?
-  active         Boolean  @default(true)
+  active         Boolean   @default(true)
   code           String
-  ticketCounter  Int      @default(0)
+  ticketCounter  Int       @default(0)
   // Estado operativo MANUAL persistido (D-10): verificada + nota de incidencia.
   // El estado del dispositivo NO se guarda aquí: lo deriva la API de devices (D-10b).
   opsVerified    Boolean   @default(false)
@@ -92,7 +95,7 @@ model Store {
   // Una sola por organización, garantizada por el índice único parcial
   // `one_central_per_org` definido en SQL en la migración.
   isCentral      Boolean   @default(false)
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
 
   organization     Organization     @relation(fields: [organizationId], references: [id])
   users            UserStore[]
@@ -129,19 +132,19 @@ model User {
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
 
-  organization     Organization     @relation(fields: [organizationId], references: [id])
-  stores           UserStore[]
-  sales            Sale[]
-  cashSessions     CashSession[]
-  cashMovements    CashMovement[]   @relation("CashMovementUser")
+  organization           Organization     @relation(fields: [organizationId], references: [id])
+  stores                 UserStore[]
+  sales                  Sale[]
+  cashSessions           CashSession[]
+  cashMovements          CashMovement[]   @relation("CashMovementUser")
   // Movimientos de efectivo que este usuario solicitó / revisó (aprobó o denegó) (#146).
-  cashMovementsRequested CashMovement[] @relation("CashMovementRequestedBy")
-  cashMovementsReviewed  CashMovement[] @relation("CashMovementReviewedBy")
-  returns          Return[]
-  stockMovements   StockMovement[]
-  timeClockEntries TimeClockEntry[]
-  refreshTokens    RefreshToken[]
-  preferences      UserPreference[]
+  cashMovementsRequested CashMovement[]   @relation("CashMovementRequestedBy")
+  cashMovementsReviewed  CashMovement[]   @relation("CashMovementReviewedBy")
+  returns                Return[]
+  stockMovements         StockMovement[]
+  timeClockEntries       TimeClockEntry[]
+  refreshTokens          RefreshToken[]
+  preferences            UserPreference[]
 
   @@index([organizationId])
 }
@@ -280,6 +283,13 @@ model Sale {
   // clientId en la org se devuelve la existente en vez de duplicarla. NULL en las
   // ventas online normales (Postgres permite múltiples NULL en el índice único).
   clientId       String?       @db.Uuid
+  // Cobro (cuentas por cobrar): canal de la venta, estado de cobro, vencimiento de
+  // la factura a crédito (NULL al contado) y fecha de cobro (NULL mientras PENDING).
+  // VENCIDA es virtual (PENDING + dueDate pasada): no se almacena.
+  channel        SaleChannel   @default(TPV)
+  paymentStatus  PaymentStatus @default(PAID)
+  dueDate        DateTime?     @db.Date
+  paidAt         DateTime?
   createdAt      DateTime      @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id])
@@ -291,6 +301,10 @@ model Sale {
   @@unique([organizationId, ticketNumber])
   @@unique([organizationId, clientId])
   @@index([organizationId, storeId, createdAt])
+  // El ledger de cobro filtra por canal/estado. El índice parcial de cartera
+  // vencida (WHERE paymentStatus='PENDING') vive en la migración SQL (Prisma no
+  // expresa índices parciales).
+  @@index([organizationId, channel, paymentStatus, createdAt])
 }
 
 model SaleLine {
@@ -693,11 +707,74 @@ model VerifactuRecord {
   lastError      String?
   sentAt         DateTime?
   createdAt      DateTime        @default(now())
+  // Transporte AEAT (#156): estado de la remisión al servicio web VERI*FACTU.
+  csv            String? // justificante (CSV) devuelto por la AEAT al aceptar
+  aeatState      String? // EstadoRegistro: Correcto|AceptadoConErrores|Incorrecto
+  errorCode      String? // CodigoErrorRegistro de la AEAT (si lo hay)
+  nextAttemptAt  DateTime? // control de flujo/backoff: no reenviar antes de esta marca
+  subsanacion    Boolean         @default(false) // RegistroAlta de subsanación (Subsanacion=S)
+  rechazoPrevio  Boolean         @default(false) // RechazoPrevio=S (el registro previo fue rechazado)
 
-  organization Organization @relation(fields: [organizationId], references: [id])
+  organization Organization          @relation(fields: [organizationId], references: [id])
+  submissions  VerifactuSubmission[]
 
   @@index([organizationId, status, createdAt])
   @@index([organizationId, createdAt])
+  @@index([status, nextAttemptAt, createdAt]) // worker: PENDING ya vencidos por antigüedad
+}
+
+// Configuración VERI*FACTU por comercio (#156, 1:1 con Organization). Define la
+// modalidad de cumplimiento, la razón social del obligado y el entorno AEAT.
+model VerifactuConfig {
+  organizationId String   @id @db.Uuid
+  mode           String   @default("DISABLED") // DISABLED|ASSISTED|DIRECT_OWN_CERT|COLLAB_SOCIAL
+  razonSocial    String? // NombreRazon del obligado (Cabecera del envío)
+  obligadoTipo   String? // IS|OTHERS (solo para avisos de plazo 2027)
+  exento         Boolean  @default(false) // fuera de ámbito (SII / foral / facturación manual)
+  exentoMotivo   String?
+  environment    String   @default("preprod") // preprod|prod (selección de endpoint AEAT)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// Certificado de cliente del comercio (#156, solo modo DIRECT_OWN_CERT). El PEM
+// (certificado + clave) se guarda CIFRADO (AES-256-GCM); la clave de cifrado vive
+// fuera de la BD (entorno). El material en claro nunca se persiste.
+model VerifactuCertificate {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  encBlob        Bytes // PEM cifrado: nonce(12) || ciphertext+tag
+  subject        String?
+  validFrom      DateTime?
+  validTo        DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, validTo])
+}
+
+// Traza APPEND-ONLY de cada envío a la AEAT (#156): prueba de remisión + diagnóstico.
+// Una fila por intento; nunca se actualiza ni borra (salvo cascada por el registro).
+model VerifactuSubmission {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  recordId       String   @db.Uuid
+  attemptedAt    DateTime @default(now())
+  endpoint       String?
+  httpStatus     Int?
+  estadoEnvio    String? // Correcto|ParcialmenteCorrecto|Incorrecto
+  estadoRegistro String? // Correcto|AceptadoConErrores|Incorrecto
+  csv            String?
+  errorCode      String?
+  errorDesc      String?
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  record       VerifactuRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@index([recordId, attemptedAt])
 }
 
 // Export asíncrono del historial de ventas a CSV (IT-05). Se pide con unos filtros
@@ -829,11 +906,28 @@ enum SaleUnit {
 enum PaymentMethod {
   CASH
   CARD
+  TRANSFER
+  BIZUM
+  DIRECT_DEBIT
 }
 
 enum SaleStatus {
   COMPLETED
   VOIDED
+}
+
+// Canal de la venta para el ledger de cobro: TPV en tienda, online o mayorista B2B.
+enum SaleChannel {
+  TPV
+  ONLINE
+  B2B
+}
+
+// Estado de cobro de la venta. VENCIDA es virtual (PENDING + dueDate pasada): no se
+// almacena, se deriva en consulta.
+enum PaymentStatus {
+  PENDING
+  PAID
 }
 
 enum DiscountSource {
@@ -925,6 +1019,14 @@ model Customer {
   phone          String?
   address        String?
   priceListId    String?  @db.Uuid
+  // ─── CRM / cartera B2B (Clientes B2B maestro-detalle) ────────────────────────
+  // tags: segmentos/etiquetas libres (VIP, HORECA, Farmacia…). paymentTerms: días
+  // de crédito (null/0 = contado) → vencimiento del pedido. salesRep: comercial
+  // asignado. creditLimit: límite de crédito en € (null = sin límite).
+  tags           String[] @default([])
+  paymentTerms   Int?
+  salesRep       String?
+  creditLimit    Decimal? @db.Decimal(12, 2)
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -985,6 +1087,14 @@ model WholesaleOrder {
   status         WholesaleOrderStatus @default(DRAFT)
   total          Decimal              @default(0) @db.Decimal(12, 2)
   notes          String?
+  // ─── Cobro (cartera B2B) ─────────────────────────────────────────────────────
+  // Reusa el enum PaymentStatus del ledger retail. Un pedido mayorista nace
+  // PENDING (a crédito), a diferencia de la venta TPV que nace PAID (al contado).
+  // dueDate se calcula al crear desde paymentTerms del cliente. VENCIDO es virtual
+  // (PENDING AND dueDate < hoy), no se almacena.
+  paymentStatus  PaymentStatus        @default(PENDING)
+  dueDate        DateTime?            @db.Date
+  paidAt         DateTime?
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
 
@@ -993,6 +1103,7 @@ model WholesaleOrder {
   lines        WholesaleOrderLine[]
 
   @@index([organizationId, status])
+  @@index([organizationId, customerId, createdAt])
 }
 
 model WholesaleOrderLine {

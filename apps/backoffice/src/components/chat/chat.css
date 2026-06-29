@@ -1,60 +1,6 @@
-/* Asistente flotante del dashboard. Se abre desde un FAB (abajo-derecha) como panel glass
-   anclado arriba-derecha, por encima del dashboard y del lienzo libre. Sigue el design system
-   (tokens --ui-*). Animaciones solo sobre transform/opacity. */
-
-/* ── FAB (cerrado) ─────────────────────────────────────────────────────────────── */
-
-.chat-fab {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 45;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 54px;
-  height: 54px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-pill);
-  background: var(--ui-primary);
-  color: var(--ui-primary-fg);
-  box-shadow: var(--ui-shadow-lg);
-  cursor: pointer;
-  transition:
-    transform var(--ui-motion-fast) var(--ui-ease),
-    background var(--ui-motion-fast) var(--ui-ease);
-}
-
-.chat-fab:hover {
-  background: var(--ui-primary-hover);
-  transform: translateY(-1px);
-}
-
-.chat-fab:focus-visible {
-  outline: 2px solid var(--ui-focus);
-  outline-offset: 2px;
-}
-
-/* ── Panel flotante (abierto) ──────────────────────────────────────────────────── */
-
-.chat-panel {
-  position: fixed;
-  top: 68px; /* mismo margen superior que el cluster Cuadrícula/Libre */
-  right: 16px;
-  bottom: 16px;
-  width: clamp(360px, 30vw, 440px);
-  z-index: 45; /* > 35 del lienzo libre */
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-xl);
-  background: color-mix(in srgb, var(--ui-surface) 90%, transparent);
-  backdrop-filter: blur(12px);
-  box-shadow: var(--ui-shadow-lg);
-  overflow: hidden;
-  transform-origin: bottom right;
-  animation: chat-panel-in var(--ui-motion-medium) var(--ui-ease);
-}
+/* Estilos compartidos del asistente (mensajes, composer, contexto, cabecera, etc.). El CONTENEDOR
+   —ventana flotante movible/redimensionable— vive en assistant-drawer.css; aquí van las piezas
+   internas reutilizables. Animaciones solo sobre transform/opacity. */
 
 @keyframes chat-panel-in {
   from {
@@ -64,15 +10,6 @@
   to {
     opacity: 1;
     transform: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .chat-fab {
-    transition: none;
-  }
-  .chat-panel {
-    animation: none;
   }
 }
 
@@ -262,7 +199,7 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   width: 100%;
   margin-block: auto;
   color: var(--ui-text-muted);
-  font-size: var(--ui-text-sm);
+  font-size: var(--ui-text-md);
   text-align: center;
 }
 
@@ -273,7 +210,7 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 
 .chat-messages__hint {
   color: var(--ui-text-muted);
-  font-size: var(--ui-text-xs);
+  font-size: var(--ui-text-sm);
 }
 
 .chat-msg {
@@ -304,8 +241,8 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   max-width: 88%;
   padding: var(--ui-space-2) var(--ui-space-3);
   border-radius: var(--ui-radius-lg);
-  font-size: var(--ui-text-sm);
-  line-height: 1.5;
+  font-size: var(--ui-text-md);
+  line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -320,8 +257,8 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 .chat-response {
   width: 100%;
   color: var(--ui-text);
-  font-size: var(--ui-text-sm);
-  line-height: 1.6;
+  font-size: var(--ui-text-md);
+  line-height: 1.65;
   word-break: break-word;
 }
 
@@ -979,109 +916,71 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   }
 }
 
-/* ── Pie con coste ─────────────────────────────────────────────────────────────── */
-
-.chat-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ui-space-2);
-  padding: var(--ui-space-2) var(--ui-space-3);
-  border-top: 1px solid var(--ui-border);
-  color: var(--ui-text-muted);
-  font-size: var(--ui-text-2xs);
-}
-
-/* ── Móvil: el panel ocupa casi toda la pantalla ───────────────────────────────── */
-
-@media (max-width: 767px) {
-  .chat-panel {
-    top: 60px;
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
-    width: auto;
-    border-radius: var(--ui-radius-lg);
-  }
-  .chat-fab {
-    right: 12px;
-    bottom: 12px;
-  }
-}
-
 /* ════════════════════════════════════════════════════════════════════════════════
-   Dock inferior del asistente (rediseño): barra única `[+ herramientas] [input] [↑]`
-   con la forma del PromptInput de ai-elements, más un popover de conversación encima.
-   Sustituye al panel lateral (FAB + glass). Anclado abajo-centro dentro del lienzo.
+   Contenedor del asistente. La GEOMETRÍA (ventana flotante movible/redimensionable,
+   overlay `position: fixed`) vive en assistant-drawer.css. Aquí quedan solo las reglas
+   base que el contenedor comparte: capa que deja pasar el ratón (sus hijos sí capturan)
+   y el backdrop transparente que cierra al clicar fuera.
    ════════════════════════════════════════════════════════════════════════════════ */
 
 .chat-dock {
   position: fixed;
-  bottom: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  /* El dock vive ahora en el shell (sibling del lienzo, que es position:fixed inset:0 z-35).
-     Debe quedar POR ENCIMA del lienzo en todas las views; bajo el cuerpo del sidebar (z-40),
-     con el que no solapa espacialmente (dock abajo-centro, sidebar a la izquierda). */
   z-index: 39;
-  width: min(680px, calc(100vw - 2rem));
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  /* Morph héroe(Dashboard)↔barra(resto): el dock viaja de centrado a abajo-centro. El movimiento
-     va por `transform` (compositor), el ancho lo acompaña en el mismo gesto. Curva expo-out, en
-     sintonía con el morph del lienzo (use-mode-transition). */
-  transition:
-    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
-    width 0.42s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform;
+  /* La capa deja pasar el ratón al contenido; solo el panel y el backdrop capturan clics. */
+  pointer-events: none;
+}
+.chat-dock > * {
+  pointer-events: auto;
 }
 
-/* «Asistente de IA» (Dashboard): el composer es el HÉROE — panel + input grandes y centrados.
-   Se eleva al centro del viewport con translateY en dvh; el 50% compensa su propia altura, así
-   queda centrado sea cual sea su tamaño. Quitar la clase (otra view) lo devuelve abajo con el morph. */
-.chat-dock--hero {
-  width: min(760px, calc(100vw - 3rem));
-  transform: translateX(-50%) translateY(calc(-50dvh + 1rem + 50%));
+/* Backdrop: cubre TODA la ventana mientras el chat está abierto. Un clic aquí (cualquier zona que no
+   sea el panel) SOLO cierra el chat — el evento aterriza en el backdrop, no en el elemento de debajo,
+   así que NO se activa. Invisible (sin oscurecer). */
+.chat-dock__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: transparent;
 }
 
-.chat-dock--hero .chat-dock__panel {
-  max-height: min(62dvh, 640px);
+/* El panel y el composer van por ENCIMA del backdrop (que es fixed; si no, los taparía). */
+.chat-dock__panel,
+.chat-dock__bar {
+  position: relative;
+  z-index: 1;
 }
 
-/* Sin animación de viaje si el usuario pidió menos movimiento: el dock aparece ya en su sitio. */
-@media (prefers-reduced-motion: reduce) {
-  .chat-dock {
-    transition: none;
-    will-change: auto;
-  }
-}
-
-/* Popover de conversación: se despliega ENCIMA del input. */
+/* Cuerpo del asistente: el cristal (borde, radio, fondo, sombra) lo conserva la ventana flotante;
+   la geometría (tamaño/posición/animación) la fija assistant-drawer.css. */
 .chat-dock__panel {
+  width: min(680px, calc(100vw - 2rem));
   display: flex;
   flex-direction: column;
   max-height: min(60vh, 540px);
   overflow: hidden;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-xl);
-  background: color-mix(in srgb, var(--ui-surface) 92%, transparent);
+  background: color-mix(in srgb, var(--ui-surface) 68%, transparent);
   backdrop-filter: blur(12px);
   box-shadow: 0 16px 44px rgb(0 0 0 / 0.2);
-  transform-origin: bottom center;
-  animation: chat-panel-in var(--ui-motion-medium) var(--ui-ease);
 }
 
 /* ── Composer (PromptInput) ──────────────────────────────────────────────────────── */
 
 .prompt-input {
+  /* El ANCHO del morph lo lleva `max-width` (NUMÉRICO), no `width`: colapsado lo capa a la píldora y
+     expandido lo suelta a su anchura plena. `width` se queda fijo en su tope, así el ancho usado =
+     min(width, max-width) y SOLO max-width transiciona → interpolación garantizada en cualquier
+     navegador (sin depender de `interpolate-size`, que fallaba al expandir por clic). */
+  width: min(680px, calc(100vw - 2rem));
+  max-width: min(680px, calc(100vw - 2rem));
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.55rem 0.65rem;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-xl);
-  background: color-mix(in srgb, var(--ui-surface) 94%, transparent);
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
   backdrop-filter: blur(12px);
   box-shadow: 0 6px 20px rgb(0 0 0 / 0.08);
   transition:
@@ -1108,14 +1007,20 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 .prompt-input__textarea {
   width: 100%;
   resize: none;
+  /* Auto-crecimiento FLUIDO: el textarea se ciñe a su contenido REAL (líneas envueltas + saltos
+     explícitos), acotado por min/max-height; al superar el máximo hace scroll en vez de desbordar.
+     `field-sizing` es Chromium (target del proyecto); donde no haya soporte, el atributo `rows`
+     (calculado en JS) sigue haciendo de degradación. */
+  field-sizing: content;
   min-height: 42px;
   max-height: 220px;
+  overflow-y: auto;
   padding: 0.4rem 0.5rem 0.1rem;
   border: none;
   background: transparent;
   font: inherit;
-  font-size: var(--ui-text-sm);
-  line-height: 1.55;
+  font-size: var(--ui-text-md);
+  line-height: 1.6;
   color: var(--ui-text);
 }
 
@@ -1125,6 +1030,17 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 
 .prompt-input__textarea::placeholder {
   color: var(--ui-text-muted);
+}
+
+/* El placeholder NUNCA envuelve: 1 línea recortada. Con `field-sizing: content`, un textarea VACÍO
+   se dimensiona a su placeholder; si éste envolviera (mientras el composer aún es estrecho durante el
+   morph de ancho), inflaría el alto y luego lo bajaría de golpe al ensanchar → el «se agranda y de
+   repente baja». Forzando 1 línea, el alto del vacío es estable. Al escribir, deja de aplicar y el
+   texto real sí envuelve con normalidad. */
+.prompt-input__textarea:placeholder-shown {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .prompt-input__textarea:disabled {
@@ -1137,6 +1053,8 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  /* `overflow` visible (default); 2.4rem deja sitio de sobra a los botones (≈34px). */
+  max-height: 2.4rem;
 }
 
 .prompt-input__tools {
@@ -1210,15 +1128,13 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  height: 34px;
+  height: 30px;
   padding: 0 0.8rem;
   border: 1px solid var(--ui-border);
-  /* Botón flotante individual (8px Vercel + sombra sutil), no dentro de un contenedor pill. */
   border-radius: var(--ui-radius-sm);
-  background: var(--ui-surface);
-  box-shadow:
-    0 1px 3px rgb(0 0 0 / 0.05),
-    0 6px 14px -6px rgb(0 0 0 / 0.1);
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
   color: var(--ui-text);
   font: inherit;
   font-size: var(--ui-text-sm);
@@ -1231,7 +1147,7 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 }
 
 .canvas-tools__trigger:hover {
-  background: var(--ui-surface-subtle);
+  background: color-mix(in srgb, var(--ui-surface-subtle) 70%, transparent);
   color: var(--ui-text);
   border-color: var(--ui-border-strong, var(--ui-border));
 }
@@ -1303,9 +1219,9 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
      iguala la caída → el arco cóncavo queda tangente al borde superior de la tarjeta (sin pico). */
   --ct-drop: calc(0.35rem + 10px);
   --ct-neck: var(--ct-drop);
-  /* Cristal IDÉNTICO al del input (.prompt-input): superficie al 94% (recupera opacidad, se lee
-     nítido) + desenfoque de 12px. Mismo lenguaje glass que el composer del chat. */
-  --ct-glass: color-mix(in srgb, var(--ui-surface) 94%, transparent);
+  /* Cristal IDÉNTICO al del input (.prompt-input): superficie al 70% (translúcida, deja ver el
+     fondo) + desenfoque de 12px. Mismo lenguaje glass que el composer del chat. */
+  --ct-glass: color-mix(in srgb, var(--ui-surface) 70%, transparent);
   --ct-blur: blur(12px);
 }
 
@@ -1353,20 +1269,35 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   }
 }
 
+/* Cierre simétrico: el menú se pliega con la animación inversa antes de desmontarse. */
+.canvas-tools__menu.is-closing {
+  animation: canvas-tools-drop-out 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes canvas-tools-drop-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+}
+
 /* Botones de MODO (Mover/Goma): fuera del menú, siempre visibles; píldora como el trigger.
    Activo = relleno índigo (acento) para indicar el modo en curso. */
 .canvas-tools__mode {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-sm);
-  background: var(--ui-surface);
-  box-shadow:
-    0 1px 3px rgb(0 0 0 / 0.05),
-    0 6px 14px -6px rgb(0 0 0 / 0.1);
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
   color: var(--ui-text-muted);
   cursor: pointer;
   transition:
@@ -1375,7 +1306,7 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
     border-color var(--ui-motion-fast) var(--ui-ease);
 }
 .canvas-tools__mode:hover:not(:disabled) {
-  background: var(--ui-surface-subtle);
+  background: color-mix(in srgb, var(--ui-surface-subtle) 70%, transparent);
   color: var(--ui-text);
   border-color: var(--ui-border-strong, var(--ui-border));
 }
@@ -1437,6 +1368,22 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   background: var(--ui-border);
 }
 
+.canvas-tools__vdivider {
+  width: 1px;
+  height: 16px;
+  background: var(--ui-border);
+  margin: 0 0.1rem;
+  flex: none;
+}
+
+.canvas-tools__zoom-pct {
+  min-width: 3rem;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  width: auto;
+}
+
 /* La paleta de widgets, abierta desde «Editar», cuelga hacia ABAJO igual que el menú. */
 .canvas-tools .dash-free-palette {
   top: calc(100% + var(--ct-drop, 9px));
@@ -1444,35 +1391,7 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   left: 0;
 }
 
-/* Botón de mostrar/ocultar la conversación (junto al «+»). */
-.chat-dock__history-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid transparent;
-  border-radius: var(--ui-radius-pill);
-  background: transparent;
-  color: var(--ui-text-muted);
-  cursor: pointer;
-  transition:
-    background var(--ui-motion-fast) var(--ui-ease),
-    color var(--ui-motion-fast) var(--ui-ease);
-}
-
-.chat-dock__history-toggle:hover,
-.chat-dock__history-toggle.is-active {
-  background: var(--ui-surface-subtle);
-  color: var(--ui-text);
-}
-
-.chat-dock__history-toggle:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus);
-}
-
-/* Cabecera del popover (solo título + acciones; el modelo/esfuerzo se movió al composer). */
+/* Cabecera del asistente (solo título + acciones; el modelo/esfuerzo se movió al composer). */
 .chat-header__title {
   flex: 1;
   font-size: var(--ui-text-sm);
@@ -1487,201 +1406,11 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
   gap: 0.4rem;
 }
 
-/* ── Selector combinado modelo + esfuerzo (en línea en el pie, estilo Claude) ─────── */
-
-.me-menu {
-  position: relative;
-  /* Contexto de apilamiento propio por encima del textarea del composer: si no, el flyout de
-     esfuerzo (que solapa la zona del input) queda pintado DEBAJO del textarea y el clic no llega. */
-  z-index: 1;
-  isolation: isolate;
-  display: inline-flex;
-}
-
-.me-menu__trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  max-width: 240px;
-  padding: 0.3rem 0.5rem;
-  border: 1px solid transparent;
-  border-radius: var(--ui-radius-pill);
-  background: transparent;
-  color: var(--ui-text-muted);
-  font: inherit;
-  font-size: var(--ui-text-xs);
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background var(--ui-motion-fast) var(--ui-ease),
-    color var(--ui-motion-fast) var(--ui-ease);
-}
-
-.me-menu__trigger:hover,
-.me-menu__trigger.is-open {
-  background: var(--ui-surface-subtle);
-  color: var(--ui-text);
-}
-
-.me-menu__trigger:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus);
-}
-
-.me-menu__trigger-model {
-  color: var(--ui-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.me-menu__trigger-effort {
-  color: var(--ui-text-muted);
-  font-weight: 500;
-}
-
-.me-menu__trigger svg {
-  color: var(--ui-text-muted);
-  flex: none;
-}
-
-.me-menu__panel {
-  position: absolute;
-  bottom: calc(100% + 0.5rem);
-  right: 0;
-  z-index: 32;
-  min-width: 14rem;
-  /* Sin overflow aquí: el flyout de esfuerzo cuelga a la izquierda y `overflow-y:auto` forzaría
-     `overflow-x:auto`, recortándolo. El scroll vive en `.me-menu__scroll` (solo la lista). */
-  padding: 0.35rem;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-lg);
-  transform-origin: bottom right;
-  animation: chat-panel-in var(--ui-motion-medium) var(--ui-ease);
-}
-
-.me-menu__group {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.me-menu__group-label {
-  margin: 0.3rem 0.5rem 0.1rem;
-  font-size: var(--ui-text-2xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ui-text-muted);
-}
-
-.me-menu__item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.45rem 0.55rem;
-  border: none;
-  border-radius: var(--ui-radius-sm);
-  background: transparent;
-  color: var(--ui-text);
-  font: inherit;
-  font-size: var(--ui-text-sm);
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--ui-motion-fast) var(--ui-ease);
-}
-
-.me-menu__item:hover,
-.me-menu__item.is-open,
-.me-menu__item.is-selected {
-  background: var(--ui-surface-subtle);
-}
-
-.me-menu__item:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus);
-}
-
-.me-menu__item-label {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.me-menu__item-value {
-  color: var(--ui-text-muted);
-  font-size: var(--ui-text-xs);
-}
-
-/* El check de seleccionado va en color de acento; la flecha de expandir, en muted. */
-.me-menu__item svg {
-  color: var(--ui-primary);
-  flex: none;
-}
-
-.me-menu__item--expand svg {
-  color: var(--ui-text-muted);
-}
-
-.me-menu__badge {
-  padding: 1px 6px;
-  border-radius: var(--ui-radius-pill);
-  background: var(--ui-surface-subtle);
-  color: var(--ui-text-muted);
-  font-size: var(--ui-text-2xs);
-  font-weight: 600;
-}
-
-.me-menu__sep {
-  display: block;
-  height: 1px;
-  margin: 0.3rem 0.2rem;
-  background: var(--ui-border);
-}
-
-/* Solo la lista de modelos scrollea; mantiene el flyout de esfuerzo fuera del overflow. */
-.me-menu__scroll {
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.me-menu__effort {
-  position: relative;
-}
-
-/* Subpanel de esfuerzo: a la IZQUIERDA del panel de modelos (el trigger vive a la derecha). */
-.me-menu__panel--sub {
-  bottom: 0;
-  right: calc(100% + 0.4rem);
-  min-width: 13rem;
-  /* Sin animación de entrada: el desplazamiento del flyout dejaba el ítem «inestable» para
-     Playwright (clic expira). El panel principal conserva su `chat-panel-in`. */
-  animation: none;
-}
-
-.me-menu__hint {
-  margin: 0.1rem 0.5rem 0.4rem;
-  font-size: var(--ui-text-2xs);
-  line-height: 1.4;
-  color: var(--ui-text-muted);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .chat-dock__panel,
   .canvas-tools__menu,
-  .me-menu__panel {
+  .canvas-tools__menu.is-closing {
     animation: none;
-  }
-}
-
-@media (max-width: 767px) {
-  .chat-dock {
-    bottom: 0.75rem;
-    width: calc(100vw - 1.25rem);
   }
 }
 
@@ -1733,7 +1462,7 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 .chat-messages__empty-title {
   margin: 0 0 var(--ui-space-3);
   color: var(--ui-text);
-  font-size: var(--ui-text-sm);
+  font-size: var(--ui-text-lg);
   font-weight: 600;
 }
 
@@ -1747,6 +1476,9 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
      y re-inserta ese padding dentro para que los chips no queden pegados al borde. */
   margin-inline: calc(-1 * var(--ui-space-3));
   padding-inline: var(--ui-space-3);
+  /* overflow-x:auto fuerza overflow-y:auto → recorta el chip arriba/abajo; este respiro vertical
+     evita que el borde o el anillo de foco se entrecorten. */
+  padding-block: 4px;
   overflow-x: auto;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* Edge antiguo */
@@ -1767,24 +1499,19 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 .suggestion {
   flex: none;
   white-space: nowrap;
-  padding: 0.35rem 0.7rem;
+  padding: 0.45rem 0.85rem;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-pill);
   background: var(--ui-surface);
   color: var(--ui-text);
   font: inherit;
-  font-size: var(--ui-text-xs);
+  font-size: var(--ui-text-base);
   cursor: pointer;
-  transition:
-    background var(--ui-motion-fast) var(--ui-ease),
-    border-color var(--ui-motion-fast) var(--ui-ease),
-    transform var(--ui-motion-fast) var(--ui-ease);
 }
 
 .suggestion:hover {
   background: var(--ui-surface-subtle);
   border-color: color-mix(in srgb, var(--ui-brand) 40%, var(--ui-border));
-  transform: translateY(-1px);
 }
 
 .suggestion:focus-visible {
@@ -1934,7 +1661,8 @@ li.ui-select-option.is-disabled[data-value^='__group_']:not(:first-child) {
 
 .ctx__panel {
   position: absolute;
-  bottom: calc(100% + 0.4rem);
+  /* Vive en la cabecera (arriba) → abre hacia ABAJO, sobre el cuerpo del asistente. */
+  top: calc(100% + 0.4rem);
   right: 0;
   z-index: 33;
   min-width: 12rem;

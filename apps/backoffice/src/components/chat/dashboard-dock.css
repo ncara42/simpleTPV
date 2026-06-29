@@ -1,0 +1,110 @@
+/* ════════════════════════════════════════════════════════════════════════════════
+   Asistente del DASHBOARD como BARRA INFERIOR. Re-ancla el `.chat-dock` a una banda
+   abajo-centro SIEMPRE visible (`[💬] [input] [enviar]`), con un popover de conversación
+   que se despliega ENCIMA del input. Es el diseño propio del Dashboard —que ES el
+   «Asistente de IA»—, distinto de la ventana flotante del resto de views
+   (assistant-drawer.css). Comparte el cristal base del `.chat-dock__panel` (chat.css);
+   aquí van la posición de banda, el centrado y la animación del popover.
+
+   Como el `.chat-dock` es `position: fixed` y deja pasar el ratón (pointer-events:none),
+   la banda NO reflowa el lienzo: el popover se superpone sin reescalar widgets ni tablas.
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+.chat-dock.chat-dock--bottombar {
+  bottom: 1rem;
+  /* El dock vive dentro de .app-content, que el sidebar fijo despeja con `margin-left`. Como el
+     dock es position:fixed, NO hereda ese margen → su borde izquierdo arranca en el ancho del
+     sidebar para CENTRAR en el área de contenido (no en el viewport). Así la banda se re-centra al
+     desplegar/contraer el sidebar, en sincronía con el contenido (misma var y duración). */
+  left: var(--sidebar-current-width);
+  right: 0;
+  width: auto;
+  transition: left 0.15s var(--ui-ease, ease);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  /* La banda deja pasar el ratón al contenido/lienzo; solo el panel y la barra capturan clics
+     (heredado de `.chat-dock` base; los hijos restablecen `pointer-events: auto`). */
+}
+
+/* Sidebar contraído a rail: el contenido se reajusta al ancho del rail; la banda sigue el mismo
+   borde para no descentrarse. El dock cuelga de .app-content (hermano del sidebar). */
+.sidebar.collapsed ~ .app-content .chat-dock--bottombar {
+  left: var(--sidebar-width-rail);
+}
+
+/* Móvil: el sidebar es off-canvas y el contenido no lleva sangrado lateral → la banda ocupa todo el
+   ancho y se centra en el viewport, como el resto de la app. */
+@media (max-width: 767px) {
+  .chat-dock--bottombar,
+  .sidebar.collapsed ~ .app-content .chat-dock--bottombar {
+    left: 0;
+  }
+}
+
+/* Con el popover abierto, la banda sube POR ENCIMA de toda la app (sidebar z40, topbar z30, lienzo,
+   etc.) para que su backdrop pueda capturar cualquier clic fuera del chat. */
+.chat-dock--bottombar.is-panel-open {
+  z-index: 50;
+}
+
+/* Popover de conversación: hereda el cristal del `.chat-dock__panel` base (chat.css) y se despliega
+   ENCIMA del input con un crecimiento desde el borde inferior. */
+.chat-dock--bottombar .chat-dock__panel {
+  transform-origin: bottom center;
+  animation: chat-panel-in var(--ui-motion-medium) var(--ui-ease);
+}
+
+/* Cierre simétrico: el popover se pliega con la animación inversa. La presencia animada (JS) lo
+   mantiene montado mientras dura, así no desaparece de golpe. */
+.chat-dock--bottombar .chat-dock__panel.is-closing {
+  animation: chat-panel-out var(--ui-motion-medium) var(--ui-ease) forwards;
+}
+
+@keyframes chat-panel-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+/* Botón de la barra que muestra/oculta la conversación (junto al input). */
+.chat-dock__history-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-pill);
+  background: transparent;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+
+.chat-dock__history-toggle:hover,
+.chat-dock__history-toggle.is-active {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+
+.chat-dock__history-toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* Reduced-motion: el popover aparece/desaparece sin desplazamiento (solo se monta/desmonta). */
+@media (prefers-reduced-motion: reduce) {
+  .chat-dock--bottombar .chat-dock__panel,
+  .chat-dock--bottombar .chat-dock__panel.is-closing {
+    animation: none;
+  }
+}

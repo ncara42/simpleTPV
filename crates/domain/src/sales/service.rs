@@ -26,9 +26,16 @@ use super::domain::{
 };
 use super::input::CreateSale;
 use super::model::{
-    OrgInfo, Sale, SaleLine, SaleListItem, SaleStatus, SaleWithLines, SalesPage, SalesSeriesPoint,
-    SalesStats, SalesStatsTotals, SalesTotals, StoreInfo, TicketBlock, TicketData, TicketLine,
+    OrgInfo, PaymentStatus, Sale, SaleChannel, SaleLine, SaleListItem, SaleStatus, SaleWithLines,
+    SalesPage, SalesSeriesPoint, SalesStats, SalesStatsTotals, SalesTotals, StoreInfo, TicketBlock,
+    TicketData, TicketLine,
 };
+
+/// «Hoy» a efectos de vencimiento de cobro: fecha de calendario en `Europe/Madrid`
+/// (misma convención de huso que el código fiscal). Una factura está VENCIDA cuando
+/// su `dueDate` es ANTERIOR a este día. Se usa como literal SQL en los filtros y
+/// agregados de cobro.
+const TODAY_MADRID_SQL: &str = "(now() AT TIME ZONE 'Europe/Madrid')::date";
 
 const MAX_SALES_PAGE_SIZE: i64 = 100;
 
@@ -39,6 +46,8 @@ const SALE_COLS: &str = r#"id, "organizationId" AS organization_id, "storeId" AS
     "cashGiven" AS cash_given, "cashChange" AS cash_change, status::text AS status,
     "voidedAt" AS voided_at, "voidedBy" AS voided_by, "clientId" AS client_id,
     "customerTaxId" AS customer_tax_id, "customerName" AS customer_name,
+    channel::text AS channel, "paymentStatus"::text AS payment_status,
+    "dueDate" AS due_date, "paidAt" AS paid_at,
     "createdAt" AS created_at"#;
 
 const LINE_COLS: &str = r#"id, "organizationId" AS organization_id, "saleId" AS sale_id,
@@ -79,6 +88,18 @@ pub async fn create(
     let limit = discount_limit(role);
     let is_org_wide = role.is_org_wide();
 
+    // Cobro: el canal y el vencimiento determinan el estado de cobro. Una venta a
+    // crédito (B2B/Online con `creditDueDate`) nace PENDING y sin `paidAt`; el resto
+    // (TPV al contado) nace PAID con `paidAt = now()`. La validación (input.rs) ya
+    // garantizó que `creditDueDate` solo viene en canales no-TPV.
+    let channel = input.channel.unwrap_or(SaleChannel::Tpv);
+    let due_date = input.credit_due()?;
+    let payment_status = if due_date.is_some() {
+        PaymentStatus::Pending
+    } else {
+        PaymentStatus::Paid
+    };
+
     with_tenant_tx(pool, org, async move |tx, _after| {
         // 1. Idempotencia offline: si el clientId ya existe, devolver la venta.
         if let Some(cid) = input.client_id {
@@ -91,15 +112,19 @@ pub async fn create(
         if !is_org_wide && !has_store_access(tx, user_id, input.store_id).await? {
             return Ok(Err(AppError::Forbidden));
         }
-        // 3. Caja abierta obligatoria.
-        let open: Option<(Uuid,)> = sqlx::query_as(
-            r#"SELECT id FROM "CashSession" WHERE "storeId" = $1 AND status = 'OPEN'::"CashSessionStatus" LIMIT 1"#,
-        )
-        .bind(input.store_id)
-        .fetch_optional(&mut **tx)
-        .await?;
-        if open.is_none() {
-            return Ok(Err(AppError::Conflict));
+        // 3. Caja abierta obligatoria SOLO para ventas TPV (al contado). Una factura
+        // a crédito (B2B/Online) se emite desde el backoffice, que no tiene caja: el
+        // gate de caja es un concepto de la terminal de tienda, no de la facturación.
+        if channel == SaleChannel::Tpv {
+            let open: Option<(Uuid,)> = sqlx::query_as(
+                r#"SELECT id FROM "CashSession" WHERE "storeId" = $1 AND status = 'OPEN'::"CashSessionStatus" LIMIT 1"#,
+            )
+            .bind(input.store_id)
+            .fetch_optional(&mut **tx)
+            .await?;
+            if open.is_none() {
+                return Ok(Err(AppError::Conflict));
+            }
         }
         // 4. Productos + precios por tienda.
         let product_ids: Vec<Uuid> = input.lines.iter().map(|l| l.product_id).collect();
@@ -188,9 +213,12 @@ pub async fn create(
         let sale: Sale = sqlx::query_as(&format!(
             r#"INSERT INTO "Sale" (id, "organizationId", "storeId", "userId", "ticketNumber",
                  subtotal, "discountTotal", total, "paymentMethod", "cashGiven", "cashChange",
-                 status, "clientId", "customerTaxId", "customerName", "createdAt")
+                 status, "clientId", "customerTaxId", "customerName",
+                 channel, "paymentStatus", "dueDate", "paidAt", "createdAt")
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::"PaymentMethod", $10, $11,
-                 'COMPLETED'::"SaleStatus", $12, $13, $14, now())
+                 'COMPLETED'::"SaleStatus", $12, $13, $14,
+                 $15::"SaleChannel", $16::"PaymentStatus", $17,
+                 CASE WHEN $16::"PaymentStatus" = 'PAID' THEN now() ELSE NULL END, now())
                RETURNING {SALE_COLS}"#,
         ))
         .bind(sale_id)
@@ -207,6 +235,9 @@ pub async fn create(
         .bind(input.client_id)
         .bind(customer_tax_id)
         .bind(customer_name)
+        .bind(channel)
+        .bind(payment_status)
+        .bind(due_date)
         .fetch_one(&mut **tx)
         .await?;
 
@@ -446,6 +477,11 @@ pub struct SalesFilter {
     /// Búsqueda libre (paridad NestJS): ILIKE sobre nº de ticket, nombre del
     /// vendedor y nombre de línea; y, si es numérico, `total` exacto.
     pub q: Option<String>,
+    /// Canal del ledger de cobro: 'TPV' | 'ONLINE' | 'B2B'.
+    pub channel: Option<String>,
+    /// Estado de cobro: 'PAID' | 'PENDING' | 'OVERDUE' (OVERDUE es virtual: PENDING
+    /// + dueDate anterior a hoy).
+    pub payment_status: Option<String>,
     pub from: Option<PrimitiveDateTime>,
     pub to: Option<PrimitiveDateTime>,
     pub page: i64,
@@ -520,6 +556,26 @@ pub async fn list(
                     .push_bind(st.clone())
                     .push(r#"::"SaleStatus""#);
             }
+            if let Some(ch) = &filter.channel {
+                qb.push(r#" AND channel = "#)
+                    .push_bind(ch.clone())
+                    .push(r#"::"SaleChannel""#);
+            }
+            // Estado de cobro. OVERDUE = PENDING + dueDate anterior a hoy (virtual).
+            match filter.payment_status.as_deref() {
+                Some("PAID") => {
+                    qb.push(r#" AND "paymentStatus" = 'PAID'::"PaymentStatus""#);
+                }
+                Some("PENDING") => {
+                    qb.push(r#" AND "paymentStatus" = 'PENDING'::"PaymentStatus""#);
+                }
+                Some("OVERDUE") => {
+                    qb.push(format!(
+                        r#" AND "paymentStatus" = 'PENDING'::"PaymentStatus" AND "dueDate" < {TODAY_MADRID_SQL}"#
+                    ));
+                }
+                _ => {}
+            }
             if let Some(f) = filter.from {
                 qb.push(r#" AND "createdAt" >= "#).push_bind(f);
             }
@@ -581,14 +637,30 @@ pub async fn list(
             .collect();
 
         // Totales: SOLO ventas COMPLETED del filtro (las VOIDED se listan pero no
-        // suman). count + importe + ratios de descuento y margen.
+        // suman). count + importe + ratios de descuento y margen + split de cobro.
+        // El split (cobrado/pendiente/vencido) IGNORA el filtro de estado de cobro
+        // (push_completed_where no lo aplica): los chips muestran siempre la foto
+        // completa bajo el resto de filtros (fecha/tienda/vendedor/canal).
         let mut agg_qb: QueryBuilder<Postgres> = QueryBuilder::new(
             r#"SELECT count(*)::bigint, COALESCE(SUM(total), 0), COALESCE(SUM(subtotal), 0),
-                 COALESCE(SUM("discountTotal"), 0) FROM "Sale""#,
+                 COALESCE(SUM("discountTotal"), 0),
+                 COALESCE(SUM(total) FILTER (WHERE "paymentStatus" = 'PAID'::"PaymentStatus"), 0),
+                 COALESCE(SUM(total) FILTER (WHERE "paymentStatus" = 'PENDING'::"PaymentStatus"), 0),
+                 COALESCE(SUM(total) FILTER (WHERE "paymentStatus" = 'PENDING'::"PaymentStatus""#,
         );
+        agg_qb
+            .push(format!(r#" AND "dueDate" < {TODAY_MADRID_SQL}"#))
+            .push(r#"), 0) FROM "Sale""#);
         push_completed_where(&mut agg_qb, org, requester, is_org_wide, &filter, "");
-        let (count, total_amount, sum_subtotal, sum_discount): (i64, Decimal, Decimal, Decimal) =
-            agg_qb.build_query_as().fetch_one(&mut **tx).await?;
+        let (count, total_amount, sum_subtotal, sum_discount, paid_total, pending_total, overdue_total): (
+            i64,
+            Decimal,
+            Decimal,
+            Decimal,
+            Decimal,
+            Decimal,
+            Decimal,
+        ) = agg_qb.build_query_as().fetch_one(&mut **tx).await?;
 
         // Margen real sobre el coste CONGELADO en la línea (IT-03): producto de
         // columnas que el agregado no expresa → SQL sobre SaleLine JOIN Sale.
@@ -623,6 +695,9 @@ pub async fn list(
                 total_amount,
                 avg_discount_pct,
                 avg_margin_pct,
+                paid_total,
+                pending_total,
+                overdue_total,
             },
         })
     })
@@ -651,6 +726,13 @@ fn push_completed_where(
     }
     if let Some(u) = f.user_id {
         qb.push(format!(r#" AND {prefix}"userId" = "#)).push_bind(u);
+    }
+    // Canal sí entra en los agregados/chips; el estado de cobro NO (los chips
+    // Cobrado/Pendiente/Vencido muestran el split completo, no el subconjunto filtrado).
+    if let Some(ch) = &f.channel {
+        qb.push(format!(r#" AND {prefix}channel = "#))
+            .push_bind(ch.clone())
+            .push(r#"::"SaleChannel""#);
     }
     if let Some(from) = f.from {
         qb.push(format!(r#" AND {prefix}"createdAt" >= "#))
@@ -753,6 +835,8 @@ pub async fn sales_stats(
                     status: filter.status.clone(),
                     family_id: filter.family_id,
                     q: filter.q.clone(),
+                    channel: filter.channel.clone(),
+                    payment_status: filter.payment_status.clone(),
                     from: Some(from - duration),
                     to: Some(from),
                     page: filter.page,
@@ -844,6 +928,57 @@ pub async fn void(
             .await?
             .expect("la venta existe; se acaba de anular en esta tx");
         Ok(Ok(voided))
+    })
+    .await?
+}
+
+/// `POST /sales/:id/collect` — registra el cobro de una factura a crédito
+/// (ADMIN/MANAGER): marca la venta como PAID y sella `paidAt`. Es un evento de
+/// TESORERÍA, no fiscal: NO toca VeriFactu ni el stock. Lock pesimista + update
+/// condicional (idempotente). Semántica:
+/// - venta inexistente → `NotFound`
+/// - venta anulada (VOIDED) → `BadRequest` (no se cobra una anulada)
+/// - ya PAID → no-op idempotente (devuelve la venta tal cual)
+/// - carrera perdida (cambió entre la lectura y el update) → `Conflict`
+pub async fn collect(
+    pool: &PgPool,
+    org: Uuid,
+    sale_id: Uuid,
+    _user_id: Uuid,
+) -> Result<Sale, AppError> {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        sqlx::query(r#"SELECT id FROM "Sale" WHERE id = $1 FOR UPDATE"#)
+            .bind(sale_id)
+            .execute(&mut **tx)
+            .await?;
+
+        let Some(sale) = load_sale_by_id(tx, sale_id).await? else {
+            return Ok(Err(AppError::NotFound));
+        };
+        if sale.status == SaleStatus::Voided {
+            return Ok(Err(AppError::BadRequest)); // no se cobra una venta anulada
+        }
+        if sale.payment_status == PaymentStatus::Paid {
+            return Ok(Ok(sale)); // idempotente: ya estaba cobrada
+        }
+
+        let updated = sqlx::query(
+            r#"UPDATE "Sale" SET "paymentStatus" = 'PAID'::"PaymentStatus", "paidAt" = now()
+               WHERE id = $1 AND status = 'COMPLETED'::"SaleStatus"
+                 AND "paymentStatus" = 'PENDING'::"PaymentStatus""#,
+        )
+        .bind(sale_id)
+        .execute(&mut **tx)
+        .await?
+        .rows_affected();
+        if updated == 0 {
+            return Ok(Err(AppError::Conflict)); // cambió entre la lectura y el update
+        }
+
+        let paid = load_sale_by_id(tx, sale_id)
+            .await?
+            .expect("la venta existe; se acaba de cobrar en esta tx");
+        Ok(Ok(paid))
     })
     .await?
 }

@@ -12,11 +12,13 @@ export default mergeConfig(createViteConfig({ port: 5174, previewPort: 4174 }), 
   define: { 'process.env.DRAGGABLE_DEBUG': 'false' },
   build: {
     rollupOptions: {
-      // Dos entries: la app real (index.html) y el harness de regresión visual (#211), servido en
-      // preview para que Playwright capture los paneles v2 con datos mock (visual.html).
+      // Entries: la app real (index.html), el harness de regresión visual (#211, visual.html) y la
+      // galería showcase de widgets (#264, gallery.html) — ambas servidas en dev/preview, fuera de
+      // la app real.
       input: {
         index: fileURLToPath(new URL('./index.html', import.meta.url)),
         visual: fileURLToPath(new URL('./visual.html', import.meta.url)),
+        gallery: fileURLToPath(new URL('./gallery.html', import.meta.url)),
       },
     },
   },

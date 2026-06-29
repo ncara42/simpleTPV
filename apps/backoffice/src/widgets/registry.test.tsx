@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { GenericSpec } from '../lib/dashboard-layout.js';
+import { PANEL_RENDER_IDS } from './panels/index.js';
 import {
   ALL_WIDGET_IDS,
   buildGenericWidgetSpec,
@@ -12,20 +13,20 @@ import {
 } from './registry.js';
 
 describe('WIDGET_REGISTRY', () => {
-  it('siembra los 22 widgets fijos del catálogo', () => {
+  it('siembra los clásicos (Ventas/Ventas por hora) más los paneles registrados', () => {
     // Solo los fijos (los genéricos se registran en runtime; los bloques #205 van con prefijo block:).
     const fixed = [...WIDGET_REGISTRY.values()].filter(
       (w) => w.kind !== 'generic' && !w.id.startsWith('block:'),
     );
-    expect(fixed).toHaveLength(22);
-    expect(WIDGET_REGISTRY.size).toBeGreaterThanOrEqual(22);
+    // Clásicos conservados + los paneles que añade cada tanda (PANEL_RENDER_IDS).
+    const expected = ['dash-bars', 'dash-hour', ...PANEL_RENDER_IDS].sort();
+    expect(fixed.map((w) => w.id).sort()).toEqual(expected);
+    expect(WIDGET_REGISTRY.size).toBeGreaterThanOrEqual(fixed.length);
   });
 
-  it('siembra los bloques pre-cableados (#205) como metadatos block:<id>', () => {
+  it('no hay bloques pre-cableados registrados', () => {
     const blocks = [...WIDGET_REGISTRY.keys()].filter((id) => id.startsWith('block:'));
-    expect(blocks).toContain('block:sales-overview');
-    expect(blocks).toContain('block:stock-risk');
-    expect(WIDGET_REGISTRY.get('block:sales-overview')?.label).toBe('Resumen de ventas');
+    expect(blocks).toHaveLength(0);
   });
 
   it('cada entrada del catálogo tiene label, kind y defaultSize', () => {
@@ -38,16 +39,15 @@ describe('WIDGET_REGISTRY', () => {
     }
   });
 
-  it('clasifica los kpi-* como kpi y el resto como panel', () => {
-    expect(WIDGET_REGISTRY.get('kpi-today')!.kind).toBe('kpi');
+  it('clasifica los widgets conservados como panel (ya no hay kpi-* en el catálogo)', () => {
     expect(WIDGET_REGISTRY.get('dash-bars')!.kind).toBe('panel');
-    expect(WIDGET_REGISTRY.get('rank-sales')!.kind).toBe('panel');
+    expect(WIDGET_REGISTRY.get('dash-hour')!.kind).toBe('panel');
   });
 });
 
 describe('getWidgetLabel', () => {
   it('devuelve la etiqueta del catálogo', () => {
-    expect(getWidgetLabel('kpi-today')).toBe('Facturación hoy');
+    expect(getWidgetLabel('dash-bars')).toBe('Ventas');
   });
 
   it('cae al id para widgets desconocidos', () => {

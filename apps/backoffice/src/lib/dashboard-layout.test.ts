@@ -21,6 +21,7 @@ import {
   freeItemSize,
   type FreeShape,
   type FreeText,
+  freeUnitsFromPx,
   type FreeWidget,
   GENERIC_DEFAULT_SIZE,
   GRID_BREAKPOINT_COLS,
@@ -41,45 +42,30 @@ import {
 // funciones de layout (buildDefaultLayout/defaultPanelOrder/…) siguen aceptando
 // cualquier PresetDef, así que estos fixtures reproducen los presets retirados
 // (Ventas/Inventario) para no perder la cobertura de la lógica de maquetación.
+// El catálogo clásico se redujo (#264) a dos paneles (dash-bars/dash-hour) más las
+// Fixtures de presets para tests. Los presets reales solo tienen dos widgets: dash-bars y dash-hour.
 const ventas: PresetDef = {
   id: 'ventas',
   label: 'Ventas',
-  cards: ['kpi-today', 'kpi-avg-ticket', 'kpi-upt'],
-  panels: ['dash-bars', 'dash-family', 'rank-sales', 'dash-hour'],
+  cards: [],
+  panels: ['dash-bars', 'dash-hour'],
 };
 const inventario: PresetDef = {
   id: 'inventario',
   label: 'Inventario',
   cards: [],
-  panels: [
-    'dash-stockout',
-    'rank-rotation',
-    'dash-expiring',
-    'dash-purchase-orders',
-    'dash-rotation',
-  ],
+  panels: ['dash-hour'],
 };
 // Presets a validar en las invariantes «para todos los presets»: los reales + los fixtures.
 const ALL_PRESETS: PresetDef[] = [...PRESETS, ventas, inventario];
 
 describe('defaultPanelOrder', () => {
   it('preset Ventas: paneles en orden canónico (maquetación), no en el orden del array', () => {
-    expect(defaultPanelOrder(ventas)).toEqual([
-      'dash-bars',
-      'dash-family',
-      'rank-sales',
-      'dash-hour',
-    ]);
+    expect(defaultPanelOrder(ventas)).toEqual(['dash-bars', 'dash-hour']);
   });
 
   it('preset Inventario: orden canónico', () => {
-    expect(defaultPanelOrder(inventario)).toEqual([
-      'dash-stockout',
-      'rank-rotation',
-      'dash-expiring',
-      'dash-purchase-orders',
-      'dash-rotation',
-    ]);
+    expect(defaultPanelOrder(inventario)).toEqual(['dash-hour']);
   });
 
   it('PANEL_CANON no tiene ids duplicados', () => {
@@ -88,16 +74,8 @@ describe('defaultPanelOrder', () => {
 });
 
 describe('presetItemIds + ITEM_SPECS', () => {
-  it('Ventas: tarjetas (en orden de preset) seguidas de paneles (en orden canónico)', () => {
-    expect(presetItemIds(ventas)).toEqual([
-      'kpi-today',
-      'kpi-avg-ticket',
-      'kpi-upt',
-      'dash-bars',
-      'dash-family',
-      'rank-sales',
-      'dash-hour',
-    ]);
+  it('Ventas: solo paneles (en orden canónico)', () => {
+    expect(presetItemIds(ventas)).toEqual(['dash-bars', 'dash-hour']);
   });
 
   it('cada elemento de cada preset tiene un tamaño en ITEM_SPECS', () => {
@@ -110,19 +88,13 @@ describe('presetItemIds + ITEM_SPECS', () => {
 });
 
 describe('buildDefaultLayout', () => {
-  it('Ventas: banda de tarjetas (w2,h1) arriba y paneles fluyendo en filas de 12', () => {
+  it('Ventas: paneles (bars y hour) fluyendo en filas de 12', () => {
     const layout = buildDefaultLayout(ventas);
     const byId = Object.fromEntries(layout.map((it) => [it.i, it]));
-    // Tres KPI de 2 columnas en la fila 0.
-    expect(byId['kpi-today']).toEqual({ i: 'kpi-today', x: 0, y: 0, w: 2, h: 1 });
-    expect(byId['kpi-avg-ticket']).toEqual({ i: 'kpi-avg-ticket', x: 2, y: 0, w: 2, h: 1 });
-    expect(byId['kpi-upt']).toEqual({ i: 'kpi-upt', x: 4, y: 0, w: 2, h: 1 });
-    // Primera fila de paneles bajo las tarjetas: bars(7) + family(5) = 12.
-    expect(byId['dash-bars']).toEqual({ i: 'dash-bars', x: 0, y: 1, w: 7, h: 2 });
-    expect(byId['dash-family']).toEqual({ i: 'dash-family', x: 7, y: 1, w: 5, h: 2 });
-    // Segunda fila de paneles: rank-sales(5) + hour(7) = 12.
-    expect(byId['rank-sales']).toEqual({ i: 'rank-sales', x: 0, y: 3, w: 5, h: 2 });
-    expect(byId['dash-hour']).toEqual({ i: 'dash-hour', x: 5, y: 3, w: 7, h: 2 });
+    // bars(7) ocupa la primera fila completa.
+    expect(byId['dash-bars']).toEqual({ i: 'dash-bars', x: 0, y: 0, w: 7, h: 2 });
+    // hour(7) no cabe junto a bars (7+7>12): salta a la segunda fila.
+    expect(byId['dash-hour']).toEqual({ i: 'dash-hour', x: 0, y: 2, w: 7, h: 2 });
   });
 
   it('ningún elemento se sale de las 12 columnas', () => {
@@ -145,42 +117,43 @@ describe('buildDefaultLayout', () => {
 
 describe('reconcileLayout', () => {
   it('añade al final (con su tamaño por defecto) los elementos que falten', () => {
-    const saved = [{ i: 'kpi-today', x: 0, y: 0, w: 2, h: 1 }];
-    const result = reconcileLayout(saved, ['kpi-today', 'kpi-avg-ticket']);
+    const saved = [{ i: 'dash-bars', x: 0, y: 0, w: 7, h: 2 }];
+    const result = reconcileLayout(saved, ['dash-bars', 'dash-hour']);
     expect(result).toHaveLength(2);
-    const added = result.find((it) => it.i === 'kpi-avg-ticket')!;
-    expect(added).toMatchObject({ w: 2, h: 1 });
-    expect(added.y).toBeGreaterThanOrEqual(1);
+    const added = result.find((it) => it.i === 'dash-hour')!;
+    // dash-hour = {w:7,h:2} en ITEM_SPECS.
+    expect(added).toMatchObject({ w: 7, h: 2 });
+    expect(added.y).toBeGreaterThanOrEqual(2);
   });
 
   it('descarta coordenadas de ids que ya no existen en el preset', () => {
     const saved = [
-      { i: 'kpi-today', x: 0, y: 0, w: 2, h: 1 },
-      { i: 'obsoleto', x: 2, y: 0, w: 2, h: 1 },
+      { i: 'dash-bars', x: 0, y: 0, w: 7, h: 2 },
+      { i: 'obsoleto', x: 3, y: 0, w: 2, h: 1 },
     ];
-    const result = reconcileLayout(saved, ['kpi-today']);
-    expect(result.map((it) => it.i)).toEqual(['kpi-today']);
+    const result = reconcileLayout(saved, ['dash-bars']);
+    expect(result.map((it) => it.i)).toEqual(['dash-bars']);
   });
 
   it('layout completo: devuelve los mismos elementos sin tocar el orden', () => {
     const saved = [
-      { i: 'kpi-today', x: 0, y: 0, w: 2, h: 1 },
-      { i: 'kpi-upt', x: 2, y: 0, w: 2, h: 1 },
+      { i: 'geist-stat-today', x: 0, y: 0, w: 3, h: 2 },
+      { i: 'dash-bars', x: 3, y: 0, w: 7, h: 2 },
     ];
-    const result = reconcileLayout(saved, ['kpi-today', 'kpi-upt']);
+    const result = reconcileLayout(saved, ['geist-stat-today', 'dash-bars']);
     expect(result).toEqual(saved);
   });
 });
 
 describe('freeItemSize', () => {
   it('traduce el tamaño de rejilla a píxeles (col×FREE_COL − gap, fila×FREE_ROW − gap)', () => {
-    // kpi = {w:2,h:1}
-    expect(freeItemSize('kpi-today')).toEqual({
-      w: 2 * FREE_COL - FREE_GAP,
-      h: 1 * FREE_ROW - FREE_GAP,
-    });
     // dash-bars = {w:7,h:2}
     expect(freeItemSize('dash-bars')).toEqual({
+      w: 7 * FREE_COL - FREE_GAP,
+      h: 2 * FREE_ROW - FREE_GAP,
+    });
+    // dash-hour = {w:7,h:2}
+    expect(freeItemSize('dash-hour')).toEqual({
       w: 7 * FREE_COL - FREE_GAP,
       h: 2 * FREE_ROW - FREE_GAP,
     });
@@ -191,6 +164,39 @@ describe('freeItemSize', () => {
       w: 4 * FREE_COL - FREE_GAP,
       h: 2 * FREE_ROW - FREE_GAP,
     });
+  });
+});
+
+describe('freeUnitsFromPx', () => {
+  it('es la INVERSA EXACTA de freeItemSize para todo el catálogo (round-trip sin pérdida)', () => {
+    // El modo CUADRÍCULA depende de recuperar las unidades enteras EXACTAS desde el px del lienzo;
+    // si esto perdiera precisión, los tiles dejarían de teselar limpio. `cols` se clampa a BOARD_COLS.
+    for (const [id, spec] of Object.entries(ITEM_SPECS)) {
+      const { w, h } = freeItemSize(id);
+      expect(freeUnitsFromPx(w, h)).toEqual({
+        cols: Math.min(BOARD_COLS, spec.w),
+        rows: spec.h,
+      });
+    }
+  });
+
+  it('recupera las unidades de un tamaño genérico (u·FREE_COL − GAP)', () => {
+    // Un widget genérico del agente con defaultSize {w:6,h:3} sembrado en el lienzo.
+    expect(freeUnitsFromPx(6 * FREE_COL - FREE_GAP, 3 * FREE_ROW - FREE_GAP)).toEqual({
+      cols: 6,
+      rows: 3,
+    });
+  });
+
+  it('clampa columnas a [1, BOARD_COLS] y filas a ≥1', () => {
+    expect(freeUnitsFromPx(99999, 99999).cols).toBe(BOARD_COLS);
+    expect(freeUnitsFromPx(0, 0)).toEqual({ cols: 1, rows: 1 });
+    expect(freeUnitsFromPx(-500, -500)).toEqual({ cols: 1, rows: 1 });
+  });
+
+  it('redondea al entero de celdas más cercano para tamaños libres (notas)', () => {
+    // NOTE_DEFAULT = 240×180 → round((240+16)/100)=3 col, round((180+16)/160)=1 fila.
+    expect(freeUnitsFromPx(NOTE_DEFAULT.w, NOTE_DEFAULT.h)).toEqual({ cols: 3, rows: 1 });
   });
 });
 
@@ -215,12 +221,12 @@ describe('buildDefaultFreeLayout', () => {
 
 describe('migrateFreeLayout', () => {
   it('convierte el formato antiguo (FreeCoords plano) en widgets', () => {
-    const result = migrateFreeLayout([{ i: 'kpi-today', x: 10, y: 20, w: 184, h: 144 }]);
+    const result = migrateFreeLayout([{ i: 'geist-stat-today', x: 10, y: 20, w: 184, h: 144 }]);
     expect(result).toEqual([
       {
         kind: 'widget',
-        id: 'kpi-today',
-        widgetId: 'kpi-today',
+        id: 'geist-stat-today',
+        widgetId: 'geist-stat-today',
         x: 10,
         y: 20,
         w: 184,
@@ -248,26 +254,35 @@ describe('reconcileFreeLayout', () => {
 
   it('NO re-añade widgets que el usuario quitó: conserva exactamente lo guardado', () => {
     // El usuario dejó solo un widget del preset Ventas.
-    const saved = [{ i: 'kpi-today', x: 50, y: 60, w: 184, h: 144 }];
+    const saved = [{ i: 'dash-hour', x: 50, y: 60, w: 184, h: 144 }];
     const result = reconcileFreeLayout(saved, ventas);
-    expect(result.map((e) => e.id)).toEqual(['kpi-today']);
+    expect(result.map((e) => e.id)).toEqual(['dash-hour']);
   });
 
   it('descarta widgets cuyo id ya no existe en el catálogo pero conserva notas', () => {
     const saved = [
-      { i: 'kpi-today', x: 0, y: 0, w: 1, h: 1 },
+      { i: 'dash-hour', x: 0, y: 0, w: 1, h: 1 },
       { i: 'obsoleta', x: 5, y: 5, w: 1, h: 1 },
       { kind: 'note', id: 'n1', x: 9, y: 9, w: 200, h: 150, z: 2, doc: null },
     ];
     const result = reconcileFreeLayout(saved, ventas);
-    expect(result.map((e) => e.id).sort()).toEqual(['kpi-today', 'n1']);
+    expect(result.map((e) => e.id).sort()).toEqual(['dash-hour', 'n1']);
   });
 
   it('CONSERVA los widgets genéricos del agente (gen:*), aunque no estén en ITEM_SPECS (#188/#189)', () => {
     // Regresión: el filtro por catálogo borraba los gen:* del lienzo → no se renderizaban (ni el
     // composite). Deben sobrevivir igual que el catálogo; solo se descartan ids de catálogo obsoletos.
     const saved = [
-      { kind: 'widget', id: 'kpi-today', widgetId: 'kpi-today', x: 0, y: 0, w: 184, h: 144, z: 0 },
+      {
+        kind: 'widget',
+        id: 'dash-hour',
+        widgetId: 'dash-hour',
+        x: 0,
+        y: 0,
+        w: 184,
+        h: 144,
+        z: 0,
+      },
       {
         kind: 'widget',
         id: 'gen:comp-1',
@@ -281,17 +296,21 @@ describe('reconcileFreeLayout', () => {
       { i: 'obsoleta', x: 5, y: 5, w: 1, h: 1 },
     ];
     const result = reconcileFreeLayout(saved, ventas);
-    expect(result.map((e) => e.id).sort()).toEqual(['gen:comp-1', 'kpi-today']);
+    expect(result.map((e) => e.id).sort()).toEqual(['dash-hour', 'gen:comp-1']);
   });
 });
 
 describe('helpers de añadir/quitar/orden', () => {
   it('availableWidgets devuelve el catálogo menos los ya presentes', () => {
     const layout = buildDefaultFreeLayout(ventas);
+    const present = new Set(
+      layout.filter((el): el is FreeWidget => el.kind === 'widget').map((el) => el.id),
+    );
     const available = availableWidgets(layout);
-    expect(available).not.toContain('kpi-today'); // está en el preset Ventas
-    expect(available).toContain('dash-suppliers'); // no está en Ventas
-    expect(available.every((id) => id in ITEM_SPECS)).toBe(true);
+    // Ningún disponible está ya en el lienzo, y todos existen en el catálogo.
+    expect(available.every((id) => id in ITEM_SPECS && !present.has(id))).toBe(true);
+    // Presentes ∪ disponibles = catálogo completo, sin solapamiento (invariante estable por tandas).
+    expect([...present, ...available].sort()).toEqual(Object.keys(ITEM_SPECS).sort());
   });
 
   it('addWidget centra el widget en el punto y lo pone al frente; no duplica', () => {
@@ -328,11 +347,11 @@ describe('helpers de añadir/quitar/orden', () => {
   });
 
   it('bringToFront da al elemento el mayor z', () => {
-    const a = addWidget([], 'kpi-today', { x: 0, y: 0 });
-    const b = addWidget(a, 'kpi-upt', { x: 0, y: 0 });
-    const front = bringToFront(b, 'kpi-today');
-    const top = front.find((e) => e.id === 'kpi-today')!;
-    expect(top.z).toBeGreaterThan(front.find((e) => e.id === 'kpi-upt')!.z);
+    const a = addWidget([], 'dash-bars', { x: 0, y: 0 });
+    const b = addWidget(a, 'dash-hour', { x: 0, y: 0 });
+    const front = bringToFront(b, 'dash-bars');
+    const top = front.find((e) => e.id === 'dash-bars')!;
+    expect(top.z).toBeGreaterThan(front.find((e) => e.id === 'dash-hour')!.z);
   });
 
   it('autoArrangeFree recoloca en filas sin solaparse, conservando el orden por z', () => {
@@ -506,8 +525,8 @@ describe('addWidgetToGrid', () => {
   });
 
   it('top-right ancla el widget al borde derecho de las 12 columnas', () => {
-    const result = addWidgetToGrid({}, 'kpi-today', { w: 2, h: 1 }, 'top-right');
-    expect(result.lg).toEqual([{ i: 'kpi-today', x: 10, y: 0, w: 2, h: 1 }]);
+    const result = addWidgetToGrid({}, 'geist-stat-today', { w: 2, h: 1 }, 'top-right');
+    expect(result.lg).toEqual([{ i: 'geist-stat-today', x: 10, y: 0, w: 2, h: 1 }]);
   });
 
   it('top-center centra el widget', () => {

@@ -1,0 +1,287 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   EXISTENCIAS — vista de niveles de stock dentro de la card de Inventario.
+   Reutiliza el carril de facetas y el lenguaje visual del Catálogo (clases `.cat-*`
+   de inventory-card.css) y añade: el punto de color en facetas/grupos, la sección
+   Tienda (ámbito), la tabla agrupada con disponible accionable, estado y acciones en
+   línea, y la barra inferior (leyenda + ámbito). Tokens --ui-* dark-aware.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Encaje en la card de Inventario ──────────────────────────────────────────
+   Existencias hereda el encaje base de la card (alto de página y respiro inferior)
+   de inventory-card.css, igual que Catálogo y Familias: las tres comparten
+   `height: calc(100dvh - 60px - 1.9rem)`. Sin sobrescritura de altura propia. */
+
+/* ─── Tabla de existencias ─────────────────────────────────────────────────── */
+.ex-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  table-layout: fixed;
+}
+.ex-col-rot {
+  width: 6rem;
+}
+.ex-col-min {
+  width: 4.6rem;
+}
+.ex-col-disp {
+  width: 6.2rem;
+}
+.ex-col-state {
+  width: 8.5rem;
+}
+.ex-col-act {
+  width: 6.4rem;
+}
+
+.ex-thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--ui-surface);
+  padding: 0.55rem 0.9rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ui-text-soft);
+  text-align: left;
+  border-bottom: 1px solid var(--ui-border);
+  white-space: nowrap;
+}
+/* Scope bajo `.ex-thead` (0-2-0) para ganar al base `.ex-thead th` (0-1-1); si no, el
+   shorthand `padding`/`text-align` del base se impondría y desalinearía las cabeceras.
+   Mismo patrón que el Catálogo (.cat-thead .cat-th-name / .cat-th-num). */
+.ex-thead .ex-th-num {
+  text-align: right;
+}
+.ex-thead .ex-th-name {
+  /* Mismo sangrado que el Catálogo (.cat-th-name) para alinear columnas entre pestañas. */
+  padding-left: 3.3rem;
+}
+
+/* Cabecera de grupo: punto de familia · nombre · nº productos · total de uds.
+   Sticky bajo el thead (top ≈ alto del thead). */
+.ex-group-head {
+  cursor: pointer;
+}
+.ex-group-cell {
+  padding: 0;
+  position: sticky;
+  top: 1.95rem;
+  z-index: 1;
+  background: var(--ui-surface-subtle);
+  box-shadow:
+    0 -1px 0 0 var(--ui-border),
+    0 1px 0 0 var(--ui-border);
+}
+.ex-group-head:hover .ex-group-cell {
+  background: color-mix(in srgb, var(--ui-surface-subtle) 70%, var(--ui-border));
+}
+.ex-group-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  /* Mismo sangrado y caret que el Catálogo (.cat-group-inner / .cat-group-caret). */
+  padding: 0.5rem 1.1rem 0.5rem 3.3rem;
+}
+.ex-group-caret {
+  position: absolute;
+  left: 1.05rem;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-shrink: 0;
+  color: var(--ui-text-soft);
+  transition: transform var(--ui-motion-fast) var(--ui-ease);
+}
+.ex-group-caret.is-collapsed {
+  transform: translateY(-50%) rotate(-90deg);
+}
+.ex-group-name {
+  font-size: 0.9rem;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+}
+.ex-group-count {
+  font-size: 0.82rem;
+  color: var(--ui-text-soft);
+  letter-spacing: -0.01em;
+}
+.ex-group-units {
+  margin-left: auto;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+
+/* Filas */
+.ex-row {
+  transition: background var(--ui-motion-fast) var(--ui-ease);
+}
+.ex-row:hover {
+  background: var(--ui-surface-subtle);
+}
+.ex-row:hover .ex-act {
+  opacity: 1;
+}
+/* Filas teñidas por el estado del ámbito: ámbar (bajo mínimo) · rojo (sin stock).
+   Tinte suave para no tapar el badge ni el texto; el hover lo intensifica un punto. */
+.ex-row.is-low {
+  background: color-mix(in srgb, var(--ui-warning-soft) 55%, var(--ui-surface));
+}
+.ex-row.is-out {
+  background: color-mix(in srgb, var(--ui-danger-soft) 55%, var(--ui-surface));
+}
+.ex-row.is-low:hover {
+  background: color-mix(in srgb, var(--ui-warning-soft) 80%, var(--ui-surface));
+}
+.ex-row.is-out:hover {
+  background: color-mix(in srgb, var(--ui-danger-soft) 80%, var(--ui-surface));
+}
+.ex-row td {
+  height: 2.75rem;
+  padding: 0 0.9rem;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text);
+}
+/* (0-2-0) gana al base `.ex-row td` (0-1-1) para fijar sangrados y tipografía. */
+.ex-row .ex-cell-name {
+  padding-left: 3.3rem;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ex-cell-rot {
+  color: var(--ui-text-muted);
+  font-size: 0.85rem;
+}
+.ex-cell-min {
+  text-align: right;
+  color: var(--ui-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+.ex-cell-disp {
+  text-align: right;
+}
+.ex-row .ex-cell-act {
+  text-align: right;
+  padding-right: 0.9rem;
+}
+
+/* Disponible: badge en color (reutiliza .cat-stock-badge/.cat-stock-*) y accionable. */
+.ex-disp {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: box-shadow var(--ui-motion-fast) var(--ui-ease);
+}
+.ex-disp:hover {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-primary) 35%, transparent);
+}
+.ex-disp:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* Estado: punto + etiqueta. Verde = etiqueta atenuada; bajo/agotado = color pleno. */
+.ex-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+}
+.ex-state-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ex-state-ok {
+  color: var(--ui-text-muted);
+}
+.ex-state-ok .ex-state-dot {
+  background: var(--ui-success);
+}
+.ex-state-low {
+  color: var(--ui-warning);
+}
+.ex-state-low .ex-state-dot {
+  background: var(--ui-warning);
+}
+.ex-state-out {
+  color: var(--ui-danger);
+}
+.ex-state-out .ex-state-dot {
+  background: var(--ui-danger);
+}
+
+/* Acciones en línea: ocultas hasta el hover de la fila (las filas con falta de stock
+   las muestran siempre vía estilo en línea). */
+.ex-act {
+  display: inline-flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+  opacity: 0;
+  transition: opacity var(--ui-motion-fast) var(--ui-ease);
+}
+.ex-act-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--ui-text) 10%, var(--ui-surface));
+  color: var(--ui-text-soft);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.2s ease;
+}
+.ex-act-btn:hover {
+  background: color-mix(in srgb, var(--ui-text) 18%, var(--ui-surface));
+  color: var(--ui-text);
+}
+.ex-act-btn.is-primary {
+  background: var(--ap-blue, var(--ui-primary));
+  color: #fff;
+}
+.ex-act-btn.is-primary:hover {
+  filter: brightness(0.93);
+  color: #fff;
+}
+.ex-act-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* ─── Subtítulo de modal (nombre de producto bajo el título) ────────────────── */
+.ex-modal-sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ui-text-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ex-row,
+  .ex-act,
+  .ex-disp,
+  .ex-group-caret,
+  .ex-act-btn {
+    transition: none;
+  }
+}
+
+/* En pantallas estrechas el carril pasa arriba (igual que el Catálogo). */
+@media (max-width: 860px) {
+  .ex-col-state {
+    width: 6.5rem;
+  }
+}

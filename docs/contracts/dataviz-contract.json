@@ -30,16 +30,5 @@
     "/product-families",
     "/suppliers"
   ],
-  "blocks": [
-    "sales-overview",
-    "stock-risk",
-    "staff-performance",
-    "product-ranking",
-    "top-margin",
-    "dead-stock",
-    "profitability",
-    "discount-control",
-    "sales-mix",
-    "store-comparison"
-  ]
+  "blocks": []
 }

@@ -1,0 +1,326 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   PEDIDOS SALIENTES B2B — maestro-detalle de 3 columnas (carril de facetas · lista ·
+   ficha), espejo de Tarifas/Clientes. Reutiliza el carril del Catálogo (`.cat-*`), la
+   rejilla y la lista de Tarifas (`.pl-*`), las filas/avatares de Clientes (`.cust-*`) y
+   la ficha de Ventas (`.ventas-*`). Aquí viven solo las piezas propias de pedidos: los
+   tonos de estado (avatar/punto/icono), el stepper de seguimiento, la tabla de líneas y
+   las notas. Paleta vía tokens --ui-*.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.bo-main--surface:has(.b2b-orders-page) {
+  padding: 0.4rem 1.25rem 1.5rem;
+}
+/* B2bPage envuelve la sección en `.catalog b2b-page` (max-width 75rem, centrado): el
+   maestro-detalle ocupa todo el ancho cuando la sección activa es Pedidos. */
+.catalog.b2b-page:has(.b2b-orders-page) {
+  max-width: none;
+  margin: 0;
+}
+.b2b-orders-page {
+  /* Offset = topbar (60px) + padding-top (0.4rem) + padding-bottom (1.5rem). */
+  height: calc(100dvh - 60px - 1.9rem);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Tonos de estado (compartidos por avatar, punto y stepper) ────────────────── */
+/* draft = naranja · confirmed = azul marca · shipped = verde · cancelled = gris. */
+
+/* Avatar/swatch teñido por estado (lista + ficha): sin el inset border del avatar
+   neutro de Clientes; fondo suave + texto del color del estado, cifras tabulares. */
+.ped-sw {
+  box-shadow: none;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.ped-sw[data-status='draft'] {
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
+}
+.ped-sw[data-status='confirmed'] {
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand);
+}
+.ped-sw[data-status='shipped'] {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.ped-sw[data-status='cancelled'] {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+
+/* Punto de estado (fila de lista + faceta de Estado). */
+.ped-dot,
+.ped-facet-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.ped-facet-dot {
+  margin-right: -0.1rem;
+}
+.ped-dot[data-status='draft'],
+.ped-facet-dot[data-status='draft'] {
+  background: var(--ui-warning);
+}
+.ped-dot[data-status='confirmed'],
+.ped-facet-dot[data-status='confirmed'] {
+  background: var(--ui-brand);
+}
+.ped-dot[data-status='shipped'],
+.ped-facet-dot[data-status='shipped'] {
+  background: var(--ui-success);
+}
+.ped-dot[data-status='cancelled'],
+.ped-facet-dot[data-status='cancelled'] {
+  background: var(--ui-border-strong);
+}
+
+/* ─── Columna central: cabecera + filas ───────────────────────────────────────── */
+.ped-list-sum {
+  font-weight: 500;
+  color: var(--ui-text-soft);
+}
+/* Estado bajo el total de la fila (réplica de `.cust-row-saldo` + punto). */
+.ped-row-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  color: var(--ui-text-soft);
+}
+
+/* ─── Columna derecha: cabecera de la ficha ───────────────────────────────────── */
+/* Referencia (title): solo cambia la familia a monospace y las cifras a tabulares; el
+   line-height lo hereda de `.cust-detail-name` (1.2), igual que el subtítulo
+   (`.cust-detail-sub`, 1.2) y que el resto del bloque de títulos. */
+.ped-detail-ref {
+  font-family: var(--ui-font-mono, 'Geist Mono', ui-monospace, 'SFMono-Regular', monospace);
+  font-variant-numeric: tabular-nums;
+}
+/* Acciones de la cabecera: icono de estado + botones (o etiqueta en estados terminales). */
+.ped-detail-actions {
+  gap: 0.4rem;
+}
+/* El icono de estado respira un poco más respecto al botón que tiene a su derecha. */
+.ped-detail-actions .ped-status-icon {
+  margin-right: 0.3rem;
+}
+
+/* Icono de estado reutilizando el lenguaje del icono de cobro de Ventas
+   (`.ventas-cobro-icon`): círculo sólido con tick/punto/aspa. */
+.ped-status-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.ped-status-icon[data-status='draft'] {
+  background: var(--ui-warning);
+}
+.ped-status-icon[data-status='confirmed'] {
+  background: var(--ui-brand);
+  color: #fff;
+}
+.ped-status-icon[data-status='shipped'] {
+  background: var(--ui-success);
+  color: #fff;
+}
+.ped-status-icon[data-status='cancelled'] {
+  background: var(--ui-text-muted);
+  color: #fff;
+}
+.ped-status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #fff;
+}
+/* Etiqueta de estado en estados terminales (Enviado / Cancelado), donde no hay botones. */
+.ped-status-text {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.ped-status-text[data-status='shipped'] {
+  color: var(--ui-success);
+}
+.ped-status-text[data-status='cancelled'] {
+  color: var(--ui-text-muted);
+}
+
+/* ─── Stepper de seguimiento (Borrador → Confirmado → Enviado) ─────────────────── */
+.ped-stepper-card {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  padding: 1rem 0.9rem 0.85rem;
+}
+.ped-stepper {
+  display: flex;
+  align-items: flex-start;
+}
+.ped-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  position: relative;
+}
+.ped-step-dot {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  z-index: 1;
+  border: 2px solid var(--ui-border-strong);
+  background: var(--ui-surface);
+  color: var(--ui-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+.ped-step-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ui-text-soft);
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+/* Conector: parte del centro del punto (top 0.75rem) hacia el siguiente paso. */
+.ped-step-conn {
+  position: absolute;
+  top: calc(0.75rem - 1px);
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--ui-border);
+  z-index: 0;
+}
+.ped-step[data-state='done'] .ped-step-dot {
+  background: var(--ui-success);
+  border-color: var(--ui-success);
+  color: #fff;
+}
+.ped-step[data-state='done'] .ped-step-conn {
+  background: var(--ui-success);
+}
+.ped-step[data-state='done'] .ped-step-label,
+.ped-step[data-state='current'] .ped-step-label {
+  color: var(--ui-text);
+}
+.ped-step[data-state='current'] .ped-step-dot {
+  background: var(--ui-brand);
+  border-color: var(--ui-brand);
+  color: #fff;
+  box-shadow: 0 0 0 4px var(--ui-brand-soft);
+}
+/* Pedido cancelado: cada paso muestra una X roja (sustituye a la nota inferior). */
+.ped-step[data-state='cancelled'] .ped-step-dot {
+  background: var(--ui-danger-soft);
+  border-color: var(--ui-danger);
+  color: var(--ui-danger);
+}
+.ped-step[data-state='cancelled'] .ped-step-conn {
+  background: var(--ui-danger-soft);
+}
+.ped-step[data-state='cancelled'] .ped-step-label {
+  color: var(--ui-danger);
+}
+
+/* ─── Tabla de líneas del pedido ──────────────────────────────────────────────── */
+.ped-lines {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  overflow: hidden;
+}
+.ped-lines-head,
+.ped-line-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3.5rem 5rem 5.5rem;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.6rem 0.9rem;
+}
+.ped-lines-head {
+  background: var(--ui-surface-subtle);
+  border-bottom: 1px solid var(--ui-border);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ui-text-soft);
+}
+.ped-line-row {
+  border-bottom: 1px solid var(--ui-border);
+  font-size: 0.82rem;
+}
+.ped-line-row:hover {
+  background: var(--ui-surface-subtle);
+}
+.ped-r {
+  text-align: right;
+  justify-self: end;
+}
+.ped-line-name {
+  min-width: 0;
+  font-weight: 500;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ped-line-sub {
+  font-weight: 600;
+}
+.ped-lines-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--ui-surface-subtle);
+  border-top: 1px solid var(--ui-border);
+}
+.ped-lines-foot-count {
+  font-size: 0.78rem;
+  color: var(--ui-text-muted);
+}
+.ped-lines-foot-total {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.ped-lines-foot-label {
+  font-size: 0.74rem;
+  color: var(--ui-text-soft);
+}
+.ped-lines-foot-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.ped-notes {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--ui-text-muted);
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  padding: 0.7rem 0.85rem;
+}
+
+/* ─── Responsive: tabla de líneas más estrecha ────────────────────────────────── */
+@media (max-width: 1150px) {
+  .ped-lines-head,
+  .ped-line-row {
+    grid-template-columns: minmax(0, 1fr) 3rem 4.2rem 4.6rem;
+    gap: 0.5rem;
+  }
+}

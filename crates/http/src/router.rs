@@ -196,6 +196,18 @@ pub fn build_router(state: AppState) -> Router {
         // El envío real lo procesa el worker de fondo (cola Postgres SKIP LOCKED).
         .route("/verifactu/records", get(verifactu::list))
         .route("/verifactu/records/{id}/retry", post(verifactu::retry))
+        // Config VERI*FACTU por comercio (#156): modalidad, razón social, exención,
+        // entorno AEAT. Solo ADMIN.
+        .route(
+            "/verifactu/config",
+            get(verifactu::config_get).put(verifactu::config_put),
+        )
+        // Certificado de cliente (modo DIRECT_OWN_CERT, #156): subida cifrada + estado.
+        .route(
+            "/verifactu/certificate",
+            get(verifactu::cert_status).put(verifactu::cert_put),
+        )
+        .route("/verifactu/verify", get(verifactu::verify_chain))
         // Catálogo (Fase 2). `/import` y `/barcode/{code}` son estáticas y no
         // colisionan con `/{id}` (axum prioriza el segmento estático).
         .route("/products", get(products::list).post(products::create))
@@ -230,7 +242,9 @@ pub fn build_router(state: AppState) -> Router {
             patch(product_families::update).delete(product_families::remove),
         )
         // Clientes B2B (Fase 4, #154, IT-17): función de central → ADMIN/MANAGER.
+        // `/customers/ledger` (agregado de cartera) antes que `/customers/{id}`.
         .route("/customers", get(customers::list).post(customers::create))
+        .route("/customers/ledger", get(customers::ledger))
         .route(
             "/customers/{id}",
             patch(customers::update).delete(customers::remove),
@@ -260,6 +274,10 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/wholesale-orders/{id}/status",
             patch(wholesale_orders::update_status),
+        )
+        .route(
+            "/wholesale-orders/{id}/collect",
+            post(wholesale_orders::collect),
         )
         .route("/wholesale-orders/{id}", get(wholesale_orders::get))
         // Promociones (Fase 4, #154): catálogo de central. Lectura abierta a la
@@ -304,6 +322,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/sales/{id}/ticket", get(sales::ticket))
         .route("/sales/{id}/receipt", get(sales::receipt))
         .route("/sales/{id}/void", post(sales::void))
+        // Cobro (cuentas por cobrar): registra el pago de una factura a crédito.
+        .route("/sales/{id}/collect", post(sales::collect))
         // Devoluciones (Fase 2): con ticket + ciega (PIN) + listado.
         .route("/returns", post(returns::create).get(returns::list))
         .route("/returns/blind", post(returns::create_blind))
@@ -400,6 +420,22 @@ pub fn build_router(state: AppState) -> Router {
         .route("/transfers/{id}/send", post(transfers::send))
         .route("/transfers/{id}/receive", post(transfers::receive))
         .route("/transfers/{id}/close", post(transfers::close))
+        .route(
+            "/transfers/{id}/attachments",
+            post(transfers::add_attachment).get(transfers::list_attachments),
+        )
+        .route(
+            "/transfers/{id}/messages",
+            post(transfers::add_message).get(transfers::list_messages),
+        )
+        .route(
+            "/transfers/{id}/messages/{messageId}",
+            patch(transfers::update_message).delete(transfers::delete_message),
+        )
+        .route(
+            "/transfers/{id}/resolve-incident",
+            post(transfers::resolve_incident),
+        )
         // Pedidos de tienda (Fase 4, #154): ALIAS de traspasos en otra ruta — el
         // StoreOrdersController de NestJS delega entero en TransfersService con los
         // mismos DTOs. Mismos handlers, mismas reglas de rol.
@@ -411,6 +447,22 @@ pub fn build_router(state: AppState) -> Router {
         .route("/store-orders/{id}/send", post(transfers::send))
         .route("/store-orders/{id}/receive", post(transfers::receive))
         .route("/store-orders/{id}/close", post(transfers::close))
+        .route(
+            "/store-orders/{id}/attachments",
+            post(transfers::add_attachment).get(transfers::list_attachments),
+        )
+        .route(
+            "/store-orders/{id}/messages",
+            post(transfers::add_message).get(transfers::list_messages),
+        )
+        .route(
+            "/store-orders/{id}/messages/{messageId}",
+            patch(transfers::update_message).delete(transfers::delete_message),
+        )
+        .route(
+            "/store-orders/{id}/resolve-incident",
+            post(transfers::resolve_incident),
+        )
         // Cierre Z (Fase 4, #124): arqueo fiscal diario por tienda. ADMIN/MANAGER.
         .route("/z-report", get(z_report::get))
         // Dashboard de KPIs (Fase 4, #154): solo central (ADMIN/MANAGER), lectura.

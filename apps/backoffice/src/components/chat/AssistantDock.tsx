@@ -5,6 +5,7 @@ import {
   useDashboardStore,
 } from '../../lib/dashboard-store.js';
 import { ChatDock } from './ChatDock.js';
+import { DashboardChatDock } from './DashboardChatDock.js';
 import { executeViewAction } from './view-actions.js';
 import type { ViewContext } from './view-context.js';
 
@@ -29,18 +30,29 @@ const undoCanvasOps = (ops: CanvasOp[]): void => {
 };
 
 export function AssistantDock({ view }: { view: ViewContext }) {
-  // La barra de herramientas del lienzo vive ahora ARRIBA en el DashboardPage (no en el dock); el
-  // dock es chat puro en todas las views. Por eso ya no consume el canvas-bridge.
+  const isDashboard = view.id === 'dashboard';
+
+  // El asistente NUNCA se auto-abre: arranca cerrado (estado por defecto del store, `open: false`) y
+  // solo lo abre el usuario con el lanzador ✦/🤖 de la isla. El store conserva el estado abierto/
+  // cerrado en memoria entre cambios de view, así que respeta tu última elección al navegar.
+  //   · Views de trabajo → ventana flotante (overlay sobre el borde derecho → el lienzo conserva su
+  //     ancho, no se reescala nada).
+  //   · Dashboard → barra inferior SIEMPRE visible, pero su popover de conversación arranca CERRADO
+  //     para no tapar el lienzo; se abre con el robot 🤖 de la isla, el botón 💬 o al enfocar.
+
+  // La barra de herramientas del lienzo vive ARRIBA en el DashboardPage (no en el dock); el dock es
+  // chat puro en todas las views. Por eso ya no consume el canvas-bridge.
+  //
+  // El Dashboard usa su BARRA INFERIOR propia ({@link DashboardChatDock}); el resto de views, la
+  // VENTANA FLOTANTE ({@link ChatDock}). Ambas comparten el mismo `useChat` y handlers de canvas.
+  const Dock = isDashboard ? DashboardChatDock : ChatDock;
   return (
-    <ChatDock
+    <Dock
       onCanvasOp={applyCanvasOp}
       onUndoCanvasOps={undoCanvasOps}
       getCanvasState={buildCanvasSnapshot}
       onViewAction={(action, args) => executeViewAction(action as ViewActionName, args)}
       view={view}
-      // En el Dashboard («Asistente de IA») el composer es el héroe: panel + input grandes y
-      // centrados. Al navegar a otra view, el dock hace morph a la barra compacta inferior.
-      hero={view.id === 'dashboard'}
     />
   );
 }

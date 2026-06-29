@@ -1,0 +1,648 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   CLIENTES B2B — maestro-detalle de 3 columnas (carril de facetas · lista · ficha).
+   Reutiliza el carril facetado del Catálogo (`.cat-*`) y el lenguaje visual de la
+   ficha de Ventas (`.ventas-*`, ambos globales vía App.tsx). Añade la lista de
+   clientes con acción de borrado inline, la ficha de cartera/crédito y las píldoras
+   de segmento/cobro. Paleta vía tokens --ui-*.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.bo-main--surface:has(.b2b-customers-page) {
+  padding: 0.4rem 1.25rem 1.5rem;
+}
+
+/* B2bPage envuelve cada sección en `.catalog b2b-page` (max-width 75rem, centrado).
+   El maestro-detalle ocupa todo el ancho disponible: anulamos esa restricción solo
+   cuando la sección activa es Clientes. */
+.catalog.b2b-page:has(.b2b-customers-page) {
+  max-width: none;
+  margin: 0;
+}
+
+.b2b-customers-page {
+  /* Offset = topbar (60px) + padding-top (0.4rem) + padding-bottom (1.5rem). */
+  height: calc(100dvh - 60px - 1.9rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.cust-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.04),
+    0 4px 24px -8px rgb(0 0 0 / 0.1);
+  /* `clip` (no `hidden`) + `contain: paint`: aísla el overflow de los scrollers
+     internos para que no propaguen scroll al documento (ver ventas.css). */
+  overflow: clip;
+  contain: paint;
+}
+
+/* ─── Cabecera de Tarifas/Pedidos SIN pestañas ni CTA ─────────────────────────── */
+/* Las sub-pestañas (Clientes · Tarifas · Pedidos) y la acción «Nuevo …» de cada sección
+   viven ahora en la TopBar (pageNav a la izquierda · pageActions a la derecha), igual que
+   en Catálogo/Ventas. La cabecera del panel de Tarifas/Pedidos conserva el padding y el
+   divisor de `.dt-header-row`, pero sus filtros se alinean a la IZQUIERDA: el space-between
+   hacia la derecha de `.dt-header-row > .users-toolbar` estaba pensado para [pestañas | CTA],
+   que ya no existen aquí. */
+.dt-header-row.dt-header-row--bare > .users-toolbar {
+  margin-left: 0;
+  justify-content: flex-start;
+}
+
+/* ─── Rejilla de 3 columnas: carril · lista · ficha ───────────────────────────── */
+.cust-layout {
+  display: grid;
+  /* Columna central a 24rem: misma anchura que la lista de Ventas (`.ventas-layout`),
+     que es la referencia del maestro-detalle de 3 columnas. */
+  grid-template-columns: 15.75rem 24rem minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+/* El carril va envuelto en `.scroll-shadow-cell` (sombra de scroll); el shell toma la
+   celda y ocupa ambas filas. `.cat-rail` scrollea dentro (ver styles/scroll-shadow.css). */
+.cust-layout > .scroll-shadow-cell {
+  grid-row: 1 / 3;
+}
+
+/* ─── Columna central: lista de clientes ──────────────────────────────────────── */
+.cust-list {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: 1 / 3;
+  min-height: 0;
+  /* Copia de `.ventas-list`: borde a IZQUIERDA y derecha (antes solo derecha), para
+     que la columna tenga los mismos márgenes/encuadre que la lista de Ventas. */
+  border-left: 1px solid var(--ui-border);
+  border-right: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+/* La lista reproduce la estructura de Ventas (`.ventas-list`): las cards de resumen
+   ocupan la fila 1 del subgrid (alineadas con la cabecera de la ficha) y la cabecera +
+   el scroll viven en un cuerpo flex en la fila 2. */
+.cust-list-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* Sombra de scroll (styles/scroll-shadow.css): la lista se difumina a su propio fondo. */
+  --scroll-shadow-bg: var(--ui-surface-subtle);
+}
+/* Si la fila 1 del subgrid la estira la cabecera de la ficha, las cards centran su
+   contenido (sin hueco inferior). */
+.cust-list > .ventas-summary > .ventas-chip {
+  justify-content: center;
+}
+.cust-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--ui-border);
+  flex: 0 0 auto;
+}
+.cust-list-count {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+}
+.cust-sort {
+  border: none;
+  background: none;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--ui-text-soft);
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+  margin: -0.15rem -0.4rem;
+  border-radius: var(--ui-radius-sm);
+}
+.cust-sort:hover {
+  color: var(--ui-text);
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
+}
+.cust-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  /* Copia de `.ventas-list-scroll`: inset uniforme de 1rem (filas al ancho de las 3
+     cards y márgenes simétricos en toda la columna) + gap 0.18rem. */
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  scrollbar-width: none;
+}
+.cust-list-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.cust-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 2rem 1rem;
+  color: var(--ui-text-soft);
+  text-align: center;
+}
+.cust-empty-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+}
+
+/* Fila de cliente: un único botón, idéntico a la fila de Ventas (`.ventas-row`).
+   El borrado se hace desde la cabecera de la ficha (botón «Borrar»), no por fila:
+   sin papelera en hover, así el hover/selección coincide 1:1 con Ventas. */
+.cust-row {
+  display: grid;
+  grid-template-columns: 2.1rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-md);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--ui-motion-fast) var(--ui-ease);
+}
+.cust-row:hover {
+  background: color-mix(in srgb, var(--ui-surface) 60%, transparent);
+}
+.cust-row.is-selected {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+}
+.cust-row:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.cust-avatar {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-subtle);
+  box-shadow: inset 0 0 0 1px var(--ui-border);
+  color: var(--ui-text-muted);
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+/* Avatar de la ficha: mismo tamaño que el de Ventas (`.ventas-avatar--lg`, 2.4rem)
+   para no verse más grande que en aquella vista. */
+.cust-avatar--lg {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: var(--ui-radius-md);
+  font-size: 0.8rem;
+}
+.cust-row-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  line-height: 1.3;
+}
+.cust-row-name {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cust-row-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cust-row-dot {
+  color: var(--ui-border-strong);
+}
+.cust-row-end {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  line-height: 1.3;
+  text-align: right;
+}
+.cust-row-billed {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.cust-row-saldo {
+  font-size: 0.7rem;
+}
+
+/* Números tabulares con tono semántico. */
+.cust-num {
+  font-variant-numeric: tabular-nums;
+}
+.cust-num[data-tone='danger'] {
+  color: var(--ui-danger);
+}
+.cust-num[data-tone='muted'] {
+  color: var(--ui-text-soft);
+}
+.cust-num[data-tone='ok'] {
+  color: var(--ui-success);
+}
+.cust-num[data-tone='plain'] {
+  color: var(--ui-text);
+}
+
+/* ─── Columna derecha: ficha del cliente ──────────────────────────────────────── */
+.cust-detail {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: 1 / 3;
+  min-width: 0;
+  min-height: 0;
+  background: var(--ui-surface);
+}
+/* Misma banda que la cabecera de la ficha de Ventas (`.ventas-detail-head`): sin
+   padding vertical y centrada, para que su altura la fije la fila 1 del subgrid (los
+   chips de resumen) y quede alineada con ellos y con la cabecera de la lista. */
+.cust-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding: 0 1.5rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.cust-detail-id {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+.cust-detail-titles {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  /* Misma separación nombre↔subtítulo y line-height que la cabecera de la ficha de
+     Ventas (`.ventas-detail-titles`: gap 0.05rem; name/meta-line a line-height 1.2). */
+  gap: 0.05rem;
+  line-height: 1.2;
+}
+.cust-detail-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+.cust-detail-name {
+  /* font-size + line-height igualados a la ficha de Ventas (`.ventas-detail-name`). */
+  font-size: 1rem;
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+}
+.cust-detail-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  /* font-size + line-height igualados a Ventas (`.ventas-detail-meta-line`). */
+  font-size: 0.78rem;
+  line-height: 1.2;
+  color: var(--ui-text-soft);
+}
+.cust-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+/* Botones de la cabecera de la ficha (Editar · Borrar): mismo tratamiento que la
+   cabecera de Tarifas — solo icono, cuadrados y compactos, alineados a la derecha. */
+.cust-detail-head .cust-detail-actions {
+  gap: 0.35rem;
+}
+.cust-detail-head .cust-detail-actions .ventas-btn {
+  height: 2rem;
+  padding: 0 0.6rem;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+}
+.cust-detail-head .cust-detail-actions .ventas-btn--icon {
+  width: 2rem;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
+}
+/* Botón «Borrar» de la ficha: mismo botón base que «Editar» (`.ventas-btn`), pero
+   neutro en reposo y rojo (peligro) al pasar el ratón / enfocar. Reemplaza a la
+   papelera por fila. Va después de `.ventas-btn` en el orden de carga, así que sus
+   reglas ganan a igual especificidad. */
+.cust-del-btn {
+  color: var(--ui-text-muted);
+}
+.cust-del-btn:hover,
+.cust-del-btn:focus-visible {
+  color: var(--ui-danger);
+  background: color-mix(in srgb, var(--ui-danger) 10%, var(--ui-surface));
+  border-color: color-mix(in srgb, var(--ui-danger) 30%, var(--ui-border));
+}
+.cust-detail-body {
+  grid-row: 2;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 1.2rem 1.5rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.3rem;
+  max-width: 46rem;
+}
+.cust-detail-body::-webkit-scrollbar {
+  display: none;
+}
+
+/* Badges de estado / segmento / cobro. */
+.cust-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 1.35rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.cust-badge-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+.cust-badge[data-tone='ok'],
+.cust-badge[data-tone='paid'] {
+  background: color-mix(in srgb, var(--ui-success) 12%, var(--ui-surface));
+  color: var(--ui-success);
+}
+.cust-badge[data-tone='off'],
+.cust-badge[data-tone='neutral'],
+.cust-badge[data-tone='void'] {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+  border-color: var(--ui-border);
+}
+.cust-badge[data-tone='vip'] {
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand);
+}
+.cust-badge[data-tone='risk'],
+.cust-badge[data-tone='overdue'] {
+  background: color-mix(in srgb, var(--ui-danger) 12%, var(--ui-surface));
+  color: var(--ui-danger);
+}
+.cust-badge[data-tone='new'],
+.cust-badge[data-tone='pending'] {
+  background: color-mix(in srgb, var(--ui-warning) 14%, var(--ui-surface));
+  color: var(--ui-warning);
+}
+
+/* Stats de cartera (4 cajas). */
+.cust-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+}
+.cust-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+}
+.cust-stat-label {
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ui-text-soft);
+}
+.cust-stat-value {
+  font-size: 1.1rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+/* Cartera y crédito. */
+.cust-credit {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg, 0.75rem);
+  overflow: hidden;
+}
+.cust-credit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 0.95rem;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+.cust-credit-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.cust-credit-terms {
+  font-size: 0.74rem;
+  color: var(--ui-text-soft);
+}
+.cust-credit-body {
+  padding: 0.95rem;
+}
+.cust-credit-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.85rem;
+  margin-bottom: 0.9rem;
+}
+.cust-credit-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.cust-credit-label {
+  font-size: 0.72rem;
+  color: var(--ui-text-soft);
+}
+.cust-credit-value {
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+.cust-credit-track {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--ui-surface-subtle);
+  overflow: hidden;
+}
+.cust-credit-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width var(--ui-motion-normal, 0.24s) var(--ui-ease);
+}
+.cust-credit-fill[data-tone='brand'] {
+  background: var(--ui-brand);
+}
+.cust-credit-fill[data-tone='warning'] {
+  background: var(--ui-warning);
+}
+.cust-credit-fill[data-tone='danger'] {
+  background: var(--ui-danger);
+}
+.cust-credit-note {
+  display: block;
+  margin-top: 0.45rem;
+  font-size: 0.72rem;
+  color: var(--ui-text-soft);
+}
+
+/* Pedidos recientes. */
+.cust-orders-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.cust-orders-total {
+  font-size: 0.74rem;
+  color: var(--ui-text-soft);
+}
+.cust-orders {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  overflow: hidden;
+}
+.cust-orders-loading {
+  padding: 0.85rem 0.95rem;
+  font-size: 0.78rem;
+  color: var(--ui-text-soft);
+}
+.cust-order {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr auto auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.95rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.cust-order:last-child {
+  border-bottom: none;
+}
+.cust-order-id {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.cust-order-date {
+  font-size: 0.74rem;
+  color: var(--ui-text-soft);
+}
+.cust-order-amount {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: right;
+  min-width: 4.5rem;
+}
+.cust-order-collect {
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-brand);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--ui-radius-sm);
+  cursor: pointer;
+  transition: background var(--ui-motion-fast) var(--ui-ease);
+}
+.cust-order-collect:hover:not(:disabled) {
+  background: var(--ui-brand-soft);
+}
+.cust-order-collect:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+.cust-order-collect-spacer {
+  width: 1px;
+}
+
+/* Selector de segmentos en el formulario. */
+.cust-tag-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.cust-tag-chip {
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  font-size: 0.76rem;
+  font-weight: 500;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    border-color var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+.cust-tag-chip:hover {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+}
+.cust-tag-chip.is-on {
+  background: var(--ui-brand);
+  border-color: var(--ui-brand);
+  color: #fff;
+}
+
+/* ─── Responsive: ficha bajo la lista en pantallas estrechas ──────────────────── */
+@media (max-width: 1100px) {
+  .cust-layout {
+    grid-template-columns: 14rem minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+  .cust-layout > .scroll-shadow-cell {
+    grid-row: 1 / 4;
+  }
+  .cust-list {
+    grid-row: 1 / 3;
+  }
+  .cust-detail {
+    grid-column: 2 / 3;
+    grid-row: 3;
+    border-top: 1px solid var(--ui-border);
+  }
+  .cust-stats,
+  .cust-credit-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

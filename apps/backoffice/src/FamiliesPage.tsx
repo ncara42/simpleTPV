@@ -1,8 +1,18 @@
 import { Button, Input, Select } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Pencil, Plus, Trash2, Upload } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  ChevronRight,
+  Download,
+  FolderPlus,
+  Package,
+  PackagePlus,
+  Pencil,
+  Plus,
+  Trash2,
+  Upload,
+} from 'lucide-react';
+import { type ReactNode, useMemo, useRef, useState } from 'react';
 
 import { AddExistingProductsModal } from './components/AddExistingProductsModal.js';
 import { useConfirm } from './components/ConfirmProvider.js';
@@ -12,6 +22,7 @@ import {
   ProductFormModal,
   type ProductFormState,
 } from './components/ProductFormModal.js';
+import { useScrollShadow } from './hooks/use-scroll-shadow.js';
 import {
   createFamily,
   deleteFamily,
@@ -19,22 +30,11 @@ import {
   listFamilies,
   updateFamily,
 } from './lib/families.js';
-import {
-  countDescendants,
-  type DropPosition,
-  findNode,
-  flattenTree,
-  insertChild,
-  isDescendantOf,
-  moveToParent,
-  removeNode,
-  renumberSiblings,
-  reorderSiblings,
-} from './lib/family-tree.js';
+import { countDescendants, findNode, flattenTree } from './lib/family-tree.js';
 import { formErrorMessage } from './lib/form-error.js';
 import { fmtEur } from './lib/format.js';
 import { usePageActions } from './lib/pageActions.js';
-import { createProduct, listProducts, updateProduct } from './lib/products.js';
+import { createProduct, listProducts, type Product, updateProduct } from './lib/products.js';
 
 // Forma del JSON de intercambio del árbol de familias (export/import). Anidada
 // con `children`, sin ids (se recrean en el import).
@@ -80,285 +80,90 @@ const norm = (s: string): string =>
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '');
 
-// Plegado del árbol: se recuerda en el navegador (localStorage) entre sesiones.
-const COLLAPSE_KEY = 'simpletpv.families.collapsed';
-const EMPTY_COLLAPSE: ReadonlySet<string> = new Set();
-function loadCollapsed(): Set<string> {
-  try {
-    const raw = localStorage.getItem(COLLAPSE_KEY);
-    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
-  } catch {
-    return new Set();
-  }
-}
-function saveCollapsed(ids: Set<string>): void {
-  try {
-    localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...ids]));
-  } catch {
-    /* almacenamiento no disponible: el plegado no se recuerda esta sesión */
-  }
+// Una columna del navegador = el contenido de un nodo (sus subfamilias + sus
+// productos directos). La columna raíz tiene `ownerId: null` (las familias raíz).
+interface NavColumn {
+  ownerId: string | null;
+  ownerName: string | null;
+  // Arquetipo: el nodo dueño solo admite productos (no subfamilias).
+  isArchetype: boolean;
+  title: string;
+  // Color heredado para los puntos de las familias sin color propio.
+  color: string | null;
+  families: FamilyNode[];
+  products: Product[];
 }
 
-interface RowActions {
-  roots: FamilyNode[];
-  // Contador real de productos del subárbol del nodo (E-16).
-  productCountOf: (node: FamilyNode) => number;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  // Nodos plegados (sus hijas no se muestran). Vacío mientras se busca.
-  collapsedIds: ReadonlySet<string>;
-  onToggleCollapse: (id: string) => void;
-  dragId: string | null;
-  dropTarget: { id: string; position: DropPosition } | null;
-  onDragStart: (node: FamilyNode) => void;
-  onDragEnd: () => void;
-  canDropOn: (target: FamilyNode) => boolean;
-  onDragOver: (target: FamilyNode, position: DropPosition) => void;
-  onDrop: (target: FamilyNode) => void;
-  onMoveTo: (childId: string, toParentId: string) => void;
-  onEdit: (n: FamilyNode) => void;
-  onAddChild: (parentId: string) => void;
-  onDelete: (n: FamilyNode) => void | Promise<void>;
-  // Atajo D-11: el contador navega a Catálogo filtrado por el nodo.
-  onOpenInCatalog?: (familyId: string) => void;
-}
-
-function FamilyRow({
-  node,
-  depth,
-  parentId,
-  actions,
-}: {
-  node: FamilyNode;
-  depth: number;
-  parentId: string | null;
-  actions: RowActions;
-}) {
-  const dragging = actions.dragId === node.id;
-  const drop = actions.dropTarget?.id === node.id ? actions.dropTarget.position : null;
-  const selected = actions.selectedId === node.id;
-  const hasChildren = node.children.length > 0;
-  const collapsed = actions.collapsedIds.has(node.id);
-  // Destinos válidos para "Mover": cualquier familia/subfamilia salvo el propio
-  // subárbol y el padre actual; NUNCA un arquetipo (solo contiene productos).
-  // La sangría del label indica la profundidad del destino.
-  const moveOptions = flattenTree(actions.roots)
-    .filter(
-      (f) =>
-        !isDescendantOf(actions.roots, node.id, f.node.id) &&
-        f.node.id !== parentId &&
-        !f.node.isArchetype,
-    )
-    .map((f) => ({ value: f.node.id, label: `${'– '.repeat(f.depth)}${f.node.name}` }));
+// Cuerpo scrollable de cada columna del miller, con la sombra de scroll inferior. Como las
+// columnas se generan en un map, cada cuerpo necesita su propio `useScrollShadow`; de ahí
+// este componente. El host (`.mc-col-bodywrap`) queda POR ENCIMA del pie de columna, así la
+// sombra se difumina al borde del cuerpo, no del pie.
+function ColumnBody({ children }: { children: ReactNode }) {
+  const { scrollRef, sentinelRef, showShadow } = useScrollShadow();
   return (
-    <>
-      <div
-        className={`fam-row${depth === 0 ? ' fam-row--root' : ''}${
-          selected ? ' is-selected' : ''
-        }${dragging ? ' fam-dragging' : ''}${drop ? ` fam-row--drop-${drop}` : ''}`}
-        style={{ paddingLeft: `${depth * 1.5 + 0.75}rem` }}
-        data-testid="fam-row"
-        data-fam-id={node.id}
-        draggable
-        tabIndex={0}
-        aria-expanded={selected}
-        onClick={() => actions.onSelect(node.id)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            actions.onSelect(node.id);
-          }
-        }}
-        onDragStart={() => actions.onDragStart(node)}
-        onDragEnd={() => actions.onDragEnd()}
-        onDragOver={(e) => {
-          if (!actions.canDropOn(node)) return;
-          e.preventDefault();
-          const rect = e.currentTarget.getBoundingClientRect();
-          const position: DropPosition =
-            e.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
-          actions.onDragOver(node, position);
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          actions.onDrop(node);
-        }}
-      >
-        {hasChildren ? (
-          <button
-            type="button"
-            className="fam-toggle"
-            aria-label={collapsed ? 'Desplegar' : 'Plegar'}
-            aria-expanded={!collapsed}
-            data-testid="fam-toggle"
-            onClick={(e) => {
-              e.stopPropagation();
-              actions.onToggleCollapse(node.id);
-            }}
-          >
-            {collapsed ? '▸' : '▾'}
-          </button>
-        ) : (
-          <span className="fam-toggle fam-toggle--leaf" aria-hidden="true" />
-        )}
-        <span className="fam-grip" aria-hidden="true" data-testid="fam-grip">
-          ⠿
-        </span>
-        <span className="fam-name">
-          <span
-            className="fam-color-dot"
-            style={{ background: node.color ?? 'var(--ui-text-soft)' }}
-          />
-          {node.name}
-          {node.isArchetype && (
-            <span className="fam-badge" data-testid="fam-archetype-badge">
-              Arquetipo
-            </span>
-          )}
-        </span>
-        <button
-          type="button"
-          className="fam-count"
-          data-testid="fam-count"
-          title="Ver estos productos en Catálogo"
-          onClick={(e) => {
-            e.stopPropagation();
-            actions.onOpenInCatalog?.(node.id);
-          }}
-        >
-          {actions.productCountOf(node)} productos
-        </button>
-        {/* U-13: las acciones de la fila están SIEMPRE visibles (atenuadas en
-            reposo, plenas al pasar el ratón o al seleccionar la fila). */}
-        <span
-          className={`fam-actions${selected ? ' is-selected' : ''}`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {moveOptions.length > 0 && (
-            <Select
-              className="fam-move-select"
-              value=""
-              onChange={(value) => {
-                if (value) actions.onMoveTo(node.id, value);
-              }}
-              triggerLabel="Mover"
-              options={[{ value: '', label: 'Mover bajo…' }, ...moveOptions]}
-              ariaLabel="Mover bajo otra familia"
-              data-testid="fam-move-to"
-            />
-          )}
-          {!node.isArchetype && (
-            <button
-              type="button"
-              className="fam-action-btn"
-              onClick={() => actions.onAddChild(node.id)}
-              data-testid="fam-add-child"
-              title="Añadir subfamilia"
-              aria-label={`Añadir subfamilia a ${node.name}`}
-            >
-              <Plus size={15} aria-hidden="true" />
-            </button>
-          )}
-          <button
-            type="button"
-            className="fam-action-btn"
-            onClick={() => actions.onEdit(node)}
-            title="Editar"
-            aria-label={`Editar ${node.name}`}
-          >
-            <Pencil size={15} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="fam-action-btn danger"
-            onClick={() => void actions.onDelete(node)}
-            title="Borrar"
-            aria-label={`Borrar ${node.name}`}
-          >
-            <Trash2 size={15} aria-hidden="true" />
-          </button>
-        </span>
+    <div className={`mc-col-bodywrap scroll-shadow-host${showShadow ? ' has-scroll-shadow' : ''}`}>
+      <div className="mc-col-body" ref={scrollRef}>
+        {children}
+        <span className="scroll-shadow-sentinel" ref={sentinelRef} aria-hidden="true" />
       </div>
-      {!collapsed &&
-        node.children.map((c) => (
-          <FamilyRow key={c.id} node={c} depth={depth + 1} parentId={node.id} actions={actions} />
-        ))}
-    </>
+    </div>
   );
 }
 
 export function FamiliesPage({
-  onOpenCatalogFamily,
   search: searchProp,
   onSearchChange,
-  familyId: familyIdProp,
 }: {
-  // Atajo del contador "X productos": navega a Catálogo filtrado por el nodo.
+  // Deep-link a Catálogo: retirado del navegador por diseño; se conserva en la API
+  // (el shell sigue pasándolo) por compatibilidad, pero el navegador no lo usa.
   onOpenCatalogFamily?: (familyId: string) => void;
-  // S-02 fase D — Filtro COMPARTIDO de Inventario. Cuando el shell pasa `search`
-  // (controlado), la búsqueda la gobierna `InventoryFilters` arriba y la página deja
-  // de pintar su propia caja `fam-search`. `familyId` (un nodo cualquiera del filtro
-  // compartido) acota el árbol a la raíz que contiene ese nodo. El drag&drop, el
-  // import/export y el panel de productos siguen intactos.
+  // Filtro de búsqueda COMPARTIDO del shell de Inventario (controlado). Filtra los
+  // elementos visibles dentro de cada columna del navegador.
   search?: string;
   onSearchChange?: (value: string) => void;
-  familyId?: string;
 } = {}) {
   const qc = useQueryClient();
   const confirm = useConfirm();
   const [form, setForm] = useState<FormState | null>(null);
-  // Modo controlado: si el shell de Inventario provee `search`, manda esa prop y los
-  // filtros propios (fam-search / fam-filter) no se pintan.
+
+  // Modo controlado: si el shell provee `search`, manda esa prop.
   const controlled = searchProp !== undefined;
-  // Toolbar de la tabla: búsqueda por nombre + filtro por familia raíz.
-  const [searchInner, setSearchInner] = useState('');
-  const [rootFilterInner, setRootFilter] = useState('');
+  const [searchInner] = useState('');
   const search = controlled ? searchProp : searchInner;
-  const setSearch = controlled ? (onSearchChange ?? (() => {})) : setSearchInner;
-  // Fila activa: solo esa muestra sus botones (Mover / Editar / Borrar / + Hija).
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const toggleSelected = (id: string): void => setSelectedId((cur) => (cur === id ? null : id));
-  // Nodos plegados (sus hijas no se muestran), recordados en localStorage.
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(loadCollapsed);
-  useEffect(() => saveCollapsed(collapsedIds), [collapsedIds]);
-  const toggleCollapse = (id: string): void =>
-    setCollapsedIds((cur) => {
-      const next = new Set(cur);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  void onSearchChange; // el navegador no pinta su propia caja de búsqueda
+
+  // Ruta abierta (drill-down): ids de raíz → nodo más profundo. Las columnas se
+  // derivan de aquí.
+  const [path, setPath] = useState<string[]>([]);
+  // Producto resaltado (solo estética: marca el último producto sobre el que se
+  // ha actuado). No abre columna.
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   const { data: serverTree = [], isLoading } = useQuery({
     queryKey: ['families'],
     queryFn: listFamilies,
   });
-  // Copia local editable para la reorganización (la demo no persiste en backend).
+  // Copia local editable (alta/edición/borrado optimistas; la demo no persiste la
+  // reorganización en backend).
   const [tree, setTree] = useState<FamilyNode[] | null>(null);
-  useEffect(() => {
-    if (serverTree.length && tree === null) {
-      setTree(serverTree.map((n) => ({ ...n, children: n.children.map((c) => ({ ...c })) })));
-    }
-  }, [serverTree, tree]);
+  // Deriva la copia editable del árbol del servidor sin un efecto: se rehace solo
+  // cuando cambia la referencia del árbol servido (evita la carrera del useEffect).
+  const treeKey = serverTree;
+  const [syncedFrom, setSyncedFrom] = useState<FamilyNode[] | null>(null);
+  if (treeKey !== syncedFrom && serverTree.length) {
+    setSyncedFrom(treeKey);
+    setTree(serverTree.map((n) => ({ ...n, children: n.children.map((c) => ({ ...c })) })));
+  }
   const view = tree ?? serverTree;
 
-  // En modo controlado, el filtro de familia COMPARTIDO trae un nodo cualquiera del
-  // árbol; lo resolvemos a la raíz que lo contiene (Familias filtra por raíz). Sin
-  // selección o nodo desconocido → '' (todas). En modo autónomo manda el `fam-filter`
-  // propio.
-  const rootFilter = controlled
-    ? (view.find((root) => familyIdProp && isDescendantOf(view, root.id, familyIdProp))?.id ?? '')
-    : rootFilterInner;
-
-  // Productos completos: alimentan el panel del nodo (I-13) y el contador REAL
-  // por subárbol de cada fila (E-16), coherente con el filtro de Catálogo.
+  // Productos completos: alimentan las hojas de cada columna y el contador REAL
+  // por subárbol de cada familia (coherente con el filtro de Catálogo).
   const { data: allProducts = [] } = useQuery({
     queryKey: ['products'],
     queryFn: () => listProducts(),
   });
   // Contador de productos del subárbol por nodo. Memoizado: el mapa de conteo
-  // directo se reconstruye solo cuando cambia la lista de productos, no en cada
-  // render (antes era O(productos) + recursión por CADA fila renderizada).
+  // directo se reconstruye solo cuando cambia la lista de productos.
   const subtreeCount = useMemo(() => {
     const directCount = new Map<string, number>();
     for (const p of allProducts) {
@@ -369,13 +174,63 @@ export function FamiliesPage({
     return count;
   }, [allProducts]);
 
-  // Exporta el árbol APLANADO en orden DFS: cada fila es un nodo con su tipo
-  // (familia/subfamilia/arquetipo), el contador real de productos de su subárbol
-  // y la ruta de ancestros. La ruta se construye en el recorrido (flattenTree solo
-  // anota la profundidad, no los nombres de ancestros).
-  // La tabla de Familias es un ÁRBOL jerárquico: un CSV plano lo aplanaría y
-  // perdería la anidación. Por eso su intercambio es JSON (estructura anidada con
-  // children), que conserva el árbol completo en export e import.
+  // Productos directos por familia (para las hojas de cada columna).
+  const directProducts = useMemo(() => {
+    const map = new Map<string, Product[]>();
+    for (const p of allProducts) {
+      if (!p.familyId) continue;
+      const list = map.get(p.familyId);
+      if (list) list.push(p);
+      else map.set(p.familyId, [p]);
+    }
+    return map;
+  }, [allProducts]);
+
+  // ── Ruta válida + columnas derivadas ──
+  const q = norm(search);
+  const matches = (name: string): boolean => !q || norm(name).includes(q);
+
+  // Prefijo de `path` que aún resuelve a nodos existentes (tras borrados).
+  const validPath: FamilyNode[] = [];
+  for (const id of path) {
+    const node = findNode(view, id);
+    if (!node) break;
+    validPath.push(node);
+  }
+
+  const columns: NavColumn[] = [
+    {
+      ownerId: null,
+      ownerName: null,
+      isArchetype: false,
+      title: 'Familias raíz',
+      color: null,
+      families: view.filter((r) => matches(r.name)),
+      products: [],
+    },
+  ];
+  let inheritedColor: string | null = null;
+  for (const node of validPath) {
+    inheritedColor = node.color ?? inheritedColor;
+    columns.push({
+      ownerId: node.id,
+      ownerName: node.name,
+      isArchetype: node.isArchetype,
+      title: node.name,
+      color: inheritedColor,
+      families: node.children.filter((c) => matches(c.name)),
+      products: (directProducts.get(node.id) ?? []).filter((p) => matches(p.name)),
+    });
+  }
+
+  // Selecciona una familia en la columna `colIndex`: recorta la ruta a ese nivel
+  // y abre la columna del nodo elegido.
+  const openFamily = (colIndex: number, id: string): void => {
+    setPath((prev) => [...prev.slice(0, colIndex), id]);
+    setSelectedProductId(null);
+  };
+
+  // ── Export / Import (intercambio JSON del árbol) ──
   const [importing, setImporting] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
   const [importResult, setImportResult] = useState<{ created: number; errors: string[] } | null>(
@@ -404,8 +259,19 @@ export function FamiliesPage({
 
   const handleExport = (): void => downloadJson('familias.json', view.map(toJsonFamily));
 
-  // Export/Import en el clúster flotante (junto al conmutador Backoffice↔TPV),
-  // no en una banda propia sobre la card.
+  // Alta de familia/subfamilia: abre el modal con el padre precargado.
+  const openNewFamily = (parentId: string | null): void =>
+    setForm({
+      name: '',
+      parentId,
+      isArchetype: false,
+      hasChildren: false,
+      color: null,
+      icon: null,
+    });
+
+  // Acciones de la vista en la TopBar (arriba-derecha, igual que el «Nuevo producto»
+  // de Catálogo): export + import (iconos) y el CTA primario «Nueva familia».
   usePageActions(
     <>
       <button
@@ -428,6 +294,13 @@ export function FamiliesPage({
       >
         <Upload size={17} aria-hidden="true" />
       </button>
+      <Button
+        onClick={() => openNewFamily(null)}
+        data-testid="new-family"
+        icon={<Plus size={16} aria-hidden="true" />}
+      >
+        Nueva familia
+      </Button>
     </>,
   );
 
@@ -489,10 +362,9 @@ export function FamiliesPage({
       if (!nodes) throw new Error('El JSON debe ser un array de familias (o { familias: [...] }).');
       const res = await createTreeRecursive(nodes, null);
       setImportResult(res);
-      // Refresca el árbol con los datos frescos del servidor (incluye las familias
-      // nuevas). Se fija directamente para evitar la carrera del useEffect de sync.
       const fresh = await listFamilies();
       qc.setQueryData(['families'], fresh);
+      setSyncedFrom(fresh);
       setTree(fresh.map((n) => ({ ...n, children: n.children.map((c) => ({ ...c })) })));
     } catch (e) {
       setImportResult({ created: 0, errors: [e instanceof Error ? e.message : 'JSON inválido'] });
@@ -500,47 +372,6 @@ export function FamiliesPage({
       setImportBusy(false);
     }
   };
-
-  // Vista filtrada por la toolbar (no muta el árbol: el reordenado y "Mover a"
-  // siguen operando sobre `view`). Una raíz que coincide se muestra entera; si solo
-  // coinciden hijas, se muestra la raíz con esas hijas. Búsqueda insensible a
-  // mayúsculas y acentos ("indica" encuentra "Índica").
-  const q = norm(search);
-  const filtered = view
-    .filter((root) => !rootFilter || root.id === rootFilter)
-    .map((root) => {
-      if (!q || norm(root.name).includes(q)) return root;
-      const kids = root.children.filter((c) => norm(c.name).includes(q));
-      return kids.length ? { ...root, children: kids } : null;
-    })
-    .filter((n): n is FamilyNode => n != null);
-
-  // FLIP: anima el cambio de posición de las filas al reordenar (Web Animations API).
-  const treeRef = useRef<HTMLDivElement>(null);
-  const prevTops = useRef<Map<string, number>>(new Map());
-  useLayoutEffect(() => {
-    const container = treeRef.current;
-    if (!container) return;
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const next = new Map<string, number>();
-    for (const el of container.querySelectorAll<HTMLElement>('[data-fam-id]')) {
-      const id = el.dataset.famId;
-      if (!id) continue;
-      const top = el.getBoundingClientRect().top;
-      next.set(id, top);
-      const oldTop = prevTops.current.get(id);
-      if (oldTop !== undefined && !reduceMotion) {
-        const delta = oldTop - top;
-        if (Math.abs(delta) > 1) {
-          el.animate([{ transform: `translateY(${delta}px)` }, { transform: 'none' }], {
-            duration: 200,
-            easing: 'ease-out',
-          });
-        }
-      }
-    }
-    prevTops.current = next;
-  }, [view]);
 
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['families'] });
 
@@ -564,7 +395,6 @@ export function FamiliesPage({
       setTree((prev) => {
         const base = prev ?? view;
         if (f.id) {
-          // Renombrar / actualizar el flag de arquetipo a cualquier profundidad.
           const rename = (list: FamilyNode[]): FamilyNode[] =>
             list.map((n) =>
               n.id === f.id
@@ -574,74 +404,29 @@ export function FamiliesPage({
           return rename(base);
         }
         const node: FamilyNode = { ...saved, children: [] };
-        return f.parentId ? insertChild(base, f.parentId, node) : [...base, node];
+        if (!f.parentId) return [...base, node];
+        const insert = (list: FamilyNode[]): FamilyNode[] =>
+          list.map((n) =>
+            n.id === f.parentId
+              ? { ...n, children: [...n.children, node] }
+              : { ...n, children: insert(n.children) },
+          );
+        return insert(base);
       });
+      // Al crear una subfamilia, abre la del padre para que la nueva quede a la vista.
+      if (!f.id && f.parentId) {
+        const parentCol = columns.findIndex((c) => c.ownerId === f.parentId);
+        if (parentCol === -1) {
+          const parentPath = pathTo(view, f.parentId);
+          if (parentPath) setPath(parentPath);
+        }
+      }
       setForm(null);
       invalidate();
     },
   });
 
   const delMut = useMutation({ mutationFn: (id: string) => deleteFamily(id) });
-
-  // Persistir el nuevo orden de hermanos (sortOrder) tras un reordenado por arrastre.
-  const reorderMut = useMutation({
-    mutationFn: (changes: { id: string; sortOrder: number }[]) =>
-      Promise.all(changes.map((c) => updateFamily(c.id, { sortOrder: c.sortOrder }))),
-    onSuccess: invalidate,
-  });
-  // Persistir el nuevo padre y posición final tras "Mover bajo…".
-  const moveMut = useMutation({
-    mutationFn: (v: { id: string; parentId: string; sortOrder: number }) =>
-      updateFamily(v.id, { parentId: v.parentId, sortOrder: v.sortOrder }),
-    onSuccess: invalidate,
-  });
-
-  // Reordenación por arrastre (solo entre hermanos del mismo nivel).
-  const [dragNode, setDragNode] = useState<FamilyNode | null>(null);
-  const [dropTarget, setDropTarget] = useState<{ id: string; position: DropPosition } | null>(null);
-  const canDropOn = (target: FamilyNode): boolean =>
-    dragNode !== null && dragNode.id !== target.id && dragNode.parentId === target.parentId;
-  const onDragOver = (target: FamilyNode, position: DropPosition): void =>
-    setDropTarget((cur) =>
-      cur?.id === target.id && cur.position === position ? cur : { id: target.id, position },
-    );
-  const clearDrag = (): void => {
-    setDragNode(null);
-    setDropTarget(null);
-  };
-  const onDrop = (target: FamilyNode): void => {
-    if (!dragNode || !canDropOn(target)) return clearDrag();
-    const from = dragNode;
-    const position = dropTarget?.id === target.id ? dropTarget.position : 'before';
-    const base = tree ?? view;
-    const next = renumberSiblings(
-      reorderSiblings(base, target.parentId, from.id, target.id, position),
-      target.parentId,
-    );
-    setTree(next);
-    // Persistir solo los hermanos cuyo sortOrder ha cambiado.
-    const siblings =
-      target.parentId === null ? next : (findNode(next, target.parentId)?.children ?? []);
-    const changes = siblings
-      .map((n) => ({ id: n.id, sortOrder: n.sortOrder }))
-      .filter((c) => findNode(base, c.id)?.sortOrder !== c.sortOrder);
-    if (changes.length) reorderMut.mutate(changes);
-    clearDrag();
-  };
-
-  const onMoveTo = (childId: string, toParentId: string): void => {
-    const base = tree ?? view;
-    const next = moveToParent(base, childId, toParentId);
-    if (next === base) return; // movimiento inválido (ciclo o nodo inexistente)
-    setTree(next);
-    // El nodo movido queda como último hijo del nuevo padre.
-    const siblings = findNode(next, toParentId)?.children ?? [];
-    moveMut.mutate({
-      id: childId,
-      parentId: toParentId,
-      sortOrder: Math.max(0, siblings.length - 1),
-    });
-  };
 
   const onDelete = async (node: FamilyNode): Promise<void> => {
     const n = countDescendants(node);
@@ -655,64 +440,17 @@ export function FamiliesPage({
       if (!ok) return;
     }
     delMut.mutate(node.id);
-    setTree((prev) => removeNode(prev ?? view, node.id));
-    setSelectedId(null);
+    setTree((prev) => removeNodeLocal(prev ?? view, node.id));
+    // Recorta la ruta si el nodo borrado (o un ancestro) estaba abierto.
+    setPath((prev) => {
+      const idx = prev.indexOf(node.id);
+      return idx === -1 ? prev : prev.slice(0, idx);
+    });
   };
 
-  const actions: RowActions = {
-    roots: view,
-    productCountOf: subtreeCount,
-    selectedId,
-    onSelect: toggleSelected,
-    // Al buscar se ignora el plegado para que las coincidencias siempre se vean.
-    collapsedIds: q ? EMPTY_COLLAPSE : collapsedIds,
-    onToggleCollapse: toggleCollapse,
-    dragId: dragNode?.id ?? null,
-    dropTarget,
-    onDragStart: setDragNode,
-    onDragEnd: clearDrag,
-    canDropOn,
-    onDragOver,
-    onDrop,
-    onMoveTo,
-    onEdit: (node) =>
-      setForm({
-        id: node.id,
-        name: node.name,
-        parentId: node.parentId,
-        isArchetype: node.isArchetype,
-        hasChildren: node.children.length > 0,
-        color: node.color,
-        icon: node.icon,
-      }),
-    onAddChild: (parentId) =>
-      setForm({
-        name: '',
-        parentId,
-        isArchetype: false,
-        hasChildren: false,
-        color: null,
-        icon: null,
-      }),
-    onDelete,
-  };
+  usePageHeader('Familias', 'Navegador de columnas · familias, subfamilias y productos');
 
-  usePageHeader('Familias', 'Organiza el catálogo en familias, subfamilias y arquetipos');
-
-  // ── Panel de productos del nodo seleccionado (I-13 / D-11) ──
-  const selectedNode = selectedId ? findNode(view, selectedId) : null;
-  // En familias/subfamilias, alternar entre productos directos y todo el subárbol.
-  const [includeSubtree, setIncludeSubtree] = useState(false);
-  const panelProducts = selectedNode
-    ? allProducts.filter((p) =>
-        p.familyId == null
-          ? false
-          : includeSubtree && !selectedNode.isArchetype
-            ? isDescendantOf(view, selectedNode.id, p.familyId)
-            : p.familyId === selectedNode.id,
-      )
-    : [];
-  // Destinos de "mover producto": cualquier nodo del árbol (sangría por profundidad).
+  // ── Altas de producto (nuevo + existentes) sobre el nodo dueño de una columna ──
   const productMoveOptions = flattenTree(view).map((f) => ({
     value: f.node.id,
     label: `${'– '.repeat(f.depth)}${f.node.name}`,
@@ -726,12 +464,9 @@ export function FamiliesPage({
       updateProduct(id, { familyId }),
     onSuccess: invalidateProducts,
   });
-  // S-18: picker de productos EXISTENTES para añadirlos al nodo seleccionado.
-  // Aditivo al alta de nuevos (`fam-panel-add-product`); no toca el drag&drop ni
-  // `moveProductMut`. El hook `useAssignProductsToFamily` ya invalida las queries.
-  const [addingExisting, setAddingExisting] = useState(false);
-  // Alta de producto con el nodo precargado (reusa el ProductFormModal de I-11).
+  const [addingExisting, setAddingExisting] = useState<FamilyNode | null>(null);
   const [productForm, setProductForm] = useState<ProductFormState | null>(null);
+  const productTarget = productForm?.familyId ? findNode(view, productForm.familyId) : null;
   const createProductMut = useMutation({
     mutationFn: (f: ProductFormState) =>
       createProduct({
@@ -749,149 +484,158 @@ export function FamiliesPage({
     },
   });
 
+  const header = (
+    <div className="mc-head">
+      <nav className="mc-crumbs" aria-label="Ruta de familias">
+        <button
+          type="button"
+          className={`mc-crumb${validPath.length === 0 ? ' is-current' : ''}`}
+          onClick={() => {
+            setPath([]);
+            setSelectedProductId(null);
+          }}
+        >
+          Raíz
+        </button>
+        {validPath.map((node, i) => (
+          <span key={node.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <ChevronRight className="mc-crumb-sep" size={14} aria-hidden="true" />
+            <button
+              type="button"
+              className={`mc-crumb${i === validPath.length - 1 ? ' is-current' : ''}`}
+              onClick={() => {
+                setPath(validPath.slice(0, i + 1).map((n) => n.id));
+                setSelectedProductId(null);
+              }}
+            >
+              {node.name}
+            </button>
+          </span>
+        ))}
+      </nav>
+    </div>
+  );
+
   return (
-    <section className="catalog">
-      <div className="table-panel">
-        <div className="table-toolbar">
-          {/* En modo controlado (shell de Inventario) la búsqueda y la familia las
-              pinta `InventoryFilters` arriba; aquí solo queda «Nueva familia». */}
-          {!controlled && (
-            <div className="sales-filters">
-              <span className="search-field">
-                <Input
-                  className="catalog-search"
-                  placeholder="Buscar familia…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  data-testid="fam-search"
-                />
-              </span>
-              <Select
-                className="catalog-search"
-                value={rootFilter}
-                onChange={setRootFilter}
-                ariaLabel="Filtrar por familia"
-                data-testid="fam-filter"
-                options={[
-                  { value: '', label: 'Todas las familias' },
-                  ...view.map((r) => ({ value: r.id, label: r.name })),
-                ]}
-              />
-            </div>
-          )}
-          <Button
-            onClick={() =>
-              setForm({
-                name: '',
-                parentId: null,
-                isArchetype: false,
-                hasChildren: false,
-                color: null,
-                icon: null,
-              })
-            }
-            data-testid="new-family"
-            icon={<Plus size={16} aria-hidden="true" />}
-          >
-            Nueva familia
-          </Button>
-        </div>
+    <section className="catalog catalog--faceted">
+      <div className="mc-nav" data-testid="fam-tree">
+        {header}
 
         {isLoading ? (
-          <p className="catalog-empty">Cargando…</p>
+          <p className="mc-col-empty">Cargando…</p>
         ) : view.length === 0 ? (
-          <p className="catalog-empty" data-testid="families-empty">
+          <p className="mc-col-empty" data-testid="families-empty">
             Sin familias. Crea la primera.
           </p>
-        ) : filtered.length === 0 ? (
-          <p className="catalog-empty" data-testid="fam-empty">
-            Sin familias para la búsqueda.
-          </p>
         ) : (
-          <div className={`fam-layout${selectedNode ? ' has-panel' : ''}`}>
-            <div className="fam-tree" data-testid="fam-tree" ref={treeRef}>
-              {filtered.map((n) => (
-                <FamilyRow key={n.id} node={n} depth={0} parentId={null} actions={actions} />
-              ))}
-            </div>
-
-            {/* Panel de productos del nodo (I-13/D-11): ver, añadir aquí y mover. */}
-            {selectedNode && (
-              <aside className="fam-products-panel" data-testid="fam-products-panel">
-                <header className="fam-panel-head">
-                  <h4>
-                    {selectedNode.name}
-                    {selectedNode.isArchetype && <span className="fam-badge">Arquetipo</span>}
-                  </h4>
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => onOpenCatalogFamily?.(selectedNode.id)}
-                    data-testid="fam-panel-to-catalog"
-                  >
-                    Ver en Catálogo →
-                  </button>
-                </header>
-                {!selectedNode.isArchetype && (
-                  <label className="fam-subtree-toggle">
-                    <input
-                      type="checkbox"
-                      checked={includeSubtree}
-                      onChange={(e) => setIncludeSubtree(e.target.checked)}
-                      data-testid="fam-panel-subtree"
-                    />
-                    <span>Incluir subfamilias</span>
-                  </label>
-                )}
-                {panelProducts.length === 0 ? (
-                  <p className="catalog-empty" data-testid="fam-panel-empty">
-                    Sin productos {includeSubtree ? 'en el subárbol' : 'directos en este nodo'}.
-                  </p>
-                ) : (
-                  <ul className="fam-product-list" data-testid="fam-product-list">
-                    {panelProducts.map((p) => (
-                      <li key={p.id} className="fam-product-item" data-testid="fam-product-item">
-                        <span className="fam-product-name">{p.name}</span>
-                        <span className="fam-product-price">{fmtEur(Number(p.salePrice))}</span>
-                        <Select
-                          className="fam-product-move"
-                          value=""
-                          onChange={(value) => {
-                            if (value && value !== p.familyId)
-                              moveProductMut.mutate({ id: p.id, familyId: value });
-                          }}
-                          triggerLabel="Mover"
-                          options={[{ value: '', label: 'Mover a…' }, ...productMoveOptions]}
-                          ariaLabel={`Mover ${p.name} a otro nodo`}
-                          data-testid="fam-product-move"
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <div className="fam-panel-actions">
-                  <Button
-                    type="button"
-                    className="fam-panel-add"
-                    onClick={() =>
-                      setProductForm({ ...EMPTY_PRODUCT_FORM, familyId: selectedNode.id })
-                    }
-                    data-testid="fam-panel-add-product"
-                  >
-                    Añadir producto aquí
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="fam-panel-add-existing"
-                    onClick={() => setAddingExisting(true)}
-                    data-testid="fam-panel-add-existing"
-                  >
-                    Añadir productos existentes
-                  </Button>
+          <div className="mc-scroll">
+            {/* Fila de cabeceras a TODO el ancho: la línea inferior cruza también el área
+                vacía de la derecha (relleno flexible). */}
+            <div className="mc-headrow">
+              {columns.map((col) => (
+                <div className="mc-col-head" key={col.ownerId ?? '__root__'}>
+                  <span className="mc-col-title">{col.title}</span>
                 </div>
-              </aside>
-            )}
+              ))}
+              <span className="mc-headrow-fill" aria-hidden="true" />
+            </div>
+            <div className="mc-colsrow" data-testid="fam-cols">
+              {columns.map((col, colIndex) => {
+                const activeId = validPath[colIndex]?.id ?? null;
+                const isEmpty = col.families.length === 0 && col.products.length === 0;
+                return (
+                  <div className="mc-col" key={col.ownerId ?? '__root__'}>
+                    <ColumnBody>
+                      {col.families.map((fam) => (
+                        <NavFamilyRow
+                          key={fam.id}
+                          node={fam}
+                          active={fam.id === activeId}
+                          dotColor={fam.color ?? col.color}
+                          count={subtreeCount(fam)}
+                          onOpen={() => openFamily(colIndex, fam.id)}
+                          onAddChild={() => openNewFamily(fam.id)}
+                          onEdit={() =>
+                            setForm({
+                              id: fam.id,
+                              name: fam.name,
+                              parentId: fam.parentId,
+                              isArchetype: fam.isArchetype,
+                              hasChildren: fam.children.length > 0,
+                              color: fam.color,
+                              icon: fam.icon,
+                            })
+                          }
+                          onDelete={() => void onDelete(fam)}
+                        />
+                      ))}
+
+                      {col.products.length > 0 && (
+                        <div className="mc-prods" data-testid="fam-product-list">
+                          {col.products.map((p) => (
+                            <NavProductRow
+                              key={p.id}
+                              product={p}
+                              selected={p.id === selectedProductId}
+                              moveOptions={productMoveOptions}
+                              onSelect={() => setSelectedProductId(p.id)}
+                              onMove={(familyId) => moveProductMut.mutate({ id: p.id, familyId })}
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {isEmpty && (q !== '' || col.isArchetype) && (
+                        <p className="mc-col-empty" data-testid="fam-col-empty">
+                          {q ? 'Sin coincidencias.' : 'Sin productos.'}
+                        </p>
+                      )}
+                    </ColumnBody>
+
+                    {col.ownerId && (
+                      <div className="mc-col-foot">
+                        {!col.isArchetype && (
+                          <button
+                            type="button"
+                            className="mc-foot-btn"
+                            data-testid="fam-add-subfamily"
+                            onClick={() => openNewFamily(col.ownerId)}
+                          >
+                            <FolderPlus size={14} aria-hidden="true" />
+                            Subfamilia
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="mc-foot-btn"
+                          data-testid="fam-panel-add-product"
+                          onClick={() => {
+                            const owner = findNode(view, col.ownerId!);
+                            if (owner)
+                              setProductForm({ ...EMPTY_PRODUCT_FORM, familyId: owner.id });
+                          }}
+                        >
+                          <PackagePlus size={14} aria-hidden="true" />
+                          Producto
+                        </button>
+                        <button
+                          type="button"
+                          className="mc-foot-btn"
+                          data-testid="fam-panel-add-existing"
+                          onClick={() => {
+                            const owner = findNode(view, col.ownerId!);
+                            if (owner) setAddingExisting(owner);
+                          }}
+                        >
+                          <Package size={14} aria-hidden="true" />
+                          Existentes
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -909,17 +653,17 @@ export function FamiliesPage({
               ? formErrorMessage(createProductMut.error, 'No se pudo crear el producto.')
               : null
           }
-          title={`Nuevo producto en ${selectedNode?.name ?? 'el nodo'}`}
+          title={`Nuevo producto en ${productTarget?.name ?? 'el nodo'}`}
           primaryLabel={createProductMut.isPending ? 'Creando…' : 'Crear'}
         />
       )}
 
-      {addingExisting && selectedNode && (
+      {addingExisting && (
         <AddExistingProductsModal
-          targetFamilyId={selectedNode.id}
-          targetFamilyName={selectedNode.name}
+          targetFamilyId={addingExisting.id}
+          targetFamilyName={addingExisting.name}
           families={view}
-          onClose={() => setAddingExisting(false)}
+          onClose={() => setAddingExisting(null)}
         />
       )}
 
@@ -1055,4 +799,169 @@ export function FamiliesPage({
       )}
     </section>
   );
+}
+
+// Fila de familia (carpeta navegable): punto de color + nombre + ARQ + contador
+// + chevron. Las acciones (subfamilia / editar / borrar) ceden el sitio del
+// contador al pasar el ratón o en la fila activa.
+function NavFamilyRow({
+  node,
+  active,
+  dotColor,
+  count,
+  onOpen,
+  onAddChild,
+  onEdit,
+  onDelete,
+}: {
+  node: FamilyNode;
+  active: boolean;
+  dotColor: string | null;
+  count: number;
+  onOpen: () => void;
+  onAddChild: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = () => {
+    hoverTimer.current = setTimeout(onOpen, 170);
+  };
+  const handleMouseLeave = () => {
+    if (hoverTimer.current) {
+      clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+  };
+
+  return (
+    <div
+      className={`mc-row mc-row--fam${active ? ' is-active' : ''}`}
+      data-testid="fam-row"
+      data-fam-id={node.id}
+      role="button"
+      tabIndex={0}
+      aria-current={active}
+      onClick={onOpen}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+    >
+      <span
+        className="mc-dot"
+        style={dotColor ? { background: dotColor } : undefined}
+        aria-hidden="true"
+      />
+      <span className="mc-name">
+        <span className="mc-name-text fam-name">{node.name}</span>
+      </span>
+      <span className="mc-count" data-testid="fam-count">
+        {count} prod.
+      </span>
+      <span className="mc-fam-actions" onClick={(e) => e.stopPropagation()}>
+        {!node.isArchetype && (
+          <button
+            type="button"
+            className="mc-act"
+            data-testid="fam-add-child"
+            title="Añadir subfamilia"
+            aria-label={`Añadir subfamilia a ${node.name}`}
+            onClick={onAddChild}
+          >
+            <Plus size={15} aria-hidden="true" />
+          </button>
+        )}
+        <button
+          type="button"
+          className="mc-act"
+          title="Editar"
+          aria-label={`Editar ${node.name}`}
+          onClick={onEdit}
+        >
+          <Pencil size={15} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="mc-act mc-act--danger"
+          title="Borrar"
+          aria-label={`Borrar ${node.name}`}
+          onClick={onDelete}
+        >
+          <Trash2 size={15} aria-hidden="true" />
+        </button>
+      </span>
+      <ChevronRight className="mc-chev" size={16} aria-hidden="true" />
+    </div>
+  );
+}
+
+// Fila de producto (hoja): nombre + precio. El precio cede el sitio al selector
+// "Mover a…" al pasar el ratón.
+function NavProductRow({
+  product,
+  selected,
+  moveOptions,
+  onSelect,
+  onMove,
+}: {
+  product: Product;
+  selected: boolean;
+  moveOptions: { value: string; label: string }[];
+  onSelect: () => void;
+  onMove: (familyId: string) => void;
+}) {
+  return (
+    <div
+      className={`mc-row mc-row--prod${selected ? ' is-active' : ''}`}
+      data-testid="fam-product-item"
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+    >
+      <span className="mc-prod-name fam-product-name">{product.name}</span>
+      <span className="mc-prod-price">{fmtEur(Number(product.salePrice))}</span>
+      <span className="mc-prod-move" onClick={(e) => e.stopPropagation()}>
+        <Select
+          value=""
+          onChange={(value) => {
+            if (value && value !== product.familyId) onMove(value);
+          }}
+          triggerLabel="Mover"
+          options={[{ value: '', label: 'Mover a…' }, ...moveOptions]}
+          ariaLabel={`Mover ${product.name} a otro nodo`}
+          data-testid="fam-product-move"
+        />
+      </span>
+    </div>
+  );
+}
+
+// Elimina un nodo por id en cualquier nivel (recursivo, inmutable). Local: solo
+// la copia editable del árbol.
+function removeNodeLocal(tree: FamilyNode[], id: string): FamilyNode[] {
+  return tree
+    .filter((n) => n.id !== id)
+    .map((n) => ({ ...n, children: removeNodeLocal(n.children, id) }));
+}
+
+// Ruta de ids (raíz → nodo) hasta `id`, o null si no existe.
+function pathTo(tree: FamilyNode[], id: string): string[] | null {
+  for (const n of tree) {
+    if (n.id === id) return [n.id];
+    const sub = pathTo(n.children, id);
+    if (sub) return [n.id, ...sub];
+  }
+  return null;
 }

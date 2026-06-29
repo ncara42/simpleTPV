@@ -1,15 +1,4 @@
-import {
-  ArrowUpRight,
-  Circle,
-  Maximize2,
-  Minus,
-  MousePointer2,
-  Pencil,
-  Plus,
-  Slash,
-  Square,
-  X,
-} from 'lucide-react';
+import { ArrowUpRight, Circle, MousePointer2, Pencil, Slash, Square, X } from 'lucide-react';
 import {
   memo,
   type ReactNode,
@@ -35,6 +24,7 @@ import {
   bringToFront,
   DRAW_COLORS,
   DRAW_STROKE_WIDTH,
+  FREE_GAP,
   type FreeDraw,
   type FreeElement,
   type FreeLayout,
@@ -48,13 +38,14 @@ import {
   minimapClickToPan,
   minimapProjection,
   offscreenArrow,
+  type SnapGuide,
+  snapMovingRect,
 } from '../lib/free-geometry.js';
 import { useEnterAnimation } from '../lib/use-enter-animation.js';
 import { FreeMinimap } from './FreeMinimap.js';
 import { FreeNote } from './FreeNote.js';
 import { FreeShapeView } from './FreeShapeView.js';
 import { FreeText } from './FreeText.js';
-import { WidgetPalette } from './WidgetPalette.js';
 
 // Lienzo "edgeless" estilo Affine: los elementos viven en coordenadas de MUNDO (px) dentro de
 // un `world` con transform translate(pan)·scale(zoom) y transform-origin 0 0; el viewport
@@ -64,6 +55,7 @@ const ZOOM_MAX = 3;
 const ZOOM_STEP = 1.2;
 const PAN_THRESHOLD = 4; // px para distinguir pan de click
 const DRAG_THRESHOLD_PX = 4; // px para distinguir arrastre de un elemento de un click en su contenido
+const SNAP_PX = 8; // radio de imán en px de PANTALLA (se divide por el zoom para pasar a mundo)
 const FIT_PADDING = 48;
 // Tope de zoom al CENTRAR/AJUSTAR la vista al contenido: nunca acercar más del 85%, aunque el
 // contenido sea pequeño y cupiera más grande (deja aire alrededor). El zoom manual sí llega a ZOOM_MAX.
@@ -72,7 +64,10 @@ const WHEEL_ZOOM_SENSITIVITY = 0.002;
 const KEY_PAN = 48; // px de pan por flecha en el fondo
 const KEY_MOVE = 10; // px de mundo por flecha al mover un elemento enfocado
 const HISTORY_MAX = 50; // tope de la pila de deshacer
-const MINIMAP_SIZE = { width: 180, height: 130 };
+// Alto ≈ al del composer del asistente expandido (≈104px), su vecino abajo: así el minimapa no
+// lo sobresale (ambos anclados a `bottom: 1rem`). El ancho mayor da una caja apaisada acorde al
+// viewport (más ancho que alto); la proyección encaja el contenido por `contain`, sin deformar.
+const MINIMAP_SIZE = { width: 180, height: 104 };
 const MIN_SHAPE = 4; // px de mundo mínimos para crear una forma (evita formas de un clic)
 const NOTE_MIN_W = 160; // px de mundo mínimos al redimensionar una nota
 const NOTE_MIN_H = 120;
@@ -110,6 +105,8 @@ export interface CanvasMeta {
   drawOpen: boolean;
   /** Modo de interacción activo (select/pan/erase) → la barra resalta el botón. */
   mode: InteractionMode;
+  /** Porcentaje de zoom actual (ej. 100 = 100%). */
+  zoomPct: number;
 }
 
 /** API imperativa del lienzo expuesta a la barra inferior (el dock del dashboard). Las
@@ -127,6 +124,10 @@ export interface FreeBoardHandle {
   setMode: (mode: InteractionMode) => void;
   /** Snapshot de los widgets de catálogo disponibles para añadir (no presentes). */
   listWidgets: () => { id: string; label: string }[];
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetZoom: () => void;
+  fitZoom: () => void;
 }
 
 interface FreeBoardProps {
@@ -227,6 +228,13 @@ export function FreeBoard({
   const colorRef = useRef(drawColor);
   colorRef.current = drawColor;
   const dragSnapshot = useRef<FreeElement[] | null>(null);
+  // Estado del arrastre con IMÁN: posición CRUDA (sin snap) acumulada del elemento que se mueve. Se
+  // separa de la posición almacenada (ya con snap) para que el bloque pueda «despegarse» al alejarlo
+  // (si guardáramos la posición con snap, los deltas pequeños se perderían y quedaría pegado). Null
+  // salvo durante un arrastre con ratón; el teclado mueve sin imán.
+  const dragRaw = useRef<{ id: string; x: number; y: number } | null>(null);
+  // Guías de alineación visibles durante el arrastre (se limpian al soltar).
+  const [guides, setGuides] = useState<SnapGuide[]>([]);
   const idCounter = useRef(0);
 
   const newId = useCallback((prefix: string): string => {
@@ -571,8 +579,36 @@ export function FreeBoard({
   const onDragStart = useCallback((): void => {
     dragSnapshot.current = elsRef.current;
   }, []);
+  // Arranca un arrastre con IMÁN (solo ratón): fija la posición cruda inicial del bloque movido.
+  const startMoveEl = useCallback((id: string): void => {
+    const el = elsRef.current.find((e) => e.id === id);
+    if (el) dragRaw.current = { id, x: el.x, y: el.y };
+  }, []);
+
   const moveEl = useCallback((id: string, dx: number, dy: number): void => {
-    setEls((prev) => prev.map((e) => (e.id === id ? { ...e, x: e.x + dx, y: e.y + dy } : e)));
+    const raw = dragRaw.current;
+    // Sin arrastre de ratón activo (p. ej. flechas del teclado): desplazamiento directo, sin imán.
+    if (!raw || raw.id !== id) {
+      setEls((prev) => prev.map((e) => (e.id === id ? { ...e, x: e.x + dx, y: e.y + dy } : e)));
+      return;
+    }
+    // Acumula sobre la posición CRUDA y deriva la posición con imán (alinear/pegar a vecinos).
+    raw.x += dx;
+    raw.y += dy;
+    const el = elsRef.current.find((e) => e.id === id);
+    if (!el) return;
+    const others = elsRef.current
+      .filter((e) => e.id !== id && (e.kind === 'widget' || e.kind === 'note'))
+      .map((e) => ({ x: e.x, y: e.y, w: e.w, h: e.h }));
+    const threshold = SNAP_PX / (zoomRef.current || 1);
+    const res = snapMovingRect(
+      { x: raw.x, y: raw.y, w: el.w, h: el.h },
+      others,
+      FREE_GAP,
+      threshold,
+    );
+    setEls((prev) => prev.map((e) => (e.id === id ? { ...e, x: res.x, y: res.y } : e)));
+    setGuides(res.guides);
   }, []);
   // Redimensiona una nota desde su tirador (esquina inf-derecha). Reusa onDragStart/commitMove
   // para el snapshot de deshacer y la persistencia (mismo ciclo que mover).
@@ -586,6 +622,8 @@ export function FreeBoard({
     );
   }, []);
   const commitMove = useCallback((): void => {
+    dragRaw.current = null;
+    setGuides([]);
     const snap = dragSnapshot.current ?? elsRef.current;
     dragSnapshot.current = null;
     pushHistory(snap);
@@ -742,8 +780,25 @@ export function FreeBoard({
       setMode: onSetMode,
       listWidgets: () =>
         availableWidgets(elsRef.current).map((id) => ({ id, label: itemLabel(id) })),
+      zoomIn: () => zoomAtCenter(ZOOM_STEP),
+      zoomOut: () => zoomAtCenter(1 / ZOOM_STEP),
+      resetZoom: reset100,
+      fitZoom: fitToContent,
     }),
-    [onAddWidget, onAddNote, onAddText, toggleDraw, undo, redo, onArrange, onSetMode, itemLabel],
+    [
+      onAddWidget,
+      onAddNote,
+      onAddText,
+      toggleDraw,
+      undo,
+      redo,
+      onArrange,
+      onSetMode,
+      itemLabel,
+      zoomAtCenter,
+      reset100,
+      fitToContent,
+    ],
   );
   useEffect(() => {
     onCanvasMeta?.({
@@ -751,8 +806,9 @@ export function FreeBoard({
       canRedo: future.length > 0,
       drawOpen,
       mode: interactionMode,
+      zoomPct,
     });
-  }, [past.length, future.length, drawOpen, interactionMode, onCanvasMeta]);
+  }, [past.length, future.length, drawOpen, interactionMode, zoomPct, onCanvasMeta]);
 
   // Entrada con rebote escalonado de los bloques (widget/nota) recién añadidos —a mano o por el
   // agente—. Las formas/dibujos/textos a mano se quedan donde se trazan (sin rebote).
@@ -880,6 +936,7 @@ export function FreeBoard({
               interactionMode={interactionMode}
               label={labelFor(el)}
               onDragStart={onDragStart}
+              onMoveStart={startMoveEl}
               onMove={moveEl}
               onResize={resizeEl}
               onCommit={commitMove}
@@ -896,6 +953,37 @@ export function FreeBoard({
               ) : null}
             </ElementView>
           ))}
+
+          {/* Guías del IMÁN (alineación/pegado) durante el arrastre. En coords de MUNDO: van dentro
+              de la capa escalada, así que el grosor se compensa con 1/zoom para verse ~1.5px en
+              pantalla a cualquier zoom. */}
+          {guides.map((g, i) =>
+            g.axis === 'x' ? (
+              <div
+                key={`g${i}`}
+                className="dash-free-guide"
+                aria-hidden="true"
+                style={{
+                  left: g.pos,
+                  top: g.start,
+                  width: 1.5 / view.zoom,
+                  height: g.end - g.start,
+                }}
+              />
+            ) : (
+              <div
+                key={`g${i}`}
+                className="dash-free-guide"
+                aria-hidden="true"
+                style={{
+                  left: g.start,
+                  top: g.pos,
+                  height: 1.5 / view.zoom,
+                  width: g.end - g.start,
+                }}
+              />
+            ),
+          )}
 
           {/* Vista previa del elemento en curso de dibujo. */}
           {draft && (
@@ -915,35 +1003,6 @@ export function FreeBoard({
           )}
         </div>
 
-        {/* Estado vacío (p. ej. preset «Personalizado»): "+" central que abre el buscador de
-            widgets para componer el lienzo desde cero. */}
-        {els.length === 0 && (
-          <div className="dash-free-empty" data-testid="dash-free-empty">
-            <button
-              type="button"
-              className="dash-free-empty-add"
-              data-testid="dash-free-empty-add"
-              aria-label="Añadir widget"
-              onClick={() => setEmptyPaletteOpen(true)}
-            >
-              <Plus size={30} aria-hidden="true" />
-            </button>
-            <p className="dash-free-empty-hint">Lienzo en blanco · añade los widgets que quieras</p>
-            {emptyPaletteOpen && (
-              <WidgetPalette
-                variant="center"
-                items={available}
-                label={itemLabel}
-                onPick={(id) => {
-                  onAddWidget(id);
-                  setEmptyPaletteOpen(false);
-                }}
-                onClose={() => setEmptyPaletteOpen(false)}
-              />
-            )}
-          </div>
-        )}
-
         {/* Flecha de orientación off-screen: persiste mientras el contenido no se vea. */}
         {arrow && (
           <button
@@ -961,32 +1020,6 @@ export function FreeBoard({
         {projection && (
           <FreeMinimap projection={projection} size={MINIMAP_SIZE} onNavigate={onMinimapNavigate} />
         )}
-
-        {/* Controles de zoom (abajo a la derecha del lienzo). */}
-        <div className="dash-free-zoom" data-testid="dash-free-zoom">
-          <button
-            type="button"
-            onClick={() => zoomAtCenter(1 / ZOOM_STEP)}
-            aria-label="Alejar"
-            title="Alejar"
-          >
-            <Minus size={16} aria-hidden="true" />
-          </button>
-          <button type="button" onClick={reset100} className="dash-free-zoom-pct" title="Zoom 100%">
-            {zoomPct}%
-          </button>
-          <button
-            type="button"
-            onClick={() => zoomAtCenter(ZOOM_STEP)}
-            aria-label="Acercar"
-            title="Acercar"
-          >
-            <Plus size={16} aria-hidden="true" />
-          </button>
-          <button type="button" onClick={() => fitToContent()} aria-label="Ajustar" title="Ajustar">
-            <Maximize2 size={15} aria-hidden="true" />
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -998,6 +1031,7 @@ interface ElementViewProps {
   interactionMode: InteractionMode;
   label: string;
   onDragStart: () => void;
+  onMoveStart: (id: string) => void;
   onMove: (id: string, dx: number, dy: number) => void;
   onResize: (id: string, dw: number, dh: number) => void;
   onCommit: () => void;
@@ -1018,6 +1052,7 @@ const ElementView = memo(function ElementView({
   interactionMode,
   label,
   onDragStart,
+  onMoveStart,
   onMove,
   onResize,
   onCommit,
@@ -1077,6 +1112,7 @@ const ElementView = memo(function ElementView({
       // widget recibe su evento.
       if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < DRAG_THRESHOLD_PX) return;
       onDragStart();
+      onMoveStart(el.id); // activa el imán para este arrastre (posición cruda de partida)
       e.currentTarget.setPointerCapture(e.pointerId); // ahora sí: arrastre real
       d.moved = true;
     }

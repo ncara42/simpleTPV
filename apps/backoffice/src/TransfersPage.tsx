@@ -7,7 +7,7 @@ export function TransfersPage() {
   usePageHeader('Traspasos', 'Movimientos de stock entre tiendas');
 
   return (
-    <section className="catalog" data-testid="transfers-page">
+    <section className="transfers-page" data-testid="transfers-page">
       <TransfersSection />
     </section>
   );

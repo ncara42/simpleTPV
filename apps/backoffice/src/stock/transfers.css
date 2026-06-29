@@ -1,0 +1,834 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   TRASPASOS v2 — tabla agrupada por estado con detalle EN LÍNEA (acordeón).
+   Reutiliza el carril y el lenguaje facetado del Catálogo/Existencias (clases
+   `.cat-*` de inventory-card.css). Cada fila lleva referencia (TR-XXXXXX) + nota,
+   ruta, líneas, fecha y píldora de unidades (recibidas/enviadas) teñida solo cuando
+   importa. Al pulsar una fila se despliega su detalle bajo ella (meta, productos,
+   incidencia, línea de tiempo y acción real). Paleta vía tokens --ui-* (dark-aware):
+   draft/sent/closed=neutro · received=success · incid=danger.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Encaje en el área de contenido (card full-height, como Ventas/Inventario) ── */
+.bo-main--surface:has(.transfers-page) {
+  padding: 0.4rem 1.25rem 1.5rem;
+}
+.transfers-page {
+  /* Offset = topbar (60px) + padding-top (0.4rem) + padding-bottom (1.5rem). */
+  height: calc(100dvh - 60px - 1.9rem);
+  display: flex;
+  flex-direction: column;
+}
+.tr-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.04),
+    0 4px 24px -8px rgb(0 0 0 / 0.1);
+  /* `clip` aísla el overflow de los scrollers internos sin crear un scroller de página. */
+  overflow: clip;
+  contain: paint;
+}
+
+/* ─── Tabla: scroller a pantalla completa (mismo patrón que el Catálogo `.cat-main`) ──
+   Sin barra de recuento/orden: la tabla arranca directa en el thead, igual que Inventario. */
+.tr-main {
+  position: relative;
+  overflow-y: auto;
+  border-left: 1px solid var(--ui-border);
+  /* Barra de scroll oculta (el scroll sigue activo: rueda/trackpad/teclado). */
+  scrollbar-width: none;
+}
+.tr-main::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── Carril: botón de limpiar filtros (el resto reutiliza `.cat-*`) ───────────── */
+.tr-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 2.1rem;
+  padding-inline: 0.75rem;
+  flex-shrink: 0;
+  margin-top: 0.4rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color var(--ui-motion-fast) var(--ui-ease),
+    border-color var(--ui-motion-fast) var(--ui-ease);
+}
+.tr-clear:hover {
+  color: var(--ui-danger);
+  border-color: color-mix(in srgb, var(--ui-danger) 40%, var(--ui-border));
+}
+.tr-clear:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* ─── Tabla agrupada ──────────────────────────────────────────────────────────── */
+.tr-table {
+  width: 100%;
+  /* Floor modesto: por debajo el scroller hace scroll horizontal en vez de recortar
+     columnas (la columna Unidades nunca queda cortada por el `clip` de la card). */
+  min-width: 30rem;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  table-layout: fixed;
+}
+/* Traspaso y Ruta son flexibles (sin width): se reparten el espacio restante a partes
+   iguales — Ruta legible en pantallas anchas y nunca desbordan. Solo las columnas
+   numéricas llevan ancho fijo. */
+.tr-col-lines {
+  width: 4rem;
+}
+.tr-col-created {
+  width: 5.5rem;
+}
+.tr-col-units {
+  /* Algo más ancha: el contador "15 / 16" (con espacios) necesita aire. */
+  width: 6.75rem;
+}
+.tr-col-chat {
+  width: 3.5rem;
+}
+
+/* Botón de comentarios (chat) al final de la fila: verde si todo OK, rojo si hubo
+   incidencia. Abre el pop-up de chat. */
+.tr-cell-chat {
+  text-align: center;
+  padding-right: 0.7rem;
+}
+.tr-chat-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.95rem;
+  height: 1.95rem;
+  border: 1px solid color-mix(in srgb, var(--ui-success) 35%, var(--ui-border));
+  border-radius: 50%;
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    transform var(--ui-motion-fast) var(--ui-ease);
+}
+.tr-chat-btn:hover {
+  background: color-mix(in srgb, var(--ui-success) 18%, var(--ui-surface));
+  transform: translateY(-1px);
+}
+.tr-chat-btn.is-incid {
+  border-color: color-mix(in srgb, var(--ui-danger) 35%, var(--ui-border));
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+}
+.tr-chat-btn.is-incid:hover {
+  background: color-mix(in srgb, var(--ui-danger) 18%, var(--ui-surface));
+}
+.tr-chat-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.tr-thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--ui-surface);
+  padding: 0.55rem 0.9rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ui-text-soft);
+  text-align: left;
+  border-bottom: 1px solid var(--ui-border);
+  white-space: nowrap;
+}
+/* `th.tr-th-name` gana a `.tr-thead th` para que la cabecera alinee con el texto de fila.
+   Mismo sangrado que el Catálogo (.cat-th-name) para igualar columnas entre vistas. */
+.tr-thead th.tr-th-name {
+  padding-left: 3.3rem;
+}
+/* `.tr-thead th.tr-th-num` (0,1,2) gana a `.tr-thead th` (0,1,1) para alinear a la
+   derecha las cabeceras numéricas (Líneas, Unidades) con sus celdas. */
+.tr-thead th.tr-th-num {
+  text-align: right;
+}
+
+/* Cabecera de grupo: nombre · nº · total de uds. Plegable. Mismo patrón que el
+   Catálogo/Existencias: sticky sobre el <td> (top ≈ alto del thead), caret en el
+   canalón izquierdo (1.05rem) y contenido sangrado a 3.3rem. */
+.tr-group-head {
+  cursor: pointer;
+}
+.tr-group-cell {
+  padding: 0;
+  position: sticky;
+  top: 1.95rem;
+  z-index: 1;
+  background: var(--ui-surface-subtle);
+  /* Contorno inferior bien visible: `--ui-border-strong` casi no se distinguía del
+     fondo, así que el borde de abajo usa un hairline oscuro real (theme-aware) para
+     delimitar siempre la cabecera de grupo (Borradores, Cerrados…). */
+  box-shadow:
+    0 -1px 0 0 var(--ui-border),
+    0 1px 0 0 color-mix(in srgb, var(--ui-text) 15%, transparent);
+}
+.tr-group-head:hover .tr-group-cell {
+  background: color-mix(in srgb, var(--ui-surface-subtle) 70%, var(--ui-border));
+}
+.tr-group-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.1rem 0.5rem 3.3rem;
+}
+.tr-group-caret {
+  position: absolute;
+  left: 1.05rem;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-shrink: 0;
+  color: var(--ui-text-soft);
+  transition: transform var(--ui-motion-fast) var(--ui-ease);
+}
+.tr-group-caret.is-collapsed {
+  transform: translateY(-50%) rotate(-90deg);
+}
+.tr-group-name {
+  font-size: 0.9rem;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+}
+.tr-group-count {
+  font-size: 0.82rem;
+  color: var(--ui-text-soft);
+  letter-spacing: -0.01em;
+}
+.tr-group-units {
+  margin-left: auto;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+
+/* Filas */
+.tr-row {
+  cursor: pointer;
+  transition: background var(--ui-motion-fast) var(--ui-ease);
+}
+.tr-row:hover {
+  background: var(--ui-surface-subtle);
+}
+.tr-row.is-expanded {
+  background: var(--ui-brand-soft);
+}
+/* Fila con incidencia en la recepción: mismo tinte rojo que Existencias
+   (.ex-row.is-out). Va tras hover/expanded para ganar también en esos estados. */
+.tr-row.is-incid {
+  background: color-mix(in srgb, var(--ui-danger-soft) 55%, var(--ui-surface));
+}
+.tr-row.is-incid:hover {
+  background: color-mix(in srgb, var(--ui-danger-soft) 80%, var(--ui-surface));
+}
+.tr-row > td {
+  /* Misma altura compacta que las filas de Inventario/Existencias (.cat-row td / .ex-row td). */
+  height: 2.75rem;
+  padding: 0 0.9rem;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text);
+}
+/* Celda Traspaso: mismo canalón que el Catálogo (.cat-row .cat-cell-name). El caret de
+   expansión va en absoluto dentro del canalón izquierdo (1.05rem, alineado con el caret
+   de la cabecera de grupo) y el contenido arranca a 3.3rem. El selector `.tr-row > td`
+   con la clase (mayor especificidad que `.tr-row > td`) fija la sangría y `position:
+   relative` ancla el caret, así nunca se solapa con el texto. */
+.tr-row > td.tr-cell-name {
+  position: relative;
+  padding-left: 3.3rem;
+}
+.tr-cell-name-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.tr-row-caret {
+  position: absolute;
+  left: 1.05rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ui-text-soft);
+  transition: transform 0.15s ease;
+}
+.tr-row-caret.is-expanded {
+  transform: translateY(-50%) rotate(90deg);
+}
+.tr-name-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.tr-ref {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tr-note {
+  font-size: 0.74rem;
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tr-cell-route {
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ui-text-muted);
+  font-size: 0.85rem;
+}
+.tr-cell-lines {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+  font-size: 0.85rem;
+}
+.tr-cell-created {
+  color: var(--ui-text-soft);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.tr-cell-units {
+  text-align: right;
+}
+
+/* Píldora de unidades: el color SOLO aparece cuando importa (recibido / incidencia). */
+.tr-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.9rem;
+  height: 1.55rem;
+  padding: 0 0.5rem;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.tr-badge--neutral {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.tr-badge--received {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.tr-badge--incid {
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+}
+
+/* Estado vacío */
+.tr-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--ui-text-soft);
+}
+.tr-empty-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+
+/* ─── Detalle en línea (acordeón bajo la fila) ─────────────────────────────────── */
+.tr-detail-cell {
+  padding: 0;
+  background: var(--ui-surface-subtle);
+  border-bottom: 1px solid var(--ui-border);
+}
+.tr-detail {
+  /* Padding inferior = al superior (1.15rem) para que el último bloque (Revisión de
+     recepción) no quede con más aire por abajo que el ritmo del resto. */
+  padding: 1.15rem 1.5rem;
+  border-left: 3px solid var(--ui-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+.tr-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.85rem 1.1rem;
+}
+.tr-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.tr-meta-label {
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-soft);
+}
+.tr-meta-value {
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--ui-text);
+}
+.tr-detail-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1.1rem 1.6rem;
+  align-items: start;
+}
+.tr-detail-col {
+  min-width: 0;
+}
+.tr-section-title {
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-soft);
+  margin: 0 0 0.5rem;
+}
+.tr-lines {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  overflow: hidden;
+  background: var(--ui-surface);
+}
+.tr-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.tr-line-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  min-width: 0;
+}
+.tr-line-name {
+  font-size: 0.81rem;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tr-line-sku {
+  font-size: 0.71rem;
+  color: var(--ui-text-soft);
+  font-family: var(--ui-font-mono, "Geist Mono", monospace);
+}
+.tr-line-right {
+  font-size: 0.81rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text);
+  white-space: nowrap;
+}
+.tr-line-right.is-short {
+  color: var(--ui-danger);
+}
+.tr-line-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.75rem;
+  background: var(--ui-surface-subtle);
+}
+.tr-line-total-label {
+  font-size: 0.81rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.tr-line-total-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.tr-incid {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--ui-radius-md);
+  background: color-mix(in srgb, var(--ui-danger) 9%, var(--ui-surface));
+  color: var(--ui-danger);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-danger) 28%, transparent);
+  font-size: 0.77rem;
+  font-weight: 500;
+}
+.tr-incid svg {
+  flex-shrink: 0;
+}
+
+/* ─── Revisión de recepción: incidencias/comentarios + fotos ──────────────────── */
+/* Vive bajo «Productos del traspaso» (misma columna) y replica su espaciado: margen
+   superior = al ritmo del detalle (1.15rem) y, en flujo de bloque normal, el h4 deja
+   sus 0.5rem bajo el título IGUAL que «Productos» (no usamos `flex gap`, que se
+   sumaba al margen del h4 y dejaba el título con más aire que el de Productos). */
+.tr-review {
+  margin-top: 1.15rem;
+}
+.tr-review-pending {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ui-text-soft);
+}
+/* Estado «todo perfecto»: píldora verde con tick. */
+.tr-review-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  align-self: flex-start;
+  /* Misma altura y radio que la píldora de incidencias / botón de mensajes. */
+  height: 2.25rem;
+  padding: 0 0.85rem 0 0.55rem;
+  border-radius: var(--ui-radius-sm);
+  background: color-mix(in srgb, var(--ui-success) 10%, var(--ui-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-success) 28%, transparent);
+  color: var(--ui-success);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.tr-review-tick {
+  display: inline-grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: var(--ui-success);
+  color: #fff;
+  flex-shrink: 0;
+}
+/* Resumen de incidencias (el detalle por línea + fotos vive en el chat). */
+.tr-review-bad {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  align-self: flex-start;
+  /* Misma altura que el CTA «Nuevo traspaso» (2.25rem) y mismo radio que el botón
+     «Ver N mensajes» (--ui-radius-sm). */
+  height: 2.25rem;
+  padding: 0 0.85rem;
+  border-radius: var(--ui-radius-sm);
+  background: color-mix(in srgb, var(--ui-danger) 9%, var(--ui-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-danger) 28%, transparent);
+  color: var(--ui-danger);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.tr-review-bad svg {
+  flex-shrink: 0;
+}
+/* Fila: la píldora de incidencias + el botón de mensajes a su lado (fuera de la píldora). */
+.tr-review-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+/* Botón «Ver N mensajes» junto al recuento de incidencias: abre el chat. */
+.tr-review-chat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  /* Misma altura (2.25rem) y radio (--ui-radius-sm) compartido con la píldora. Color
+     neutro: vale tanto para incidencias (rojo al lado) como para «Solucionado» (verde). */
+  height: 2.25rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    border-color var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+.tr-review-chat:hover {
+  border-color: var(--ui-brand);
+  color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+}
+.tr-review-chat:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.tr-review-chat svg {
+  flex-shrink: 0;
+}
+.tr-review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.tr-review-item {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--ui-radius-md);
+  background: color-mix(in srgb, var(--ui-danger) 8%, var(--ui-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-danger) 24%, transparent);
+}
+.tr-review-ico {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  color: var(--ui-danger);
+}
+.tr-review-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.tr-review-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.tr-review-prod {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.tr-review-qty {
+  font-size: 0.77rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+.tr-review-qty.is-short {
+  color: var(--ui-danger);
+  font-weight: 600;
+}
+.tr-review-note {
+  font-size: 0.79rem;
+  color: var(--ui-text-muted);
+}
+
+/* Galería de fotos de la recepción */
+.tr-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  /* Separación respecto al bloque de estado (antes la daba el `gap` del contenedor). */
+  margin-top: 0.6rem;
+}
+.tr-photo {
+  width: 4.5rem;
+  height: 4.5rem;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  overflow: hidden;
+  background: var(--ui-surface);
+  cursor: pointer;
+  transition:
+    transform var(--ui-motion-fast) var(--ui-ease),
+    box-shadow var(--ui-motion-fast) var(--ui-ease);
+}
+.tr-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.tr-photo:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -4px rgb(0 0 0 / 0.25);
+}
+.tr-photo:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.tr-photos-empty {
+  margin: 0.6rem 0 0;
+  font-size: 0.79rem;
+  color: var(--ui-text-soft);
+}
+/* Lightbox de foto a tamaño grande */
+.tr-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: rgb(0 0 0 / 0.72);
+  cursor: zoom-out;
+}
+.tr-lightbox img {
+  max-width: min(92vw, 60rem);
+  max-height: 88vh;
+  border-radius: var(--ui-radius-md);
+  box-shadow: 0 20px 60px -12px rgb(0 0 0 / 0.6);
+}
+
+/* Línea de tiempo del traspaso */
+.tr-timeline {
+  display: flex;
+  flex-direction: column;
+}
+.tr-tl-step {
+  display: flex;
+  gap: 0.7rem;
+}
+.tr-tl-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+}
+.tr-tl-dot {
+  display: inline-grid;
+  place-items: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.tr-tl-dot--done {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-success) 30%, transparent);
+}
+.tr-tl-dot--ok {
+  background: var(--ui-success);
+  color: #fff;
+}
+.tr-tl-dot--transit {
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-warning) 30%, transparent);
+}
+.tr-tl-dot--incid {
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-danger) 30%, transparent);
+}
+.tr-tl-dot--pending {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-soft);
+  box-shadow: inset 0 0 0 1px var(--ui-border);
+}
+.tr-tl-line {
+  width: 2px;
+  flex: 1;
+  min-height: 0.85rem;
+  background: var(--ui-border);
+}
+.tr-tl-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  padding-bottom: 0.75rem;
+}
+.tr-tl-label {
+  font-size: 0.81rem;
+  font-weight: 500;
+  color: var(--ui-text);
+}
+.tr-tl-when {
+  font-size: 0.71rem;
+  color: var(--ui-text-soft);
+}
+
+/* Acción real (enviar/recibir/cerrar) dentro del detalle */
+.tr-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.tr-detail-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.3rem;
+  padding: 0 0.95rem;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-primary);
+  color: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--ui-motion-fast) var(--ui-ease);
+}
+.tr-detail-btn:hover {
+  background: var(--ui-primary-hover, var(--ui-primary));
+  filter: brightness(0.97);
+}
+.tr-detail-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+.tr-detail-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tr-row,
+  .tr-clear,
+  .tr-group-caret,
+  .tr-row-caret,
+  .tr-photo {
+    transition: none;
+  }
+}
+
+/* En pantallas estrechas el carril pasa arriba (igual que Catálogo/Existencias). */
+@media (max-width: 860px) {
+  .tr-main {
+    border-left: none;
+  }
+}

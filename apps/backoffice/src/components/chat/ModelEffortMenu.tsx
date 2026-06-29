@@ -1,3 +1,5 @@
+import './ModelEffortMenu.css';
+
 import { Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 

@@ -6,7 +6,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use simpletpv_auth::Role;
 use simpletpv_domain::customers::model::Customer;
-use simpletpv_domain::customers::{service, CreateCustomer, UpdateCustomer};
+use simpletpv_domain::customers::{service, CreateCustomer, CustomerLedgerRow, UpdateCustomer};
 use uuid::Uuid;
 
 use crate::error::ApiError;
@@ -21,6 +21,18 @@ pub async fn list(
 ) -> Result<Json<Vec<Customer>>, ApiError> {
     user.require_role(&MGMT_ROLES)?;
     Ok(Json(service::list(state.db(), user.organization_id).await?))
+}
+
+/// `GET /customers/ledger` — agregado de cartera por cliente (saldo, vencido,
+/// facturado 12m, nº de pedidos, último pedido). Alimenta la ficha maestro-detalle.
+pub async fn ledger(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> Result<Json<Vec<CustomerLedgerRow>>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    Ok(Json(
+        service::ledger(state.db(), user.organization_id).await?,
+    ))
 }
 
 pub async fn create(

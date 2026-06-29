@@ -16,6 +16,15 @@ serde.workspace = true
 rust_decimal.workspace = true
 serde_json = "1"
 sha2.workspace = true
+# QR de cotejo VERI*FACTU en el documento fiscal (#156).
+qrcode.workspace = true
+# Parseo del XML de respuesta de la AEAT (#156).
+quick-xml.workspace = true
+# Cliente SOAP/mTLS hacia el servicio web de la AEAT (#156, Fase 4). rustls + identidad
+# de cliente (PEM); sin native-tls (coherente con el resto del stack).
+reqwest.workspace = true
+# Cifrado en reposo del certificado de cliente (#156, Fase 8): AES-256-GCM.
+aes-gcm.workspace = true
 time.workspace = true
 time-tz.workspace = true
 tracing.workspace = true

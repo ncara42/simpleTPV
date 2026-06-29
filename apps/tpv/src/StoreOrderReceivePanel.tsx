@@ -2,11 +2,12 @@ import { ApiError, type StoreOrder } from '@simpletpv/auth';
 import { Alert, Button, DataTable, Select } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Clock, PackageCheck, X } from 'lucide-react';
+import { Check, Clock, MessageCircle, PackageCheck, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { listStores } from './lib/sales.js';
 import { listIncomingStoreOrders, receiveStoreOrder } from './lib/store-orders.js';
+import { StoreOrderChatModal } from './StoreOrderChatModal.js';
 
 interface LineInput {
   received: string;
@@ -23,6 +24,8 @@ export function StoreOrderReceivePanel() {
   const [lines, setLines] = useState<Record<string, LineInput>>({});
   const [done, setDone] = useState(false);
   const [scan, setScan] = useState('');
+  // Chat (pop-up) del pedido abierto desde el botón de comentarios de la fila.
+  const [chatOrder, setChatOrder] = useState<StoreOrder | null>(null);
   // Cabecera del panel (buscador + filtro de estado), como las tablas del admin.
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -60,6 +63,14 @@ export function StoreOrderReceivePanel() {
     setLines(init);
   }
 
+  // Parche inmutable de una línea, preservando el resto de campos (cantidad/nota).
+  function patchLine(id: string, patch: Partial<LineInput>) {
+    setLines((prev) => ({
+      ...prev,
+      [id]: { received: '', note: '', ...prev[id], ...patch },
+    }));
+  }
+
   function bumpScannedLine() {
     const term = scan.trim().toLowerCase();
     if (!selected || term.length === 0) return;
@@ -70,13 +81,7 @@ export function StoreOrderReceivePanel() {
         l.productName?.toLowerCase().includes(term),
     );
     if (!line) return;
-    setLines((prev) => ({
-      ...prev,
-      [line.id]: {
-        received: String(Number(prev[line.id]?.received ?? 0) + 1),
-        note: prev[line.id]?.note ?? '',
-      },
-    }));
+    patchLine(line.id, { received: String(Number(lines[line.id]?.received ?? 0) + 1) });
     setScan('');
   }
 
@@ -90,6 +95,18 @@ export function StoreOrderReceivePanel() {
     const hh = String(d.getUTCHours()).padStart(2, '0');
     const min = String(d.getUTCMinutes()).padStart(2, '0');
     return `${dd}/${mm} ${hh}:${min}`;
+  }
+
+  // ¿Incidencia abierta? Recibido/cerrado con faltante o nota y aún sin resolver.
+  function orderIncidentOpen(o: StoreOrder): boolean {
+    const showRecv = o.status === 'RECEIVED' || o.status === 'CLOSED';
+    if (!showRecv || o.incidentResolvedAt) return false;
+    return o.lines.some((l) => {
+      const recv = l.quantityReceived == null ? null : Number(l.quantityReceived);
+      const short = recv != null && recv < Number(l.quantitySent);
+      const note = (l.discrepancyNote ?? '').trim() !== '';
+      return short || note;
+    });
   }
 
   // Filtro de la cabecera: por texto (origen/fecha/nº líneas) y por estado.
@@ -181,18 +198,31 @@ export function StoreOrderReceivePanel() {
                 key: 'action',
                 header: '',
                 align: 'right',
-                render: (t) =>
-                  t.status !== 'RECEIVED' ? (
+                render: (t) => (
+                  <span className="store-order-actions">
+                    {t.status !== 'RECEIVED' && (
+                      <button
+                        type="button"
+                        className="link-btn link-btn--receive"
+                        onClick={() => openOrder(t)}
+                        data-testid="store-order-open"
+                      >
+                        <PackageCheck size={15} strokeWidth={2.25} aria-hidden="true" />
+                        Recibir
+                      </button>
+                    )}
                     <button
                       type="button"
-                      className="link-btn link-btn--receive"
-                      onClick={() => openOrder(t)}
-                      data-testid="store-order-open"
+                      className="store-order-chat-btn"
+                      onClick={() => setChatOrder(t)}
+                      title="Comentarios con central"
+                      aria-label="Comentarios con central"
+                      data-testid="store-order-chat-open"
                     >
-                      <PackageCheck size={15} strokeWidth={2.25} aria-hidden="true" />
-                      Recibir
+                      <MessageCircle size={16} aria-hidden="true" />
                     </button>
-                  ) : null,
+                  </span>
+                ),
               },
             ]}
           />
@@ -261,12 +291,7 @@ export function StoreOrderReceivePanel() {
                             type="number"
                             min={0}
                             value={lines[l.id]?.received ?? ''}
-                            onChange={(e) =>
-                              setLines((prev) => ({
-                                ...prev,
-                                [l.id]: { received: e.target.value, note: prev[l.id]?.note ?? '' },
-                              }))
-                            }
+                            onChange={(e) => patchLine(l.id, { received: e.target.value })}
                             data-testid="store-order-received-input"
                             className="recv-input recv-input--num"
                           />
@@ -276,15 +301,7 @@ export function StoreOrderReceivePanel() {
                             type="text"
                             placeholder="(opcional)"
                             value={lines[l.id]?.note ?? ''}
-                            onChange={(e) =>
-                              setLines((prev) => ({
-                                ...prev,
-                                [l.id]: {
-                                  received: prev[l.id]?.received ?? '',
-                                  note: e.target.value,
-                                },
-                              }))
-                            }
+                            onChange={(e) => patchLine(l.id, { note: e.target.value })}
                             data-testid="store-order-note-input"
                             className="recv-input"
                           />
@@ -294,6 +311,11 @@ export function StoreOrderReceivePanel() {
                   </tbody>
                 </table>
               </div>
+
+              <p className="recv-hint">
+                ¿Algo roto o incompleto? Cuéntaselo a central con fotos en{' '}
+                <strong>Comentarios</strong> (botón de la lista).
+              </p>
 
               {receiveMutation.isError && (
                 <p className="recv-error" data-testid="transfer-error">
@@ -324,6 +346,16 @@ export function StoreOrderReceivePanel() {
             </footer>
           </div>
         </div>
+      )}
+
+      {chatOrder && (
+        <StoreOrderChatModal
+          orderId={chatOrder.id}
+          title="Comentarios con central"
+          subtitle={`Central · ${fmt(chatOrder.sentAt ?? chatOrder.createdAt)}`}
+          incidentOpen={orderIncidentOpen(chatOrder)}
+          onClose={() => setChatOrder(null)}
+        />
       )}
 
       {done && (

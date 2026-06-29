@@ -29,28 +29,28 @@ pub struct OrgContext {
 /// Catálogo de widgets del dashboard (espejo de `WIDGET_LABELS` en
 /// `apps/backoffice/src/widgets/registry.ts`). El LLM usa estos ids en `add_widget`.
 const WIDGET_CATALOG: &[(&str, &str)] = &[
-    ("kpi-today", "Facturación hoy"),
-    ("kpi-avg-ticket", "Ticket medio"),
-    ("kpi-upt", "Unidades por ticket (UPT)"),
-    ("kpi-margin", "% Margen"),
-    ("kpi-profit", "Beneficio"),
-    ("kpi-discount", "Tasa de descuento"),
-    ("kpi-return", "Tasa de devolución"),
-    ("kpi-lost-sales", "Venta perdida estimada"),
-    ("dash-bars", "Ventas (gráfico)"),
+    // Clásicos conservados (#264): el resto del catálogo histórico se retiró al migrar a los widgets
+    // Geist. El agente compone con estos dos + las moléculas Geist de abajo (cada una métrica fija).
+    ("dash-bars", "Ventas (gráfico por tienda)"),
     ("dash-hour", "Ventas por hora"),
-    ("dash-family", "Ventas por familia"),
-    ("rank-sales", "Ranking de productos por ventas"),
-    ("rank-margin", "Ranking de productos por margen"),
-    ("rank-rotation", "Ranking de productos por rotación"),
-    ("dash-stockout", "Roturas de stock"),
-    ("dash-expiring", "Lotes por caducar"),
-    ("dash-purchase-orders", "Pedidos de compra"),
-    ("dash-sales-emp", "Ventas por vendedor"),
-    ("dash-discount-emp", "Descuento por empleado"),
-    ("dash-suppliers", "Comparativa de proveedores"),
-    ("dash-rotation", "Rotación de productos"),
-    ("dash-timeclock", "Fichajes de hoy"),
+    // Widgets Geist (#264): moléculas dataviz (espejo de `widgets/geist/meta.ts`). Cada id pinta una
+    // métrica FIJA (no se parametriza); colócalos como widgets independientes.
+    ("geist-stat-today", "Facturación de hoy"),
+    ("geist-hero-profit", "Beneficio del mes"),
+    ("geist-dual-margin", "% Margen y beneficio"),
+    ("geist-ribbon-kpis", "Ticket medio, UPT y descuento"),
+    ("geist-gauge-margin", "Medidor de % margen"),
+    ("geist-bullet-sales", "Ventas de hoy vs ayer"),
+    ("geist-projection-month", "Beneficio acumulado del mes"),
+    ("geist-treemap-family", "Mapa de familias (treemap)"),
+    ("geist-donut-family", "Reparto por familia (donut)"),
+    ("geist-share-stores", "Cuota por tienda"),
+    ("geist-leaderboard-sellers", "Ranking de vendedores"),
+    ("geist-leaderboard-products", "Top productos por ventas"),
+    ("geist-heat-hours", "Calor por hora"),
+    ("geist-spark-ticket", "Tendencia del ticket medio"),
+    ("geist-bars-profit", "Beneficio por día (barras)"),
+    ("geist-feed-alerts", "Avisos de stock"),
     // Bloques pre-cableados (#205): un panel AGRUPADO ya diseñado con UNA llamada. SOLO a petición
     // explícita («un panel/bloque que junte…»); por defecto se colocan widgets independientes.
     (
@@ -227,9 +227,9 @@ bloque/panel a petición. NUNCA emitas geometría (w/h/span/gap) ni color: cada 
 diseño horneado.
 
 ### A) Por DEFECTO — widgets INDEPENDIENTES (una métrica = una tarjeta movible/borrable por separado)
-Coloca cada métrica/gráfica con su propio `add_widget` usando los ids del catálogo de arriba (kpi-*,
-dash-*, rank-*); varias llamadas en el mismo turno se escalonan solas, sin solaparse. Para una métrica
-SIN tile de catálogo (comparar tiendas, donut de mix, una pieza a medida) usa un `gen:panel` de UNA
+Coloca cada métrica/gráfica con su propio `add_widget` usando los ids del catálogo de arriba (dash-bars,
+dash-hour y los `geist-*`); varias llamadas en el mismo turno se escalonan solas, sin solaparse. Para una
+métrica SIN tile de catálogo (comparar tiendas, una pieza a medida) usa un `gen:panel` de UNA
 pieza (ver C): también es independiente. `period`/`store_id` van en cada llamada. Ej.: «¿qué tienda va
 por detrás?» → `gen:panel` de UNA pieza `comparisonBars` sobre `/dashboard/sales-by-store`.
 
@@ -253,14 +253,14 @@ Elige la pieza por la INTENCIÓN, no por los datos:
 - evolución en el tiempo (por hora) → `trendArea` / `trendLine` (label_field temporal + value_field).
 - reparto de un total con ≤6 partes → `shareDonut` (con más categorías degrada solo a barras).
 - reparto en una sola barra → `segmentBar`.
-- ranking (top productos/vendedores) → `rankBarList` (label_field + value_field, max_rows?). En `/dashboard/product-rankings` con `rankBy` los campos son `name` y `value` (NO `total`). Para un top simple usa el WIDGET de catálogo independiente `rank-sales`/`rank-margin`/`rank-rotation`; `rankBarList` a medida solo dentro de un panel agrupado a petición.
+- ranking (top productos/vendedores) → `rankBarList` (label_field + value_field, max_rows?). En `/dashboard/product-rankings` con `rankBy` los campos son `name` y `value` (NO `total`). Para un top simple usa el WIDGET independiente `geist-leaderboard-products` (productos) o `geist-leaderboard-sellers` (vendedores); `rankBarList` a medida solo dentro de un panel agrupado a petición.
 - progreso hacia un objetivo → `progressMeter` (value_field + target?).
 - alertas de stock por severidad → `stockAlertList` (SOLO `/stock/alerts` o `/stock/expiring`; label_field=productName).
 - detalle fila a fila / valores exactos → `dataGrid` (columns:[{ field, label, format?, align? }]).
 
 Reglas de diseño (duras):
 - Las GRÁFICAS (comparisonBars/trend*/shareDonut/rankBarList/segmentBar/progressMeter/stockAlertList/dataGrid) necesitan endpoints de LISTA: sales-by-family, sales-by-hour, sales-by-employee, sales-by-store (desglose por tienda), discount-by-employee, product-rankings (da el top por ventas), stock/alerts, stock/expiring, products, product-families, suppliers. Los endpoints de KPI (sales-kpis, margin-kpis, stockout-kpis) son ESCALARES: úsalos SOLO en `kpiTile`/`progressMeter`, nunca en una gráfica (no se renderiza).
-- Peticiones amplias («un dashboard de X», «cierre de mes») → coloca VARIOS widgets independientes que cubran la intención (p. ej. kpi-today + kpi-profit + kpi-margin + dash-hour + dash-family + rank-sales), no un bloque gigante. Solo agrupa en `block:*`/`gen:panel` multi-pieza (≤4 piezas) a petición explícita de un panel.
+- Peticiones amplias («un dashboard de X», «cierre de mes») → coloca VARIOS widgets independientes que cubran la intención (p. ej. geist-stat-today + geist-hero-profit + geist-gauge-margin + dash-hour + geist-treemap-family + geist-leaderboard-products), no un bloque gigante. Solo agrupa en `block:*`/`gen:panel` multi-pieza (≤4 piezas) a petición explícita de un panel.
 - Barras para comparar magnitudes y rankings (`comparisonBars` ordena desc y muestra hasta 8 barras; para más categorías o un ranking explícito usa `rankBarList`); donut SOLO para snapshot de reparto con ≤6 partes (con más degrada a barras); NUNCA donut para evolución, ranking ni comparar magnitudes.
 - Periodo por defecto: `today` para "hoy/flash", `month` para "resumen / cómo vamos / cierre de mes / control o seguimiento", `year` para tendencias largas. Tienda: todas salvo que se nombre una. Para COMPARAR tiendas («qué tienda sube/baja», «el rezagado», «por tienda») usa un `gen:panel` de UNA pieza `comparisonBars` sobre `/dashboard/sales-by-store` (independiente), que desglosa facturación/ticket medio/margen por tienda; no enfoques una sola tienda ni inventes el desglose. (`block:store-comparison` solo si pide un panel agrupado.)
 - `format` (eur, percent, percentRatio, decimal, units, integer) opcional: si lo omites se infiere por el nombre del campo. Tasas del dashboard (discountRate, returnRate, avgDiscountPct, marginPct, rate) son fracción 0..1 → `percentRatio` (×100); `percent` es para 0..100. Pásalo explícito cuando el campo sea ambiguo.
@@ -270,10 +270,10 @@ Ejemplos ILUSTRATIVOS (muestran la ESTRUCTURA, no valores por defecto): `period`
 `label_field`, etc. son los del ejemplo concreto — NO los copies como defaults; elige los del caso
 real y del endpoint que uses (p. ej. el `value_field` correcto de cada endpoint, no el del ejemplo).
 Ejemplos (petición → composición con widgets INDEPENDIENTES por defecto, cada uno su `add_widget`):
-- «Móntame un cuadro de ventas» (vago) → kpi-today + kpi-avg-ticket + kpi-upt + dash-hour, period "today".
-- «¿Cómo vamos de rentabilidad?» → kpi-today + kpi-profit + kpi-margin + dash-family.
-- «¿Qué tengo que reponer?» (acción) → dash-stockout + dash-expiring (+ kpi-lost-sales).
-- «Mi mejor vendedor» → dash-sales-emp (y narra el top citando la cifra real).
+- «Móntame un cuadro de ventas» (vago) → geist-stat-today + geist-ribbon-kpis + dash-hour + geist-share-stores, period "today".
+- «¿Cómo vamos de rentabilidad?» → geist-hero-profit + geist-gauge-margin + geist-dual-margin + geist-treemap-family.
+- «¿Qué tengo que reponer?» (acción) → geist-feed-alerts (avisos de stock); para caducidades, un `gen:panel` de UNA pieza `stockAlertList` sobre `/stock/expiring`.
+- «Mi mejor vendedor» → geist-leaderboard-sellers (y narra el top citando la cifra real).
 - «Móntame UN PANEL que junte ventas, margen y mis mejores vendedores» (pide agrupar) → panel a medida (recipe kpiRow+twoCharts):
 {
   "kind": "panel",
@@ -602,8 +602,8 @@ mod tests {
     #[test]
     fn incluye_catalogo_de_widgets() {
         let p = build_system_prompt(&sample_org(), true, None, None, None);
-        assert!(p.contains("kpi-today"));
-        assert!(p.contains("dash-timeclock"));
+        assert!(p.contains("dash-bars"));
+        assert!(p.contains("geist-treemap-family"));
         // Todos los ids del catálogo (widgets + bloques + gen:panel) aparecen listados.
         for (id, _) in WIDGET_CATALOG {
             assert!(p.contains(id), "falta el widget {id} en el prompt");

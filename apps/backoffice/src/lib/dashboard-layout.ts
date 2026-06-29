@@ -33,22 +33,7 @@ export const PRESETS: PresetDef[] = [
 // Orden CANÓNICO de los paneles (= orden de maquetación histórico). Define el orden por
 // defecto de colocación: se filtra por los paneles que el preset incluye. El bloque de
 // rankings se representa con tres ids (uno por pestaña inicial); solo uno por preset.
-export const PANEL_CANON: string[] = [
-  'dash-bars',
-  'dash-family',
-  'dash-stockout',
-  'rank-sales',
-  'rank-margin',
-  'rank-rotation',
-  'dash-expiring',
-  'dash-purchase-orders',
-  'dash-hour',
-  'dash-sales-emp',
-  'dash-discount-emp',
-  'dash-suppliers',
-  'dash-rotation',
-  'dash-timeclock',
-];
+export const PANEL_CANON: string[] = ['dash-bars', 'dash-hour'];
 
 // Orden por defecto de los paneles de un preset: los del preset, en orden canónico.
 export function defaultPanelOrder(preset: PresetDef): string[] {
@@ -60,34 +45,37 @@ export function defaultPanelOrder(preset: PresetDef): string[] {
 // tarjetas KPI ocupan 2 columnas y 1 fila; los paneles heredan su ancho histórico
 // (span 5/7/12) y un alto que encaja su contenido (gráfico ~200px o lista con scroll).
 export const BOARD_COLS = 12;
-const CARD_SPEC = { w: 2, h: 1 };
 export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
-  // Tarjetas KPI
-  'kpi-today': CARD_SPEC,
-  'kpi-avg-ticket': CARD_SPEC,
-  'kpi-upt': CARD_SPEC,
-  'kpi-margin': CARD_SPEC,
-  'kpi-profit': CARD_SPEC,
-  'kpi-discount': CARD_SPEC,
-  'kpi-return': CARD_SPEC,
-  'kpi-lost-sales': CARD_SPEC,
-  // Paneles
+  // Únicos widgets del catálogo: «Ventas» y «Ventas por hora».
   'dash-bars': { w: 7, h: 2 },
   // "Ventas por hora": gráfico + barra fina de navegación. El gráfico llena el alto del tile
   // (dash-panel--fill), así que 2 filas bastan sin dejar hueco inferior.
   'dash-hour': { w: 7, h: 2 },
-  'dash-family': { w: 5, h: 2 },
-  'rank-sales': { w: 5, h: 2 },
-  'rank-margin': { w: 7, h: 2 },
-  'rank-rotation': { w: 7, h: 2 },
-  'dash-stockout': { w: 5, h: 2 },
-  'dash-expiring': { w: 7, h: 2 },
-  'dash-purchase-orders': { w: 5, h: 2 },
-  'dash-sales-emp': { w: 7, h: 2 },
-  'dash-discount-emp': { w: 5, h: 2 },
-  'dash-suppliers': { w: 12, h: 2 },
-  'dash-rotation': { w: 12, h: 3 },
-  'dash-timeclock': { w: 12, h: 2 },
+  // Sección 01 · KPIs (rediseño): rejilla conectada (tarjeta redondeada de 6 KPIs, banda baja) y clásica.
+  'kpi-grid-connected': { w: 12, h: 1 },
+  'kpi-classic': { w: 3, h: 1 },
+  // Sección 02 · Gráficas (rediseño): distribución horaria (área), ventas por tienda (barras) y heatmap.
+  // La distribución horaria comparte tamaño con el heatmap (6×2): contenido compacto, sin scroll.
+  'graf-hour-area': { w: 6, h: 2 },
+  'graf-store-bars': { w: 6, h: 2 },
+  'graf-heatmap': { w: 6, h: 2 },
+  // Sección 03 · Listas (rediseño): reparto por familia, ranking de productos y mix (treemap).
+  'lista-familia': { w: 4, h: 3 },
+  'lista-rankings': { w: 4, h: 3 },
+  'lista-mix': { w: 4, h: 3 },
+  // Sección 05 · Compactos (rediseño): tiles pequeños (ribbon, donut, treemap, top, cifra-héroe).
+  'cmp-ribbon': { w: 3, h: 2 },
+  'cmp-donut': { w: 3, h: 2 },
+  'cmp-treemap': { w: 3, h: 2 },
+  'cmp-leaderboard': { w: 3, h: 3 },
+  'cmp-hero': { w: 5, h: 2 },
+  // Sección 06 · Diagnóstico (rediseño): feed de actividad (lista alta).
+  'diag-actividad': { w: 4, h: 3 },
+  // Sección 07 · KPIs · más formatos (rediseño): tarjetas KPI (dual, área, alerta, 7 días).
+  'kpi-dual': { w: 3, h: 2 },
+  'kpi-area': { w: 3, h: 2 },
+  'kpi-alerta': { w: 3, h: 2 },
+  'kpi-7dias': { w: 3, h: 2 },
 };
 
 const DEFAULT_SPEC = { w: 4, h: 2 };
@@ -541,6 +529,19 @@ export function freeItemSize(id: string): { w: number; h: number } {
   return { w: spec.w * FREE_COL - FREE_GAP, h: spec.h * FREE_ROW - FREE_GAP };
 }
 
+// INVERSA EXACTA de `freeItemSize`: recupera las unidades enteras de rejilla (columnas/filas) a
+// partir del tamaño en píxeles de un elemento del lienzo. Como el px de mundo es `u·CELDA − GAP`,
+// `round((px + GAP) / CELDA)` devuelve la unidad original sin pérdida para todo lo sembrado desde
+// la rejilla (catálogo y genéricos); para elementos de tamaño libre (notas redimensionadas) cae al
+// número entero de celdas más cercano. Las columnas se clampan a [1, BOARD_COLS]; las filas a ≥1.
+// Es lo que usa el modo CUADRÍCULA para teselar sin huecos sobre una rejilla real de 12 columnas,
+// en vez de aproximar el tramo con umbrales de píxel (que dejaban huecos y no llenaban el ancho).
+export function freeUnitsFromPx(w: number, h: number): { cols: number; rows: number } {
+  const cols = Math.min(BOARD_COLS, Math.max(1, Math.round((w + FREE_GAP) / FREE_COL)));
+  const rows = Math.max(1, Math.round((h + FREE_GAP) / FREE_ROW));
+  return { cols, rows };
+}
+
 // Tamaño por defecto de una nota nueva (px de mundo).
 export const NOTE_DEFAULT = { w: 240, h: 180 };
 
@@ -663,9 +664,17 @@ export function reconcileFreeLayout(saved: readonly unknown[], preset: PresetDef
   if (migrated.length === 0) return buildDefaultFreeLayout(preset);
   // Notas/formas/trazos/textos se conservan siempre; los widgets se conservan si son del catálogo
   // (en ITEM_SPECS) o genéricos (`gen:*`). Solo se descartan ids de catálogo obsoletos.
-  return migrated.filter(
-    (e) => e.kind !== 'widget' || e.widgetId in ITEM_SPECS || e.widgetId.startsWith('gen:'),
-  );
+  // Los widgets del catálogo se re-dimensionan al tamaño actual de ITEM_SPECS: el usuario no puede
+  // redimensionarlos (solo las notas tienen handles de resize), así que el tamaño guardado puede
+  // quedar desfasado cuando cambia ITEM_SPECS.
+  return migrated
+    .filter((e) => e.kind !== 'widget' || e.widgetId in ITEM_SPECS || e.widgetId.startsWith('gen:'))
+    .map((e) => {
+      if (e.kind !== 'widget' || !(e.widgetId in ITEM_SPECS)) return e;
+      const size = freeItemSize(e.widgetId);
+      if (e.w === size.w && e.h === size.h) return e;
+      return { ...e, w: size.w, h: size.h };
+    });
 }
 
 // Siguiente `z` (encima de todo).

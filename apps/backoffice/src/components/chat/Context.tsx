@@ -26,9 +26,10 @@ function fmtEur(value: string): string {
 
 /**
  * Uso del contexto (tokens + coste), estilo Context de ai-elements: un trigger compacto con el
- * porcentaje y un popover con el desglose entrada/salida y el coste. Abre hacia arriba (vive en
- * el pie del popover de conversación). El % es orientativo (no conocemos la ventana real del
- * gateway). Diseño con tokens del sistema.
+ * porcentaje y un popover con el desglose entrada/salida y el coste. Vive ARRIBA, en la cabecera del
+ * asistente, y abre hacia abajo. El % es orientativo (no conocemos la ventana real del gateway).
+ * `data-no-drag` evita que interactuar con él arrastre la ventana (la cabecera es el asa). Diseño con
+ * tokens del sistema.
  */
 export function Context({ inputTokens, outputTokens, costEur, maxTokens = 200000 }: ContextProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -46,7 +47,7 @@ export function Context({ inputTokens, outputTokens, costEur, maxTokens = 200000
   }, [open]);
 
   return (
-    <div className="ctx" ref={ref}>
+    <div className="ctx" ref={ref} data-no-drag>
       <button
         type="button"
         className="ctx__trigger"

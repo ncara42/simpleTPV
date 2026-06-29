@@ -7,8 +7,10 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 use simpletpv_auth::Role;
-use simpletpv_domain::transfers::model::TransferWithLines;
-use simpletpv_domain::transfers::{service, CreateTransfer, ReceiveTransfer};
+use simpletpv_domain::transfers::model::{TransferAttachment, TransferMessage, TransferWithLines};
+use simpletpv_domain::transfers::{
+    service, CreateAttachment, CreateMessage, CreateTransfer, EditMessage, ReceiveTransfer,
+};
 use simpletpv_shared::AppError;
 use uuid::Uuid;
 
@@ -89,6 +91,123 @@ pub async fn receive(
     )
     .await?;
     Ok(Json(t))
+}
+
+/// `POST /transfers/:id/attachments` (ADMIN/MANAGER/CLERK) — adjunta una foto de la
+/// recepción. Mismas reglas de acceso que recibir (CLERK acotado a su tienda destino).
+pub async fn add_attachment(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(body): Json<CreateAttachment>,
+) -> Result<(StatusCode, Json<TransferAttachment>), ApiError> {
+    let a = service::add_attachment(
+        state.db(),
+        user.organization_id,
+        user.user_id,
+        user.role.is_org_wide(),
+        id,
+        body,
+    )
+    .await?;
+    Ok((StatusCode::CREATED, Json(a)))
+}
+
+/// `GET /transfers/:id/attachments` — fotos del traspaso (cualquier rol con sesión).
+pub async fn list_attachments(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<TransferAttachment>>, ApiError> {
+    Ok(Json(
+        service::list_attachments(state.db(), user.organization_id, id).await?,
+    ))
+}
+
+/// `POST /transfers/:id/messages` — añade un mensaje al chat (texto y/o foto). El autor
+/// ('central'/'store') se deriva del rol; CLERK acotado a su tienda destino.
+pub async fn add_message(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(body): Json<CreateMessage>,
+) -> Result<(StatusCode, Json<TransferMessage>), ApiError> {
+    let m = service::add_message(
+        state.db(),
+        user.organization_id,
+        user.user_id,
+        user.role.is_org_wide(),
+        id,
+        body,
+    )
+    .await?;
+    Ok((StatusCode::CREATED, Json(m)))
+}
+
+/// `PATCH /transfers/:id/messages/:messageId` — edita el texto de un mensaje.
+pub async fn update_message(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path((id, message_id)): Path<(Uuid, Uuid)>,
+    Json(body): Json<EditMessage>,
+) -> Result<Json<TransferMessage>, ApiError> {
+    let m = service::update_message(
+        state.db(),
+        user.organization_id,
+        user.user_id,
+        user.role.is_org_wide(),
+        id,
+        message_id,
+        body,
+    )
+    .await?;
+    Ok(Json(m))
+}
+
+/// `DELETE /transfers/:id/messages/:messageId` — borra un mensaje.
+pub async fn delete_message(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path((id, message_id)): Path<(Uuid, Uuid)>,
+) -> Result<StatusCode, ApiError> {
+    service::delete_message(
+        state.db(),
+        user.organization_id,
+        user.user_id,
+        user.role.is_org_wide(),
+        id,
+        message_id,
+    )
+    .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// `POST /transfers/:id/resolve-incident` — marca la incidencia como solucionada.
+pub async fn resolve_incident(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<TransferWithLines>, ApiError> {
+    let t = service::resolve_incident(
+        state.db(),
+        user.organization_id,
+        user.user_id,
+        user.role.is_org_wide(),
+        id,
+    )
+    .await?;
+    Ok(Json(t))
+}
+
+/// `GET /transfers/:id/messages` — hilo del chat (cualquier rol con sesión).
+pub async fn list_messages(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<TransferMessage>>, ApiError> {
+    Ok(Json(
+        service::list_messages(state.db(), user.organization_id, id).await?,
+    ))
 }
 
 /// `POST /transfers/:id/close` (ADMIN/MANAGER).

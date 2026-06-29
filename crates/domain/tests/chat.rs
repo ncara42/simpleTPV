@@ -225,7 +225,7 @@ async fn prune_after_devuelve_solo_add_ops_inversibles() {
             role: "assistant".into(),
             content: text_content("añado el widget"),
             tool_calls: Some(serde_json::json!([
-                { "name": "add_widget", "args": { "element_id": "e1", "widget_id": "kpi-today" } },
+                { "name": "add_widget", "args": { "element_id": "e1", "widget_id": "dash-bars" } },
                 { "name": "clear_canvas", "args": {} },
                 { "name": "remove_element", "args": { "element_id": "old" } }
             ])),

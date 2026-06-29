@@ -1,0 +1,182 @@
+/* ════════════════════════════════════════════════════════════════════════════════
+   Asistente como VENTANA FLOTANTE libre. Re-ancla el `.chat-dock` a una tarjeta overlay
+   (`position: fixed`) movible por toda la pantalla y redimensionable desde bordes/esquinas.
+   La GEOMETRÍA (left/top/width/height) la fija el estilo inline desde el store (rect);
+   aquí van presentación, animación de apertura y las asas.
+
+   CLAVE (condición del producto): es overlay con stacking context propio. El lienzo
+   (`.bo-main--canvas` / `.bo-main--surface`) conserva su ancho con la ventana abierta,
+   movida o agrandada → manipular el asistente NUNCA reflowa ni reescala widgets ni tablas.
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+/* Capa raíz: cubre el viewport pero deja pasar el ratón (pointer-events:none); solo el backdrop y
+   la ventana capturan clics. */
+.chat-dock.chat-dock--drawer {
+  inset: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  padding: 0;
+  gap: 0;
+  display: block;
+  align-items: initial;
+  pointer-events: none;
+  transition: none;
+}
+
+/* Abierta: por encima del sidebar (z40) y la topbar (z30) para que el backdrop capture cualquier
+   clic fuera. Cerrada hereda z39 (irrelevante: la ventana está oculta). */
+.chat-dock--drawer.is-open {
+  z-index: 50;
+}
+
+/* Backdrop a todo el viewport (transparente, no oscurece): un clic aquí cierra el chat. */
+.chat-dock--drawer .chat-dock__backdrop {
+  position: fixed;
+  inset: 0;
+}
+
+/* La ventana: `position: fixed` con geometría por estilo inline (left/top/width/height desde el
+   store). Conserva el cristal del `.chat-dock__panel` base (fondo, blur, borde, sombra) y redefine
+   solo lo necesario: sin topes de tamaño (se puede agrandar sin límite) y abrir/cerrar con
+   fade+scale (no slide: la ventana puede estar en cualquier sitio). */
+.chat-dock--drawer .chat-dock__panel {
+  position: fixed;
+  max-width: none;
+  max-height: none;
+  border-radius: var(--ui-radius-xl);
+  transform-origin: center;
+  animation: none;
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity var(--ui-motion-medium, 0.18s) var(--ui-ease, ease),
+    transform var(--ui-motion-medium, 0.18s) var(--ui-ease, ease);
+  will-change: transform;
+}
+
+.chat-dock--drawer.is-open .chat-dock__panel {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Cerrada: sin interacción (refuerza el atributo `inert` del JSX para teclado/SR). */
+.chat-dock--drawer:not(.is-open) .chat-dock__panel {
+  pointer-events: none;
+}
+
+/* El cuerpo scrollea dentro del alto de la ventana (min-height:0 para que el flex encoja). */
+.chat-dock--drawer .chat-messages,
+.chat-dock--drawer .chat-panel__history {
+  min-height: 0;
+}
+
+/* Composer al pie de la ventana, separado por un filete; a todo el ancho (anula el `min/max-width:
+   680px` del modo barra inferior). */
+.chat-dock--drawer .chat-dock__bar {
+  padding: var(--ui-space-3, 0.75rem);
+  border-top: 1px solid var(--ui-border);
+}
+.chat-dock--drawer .prompt-input {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* ── Asa de arrastre (cabecera) ──────────────────────────────────────────────────── */
+.chat-dock__drag {
+  cursor: grab;
+  touch-action: none;
+}
+/* Durante drag/resize: cursor global + sin selección de texto + sin transición (la ventana sigue al
+   puntero al instante, sin “tirar”). */
+body.chat-dock--dragging,
+body.chat-dock--dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+body.chat-dock--dragging .chat-dock--drawer .chat-dock__panel {
+  transition: none;
+}
+
+/* ── Asas de redimensión: 4 bordes (6px) + 4 esquinas (14px) ─────────────────────── */
+.chat-dock__resize {
+  position: absolute;
+  z-index: 2;
+  touch-action: none;
+}
+.chat-dock__resize--n {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: ns-resize;
+}
+.chat-dock__resize--s {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: ns-resize;
+}
+.chat-dock__resize--e {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+}
+.chat-dock__resize--w {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+}
+.chat-dock__resize--ne {
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nesw-resize;
+}
+.chat-dock__resize--nw {
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+}
+.chat-dock__resize--se {
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+}
+.chat-dock__resize--sw {
+  bottom: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nesw-resize;
+}
+
+/* Móvil: en pantallas pequeñas no hay redimensión por puntero (las asas se ocultan); la ventana
+   sigue siendo movible y usa su rect del store. */
+@media (max-width: 767px) {
+  .chat-dock--drawer .chat-dock__resize {
+    display: none;
+  }
+}
+
+/* Reduced-motion: aparece/desaparece sin escala (solo se oculta). */
+@media (prefers-reduced-motion: reduce) {
+  .chat-dock--drawer .chat-dock__panel {
+    transition: none;
+    transform: none;
+  }
+  .chat-dock--drawer:not(.is-open) .chat-dock__panel {
+    visibility: hidden;
+  }
+}

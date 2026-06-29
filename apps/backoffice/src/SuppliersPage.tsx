@@ -1,6 +1,7 @@
 import { usePageHeader } from '@simpletpv/ui';
 import { useState } from 'react';
 
+import { usePageNav } from './lib/pageNav.js';
 import { OrdersSection as PurchaseOrdersSection } from './purchases/OrdersSection.js';
 import { SuggestSection } from './purchases/SuggestSection.js';
 import { SupplierPricesSection } from './purchases/SupplierPricesSection.js';
@@ -23,49 +24,68 @@ interface SuppliersPageProps {
 export function SuppliersPage({ initialSection, initialPricesView }: SuppliersPageProps = {}) {
   const [section, setSection] = useState<Section>(initialSection ?? 'suppliers');
   usePageHeader('Proveedores', 'Proveedores, tarifas de compra, pedidos de compra y propuesta');
-  // Las pestañas viven DENTRO de la card de la sección activa (cabecera del panel),
-  // no flotando sobre el lienzo. El estado sigue aquí; cada sección las pinta en su
-  // card (slot `header` del DataTable o primer hijo de su `.table-panel`).
-  const tabs = (
-    <nav className="bo-tabs" data-testid="suppliers-subtabs">
+
+  // Subnavegación como las views de Inventario/B2B: cada sección es un botón independiente
+  // (`.inv-nav-tab`) inyectado en la columna IZQUIERDA de la TopBar, no una píldora-contenedor
+  // dentro de la card. Cada sección pinta solo su contenido (sin banda de pestañas propia).
+  usePageNav(
+    <div
+      className="inv-nav-tabs"
+      role="tablist"
+      aria-label="Sección de proveedores"
+      data-testid="suppliers-subtabs"
+    >
       <button
-        className={`bo-tab ${section === 'suppliers' ? 'active' : ''}`}
+        type="button"
+        role="tab"
+        className={`inv-nav-tab${section === 'suppliers' ? ' is-active' : ''}`}
+        aria-pressed={section === 'suppliers'}
         onClick={() => setSection('suppliers')}
         data-testid="suppliers-tab-suppliers"
       >
         Proveedores
       </button>
       <button
-        className={`bo-tab ${section === 'prices' ? 'active' : ''}`}
+        type="button"
+        role="tab"
+        className={`inv-nav-tab${section === 'prices' ? ' is-active' : ''}`}
+        aria-pressed={section === 'prices'}
         onClick={() => setSection('prices')}
         data-testid="suppliers-tab-prices"
       >
         Tarifas de compra
       </button>
       <button
-        className={`bo-tab ${section === 'orders' ? 'active' : ''}`}
+        type="button"
+        role="tab"
+        className={`inv-nav-tab${section === 'orders' ? ' is-active' : ''}`}
+        aria-pressed={section === 'orders'}
         onClick={() => setSection('orders')}
         data-testid="suppliers-tab-orders"
       >
         Pedidos de compra
       </button>
       <button
-        className={`bo-tab ${section === 'suggest' ? 'active' : ''}`}
+        type="button"
+        role="tab"
+        className={`inv-nav-tab${section === 'suggest' ? ' is-active' : ''}`}
+        aria-pressed={section === 'suggest'}
         onClick={() => setSection('suggest')}
         data-testid="suppliers-tab-suggest"
       >
         Propuesta
       </button>
-    </nav>
+    </div>,
   );
+
   return (
     <section className="catalog" data-testid="suppliers-page">
-      {section === 'suppliers' && <SuppliersSection tabs={tabs} />}
+      {section === 'suppliers' && <SuppliersSection />}
       {section === 'prices' && (
-        <SupplierPricesSection tabs={tabs} initialView={initialPricesView ?? 'tarifas'} />
+        <SupplierPricesSection initialView={initialPricesView ?? 'tarifas'} />
       )}
-      {section === 'orders' && <PurchaseOrdersSection tabs={tabs} />}
-      {section === 'suggest' && <SuggestSection tabs={tabs} />}
+      {section === 'orders' && <PurchaseOrdersSection />}
+      {section === 'suggest' && <SuggestSection />}
     </section>
   );
 }

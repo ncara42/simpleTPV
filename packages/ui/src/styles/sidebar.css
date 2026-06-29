@@ -155,7 +155,9 @@
 
 .sidebar-item:hover {
   background: var(--sidebar-item-hover-bg);
-  border-radius: 9999px;
+  /* Rectángulo redondeado sutil (tipo Vercel/Geist), no píldora. Igual radio que
+     la base del item para que hover y reposo compartan forma. */
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-text);
 }
 
@@ -166,7 +168,7 @@
 /* Selección silenciosa: relleno neutro + tinta plena, sin color. */
 .sidebar-item.active {
   background: var(--sidebar-item-active-bg);
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-sm);
   color: var(--sidebar-text-active);
   font-weight: 600;
 }
@@ -661,6 +663,19 @@
   .sidebar-nav
   .sidebar-group-items:not(.sidebar-dd-items)
   .sidebar-item:focus-visible
+  .sidebar-item-label,
+/* Cabeceras de grupo (no están dentro de .sidebar-group-items): misma burbuja de
+   nombre al hover/focus en rail. Se suprime con el flyout abierto (.open), que ya
+   muestra los nombres de las opciones. */
+.sidebar.collapsed
+  .sidebar-nav
+  .sidebar-group--dd:not(.open)
+  .sidebar-group-entry:hover
+  .sidebar-item-label,
+.sidebar.collapsed
+  .sidebar-nav
+  .sidebar-group--dd:not(.open)
+  .sidebar-group-entry:focus-visible
   .sidebar-item-label {
   display: block;
   position: absolute;
@@ -679,7 +694,7 @@
   overflow: visible;
   z-index: 60;
   pointer-events: none;
-  animation: sidebar-flyout-in 0.12s var(--ui-ease, ease);
+  animation: sidebar-namebubble-in 0.12s var(--ui-ease, ease);
 }
 .sidebar.collapsed .sidebar-item-badge {
   position: absolute;
@@ -731,6 +746,21 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* Variante para la burbuja de NOMBRE (rail) y el .ui-tooltip: estas van centradas
+   con translateY(-50%), así que el keyframe debe CONSERVAR ese eje al animar la
+   entrada en X — si no, durante la animación se pierde el centrado y la burbuja
+   aparece unos px más abajo y «salta» a su sitio al terminar. */
+@keyframes sidebar-namebubble-in {
+  from {
+    opacity: 0;
+    transform: translate(-4px, -50%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%);
   }
 }
 
@@ -915,10 +945,15 @@
       0 18px 40px -12px rgb(0 0 0 / 0.2);
     z-index: 40;
     transform-origin: top center;
-    /* Aparece/desaparece EN SU SITIO (fundido + leve escala), nunca deslizándose a un lado. */
+    /* Aparece/desaparece EN SU SITIO (fundido + leve escala), nunca deslizándose a un lado.
+       `visibility` entra en la transición para poder DIFERIR el ocultado: al aparecer es inmediata
+       (visible) y el cuerpo se funde de entrada; al ocultarse espera a que el fundido termine (ver
+       .is-hidden/.is-eclipsed). Sin esto, `visibility:hidden` cortaba la salida y el cuerpo
+       desaparecía de golpe pese a aparecer animado. */
     transition:
       opacity 0.2s var(--ui-ease, ease),
-      transform 0.2s var(--ui-ease, cubic-bezier(0.16, 1, 0.3, 1));
+      transform 0.2s var(--ui-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+      visibility 0s linear 0s;
   }
 
   /* El logo ya vive en la pestaña superior; el header interno (que lo duplicaba) se oculta
@@ -942,6 +977,11 @@
     transform: scale(0.97);
     pointer-events: none;
     visibility: hidden;
+    /* La ocultación de `visibility` se difiere 0.2s → el fundido + escala de salida se ven enteros. */
+    transition:
+      opacity 0.2s var(--ui-ease, ease),
+      transform 0.2s var(--ui-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+      visibility 0s linear 0.2s;
   }
   .sidebar--floating.is-hidden ~ .app-content {
     margin-left: 0;
@@ -955,6 +995,11 @@
     transform: scale(0.97);
     pointer-events: none;
     visibility: hidden;
+    /* Igual que .is-hidden: difiere `visibility` para que el desvanecido se vea completo. */
+    transition:
+      opacity 0.2s var(--ui-ease, ease),
+      transform 0.2s var(--ui-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+      visibility 0s linear 0.2s;
   }
 
   /* ── Pestaña del TOGGLE: arriba-izquierda, comparte borde izquierdo con el cuerpo. Arriba
@@ -1224,7 +1269,41 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebar--floating {
+  /* Los selectores compuestos igualan la especificidad de .is-hidden/.is-eclipsed para que
+     `transition:none` también gane ahí (si no, su transición con `visibility` animaría igual). */
+  .sidebar--floating,
+  .sidebar--floating.is-hidden,
+  .sidebar--floating.is-eclipsed {
     transition: none;
+  }
+}
+
+/* ─── Tooltip de los items «padre» del sidebar (componente <Tooltip>) ──────────
+   En modo expandido el `title` nativo gris del navegador se sustituye por esta
+   burbuja con la piel SimpleTPV. Se monta por PORTAL en <body> (de ahí que el
+   selector sea global, no anidado bajo .sidebar) para escapar del overflow:hidden
+   del aside, que la recortaría hacia la derecha. Mismos tokens que la burbuja del
+   rail (ver .sidebar-item-label flotante, arriba) para coherencia visual.
+   El posicionamiento (top/left) lo fija el componente; aquí solo la piel. */
+.ui-tooltip {
+  transform: translateY(-50%);
+  padding: 0.35rem 0.7rem;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 10px;
+  box-shadow: var(--ui-shadow-md);
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--ui-text);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 70; /* por encima de flyouts (40) y burbuja del rail (60) */
+  animation: sidebar-namebubble-in 0.12s var(--ui-ease, ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-tooltip {
+    animation: none;
   }
 }

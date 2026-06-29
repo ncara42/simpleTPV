@@ -98,7 +98,8 @@ test.skip('el toggle de gráfico y el desplegable de comparación viven dentro d
 });
 
 test.skip('Ventas por familia: lista con scroll vertical y buscador', async () => {
-  // Reimplementar en F1.2 — requiere widget dash-family en el lienzo.
+  // Obsoleto (#264): el widget clásico `dash-family` se retiró al migrar a los widgets Geist; el
+  // reparto por familia lo cubren ahora `geist-treemap-family` / `geist-donut-family`.
 });
 
 test.skip('preferencias por defecto: el dashboard recuerda el periodo elegido (IT-16)', async () => {
@@ -137,7 +138,7 @@ test('el dashboard no embebe la tabla de ventas (I-17, D-06)', async ({ page }) 
   // El dashboard ya no contiene el historial de ventas (E-10: scroll eterno); Ventas es
   // page propia accesible desde el sidebar.
   await expect(page.getByTestId('dashboard')).toBeVisible();
-  await expect(page.getByTestId('sales-table')).toHaveCount(0);
+  await expect(page.getByTestId('sales-page')).toHaveCount(0);
 });
 
 test('lienzo libre: añadir un widget desde la paleta y quitarlo', async ({ page }) => {
@@ -456,9 +457,9 @@ test('dashboard: modo cuadrícula — toggle, añadir widget desde el «+» del 
   const tiles = page.locator('.dash-grid-tile');
   await expect(tiles).toHaveCount(0);
   await page.getByTestId('topbar-add-widget').click();
-  const palette = page.locator('.dash-free-palette');
-  await expect(palette).toBeVisible();
-  await palette.locator('button[role="menuitem"]').first().click();
+  const gallery = page.getByTestId('widget-gallery-modal');
+  await expect(gallery).toBeVisible();
+  await gallery.getByTestId('widget-gallery-card-dash-bars').click();
   await expect(tiles).toHaveCount(1);
 
   // Volver a LIENZO LIBRE: el MISMO widget sigue ahí (mismo set, dos vistas).

@@ -144,6 +144,28 @@ async fn store_with_open_session(admin: &PgPool) -> Uuid {
     store
 }
 
+/// Crea una tienda SIN caja abierta y devuelve su id. Las facturas a crédito (B2B)
+/// se emiten desde el backoffice, que no tiene caja: no exigen sesión abierta.
+async fn store_without_session(admin: &PgPool) -> Uuid {
+    let org: Uuid = sqlx::query_scalar(r#"SELECT id FROM "Organization" WHERE nif = 'B11111111'"#)
+        .fetch_one(admin)
+        .await
+        .unwrap();
+    let store = Uuid::new_v4();
+    let code = format!("H{}", &store.simple().to_string()[..8]);
+    sqlx::query(
+        r#"INSERT INTO "Store" (id, "organizationId", name, code) VALUES ($1, $2, $3, $4)"#,
+    )
+    .bind(store)
+    .bind(org)
+    .bind(format!("Tienda {code}"))
+    .bind(&code)
+    .execute(admin)
+    .await
+    .unwrap();
+    store
+}
+
 async fn cleanup(admin: &PgPool, store: Uuid, product: &str) {
     let pid = Uuid::parse_str(product).unwrap();
     for sql in [
@@ -304,4 +326,139 @@ async fn ticket_requires_auth() {
         .unwrap();
     let (st, _, _) = send(&app, req).await;
     assert_eq!(st, StatusCode::UNAUTHORIZED);
+}
+
+/// `POST /sales` con `channel:"B2B"` + `creditDueDate` y SIN caja abierta para esa
+/// tienda → 201 con `paymentStatus:"PENDING"`, `dueDate` fijada y `paidAt` nulo. El
+/// gate de caja no aplica a la facturación a crédito.
+#[tokio::test]
+async fn crea_factura_credito_b2b_sin_caja_devuelve_pendiente() {
+    let (app, admin) = build().await;
+    let token = login(&app, "admin@org1.test").await;
+    let store = store_without_session(&admin).await; // SIN caja abierta
+    let product = create_product(&app, &token).await;
+
+    let body = format!(
+        r#"{{"storeId":"{store}","paymentMethod":"TRANSFER","channel":"B2B","creditDueDate":"2999-12-31","lines":[{{"productId":"{product}","qty":3}}]}}"#
+    );
+    let (st, _, b) = send(&app, body_req("POST", "/sales", Some(&token), &body)).await;
+    assert_eq!(st, StatusCode::CREATED, "{b}");
+    let sale = json(&b);
+    assert_eq!(sale["paymentStatus"], "PENDING");
+    assert_eq!(sale["channel"], "B2B");
+    assert_eq!(sale["dueDate"], "2999-12-31");
+    assert!(
+        sale["paidAt"].is_null(),
+        "una factura a crédito nace sin paidAt"
+    );
+
+    cleanup(&admin, store, &product).await;
+}
+
+/// `POST /sales/:id/collect`: 200 + `paymentStatus:"PAID"` para ADMIN sobre una
+/// factura PENDING; 403 para CLERK (la ruta exige ADMIN/MANAGER); 404 para un id
+/// inexistente.
+#[tokio::test]
+async fn collect_cobra_factura_admin_y_restringe_clerk() {
+    let (app, admin) = build().await;
+    let token = login(&app, "admin@org1.test").await;
+    let clerk = login(&app, "clerk@org1.test").await;
+    let store = store_without_session(&admin).await;
+    let product = create_product(&app, &token).await;
+
+    // Factura a crédito B2B (sin caja) → 201 PENDING.
+    let body = format!(
+        r#"{{"storeId":"{store}","paymentMethod":"TRANSFER","channel":"B2B","creditDueDate":"2999-12-31","lines":[{{"productId":"{product}","qty":1}}]}}"#
+    );
+    let (st, _, b) = send(&app, body_req("POST", "/sales", Some(&token), &body)).await;
+    assert_eq!(st, StatusCode::CREATED, "{b}");
+    let id = json(&b)["id"].as_str().unwrap().to_owned();
+
+    // CLERK no puede cobrar → 403 (chequeo de rol antes de tocar la BD).
+    let (s403, _, _) = send(
+        &app,
+        body_req("POST", &format!("/sales/{id}/collect"), Some(&clerk), "{}"),
+    )
+    .await;
+    assert_eq!(s403, StatusCode::FORBIDDEN);
+
+    // ADMIN cobra → 200 + paymentStatus PAID.
+    let (s200, _, b200) = send(
+        &app,
+        body_req("POST", &format!("/sales/{id}/collect"), Some(&token), "{}"),
+    )
+    .await;
+    assert_eq!(s200, StatusCode::OK, "{b200}");
+    assert_eq!(json(&b200)["paymentStatus"], "PAID");
+
+    // Id inexistente → 404.
+    let (s404, _, _) = send(
+        &app,
+        body_req(
+            "POST",
+            &format!("/sales/{}/collect", Uuid::new_v4()),
+            Some(&token),
+            "{}",
+        ),
+    )
+    .await;
+    assert_eq!(s404, StatusCode::NOT_FOUND);
+
+    cleanup(&admin, store, &product).await;
+}
+
+/// `GET /sales?paymentStatus=OVERDUE` → 200 y SOLO las filas vencidas (PENDING +
+/// vencimiento pasado). Una factura a crédito con `dueDate` futura (pendiente pero no
+/// vencida) NO aparece.
+#[tokio::test]
+async fn lista_filtra_estado_de_cobro_vencido() {
+    let (app, admin) = build().await;
+    let token = login(&app, "admin@org1.test").await;
+    let store = store_without_session(&admin).await;
+    let product = create_product(&app, &token).await;
+
+    // Vencida: dueDate en el pasado.
+    let overdue_body = format!(
+        r#"{{"storeId":"{store}","paymentMethod":"TRANSFER","channel":"B2B","creditDueDate":"2000-01-01","lines":[{{"productId":"{product}","qty":1}}]}}"#
+    );
+    let (so, _, bo) = send(
+        &app,
+        body_req("POST", "/sales", Some(&token), &overdue_body),
+    )
+    .await;
+    assert_eq!(so, StatusCode::CREATED, "{bo}");
+    let overdue_id = json(&bo)["id"].as_str().unwrap().to_owned();
+
+    // Pendiente NO vencida: dueDate en el futuro.
+    let future_body = format!(
+        r#"{{"storeId":"{store}","paymentMethod":"TRANSFER","channel":"B2B","creditDueDate":"2999-12-31","lines":[{{"productId":"{product}","qty":1}}]}}"#
+    );
+    let (sf, _, bf) = send(&app, body_req("POST", "/sales", Some(&token), &future_body)).await;
+    assert_eq!(sf, StatusCode::CREATED, "{bf}");
+    let future_id = json(&bf)["id"].as_str().unwrap().to_owned();
+
+    // GET acotado a la tienda + paymentStatus=OVERDUE → solo la vencida.
+    let (st, _, bl) = send(
+        &app,
+        get(
+            &format!("/sales?storeId={store}&paymentStatus=OVERDUE"),
+            &token,
+        ),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "{bl}");
+    let page = json(&bl);
+    let items = page["items"].as_array().unwrap();
+    assert!(
+        items.iter().any(|s| s["id"] == overdue_id),
+        "la vencida aparece"
+    );
+    assert!(
+        !items.iter().any(|s| s["id"] == future_id),
+        "la pendiente no vencida no aparece"
+    );
+    // Vencida = PENDING + vencimiento pasado: toda fila devuelta es PENDING.
+    assert!(items.iter().all(|s| s["paymentStatus"] == "PENDING"));
+
+    cleanup(&admin, store, &product).await;
 }

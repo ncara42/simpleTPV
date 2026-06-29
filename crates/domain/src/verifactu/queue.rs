@@ -160,14 +160,22 @@ pub async fn list(
 }
 
 /// Reintenta un registro: lo vuelve a PENDING y limpia el error (idempotente,
-/// paridad NestJS `retry`); el worker lo recoge en el siguiente ciclo.
+/// paridad NestJS `retry`); el worker lo recoge en el siguiente ciclo. Si el registro
+/// había sido RECHAZADO por la AEAT (`aeatState='Incorrecto'` o con `errorCode`), el
+/// reenvío se marca como **subsanación** (`Subsanacion=S` en el alta, #156): la AEAT
+/// distingue así una corrección de un alta nueva.
 pub async fn retry(pool: &PgPool, org: Uuid, id: Uuid) -> Result<(), AppError> {
     with_tenant_tx(pool, org, async move |tx, _| {
         // Resetea `attempts` (H-02): si no, un FAILED (attempts=MAX) re-encolado
         // se marcaría FAILED tras un único intento, haciendo el retry inefectivo.
+        // Limpia `nextAttemptAt` para que el worker lo tome de inmediato.
         sqlx::query(
             r#"UPDATE "VerifactuRecord"
-               SET status = 'PENDING'::"VerifactuStatus", "lastError" = NULL, attempts = 0
+               SET status = 'PENDING'::"VerifactuStatus", "lastError" = NULL, attempts = 0,
+                   "nextAttemptAt" = NULL,
+                   subsanacion = subsanacion
+                     OR COALESCE("aeatState" = 'Incorrecto', false)
+                     OR "errorCode" IS NOT NULL
                WHERE id = $1 AND "organizationId" = $2"#,
         )
         .bind(id)

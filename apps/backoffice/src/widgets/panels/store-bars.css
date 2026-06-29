@@ -1,0 +1,139 @@
+/* Sección 02 · «Ventas por tienda» — barras de facturación por tienda (banda con hairline arriba/abajo),
+   réplica pixel-a-pixel del handoff «Fundación Geist». Las 3 primeras en acento, el resto en azul suave;
+   valor encima de cada barra y nombre debajo. Área de barras flexible (crece con el alto del tile). */
+.sb-panel {
+  position: relative;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  overflow: hidden;
+  padding: 18px 0 4px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+.sb-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+  padding: 0 20px;
+  color: var(--ui-text);
+}
+/* Carril desplazable. El padding lateral deja respirar a la primera/última barra en los extremos del
+   scroll (en el medio las barras van a sangre, porque el padding queda fuera de vista al desplazar). */
+.sb-scroll {
+  position: relative;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  touch-action: pan-x;
+  user-select: none;
+}
+.sb-scroll::-webkit-scrollbar {
+  display: none;
+}
+/* Tira interna (barras + etiquetas): objetivo del rubber-band (se traslada con transform). El ancho es
+   max(100% del carril, ancho intrínseco de las barras) → rellena cuando las tiendas son pocas y desborda
+   con scroll cuando son muchas. */
+.sb-strip {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+}
+.sb-bars {
+  /* Altura fija: es la referencia definida para .sb-col { height: 100% } y .sb-bar { height: N% }.
+     No puede ser flex:1 + min-height porque min-height no es "altura definida" en CSS y los % colapsan. */
+  height: 200px;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--ui-border-strong);
+}
+.sb-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+.sb-val {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.sb-bar {
+  width: 100%;
+  max-width: 42px;
+  border-radius: 6px 6px 0 0;
+  background: var(--ui-brand);
+  transform-origin: bottom;
+  animation: sb-grow 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* Tiendas fuera del podio: azul suave (≈ #bcd9fb), derivado del acento → sigue el tema. */
+.sb-bar--soft {
+  background: color-mix(in srgb, var(--ui-brand) 28%, var(--ui-surface));
+}
+@keyframes sb-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+.sb-labels {
+  display: flex;
+  gap: 14px;
+  margin-top: 9px;
+  padding: 0 20px;
+}
+.sb-label {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ui-text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Barra de scroll personalizada: pista anclada al fondo del panel (igual que en el heatmap).
+   Posición/ancho del thumb calculados en JS. Se oculta con opacity:0 si todo el contenido cabe. */
+.sb-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  height: 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ui-border) 55%, transparent);
+  transition: opacity var(--ui-dur-fast, 150ms) ease;
+}
+.sb-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  border-radius: 3px;
+  background: var(--ui-brand);
+}
+.sb-empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-height: 170px;
+  font-size: 13px;
+  color: var(--ui-text-soft);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-bar {
+    animation: none;
+  }
+}

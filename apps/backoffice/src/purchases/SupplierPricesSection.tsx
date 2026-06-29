@@ -31,11 +31,9 @@ import {
 export function SupplierPricesSection({
   fixedSupplierId,
   initialView,
-  tabs,
 }: {
   fixedSupplierId?: string;
   initialView?: 'tarifas' | 'comparativa';
-  tabs?: ReactNode;
 } = {}) {
   const qc = useQueryClient();
   const [view, setView] = useState<'tarifas' | 'comparativa'>(initialView ?? 'tarifas');
@@ -207,31 +205,40 @@ export function SupplierPricesSection({
     ) : null,
   );
 
-  // Cabecera de la card: pestañas de página (Proveedores/Tarifas/…) + las sub-vistas
-  // de tarifas (por proveedor / comparativa), apiladas DENTRO del panel en vez de
-  // flotar sobre el lienzo. En la vista detalle de proveedor (fixedSupplierId) no hay
-  // ni pestañas de página ni sub-vistas → null (sin cabecera).
-  const cardHeader = fixedSupplierId ? null : (
-    <>
-      {tabs}
-      <nav className="bo-tabs" data-testid="sp-view-tabs">
-        <button
-          className={`bo-tab ${view === 'tarifas' ? 'active' : ''}`}
-          onClick={() => setView('tarifas')}
-          data-testid="sp-view-tarifas"
-        >
-          Tarifas por proveedor
-        </button>
-        <button
-          className={`bo-tab ${view === 'comparativa' ? 'active' : ''}`}
-          onClick={() => setView('comparativa')}
-          data-testid="sp-view-comparativa"
-        >
-          Comparativa
-        </button>
-      </nav>
-    </>
+  // Sub-navegación de vistas de tarifas (Tarifas por proveedor / Comparativa). Las pestañas de
+  // PÁGINA (Proveedores/Tarifas/Pedidos/Propuesta) ya no viven aquí: se inyectan en la TopBar
+  // desde SuppliersPage. En la vista detalle de proveedor (fixedSupplierId) no hay sub-vistas.
+  const subViewNav = (
+    <nav className="bo-tabs" data-testid="sp-view-tabs">
+      <button
+        className={`bo-tab ${view === 'tarifas' ? 'active' : ''}`}
+        onClick={() => setView('tarifas')}
+        data-testid="sp-view-tarifas"
+      >
+        Tarifas por proveedor
+      </button>
+      <button
+        className={`bo-tab ${view === 'comparativa' ? 'active' : ''}`}
+        onClick={() => setView('comparativa')}
+        data-testid="sp-view-comparativa"
+      >
+        Comparativa
+      </button>
+    </nav>
   );
+  // Cabecera de card en UNA sola línea: sub-navegación de vistas + herramientas (filtro/CTA).
+  // En la vista detalle (fixedSupplierId) no hay sub-nav: solo la fila de herramientas (si las hay).
+  const renderHeader = (tools: ReactNode) =>
+    fixedSupplierId ? (
+      tools ? (
+        <div className="dt-header-row">{tools}</div>
+      ) : null
+    ) : (
+      <div className="dt-header-row">
+        {subViewNav}
+        {tools}
+      </div>
+    );
 
   return (
     <section className="catalog">
@@ -241,12 +248,7 @@ export function SupplierPricesSection({
 
           <div className="table-panel">
             <DataTable
-              header={cardHeader}
-              columns={[...effectiveColumns, deleteColumn]}
-              rows={priceSorted}
-              rowKey={(r) => r.id}
-              loading={pricesLoading}
-              toolbar={
+              header={renderHeader(
                 <div className="users-toolbar">
                   <div className="sales-filters">
                     {!fixedSupplierId && (
@@ -274,8 +276,12 @@ export function SupplierPricesSection({
                       Añadir tarifa
                     </Button>
                   </div>
-                </div>
-              }
+                </div>,
+              )}
+              columns={[...effectiveColumns, deleteColumn]}
+              rows={priceSorted}
+              rowKey={(r) => r.id}
+              loading={pricesLoading}
               {...(sort ? { sort } : {})}
               onSortChange={(key) =>
                 setSort((cur) =>
@@ -295,27 +301,28 @@ export function SupplierPricesSection({
       ) : (
         <>
           <div className="table-panel">
-            {cardHeader}
-            <div className="table-toolbar">
-              <div className="sales-filters">
-                <Select
-                  className="catalog-search"
-                  value={familyId}
-                  onChange={setFamilyId}
-                  ariaLabel="Arquetipo"
-                  data-testid="sp-family"
-                  options={[
-                    { value: '', label: 'Todos los arquetipos' },
-                    // Solo nodos ARQUETIPO: la comparativa agrupa productos casi
-                    // idénticos; filtrar por una familia raíz no casa con el árbol
-                    // canónico (los comparables cuelgan de arquetipos hoja).
-                    ...flattenTree(families)
-                      .filter((f) => f.node.isArchetype)
-                      .map((f) => ({ value: f.node.id, label: f.node.name })),
-                  ]}
-                />
-              </div>
-            </div>
+            {renderHeader(
+              <div className="users-toolbar">
+                <div className="sales-filters">
+                  <Select
+                    className="catalog-search"
+                    value={familyId}
+                    onChange={setFamilyId}
+                    ariaLabel="Arquetipo"
+                    data-testid="sp-family"
+                    options={[
+                      { value: '', label: 'Todos los arquetipos' },
+                      // Solo nodos ARQUETIPO: la comparativa agrupa productos casi
+                      // idénticos; filtrar por una familia raíz no casa con el árbol
+                      // canónico (los comparables cuelgan de arquetipos hoja).
+                      ...flattenTree(families)
+                        .filter((f) => f.node.isArchetype)
+                        .map((f) => ({ value: f.node.id, label: f.node.name })),
+                    ]}
+                  />
+                </div>
+              </div>,
+            )}
           </div>
           {/* Comparativa gráfica: media/mediana por proveedor + producto concreto.
               Apilados para que cada gráfico respire; con ≤3 proveedores las barras
