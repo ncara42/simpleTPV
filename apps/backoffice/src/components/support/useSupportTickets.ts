@@ -73,9 +73,41 @@ export function useSupportTickets(): UseSupportTickets {
     }
   }, []);
 
+  const selectTicket = useCallback((id: string) => {
+    setSelectedId(id);
+    setError(null);
+    setUnread((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    setLoadingThread(true);
+    void getTicketThread(id)
+      .then((thread) => {
+        for (const m of thread.messages) seenIdsRef.current.add(m.id);
+        setMessages(thread.messages);
+        setTickets((prev) => prev.map((t) => (t.id === id ? thread.ticket : t)));
+      })
+      .catch(() => setError('No se pudo cargar el ticket.'))
+      .finally(() => setLoadingThread(false));
+  }, []);
+
+  // Carga inicial: tickets + auto-selección del último ticket abierto.
   useEffect(() => {
-    void refreshTickets();
-  }, [refreshTickets]);
+    void (async () => {
+      try {
+        const res = await listTickets();
+        setTickets(res.tickets);
+        if (selectedIdRef.current === null) {
+          const firstOpen = res.tickets.find((t) => t.status === 'open');
+          if (firstOpen) selectTicket(firstOpen.id);
+        }
+      } catch {
+        setError('No se pudieron cargar tus tickets.');
+      }
+    })();
+  }, [selectTicket]);
 
   // Respuestas de soporte en vivo (vía Telegram) y cierres.
   useEffect(() => {
@@ -117,26 +149,6 @@ export function useSupportTickets(): UseSupportTickets {
     });
     return unsubscribe;
   }, [refreshTickets]);
-
-  const selectTicket = useCallback((id: string) => {
-    setSelectedId(id);
-    setError(null);
-    setUnread((prev) => {
-      if (!prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    setLoadingThread(true);
-    void getTicketThread(id)
-      .then((thread) => {
-        for (const m of thread.messages) seenIdsRef.current.add(m.id);
-        setMessages(thread.messages);
-        setTickets((prev) => prev.map((t) => (t.id === id ? thread.ticket : t)));
-      })
-      .catch(() => setError('No se pudo cargar el ticket.'))
-      .finally(() => setLoadingThread(false));
-  }, []);
 
   const startNew = useCallback(() => {
     setSelectedId(null);
