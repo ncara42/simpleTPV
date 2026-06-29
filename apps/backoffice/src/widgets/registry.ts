@@ -43,6 +43,15 @@ export const WIDGET_LABELS: Record<string, string> = {
   'kpi-area': 'KPI con área',
   'kpi-alerta': 'KPI de alerta',
   'kpi-7dias': 'KPI 7 días',
+  // Sección 08 · Mini gráficas (rediseño)
+  'mini-tiendas': 'Mini · barras por tienda',
+  'mini-tendencia': 'Mini · línea de tendencia',
+  'mini-acumulado': 'Mini · área acumulada',
+  'mini-donut': 'Mini · donut de familias',
+  'mini-gauge': 'Mini · gauge de margen',
+  'mini-familias': 'Mini · top familias',
+  'mini-heatmap': 'Mini · heatmap horario',
+  'mini-columnas': 'Mini · columnas por hora',
 };
 
 // Tipo de widget en el registry. Los del catálogo son 'kpi' o 'panel' (su render lo posee

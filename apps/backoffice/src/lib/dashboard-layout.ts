@@ -76,6 +76,15 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'kpi-area': { w: 3, h: 2 },
   'kpi-alerta': { w: 3, h: 2 },
   'kpi-7dias': { w: 3, h: 2 },
+  // Sección 08 · Mini gráficas (rediseño): tiles de bolsillo (rejilla de 5 en el handoff).
+  'mini-tiendas': { w: 3, h: 1 },
+  'mini-tendencia': { w: 3, h: 1 },
+  'mini-acumulado': { w: 3, h: 1 },
+  'mini-donut': { w: 3, h: 1 },
+  'mini-gauge': { w: 3, h: 1 },
+  'mini-familias': { w: 3, h: 1 },
+  'mini-heatmap': { w: 3, h: 1 },
+  'mini-columnas': { w: 3, h: 1 },
 };
 
 const DEFAULT_SPEC = { w: 4, h: 2 };

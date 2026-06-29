@@ -611,6 +611,225 @@ function ThumbKpi7d(): ReactNode {
   );
 }
 
+// ── Sección 08 · Mini gráficas: miniaturas de bolsillo (mismas viz, en pequeño) ──
+
+// «Mini · barras por tienda»: 5 barras, las 3 primeras en acento, el resto suaves.
+function ThumbMiniStoreBars(): ReactNode {
+  const bars = [100, 94, 90, 78, 75];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {bars.map((h, i) => (
+        <rect
+          key={i}
+          x={8 + i * 24}
+          y={60 - (h / 100) * 52}
+          width={16}
+          height={(h / 100) * 52}
+          rx={2.5}
+          fill={i < 3 ? 'var(--ui-brand)' : SOFT_BLUE}
+        />
+      ))}
+    </svg>
+  );
+}
+
+// «Mini · línea de tendencia»: polilínea con punto al final.
+function ThumbMiniTrend(): ReactNode {
+  const line = 'M6,50 L26,38 L46,42 L66,26 L86,40 L106,22 L126,30';
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <path
+        d={line}
+        fill="none"
+        stroke="var(--ui-brand)"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+      <circle cx={126} cy={30} r={3.5} fill="var(--ui-brand)" />
+    </svg>
+  );
+}
+
+// «Mini · área acumulada»: área ascendente (acumulado siempre creciente).
+function ThumbMiniArea(): ReactNode {
+  const line = 'M6,52 L46,42 L86,28 L126,12';
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <path d={`${line} L126,60 L6,60 Z`} fill="var(--ui-brand-soft)" />
+      <path
+        d={line}
+        fill="none"
+        stroke="var(--ui-brand)"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
+// «Mini · donut de familias»: rótulo a la izquierda + anillo segmentado a la derecha.
+function ThumbMiniDonut(): ReactNode {
+  const R = 18;
+  const C = 2 * Math.PI * R;
+  const segs = [0.46, 0.28, 0.16, 0.1];
+  let acc = 0;
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <rect x={10} y={20} width={26} height={4} rx={2} fill={SOFT_BLUE} />
+      <rect x={10} y={30} width={40} height={11} rx={2} fill="var(--ui-brand)" />
+      <g transform="translate(102,32) rotate(-90)">
+        {segs.map((f, i) => {
+          const len = f * C;
+          const node = (
+            <circle
+              key={i}
+              r={R}
+              fill="none"
+              strokeWidth={9}
+              stroke={`color-mix(in oklab, var(--ui-brand) ${100 - i * 24}%, var(--ui-surface))`}
+              strokeDasharray={`${len} ${C - len}`}
+              strokeDashoffset={-acc}
+            />
+          );
+          acc += len;
+          return node;
+        })}
+      </g>
+    </svg>
+  );
+}
+
+// «Mini · gauge de margen»: semicírculo de capacidad con la cifra al pie.
+function ThumbMiniGauge(): ReactNode {
+  const arc = 'M18,52 A40,40 0 0 1 114,52';
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <path
+        d={arc}
+        fill="none"
+        stroke="var(--ui-surface-subtle)"
+        strokeWidth={10}
+        strokeLinecap="round"
+      />
+      <path
+        d={arc}
+        fill="none"
+        stroke="var(--ui-brand)"
+        strokeWidth={10}
+        strokeLinecap="round"
+        strokeDasharray="92 160"
+      />
+    </svg>
+  );
+}
+
+// «Mini · top familias»: tres filas (rótulo + riel proporcional).
+function ThumbMiniTopFam(): ReactNode {
+  const widths = [108, 96, 78];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {widths.map((w, i) => {
+        const y = 12 + i * 18;
+        return (
+          <g key={i}>
+            <rect x={6} y={y} width={18} height={6} rx={3} fill={SOFT_BLUE} />
+            <rect x={28} y={y} width={6} height={6} rx={3} fill="var(--ui-surface-subtle)" />
+            <rect x={28} y={y} width={w - 30} height={6} rx={3} fill="var(--ui-brand)" />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// «Mini · heatmap horario»: tira de 11 celdas con intensidad variable.
+function ThumbMiniHeatmap(): ReactNode {
+  const heat = [0.24, 0.46, 0.62, 0.9, 1, 0.72, 0.5, 0.62, 0.58, 0.6, 0.34];
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {heat.map((t, i) => (
+        <rect
+          key={i}
+          x={6 + i * 11.2}
+          y={24}
+          width={9.5}
+          height={16}
+          rx={2.5}
+          fill={`color-mix(in oklab, var(--ui-brand) ${Math.round(8 + t * 92)}%, var(--ui-surface))`}
+        />
+      ))}
+    </svg>
+  );
+}
+
+// «Mini · columnas por hora»: columnas con la hora punta en acento.
+function ThumbMiniColumns(): ReactNode {
+  const heights = [61, 95, 95, 100, 75, 79, 87, 75, 77, 76, 92];
+  const peak = heights.indexOf(Math.max(...heights));
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {heights.map((h, i) => (
+        <rect
+          key={i}
+          x={6 + i * 11.2}
+          y={58 - (h / 100) * 50}
+          width={9}
+          height={(h / 100) * 50}
+          rx={2}
+          fill={
+            i === peak
+              ? 'var(--ui-brand)'
+              : `color-mix(in oklab, var(--ui-brand) 15%, var(--ui-surface))`
+          }
+        />
+      ))}
+    </svg>
+  );
+}
+
 // Entradas de la galería (se amplía por tandas).
 export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
   // Sección 01 · KPIs
@@ -758,5 +977,62 @@ export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
     category: 'kpis-formatos',
     description: 'Cifra con mini-barras recientes',
     thumbnail: <ThumbKpi7d />,
+  },
+  // Sección 08 · Mini gráficas
+  {
+    id: 'mini-tiendas',
+    label: 'Mini · barras por tienda',
+    category: 'mini',
+    description: 'Facturación de hoy por tienda',
+    thumbnail: <ThumbMiniStoreBars />,
+  },
+  {
+    id: 'mini-tendencia',
+    label: 'Mini · línea de tendencia',
+    category: 'mini',
+    description: 'Tendencia del ticket medio',
+    thumbnail: <ThumbMiniTrend />,
+  },
+  {
+    id: 'mini-acumulado',
+    label: 'Mini · área acumulada',
+    category: 'mini',
+    description: 'Beneficio acumulado del periodo',
+    thumbnail: <ThumbMiniArea />,
+  },
+  {
+    id: 'mini-donut',
+    label: 'Mini · donut de familias',
+    category: 'mini',
+    description: 'Reparto por familia, en anillo',
+    thumbnail: <ThumbMiniDonut />,
+  },
+  {
+    id: 'mini-gauge',
+    label: 'Mini · gauge de margen',
+    category: 'mini',
+    description: '% de margen como capacidad',
+    thumbnail: <ThumbMiniGauge />,
+  },
+  {
+    id: 'mini-familias',
+    label: 'Mini · top familias',
+    category: 'mini',
+    description: 'Las 3 familias top, en riel',
+    thumbnail: <ThumbMiniTopFam />,
+  },
+  {
+    id: 'mini-heatmap',
+    label: 'Mini · heatmap horario',
+    category: 'mini',
+    description: 'Intensidad por hora (7h→17h)',
+    thumbnail: <ThumbMiniHeatmap />,
+  },
+  {
+    id: 'mini-columnas',
+    label: 'Mini · columnas por hora',
+    category: 'mini',
+    description: 'Ventas por hora; punta en acento',
+    thumbnail: <ThumbMiniColumns />,
   },
 ];

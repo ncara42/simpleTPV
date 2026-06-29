@@ -13,6 +13,16 @@ import { HourArea, HourHeatmap, StoreBars } from './graficas.js';
 import { ClassicKpiCard, ConnectedKpiGrid } from './kpis.js';
 import { AlertKpi, AreaKpi, DualKpi, SevenDayKpi } from './kpis-formatos.js';
 import { FamilyShare, ProductRanking, SalesMix } from './listas.js';
+import {
+  MiniCumulativeArea,
+  MiniFamilyDonut,
+  MiniHourColumns,
+  MiniHourHeatmap,
+  MiniMarginGauge,
+  MiniStoreBars,
+  MiniTopFamilies,
+  MiniTrendLine,
+} from './mini.js';
 import type { PanelProps } from './types.js';
 
 // Registro de RENDER de los widgets del rediseño. Una entrada por widget; se amplía por tandas (cada
@@ -44,6 +54,15 @@ export const WIDGET_PANELS: Record<string, (props: PanelProps) => ReactElement> 
   'kpi-area': AreaKpi,
   'kpi-alerta': AlertKpi,
   'kpi-7dias': SevenDayKpi,
+  // Sección 08 · Mini gráficas
+  'mini-tiendas': MiniStoreBars,
+  'mini-tendencia': MiniTrendLine,
+  'mini-acumulado': MiniCumulativeArea,
+  'mini-donut': MiniFamilyDonut,
+  'mini-gauge': MiniMarginGauge,
+  'mini-familias': MiniTopFamilies,
+  'mini-heatmap': MiniHourHeatmap,
+  'mini-columnas': MiniHourColumns,
 };
 
 // Ids de los widgets con render (para el test de paridad con el catálogo).
