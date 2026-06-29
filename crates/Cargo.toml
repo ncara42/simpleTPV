@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["shared", "db", "auth", "domain", "http", "app", "ai"]
+members = ["shared", "db", "auth", "domain", "http", "app", "ai", "telegram"]
 
 # Migración del backend a Rust — workspace Cargo.
 # Arquitectura por capas (ver docs/migration-rust/02 §3):

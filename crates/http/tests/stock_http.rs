@@ -52,6 +52,7 @@ async fn build() -> (Router, PgPool) {
             false,
             Vec::new(),
             None,
+            None,
         )),
         admin,
     )

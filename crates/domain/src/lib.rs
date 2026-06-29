@@ -32,6 +32,7 @@ pub mod serde_helpers;
 pub mod stock;
 pub mod store_access;
 pub mod stores;
+pub mod support;
 pub mod suppliers;
 pub mod time_clock;
 pub mod transfers;

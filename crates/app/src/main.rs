@@ -12,6 +12,7 @@ use simpletpv_ai::AiConfig;
 use simpletpv_auth::{AuthConfig, AuthService, DbUserStateLookup, UserStateService};
 use simpletpv_http::{build_router, AppState};
 use simpletpv_shared::AppConfig;
+use simpletpv_telegram::{TelegramClient, TelegramConfig};
 use tokio::net::TcpListener;
 use tokio::signal;
 use tracing_subscriber::layer::SubscriberExt;
@@ -118,6 +119,30 @@ async fn run() -> anyhow::Result<()> {
     if ai.is_none() {
         tracing::info!("chatbot IA deshabilitado (sin OPENAI_API_KEY ni ANTHROPIC_API_KEY)");
     }
+    // Soporte por Telegram (Ayuda). Sin las variables TELEGRAM_* el escalado a
+    // humano queda inactivo (la IA sigue resolviendo lo que pueda).
+    let telegram = TelegramConfig::from_env().map(TelegramClient::new);
+    match &telegram {
+        Some(client) => {
+            // Registro best-effort del webhook al arrancar si se indica la URL pública
+            // (idempotente en Telegram). Si no, se registra manualmente con setWebhook.
+            if let Some(url) = std::env::var("TELEGRAM_WEBHOOK_URL")
+                .ok()
+                .filter(|s| !s.trim().is_empty())
+            {
+                let client = client.clone();
+                tokio::spawn(async move {
+                    match client.set_webhook(url.trim()).await {
+                        Ok(()) => tracing::info!("webhook de Telegram registrado"),
+                        Err(e) => tracing::error!(error = %e, "fallo registrando el webhook de Telegram"),
+                    }
+                });
+            }
+        }
+        None => tracing::info!(
+            "soporte por Telegram deshabilitado (faltan TELEGRAM_BOT_TOKEN / TELEGRAM_SUPPORT_CHAT_ID / TELEGRAM_WEBHOOK_SECRET)"
+        ),
+    }
     let app = build_router(AppState::new(
         auth,
         user_state,
@@ -126,6 +151,7 @@ async fn run() -> anyhow::Result<()> {
         cookie_secure,
         config.cors_origins,
         ai,
+        telegram,
     ));
 
     // Worker de envío VeriFactu (#155): drena la cola de registros PENDING con
@@ -444,6 +470,11 @@ async fn run_migrations(pool: &sqlx::PgPool) -> anyhow::Result<()> {
             "../migrations/20260623130000_sale_customer_fiscal.sql",
             20260623130000,
             "sale_customer_fiscal"
+        ),
+        m!(
+            "../migrations/20260629120000_support.sql",
+            20260629120000,
+            "support"
         ),
     ];
 

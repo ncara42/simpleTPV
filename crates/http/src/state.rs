@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use simpletpv_ai::AiConfig;
 use simpletpv_auth::{AuthService, DbUserStateLookup, UserStateService};
+use simpletpv_telegram::TelegramClient;
 use sqlx::PgPool;
 
 use crate::events::EventHub;
@@ -38,9 +39,15 @@ struct Inner {
     events: EventHub,
     /// Configuración de proveedores LLM (claves de API). None si no se configuró.
     ai: Option<AiConfig>,
+    /// Cliente del bot de Telegram para el soporte con escalado humano (Ayuda).
+    /// None si no se configuró (TELEGRAM_*): el escalado a humano queda inactivo.
+    telegram: Option<TelegramClient>,
 }
 
 impl AppState {
+    // El estado agrupa las dependencias del router (auth, pools, config, IA,
+    // Telegram). Pasarlas explícitas es más claro que un struct de config aparte.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         auth: AuthService,
         user_state: UserStateService<DbUserStateLookup>,
@@ -49,6 +56,7 @@ impl AppState {
         cookie_secure: bool,
         cors_origins: Vec<String>,
         ai: Option<AiConfig>,
+        telegram: Option<TelegramClient>,
     ) -> Self {
         Self {
             inner: Arc::new(Inner {
@@ -60,6 +68,7 @@ impl AppState {
                 cors_origins,
                 events: EventHub::new(),
                 ai,
+                telegram,
             }),
         }
     }
@@ -97,5 +106,10 @@ impl AppState {
     /// Configuración de proveedores LLM. None si no hay claves configuradas.
     pub fn ai(&self) -> Option<&AiConfig> {
         self.inner.ai.as_ref()
+    }
+
+    /// Cliente de Telegram para el soporte (Ayuda). None si no se configuró.
+    pub fn telegram(&self) -> Option<&TelegramClient> {
+        self.inner.telegram.as_ref()
     }
 }

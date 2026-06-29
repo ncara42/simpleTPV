@@ -43,6 +43,7 @@ use crate::sales_export;
 use crate::state::AppState;
 use crate::stock;
 use crate::stores;
+use crate::support;
 use crate::suppliers;
 use crate::time_clock;
 use crate::transfers;
@@ -187,6 +188,10 @@ pub fn build_router(state: AppState) -> Router {
                 config: Arc::new(public_rl),
             }),
         )
+        // Webhook de Telegram para el soporte (Ayuda): SIN JWT (lo llama Telegram).
+        // Se autentica con el secreto compartido en la cabecera
+        // `X-Telegram-Bot-Api-Secret-Token`, validado dentro del handler.
+        .route("/telegram/webhook", post(support::telegram_webhook))
         // VeriFactu (Fase 5, #155): estado y reintento de registros (ADMIN/MANAGER).
         // El envío real lo procesa el worker de fondo (cola Postgres SKIP LOCKED).
         .route("/verifactu/records", get(verifactu::list))
@@ -471,6 +476,10 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/chat/models", get(chat::list_models))
         .route("/chat/usage", get(chat::get_org_usage))
+        // Soporte con escalado a humano (Ayuda): cualquier rol autenticado. La IA
+        // triagea y, si no puede, escala al tema de Telegram del cliente.
+        .route("/support/chat", post(support::chat))
+        .route("/support/messages", get(support::get_messages))
         // Eventos en tiempo real (Fase 4, #32): stream SSE filtrado por tenant del
         // JWT. Cualquier rol; tope de conexiones por usuario (SEC-03).
         .route("/events", get(events::stream))

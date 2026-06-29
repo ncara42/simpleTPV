@@ -12,6 +12,7 @@ simpletpv-db = { path = "../db" }
 simpletpv-auth = { path = "../auth" }
 simpletpv-domain = { path = "../domain" }
 simpletpv-ai = { path = "../ai" }
+simpletpv-telegram = { path = "../telegram" }
 axum.workspace = true
 axum-extra.workspace = true
 tower.workspace = true
@@ -22,7 +23,7 @@ uuid.workspace = true
 serde.workspace = true
 serde_json = "1"
 tracing.workspace = true
-time = "0.3"
+time = { workspace = true }
 # SSE (#32): bus de eventos in-process (broadcast por tenant) + stream del endpoint.
 tokio = { workspace = true, features = ["sync"] }
 async-stream = { workspace = true }

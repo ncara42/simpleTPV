@@ -690,7 +690,11 @@ export type AppEventType =
   | 'stock.changed'
   | 'sale.completed'
   | 'alert.created'
-  | 'cash.movement.requested';
+  | 'cash.movement.requested'
+  // Soporte (Ayuda): respuesta de una persona de soporte (vía Telegram) y cierre
+  // de la conversación (vuelta al asistente automático con /cerrar).
+  | 'support.message'
+  | 'support.closed';
 export interface AppEvent {
   type: AppEventType;
   data: Record<string, unknown>;

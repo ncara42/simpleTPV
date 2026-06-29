@@ -3,6 +3,7 @@ import { LifeBuoy, Mail, MessageCircle, Phone } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { ApiKeysSection } from './ApiKeysSection.js';
+import { SupportChat } from './components/support/SupportChat.js';
 
 // Canales de soporte. Configurables por despliegue (VITE_SUPPORT_*) con defaults
 // para que el panel funcione sin configuración. El WhatsApp es el número en
@@ -62,6 +63,10 @@ export function HelpPage() {
 
   return (
     <section className="catalog help-page" data-testid="help-page">
+      {/* Chat de soporte: la IA resuelve lo que puede y, si no, escala a una
+          persona (vía Telegram). Las respuestas humanas llegan en vivo por SSE. */}
+      <SupportChat />
+
       <section className="help-section">
         <header className="help-section-head">
           <h3 className="help-title">

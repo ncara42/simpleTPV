@@ -2645,6 +2645,126 @@
   color: var(--ui-text-muted);
 }
 
+/* ── Chat de soporte (Ayuda) ──────────────────────────────────────────────── */
+/* Mismo lenguaje-superficie que el resto de .help-section. El log es una zona con
+   scroll propio; el composer queda anclado debajo. */
+.support-log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4);
+  max-height: 22rem;
+  overflow-y: auto;
+  padding: var(--ui-space-2);
+}
+.support-empty {
+  margin: var(--ui-space-6) 0;
+  text-align: center;
+  color: var(--ui-text-muted);
+}
+.support-msg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+  max-width: 82%;
+}
+/* El usuario a la derecha; asistente y soporte a la izquierda (jerarquía clara de
+   quién habla, sin uniformar todas las burbujas). */
+.support-msg--user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+.support-msg--ai,
+.support-msg--agent {
+  align-self: flex-start;
+}
+.support-msg-author {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  color: var(--ui-text-soft);
+}
+.support-msg-body {
+  padding: var(--ui-space-3) var(--ui-space-4);
+  border-radius: var(--ui-radius-xl);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  font-size: var(--ui-text-base);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.support-msg--user .support-msg-body {
+  background: var(--ui-accent-soft, var(--ui-surface));
+  border-color: var(--ui-border-strong);
+}
+/* La respuesta de una persona de soporte se distingue con un acento lateral. */
+.support-msg--agent .support-msg-body {
+  border-left: 3px solid var(--ui-accent, var(--ui-border-strong));
+}
+.support-msg-body > :first-child {
+  margin-top: 0;
+}
+.support-msg-body > :last-child {
+  margin-bottom: 0;
+}
+.support-error {
+  margin: var(--ui-space-2) 0 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-danger, #c0392b);
+}
+.support-composer {
+  display: flex;
+  gap: var(--ui-space-3);
+  align-items: flex-end;
+  margin-top: var(--ui-space-5);
+}
+.support-input {
+  flex: 1;
+  resize: none;
+  min-height: 2.75rem;
+  max-height: 8rem;
+  padding: var(--ui-space-3) var(--ui-space-4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+  line-height: 1.4;
+}
+.support-input:focus-visible {
+  outline: none;
+  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-focus);
+}
+.support-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-xl);
+  background: var(--ui-accent, var(--ui-text));
+  color: var(--ui-on-accent, #fff);
+  cursor: pointer;
+  transition:
+    transform 0.18s var(--ui-ease),
+    opacity 0.18s var(--ui-ease);
+}
+.support-send:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.support-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.support-send:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
 /* ── FAQ (acordeón) ───────────────────────────────────────────────────────── */
 /* Un solo bloque: las preguntas se separan con hairlines sutiles (no una caja por
    cada ítem). El indicador de abierto/cerrado es un chevron rotatorio, no la caja. */
