@@ -392,14 +392,22 @@ async fn forward_to_support(
         tracing::warn!(%org, "escalado de soporte sin Telegram configurado: no se notifica");
         return;
     };
+    let is_first_contact = ticket.telegram_topic_id.is_none();
     let Some(thread_id) = ensure_topic(pool, org, ticket, tg).await else {
         return;
     };
+    // En el primer escalado mostramos la pregunta original (título del ticket),
+    // no el mensaje que disparó el escalado que puede ser un turn posterior.
+    let display_message = if is_first_contact {
+        ticket.title.as_deref().unwrap_or(user_message)
+    } else {
+        user_message
+    };
     let text = match summary {
         Some(s) if !s.trim().is_empty() => {
-            format!("💬 {user_message}\n\n🤖 Resumen del asistente: {s}")
+            format!("💬 {display_message}\n\n🤖 Resumen del asistente: {s}")
         }
-        _ => format!("💬 {user_message}"),
+        _ => format!("💬 {display_message}"),
     };
     if let Err(e) = tg.send_message(Some(thread_id), &text).await {
         tracing::error!(%org, error = %e, "fallo enviando mensaje de soporte a Telegram");
