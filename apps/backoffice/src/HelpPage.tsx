@@ -9,6 +9,20 @@ import { viewContextFor } from './components/chat/view-context.js';
 import { useSupportTickets } from './components/support/useSupportTickets.js';
 import type { SupportMessage, Ticket } from './lib/support.js';
 
+// Hora relativa breve para la lista de tickets ("ahora", "hace 12 min", "hace 3 h"…).
+function formatRelative(iso: string): string {
+  const ts = new Date(iso).getTime();
+  if (Number.isNaN(ts)) return '';
+  const min = Math.round((Date.now() - ts) / 60000);
+  if (min < 1) return 'ahora';
+  if (min < 60) return `hace ${min} min`;
+  const hours = Math.round(min / 60);
+  if (hours < 24) return `hace ${hours} h`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `hace ${days} d`;
+  return new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+}
+
 // ── Composer (textarea + enviar) ─────────────────────────────────────────────────
 
 interface ComposerProps {
@@ -88,6 +102,7 @@ interface SidebarProps {
 function Sidebar({ tickets, selectedId, unread, onSelect, onNew }: SidebarProps) {
   return (
     <aside className="ticket-sidebar" data-testid="ticket-sidebar">
+      <p className="ticket-sidebar-head">Tus consultas</p>
       <button type="button" className="ticket-new-btn" onClick={onNew} data-testid="ticket-new">
         <Plus size={16} aria-hidden="true" /> Nueva consulta
       </button>
@@ -107,6 +122,7 @@ function Sidebar({ tickets, selectedId, unread, onSelect, onNew }: SidebarProps)
                 <span className={`ticket-badge ticket-badge--${t.status}`}>
                   {t.status === 'open' ? 'Abierto' : 'Cerrado'}
                 </span>
+                <span className="ticket-item-time">{formatRelative(t.updatedAt)}</span>
                 {unread.has(t.id) && (
                   <span className="ticket-unread" aria-label="Mensajes nuevos" />
                 )}
