@@ -1,8 +1,18 @@
 import './help.css';
 
 import { usePageHeader } from '@simpletpv/ui';
-import { ArrowUp, Check, CheckCheck, History, Loader2, Lock, Plus, Search } from 'lucide-react';
-import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import {
+  ArrowUp,
+  Check,
+  CheckCheck,
+  History,
+  Loader2,
+  Lock,
+  Paperclip,
+  Plus,
+  X,
+} from 'lucide-react';
+import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { ChatMarkdown } from './components/chat/ChatMarkdown.js';
@@ -43,19 +53,60 @@ interface ComposerProps {
   pending: boolean;
   placeholder: string;
   autoFocus?: boolean;
+  canAttach?: boolean;
+  onAttach?: (file: File) => void;
 }
 
-function Composer({ value, onChange, onSubmit, pending, placeholder, autoFocus }: ComposerProps) {
+function Composer({
+  value,
+  onChange,
+  onSubmit,
+  pending,
+  placeholder,
+  autoFocus,
+  canAttach,
+  onAttach,
+}: ComposerProps) {
+  const fileRef = useRef<HTMLInputElement>(null);
   const canSend = value.trim().length > 0 && !pending;
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (canSend) onSubmit();
     }
   };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    if (file) onAttach?.(file);
+    e.target.value = '';
+  };
+
   return (
-    <div className="ticket-composer">
-      <Search className="ticket-composer-clip" size={18} aria-hidden="true" />
+    <div className={`ticket-composer${canAttach ? ' ticket-composer--has-clip' : ''}`}>
+      {canAttach && (
+        <>
+          <button
+            type="button"
+            className="ticket-composer-clip"
+            onClick={() => fileRef.current?.click()}
+            disabled={pending}
+            aria-label="Adjuntar archivo"
+          >
+            <Paperclip size={17} aria-hidden="true" />
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            className="ticket-composer-file"
+            onChange={handleFileChange}
+            accept="image/*,.pdf,.doc,.docx,.txt,.csv,.xls,.xlsx"
+            aria-hidden="true"
+            tabIndex={-1}
+          />
+        </>
+      )}
       <input
         className="ticket-input"
         type="text"
@@ -223,6 +274,7 @@ export function HelpPage() {
   const view = viewContextFor('help');
   const s = useSupportTickets();
   const [draft, setDraft] = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [historialOpen, setHistorialOpen] = useState(false);
   const historialBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -247,6 +299,7 @@ export function HelpPage() {
     if (!text) return;
     s.send(text);
     setDraft('');
+    setAttachment(null);
   };
 
   const pickSuggestion = (text: string): void => {
@@ -393,13 +446,31 @@ export function HelpPage() {
             {errorBanner}
 
             {open ? (
-              <Composer
-                value={draft}
-                onChange={setDraft}
-                onSubmit={submit}
-                pending={s.pending}
-                placeholder="Escribe un mensaje…"
-              />
+              <>
+                {attachment && (
+                  <div className="ticket-attachment-chip">
+                    <Paperclip size={12} aria-hidden="true" />
+                    <span className="ticket-attachment-name">{attachment.name}</span>
+                    <button
+                      type="button"
+                      className="ticket-attachment-remove"
+                      onClick={() => setAttachment(null)}
+                      aria-label="Quitar adjunto"
+                    >
+                      <X size={11} aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
+                <Composer
+                  value={draft}
+                  onChange={setDraft}
+                  onSubmit={submit}
+                  pending={s.pending}
+                  placeholder="Escribe un mensaje…"
+                  canAttach={s.selected?.mode === 'human'}
+                  onAttach={setAttachment}
+                />
+              </>
             ) : (
               <div className="ticket-closed-note" data-testid="ticket-closed-note">
                 <Lock size={15} aria-hidden="true" />
