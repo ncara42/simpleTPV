@@ -798,11 +798,11 @@
   background: var(--ui-danger, #ef4444);
 }
 
-/* ── Pie de mensaje: hora + tick ─────────────────────────────────────────────────── */
+/* ── Pie de mensaje: hora + estado (solo último mensaje) ────────────────────────── */
 .ticket-msg-meta {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
 }
 .ticket-msg--user .ticket-msg-meta {
   justify-content: flex-end;
@@ -816,18 +816,19 @@
 .ticket-msg--user .ticket-msg-time {
   color: rgba(255, 255, 255, 0.5);
 }
-.msg-status {
-  display: block;
-  flex: none;
+.ticket-msg-status {
+  font-size: 0.6875rem;
+  line-height: 1;
+  user-select: none;
 }
-.msg-status--sending {
-  color: rgba(255, 255, 255, 0.35);
+.ticket-msg-status--sending {
+  color: rgba(255, 255, 255, 0.4);
 }
-.msg-status--received {
+.ticket-msg-status--received {
   color: rgba(255, 255, 255, 0.6);
 }
-.msg-status--seen {
-  color: #60a5fa;
+.ticket-msg-status--seen {
+  color: #93c5fd;
 }
 
 /* Punto parpadeante: estado Abierto en cabecera del ticket */

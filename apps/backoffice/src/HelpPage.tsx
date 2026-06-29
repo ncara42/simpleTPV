@@ -1,17 +1,7 @@
 import './help.css';
 
 import { usePageHeader } from '@simpletpv/ui';
-import {
-  ArrowUp,
-  Check,
-  CheckCheck,
-  History,
-  Loader2,
-  Lock,
-  Paperclip,
-  Plus,
-  X,
-} from 'lucide-react';
+import { ArrowUp, History, Loader2, Lock, Paperclip, Plus, X } from 'lucide-react';
 import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -28,20 +18,6 @@ type MsgStatus = 'sending' | 'received' | 'seen';
 function TicketStatusDot({ status }: { status: 'online' | 'waiting' | 'closed' }) {
   const label = { online: 'Agente en línea', waiting: 'En espera', closed: 'Cerrado' }[status];
   return <span className={`ticket-agent-dot ticket-agent-dot--${status}`} aria-label={label} />;
-}
-
-// ── Icono de estado del mensaje (check / double-check) ────────────────────────────
-
-function MsgStatusIcon({ status }: { status: MsgStatus }) {
-  if (status === 'seen')
-    return <CheckCheck size={12} className="msg-status msg-status--seen" aria-label="Visto" />;
-  return (
-    <Check
-      size={12}
-      className={`msg-status msg-status--${status}`}
-      aria-label={status === 'received' ? 'Recibido' : 'Enviando'}
-    />
-  );
 }
 
 // ── Composer (textarea + enviar) ─────────────────────────────────────────────────
@@ -150,24 +126,38 @@ function formatTime(iso: string): string {
 function Bubble({
   message,
   isFirstInBlock,
+  isLast,
   status,
 }: {
   message: SupportMessage;
   isFirstInBlock: boolean;
+  isLast?: boolean;
   status?: MsgStatus;
 }) {
   const mine = message.author === 'user';
   const who = message.author === 'agent' ? 'Soporte' : message.author === 'ai' ? 'Asistente' : 'Tú';
+  const statusLabel =
+    status === 'seen'
+      ? 'Leído'
+      : status === 'received'
+        ? 'Entregado'
+        : status === 'sending'
+          ? 'Enviando…'
+          : null;
   return (
     <div className={`ticket-msg ticket-msg--${mine ? 'user' : message.author}`}>
       {!mine && isFirstInBlock && <span className="ticket-msg-author">{who}</span>}
       <div className="ticket-msg-body">
         {mine ? message.body : <ChatMarkdown>{message.body}</ChatMarkdown>}
       </div>
-      <div className="ticket-msg-meta">
-        <span className="ticket-msg-time">{formatTime(message.createdAt)}</span>
-        {mine && status !== undefined && <MsgStatusIcon status={status} />}
-      </div>
+      {isLast && (
+        <div className="ticket-msg-meta">
+          <span className="ticket-msg-time">{formatTime(message.createdAt)}</span>
+          {mine && statusLabel && (
+            <span className={`ticket-msg-status ticket-msg-status--${status}`}>{statusLabel}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -400,9 +390,10 @@ export function HelpPage() {
               ) : (
                 <>
                   {threadMessages.map((m, i) => {
+                    const isLast = i === threadMessages.length - 1;
                     const isFirstInBlock = i === 0 || threadMessages[i - 1]?.author !== m.author;
                     let msgStatus: MsgStatus | undefined;
-                    if (m.author === 'user') {
+                    if (isLast && m.author === 'user') {
                       const hasReply = threadMessages
                         .slice(i + 1)
                         .some((msg) => msg.author === 'ai' || msg.author === 'agent');
@@ -419,6 +410,7 @@ export function HelpPage() {
                         key={m.id}
                         message={m}
                         isFirstInBlock={isFirstInBlock}
+                        isLast={isLast}
                         {...(msgStatus !== undefined && { status: msgStatus })}
                       />
                     );
