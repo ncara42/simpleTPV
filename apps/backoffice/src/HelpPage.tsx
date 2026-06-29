@@ -1,7 +1,7 @@
 import './help.css';
 
 import { usePageHeader } from '@simpletpv/ui';
-import { ArrowUp, History, Loader2, Lock, Plus, Search } from 'lucide-react';
+import { ArrowUp, Check, CheckCheck, History, Loader2, Lock, Plus, Search } from 'lucide-react';
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -10,6 +10,29 @@ import { viewContextFor } from './components/chat/view-context.js';
 import { useSupportTickets } from './components/support/useSupportTickets.js';
 import { usePageNav } from './lib/pageNav.js';
 import type { SupportMessage, Ticket } from './lib/support.js';
+
+type MsgStatus = 'sending' | 'received' | 'seen';
+
+// ── Dot de estado del agente ──────────────────────────────────────────────────────
+
+function TicketStatusDot({ status }: { status: 'online' | 'waiting' | 'closed' }) {
+  const label = { online: 'Agente en línea', waiting: 'En espera', closed: 'Cerrado' }[status];
+  return <span className={`ticket-agent-dot ticket-agent-dot--${status}`} aria-label={label} />;
+}
+
+// ── Icono de estado del mensaje (check / double-check) ────────────────────────────
+
+function MsgStatusIcon({ status }: { status: MsgStatus }) {
+  if (status === 'seen')
+    return <CheckCheck size={12} className="msg-status msg-status--seen" aria-label="Visto" />;
+  return (
+    <Check
+      size={12}
+      className={`msg-status msg-status--${status}`}
+      aria-label={status === 'received' ? 'Recibido' : 'Enviando'}
+    />
+  );
+}
 
 // ── Composer (textarea + enviar) ─────────────────────────────────────────────────
 
@@ -65,15 +88,24 @@ function Composer({ value, onChange, onSubmit, pending, placeholder, autoFocus }
 
 // ── Burbuja de mensaje ───────────────────────────────────────────────────────────
 
-function Bubble({ message }: { message: SupportMessage }) {
+function Bubble({
+  message,
+  isFirstInBlock,
+  status,
+}: {
+  message: SupportMessage;
+  isFirstInBlock: boolean;
+  status?: MsgStatus;
+}) {
   const mine = message.author === 'user';
   const who = message.author === 'agent' ? 'Soporte' : message.author === 'ai' ? 'Asistente' : 'Tú';
   return (
     <div className={`ticket-msg ticket-msg--${mine ? 'user' : message.author}`}>
-      {!mine && <span className="ticket-msg-author">{who}</span>}
+      {!mine && isFirstInBlock && <span className="ticket-msg-author">{who}</span>}
       <div className="ticket-msg-body">
         {mine ? message.body : <ChatMarkdown>{message.body}</ChatMarkdown>}
       </div>
+      {mine && status !== undefined && <MsgStatusIcon status={status} />}
     </div>
   );
 }
@@ -226,6 +258,15 @@ export function HelpPage() {
   const thinking =
     s.pending && s.messages.length > 0 && s.messages[s.messages.length - 1]?.author === 'user';
 
+  const dotStatus =
+    s.selected?.status === 'closed'
+      ? 'closed'
+      : s.selected?.mode === 'human'
+        ? 'online'
+        : 'waiting';
+
+  const typingLabel = s.selected?.mode === 'human' ? 'Escribiendo…' : 'Pensando…';
+
   return (
     <section className="help-centered" data-testid="help-page">
       {historialOpen && (
@@ -284,6 +325,7 @@ export function HelpPage() {
                 <span className="ticket-view-num">#{s.selected?.number ?? '—'}</span>
                 <h2>{s.selected?.title ?? 'Consulta'}</h2>
               </div>
+              {s.selectedId && <TicketStatusDot status={dotStatus} />}
             </header>
 
             <div className="ticket-thread" data-testid="ticket-thread">
@@ -293,19 +335,41 @@ export function HelpPage() {
                 </p>
               ) : (
                 <>
-                  {threadMessages.map((m) => (
-                    <Bubble key={m.id} message={m} />
-                  ))}
+                  {threadMessages.map((m, i) => {
+                    const isFirstInBlock = i === 0 || threadMessages[i - 1]?.author !== m.author;
+                    let msgStatus: MsgStatus | undefined;
+                    if (m.author === 'user') {
+                      if (m.id.startsWith('local-')) {
+                        msgStatus = 'sending';
+                      } else {
+                        const hasReply = threadMessages
+                          .slice(i + 1)
+                          .some((msg) => msg.author === 'ai' || msg.author === 'agent');
+                        msgStatus = hasReply ? 'seen' : 'received';
+                      }
+                    }
+                    return (
+                      <Bubble
+                        key={m.id}
+                        message={m}
+                        isFirstInBlock={isFirstInBlock}
+                        {...(msgStatus !== undefined && { status: msgStatus })}
+                      />
+                    );
+                  })}
                   {thinking && (
                     <div className="ticket-msg ticket-msg--ai">
-                      <span className="ticket-msg-author">Asistente</span>
+                      {(threadMessages.length === 0 ||
+                        threadMessages[threadMessages.length - 1]?.author !== 'ai') && (
+                        <span className="ticket-msg-author">Asistente</span>
+                      )}
                       <div className="ticket-msg-body ticket-thinking" role="status">
                         <span className="ticket-thinking-dots" aria-hidden="true">
                           <i />
                           <i />
                           <i />
                         </span>
-                        Pensando…
+                        {typingLabel}
                       </div>
                     </div>
                   )}

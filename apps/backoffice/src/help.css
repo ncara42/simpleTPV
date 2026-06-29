@@ -778,6 +778,42 @@
   background: color-mix(in srgb, var(--ui-text-muted) 14%, transparent);
 }
 
+/* ── Dot de estado del agente (cabecera ticket) ──────────────────────────────────── */
+.ticket-agent-dot {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  flex: none;
+}
+.ticket-agent-dot--online {
+  background: var(--ui-success, #16a34a);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-success, #16a34a) 28%, transparent);
+  animation: ticket-dot-pulse 2s ease-in-out infinite;
+}
+.ticket-agent-dot--waiting {
+  background: #f59e0b;
+}
+.ticket-agent-dot--closed {
+  background: var(--ui-danger, #ef4444);
+}
+
+/* ── Checks de estado del mensaje ────────────────────────────────────────────────── */
+.msg-status {
+  display: block;
+  flex: none;
+  margin-top: 2px;
+}
+.msg-status--sending {
+  color: rgba(255, 255, 255, 0.35);
+}
+.msg-status--received {
+  color: rgba(255, 255, 255, 0.6);
+}
+.msg-status--seen {
+  color: #60a5fa;
+}
+
 /* Punto parpadeante: estado Abierto en cabecera del ticket */
 .ticket-status-dot {
   display: inline-block;
@@ -887,7 +923,7 @@
 }
 .ticket-view-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--ui-space-3);
   padding-bottom: var(--ui-space-3);
@@ -895,7 +931,7 @@
 }
 .ticket-view-title {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--ui-space-2);
   min-width: 0;
 }
@@ -945,7 +981,13 @@
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-4);
-  padding: var(--ui-space-4) var(--ui-space-1);
+  padding: var(--ui-space-4) var(--ui-space-1) 4rem;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 4rem), transparent 100%);
+  mask-image: linear-gradient(to bottom, black calc(100% - 4rem), transparent 100%);
+}
+.ticket-thread::-webkit-scrollbar {
+  display: none;
 }
 .ticket-loading {
   display: inline-flex;
@@ -977,12 +1019,20 @@
   overflow-wrap: anywhere;
 }
 
-/* Mensajes del usuario: burbuja */
+/* Mensajes del usuario: burbuja — estilo Vercel */
+.ticket-msg--user {
+  max-width: 70%;
+}
 .ticket-msg--user .ticket-msg-body {
-  padding: var(--ui-space-3) var(--ui-space-4);
-  border-radius: var(--ui-radius-xl);
-  border: 1px solid var(--ui-border-strong);
-  background: var(--ui-accent-soft, var(--ui-surface-subtle));
+  padding: 0.5625rem 0.9375rem;
+  border-radius: 14px;
+  border: none;
+  background: var(--ui-text);
+  color: var(--ui-bg, #fff);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  font-weight: 400;
 }
 
 /* Mensajes del asistente / agente: texto plano sin fondo */
@@ -1040,6 +1090,10 @@
 .ticket-composer {
   position: relative;
   margin-top: var(--ui-space-3);
+}
+/* En ticket-view el composer va pegado al thread (0 margen) */
+.ticket-view > .ticket-composer {
+  margin-top: 0;
 }
 .ticket-composer-clip {
   position: absolute;
