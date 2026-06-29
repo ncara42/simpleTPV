@@ -1,8 +1,9 @@
 import './help.css';
 
 import { usePageHeader } from '@simpletpv/ui';
-import { ArrowUp, History, LifeBuoy, Loader2, Lock, Paperclip, Plus, X } from 'lucide-react';
-import { type KeyboardEvent, useState } from 'react';
+import { ArrowUp, History, Loader2, Lock, Plus, Search } from 'lucide-react';
+import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { ChatMarkdown } from './components/chat/ChatMarkdown.js';
 import { viewContextFor } from './components/chat/view-context.js';
@@ -31,7 +32,7 @@ function Composer({ value, onChange, onSubmit, pending, placeholder, autoFocus }
   };
   return (
     <div className="ticket-composer">
-      <Paperclip className="ticket-composer-clip" size={18} aria-hidden="true" />
+      <Search className="ticket-composer-clip" size={18} aria-hidden="true" />
       <input
         className="ticket-input"
         type="text"
@@ -77,35 +78,83 @@ function Bubble({ message }: { message: SupportMessage }) {
   );
 }
 
-// ── Sidebar: lista de tickets ──────────────────────────────────────────────────────
+// ── Dropdown historial ────────────────────────────────────────────────────────────
 
-interface SidebarProps {
+interface HistorialDropdownProps {
   tickets: Ticket[];
   selectedId: string | null;
   unread: ReadonlySet<string>;
+  anchorRef: React.RefObject<HTMLButtonElement | null>;
   onSelect: (id: string) => void;
   onNew: () => void;
+  onClose: () => void;
 }
 
-function Sidebar({ tickets, selectedId, unread, onSelect, onNew }: SidebarProps) {
-  return (
-    <aside className="ticket-sidebar" data-testid="ticket-sidebar">
-      <button type="button" className="ticket-new-btn" onClick={onNew} data-testid="ticket-new">
-        <Plus size={16} aria-hidden="true" /> Nueva consulta
+function HistorialDropdown({
+  tickets,
+  selectedId,
+  unread,
+  anchorRef,
+  onSelect,
+  onNew,
+  onClose,
+}: HistorialDropdownProps) {
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const rect = anchorRef.current?.getBoundingClientRect();
+
+  useEffect(() => {
+    function handlePointerDown(e: PointerEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node) &&
+        anchorRef.current &&
+        !anchorRef.current.contains(e.target as Node)
+      ) {
+        onClose();
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [onClose, anchorRef]);
+
+  return createPortal(
+    <div
+      ref={dropdownRef}
+      className="historial-dropdown"
+      style={{
+        top: rect ? rect.bottom + 6 : 68,
+        left: rect ? rect.left : 16,
+      }}
+      role="dialog"
+      aria-label="Historial de consultas"
+    >
+      <button
+        type="button"
+        className="historial-new-btn"
+        onClick={() => {
+          onNew();
+          onClose();
+        }}
+      >
+        <Plus size={14} aria-hidden="true" />
+        Nueva consulta
       </button>
-      <div className="ticket-list">
-        {tickets.length === 0 ? (
-          <p className="ticket-empty">Aún no tienes consultas de soporte.</p>
-        ) : (
-          tickets.map((t) => (
+      {tickets.length === 0 ? (
+        <p className="historial-empty">Sin consultas previas</p>
+      ) : (
+        <div className="historial-list">
+          {tickets.map((t) => (
             <button
               key={t.id}
               type="button"
-              className={`ticket-item${t.id === selectedId ? ' is-active' : ''}`}
-              onClick={() => onSelect(t.id)}
+              className={`historial-item${t.id === selectedId ? ' is-active' : ''}`}
+              onClick={() => {
+                onSelect(t.id);
+                onClose();
+              }}
             >
-              <span className="ticket-item-top">
-                <span className="ticket-item-num">#{t.number ?? '—'}</span>
+              <span className="historial-item-meta">
+                <span className="historial-item-num">#{t.number ?? '—'}</span>
                 <span className={`ticket-badge ticket-badge--${t.status}`}>
                   {t.status === 'open' ? 'Abierto' : 'Cerrado'}
                 </span>
@@ -113,12 +162,13 @@ function Sidebar({ tickets, selectedId, unread, onSelect, onNew }: SidebarProps)
                   <span className="ticket-unread" aria-label="Mensajes nuevos" />
                 )}
               </span>
-              <span className="ticket-item-title">{t.title ?? 'Consulta'}</span>
+              <span className="historial-item-title">{t.title ?? 'Consulta'}</span>
             </button>
-          ))
-        )}
-      </div>
-    </aside>
+          ))}
+        </div>
+      )}
+    </div>,
+    document.body,
   );
 }
 
@@ -130,17 +180,18 @@ export function HelpPage() {
   const view = viewContextFor('help');
   const s = useSupportTickets();
   const [draft, setDraft] = useState('');
+  const [historialOpen, setHistorialOpen] = useState(false);
+  const historialBtnRef = useRef<HTMLButtonElement>(null);
 
   usePageNav(
     s.tickets.length > 0 ? (
       <button
+        ref={historialBtnRef}
         type="button"
         className="help-history-btn"
-        onClick={() => {
-          s.startNew();
-          setDraft('');
-        }}
+        onClick={() => setHistorialOpen((o) => !o)}
         data-testid="help-history"
+        aria-expanded={historialOpen}
       >
         <History size={15} aria-hidden="true" />
         Historial
@@ -169,38 +220,38 @@ export function HelpPage() {
     </div>
   );
 
-  // Mensajes a pintar: se omite el PRIMERO (es el título del ticket, ya mostrado en
-  // la cabecera, para no repetir el texto).
+  // Se omite el PRIMERO (es el título del ticket, no repetirlo en el hilo).
   const threadMessages = s.messages.slice(1);
   const open = s.selected?.status === 'open';
-  // Turno en vivo: tras enviar, el último mensaje es del usuario y esperamos respuesta.
   const thinking =
     s.pending && s.messages.length > 0 && s.messages[s.messages.length - 1]?.author === 'user';
 
   return (
-    <section className="help-tickets" data-testid="help-page">
-      <Sidebar
-        tickets={s.tickets}
-        selectedId={s.selectedId}
-        unread={s.unread}
-        onSelect={s.selectTicket}
-        onNew={() => {
-          s.startNew();
-          setDraft('');
-        }}
-      />
+    <section className="help-centered" data-testid="help-page">
+      {historialOpen && (
+        <HistorialDropdown
+          tickets={s.tickets}
+          selectedId={s.selectedId}
+          unread={s.unread}
+          anchorRef={historialBtnRef}
+          onSelect={s.selectTicket}
+          onNew={() => {
+            s.startNew();
+            setDraft('');
+          }}
+          onClose={() => setHistorialOpen(false)}
+        />
+      )}
 
       <main className="ticket-main">
         {s.selectedId === null ? (
           // ── Nueva consulta ──
           <section className="ticket-hero">
-            <p className="ticket-hero-eyebrow">
-              <LifeBuoy size={16} aria-hidden="true" /> Centro de ayuda
-            </p>
+            <p className="ticket-hero-eyebrow">Centro de ayuda</p>
             <h1 className="ticket-hero-title">¿En qué podemos ayudarte?</h1>
             <p className="ticket-hero-subtitle">
-              Cuéntanos tu consulta. Te respondo al momento y, si no puedo resolverlo, lo derivo a
-              una persona del equipo. Tu primer mensaje será el título del ticket.
+              Pregunta lo que quieras sobre tu TPV y te respondo al momento. Si no puedo resolverlo,
+              lo derivo a una persona del equipo. Soporte de lunes a viernes, de 9:00 a 19:00.
             </p>
             {errorBanner}
             <Composer
@@ -208,7 +259,7 @@ export function HelpPage() {
               onChange={setDraft}
               onSubmit={submit}
               pending={s.pending}
-              placeholder="Escribe tu consulta…"
+              placeholder="Escribe tu pregunta..."
               autoFocus
             />
             <div className="ticket-chips">
@@ -232,25 +283,6 @@ export function HelpPage() {
               <div className="ticket-view-title">
                 <span className="ticket-view-num">#{s.selected?.number ?? '—'}</span>
                 <h2>{s.selected?.title ?? 'Consulta'}</h2>
-              </div>
-              <div className="ticket-view-actions">
-                {open ? (
-                  <span className="ticket-status-dot" aria-label="Abierto" title="Abierto" />
-                ) : (
-                  <span className="ticket-badge ticket-badge--closed">Cerrado</span>
-                )}
-                {open && (
-                  <button
-                    type="button"
-                    className="ticket-close-icon-btn"
-                    onClick={s.closeSelected}
-                    aria-label="Cerrar ticket"
-                    title="Cerrar ticket"
-                    data-testid="ticket-close"
-                  >
-                    <X size={13} aria-hidden="true" />
-                  </button>
-                )}
               </div>
             </header>
 

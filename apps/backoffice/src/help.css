@@ -648,93 +648,114 @@
   box-shadow: var(--ui-focus);
 }
 
-/* ── Sistema de tickets de soporte ─────────────────────────────────────────── */
-.help-tickets {
-  display: grid;
-  grid-template-columns: clamp(15rem, 24%, 20rem) 1fr;
-  gap: var(--ui-space-5);
-  height: 100%;
+/* ── Layout centrado (sin sidebar) ──────────────────────────────────────────── */
+.bo-main--surface:has(> .help-centered) {
+  padding: 0.4rem 1.25rem 1.5rem;
+}
+.help-centered {
+  height: calc(100dvh - 60px - 1.9rem);
+  display: flex;
+  flex-direction: column;
   min-height: 0;
+}
+.help-centered .ticket-main {
+  flex: 1;
+  min-height: 0;
+}
+.help-centered .ticket-view {
+  max-width: 46rem;
+  width: 100%;
+  margin: 0 auto;
 }
 
-/* Sidebar: nueva consulta + lista de tickets con scroll propio. */
-.ticket-sidebar {
+/* ── Dropdown historial ──────────────────────────────────────────────────────── */
+.historial-dropdown {
+  position: fixed;
+  z-index: 999;
+  min-width: 220px;
+  max-width: 300px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-lg, 0 8px 24px rgb(0 0 0 / 0.12));
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-3);
-  min-height: 0;
-  border-right: 1px solid var(--ui-border);
-  padding-right: var(--ui-space-4);
+  overflow: hidden;
 }
-.ticket-new-btn {
-  display: inline-flex;
+.historial-new-btn {
+  display: flex;
   align-items: center;
-  justify-content: center;
   gap: var(--ui-space-2);
   padding: var(--ui-space-3) var(--ui-space-4);
+  font: inherit;
+  font-size: var(--ui-text-sm);
   font-weight: 600;
-  color: var(--ui-on-accent, #fff);
-  background: var(--ui-accent, var(--ui-text));
+  color: var(--ui-accent, var(--ui-text));
+  background: none;
   border: 0;
-  border-radius: var(--ui-radius-md);
+  border-bottom: 1px solid var(--ui-border);
   cursor: pointer;
-  transition: transform 0.15s var(--ui-ease);
+  width: 100%;
+  text-align: left;
+  transition: background 0.12s ease;
 }
-.ticket-new-btn:hover {
-  transform: translateY(-1px);
+.historial-new-btn:hover {
+  background: var(--ui-surface-subtle);
 }
-.ticket-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-2);
-  overflow-y: auto;
-  min-height: 0;
-}
-.ticket-empty {
-  margin: var(--ui-space-4) 0;
+.historial-empty {
+  margin: 0;
+  padding: var(--ui-space-4);
   font-size: var(--ui-text-sm);
   color: var(--ui-text-muted);
   text-align: center;
 }
-.ticket-item {
+.historial-list {
+  overflow-y: auto;
+  max-height: 320px;
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-1);
-  width: 100%;
-  padding: var(--ui-space-3);
+}
+.historial-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--ui-space-3) var(--ui-space-4);
   text-align: left;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  font: inherit;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
   cursor: pointer;
-  transition:
-    border-color 0.15s var(--ui-ease),
-    background 0.15s var(--ui-ease);
+  transition: background 0.12s ease;
 }
-.ticket-item:hover {
-  border-color: var(--ui-border-strong);
+.historial-item:last-child {
+  border-bottom: 0;
 }
-.ticket-item.is-active {
-  border-color: var(--ui-accent, var(--ui-border-strong));
-  background: var(--ui-accent-soft, var(--ui-surface));
+.historial-item:hover {
+  background: var(--ui-surface-subtle);
 }
-.ticket-item-top {
+.historial-item.is-active {
+  background: var(--ui-accent-soft, var(--ui-surface-subtle));
+}
+.historial-item-meta {
   display: flex;
   align-items: center;
   gap: var(--ui-space-2);
 }
-.ticket-item-num {
+.historial-item-num {
+  font-size: var(--ui-text-xs);
   font-weight: 700;
-  font-size: var(--ui-text-sm);
   color: var(--ui-text-soft);
 }
-.ticket-item-title {
+.historial-item-title {
   font-size: var(--ui-text-sm);
   color: var(--ui-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── Badges y dot de estado (compartidos sidebar→dropdown) ───────────────────── */
 .ticket-unread {
   width: 8px;
   height: 8px;
@@ -786,34 +807,51 @@
 
 /* Nueva consulta (hero) */
 .ticket-hero {
-  max-width: 42rem;
-  margin: auto;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-4);
-  padding: var(--ui-space-6) 0;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--ui-space-5);
+  padding: clamp(2.5rem, 1.4rem + 5vw, 5rem) var(--ui-space-6);
+  width: 100%;
 }
 .ticket-hero-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ui-space-2);
   margin: 0;
-  font-size: var(--ui-text-sm);
-  color: var(--ui-text-soft);
+  font-size: var(--ui-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ui-brand, var(--ui-accent, #2563eb));
 }
 .ticket-hero-title {
   margin: 0;
-  font-size: var(--ui-text-2xl, 1.75rem);
-  letter-spacing: -0.02em;
+  font-size: clamp(2.5rem, 1.25rem + 5vw, 4.5rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.06;
+  color: var(--ui-text);
+  text-wrap: balance;
 }
 .ticket-hero-subtitle {
   margin: 0;
+  max-width: 38rem;
+  font-size: clamp(1rem, 0.9rem + 0.4vw, 1.125rem);
+  line-height: 1.55;
   color: var(--ui-text-muted);
+  text-wrap: balance;
+}
+.ticket-hero .ticket-composer {
+  width: 100%;
+  max-width: 44rem;
+  margin-top: 0;
 }
 .ticket-chips {
   display: flex;
   flex-wrap: wrap;
   gap: var(--ui-space-2);
+  justify-content: center;
 }
 .ticket-chip {
   padding: var(--ui-space-2) var(--ui-space-3);
@@ -823,9 +861,17 @@
   border: 1px solid var(--ui-border);
   border-radius: 999px;
   cursor: pointer;
+  transition:
+    background 0.15s var(--ui-ease),
+    border-color 0.15s var(--ui-ease);
 }
 .ticket-chip:hover:not(:disabled) {
+  background: var(--ui-surface-subtle);
   border-color: var(--ui-border-strong);
+}
+.ticket-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
 }
 .ticket-chip:disabled {
   opacity: 0.5;
@@ -1085,17 +1131,6 @@
   border: 0;
   cursor: pointer;
   text-decoration: underline;
-}
-
-@media (max-width: 720px) {
-  .help-tickets {
-    grid-template-columns: 1fr;
-  }
-  .ticket-sidebar {
-    border-right: 0;
-    padding-right: 0;
-    max-height: 14rem;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
