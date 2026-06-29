@@ -48,6 +48,7 @@ async fn build() -> Router {
         false,
         Vec::new(),
         None,
+        None,
     ))
 }
 

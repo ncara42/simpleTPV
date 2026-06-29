@@ -2966,6 +2966,7 @@ dependencies = [
  "simpletpv-domain",
  "simpletpv-http",
  "simpletpv-shared",
+ "simpletpv-telegram",
  "sqlx",
  "tokio",
  "tracing",
@@ -3042,6 +3043,7 @@ dependencies = [
  "simpletpv-db",
  "simpletpv-domain",
  "simpletpv-shared",
+ "simpletpv-telegram",
  "sqlx",
  "time",
  "tokio",
@@ -3061,6 +3063,17 @@ dependencies = [
  "rust_decimal",
  "secrecy",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "simpletpv-telegram"
+version = "0.0.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]

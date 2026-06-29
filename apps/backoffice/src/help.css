@@ -556,6 +556,22 @@
   cursor: pointer;
 }
 
+/* Aviso de que una persona de soporte está al cargo (tras escalar a Telegram). */
+.help-human {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  margin-bottom: var(--ui-space-4);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  color: var(--ui-text);
+  background: var(--ui-accent-soft, var(--ui-surface));
+  border: 1px solid var(--ui-border-strong);
+  border-left: 3px solid var(--ui-accent, var(--ui-border-strong));
+  border-radius: var(--ui-radius-md);
+}
+
 /* ── Primitivas de sección compartidas (SettingsPage / VerifactuPage) ─────────
    No las usa esta vista, pero sí esas dos como "panel-superficie" con cabecera. */
 .help-section {

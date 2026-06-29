@@ -33,6 +33,7 @@ pub mod stock;
 pub mod store_access;
 pub mod stores;
 pub mod suppliers;
+pub mod support;
 pub mod time_clock;
 pub mod transfers;
 pub mod users;

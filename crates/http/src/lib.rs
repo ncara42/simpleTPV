@@ -37,6 +37,7 @@ mod state;
 mod stock;
 mod stores;
 mod suppliers;
+mod support;
 mod time_clock;
 mod transfers;
 mod users;

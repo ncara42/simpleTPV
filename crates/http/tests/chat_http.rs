@@ -47,7 +47,16 @@ async fn build() -> (Router, PgPool) {
             refresh_ttl: Duration::from_secs(604_800),
         },
     );
-    let state = AppState::new(auth, user_state, db, admin.clone(), false, Vec::new(), None);
+    let state = AppState::new(
+        auth,
+        user_state,
+        db,
+        admin.clone(),
+        false,
+        Vec::new(),
+        None,
+        None,
+    );
     (build_router(state), admin)
 }
 
