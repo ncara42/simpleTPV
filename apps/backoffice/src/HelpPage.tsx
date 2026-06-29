@@ -1,12 +1,13 @@
 import './help.css';
 
 import { usePageHeader } from '@simpletpv/ui';
-import { ArrowUp, LifeBuoy, Loader2, Lock, Plus } from 'lucide-react';
+import { ArrowUp, History, LifeBuoy, Loader2, Lock, Paperclip, Plus, X } from 'lucide-react';
 import { type KeyboardEvent, useState } from 'react';
 
 import { ChatMarkdown } from './components/chat/ChatMarkdown.js';
 import { viewContextFor } from './components/chat/view-context.js';
 import { useSupportTickets } from './components/support/useSupportTickets.js';
+import { usePageNav } from './lib/pageNav.js';
 import type { SupportMessage, Ticket } from './lib/support.js';
 
 // ── Composer (textarea + enviar) ─────────────────────────────────────────────────
@@ -22,20 +23,21 @@ interface ComposerProps {
 
 function Composer({ value, onChange, onSubmit, pending, placeholder, autoFocus }: ComposerProps) {
   const canSend = value.trim().length > 0 && !pending;
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>): void => {
+    if (e.key === 'Enter') {
       e.preventDefault();
       if (canSend) onSubmit();
     }
   };
   return (
     <div className="ticket-composer">
-      <textarea
+      <Paperclip className="ticket-composer-clip" size={18} aria-hidden="true" />
+      <input
         className="ticket-input"
+        type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        rows={1}
         placeholder={placeholder}
         disabled={pending}
         autoFocus={autoFocus}
@@ -129,6 +131,23 @@ export function HelpPage() {
   const s = useSupportTickets();
   const [draft, setDraft] = useState('');
 
+  usePageNav(
+    s.tickets.length > 0 ? (
+      <button
+        type="button"
+        className="help-history-btn"
+        onClick={() => {
+          s.startNew();
+          setDraft('');
+        }}
+        data-testid="help-history"
+      >
+        <History size={15} aria-hidden="true" />
+        Historial
+      </button>
+    ) : null,
+  );
+
   const submit = (): void => {
     const text = draft.trim();
     if (!text) return;
@@ -215,17 +234,21 @@ export function HelpPage() {
                 <h2>{s.selected?.title ?? 'Consulta'}</h2>
               </div>
               <div className="ticket-view-actions">
-                <span className={`ticket-badge ticket-badge--${s.selected?.status ?? 'open'}`}>
-                  {open ? 'Abierto' : 'Cerrado'}
-                </span>
+                {open ? (
+                  <span className="ticket-status-dot" aria-label="Abierto" title="Abierto" />
+                ) : (
+                  <span className="ticket-badge ticket-badge--closed">Cerrado</span>
+                )}
                 {open && (
                   <button
                     type="button"
-                    className="ticket-close-btn"
+                    className="ticket-close-icon-btn"
                     onClick={s.closeSelected}
+                    aria-label="Cerrar ticket"
+                    title="Cerrar ticket"
                     data-testid="ticket-close"
                   >
-                    Cerrar ticket
+                    <X size={13} aria-hidden="true" />
                   </button>
                 )}
               </div>

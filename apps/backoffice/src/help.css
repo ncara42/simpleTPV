@@ -614,6 +614,40 @@
   }
 }
 
+/* ── Botón «Historial» en topbar-page-nav ────────────────────────────────────
+   Mismo alto (30px) que los botones del clúster derecho y las page-actions. */
+.help-history-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  height: 30px;
+  padding: 0 var(--ui-space-3);
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  font-weight: 500;
+  color: var(--ui-text-muted);
+  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+  transition:
+    color 0.14s ease,
+    border-color 0.14s ease,
+    background 0.14s ease;
+}
+.help-history-btn:hover {
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+  background: color-mix(in srgb, var(--ui-surface-subtle) 70%, transparent);
+}
+.help-history-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
 /* ── Sistema de tickets de soporte ─────────────────────────────────────────── */
 .help-tickets {
   display: grid;
@@ -723,6 +757,26 @@
   background: color-mix(in srgb, var(--ui-text-muted) 14%, transparent);
 }
 
+/* Punto parpadeante: estado Abierto en cabecera del ticket */
+.ticket-status-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ui-success, #197a3d);
+  flex: none;
+  animation: ticket-dot-pulse 2s ease-in-out infinite;
+}
+@keyframes ticket-dot-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ui-success, #197a3d) 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--ui-success, #197a3d) 0%, transparent);
+  }
+}
+
 /* Panel principal */
 .ticket-main {
   display: flex;
@@ -815,16 +869,25 @@
   gap: var(--ui-space-3);
   flex: none;
 }
-.ticket-close-btn {
-  padding: var(--ui-space-2) var(--ui-space-3);
-  font-size: var(--ui-text-sm);
-  color: var(--ui-text);
-  background: var(--ui-surface);
+/* Botón cerrar ticket: icono redondo */
+.ticket-close-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 50%;
   border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
   cursor: pointer;
+  transition:
+    background 0.15s var(--ui-ease),
+    border-color 0.15s var(--ui-ease),
+    color 0.15s var(--ui-ease);
 }
-.ticket-close-btn:hover {
+.ticket-close-icon-btn:hover {
+  background: color-mix(in srgb, var(--ui-danger, #c0392b) 8%, var(--ui-surface));
   border-color: var(--ui-danger, #c0392b);
   color: var(--ui-danger, #c0392b);
 }
@@ -864,20 +927,29 @@
   color: var(--ui-text-soft);
 }
 .ticket-msg-body {
-  padding: var(--ui-space-3) var(--ui-space-4);
-  border-radius: var(--ui-radius-xl);
-  border: 1px solid var(--ui-border);
-  background: var(--ui-surface);
-  line-height: 1.5;
+  line-height: 1.6;
   overflow-wrap: anywhere;
 }
+
+/* Mensajes del usuario: burbuja */
 .ticket-msg--user .ticket-msg-body {
-  background: var(--ui-accent-soft, var(--ui-surface));
-  border-color: var(--ui-border-strong);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  border-radius: var(--ui-radius-xl);
+  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-accent-soft, var(--ui-surface-subtle));
 }
+
+/* Mensajes del asistente / agente: texto plano sin fondo */
+.ticket-msg--ai .ticket-msg-body,
 .ticket-msg--agent .ticket-msg-body {
-  border-left: 3px solid var(--ui-accent, var(--ui-border-strong));
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  font-size: 1rem;
+  color: var(--ui-text);
 }
+
 .ticket-msg-body > :first-child {
   margin-top: 0;
 }
@@ -918,46 +990,68 @@
   }
 }
 
-/* Composer */
+/* Composer — mismo estilo que el hero input, clip a la izquierda */
 .ticket-composer {
-  display: flex;
-  gap: var(--ui-space-3);
-  align-items: flex-end;
-  padding-top: var(--ui-space-3);
+  position: relative;
+  margin-top: var(--ui-space-3);
+}
+.ticket-composer-clip {
+  position: absolute;
+  left: 1.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ui-text-soft);
+  pointer-events: none;
 }
 .ticket-input {
-  flex: 1;
-  resize: none;
-  min-height: 2.75rem;
-  max-height: 9rem;
-  padding: var(--ui-space-3) var(--ui-space-4);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-xl);
-  background: var(--ui-surface);
-  color: var(--ui-text);
+  width: 100%;
+  height: 3.75rem;
+  padding: 0 3.75rem 0 3.25rem;
   font: inherit;
-  line-height: 1.4;
+  font-size: var(--ui-text-lg);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  box-shadow: var(--ui-shadow-sm);
+  transition:
+    border-color 0.18s var(--ui-ease),
+    box-shadow 0.18s var(--ui-ease);
+}
+.ticket-input::placeholder {
+  color: var(--ui-text-soft);
 }
 .ticket-input:focus-visible {
   outline: none;
-  border-color: var(--ui-border-strong);
+  border-color: var(--ui-brand, var(--ui-accent, var(--ui-border-strong)));
   box-shadow: var(--ui-focus);
 }
+.ticket-input:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
 .ticket-send {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
   flex: none;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-xl);
+  border: 0;
+  border-radius: 10px;
   background: var(--ui-accent, var(--ui-text));
   color: var(--ui-on-accent, #fff);
   cursor: pointer;
+  transition: background 0.15s var(--ui-ease);
+}
+.ticket-send:hover:not(:disabled) {
+  opacity: 0.88;
 }
 .ticket-send:disabled {
-  opacity: 0.5;
+  background: var(--ui-border-strong);
   cursor: not-allowed;
 }
 .ticket-spin {
