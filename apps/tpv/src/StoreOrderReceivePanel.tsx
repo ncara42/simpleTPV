@@ -1,9 +1,17 @@
 import { ApiError, type StoreOrder } from '@simpletpv/auth';
-import { Alert, Button, DataTable, Select } from '@simpletpv/ui';
+import {
+  Alert,
+  Button,
+  DataTable,
+  type FacetedColumn,
+  type FacetedGroup,
+  FacetedTable,
+  type FacetSection,
+} from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Clock, MessageCircle, PackageCheck, X } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { listStores } from './lib/sales.js';
 import { listIncomingStoreOrders, receiveStoreOrder } from './lib/store-orders.js';
@@ -26,9 +34,18 @@ export function StoreOrderReceivePanel() {
   const [scan, setScan] = useState('');
   // Chat (pop-up) del pedido abierto desde el botón de comentarios de la fila.
   const [chatOrder, setChatOrder] = useState<StoreOrder | null>(null);
-  // Cabecera del panel (buscador + filtro de estado), como las tablas del admin.
+  // Carril de facetas (buscador + vista por estado), como el Catálogo del admin.
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [view, setView] = useState<'all' | 'SENT' | 'RECEIVED'>('all');
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+
+  const toggleGroup = (key: string): void =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['incoming-store-orders', activeStore],
@@ -97,6 +114,25 @@ export function StoreOrderReceivePanel() {
     return `${dd}/${mm} ${hh}:${min}`;
   }
 
+  // Solo la hora "HH:mm" (la fecha ya la da la cabecera del grupo por día).
+  function fmtTime(iso: string | null): string {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+  }
+
+  // Etiqueta de día (cabecera de grupo): "Lunes, 5 de mayo de 2025".
+  function dayLabel(iso: string | null): string {
+    if (!iso) return 'Sin fecha';
+    const raw = new Date(iso).toLocaleDateString('es-ES', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }
+
   // ¿Incidencia abierta? Recibido/cerrado con faltante o nota y aún sin resolver.
   function orderIncidentOpen(o: StoreOrder): boolean {
     const showRecv = o.status === 'RECEIVED' || o.status === 'CLOSED';
@@ -109,124 +145,193 @@ export function StoreOrderReceivePanel() {
     });
   }
 
-  // Filtro de la cabecera: por texto (origen/fecha/nº líneas) y por estado.
+  // Recuentos por vista (sobre el conjunto completo, antes de filtrar) como en el Catálogo.
+  const viewCounts = useMemo(
+    () => ({
+      all: orders.length,
+      SENT: orders.filter((t) => t.status === 'SENT').length,
+      RECEIVED: orders.filter((t) => t.status === 'RECEIVED').length,
+    }),
+    [orders],
+  );
+
+  // Filtro: por vista (estado) y por texto (origen/fecha/nº líneas).
   const term = search.trim().toLowerCase();
-  const visibleOrders = orders.filter((t) => {
-    if (statusFilter !== '' && t.status !== statusFilter) return false;
-    if (term === '') return true;
-    const haystack = `central ${fmt(t.sentAt ?? t.createdAt)} ${t.lines.length}`.toLowerCase();
-    return haystack.includes(term);
-  });
+  const visibleOrders = useMemo(
+    () =>
+      orders.filter((t) => {
+        if (view !== 'all' && t.status !== view) return false;
+        if (term === '') return true;
+        const haystack = `central ${fmt(t.sentAt ?? t.createdAt)} ${t.lines.length}`.toLowerCase();
+        return haystack.includes(term);
+      }),
+    [orders, view, term],
+  );
+
+  // Agrupa los pedidos por día (más reciente primero; dentro, hora descendente).
+  const orderGroups = useMemo<FacetedGroup<StoreOrder>[]>(() => {
+    const map = new Map<string, { ts: number; rows: StoreOrder[] }>();
+    for (const o of visibleOrders) {
+      const iso = o.sentAt ?? o.createdAt;
+      const d = new Date(iso);
+      const key = d.toDateString();
+      let g = map.get(key);
+      if (!g) {
+        g = { ts: d.getTime(), rows: [] };
+        map.set(key, g);
+      }
+      g.rows.push(o);
+    }
+    return [...map.entries()]
+      .sort((a, b) => b[1].ts - a[1].ts)
+      .map(([key, g]) => {
+        const rows = g.rows.sort(
+          (a, b) =>
+            new Date(b.sentAt ?? b.createdAt).getTime() -
+            new Date(a.sentAt ?? a.createdAt).getTime(),
+        );
+        return {
+          key,
+          label: dayLabel(rows[0]?.sentAt ?? rows[0]?.createdAt ?? null),
+          meta: `${rows.length} ${rows.length === 1 ? 'pedido' : 'pedidos'}`,
+          rows,
+        };
+      });
+  }, [visibleOrders]);
+
+  const orderFacets: FacetSection[] = [
+    {
+      kind: 'views',
+      title: 'Estado',
+      options: [
+        { key: 'all', label: 'Todos los pedidos', count: viewCounts.all },
+        { key: 'SENT', label: 'Pendientes', count: viewCounts.SENT },
+        { key: 'RECEIVED', label: 'Recibidos', count: viewCounts.RECEIVED },
+      ],
+      active: view,
+      onSelect: (key) => setView(key as 'all' | 'SENT' | 'RECEIVED'),
+      testIdPrefix: 'store-order-view',
+    },
+  ];
+
+  const orderColumns: FacetedColumn<StoreOrder>[] = [
+    {
+      key: 'origin',
+      header: 'Origen',
+      variant: 'name',
+      render: () => 'Central',
+    },
+    {
+      key: 'time',
+      header: 'Hora',
+      variant: 'mid',
+      width: 'num',
+      render: (t) => fmtTime(t.sentAt ?? t.createdAt),
+    },
+    {
+      key: 'lines',
+      header: 'Líneas',
+      variant: 'mid',
+      width: 'mid',
+      render: (t) => t.lines.length,
+    },
+    {
+      key: 'status',
+      header: 'Estado',
+      variant: 'state',
+      width: 'mid',
+      render: (t) => {
+        const received = t.status === 'RECEIVED';
+        return (
+          <span
+            className={`order-state ${received ? 'received' : 'pending'}`}
+            data-testid="store-order-status"
+          >
+            <span className="order-state__icon">
+              {received ? (
+                <Check size={13} strokeWidth={3} aria-hidden="true" />
+              ) : (
+                <Clock size={13} strokeWidth={2.5} aria-hidden="true" />
+              )}
+            </span>
+            {received ? 'Recibido' : 'Pendiente'}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'action',
+      header: '',
+      variant: 'num',
+      render: (t) => (
+        <span className="store-order-actions">
+          {t.status !== 'RECEIVED' && (
+            <button
+              type="button"
+              className="link-btn link-btn--receive"
+              onClick={(e) => {
+                e.stopPropagation();
+                openOrder(t);
+              }}
+              data-testid="store-order-open"
+            >
+              <PackageCheck size={15} strokeWidth={2.25} aria-hidden="true" />
+              Recibir
+            </button>
+          )}
+          <button
+            type="button"
+            className="store-order-chat-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              setChatOrder(t);
+            }}
+            title="Comentarios con central"
+            aria-label="Comentarios con central"
+            data-testid="store-order-chat-open"
+          >
+            <MessageCircle size={16} aria-hidden="true" />
+          </button>
+        </span>
+      ),
+    },
+  ];
 
   return (
     <>
       <div className="transfer-view" data-testid="store-order-receive">
-        <div className="table-panel">
-          <div className="users-toolbar">
-            <div className="sales-filters">
-              <span className="search-field">
-                <input
-                  className="catalog-search"
-                  placeholder="Buscar por origen o fecha…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  data-testid="store-order-search"
-                />
-              </span>
-              <Select
-                className="catalog-search"
-                value={statusFilter}
-                onChange={setStatusFilter}
-                ariaLabel="Filtrar por estado"
-                data-testid="store-order-status-filter"
-                options={[
-                  { value: '', label: 'Todos los estados' },
-                  { value: 'SENT', label: 'Pendientes' },
-                  { value: 'RECEIVED', label: 'Recibidos' },
-                ]}
-              />
-            </div>
-          </div>
-          <DataTable
-            data-testid="store-order-list"
-            rowTestId="store-order-item"
-            rows={visibleOrders}
-            rowKey={(t) => t.id}
-            loading={isLoading}
-            emptyState={
-              orders.length === 0 ? (
-                <span className="catalog-empty" data-testid="store-order-empty">
-                  No hay pedidos pendientes de recibir.
-                </span>
-              ) : (
-                <span className="catalog-empty" data-testid="store-order-no-results">
-                  Sin pedidos que coincidan con el filtro.
-                </span>
-              )
-            }
-            columns={[
-              {
-                key: 'date',
-                header: 'Fecha',
-                render: (t) => <span className="muted">{fmt(t.sentAt ?? t.createdAt)}</span>,
-              },
-              { key: 'origin', header: 'Origen', render: () => 'Central' },
-              { key: 'lines', header: 'Líneas', render: (t) => t.lines.length },
-              {
-                key: 'status',
-                header: 'Estado',
-                render: (t) => {
-                  const received = t.status === 'RECEIVED';
-                  return (
-                    <span
-                      className={`order-state ${received ? 'received' : 'pending'}`}
-                      data-testid="store-order-status"
-                    >
-                      <span className="order-state__icon">
-                        {received ? (
-                          <Check size={13} strokeWidth={3} aria-hidden="true" />
-                        ) : (
-                          <Clock size={13} strokeWidth={2.5} aria-hidden="true" />
-                        )}
-                      </span>
-                      {received ? 'Recibido' : 'Pendiente'}
-                    </span>
-                  );
-                },
-              },
-              {
-                key: 'action',
-                header: '',
-                align: 'right',
-                render: (t) => (
-                  <span className="store-order-actions">
-                    {t.status !== 'RECEIVED' && (
-                      <button
-                        type="button"
-                        className="link-btn link-btn--receive"
-                        onClick={() => openOrder(t)}
-                        data-testid="store-order-open"
-                      >
-                        <PackageCheck size={15} strokeWidth={2.25} aria-hidden="true" />
-                        Recibir
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="store-order-chat-btn"
-                      onClick={() => setChatOrder(t)}
-                      title="Comentarios con central"
-                      aria-label="Comentarios con central"
-                      data-testid="store-order-chat-open"
-                    >
-                      <MessageCircle size={16} aria-hidden="true" />
-                    </button>
-                  </span>
-                ),
-              },
-            ]}
-          />
-        </div>
+        <FacetedTable<StoreOrder>
+          railLabel="Filtros de pedidos"
+          railTestId="store-order-facets"
+          mainTestId="store-order-list"
+          rowTestId="store-order-item"
+          search={{
+            value: search,
+            onChange: setSearch,
+            placeholder: 'Buscar por origen o fecha…',
+            testId: 'store-order-search',
+          }}
+          sections={orderFacets}
+          columns={orderColumns}
+          groups={orderGroups}
+          rowKey={(t) => t.id}
+          collapsedKeys={collapsed}
+          onToggleGroup={toggleGroup}
+          onRowClick={(t) => {
+            if (t.status !== 'RECEIVED') openOrder(t);
+          }}
+          emptyState={
+            <span
+              data-testid={orders.length === 0 ? 'store-order-empty' : 'store-order-no-results'}
+            >
+              {isLoading
+                ? 'Cargando…'
+                : orders.length === 0
+                  ? 'No hay pedidos pendientes de recibir.'
+                  : 'Sin pedidos que coincidan con el filtro.'}
+            </span>
+          }
+        />
       </div>
 
       {selected && (

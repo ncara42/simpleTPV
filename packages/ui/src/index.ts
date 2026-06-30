@@ -13,6 +13,17 @@ export {
 } from './components/DataTable.js';
 export * from './components/dataviz/index.js';
 export { ErrorScreen } from './components/ErrorScreen.js';
+export {
+  type FacetChecksSection,
+  type FacetColumnVariant,
+  type FacetColumnWidth,
+  type FacetedColumn,
+  type FacetedGroup,
+  FacetedTable,
+  type FacetedTableProps,
+  type FacetSection,
+  type FacetViewsSection,
+} from './components/FacetedTable.js';
 export { Input } from './components/Input.js';
 export { LoginForm, type LoginFormProps } from './components/LoginForm.js';
 export { MultiSelect, type MultiSelectProps } from './components/MultiSelect.js';

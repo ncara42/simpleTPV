@@ -1,20 +1,21 @@
 /* ════════════════════════════════════════════════════════════════════════════
-   TICKETS EMITIDOS — vista facetada idéntica al Catálogo del backoffice: carril de
-   facetas a la izquierda + tabla agrupada por día a la derecha, dentro de UNA sola
-   card. Las clases .cat-* replican el lenguaje de inventory-card.css (Catálogo) para
-   que ambas vistas sean visualmente idénticas. Tokens --ui-* dark-aware.
+   FACETED TABLE (@simpletpv/ui) — vista facetada reutilizable con el lenguaje del
+   Catálogo del backoffice: carril de facetas a la izquierda + tabla agrupada a la
+   derecha, dentro de UNA sola card. La usan Tickets emitidos y Pedidos del TPV (y
+   cualquier listado navegable). Las clases .cat-* replican inventory-card.css para
+   que todas las vistas sean visualmente idénticas. Tokens --ui-* dark-aware.
    ════════════════════════════════════════════════════════════════════════════ */
 
 /* Página: ocupa el alto disponible (topbar 60px + paddings del .app-main) para que el
    carril y la tabla scrolleen DENTRO de la card, igual que en Inventario. */
-.tickets-faceted {
+.faceted-table {
   height: calc(100dvh - 60px - 5.5rem);
   min-height: 26rem;
   display: flex;
 }
 
 /* Card contenedora (= .inv-card del backoffice). */
-.tickets-card {
+.faceted-table-card {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -367,7 +368,7 @@
 }
 
 @media (max-width: 860px) {
-  .tickets-faceted {
+  .faceted-table {
     height: auto;
   }
   .cat-layout {
