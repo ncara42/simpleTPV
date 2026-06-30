@@ -10,7 +10,8 @@ import { cn } from '../lib/cn.js';
 //   · tonos de fila                            (rowTone)            → p. ej. Existencias
 //   · acciones/badges en celda                 (column.render)     → cualquier variante
 //   · detalle expandible por fila (acordeón)   (renderDetail + expandedKeys/onToggleRow)
-//   · layout 'card' (carril propio) | 'table'  (solo la tabla; la página aporta carril)
+//   · chrome de card opcional                   (header/toolbar/footer + loading)
+//   · layout 'card' (carril propio si hay search/sections) | 'table' (solo la tabla)
 // Componente presentacional puro: el padre filtra/agrupa y pasa selección/manejadores.
 // CSS en styles/faceted-table.css.
 
@@ -86,8 +87,19 @@ export interface FacetedTableProps<Row> {
     placeholder?: string;
     testId?: string;
   };
-  /** Secciones del carril (solo layout 'card'). */
+  /** Secciones del carril (solo layout 'card'). Si no hay search ni secciones,
+   *  el carril se omite y la tabla agrupada ocupa toda la card. */
   sections?: FacetSection[];
+  /** Slot de cabecera de la card, sobre el toolbar (p. ej. sub-pestañas). Solo 'card'. */
+  header?: React.ReactNode;
+  /** Slot de toolbar (filtros/acciones), bajo la cabecera. Solo layout 'card'. */
+  toolbar?: React.ReactNode;
+  /** Slot de pie (totales/agregados) al fondo de la card. Solo layout 'card'. */
+  footer?: React.ReactNode;
+  /** Muestra filas skeleton (sin desmontar la tabla) mientras se cargan datos. */
+  loading?: boolean;
+  /** Nº de filas skeleton al cargar (def. 8). */
+  skeletonRows?: number;
   /** Grupos plegados (key) + manejador. Si falta el manejador, no son plegables. */
   collapsedKeys?: ReadonlySet<string>;
   onToggleGroup?: (key: string) => void;
@@ -213,6 +225,11 @@ export function FacetedTable<Row>({
   rowProps,
   search,
   sections = [],
+  header,
+  toolbar,
+  footer,
+  loading = false,
+  skeletonRows = 8,
   collapsedKeys,
   onToggleGroup,
   selectable = false,
@@ -233,6 +250,7 @@ export function FacetedTable<Row>({
   const colCount = columns.length;
   const collapsible = onToggleGroup != null;
   const expandable = renderDetail != null && onToggleRow != null;
+  const hasRail = search != null || sections.length > 0;
 
   const rowClickHandler = (row: Row, key: string): (() => void) | undefined => {
     if (expandable) return () => onToggleRow(key);
@@ -240,6 +258,21 @@ export function FacetedTable<Row>({
     if (selectable && onToggleSelect) return () => onToggleSelect(key);
     return undefined;
   };
+
+  // Cuerpo skeleton (no desmonta la tabla): filas atenuadas con barra shimmer.
+  const skeletonBody = (
+    <tbody>
+      {Array.from({ length: skeletonRows }, (_, r) => (
+        <tr key={`skel-${r}`} className="cat-row cat-row--skel">
+          {columns.map((col) => (
+            <td key={col.key} className={cn(TD_CLASS[col.variant ?? 'mid'], col.tdClassName)}>
+              <span className="cat-skel-bar" />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </tbody>
+  );
 
   const table = (
     <table className={cn('cat-table', layout === 'table' && className)}>
@@ -257,85 +290,88 @@ export function FacetedTable<Row>({
           ))}
         </tr>
       </thead>
-      {groups.map((group) => {
-        const isCollapsed = collapsedKeys?.has(group.key) ?? false;
-        return (
-          <tbody key={group.key} className="cat-group">
-            <tr
-              className="cat-group-head"
-              onClick={collapsible ? () => onToggleGroup(group.key) : undefined}
-            >
-              <td className="cat-group-cell" colSpan={colCount}>
-                <div className="cat-group-inner">
-                  {collapsible && <Caret collapsed={isCollapsed} />}
-                  <span className="cat-group-name">{group.label}</span>
-                  {group.meta !== undefined && (
-                    <span className="cat-group-count">{group.meta}</span>
-                  )}
-                  {group.metaRight !== undefined && (
-                    <span className="cat-group-units">{group.metaRight}</span>
-                  )}
-                </div>
-              </td>
-            </tr>
-            {!isCollapsed &&
-              group.rows.map((row) => {
-                const key = rowKey(row);
-                const selected = selectable && (selectedKeys?.has(key) ?? false);
-                const expanded = expandable && (expandedKeys?.has(key) ?? false);
-                const detail = expandable ? renderDetail(row) : null;
-                const onClick = rowClickHandler(row, key);
-                return (
-                  <React.Fragment key={key}>
-                    <tr
-                      className={cn(
-                        'cat-row',
-                        rowTone?.(row),
-                        selected && 'is-selected',
-                        expandable && 'cat-row--expandable',
-                        expanded && 'is-expanded',
+      {loading
+        ? skeletonBody
+        : groups.map((group) => {
+            const isCollapsed = collapsedKeys?.has(group.key) ?? false;
+            return (
+              <tbody key={group.key} className="cat-group">
+                <tr
+                  className="cat-group-head"
+                  onClick={collapsible ? () => onToggleGroup(group.key) : undefined}
+                >
+                  <td className="cat-group-cell" colSpan={colCount}>
+                    <div className="cat-group-inner">
+                      {collapsible && <Caret collapsed={isCollapsed} />}
+                      <span className="cat-group-name">{group.label}</span>
+                      {group.meta !== undefined && (
+                        <span className="cat-group-count">{group.meta}</span>
                       )}
-                      data-testid={rowTestId}
-                      aria-selected={selectable ? selected : undefined}
-                      aria-expanded={expandable ? expanded : undefined}
-                      onClick={onClick}
-                      {...(rowProps?.(row) ?? {})}
-                    >
-                      {columns.map((col) => {
-                        const variant = col.variant ?? 'mid';
-                        return (
-                          <td key={col.key} className={cn(TD_CLASS[variant], col.tdClassName)}>
-                            {variant === 'name' && selectable && (
-                              <input
-                                type="checkbox"
-                                className="cat-row-check"
-                                checked={selected}
-                                onChange={() => onToggleSelect?.(key)}
-                                onClick={(e) => e.stopPropagation()}
-                                data-testid={selectTestId}
-                                aria-label={selectAriaLabel?.(row) ?? 'Seleccionar fila'}
-                              />
-                            )}
-                            {col.render(row)}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                    {detail != null && detail !== false && expanded && (
-                      <tr className="cat-detail-row">
-                        <td colSpan={colCount}>{detail}</td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-          </tbody>
-        );
-      })}
+                      {group.metaRight !== undefined && (
+                        <span className="cat-group-units">{group.metaRight}</span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+                {!isCollapsed &&
+                  group.rows.map((row) => {
+                    const key = rowKey(row);
+                    const selected = selectable && (selectedKeys?.has(key) ?? false);
+                    const expanded = expandable && (expandedKeys?.has(key) ?? false);
+                    const detail = expandable ? renderDetail(row) : null;
+                    const onClick = rowClickHandler(row, key);
+                    return (
+                      <React.Fragment key={key}>
+                        <tr
+                          className={cn(
+                            'cat-row',
+                            rowTone?.(row),
+                            selected && 'is-selected',
+                            expandable && 'cat-row--expandable',
+                            expanded && 'is-expanded',
+                          )}
+                          data-testid={rowTestId}
+                          aria-selected={selectable ? selected : undefined}
+                          aria-expanded={expandable ? expanded : undefined}
+                          onClick={onClick}
+                          {...(rowProps?.(row) ?? {})}
+                        >
+                          {columns.map((col) => {
+                            const variant = col.variant ?? 'mid';
+                            return (
+                              <td key={col.key} className={cn(TD_CLASS[variant], col.tdClassName)}>
+                                {variant === 'name' && selectable && (
+                                  <input
+                                    type="checkbox"
+                                    className="cat-row-check"
+                                    checked={selected}
+                                    onChange={() => onToggleSelect?.(key)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    data-testid={selectTestId}
+                                    aria-label={selectAriaLabel?.(row) ?? 'Seleccionar fila'}
+                                  />
+                                )}
+                                {col.render(row)}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                        {detail != null && detail !== false && expanded && (
+                          <tr className="cat-detail-row">
+                            <td colSpan={colCount}>{detail}</td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+              </tbody>
+            );
+          })}
     </table>
   );
 
-  const empty = groups.length === 0 ? <div className="cat-empty">{emptyState}</div> : null;
+  const empty =
+    !loading && groups.length === 0 ? <div className="cat-empty">{emptyState}</div> : null;
 
   // Layout 'table': solo la tabla + vacío; la página aporta carril/contenedor/scroll.
   if (layout === 'table') {
@@ -347,37 +383,43 @@ export function FacetedTable<Row>({
     );
   }
 
-  // Layout 'card': card + carril propio (búsqueda + secciones) + tabla.
+  // Layout 'card': card con chrome opcional (header/toolbar/footer), carril propio
+  // (búsqueda + secciones) SOLO si se aportan, y la tabla agrupada.
   return (
     <div className={cn('faceted-table', className)}>
       <div className="faceted-table-card">
-        <div className="cat-layout">
-          <aside className="cat-rail" aria-label={railLabel} data-testid={railTestId}>
-            {search && (
-              <span className="search-field cat-rail-search">
-                <input
-                  className="catalog-search"
-                  value={search.value}
-                  onChange={(e) => search.onChange(e.target.value)}
-                  placeholder={search.placeholder}
-                  data-testid={search.testId}
-                />
-              </span>
-            )}
-            {sections.map((section, i) =>
-              section.kind === 'views' ? (
-                <ViewsSection key={section.title ?? i} section={section} />
-              ) : (
-                <ChecksSection key={section.title} section={section} />
-              ),
-            )}
-          </aside>
+        {header != null && <div className="cat-card-header">{header}</div>}
+        {toolbar != null && <div className="cat-card-toolbar">{toolbar}</div>}
+        <div className={cn('cat-layout', !hasRail && 'cat-layout--norail')}>
+          {hasRail && (
+            <aside className="cat-rail" aria-label={railLabel} data-testid={railTestId}>
+              {search && (
+                <span className="search-field cat-rail-search">
+                  <input
+                    className="catalog-search"
+                    value={search.value}
+                    onChange={(e) => search.onChange(e.target.value)}
+                    placeholder={search.placeholder}
+                    data-testid={search.testId}
+                  />
+                </span>
+              )}
+              {sections.map((section, i) =>
+                section.kind === 'views' ? (
+                  <ViewsSection key={section.title ?? i} section={section} />
+                ) : (
+                  <ChecksSection key={section.title} section={section} />
+                ),
+              )}
+            </aside>
+          )}
 
           <div className="cat-main" data-testid={mainTestId}>
             {table}
             {empty}
           </div>
         </div>
+        {footer != null && <div className="cat-card-footer">{footer}</div>}
       </div>
     </div>
   );
