@@ -85,14 +85,16 @@
 
 .ui-dt-table th {
   text-align: left;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--ui-text-soft);
-  padding: 0.55rem 0.85rem;
-  background: var(--ui-surface-subtle);
-  border-bottom: 1px solid var(--ui-border-strong);
+  padding: 0.55rem 0.9rem 0.5rem;
+  /* Cabecera sobre superficie blanca (estilo Existencias): separada solo por el
+     hairline inferior, sin banda gris. Tokens --ui-* dark-aware. */
+  background: var(--ui-surface);
+  border-bottom: 1px solid var(--ui-border);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -164,8 +166,8 @@ th[aria-sort='descending'] .ui-dt-sort-icon {
 }
 
 .ui-dt-table td {
-  height: 3.5rem;
-  padding: 0 0.85rem;
+  height: 2.75rem;
+  padding: 0 0.9rem;
   vertical-align: middle;
   border-bottom: 1px solid var(--ui-border);
   color: var(--ui-text);
