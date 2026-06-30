@@ -140,6 +140,25 @@
 .ex-row.is-out:hover {
   background: color-mix(in srgb, var(--ui-danger-soft) 80%, var(--ui-surface));
 }
+
+/* Existencias migrada al componente único (FacetedTable): las filas son `.cat-row`.
+   Reproduce el reveal de acciones por hover y los tonos por nivel de stock. Scoped a
+   `.ex-main` para no afectar al Catálogo (también `.cat-row`, pero sin tono ni `.ex-act`). */
+.ex-main .cat-row:hover .ex-act {
+  opacity: 1;
+}
+.ex-main .cat-row.is-low {
+  background: color-mix(in srgb, var(--ui-warning-soft) 55%, var(--ui-surface));
+}
+.ex-main .cat-row.is-out {
+  background: color-mix(in srgb, var(--ui-danger-soft) 55%, var(--ui-surface));
+}
+.ex-main .cat-row.is-low:hover {
+  background: color-mix(in srgb, var(--ui-warning-soft) 80%, var(--ui-surface));
+}
+.ex-main .cat-row.is-out:hover {
+  background: color-mix(in srgb, var(--ui-danger-soft) 80%, var(--ui-surface));
+}
 .ex-row td {
   height: 2.75rem;
   padding: 0 0.9rem;
