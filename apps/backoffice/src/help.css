@@ -874,12 +874,23 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  overflow: hidden;
+}
+/* Todo el contenido del hero, centrado verticalmente */
+.ticket-hero-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   gap: var(--ui-space-5);
   padding: clamp(2.5rem, 1.4rem + 5vw, 5rem) var(--ui-space-6);
-  width: 100%;
+  /* El carrusel usa márgenes negativos para llegar a los bordes de la card */
 }
 .ticket-hero-eyebrow {
   margin: 0;
@@ -906,25 +917,46 @@
   color: var(--ui-text-muted);
   text-wrap: balance;
 }
-.ticket-hero .ticket-composer {
+.ticket-hero-body .ticket-composer {
   width: 100%;
   max-width: 44rem;
   margin-top: 0;
 }
+/* Carrusel edge-to-edge — clip container, ancho natural del hero */
 .ticket-chips {
+  overflow: hidden;
+  padding: 0.35rem 0 1.25rem;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ticket-chips:active {
+  cursor: grabbing;
+}
+/* Track: posición controlada por rAF en JS, sin CSS animation */
+.ticket-chips-track {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--ui-space-2);
-  justify-content: center;
+  width: max-content;
+  padding: 0 var(--ui-space-6);
+}
+/* Carousel dentro del hero-body: rompe el padding lateral para ir edge-to-edge */
+.ticket-hero-body .ticket-chips {
+  width: calc(100% + 2 * var(--ui-space-6));
+  margin-left: calc(-1 * var(--ui-space-6));
+  margin-right: calc(-1 * var(--ui-space-6));
 }
 .ticket-chip {
+  flex-shrink: 0;
   padding: var(--ui-space-2) var(--ui-space-3);
-  font-size: var(--ui-text-sm);
+  font-size: var(--ui-text-base);
   color: var(--ui-text);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: 999px;
   cursor: pointer;
+  white-space: nowrap;
   transition:
     background 0.15s var(--ui-ease),
     border-color 0.15s var(--ui-ease);
@@ -1255,7 +1287,6 @@
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: 14px;
-  box-shadow: var(--ui-shadow-sm);
   transition:
     border-color 0.18s var(--ui-ease),
     box-shadow 0.18s var(--ui-ease);
@@ -1339,5 +1370,8 @@
   }
   .ticket-new-btn:hover {
     transform: none;
+  }
+  .ticket-chips-track {
+    /* rAF loop se detiene externamente — nada que anular aquí */
   }
 }

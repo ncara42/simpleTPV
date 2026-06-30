@@ -191,6 +191,9 @@
    divisoria y con acento azul (--ui-primary) para distinguirla de la navegación
    propia del backoffice. El icono hereda el color (color: inherit) → sale azul. */
 .sidebar-app-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin-top: 0.45rem;
   padding-top: 0.45rem;
   border-top: 1px solid var(--ui-border);
@@ -333,7 +336,7 @@
    por encima de esta línea y del icono de usuario. */
 .sidebar-footer-sep {
   height: 1px;
-  margin: 0.3rem 0.3rem;
+  margin: 6px 0 0.3rem;
   background: var(--sidebar-border);
 }
 

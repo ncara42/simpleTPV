@@ -25,19 +25,19 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeftRight,
   Bell,
-  Bot,
-  Boxes,
   BriefcaseBusiness,
   Building2,
   CheckSquare,
-  CircleHelp,
   CreditCard,
   Handshake,
+  LayoutDashboard,
+  Lifebuoy,
   Package,
   Percent,
   ScanLine,
   Settings,
   Store,
+  Tag,
   TrendingUp,
   Truck,
   Users,
@@ -81,19 +81,19 @@ import { VerifactuPage } from './VerifactuPage.js';
 // grupos se despliegan como dropdown (hover sostenido >200ms = preview; clic =
 // anclado). El mapa de contenido por grupo es el cerrado en informe_decisiones D-09.
 const NAV_GROUPS: NavGroup[] = [
-  { id: 'inventory', label: 'Catálogo e inventario', icon: <Package size={18} /> },
+  { id: 'inventory', label: 'Catálogo e inventario', icon: <Tag size={18} /> },
   { id: 'commercial', label: 'Ventas y clientes', icon: <TrendingUp size={18} /> },
   { id: 'org', label: 'Organización', icon: <Building2 size={18} /> },
   { id: 'rrhh', label: 'RRHH', icon: <BriefcaseBusiness size={18} /> },
 ];
 
 const ALL_NAV: NavItem[] = [
-  { id: 'dashboard', label: 'Asistente de IA', icon: <Bot size={18} /> },
+  { id: 'dashboard', label: 'Asistente de IA', icon: <LayoutDashboard size={18} /> },
   { id: 'notifications', label: 'Notificaciones', icon: <Bell size={18} />, group: 'inventory' },
   // S-02 fase A: una sola entrada "Inventario" monta InventoryPage con vistas
   // segmentadas (Catálogo · Familias · Existencias). Las tres entradas previas se
   // colapsan aquí; sus rutas siguen vivas (deep-link/redirección) pero ocultas del menú.
-  { id: 'inventory', label: 'Inventario', icon: <Boxes size={18} />, group: 'inventory' },
+  { id: 'inventory', label: 'Inventario', icon: <Package size={18} />, group: 'inventory' },
   { id: 'transfers', label: 'Traspasos', icon: <ArrowLeftRight size={18} />, group: 'inventory' },
   { id: 'suppliers', label: 'Proveedores', icon: <Truck size={18} />, group: 'inventory' },
   // Ventas y clientes (D-09): Ventas · Clientes B2B · Promociones
@@ -109,7 +109,7 @@ const ALL_NAV: NavItem[] = [
   { id: 'personal', label: 'Personal', icon: <Users size={18} />, group: 'rrhh' },
   { id: 'settings', label: 'Configuración', icon: <Settings size={18} />, group: 'org' },
   { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'org' },
-  { id: 'help', label: 'Ayuda', icon: <CircleHelp size={18} />, afterSwitch: true },
+  { id: 'help', label: 'Ayuda', icon: <Lifebuoy size={18} />, afterSwitch: true },
 ];
 
 // VeriFactu se mantiene fuera del menú (backend sin UI). Notificaciones también:

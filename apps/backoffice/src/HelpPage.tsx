@@ -3,6 +3,30 @@ import './help.css';
 import { usePageHeader } from '@simpletpv/ui';
 import { ArrowUp, History, Loader2, Lock, Paperclip, Plus, X } from 'lucide-react';
 import { type ChangeEvent, Fragment, type KeyboardEvent, useEffect, useRef, useState } from 'react';
+
+// ── Sugerencias del carrusel hero (20 preguntas frecuentes) ─────────────────────
+const HELP_SUGGESTIONS = [
+  '¿Cómo funciona el TPV?',
+  '¿Qué puedo hacer en el backoffice?',
+  'Guía rápida de ventas',
+  '¿Cómo gestiono el stock?',
+  '¿Cómo añado un producto?',
+  '¿Cómo creo una promoción?',
+  '¿Cómo gestiono mis proveedores?',
+  'Roles y permisos de usuarios',
+  '¿Cómo funciona el control horario?',
+  '¿Cómo configuro una tienda?',
+  '¿Qué es VeriFactu?',
+  '¿Cómo gestiono los traspasos?',
+  '¿Cómo veo los informes de ventas?',
+  '¿Cómo personalizo el tema?',
+  '¿Cómo funciona el B2B?',
+  'Alertas de stock bajas',
+  '¿Cómo funciona el cierre de caja?',
+  '¿Cómo añado un cliente?',
+  '¿Qué es el ticket Z?',
+  'Comparativa de ventas entre tiendas',
+];
 import { createPortal } from 'react-dom';
 
 import { ChatMarkdown } from './components/chat/ChatMarkdown.js';
@@ -278,6 +302,126 @@ function HistorialDropdown({
   );
 }
 
+// ── Carrusel de sugerencias (auto-scroll, pausa al hover) ────────────────────────
+
+interface SuggestionsCarouselProps {
+  onSelect: (s: string) => void;
+  disabled?: boolean;
+}
+
+const CAROUSEL_DURATION = 120; // segundos para un ciclo completo
+
+function SuggestionsCarousel({ onSelect, disabled }: SuggestionsCarouselProps) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  // Posición en refs — sin getComputedStyle, sin desincronía con la animación
+  const pos = useRef(0);
+  const half = useRef(0);
+  const paused = useRef(false);
+  const dragging = useRef(false);
+  const dragStart = useRef({ x: 0, tx: 0, moved: false });
+
+  const doubled = [...HELP_SUGGESTIONS, ...HELP_SUGGESTIONS];
+
+  // Loop rAF en lugar de CSS animation
+  useEffect(() => {
+    let rafId: number;
+    let lastTs: number | null = null;
+
+    const tick = (ts: number) => {
+      if (!lastTs) lastTs = ts;
+      const dt = (ts - lastTs) / 1000;
+      lastTs = ts;
+
+      if (!paused.current && !dragging.current && half.current > 0) {
+        pos.current -= (half.current / CAROUSEL_DURATION) * dt;
+        if (pos.current < -half.current) pos.current += half.current;
+        if (trackRef.current) trackRef.current.style.transform = `translateX(${pos.current}px)`;
+      }
+
+      rafId = requestAnimationFrame(tick);
+    };
+
+    // Medir half tras el primer paint
+    rafId = requestAnimationFrame(() => {
+      if (trackRef.current) half.current = trackRef.current.scrollWidth / 2;
+      rafId = requestAnimationFrame(tick);
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+
+  // Drag en el documento
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      const dx = e.clientX - dragStart.current.x;
+      if (Math.abs(dx) > 4) dragStart.current.moved = true;
+      pos.current = dragStart.current.tx + dx;
+      if (trackRef.current) trackRef.current.style.transform = `translateX(${pos.current}px)`;
+    };
+
+    const onUp = () => {
+      if (!dragging.current) return;
+      dragging.current = false;
+      // Normalizar al rango [-half, 0)
+      if (half.current > 0)
+        pos.current = (((pos.current % half.current) + half.current) % half.current) - half.current;
+      if (wrapRef.current && !wrapRef.current.matches(':hover')) paused.current = false;
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
+  const handleMouseEnter = () => {
+    paused.current = true;
+  };
+  const handleMouseLeave = () => {
+    if (!dragging.current) paused.current = false;
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault(); // evita drag nativo del browser
+    dragging.current = true;
+    dragStart.current = { x: e.clientX, tx: pos.current, moved: false };
+  };
+
+  const handleChipClick = (sug: string) => () => {
+    if (dragStart.current.moved) return;
+    onSelect(sug);
+  };
+
+  return (
+    <div
+      ref={wrapRef}
+      className="ticket-chips"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onMouseDown={handleMouseDown}
+    >
+      <div ref={trackRef} className="ticket-chips-track">
+        {doubled.map((sug, i) => (
+          <button
+            key={`${sug}-${i}`}
+            type="button"
+            className="ticket-chip"
+            onClick={handleChipClick(sug)}
+            disabled={disabled}
+            draggable={false}
+          >
+            {sug}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Página ───────────────────────────────────────────────────────────────────────
 
 export function HelpPage() {
@@ -364,33 +508,24 @@ export function HelpPage() {
         {s.selectedId === null ? (
           // ── Nueva consulta ──
           <section className="ticket-hero">
-            <p className="ticket-hero-eyebrow">Centro de ayuda</p>
-            <h1 className="ticket-hero-title">¿En qué podemos ayudarte?</h1>
-            <p className="ticket-hero-subtitle">
-              Pregunta lo que quieras sobre tu TPV y te respondo al momento. Si no puedo resolverlo,
-              lo derivo a una persona del equipo. Soporte de lunes a viernes, de 9:00 a 19:00.
-            </p>
-            {errorBanner}
-            <Composer
-              value={draft}
-              onChange={setDraft}
-              onSubmit={submit}
-              pending={s.pending}
-              placeholder="Escribe tu pregunta..."
-              autoFocus
-            />
-            <div className="ticket-chips">
-              {view.suggestions.map((sug) => (
-                <button
-                  key={sug}
-                  type="button"
-                  className="ticket-chip"
-                  onClick={() => pickSuggestion(sug)}
-                  disabled={s.pending}
-                >
-                  {sug}
-                </button>
-              ))}
+            <div className="ticket-hero-body">
+              <p className="ticket-hero-eyebrow">Centro de ayuda</p>
+              <h1 className="ticket-hero-title">¿En qué podemos ayudarte?</h1>
+              <p className="ticket-hero-subtitle">
+                Pregunta lo que necesites y te respondemos al momento. Si no podemos resolverlo o
+                quieres pedir una funcionalidad nueva, lo escalamos al equipo. Atención de lunes a
+                domingo, de 9 a 22h.
+              </p>
+              {errorBanner}
+              <Composer
+                value={draft}
+                onChange={setDraft}
+                onSubmit={submit}
+                pending={s.pending}
+                placeholder="Escribe tu pregunta..."
+                autoFocus
+              />
+              <SuggestionsCarousel onSelect={pickSuggestion} disabled={s.pending} />
             </div>
           </section>
         ) : (

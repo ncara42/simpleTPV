@@ -22,7 +22,7 @@ export interface NavItem {
   badge?: number;
   /** Texto opcional (p. ej. temporizador del fichaje en vivo) como píldora a la derecha. */
   counter?: string;
-  /** Si true, el item se renderiza DESPUÉS del appSwitch en lugar de antes. */
+  /** Si true, el item se renderiza en el footer (debajo de TPV, encima del toggle de tema). */
   afterSwitch?: boolean;
 }
 
@@ -663,60 +663,6 @@ export function Sidebar({
               })}
             </>
           )}
-
-          {/* Bloque inferior: divisor + items afterSwitch (p. ej. Ayuda) + TPV.
-              Todo comparte el mismo border-top para quedar visualmente agrupado. */}
-          {(appSwitch || postItems.length > 0) && (
-            <div className="sidebar-app-switch">
-              {postItems.length > 0 && (
-                <ul className="sidebar-group-items">
-                  {postItems.map((item, index) => {
-                    const isActive = activeItem === item.id;
-                    const button = (
-                      <button
-                        type="button"
-                        className={`sidebar-item${isActive ? ' active' : ''}`}
-                        onClick={() => handleSelect(item.id)}
-                        title={collapsed ? undefined : item.label}
-                        aria-current={isActive ? 'page' : undefined}
-                        data-testid={`nav-${item.id}`}
-                      >
-                        <span
-                          className="sidebar-item-icon"
-                          style={
-                            { '--sidebar-icon-anim': iconAnimAt(index) } as React.CSSProperties
-                          }
-                        >
-                          {item.icon}
-                        </span>
-                        <span className="sidebar-item-label">{item.label}</span>
-                      </button>
-                    );
-                    return (
-                      <li key={item.id}>
-                        {!collapsed ? <Tooltip label={item.label}>{button}</Tooltip> : button}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-              {appSwitch && (
-                <button
-                  type="button"
-                  className="sidebar-item sidebar-item--app"
-                  onClick={() => {
-                    appSwitch.onClick();
-                    setMobileOpen(false);
-                  }}
-                  title={appSwitch.label}
-                  data-testid={appSwitch.testId ?? 'sidebar-app-switch'}
-                >
-                  <span className="sidebar-item-icon">{appSwitch.icon}</span>
-                  <span className="sidebar-item-label">{appSwitch.label}</span>
-                </button>
-              )}
-            </div>
-          )}
         </nav>
 
         {/* Footer: cuenta (estilo ChatGPT) o cierre de sesión simple. En modo flotante la cuenta
@@ -768,6 +714,61 @@ export function Sidebar({
                     </button>
                   )}
                 </div>
+              )}
+              {/* TPV + Ayuda: encima del toggle de tema */}
+              {(appSwitch || postItems.length > 0) && (
+                <div className="sidebar-app-switch">
+                  {appSwitch && (
+                    <button
+                      type="button"
+                      className="sidebar-item sidebar-item--app"
+                      onClick={() => {
+                        appSwitch.onClick();
+                        setMobileOpen(false);
+                      }}
+                      title={appSwitch.label}
+                      data-testid={appSwitch.testId ?? 'sidebar-app-switch'}
+                    >
+                      <span className="sidebar-item-icon">{appSwitch.icon}</span>
+                      <span className="sidebar-item-label">{appSwitch.label}</span>
+                    </button>
+                  )}
+                  {postItems.length > 0 && (
+                    <ul className="sidebar-group-items">
+                      {postItems.map((item, index) => {
+                        const isActive = activeItem === item.id;
+                        const button = (
+                          <button
+                            type="button"
+                            className={`sidebar-item${isActive ? ' active' : ''}`}
+                            onClick={() => handleSelect(item.id)}
+                            title={collapsed ? undefined : item.label}
+                            aria-current={isActive ? 'page' : undefined}
+                            data-testid={`nav-${item.id}`}
+                          >
+                            <span
+                              className="sidebar-item-icon"
+                              style={
+                                { '--sidebar-icon-anim': iconAnimAt(index) } as React.CSSProperties
+                              }
+                            >
+                              {item.icon}
+                            </span>
+                            <span className="sidebar-item-label">{item.label}</span>
+                          </button>
+                        );
+                        return (
+                          <li key={item.id}>
+                            {!collapsed ? <Tooltip label={item.label}>{button}</Tooltip> : button}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
+              {(appSwitch || postItems.length > 0) && (
+                <div className="sidebar-footer-sep" aria-hidden="true" />
               )}
               {/* Toggle de tema ENCIMA de la cuenta, separado por un filete divisor. */}
               <SidebarThemeToggle />
