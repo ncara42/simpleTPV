@@ -816,6 +816,7 @@ model CashSession {
   status         CashSessionStatus @default(OPEN)
   openedAt       DateTime          @default(now())
   closedAt       DateTime?
+  closingNote    String? // anotación del cajero cuando el arqueo no cuadra
 
   organization Organization   @relation(fields: [organizationId], references: [id])
   store        Store          @relation(fields: [storeId], references: [id])

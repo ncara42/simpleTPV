@@ -37,7 +37,7 @@ struct PendingRow {
 const SESSION_COLS: &str = r#"id, "organizationId" AS organization_id, "storeId" AS store_id,
     "userId" AS user_id, "openingAmount" AS opening_amount, "closingAmount" AS closing_amount,
     "expectedAmount" AS expected_amount, difference, status::text AS status,
-    "openedAt" AS opened_at, "closedAt" AS closed_at"#;
+    "openedAt" AS opened_at, "closedAt" AS closed_at, "closingNote" AS closing_note"#;
 
 const MOVEMENT_COLS: &str = r#"id, "organizationId" AS organization_id,
     "cashSessionId" AS cash_session_id, "storeId" AS store_id, "userId" AS user_id,
@@ -58,6 +58,56 @@ async fn load_session(
         .bind(org)
         .fetch_optional(&mut **tx)
         .await
+}
+
+/// Efectivo esperado en el cajón de una sesión: inicial + ventas en efectivo del
+/// turno + neto de movimientos APPROVED − reembolsos en efectivo (SEC-11). Se usa
+/// en el cierre (cuadre definitivo) y en `current` (cuadre en vivo de la caja
+/// abierta, para que el TPV sepa el importe que debería haber).
+async fn compute_session_expected(
+    tx: &mut Transaction<'_, Postgres>,
+    org: Uuid,
+    store_id: Uuid,
+    session_id: Uuid,
+    opened_at: time::PrimitiveDateTime,
+    opening_amount: Decimal,
+) -> Result<Decimal, sqlx::Error> {
+    let cash_sales: Decimal = sqlx::query_scalar(
+        r#"SELECT COALESCE(SUM(total), 0) FROM "Sale"
+           WHERE "organizationId" = $1 AND "storeId" = $2 AND status = 'COMPLETED'::"SaleStatus"
+             AND "paymentMethod" = 'CASH'::"PaymentMethod" AND "createdAt" >= $3"#,
+    )
+    .bind(org)
+    .bind(store_id)
+    .bind(opened_at)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    // Neto de movimientos APPROVED: IN suma, OUT/TRANSFER_OUT restan.
+    let movement_net: Decimal = sqlx::query_scalar(
+        r#"SELECT COALESCE(SUM(CASE WHEN type = 'IN'::"CashMovementType" THEN amount ELSE -amount END), 0)
+           FROM "CashMovement"
+           WHERE "organizationId" = $1 AND "cashSessionId" = $2 AND status = 'APPROVED'::"CashMovementStatus""#,
+    )
+    .bind(org)
+    .bind(session_id)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    // Reembolsos en efectivo del turno (SEC-11): sin ticket o venta en efectivo.
+    let cash_refunds: Decimal = sqlx::query_scalar(
+        r#"SELECT COALESCE(SUM(r.total), 0) FROM "Return" r
+           LEFT JOIN "Sale" s ON s.id = r."saleId"
+           WHERE r."organizationId" = $1 AND r."storeId" = $2 AND r."createdAt" >= $3
+             AND (r."saleId" IS NULL OR s."paymentMethod" = 'CASH'::"PaymentMethod")"#,
+    )
+    .bind(org)
+    .bind(store_id)
+    .bind(opened_at)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    Ok(compute_expected(opening_amount, cash_sales, movement_net, cash_refunds))
 }
 
 /// Lock pesimista de la fila de la sesión (serializa cierre vs movimientos).
@@ -163,47 +213,28 @@ pub async fn close(
         .execute(&mut **tx)
         .await?;
 
-        let cash_sales: Decimal = sqlx::query_scalar(
-            r#"SELECT COALESCE(SUM(total), 0) FROM "Sale"
-               WHERE "organizationId" = $1 AND "storeId" = $2 AND status = 'COMPLETED'::"SaleStatus"
-                 AND "paymentMethod" = 'CASH'::"PaymentMethod" AND "createdAt" >= $3"#,
+        let expected = compute_session_expected(
+            tx,
+            org,
+            session.store_id,
+            id,
+            session.opened_at,
+            session.opening_amount,
         )
-        .bind(org)
-        .bind(session.store_id)
-        .bind(session.opened_at)
-        .fetch_one(&mut **tx)
         .await?;
-
-        // Neto de movimientos APPROVED: IN suma, OUT/TRANSFER_OUT restan.
-        let movement_net: Decimal = sqlx::query_scalar(
-            r#"SELECT COALESCE(SUM(CASE WHEN type = 'IN'::"CashMovementType" THEN amount ELSE -amount END), 0)
-               FROM "CashMovement"
-               WHERE "organizationId" = $1 AND "cashSessionId" = $2 AND status = 'APPROVED'::"CashMovementStatus""#,
-        )
-        .bind(org)
-        .bind(id)
-        .fetch_one(&mut **tx)
-        .await?;
-
-        // Reembolsos en efectivo del turno (SEC-11): sin ticket o venta en efectivo.
-        let cash_refunds: Decimal = sqlx::query_scalar(
-            r#"SELECT COALESCE(SUM(r.total), 0) FROM "Return" r
-               LEFT JOIN "Sale" s ON s.id = r."saleId"
-               WHERE r."organizationId" = $1 AND r."storeId" = $2 AND r."createdAt" >= $3
-                 AND (r."saleId" IS NULL OR s."paymentMethod" = 'CASH'::"PaymentMethod")"#,
-        )
-        .bind(org)
-        .bind(session.store_id)
-        .bind(session.opened_at)
-        .fetch_one(&mut **tx)
-        .await?;
-
-        let expected = compute_expected(session.opening_amount, cash_sales, movement_net, cash_refunds);
         let difference = compute_difference(input.counted_amount, expected);
 
+        // Nota solo si el arqueo no cuadra y trae texto real; en exacto guardamos null.
+        let note = input
+            .closing_note
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty() && difference != Decimal::ZERO)
+            .map(|s| s.to_string());
         let updated = sqlx::query(
             r#"UPDATE "CashSession" SET status = 'CLOSED'::"CashSessionStatus",
-                 "closingAmount" = $3, "expectedAmount" = $4, difference = $5, "closedAt" = now()
+                 "closingAmount" = $3, "expectedAmount" = $4, difference = $5,
+                 "closingNote" = $6, "closedAt" = now()
                WHERE id = $1 AND "organizationId" = $2 AND status = 'OPEN'::"CashSessionStatus""#,
         )
         .bind(id)
@@ -211,6 +242,7 @@ pub async fn close(
         .bind(input.counted_amount)
         .bind(expected)
         .bind(difference)
+        .bind(note)
         .execute(&mut **tx)
         .await?
         .rows_affected();
@@ -245,6 +277,25 @@ pub async fn current(
             .bind(org)
             .fetch_optional(&mut **tx)
             .await?;
+            // Cuadre en vivo: la caja abierta no tiene expectedAmount persistido, así
+            // que lo calculamos al vuelo para que el TPV muestre "esperado" y el
+            // semáforo del cierre (falta/sobra/exacto) sea real.
+            let s = match s {
+                Some(mut sess) => {
+                    let expected = compute_session_expected(
+                        tx,
+                        org,
+                        sess.store_id,
+                        sess.id,
+                        sess.opened_at,
+                        sess.opening_amount,
+                    )
+                    .await?;
+                    sess.expected_amount = Some(expected);
+                    Some(sess)
+                }
+                None => None,
+            };
             Ok(Ok(s))
         })
         .await?;

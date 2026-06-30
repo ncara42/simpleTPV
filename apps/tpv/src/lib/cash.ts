@@ -14,8 +14,15 @@ export function openCashSession(input: OpenCashSessionInput): Promise<CashSessio
   return api.post<CashSession>('/cash-sessions/open', input);
 }
 
-export function closeCashSession(id: string, countedAmount: number): Promise<CashSession> {
-  return api.post<CashSession>(`/cash-sessions/${id}/close`, { countedAmount });
+export function closeCashSession(
+  id: string,
+  countedAmount: number,
+  closingNote?: string,
+): Promise<CashSession> {
+  return api.post<CashSession>(`/cash-sessions/${id}/close`, {
+    countedAmount,
+    ...(closingNote ? { closingNote } : {}),
+  });
 }
 
 export async function currentCashSession(storeId: string): Promise<CashSession | null> {

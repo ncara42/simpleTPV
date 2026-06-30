@@ -349,6 +349,8 @@ export interface CashSession {
   status: CashSessionStatus;
   openedAt: string;
   closedAt: string | null;
+  // Anotación del cajero cuando el arqueo no cuadra; null si exacto o sin nota.
+  closingNote: string | null;
 }
 
 // IN = ingreso en el cajón, OUT = retirada, TRANSFER_OUT = traspaso a la central (#146).
@@ -405,6 +407,8 @@ export interface OpenCashSessionInput {
 
 export interface CloseCashSessionInput {
   countedAmount: number;
+  // Anotación opcional cuando el arqueo no cuadra (sobra o falta dinero).
+  closingNote?: string;
 }
 
 // Devolución parcial contra un ticket (#15). Los Decimal de Prisma viajan como

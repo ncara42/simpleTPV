@@ -17,7 +17,6 @@ import {
   HelpCircle,
   ReceiptText,
   ShoppingBag,
-  Store,
   Truck,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -32,7 +31,6 @@ import { useDevAutoLogin } from './lib/dev-autologin.js';
 import { useFeatures } from './lib/features.js';
 import { formatDuration } from './lib/format.js';
 import { getMe, roleLabel } from './lib/me.js';
-import { switchApp } from './lib/nav.js';
 import { listStores } from './lib/sales.js';
 import { useOfflineSync } from './lib/useOfflineSync.js';
 import { useTimeClock } from './lib/useTimeClock.js';
@@ -121,13 +119,6 @@ function Home() {
         // Cuenta al PIE del sidebar (avatar → menú cerrar sesión), estilo ChatGPT/Claude.
         account={{ name: me?.name || 'Usuario', subtitle: roleLabel(me?.role) }}
         onLogout={logout}
-        // El cambio a Backoffice es la última entrada del sidebar (no en el topbar).
-        appSwitch={{
-          label: 'Backoffice',
-          icon: <Store size={19} aria-hidden="true" />,
-          onClick: () => switchApp('backoffice'),
-          testId: 'switch-backoffice',
-        }}
       />
       <div className="app-content">
         <ConnectivityBanner queuedCount={queuedCount} />

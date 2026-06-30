@@ -25,6 +25,8 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
   // Total contado, alimentado por el contador de denominaciones (CashCount).
   const [counted, setCounted] = useState(0);
   const [closing, setClosing] = useState(false);
+  // Anotación del cajero cuando el arqueo no cuadra (solo se envía si hay descuadre).
+  const [closingNote, setClosingNote] = useState('');
   // El TPV SOLICITA movimientos (#146): el cajero elige tipo, importe y motivo, y
   // un responsable los aprueba/deniega desde el backoffice.
   const [movementType, setMovementType] = useState<CashMovementType>('OUT');
@@ -93,9 +95,11 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
   });
 
   const closeMutation = useMutation({
-    mutationFn: (amount: number) => closeCashSession(session!.id, amount),
+    mutationFn: (vars: { amount: number; note: string }) =>
+      closeCashSession(session!.id, vars.amount, vars.note || undefined),
     onSuccess: (result) => {
       setCounted(0);
+      setClosingNote('');
       // El cierre se confirmó: descartamos el borrador del conteo persistido.
       try {
         localStorage.removeItem(`cash-count:${result.id}`);
@@ -126,6 +130,12 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
   // Caja abierta
   if (session) {
     const opening = Number(session.openingAmount);
+    // Cuadre en vivo: rojo si falta dinero (contado < teórico), ámbar si sobra y
+    // verde si es exacto. La nota de descuadre solo aparece cuando no cuadra.
+    const expected = Number(session.expectedAmount ?? 0);
+    const diff = Math.round((counted - expected) * 100) / 100;
+    const isExact = diff === 0;
+    const closeStateClass = isExact ? 'is-exact' : diff > 0 ? 'is-over' : 'is-short';
 
     return (
       <>
@@ -168,15 +178,33 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
               className="cash-form"
               onSubmit={(e) => {
                 e.preventDefault();
-                closeMutation.mutate(counted);
+                closeMutation.mutate({ amount: counted, note: isExact ? '' : closingNote.trim() });
               }}
             >
               {/* Conteo por denominaciones (persiste mientras la caja siga abierta). */}
               <CashCount
-                expected={Number(session.expectedAmount ?? 0)}
+                expected={expected}
                 storageKey={`cash-count:${session.id}`}
                 onTotalChange={setCounted}
               />
+              {!isExact && (
+                <label className="cash-note" data-testid="cash-close-note-field">
+                  <span className="cash-note-label">
+                    {diff < 0
+                      ? 'Falta dinero en caja. ¿Qué ha pasado?'
+                      : 'Sobra dinero en caja. ¿Qué ha pasado?'}
+                  </span>
+                  <textarea
+                    className="cash-note-input"
+                    value={closingNote}
+                    onChange={(e) => setClosingNote(e.target.value)}
+                    placeholder="Ej.: faltaba cambio al abrir, un cobro entró de más…"
+                    rows={2}
+                    maxLength={500}
+                    data-testid="cash-close-note"
+                  />
+                </label>
+              )}
               <div className="cash-actions">
                 <button
                   type="button"
@@ -194,7 +222,7 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
                   type="submit"
                   disabled={closeMutation.isPending}
                   data-testid="cash-close-confirm"
-                  className="cash-btn-close"
+                  className={`cash-btn-close ${closeStateClass}`}
                 >
                   {closeMutation.isPending ? 'Cerrando…' : `Confirmar cierre · ${eur(counted)} €`}
                 </button>
@@ -214,9 +242,7 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
                   options={[
                     { value: 'OUT', label: 'Retirada' },
                     { value: 'IN', label: 'Entrada' },
-                    ...(hasCentral
-                      ? [{ value: 'TRANSFER_OUT', label: 'Traspaso a central' }]
-                      : []),
+                    ...(hasCentral ? [{ value: 'TRANSFER_OUT', label: 'Traspaso a central' }] : []),
                   ]}
                   ariaLabel="Tipo de movimiento"
                   data-testid="cash-movement-type"

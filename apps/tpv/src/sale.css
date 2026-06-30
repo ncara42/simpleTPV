@@ -1407,8 +1407,85 @@
   color: #fff;
 }
 
+/* Semáforo del cuadre: rojo = falta dinero, ámbar = sobra, verde = cuadra exacto.
+   En modo oscuro el ámbar/verde son luminosos, así que el texto pasa a oscuro. */
+.cash-btn-close.is-short {
+  background: var(--ui-danger);
+  color: #fff;
+}
+
+.cash-btn-close.is-over {
+  background: var(--ui-warning);
+  color: #fff;
+}
+
+.cash-btn-close.is-exact {
+  background: var(--ui-success);
+  color: #fff;
+}
+
+:root[data-theme='dark'] .cash-btn-close.is-over {
+  color: #1a1300;
+}
+
+:root[data-theme='dark'] .cash-btn-close.is-exact {
+  color: #05130b;
+}
+
 .cash-btn-close:hover {
   filter: brightness(0.94);
+}
+
+/* Anotación del descuadre: aparece bajo el conteo solo si no cuadra. */
+.cash-note {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.cash-note-label {
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  color: var(--ui-text-soft);
+}
+
+.cash-note-input {
+  resize: vertical;
+  min-height: 2.6rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+  font-size: var(--ui-text-md);
+  transition:
+    border-color 0.1s,
+    box-shadow 0.1s;
+}
+
+.cash-note-input:focus {
+  outline: none;
+  border-color: var(--ui-brand);
+  box-shadow: var(--ui-focus);
+}
+
+/* Misma nota, en solo lectura dentro del resumen de cierre. */
+.cash-note--readonly {
+  margin-top: 0.6rem;
+}
+
+.cash-note-text {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  font-size: var(--ui-text-md);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .cash-btn-cancel {
@@ -3022,18 +3099,68 @@
   flex-direction: column;
 }
 
+/* Stepper en una sola cápsula: el borde vive en el contenedor (un único trazo pill)
+   y los hijos (−, número, +) van sin borde, igual que el stepper del arqueo. Así no
+   hay dos juegos de controles (sin flechas nativas) ni divisores entre piezas. */
 .inventory-row > div {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0;
+  border: 1.5px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface);
+  overflow: hidden;
+  transition:
+    border-color 0.1s,
+    box-shadow 0.1s;
+}
+
+.inventory-row > div:focus-within {
+  border-color: var(--ui-brand);
+  box-shadow: var(--ui-focus);
 }
 
 .inventory-row button {
-  width: 2rem;
-  height: 2rem;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-  background: var(--ui-surface);
+  width: 2.25rem;
+  height: 2.25rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 1.05rem;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition:
+    background 0.1s,
+    color 0.1s;
+}
+
+.inventory-row button:hover {
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-ink);
+}
+
+/* El input pierde su marco propio (lo aporta la cápsula) y oculta las flechas
+   nativas de incremento, que duplicaban los botones −/+ laterales. */
+.inventory-row input {
+  width: 3rem;
+  height: 2.25rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  outline: none;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.inventory-row input::-webkit-outer-spin-button,
+.inventory-row input::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .cash-movement-form {

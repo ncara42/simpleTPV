@@ -2,30 +2,32 @@ import { useEffect, useState } from 'react';
 
 import { eur } from './lib/format.js';
 
-// Denominaciones EUR de mayor a menor, en CÉNTIMOS (enteros) para evitar errores
-// de coma flotante al sumar (0.1 + 0.2 ≠ 0.3). El total se divide entre 100.
+// Denominaciones EUR de menor a mayor (1 ct → 500 €), en CÉNTIMOS (enteros) para
+// evitar errores de coma flotante al sumar (0.1 + 0.2 ≠ 0.3). El total se divide
+// entre 100. El orden ascendente arranca el conteo en la moneda más pequeña.
 const CASH_DENOMINATIONS: ReadonlyArray<{ cents: number; label: string }> = [
-  { cents: 50000, label: '500 €' },
-  { cents: 20000, label: '200 €' },
-  { cents: 10000, label: '100 €' },
-  { cents: 5000, label: '50 €' },
-  { cents: 2000, label: '20 €' },
-  { cents: 1000, label: '10 €' },
-  { cents: 500, label: '5 €' },
-  { cents: 200, label: '2 €' },
-  { cents: 100, label: '1 €' },
-  { cents: 50, label: '50 cts' },
-  { cents: 20, label: '20 cts' },
-  { cents: 10, label: '10 cts' },
-  { cents: 5, label: '5 cts' },
-  { cents: 2, label: '2 cts' },
   { cents: 1, label: '1 ct' },
+  { cents: 2, label: '2 cts' },
+  { cents: 5, label: '5 cts' },
+  { cents: 10, label: '10 cts' },
+  { cents: 20, label: '20 cts' },
+  { cents: 50, label: '50 cts' },
+  { cents: 100, label: '1 €' },
+  { cents: 200, label: '2 €' },
+  { cents: 500, label: '5 €' },
+  { cents: 1000, label: '10 €' },
+  { cents: 2000, label: '20 €' },
+  { cents: 5000, label: '50 €' },
+  { cents: 10000, label: '100 €' },
+  { cents: 20000, label: '200 €' },
+  { cents: 50000, label: '500 €' },
 ];
 
-// Partición para el arqueo: billetes (≥ 5 €) y monedas (< 5 €). Conserva el orden
-// de mayor a menor de CASH_DENOMINATIONS; se usa para agrupar el conteo en dos columnas.
-const CASH_NOTES = CASH_DENOMINATIONS.filter((d) => d.cents >= 500);
+// Partición para el arqueo: monedas (< 5 €) y billetes (≥ 5 €). Conserva el orden
+// ascendente de CASH_DENOMINATIONS; las monedas se muestran primero para que la
+// lectura (columna izquierda → derecha) vaya de 1 ct hasta 500 €.
 const CASH_COINS = CASH_DENOMINATIONS.filter((d) => d.cents < 500);
+const CASH_NOTES = CASH_DENOMINATIONS.filter((d) => d.cents >= 500);
 
 export type CashCounts = Record<string, number>;
 
@@ -132,10 +134,10 @@ export function CashCount({
     <div className="cash-count" data-testid="cash-count">
       <div className="cash-count-groups">
         <section className="cash-count-group">
-          <div className="cash-count-rows">{CASH_NOTES.map(renderDenom)}</div>
+          <div className="cash-count-rows">{CASH_COINS.map(renderDenom)}</div>
         </section>
         <section className="cash-count-group">
-          <div className="cash-count-rows">{CASH_COINS.map(renderDenom)}</div>
+          <div className="cash-count-rows">{CASH_NOTES.map(renderDenom)}</div>
         </section>
       </div>
       <div className="cash-count-foot">

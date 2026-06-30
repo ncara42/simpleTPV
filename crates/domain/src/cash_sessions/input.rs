@@ -37,12 +37,20 @@ impl OpenCashSession {
 #[serde(rename_all = "camelCase")]
 pub struct CloseCashSession {
     pub counted_amount: Decimal,
+    /// Anotación libre del cajero cuando el arqueo no cuadra (opcional, máx. 500).
+    #[serde(default)]
+    pub closing_note: Option<String>,
 }
 
 impl CloseCashSession {
     pub fn validate(&self) -> Result<(), AppError> {
         if self.counted_amount < Decimal::ZERO || self.counted_amount > max_amount() {
             return Err(AppError::BadRequest);
+        }
+        if let Some(note) = &self.closing_note {
+            if note.chars().count() > 500 {
+                return Err(AppError::BadRequest);
+            }
         }
         Ok(())
     }

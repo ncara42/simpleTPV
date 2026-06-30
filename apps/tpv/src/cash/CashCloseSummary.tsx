@@ -49,6 +49,12 @@ export function CashCloseSummary({
             </span>
           </div>
         </div>
+        {session.closingNote && (
+          <div className="cash-note cash-note--readonly" data-testid="cash-summary-note">
+            <span className="cash-note-label">Anotación del descuadre</span>
+            <p className="cash-note-text">{session.closingNote}</p>
+          </div>
+        )}
         <button
           className="cash-btn-cancel"
           onClick={onDismiss}

@@ -173,6 +173,7 @@ async fn apertura_movimientos_aprobacion_y_cuadre() {
         session.id,
         CloseCashSession {
             counted_amount: Decimal::from(120),
+            closing_note: None,
         },
     )
     .await
@@ -252,6 +253,7 @@ async fn denegar_solicitud_no_afecta_cuadre() {
         session.id,
         CloseCashSession {
             counted_amount: Decimal::from(200),
+            closing_note: None,
         },
     )
     .await
@@ -301,6 +303,7 @@ async fn cierre_autodeniega_pendientes_y_no_afectan_cuadre() {
         session.id,
         CloseCashSession {
             counted_amount: Decimal::from(100),
+            closing_note: None,
         },
     )
     .await

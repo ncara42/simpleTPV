@@ -49,6 +49,8 @@ pub struct CashSession {
     pub opened_at: PrimitiveDateTime,
     #[serde(serialize_with = "crate::serde_helpers::iso_opt_utc")]
     pub closed_at: Option<PrimitiveDateTime>,
+    /// Anotación del cajero cuando el arqueo no cuadra; null si exacto o sin nota.
+    pub closing_note: Option<String>,
 }
 
 /// Movimiento de efectivo (salida JSON, paridad Prisma).
