@@ -106,6 +106,7 @@ struct Rec {
     error_code: Option<String>,
     last_error: Option<String>,
     subsanacion: bool,
+    rechazo_previo: bool,
     next_future: bool,
 }
 
@@ -113,6 +114,7 @@ async fn rec(admin: &PgPool, id: Uuid) -> Rec {
     sqlx::query_as(
         r#"SELECT status::text AS status, attempts, csv, "aeatState" AS aeat_state,
                   "errorCode" AS error_code, "lastError" AS last_error, subsanacion,
+                  "rechazoPrevio" AS rechazo_previo,
                   COALESCE("nextAttemptAt" > now(), false) AS next_future
            FROM "VerifactuRecord" WHERE id = $1"#,
     )
@@ -544,14 +546,18 @@ async fn ciclo_subsanacion_rechazo_retry_reenvia_con_subsanacion() {
     assert_eq!(rec(&admin, id).await.status, "FAILED");
 
     // 2) El comercio corrige y reintenta: `retry` reabre el registro y, al venir de un
-    //    rechazo de la AEAT, lo marca como subsanación.
+    //    rechazo de la AEAT, lo marca como subsanación CON rechazo previo.
     queue::retry(&admin, org, id).await.unwrap();
     let r = rec(&admin, id).await;
     assert_eq!(r.status, "PENDING", "retry reabre el registro");
     assert_eq!(r.attempts, 0, "retry resetea intentos");
     assert!(r.subsanacion, "un reenvío tras rechazo es una subsanación");
+    assert!(
+        r.rechazo_previo,
+        "el rechazo previo de la AEAT marca RechazoPrevio (enum oficial: 'Ha habido rechazo previo')"
+    );
 
-    // 3) El reenvío incluye Subsanacion=S y la AEAT lo acepta → SENT.
+    // 3) El reenvío incluye Subsanacion=S y RechazoPrevio=S, y la AEAT lo acepta → SENT.
     let acepta = FakeTransport::new(FakeMode::Body(body_ok(&[("T01-300001", "CSV-SUB")])));
     process_aeat_batch(&admin, &cfg(true), &acepta, 50, Some(org))
         .await
@@ -562,6 +568,10 @@ async fn ciclo_subsanacion_rechazo_retry_reenvia_con_subsanacion() {
     assert!(
         enviados[0].contains("<sf:Subsanacion>S</sf:Subsanacion>"),
         "el reenvío de subsanación lleva Subsanacion=S"
+    );
+    assert!(
+        enviados[0].contains("<sf:RechazoPrevio>S</sf:RechazoPrevio>"),
+        "el reenvío tras rechazo lleva RechazoPrevio=S"
     );
     assert_eq!(
         rec(&admin, id).await.status,

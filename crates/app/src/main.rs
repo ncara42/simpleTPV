@@ -621,6 +621,11 @@ async fn run_migrations(pool: &sqlx::PgPool) -> anyhow::Result<()> {
             "support"
         ),
         m!(
+            "../migrations/20260629140000_verifactu_immutable.sql",
+            20260629140000,
+            "verifactu_immutable"
+        ),
+        m!(
             "../migrations/20260629170000_support_tickets.sql",
             20260629170000,
             "support_tickets"

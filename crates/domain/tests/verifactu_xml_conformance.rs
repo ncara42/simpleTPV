@@ -354,9 +354,9 @@ fn huella_anulacion_se_recomputa_desde_el_xml() {
     );
     let recomputada = compute_anulacion_hash(
         &AnulacionHashInput {
-            id_emisor: get(&items, "IDFactura", "IDEmisorFactura").unwrap(),
-            num_serie: get(&items, "IDFactura", "NumSerieFactura").unwrap(),
-            fecha_expedicion: get(&items, "IDFactura", "FechaExpedicionFactura").unwrap(),
+            id_emisor: get(&items, "IDFactura", "IDEmisorFacturaAnulada").unwrap(),
+            num_serie: get(&items, "IDFactura", "NumSerieFacturaAnulada").unwrap(),
+            fecha_expedicion: get(&items, "IDFactura", "FechaExpedicionFacturaAnulada").unwrap(),
             fecha_hora_huso_gen: get(&items, "RegistroAnulacion", "FechaHoraHusoGenRegistro")
                 .unwrap(),
         },

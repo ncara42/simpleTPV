@@ -246,19 +246,22 @@ pub fn registro_anulacion_xml(
     out.push_str("<sf:RegistroAnulacion>");
     el(&mut out, "IDVersion", "1.0");
     out.push_str("<sf:IDFactura>");
+    // El XSD oficial (IDFacturaExpedidaBajaType) exige los nombres con sufijo
+    // `Anulada`, distintos de los del alta (IDFacturaExpedidaType). Son los mismos
+    // campos que entran en la huella de anulación (compute_anulacion_hash).
     el(
         &mut out,
-        "IDEmisorFactura",
+        "IDEmisorFacturaAnulada",
         p(payload, "idEmisorFacturaAnulada"),
     );
     el(
         &mut out,
-        "NumSerieFactura",
+        "NumSerieFacturaAnulada",
         p(payload, "numSerieFacturaAnulada"),
     );
     el(
         &mut out,
-        "FechaExpedicionFactura",
+        "FechaExpedicionFacturaAnulada",
         p(payload, "fechaExpedicionFacturaAnulada"),
     );
     out.push_str("</sf:IDFactura>");
@@ -466,7 +469,7 @@ mod tests {
         });
         let xml = registro_anulacion_xml(&payload, false, &Encadenamiento::Primero, &sis());
         assert!(xml.contains("<sf:RegistroAnulacion>"));
-        assert!(xml.contains("<sf:IDEmisorFactura>B12345678</sf:IDEmisorFactura>"));
+        assert!(xml.contains("<sf:IDEmisorFacturaAnulada>B12345678</sf:IDEmisorFacturaAnulada>"));
         // La anulación NO lleva NombreRazonEmisor ni Desglose.
         assert!(!xml.contains("<sf:NombreRazonEmisor>"));
         assert!(!xml.contains("<sf:Desglose>"));
