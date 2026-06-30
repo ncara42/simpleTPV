@@ -1,4 +1,11 @@
-import { Button, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
+import {
+  Button,
+  type DataTableColumn,
+  type FacetedColumn,
+  FacetedTable,
+  Input,
+  Select,
+} from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Plus, SlidersHorizontal, X } from 'lucide-react';
@@ -7,6 +14,7 @@ import { useMemo, useState } from 'react';
 import { CsvActionButton } from './components/CsvActionButton.js';
 import { ImportExportModal } from './components/ImportExportModal.js';
 import { Modal } from './components/Modal.js';
+import { ScrollShadowCell } from './components/ScrollShadowCell.js';
 import { useTableColumns } from './components/useTableColumns.js';
 import {
   assignUserStores,
@@ -84,7 +92,15 @@ export function UsersPage() {
   const [wizard, setWizard] = useState<EditWizard | null>(null);
   // Modal unificado de Importar/Exportar equipo (B-04).
   const [dataModal, setDataModal] = useState<'import' | 'export' | null>(null);
-  const [sortDesc, setSortDesc] = useState(false);
+  // Roles plegados (key = rol): cabeceras de grupo plegables.
+  const [collapsedRoles, setCollapsedRoles] = useState<ReadonlySet<string>>(new Set());
+  const toggleGroup = (key: string): void =>
+    setCollapsedRoles((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   // Filtros de la barra superior (espejo de la toolbar de stock).
   const [search, setSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
@@ -335,23 +351,34 @@ export function UsersPage() {
     editorTestId: 'users-columns-editor',
     title: 'Columnas de usuarios',
   });
-  const selectColumn: DataTableColumn<UserWithStores> = {
-    key: 'select',
-    header: '',
-    width: '2.2rem',
-    render: (u) => (
-      <input
-        type="checkbox"
-        className="user-check"
-        aria-label={`Seleccionar ${u.name}`}
-        data-testid="user-select"
-        checked={selectedSet.has(u.id)}
-        onChange={() => toggleSelect(u.id)}
-        onClick={(e) => e.stopPropagation()}
-      />
-    ),
-  };
-  const tableColumns = [selectColumn, ...effectiveColumns];
+  // Mapea las columnas efectivas (DataTableColumn del editor) a FacetedColumn: el
+  // nombre es la columna 'name' (indentada/bold; aloja el checkbox de selección),
+  // el estado va a la derecha ('num') y el resto 'mid'. El checkbox lo pinta la
+  // tabla (selectable) dentro de la celda de nombre.
+  const variantOf = (key: string): 'name' | 'num' | 'mid' =>
+    key === 'name' ? 'name' : key === 'active' ? 'num' : 'mid';
+  const facetedColumns: FacetedColumn<UserWithStores>[] = effectiveColumns.map((c) => ({
+    key: c.key,
+    header: c.header,
+    variant: variantOf(c.key),
+    render: (u: UserWithStores) =>
+      c.render ? c.render(u, 0) : String((u as unknown as Record<string, unknown>)[c.key] ?? ''),
+  }));
+
+  // Grupos por rol (jerárquico: Admin → Responsable → Dependiente); usuarios
+  // ordenados por nombre dentro de cada grupo. El rol sigue visible por fila.
+  const groups = (['ADMIN', 'MANAGER', 'CLERK'] as Role[])
+    .map((role) => ({
+      role,
+      rows: filtered.filter((u) => u.role === role).sort((a, b) => a.name.localeCompare(b.name)),
+    }))
+    .filter((g) => g.rows.length > 0)
+    .map((g) => ({
+      key: g.role,
+      label: ROLE_LABEL[g.role],
+      meta: `${g.rows.length} ${g.rows.length === 1 ? 'usuario' : 'usuarios'}`,
+      rows: g.rows,
+    }));
 
   usePageActions(
     <>
@@ -382,104 +409,108 @@ export function UsersPage() {
   );
 
   return (
-    <section className="catalog">
+    <section className="catalog catalog--faceted">
       {columnsEditor}
 
-      <div className="table-panel">
-        <DataTable
-          columns={tableColumns}
-          rows={sortDesc ? [...filtered].reverse() : filtered}
-          rowKey={(u) => u.id}
-          loading={isLoading}
-          toolbar={
-            <div className="users-toolbar">
-              <div className="sales-filters">
-                <span className="search-field">
-                  <Input
-                    className="catalog-search"
-                    placeholder="Buscar por nombre…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    data-testid="users-search"
-                  />
-                </span>
-                <Select
+      <div className="inv-card">
+        <div className="cat-card-toolbar">
+          <div className="users-toolbar">
+            <div className="sales-filters">
+              <span className="search-field">
+                <Input
                   className="catalog-search"
-                  value={storeFilter}
-                  onChange={setStoreFilter}
-                  ariaLabel="Filtrar por tienda"
-                  data-testid="users-store"
-                  options={[
-                    { value: '', label: 'Todas las tiendas' },
-                    ...stores.map((s) => ({ value: s.id, label: s.name })),
-                  ]}
+                  placeholder="Buscar por nombre…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  data-testid="users-search"
                 />
-                {selected.length > 0 && (
-                  <>
-                    {!allFilteredSelected && (
-                      <button
-                        type="button"
-                        className="users-sel-btn"
-                        onClick={selectAllFiltered}
-                        data-testid="users-select-all"
-                      >
-                        Seleccionar todo
-                      </button>
-                    )}
+              </span>
+              <Select
+                className="catalog-search"
+                value={storeFilter}
+                onChange={setStoreFilter}
+                ariaLabel="Filtrar por tienda"
+                data-testid="users-store"
+                options={[
+                  { value: '', label: 'Todas las tiendas' },
+                  ...stores.map((s) => ({ value: s.id, label: s.name })),
+                ]}
+              />
+              {selected.length > 0 && (
+                <>
+                  {!allFilteredSelected && (
                     <button
                       type="button"
                       className="users-sel-btn"
-                      onClick={clearSelection}
-                      data-testid="users-clear"
+                      onClick={selectAllFiltered}
+                      data-testid="users-select-all"
                     >
-                      Quitar selección
+                      Seleccionar todo
                     </button>
-                  </>
-                )}
-              </div>
-              {selected.length > 0 ? (
-                <div className="ui-dt-toolbar-actions">
+                  )}
                   <button
                     type="button"
-                    className="users-bulk-edit"
-                    onClick={openBulkEdit}
-                    data-testid="users-edit"
+                    className="users-sel-btn"
+                    onClick={clearSelection}
+                    data-testid="users-clear"
                   >
-                    Editar{selected.length > 1 ? ` (${selected.length})` : ''}
+                    Quitar selección
                   </button>
-                  <button
-                    type="button"
-                    className="users-bulk-del"
-                    onClick={removeSelected}
-                    data-testid="users-delete"
-                  >
-                    Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
-                  </button>
-                </div>
-              ) : (
-                <div className="ui-dt-toolbar-actions">
-                  <Button
-                    onClick={openCreate}
-                    data-testid="new-user"
-                    icon={<Plus size={16} aria-hidden="true" />}
-                  >
-                    Nuevo usuario
-                  </Button>
-                </div>
+                </>
               )}
             </div>
-          }
-          sort={{ key: 'name', dir: sortDesc ? 'desc' : 'asc' }}
-          onSortChange={() => setSortDesc((d) => !d)}
-          onRowClick={(u) => toggleSelect(u.id)}
-          rowClassName={(u) => (selectedSet.has(u.id) ? 'is-selected' : undefined)}
-          rowAriaSelected={(u) => selectedSet.has(u.id)}
-          rowTestId="user-row"
-          emptyState={
-            <span data-testid="users-empty">Sin usuarios para los filtros seleccionados.</span>
-          }
-          data-testid="users-table"
-        />
+            {selected.length > 0 ? (
+              <div className="ui-dt-toolbar-actions">
+                <button
+                  type="button"
+                  className="users-bulk-edit"
+                  onClick={openBulkEdit}
+                  data-testid="users-edit"
+                >
+                  Editar{selected.length > 1 ? ` (${selected.length})` : ''}
+                </button>
+                <button
+                  type="button"
+                  className="users-bulk-del"
+                  onClick={removeSelected}
+                  data-testid="users-delete"
+                >
+                  Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
+                </button>
+              </div>
+            ) : (
+              <div className="ui-dt-toolbar-actions">
+                <Button
+                  onClick={openCreate}
+                  data-testid="new-user"
+                  icon={<Plus size={16} aria-hidden="true" />}
+                >
+                  Nuevo usuario
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+        <ScrollShadowCell className="cat-main cat-main--solo" data-testid="users-table">
+          <FacetedTable<UserWithStores>
+            layout="table"
+            columns={facetedColumns}
+            groups={groups}
+            rowKey={(u) => u.id}
+            loading={isLoading}
+            selectable
+            selectedKeys={selectedSet}
+            onToggleSelect={toggleSelect}
+            selectTestId="user-select"
+            selectAriaLabel={(u) => `Seleccionar ${u.name}`}
+            collapsedKeys={collapsedRoles}
+            onToggleGroup={toggleGroup}
+            rowTestId="user-row"
+            emptyState={
+              <span data-testid="users-empty">Sin usuarios para los filtros seleccionados.</span>
+            }
+          />
+        </ScrollShadowCell>
       </div>
 
       {form && (
