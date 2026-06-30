@@ -1,5 +1,5 @@
-import type { PurchaseOrder } from '@simpletpv/auth';
-import { Badge, Button, DataTable, Input } from '@simpletpv/ui';
+import type { PurchaseOrder, PurchaseOrderStatus } from '@simpletpv/auth';
+import { Button, DataTable, type FacetedColumn, FacetedTable, Input } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -12,6 +12,15 @@ import {
 } from '../lib/purchases.js';
 import { STATUS_LABEL } from './labels.js';
 
+// Orden de los grupos por estado: lo accionable primero (Borrador → Confirmado →
+// Parcial → Recibido). La columna Estado desaparece (sube a la cabecera de grupo).
+const STATUS_ORDER: PurchaseOrderStatus[] = [
+  'DRAFT',
+  'CONFIRMED',
+  'PARTIALLY_RECEIVED',
+  'RECEIVED',
+];
+
 export function OrdersSection({
   supplierId,
 }: {
@@ -20,6 +29,14 @@ export function OrdersSection({
 } = {}) {
   const qc = useQueryClient();
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  const toggleGroup = (key: string): void =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['purchase-orders', supplierId ?? null],
@@ -31,15 +48,71 @@ export function OrdersSection({
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['purchase-orders'] }),
   });
 
+  // Grupos por estado (solo los presentes), pedidos recientes primero dentro de cada uno.
+  const groups = STATUS_ORDER.map((status) => ({
+    status,
+    rows: orders
+      .filter((o) => o.status === status)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+  }))
+    .filter((g) => g.rows.length > 0)
+    .map((g) => ({
+      key: g.status,
+      label: STATUS_LABEL[g.status],
+      meta: `${g.rows.length} ${g.rows.length === 1 ? 'pedido' : 'pedidos'}`,
+      rows: g.rows,
+    }));
+
+  const columns: FacetedColumn<PurchaseOrder>[] = [
+    {
+      key: 'date',
+      header: 'Fecha',
+      variant: 'name',
+      render: (o) => new Date(o.createdAt).toLocaleDateString('es-ES'),
+    },
+    { key: 'lines', header: 'Líneas', variant: 'num', render: (o) => o.lines.length },
+    {
+      key: 'actions',
+      header: '',
+      variant: 'num',
+      render: (o) => (
+        <>
+          {o.status === 'DRAFT' && (
+            <button
+              type="button"
+              className="link-btn"
+              disabled={confirmMut.isPending}
+              onClick={() => confirmMut.mutate(o.id)}
+              data-testid="order-confirm"
+            >
+              Confirmar
+            </button>
+          )}
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => setDetailId(o.id)}
+            data-testid="order-detail"
+          >
+            Ver
+          </button>
+        </>
+      ),
+    },
+  ];
+
   return (
     <>
       <div className="table-panel">
-        <DataTable
-          data-testid="orders-table"
-          rowTestId="order-row"
-          rows={orders}
+        <FacetedTable<PurchaseOrder>
+          layout="table"
+          columns={columns}
+          groups={groups}
           rowKey={(o) => o.id}
+          rowTestId="order-row"
           loading={isLoading}
+          collapsedKeys={collapsed}
+          onToggleGroup={toggleGroup}
           emptyState={
             supplierId ? (
               <span className="catalog-empty" data-testid="orders-empty">
@@ -69,53 +142,6 @@ export function OrdersSection({
               </div>
             )
           }
-          columns={[
-            {
-              key: 'date',
-              header: 'Fecha',
-              render: (o) => (
-                <span className="muted">{new Date(o.createdAt).toLocaleDateString('es-ES')}</span>
-              ),
-            },
-            { key: 'lines', header: 'Líneas', render: (o) => o.lines.length },
-            {
-              key: 'status',
-              header: 'Estado',
-              render: (o) => (
-                <Badge variant="muted" data-testid="order-status">
-                  {STATUS_LABEL[o.status]}
-                </Badge>
-              ),
-            },
-            {
-              key: 'actions',
-              header: '',
-              align: 'right',
-              render: (o) => (
-                <>
-                  {o.status === 'DRAFT' && (
-                    <button
-                      type="button"
-                      className="link-btn"
-                      disabled={confirmMut.isPending}
-                      onClick={() => confirmMut.mutate(o.id)}
-                      data-testid="order-confirm"
-                    >
-                      Confirmar
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => setDetailId(o.id)}
-                    data-testid="order-detail"
-                  >
-                    Ver
-                  </button>
-                </>
-              ),
-            },
-          ]}
         />
       </div>
       {detailId && <OrderDetailModal id={detailId} onClose={() => setDetailId(null)} />}
