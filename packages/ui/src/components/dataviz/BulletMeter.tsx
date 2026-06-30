@@ -44,6 +44,20 @@ export function BulletMeter({
   const actualOfTarget = pctOfTarget(value);
   const projOfTarget = proj != null ? pctOfTarget(proj) : null;
 
+  // Etiquetas de valor (actual / objetivo) sobre la barra: si los dos importes caen muy juntos se
+  // solaparían (cumplimiento ≈ 100 %). Cuando están cerca, anclamos la de menor % por la derecha
+  // (texto hacia la izquierda) y la de mayor % por la izquierda (texto hacia la derecha): abren
+  // hueco a cada lado del punto en vez de pisarse. Si no, ambas anclan a la izquierda (original).
+  const tagsClose = Math.abs(targetPct - actualPct) < 18;
+  const actualTagStyle =
+    tagsClose && actualPct <= targetPct
+      ? { right: `${(100 - actualPct).toFixed(2)}%` }
+      : { left: `${actualPct.toFixed(2)}%` };
+  const targetTagStyle =
+    tagsClose && targetPct < actualPct
+      ? { right: `${(100 - targetPct).toFixed(2)}%` }
+      : { left: `${targetPct.toFixed(2)}%` };
+
   return (
     <div className="dv-bullet">
       <div className="dv-bullet-track">
@@ -55,10 +69,10 @@ export function BulletMeter({
           />
         ) : null}
         <span className="dv-bullet-target" style={{ left: `${targetPct}%` }} />
-        <span className="dv-bullet-tag dv-bullet-tag--actual" style={{ left: `${actualPct}%` }}>
+        <span className="dv-bullet-tag dv-bullet-tag--actual" style={actualTagStyle}>
           {formatValue(value, format)}
         </span>
-        <span className="dv-bullet-tag dv-bullet-tag--target" style={{ left: `${targetPct}%` }}>
+        <span className="dv-bullet-tag dv-bullet-tag--target" style={targetTagStyle}>
           {formatValue(target, format)}
         </span>
       </div>

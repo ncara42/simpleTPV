@@ -83,7 +83,7 @@ export function DonutStat({
               style={{ background: rampColor(s.colorIdx) }}
             />
             <span className="dv-donutstat-legend-label">{s.label}</span>
-            <span className="dv-donutstat-legend-pct">{s.pct.toFixed(1)}%</span>
+            <span className="dv-donutstat-legend-pct">{s.pct.toFixed(1).replace('.', ',')}%</span>
           </li>
         ))}
       </ul>
