@@ -70,17 +70,6 @@ const PERIOD_SUBTITLE: Record<DashboardPeriod, string> = {
   year: 'Este año',
 };
 
-// Fecha completa del día elegido en "Ventas por hora" (subtítulo de la card).
-const HOUR_DAY_FMT = new Intl.DateTimeFormat('es-ES', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-});
-const formatHourDay = (iso: string): string => {
-  const s = HOUR_DAY_FMT.format(new Date(`${iso}T00:00:00`));
-  return s.charAt(0).toUpperCase() + s.slice(1);
-};
-
 // ── Comparativa del panel de ventas (hoy vs ayer / mes vs mes / año vs año) ──
 const MONTHS_ES = [
   'enero',
@@ -543,7 +532,6 @@ export function DashboardPage({
                 <header className="dash-panel-head">
                   <div className="dash-panel-titles">
                     <h3>Ventas</h3>
-                    <p className="dash-panel-sub">Facturación neta por tienda</p>
                   </div>
                   <div className="dash-bars-controls">
                     <ChartKindToggle
@@ -811,7 +799,6 @@ export function DashboardPage({
               <header className="dash-panel-head">
                 <div className="dash-panel-titles">
                   <h3>Ventas por hora</h3>
-                  <p className="dash-panel-sub">{formatHourDay(hourDay)}</p>
                 </div>
                 <div className="dash-bars-controls">
                   <DaySelector value={hourDay} onChange={setHourDay} />

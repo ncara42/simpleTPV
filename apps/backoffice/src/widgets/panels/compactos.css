@@ -13,28 +13,11 @@
 }
 .ct-title {
   flex: none;
-  margin: 0;
+  margin: 0 0 16px;
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--ui-text);
-}
-/* Etiqueta «TREEMAP»: acento al 10% sobre la superficie (handoff: rgba(0,112,243,.10)). */
-.ct-badge {
-  margin-left: 6px;
-  padding: 2px 7px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--ui-brand);
-  background: color-mix(in oklab, var(--ui-brand) 10%, var(--ui-surface));
-}
-.ct-sub {
-  flex: none;
-  margin: 3px 0 16px;
-  font-size: 12.5px;
-  color: var(--ui-text-soft);
 }
 /* Rejilla del treemap: crece con el tile (panel `fit=stretch`). Sin min-height rígido → no desborda. */
 .ct-grid {
@@ -96,11 +79,6 @@
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--ui-text);
-}
-.lb-sub {
-  margin: 3px 0 0;
-  font-size: 12.5px;
-  color: var(--ui-text-soft);
 }
 .lb-list {
   flex: 1;

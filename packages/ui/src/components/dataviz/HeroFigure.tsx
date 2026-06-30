@@ -9,7 +9,7 @@ export interface HeroFigureChip {
   tone?: 'neutral' | 'success' | 'danger';
 }
 export interface HeroFigureProps {
-  eyebrow: string;
+  eyebrow?: string;
   badge?: string;
   value: number | null | undefined;
   format?: StatFormat;
@@ -30,10 +30,12 @@ export function HeroFigure({
   return (
     <div className="dv-herofigure">
       <div className="dv-herofigure-main">
-        <span className="dv-herofigure-eyebrow">
-          {eyebrow}
-          {badge ? <span className="dv-herofigure-badge">{badge}</span> : null}
-        </span>
+        {eyebrow || badge ? (
+          <span className="dv-herofigure-eyebrow">
+            {eyebrow}
+            {badge ? <span className="dv-herofigure-badge">{badge}</span> : null}
+          </span>
+        ) : null}
         <div className="dv-herofigure-value">{valueText ?? formatValue(value, format)}</div>
         {chips.length > 0 ? (
           <div className="dv-herofigure-chips">

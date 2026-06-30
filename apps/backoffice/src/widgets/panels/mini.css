@@ -136,18 +136,19 @@
   background: var(--ui-brand);
 }
 
-/* ── Heatmap · horas: tira de 11 celdas, intensidad por facturación ── */
+/* ── Heatmap · horas: UNA sola línea de 11 cuadrados, intensidad por facturación ── */
 .mw-heat {
   display: grid;
-  /* 6 columnas fijas → las 11 horas SIEMPRE caen en 2 filas equilibradas (6 + 5), a cualquier ancho.
-     Las celdas reparten el alto (`1fr`) para llenar la tarjeta (panel `fit=stretch`) sin banda blanca. */
-  grid-template-columns: repeat(6, 1fr);
-  grid-auto-rows: 1fr;
+  /* 11 columnas → las 11 horas en una única fila; `aspect-ratio:1` las hace cuadradas y `align-content`
+     centra esa fila en el alto disponible de la tarjeta (sin banda muerta). */
+  grid-template-columns: repeat(11, 1fr);
   gap: 5px;
   flex: 1;
   min-height: 0;
+  align-content: center;
 }
 .mw-heat > span {
+  aspect-ratio: 1;
   border-radius: 4px;
 }
 .mw-heat-foot {

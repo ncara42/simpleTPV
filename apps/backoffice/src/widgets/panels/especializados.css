@@ -18,13 +18,7 @@
   font-weight: 600;
   color: var(--ui-text);
 }
-.sp-sub {
-  flex: none;
-  margin: 4px 0 14px;
-  font-size: 12px;
-  color: var(--ui-text-soft);
-}
-/* Título sin subtítulo (p. ej. «Tiendas»): aporta el aire inferior que da el subtítulo. */
+/* Título sin subtítulo: aporta el aire inferior que antes daba el subtítulo. */
 .sp-title--gap {
   margin-bottom: 14px;
 }
@@ -43,8 +37,13 @@
 }
 .sp-prov-name {
   flex: 1;
+  min-width: 0; /* permite truncar dentro del flex */
   font-size: 13px;
   color: var(--ui-text);
+  /* Nombre a UNA línea: sin esto, los nombres largos envuelven y las 6 filas desbordan el tile. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sp-badge {
   font-size: 11.5px;
@@ -68,7 +67,7 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 74px repeat(3, 1fr);
+  /* grid-template-columns lo fija el componente (74px + N horas) según el rango activo del día. */
   grid-auto-rows: minmax(22px, 1fr);
   gap: 5px;
   align-items: center;
@@ -81,11 +80,41 @@
 .sp-matrix-rowlabel {
   font-size: 11.5px;
   color: var(--ui-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .sp-matrix-cell {
   height: 100%;
   min-height: 22px;
   border-radius: 4px;
+}
+/* Bubble flotante (portal a <body>, fixed) con el nombre completo de la tienda al hacer hover sobre
+   una etiqueta truncada. Mismo lenguaje que el tooltip de las gráficas (tokens --ui-chart-tip-*). */
+.sp-tip {
+  position: fixed;
+  transform: translate(-50%, calc(-100% - 8px));
+  background: var(--ui-chart-tip-bg);
+  color: var(--ui-chart-tip-fg);
+  border-radius: 7px;
+  padding: 5px 9px;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.4);
+  z-index: 90;
+  pointer-events: none;
+}
+.sp-tip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--ui-chart-tip-bg);
 }
 
 /* ── Lista de tiendas ──────────────────────────────────────────────────── */
@@ -139,15 +168,7 @@
   flex: 1;
   min-width: 200px;
 }
-.sp-exec-eyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ui-brand);
-}
 .sp-exec-text {
-  margin-top: 8px;
   font-size: 15px;
   line-height: 1.5;
   color: var(--ui-text-muted);

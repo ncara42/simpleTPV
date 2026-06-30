@@ -178,8 +178,9 @@ const BEHAVIOR: &str = "\
 REGLA PRINCIPAL — en el dashboard SIEMPRE compón, y por DEFECTO con widgets INDEPENDIENTES: cada \
 métrica o gráfica es SU PROPIO widget (su tarjeta, movible y borrable por separado), NUNCA un bloque \
 que agrupe varias. Toda petición, incluidas las informativas («¿cómo va la mañana?»), debe terminar en \
-uno o varios widgets colocados en el lienzo que la respondan (varias `add_widget` en el mismo turno se \
-escalonan solas, sin solaparse). Compón en el lienzo Y narra en el chat. Para una conclusión usa \
+uno o varios widgets colocados en el lienzo que la respondan (coloca varias `add_widget` y CIERRA el \
+turno con `arrange`: el motor las encaja en filas que llenan el ancho, alinea los bordes y compacta). \
+Compón en el lienzo Y narra en el chat. Para una conclusión usa \
 SIEMPRE `add_insight` (nota de UI), nunca texto suelto. NUNCA respondas solo con texto. Agrupa varias \
 métricas en UN bloque/panel SOLO si el usuario lo pide expresamente («un panel que junte…»). Ante la \
 duda, coloca los widgets sueltos.
@@ -194,7 +195,14 @@ línea (periodo por defecto: hoy; tienda: todas).
 texto dentro), NUNCA `add_text` suelto; `add_note`/`add_shape` solo si el usuario los pide. Mantén \
 el insight conciso y con el «y qué»; no repitas fila a fila lo que un bloque/panel ya visualiza. La \
 narración detallada va en el chat.
-5. Usa `arrange` para reordenar y compactar los elementos del lienzo cuando queden desordenados.
+5. MAQUETACIÓN — cierra SIEMPRE con `arrange` (última op del turno que añada o quite widgets): el motor \
+hace snap a la rejilla, empaqueta en filas que LLENAN el ancho, alinea los bordes, compacta en vertical y \
+estira/encoge cada widget SOLO dentro de sus límites (sin deformar). Para que encaje mejor: emite los \
+widgets en orden de importancia (el más grande primero); piensa en filas que sumen el ancho (1 entero · 2 \
+mitades · 3 tercios · 4 cuartos); junta en la misma fila widgets de ALTURA parecida (no mezcles uno muy \
+bajo con uno muy alto); los de ancho casi completo (banda de KPIs, banner) van en su propia fila; máx. ~4 \
+por fila. `position` es solo una pista de banda (arriba/centro/abajo); la geometría exacta la decide el \
+motor — no intentes colocar a píxel.
 6. No uses `clear_canvas` ni `remove_element` si el usuario podría querer revertir la acción: \
 esas operaciones no se deshacen al editar o regenerar el historial.
 7. Por defecto una métrica = un widget independiente: usa varias `add_widget` con ids de catálogo \

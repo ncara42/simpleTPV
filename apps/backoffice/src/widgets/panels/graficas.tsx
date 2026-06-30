@@ -16,11 +16,10 @@ function todayLocalIso(): string {
   return new Intl.DateTimeFormat('en-CA').format(new Date());
 }
 
-// Sección 02 · «Mapa de calor horario» (réplica pixel-a-pixel del handoff). Una celda cuadrada por hora;
-// la intensidad del azul = facturación de la franja, el pico con anillo. Muestra las 24 h: por defecto
-// se ven 07–17 y el resto se desplaza horizontalmente. Comparte el queryKey 'dash-hour' → caché común.
+// Sección 02 · «Mapa de calor horario» (réplica del handoff). Una celda cuadrada por hora; la intensidad
+// del azul = facturación de la franja, el pico con anillo. Las 24 h se reparten en una REJILLA de varias
+// filas (12×2) que llena el tile — sin scroll horizontal. Comparte el queryKey 'dash-hour' → caché común.
 const HM_HOURS: readonly number[] = Array.from({ length: 24 }, (_, h) => h);
-const HM_DEFAULT_START = 7; // primera hora visible al montar (07–17 a la vista)
 const HM_INK = '#0d3a73'; // texto sobre celdas claras (azul tinta del handoff)
 const hmRamp = (t: number): string =>
   `color-mix(in oklab, var(--ui-brand) ${Math.round(8 + Math.max(0, Math.min(1, t)) * 92)}%, var(--ui-surface))`;
@@ -33,11 +32,6 @@ export function HourHeatmap({ store }: PanelProps): ReactElement {
     queryFn: () => getSalesByHourOnDay(day, store),
     placeholderData: keepPreviousData,
   });
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const stripRef = useRef<HTMLDivElement>(null);
-  const startRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const thumbRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const tipRef = useRef<HTMLDivElement>(null);
   const [hoveredHour, setHoveredHour] = useState<number | null>(null);
@@ -53,21 +47,13 @@ export function HourHeatmap({ store }: PanelProps): ReactElement {
   const peakHour: number | null =
     maxRev > 0 ? rows.reduce((b, h) => (h.revenue > b.revenue ? h : b)).hour : null;
 
-  // Al montar (y al llegar datos) deja 07–17 a la vista; el resto queda desplazable. El carril, su
-  // barra de scroll y el rebote elástico los gobierna el hook compartido `useBounceScroll`.
-  useEffect(() => {
-    const el = scrollRef.current;
-    const st = startRef.current;
-    if (el && st) el.scrollLeft = Math.max(0, st.offsetLeft - 18);
-  }, [rows.length]);
-  useBounceScroll(scrollRef, stripRef, trackRef, thumbRef, rows.length);
-
   const handleCellEnter = (e: { currentTarget: HTMLDivElement }, h: number): void => {
     setHoveredHour(h);
     const r = e.currentTarget.getBoundingClientRect();
     const tipH = tipRef.current?.offsetHeight ?? 44;
     const vx = r.left + r.width / 2;
-    const vy = r.top;
+    // Ancla la bubble al BORDE INFERIOR de la celda (no al superior) → cae debajo del cuadradito.
+    const vy = r.bottom;
     const panelBottom = panelRef.current?.getBoundingClientRect().bottom ?? window.innerHeight;
     setTipBelow(vy + TIP_GAP + tipH <= panelBottom);
     setTipStyle({ left: `${vx}px`, top: `${vy}px` });
@@ -93,14 +79,12 @@ export function HourHeatmap({ store }: PanelProps): ReactElement {
         </div>
         <div
           className="hm-scroll"
-          ref={scrollRef}
           role="img"
-          aria-label="Intensidad de ventas por hora (24 horas, 07–17 a la vista)"
+          aria-label="Intensidad de ventas por hora (24 horas)"
           onMouseLeave={clearHover}
         >
-          {/* La tira interior es la que se traslada para el efecto de rebote (rubber-band) al
-              sobrepasar los extremos; el scroll vive en el contenedor `.hm-scroll`. */}
-          <div className="hm-strip" ref={stripRef}>
+          {/* Rejilla que reparte las 24 h en varias filas (12×2) y llena el tile, sin scroll. */}
+          <div className="hm-strip">
             {HM_HOURS.map((h) => {
               const row = byHour.get(h);
               const rev = row?.revenue ?? 0;
@@ -108,7 +92,6 @@ export function HourHeatmap({ store }: PanelProps): ReactElement {
               return (
                 <div
                   key={h}
-                  ref={h === HM_DEFAULT_START ? startRef : undefined}
                   className={`hm-cell${peakHour === h ? ' hm-cell--peak' : ''}`}
                   style={{
                     background: hmRamp(t),
@@ -121,9 +104,6 @@ export function HourHeatmap({ store }: PanelProps): ReactElement {
               );
             })}
           </div>
-        </div>
-        <div className="hm-track" ref={trackRef} aria-hidden="true">
-          <div className="hm-thumb" ref={thumbRef} />
         </div>
         {hoveredHour !== null &&
           createPortal(

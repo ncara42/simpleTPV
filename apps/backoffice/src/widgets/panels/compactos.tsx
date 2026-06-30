@@ -140,10 +140,7 @@ export function CompactTreemap({ period, store }: PanelProps): ReactElement {
   return (
     <PanelShell id="cmp-treemap" fit="stretch" bare>
       <div className="ct-card">
-        <h3 className="ct-title">
-          Mix por familia <span className="ct-badge">TREEMAP</span>
-        </h3>
-        <p className="ct-sub">Área proporcional a la facturación</p>
+        <h3 className="ct-title">Mix por familia</h3>
         <div className="ct-grid" role="img" aria-label="Reparto de la facturación por familia">
           {rows.map((row, r) => (
             <div
@@ -198,7 +195,6 @@ export function CompactLeaderboard({ period, store }: PanelProps): ReactElement 
       <div className="lb-card">
         <div className="lb-head">
           <h3 className="lb-title">Top vendedores</h3>
-          <p className="lb-sub">Facturación · este mes</p>
         </div>
         <div className="lb-list" ref={ref}>
           {rows.map((e, i) => {
@@ -256,7 +252,6 @@ export function CompactHero({ period, store }: PanelProps): ReactElement {
   return (
     <PanelShell id="cmp-hero" fill>
       <HeroFigure
-        eyebrow="Facturación"
         value={s?.revenue ?? null}
         format="eur"
         {...(s ? { chips: [{ text: `${s.salesCount} tickets` }] } : {})}

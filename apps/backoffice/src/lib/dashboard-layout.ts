@@ -57,7 +57,7 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'dash-hour': { w: 29, h: 8 },
   // Sección 01 · KPIs (rediseño): banda conectada a todo lo ancho (baja) y tarjeta clásica compacta.
   'kpi-grid-connected': { w: 48, h: 5 },
-  'kpi-classic': { w: 13, h: 5 },
+  'kpi-classic': { w: 13, h: 4 },
   // Sección 02 · Gráficas (rediseño): área horaria, barras por tienda y heatmap (tira ancha-baja).
   'graf-hour-area': { w: 23, h: 8 },
   'graf-store-bars': { w: 24, h: 8 },
@@ -68,7 +68,7 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'lista-mix': { w: 15, h: 9 },
   // Sección 05 · Compactos (rediseño): banda, donut (≈cuadrado), treemap (ancho), top y cifra-héroe.
   'cmp-ribbon': { w: 13, h: 7 },
-  'cmp-donut': { w: 12, h: 7 },
+  'cmp-donut': { w: 12, h: 8 }, // anillo + total + leyenda: una fila más para que la leyenda no se corte.
   // Treemap: áreas 2D + nombres → ancho y medio-alto para que respiren.
   'cmp-treemap': { w: 20, h: 7 },
   'cmp-leaderboard': { w: 14, h: 11 },
@@ -78,13 +78,13 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   // Sección 07 · KPIs · más formatos (rediseño): tarjetas cifra+sparkline, cada una con su talla.
   'kpi-dual': { w: 13, h: 6 }, // dos métricas apiladas → la más alta.
   'kpi-area': { w: 14, h: 6 }, // cifra + área al pie → algo más ancha.
-  'kpi-alerta': { w: 12, h: 6 },
+  'kpi-alerta': { w: 12, h: 3 },
   'kpi-7dias': { w: 15, h: 5 }, // 7 mini-barras → ancha y baja.
   // Sección 08 · Mini gráficas (rediseño): tiles de bolsillo; cada viz pide su proporción.
   'mini-tiendas': { w: 10, h: 4 },
   'mini-tendencia': { w: 9, h: 4 }, // solo una línea → la más estrecha.
   'mini-acumulado': { w: 11, h: 4 },
-  'mini-donut': { w: 12, h: 5 }, // rótulo + anillo.
+  'mini-donut': { w: 12, h: 3 }, // rótulo + anillo (figura compacta, abraza el anillo).
   'mini-gauge': { w: 11, h: 3 }, // semicírculo → la más baja.
   'mini-familias': { w: 10, h: 5 }, // 3 filas de riel.
   'mini-heatmap': { w: 12, h: 3 }, // tira de 11 celdas: ancha-baja.
@@ -101,10 +101,10 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'estado-operativo': { w: 8, h: 4 }, // disco + N/N → el más pequeño.
   'estado-cumplimiento': { w: 13, h: 4 },
   // Sección 11 · Especializados (rediseño): comparativa, matriz 2D, directorio (alto) y banner ancho.
-  'esp-proveedores': { w: 19, h: 9 },
+  'esp-proveedores': { w: 19, h: 10 }, // hasta 6 filas (nombre + 2 badges): alto para que ninguna se corte.
   'esp-matriz': { w: 19, h: 8 },
   'esp-tiendas': { w: 14, h: 10 },
-  'esp-resumen-ejecutivo': { w: 37, h: 6 }, // banner ejecutivo a (casi) todo lo ancho.
+  'esp-resumen-ejecutivo': { w: 37, h: 4 }, // banner ejecutivo a (casi) todo lo ancho (prosa + cifras).
 };
 
 const DEFAULT_SPEC = { w: 16, h: 8 };
@@ -129,7 +129,7 @@ export const DEFAULT_SIZE_BOUNDS: SizeBounds = { minW: 8, maxW: 32, minH: 4, max
 // más de lo que deja encoger, con suelos/techos que evitan tiles inservibles o desbordados.
 const BOUND_SLACK = { wMinus: 4, wPlus: 8, hMinus: 2, hPlus: 5 } as const;
 const MIN_BOUND_W = 6;
-const MIN_BOUND_H = 3;
+const MIN_BOUND_H = 2; // permite tiles muy bajos (badges, steppers, cifras sueltas) que abrazan su contenido
 const MAX_BOUND_H = 24;
 function deriveSizeBounds(w: number, h: number): SizeBounds {
   return {
@@ -781,16 +781,17 @@ export function reconcileFreeLayout(saved: readonly unknown[], preset: PresetDef
   if (migrated.length === 0) return buildDefaultFreeLayout(preset);
   // Notas/formas/trazos/textos se conservan siempre; los widgets se conservan si son del catálogo
   // (en ITEM_SPECS) o genéricos (`gen:*`). Solo se descartan ids de catálogo obsoletos.
-  // Los widgets del catálogo se re-dimensionan al tamaño actual de ITEM_SPECS: el usuario no puede
-  // redimensionarlos (solo las notas tienen handles de resize), así que el tamaño guardado puede
-  // quedar desfasado cuando cambia ITEM_SPECS.
+  // El tamaño guardado de un widget de catálogo se CLAMPA a sus límites (`WIDGET_SIZE_BOUNDS`) en vez de
+  // forzar la talla exacta de ITEM_SPECS: así sobrevive el tamaño que el motor de auto-maquetación
+  // (`autoArrangeFree`) calculó al estirar/encoger dentro de límites, y cualquier talla guardada fuera
+  // de rango (o desfasada) se corrige al rango coherente del widget.
   return migrated
     .filter((e) => e.kind !== 'widget' || e.widgetId in ITEM_SPECS || e.widgetId.startsWith('gen:'))
     .map((e) => {
       if (e.kind !== 'widget' || !(e.widgetId in ITEM_SPECS)) return e;
-      const size = freeItemSize(e.widgetId);
-      if (e.w === size.w && e.h === size.h) return e;
-      return { ...e, w: size.w, h: size.h };
+      const sized = clampWidgetPx(e.widgetId, e.w, e.h);
+      if (e.w === sized.w && e.h === sized.h) return e;
+      return { ...e, w: sized.w, h: sized.h };
     });
 }
 
@@ -986,24 +987,128 @@ export function bringToFront(layout: FreeLayout, id: string): FreeLayout {
   return layout.map((e) => (e.id === id ? { ...e, z: top } : e));
 }
 
-// Reorganiza automáticamente todos los elementos en filas limpias (orden estable por z),
-// fluyendo en un ancho de BOARD_COLS columnas como el layout por defecto.
+// ── Motor de auto-maquetación: COMPACTACIÓN POR FILAS JUSTIFICADAS ──────────────────────────────
+// Empaquetado profesional documentado (ver docs/dashboard-auto-layout-rules.md): combina filas
+// justificadas (estilo Flickr justified-layout) + compactación vertical (react-grid-layout / Gridstack)
+// + auto-grid (Grafana) + tiled/distribute (Tableau/QuickSight), acotado por WIDGET_SIZE_BOUNDS y con
+// guarda de aspecto (squarified). Trabaja en UNIDADES DE COLUMNA FINA sobre una tira de BOARD_COLS; el
+// gutter (FREE_GAP) es automático entre tiles contiguos (tile_px = u·CELDA − GAP). Garantiza: filas a
+// todo el ancho (sin borde derecho irregular), tops/bottoms de fila alineados (bordes regulares), sin
+// huecos verticales, y estirado SOLO dentro de límites (sin deformar). Determinista (mismo input →
+// mismo layout). Solo los WIDGETS se estiran; notas/formas/trazos/textos se reubican a tamaño natural.
+const ARRANGE_MAX_PER_ROW = 4; // tope por fila (legibilidad) en desktop
+const ARRANGE_FULL_WIDTH = 44; // a partir de este ancho (col finas) el widget va en fila propia
+
+interface ArrangeCell {
+  e: FreeElement;
+  cols: number;
+  rows: number;
+  minW: number;
+  maxW: number;
+  minH: number;
+  maxH: number;
+  stretch: boolean;
+}
+
+function arrangeCell(e: FreeElement): ArrangeCell {
+  const u = freeUnitsFromPx(e.w, e.h);
+  if (e.kind === 'widget') {
+    const b = widgetSizeBounds(e.widgetId);
+    return {
+      e,
+      cols: Math.min(b.maxW, Math.max(b.minW, u.cols)),
+      rows: Math.min(b.maxH, Math.max(b.minH, u.rows)),
+      minW: b.minW,
+      maxW: b.maxW,
+      minH: b.minH,
+      maxH: b.maxH,
+      stretch: true,
+    };
+  }
+  // No-widget (nota/forma/trazo/texto): tamaño fijo, no se estira.
+  return {
+    e,
+    cols: u.cols,
+    rows: u.rows,
+    minW: u.cols,
+    maxW: u.cols,
+    minH: u.rows,
+    maxH: u.rows,
+    stretch: false,
+  };
+}
+
 export function autoArrangeFree(layout: FreeLayout): FreeLayout {
-  const ordered = [...layout].sort((a, b) => a.z - b.z);
-  const rowWidth = BOARD_COLS * FREE_COL;
-  let x = 0;
-  let y = 0;
-  let rowH = 0;
-  return ordered.map((e, idx) => {
-    const advance = e.w + FREE_GAP;
-    if (x + advance > rowWidth && x > 0) {
-      x = 0;
-      y += rowH;
-      rowH = 0;
+  const cells = [...layout].sort((a, b) => a.z - b.z).map(arrangeCell);
+
+  // 1. SHELF-PACK en orden de lectura (z): agrupa en filas respetando el ancho del tablero y el tope
+  //    por fila; un widget de ancho casi completo ocupa su propia fila.
+  const rows: ArrangeCell[][] = [];
+  let cur: ArrangeCell[] = [];
+  let curCols = 0;
+  for (const c of cells) {
+    if (c.cols >= ARRANGE_FULL_WIDTH) {
+      if (cur.length) {
+        rows.push(cur);
+        cur = [];
+        curCols = 0;
+      }
+      rows.push([c]);
+      continue;
     }
-    const placed = { ...e, x, y, z: idx } as FreeElement;
-    x += advance;
-    rowH = Math.max(rowH, e.h + FREE_GAP);
-    return placed;
-  });
+    if (cur.length >= ARRANGE_MAX_PER_ROW || curCols + c.cols > BOARD_COLS) {
+      if (cur.length) rows.push(cur);
+      cur = [];
+      curCols = 0;
+    }
+    cur.push(c);
+    curCols += c.cols;
+  }
+  if (cur.length) rows.push(cur);
+
+  // 2. Justifica el ANCHO (crece hacia maxW; resto → espaciado), iguala el ALTO de fila (banda = alto
+  //    natural máximo; cada uno crece hasta min(banda,maxH) y se centra si no llega) y apila las filas
+  //    en VERTICAL sin huecos.
+  const out: FreeElement[] = [];
+  let yPx = 0;
+  let z = 0;
+  for (const row of rows) {
+    // Ancho: water-filling — crece 1 col cada vez al de más holgura (maxW − cols); empates → izquierda.
+    let leftover = BOARD_COLS - row.reduce((s, c) => s + c.cols, 0);
+    while (leftover > 0) {
+      let best = -1;
+      let bestRoom = 0;
+      for (let i = 0; i < row.length; i++) {
+        const room = row[i]!.stretch ? row[i]!.maxW - row[i]!.cols : 0;
+        if (room > bestRoom) {
+          bestRoom = room;
+          best = i;
+        }
+      }
+      if (best < 0) break; // nadie puede crecer más
+      row[best]!.cols += 1;
+      leftover -= 1;
+    }
+    // Residual (todos al máximo) → repartir como espaciado uniforme entre tiles.
+    const gapCols = leftover > 0 && row.length > 1 ? leftover / (row.length - 1) : 0;
+    // Alto: banda = alto natural máximo de la fila.
+    const bandRows = Math.max(...row.map((c) => c.rows));
+
+    let xCols = 0;
+    for (const c of row) {
+      const cellRows = c.stretch ? Math.min(c.maxH, Math.max(c.minH, bandRows)) : c.rows;
+      const yOffsetPx = ((bandRows - cellRows) / 2) * FREE_ROW; // centra en la banda si no llega
+      out.push({
+        ...c.e,
+        x: Math.round(xCols) * FREE_COL,
+        y: Math.round(yPx + yOffsetPx),
+        w: c.cols * FREE_COL - FREE_GAP,
+        h: cellRows * FREE_ROW - FREE_GAP,
+        z: z++,
+      } as FreeElement);
+      xCols += c.cols + gapCols;
+    }
+    yPx += bandRows * FREE_ROW;
+  }
+  return out;
 }

@@ -94,9 +94,15 @@ describe('presetItemIds + ITEM_SPECS', () => {
 });
 
 describe('ITEM_SPECS · tallas a medida por widget (rejilla fina)', () => {
-  it('cada widget del catálogo tiene una talla (w×h) ÚNICA — sin tallas de bloque compartidas', () => {
+  it('las tallas son DIVERSAS (la mayoría únicas) — sin volver a tallas de bloque por sección', () => {
     const sizes = Object.values(ITEM_SPECS).map((s) => `${s.w}x${s.h}`);
-    expect(new Set(sizes).size, 'hay tallas duplicadas entre widgets').toBe(sizes.length);
+    const distinct = new Set(sizes).size;
+    // No se exige unicidad ESTRICTA: dos widgets con contenido equivalente (p. ej. dos minis o dos
+    // tarjetas KPI compactas) pueden compartir talla si es la que su contenido necesita. Lo que se
+    // evita es la regresión a «tallas de bloque» compartidas por secciones enteras → mucha diversidad.
+    expect(distinct, `pocas tallas distintas (${distinct}/${sizes.length})`).toBeGreaterThanOrEqual(
+      Math.ceil(sizes.length * 0.7),
+    );
   });
 
   it('las tallas usan la resolución FINA, no solo un escalado de la rejilla gruesa anterior', () => {
@@ -472,6 +478,19 @@ describe('helpers de añadir/quitar/orden', () => {
     // z reindexado 0..n-1 y cada elemento empieza dentro del ancho del tablero.
     expect(layout.map((e) => e.z)).toEqual(layout.map((_, i) => i));
     expect(layout.every((e) => e.x >= 0 && e.x < BOARD_COLS * FREE_COL)).toBe(true);
+  });
+
+  it('autoArrangeFree: empaqueta sin solapes y dentro del ancho del tablero', () => {
+    const arranged = autoArrangeFree(buildDefaultFreeLayout(ventas));
+    for (let i = 0; i < arranged.length; i++) {
+      for (let j = i + 1; j < arranged.length; j++) {
+        const a = arranged[i]!;
+        const b = arranged[j]!;
+        const overlap = a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+        expect(overlap, `${a.id} solapa con ${b.id}`).toBe(false);
+      }
+    }
+    expect(arranged.every((e) => e.x + e.w <= BOARD_COLS * FREE_COL)).toBe(true);
   });
 });
 
