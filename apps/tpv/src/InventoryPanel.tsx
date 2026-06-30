@@ -1,4 +1,4 @@
-import { usePageHeader } from '@simpletpv/ui';
+import { DataTable, usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ClipboardList, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -105,27 +105,54 @@ export function InventoryPanel({ storeId }: { storeId: string | null }) {
           </p>
         </div>
       ) : (
-        <div className="inventory-table" data-testid="inventory-lines">
-          {rows.map((row) => (
-            <div className="inventory-row" key={row.product.id} data-testid="inventory-line">
-              <span>
-                <strong>{row.product.name}</strong>
-                <small>Actual: {stockByProduct.get(row.product.id) ?? '-'}</small>
-              </span>
-              <div>
-                <button onClick={() => add(row.product, -1)}>-</button>
-                <input
-                  type="number"
-                  min={0}
-                  value={row.qty}
-                  onChange={(e) => add(row.product, Number(e.target.value) - row.qty)}
-                  data-testid="inventory-qty"
-                />
-                <button onClick={() => add(row.product, 1)}>+</button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <DataTable<{ product: Product; qty: number }>
+          data-testid="inventory-lines"
+          rowTestId="inventory-line"
+          rows={rows}
+          rowKey={(r) => r.product.id}
+          columns={[
+            {
+              key: 'product',
+              header: 'Producto',
+              render: (r) => (
+                <span className="inventory-name">
+                  <strong>{r.product.name}</strong>
+                  <small>Actual: {stockByProduct.get(r.product.id) ?? '-'}</small>
+                </span>
+              ),
+            },
+            {
+              key: 'qty',
+              header: 'Cantidad',
+              align: 'right',
+              render: (r) => (
+                <div className="inventory-stepper">
+                  <button
+                    type="button"
+                    aria-label={`Restar ${r.product.name}`}
+                    onClick={() => add(r.product, -1)}
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    min={0}
+                    value={r.qty}
+                    onChange={(e) => add(r.product, Number(e.target.value) - r.qty)}
+                    data-testid="inventory-qty"
+                  />
+                  <button
+                    type="button"
+                    aria-label={`Sumar ${r.product.name}`}
+                    onClick={() => add(r.product, 1)}
+                  >
+                    +
+                  </button>
+                </div>
+              ),
+            },
+          ]}
+        />
       )}
 
       <div className="inventory-actions">

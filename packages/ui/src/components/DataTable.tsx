@@ -71,6 +71,9 @@ export interface DataTableProps<Row> {
   /** Fila de detalle bajo la fila (p. ej. desglose por tienda del Stock):
    *  si devuelve contenido, se pinta un <tr> extra a ancho completo. */
   renderDetail?: (row: Row) => React.ReactNode;
+  /** Variante sin chrome de tarjeta (sin borde/radio/fondo): para tablas
+   *  embebidas en un modal o panel que ya aporta su propio contenedor. */
+  bare?: boolean;
   className?: string;
   'data-testid'?: string;
 }
@@ -144,6 +147,7 @@ export function DataTable<Row>({
   rowAriaSelected,
   rowTestId = 'ui-dt-row',
   renderDetail,
+  bare = false,
   className,
   'data-testid': testid,
 }: DataTableProps<Row>) {
@@ -151,7 +155,7 @@ export function DataTable<Row>({
   const hasFooter = footer != null || pagination != null;
 
   return (
-    <div className={cn('ui-dt', className)} data-testid={testid}>
+    <div className={cn('ui-dt', bare && 'ui-dt--bare', className)} data-testid={testid}>
       {header != null && <div className="ui-dt-header">{header}</div>}
       {toolbar != null && <div className="ui-dt-toolbar">{toolbar}</div>}
 

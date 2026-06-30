@@ -1,6 +1,7 @@
+import { DataTable } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
 
-import { listClosedCashSessions } from '../lib/cash.js';
+import { type CashSession, listClosedCashSessions } from '../lib/cash.js';
 import { eur } from '../lib/format.js';
 
 // Fecha legible (dd/mm/aaaa hh:mm) en hora local para el listado de cierres.
@@ -13,7 +14,8 @@ const dateFmt = new Intl.DateTimeFormat('es-ES', {
 });
 
 // Registro de cierres de caja de la tienda activa (#145): cada arqueo con su
-// esperado, contado y diferencia (sobrante/faltante). Solo lectura.
+// esperado, contado y diferencia (sobrante/faltante). Solo lectura, sobre el
+// DataTable compartido para mantener el estilo de tabla del resto de la app.
 export function CashClosuresList({ storeId }: { storeId: string | null }) {
   const { data: sessions = [], isLoading } = useQuery({
     queryKey: ['cash-closed', storeId],
@@ -28,35 +30,51 @@ export function CashClosuresList({ storeId }: { storeId: string | null }) {
   return (
     <section className="cash-closures" data-testid="cash-closures">
       <h3 className="cash-closures-title">Cierres recientes</h3>
-      {isLoading ? (
-        <p className="cash-closures-empty">Cargando…</p>
-      ) : sessions.length === 0 ? (
-        <p className="cash-closures-empty" data-testid="cash-closures-empty">
-          Aún no hay cierres registrados.
-        </p>
-      ) : (
-        <ul className="cash-closures-list">
-          {sessions.map((s) => {
-            const diff = Number(s.difference ?? 0);
-            const tone = diff === 0 ? 'ok' : diff > 0 ? 'over' : 'under';
-            return (
-              <li key={s.id} className="cash-closure-row" data-testid="cash-closure-row">
-                <span className="cash-closure-date">
-                  {s.closedAt ? dateFmt.format(new Date(s.closedAt)) : '—'}
-                </span>
-                <span className="cash-closure-amounts">
-                  <span>Esperado {eur(Number(s.expectedAmount ?? 0))} €</span>
-                  <span>Contado {eur(Number(s.closingAmount ?? 0))} €</span>
-                </span>
+      <DataTable<CashSession>
+        rows={sessions}
+        rowKey={(s) => s.id}
+        rowTestId="cash-closure-row"
+        loading={isLoading}
+        skeletonRows={3}
+        emptyState={<span data-testid="cash-closures-empty">Aún no hay cierres registrados.</span>}
+        columns={[
+          {
+            key: 'date',
+            header: 'Fecha',
+            render: (s) => (s.closedAt ? dateFmt.format(new Date(s.closedAt)) : '—'),
+          },
+          {
+            key: 'expected',
+            header: 'Esperado',
+            align: 'right',
+            noWrap: true,
+            render: (s) => `${eur(Number(s.expectedAmount ?? 0))} €`,
+          },
+          {
+            key: 'counted',
+            header: 'Contado',
+            align: 'right',
+            noWrap: true,
+            render: (s) => `${eur(Number(s.closingAmount ?? 0))} €`,
+          },
+          {
+            key: 'diff',
+            header: 'Diferencia',
+            align: 'right',
+            noWrap: true,
+            render: (s) => {
+              const diff = Number(s.difference ?? 0);
+              const tone = diff === 0 ? 'ok' : diff > 0 ? 'over' : 'under';
+              return (
                 <span className={`cash-closure-diff diff-${tone}`} data-testid="cash-closure-diff">
                   {diff > 0 ? '+' : ''}
                   {eur(diff)} €
                 </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+              );
+            },
+          },
+        ]}
+      />
     </section>
   );
 }

@@ -8,6 +8,14 @@
   overflow: hidden;
 }
 
+/* Variante sin tarjeta: la tabla va dentro de un modal/panel que ya aporta el
+   contenedor, así que se quita borde, radio y fondo para no doblar el marco. */
+.ui-dt--bare {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
 /* Slot superior (filtros/acciones): filtros a la izquierda, CTA primario a la
    derecha (en .ui-dt-toolbar-actions), todo centrado verticalmente. */
 .ui-dt-toolbar {

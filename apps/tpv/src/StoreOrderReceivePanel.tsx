@@ -270,46 +270,57 @@ export function StoreOrderReceivePanel() {
               </div>
 
               <div className="recv-table-wrap">
-                <table className="recv-table" data-testid="store-order-lines">
-                  <thead>
-                    <tr>
-                      <th>Producto</th>
-                      <th className="recv-table__num">Enviado</th>
-                      <th className="recv-table__num">Recibido</th>
-                      <th>Nota discrepancia</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selected.lines.map((l) => (
-                      <tr key={l.id} data-testid="store-order-line">
-                        <td className="recv-table__name">
-                          {l.productName ?? `${l.productId.slice(0, 8)}...`}
-                        </td>
-                        <td className="recv-table__num recv-table__sent">{l.quantitySent}</td>
-                        <td className="recv-table__num">
-                          <input
-                            type="number"
-                            min={0}
-                            value={lines[l.id]?.received ?? ''}
-                            onChange={(e) => patchLine(l.id, { received: e.target.value })}
-                            data-testid="store-order-received-input"
-                            className="recv-input recv-input--num"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            placeholder="(opcional)"
-                            value={lines[l.id]?.note ?? ''}
-                            onChange={(e) => patchLine(l.id, { note: e.target.value })}
-                            data-testid="store-order-note-input"
-                            className="recv-input"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable<StoreOrder['lines'][number]>
+                  bare
+                  data-testid="store-order-lines"
+                  rowTestId="store-order-line"
+                  rows={selected.lines}
+                  rowKey={(l) => l.id}
+                  columns={[
+                    {
+                      key: 'product',
+                      header: 'Producto',
+                      render: (l) => l.productName ?? `${l.productId.slice(0, 8)}...`,
+                    },
+                    {
+                      key: 'sent',
+                      header: 'Enviado',
+                      align: 'right',
+                      noWrap: true,
+                      render: (l) => <span className="recv-table__sent">{l.quantitySent}</span>,
+                    },
+                    {
+                      key: 'received',
+                      header: 'Recibido',
+                      align: 'right',
+                      noWrap: true,
+                      render: (l) => (
+                        <input
+                          type="number"
+                          min={0}
+                          value={lines[l.id]?.received ?? ''}
+                          onChange={(e) => patchLine(l.id, { received: e.target.value })}
+                          data-testid="store-order-received-input"
+                          className="recv-input recv-input--num"
+                        />
+                      ),
+                    },
+                    {
+                      key: 'note',
+                      header: 'Nota discrepancia',
+                      render: (l) => (
+                        <input
+                          type="text"
+                          placeholder="(opcional)"
+                          value={lines[l.id]?.note ?? ''}
+                          onChange={(e) => patchLine(l.id, { note: e.target.value })}
+                          data-testid="store-order-note-input"
+                          className="recv-input"
+                        />
+                      ),
+                    },
+                  ]}
+                />
               </div>
 
               <p className="recv-hint">

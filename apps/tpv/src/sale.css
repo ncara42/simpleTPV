@@ -321,6 +321,16 @@
   gap: 0.4rem;
 }
 
+/* Celda Tienda del modal de stock: punto de nivel + nombre alineados. */
+.prod-stock-store {
+  display: inline-flex;
+  align-items: center;
+}
+
+.prod-stock-store .stock-dot {
+  flex: none;
+}
+
 .muted {
   color: var(--ui-text-muted);
 }
@@ -2921,7 +2931,7 @@
 }
 
 .ticket-row small,
-.inventory-row small {
+.inventory-name small {
   color: var(--ui-text-soft);
   font-size: var(--ui-text-xs);
 }
@@ -3111,7 +3121,8 @@
   border-radius: var(--ui-radius-lg);
 }
 
-.inventory-row > span {
+/* Nombre del producto + "Actual: X" apilados en la celda Producto. */
+.inventory-name {
   display: flex;
   flex-direction: column;
 }
@@ -3119,7 +3130,7 @@
 /* Stepper en una sola cápsula: el borde vive en el contenedor (un único trazo pill)
    y los hijos (−, número, +) van sin borde, igual que el stepper del arqueo. Así no
    hay dos juegos de controles (sin flechas nativas) ni divisores entre piezas. */
-.inventory-row > div {
+.inventory-stepper {
   display: inline-flex;
   align-items: center;
   gap: 0;
@@ -3132,12 +3143,12 @@
     box-shadow 0.1s;
 }
 
-.inventory-row > div:focus-within {
+.inventory-stepper:focus-within {
   border-color: var(--ui-brand);
   box-shadow: var(--ui-focus);
 }
 
-.inventory-row button {
+.inventory-stepper button {
   width: 2.25rem;
   height: 2.25rem;
   border: none;
@@ -3154,27 +3165,28 @@
     color 0.1s;
 }
 
-.inventory-row button:hover {
+.inventory-stepper button:hover {
   background: var(--ui-brand-soft);
   color: var(--ui-brand-ink);
 }
 
 /* El input pierde su marco propio (lo aporta la cápsula) y oculta las flechas
    nativas de incremento, que duplicaban los botones −/+ laterales. */
-.inventory-row input {
+.inventory-stepper input {
   width: 3rem;
   height: 2.25rem;
   border: none;
   border-radius: 0;
   background: transparent;
   padding: 0;
+  text-align: center;
   outline: none;
   appearance: textfield;
   -moz-appearance: textfield;
 }
 
-.inventory-row input::-webkit-outer-spin-button,
-.inventory-row input::-webkit-inner-spin-button {
+.inventory-stepper input::-webkit-outer-spin-button,
+.inventory-stepper input::-webkit-inner-spin-button {
   appearance: none;
   -webkit-appearance: none;
   margin: 0;
