@@ -508,6 +508,18 @@
   background: var(--ui-surface-subtle);
   border-bottom: 1px solid var(--ui-border);
 }
+
+/* Proveedores migrada al componente único (FacetedTable): filas `.cat-row` y detalle
+   `.cat-detail-row`. Reproduce el resaltado de expandida y el contenedor del acordeón.
+   Scoped a `.sup-main` para no afectar a otras tablas `.cat-row`. */
+.sup-main .cat-row.is-expanded {
+  background: var(--ui-brand-soft);
+}
+.sup-main .cat-detail-row > td {
+  padding: 0;
+  background: var(--ui-surface-subtle);
+  border-bottom: 1px solid var(--ui-border);
+}
 .sup-detail {
   padding: 1.15rem 1.5rem;
   border-left: 3px solid var(--ui-primary);

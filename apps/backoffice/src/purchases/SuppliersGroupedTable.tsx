@@ -1,6 +1,7 @@
 import type { PurchaseOrder, Supplier } from '@simpletpv/auth';
+import { cn, type FacetedColumn, FacetedTable } from '@simpletpv/ui';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import { ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 import { fmtEur } from '../lib/format.js';
@@ -9,11 +10,13 @@ import { listSupplierPrices } from '../lib/supplier-prices.js';
 import { STATUS_LABEL } from './labels.js';
 import type { SupplierGroup, SupplierMetrics, SupplierRow } from './suppliers-view.js';
 
-// Tabla de Proveedores agrupada por estado (Activos · Inactivos) con detalle EN LÍNEA
-// (acordeón), hermana de la de Traspasos (stock/TransfersTable). Cabecera fija; cabeceras
-// de grupo plegables; filas con proveedor + lead time, fiabilidad, pedidos abiertos,
-// volumen 12m y estado. Al pulsar una fila se despliega su detalle (datos, pedidos,
-// tarifa, aprovisionamiento, actividad y acciones), igual que el acordeón de Traspasos.
+// Tabla de Proveedores: variante del componente único (FacetedTable) con detalle EN
+// LÍNEA (acordeón) de CARGA PEREZOSA — el detalle solo se monta al expandir y carga sus
+// pedidos/tarifa entonces. Agrupada por estado (Activos · Inactivos); filas con proveedor
+// + lead time, fiabilidad, pedidos abiertos, volumen 12m y estado. El carril y el scroll
+// los aporta la página.
+
+const EMPTY: ReadonlySet<string> = new Set();
 
 interface SuppliersGroupedTableProps {
   groups: SupplierGroup[];
@@ -43,148 +46,113 @@ export function SuppliersGroupedTable({
       return next;
     });
 
-  const isEmpty = groups.length === 0;
-
-  return (
-    <div className="sup-main" data-testid="suppliers-table">
-      {isEmpty ? (
-        <div className="sup-empty" data-testid="suppliers-empty">
-          {empty}
-        </div>
-      ) : (
-        <table className="sup-table">
-          <colgroup>
-            <col />
-            <col className="sup-col-lead" />
-            <col className="sup-col-ontime" />
-            <col className="sup-col-open" />
-            <col className="sup-col-bought" />
-            <col className="sup-col-state" />
-          </colgroup>
-          <thead className="sup-thead">
-            <tr>
-              <th className="sup-th-name">Proveedor</th>
-              <th className="sup-th-num">Lead time</th>
-              <th className="sup-th-num">A tiempo</th>
-              <th className="sup-th-num">Abiertos</th>
-              <th className="sup-th-num">Pedidos 12m</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          {groups.map((group) => {
-            const isCollapsed = collapsed.has(group.key);
-            return (
-              <tbody key={group.key}>
-                <tr className="sup-group-head" onClick={() => toggleGroup(group.key)}>
-                  <td className="sup-group-cell" colSpan={6}>
-                    <div className="sup-group-inner">
-                      <ChevronDown
-                        size={15}
-                        className={`sup-group-caret${isCollapsed ? ' is-collapsed' : ''}`}
-                        aria-hidden="true"
-                      />
-                      <span className="sup-group-name">{group.label}</span>
-                      <span className="sup-group-count">
-                        · {group.count} {group.count === 1 ? 'proveedor' : 'proveedores'}
-                      </span>
-                      <span className="sup-group-total">
-                        {group.openTotal} {group.openTotal === 1 ? 'abierto' : 'abiertos'}
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-                {!isCollapsed &&
-                  group.rows.map((row) => (
-                    <SupplierTableRow
-                      key={row.supplier.id}
-                      row={row}
-                      expanded={expandedId === row.supplier.id}
-                      onToggle={() => onToggleExpand(row.supplier.id)}
-                      onEdit={onEdit}
-                      onDelete={onDelete}
-                      deleting={deletingId === row.supplier.id}
-                    />
-                  ))}
-              </tbody>
-            );
-          })}
-        </table>
-      )}
-    </div>
-  );
-}
-
-interface SupplierTableRowProps {
-  row: SupplierRow;
-  expanded: boolean;
-  onToggle: () => void;
-  onEdit: (supplier: Supplier) => void;
-  onDelete: (supplier: Supplier) => void;
-  deleting: boolean;
-}
-
-function SupplierTableRow({
-  row,
-  expanded,
-  onToggle,
-  onEdit,
-  onDelete,
-  deleting,
-}: SupplierTableRowProps) {
-  const { supplier, metrics } = row;
-  return (
-    <>
-      <tr
-        className={`sup-row${expanded ? ' is-expanded' : ''}`}
-        data-testid="supplier-row"
-        aria-expanded={expanded}
-        onClick={onToggle}
-      >
-        <td className="sup-cell-name">
+  const columns: FacetedColumn<SupplierRow>[] = [
+    {
+      key: 'name',
+      header: 'Proveedor',
+      variant: 'name',
+      render: (row) => {
+        const expanded = expandedId === row.supplier.id;
+        return (
           <div className="sup-cell-name-row">
             <ChevronRight
               size={13}
-              className={`sup-row-caret${expanded ? ' is-expanded' : ''}`}
+              className={cn('sup-row-caret', expanded && 'is-expanded')}
               aria-hidden="true"
             />
             <span className="sup-name" data-testid="supplier-name">
-              {supplier.name}
+              {row.supplier.name}
             </span>
           </div>
-        </td>
-        <td className="sup-cell-lead">{supplier.leadTimeDays} d</td>
-        <td className={`sup-cell-ontime ${onTimeTone(metrics.onTimePct)}`}>
-          {metrics.onTimePct == null ? '—' : `${metrics.onTimePct}%`}
-        </td>
-        <td className="sup-cell-open">
-          <span
-            className={`sup-badge ${metrics.openCount > 0 ? 'sup-badge--open' : 'sup-badge--neutral'}`}
-          >
-            {metrics.openCount}
-          </span>
-        </td>
-        <td className="sup-cell-bought">{metrics.orders12m}</td>
-        <td>
-          <span className={`sup-state sup-state--${supplier.active ? 'active' : 'inactive'}`}>
-            <span className="sup-state-dot" aria-hidden="true" />
-            {supplier.active ? 'Activo' : 'Inactivo'}
-          </span>
-        </td>
-      </tr>
-      {expanded && (
-        <tr className="sup-detail-row">
-          <td className="sup-detail-cell" colSpan={6}>
-            <SupplierRowDetail
-              supplier={supplier}
-              metrics={metrics}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              deleting={deleting}
-            />
-          </td>
-        </tr>
-      )}
-    </>
+        );
+      },
+    },
+    {
+      key: 'lead',
+      header: 'Lead time',
+      variant: 'num',
+      colClassName: 'sup-col-lead',
+      tdClassName: 'sup-cell-lead',
+      render: (row) => `${row.supplier.leadTimeDays} d`,
+    },
+    {
+      key: 'ontime',
+      header: 'A tiempo',
+      variant: 'num',
+      colClassName: 'sup-col-ontime',
+      render: (row) => (
+        <span className={cn('sup-cell-ontime', onTimeTone(row.metrics.onTimePct))}>
+          {row.metrics.onTimePct == null ? '—' : `${row.metrics.onTimePct}%`}
+        </span>
+      ),
+    },
+    {
+      key: 'open',
+      header: 'Abiertos',
+      variant: 'num',
+      colClassName: 'sup-col-open',
+      render: (row) => (
+        <span
+          className={`sup-badge ${row.metrics.openCount > 0 ? 'sup-badge--open' : 'sup-badge--neutral'}`}
+        >
+          {row.metrics.openCount}
+        </span>
+      ),
+    },
+    {
+      key: 'bought',
+      header: 'Pedidos 12m',
+      variant: 'num',
+      colClassName: 'sup-col-bought',
+      tdClassName: 'sup-cell-bought',
+      render: (row) => row.metrics.orders12m,
+    },
+    {
+      key: 'state',
+      header: 'Estado',
+      variant: 'mid',
+      colClassName: 'sup-col-state',
+      render: (row) => (
+        <span className={`sup-state sup-state--${row.supplier.active ? 'active' : 'inactive'}`}>
+          <span className="sup-state-dot" aria-hidden="true" />
+          {row.supplier.active ? 'Activo' : 'Inactivo'}
+        </span>
+      ),
+    },
+  ];
+
+  const fgroups = groups.map((g) => ({
+    key: g.key,
+    label: g.label,
+    meta: `${g.count} ${g.count === 1 ? 'proveedor' : 'proveedores'}`,
+    metaRight: `${g.openTotal} ${g.openTotal === 1 ? 'abierto' : 'abiertos'}`,
+    rows: g.rows,
+  }));
+
+  return (
+    <div className="sup-main" data-testid="suppliers-table">
+      <FacetedTable<SupplierRow>
+        layout="table"
+        groups={fgroups}
+        columns={columns}
+        rowKey={(row) => row.supplier.id}
+        rowTestId="supplier-row"
+        collapsedKeys={collapsed}
+        onToggleGroup={toggleGroup}
+        expandedKeys={expandedId ? new Set([expandedId]) : EMPTY}
+        onToggleRow={(key) => onToggleExpand(key)}
+        renderDetail={(row) => (
+          <SupplierRowDetail
+            supplier={row.supplier}
+            metrics={row.metrics}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            deleting={deletingId === row.supplier.id}
+          />
+        )}
+        emptyState={<span data-testid="suppliers-empty">{empty}</span>}
+      />
+    </div>
   );
 }
 
