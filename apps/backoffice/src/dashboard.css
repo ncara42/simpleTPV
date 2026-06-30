@@ -213,7 +213,7 @@
 }
 .dash-compare-curr {
   color: var(--ui-success);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 /* ─── Ventas por hora ─── */

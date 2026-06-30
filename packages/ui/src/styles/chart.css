@@ -307,7 +307,7 @@ button.ui-chart-group:focus-visible {
   padding-top: 3px;
   border-top: 1px solid rgb(255 255 255 / 0.16);
   font-size: 0.74rem;
-  font-weight: 650;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--ui-chart-tip-fg, #fff);
 }
@@ -372,7 +372,7 @@ button.ui-chart-group:focus-visible {
 }
 .ui-chart-tip-row2-amount {
   margin-left: auto;
-  font-weight: 650;
+  font-weight: 600;
 }
 /* Delta de cierre: separador fino arriba, alineado a la derecha (sobre la misma
    columna que los importes) y color por signo (verde/rojo aclarados para
@@ -384,7 +384,7 @@ button.ui-chart-group:focus-visible {
   padding-top: 4px;
   border-top: 1px solid rgb(255 255 255 / 0.16);
   font-size: 0.74rem;
-  font-weight: 650;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--ui-chart-tip-fg-muted, #b9c2d0);
 }
@@ -529,7 +529,7 @@ button.ui-chart-group:focus-visible {
 /* Delta bajo el nombre: verde si sube, rojo si baja, neutro si igual/sin dato. */
 .ui-chart-sub {
   font-size: 0.7rem;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.1;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;

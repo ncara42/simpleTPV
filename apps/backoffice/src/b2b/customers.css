@@ -313,7 +313,7 @@
   /* font-size + line-height igualados a la ficha de Ventas (`.ventas-detail-name`). */
   font-size: 1rem;
   line-height: 1.2;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--ui-text);
 }
@@ -447,7 +447,7 @@
 }
 .cust-stat-value {
   font-size: 1.1rem;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 

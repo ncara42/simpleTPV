@@ -82,7 +82,7 @@ body.tc-dragging .tc-panel {
 }
 .tc-title {
   font-size: 0.9rem;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--ui-text);
   white-space: nowrap;
