@@ -22,6 +22,8 @@ export interface NavItem {
   badge?: number;
   /** Texto opcional (p. ej. temporizador del fichaje en vivo) como píldora a la derecha. */
   counter?: string;
+  /** Si true, el item se renderiza en el footer (debajo de TPV, encima del toggle de tema). */
+  afterSwitch?: boolean;
 }
 
 export interface NavGroup {
@@ -72,6 +74,8 @@ export interface SidebarProps {
    * tiene efecto con `floating`.
    */
   floatingActions?: React.ReactNode;
+  /** Abre la página de configuración desde el menú del usuario. */
+  onSettings?: () => void;
   /** Abre el panel de notificaciones desde el menú del usuario. */
   onNotifications?: () => void;
   /** Nº de notificaciones sin leer; pinta un punto rojo sobre el avatar si > 0. */
@@ -123,6 +127,25 @@ function BellGlyph() {
     >
       <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
       <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </svg>
+  );
+}
+
+function SettingsGlyph() {
+  return (
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
     </svg>
   );
 }
@@ -231,6 +254,7 @@ export function Sidebar({
   collapsible = false,
   floating = false,
   floatingActions,
+  onSettings,
   onNotifications,
   notificationCount = 0,
   appSwitch,
@@ -269,6 +293,8 @@ export function Sidebar({
   const isHidden = floating && hidden && !mobileOpen;
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuClosing, setMenuClosing] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const accountRef = useRef<HTMLDivElement>(null);
   const accountTriggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -280,7 +306,28 @@ export function Sidebar({
     setCollapsedGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
   }, []);
 
-  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const openMenu = useCallback(() => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    setMenuClosing(false);
+    setMenuOpen(true);
+  }, []);
+
+  // Anima la salida (120 ms) antes de desmontar.
+  const closeMenu = useCallback(() => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    setMenuClosing(true);
+    closeTimerRef.current = setTimeout(() => {
+      setMenuOpen(false);
+      setMenuClosing(false);
+    }, 120);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    },
+    [],
+  );
 
   // Cerrar el menú de cuenta al hacer click fuera o pulsar Escape (patrón de Select).
   useEffect(() => {
@@ -288,13 +335,13 @@ export function Sidebar({
     const onPointerDown = (e: PointerEvent) => {
       const target = e.target as Node;
       if (!accountRef.current?.contains(target) && !toggleTabRef.current?.contains(target)) {
-        setMenuOpen(false);
+        closeMenu();
       }
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        setMenuOpen(false);
+        closeMenu();
         accountTriggerRef.current?.focus();
       }
     };
@@ -304,7 +351,7 @@ export function Sidebar({
       document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [menuOpen]);
+  }, [menuOpen, closeMenu]);
 
   // Al abrir, llevar el foco al primer item del menú (navegación por teclado).
   useEffect(() => {
@@ -335,22 +382,23 @@ export function Sidebar({
   // cuenta bajo el avatar) son mutuamente excluyentes: abrir el de cuenta eclipsa el cuerpo y
   // cierra cualquier grupo desplegado; el cuerpo reaparece al cerrarlo (clic fuera / opción).
   const toggleAccountMenu = useCallback(() => {
-    setMenuOpen((prev) => {
-      const next = !prev;
-      if (next) closeDropdown();
-      return next;
-    });
-  }, [closeDropdown]);
+    if (menuOpen && !menuClosing) {
+      closeMenu();
+    } else {
+      openMenu();
+      closeDropdown();
+    }
+  }, [menuOpen, menuClosing, closeMenu, openMenu, closeDropdown]);
 
   // Pulsar el logo con el panel de cuenta abierto solo lo cierra (revela el cuerpo); si no, hace
   // su función normal de ocultar/mostrar el cuerpo del sidebar flotante.
   const onToggleClick = useCallback(() => {
     if (menuOpen) {
-      setMenuOpen(false);
+      closeMenu();
       return;
     }
     toggleHidden();
-  }, [menuOpen, toggleHidden]);
+  }, [menuOpen, closeMenu, toggleHidden]);
 
   // Clic: togglea el grupo. Al ser `openGroup` un único estado, abrir B cierra A.
   const onGroupClick = useCallback((groupId: string) => {
@@ -383,10 +431,13 @@ export function Sidebar({
     [onSelect, groupsAsDropdowns, closeDropdown],
   );
 
+  const preItems = items.filter((item) => !item.afterSwitch);
+  const postItems = items.filter((item) => item.afterSwitch);
+
   // `withTooltip`: solo los items PADRE (entradas directas de primer nivel) reciben
   // el tooltip con estilo propio en modo expandido; los hijos de un grupo, no.
   const renderItems = (filterGroup?: string, onlyId?: string, withTooltip = false) =>
-    items
+    preItems
       .filter((item) => item.group === filterGroup && (onlyId === undefined || item.id === onlyId))
       .map((item, index) => {
         const isActive = activeItem === item.id;
@@ -612,26 +663,6 @@ export function Sidebar({
               })}
             </>
           )}
-
-          {/* Cambio de app (p. ej. TPV): última entrada de la lista, tras una línea
-              divisoria y con acento azul para distinguirla del propio backoffice. */}
-          {appSwitch && (
-            <div className="sidebar-app-switch">
-              <button
-                type="button"
-                className="sidebar-item sidebar-item--app"
-                onClick={() => {
-                  appSwitch.onClick();
-                  setMobileOpen(false);
-                }}
-                title={appSwitch.label}
-                data-testid={appSwitch.testId ?? 'sidebar-app-switch'}
-              >
-                <span className="sidebar-item-icon">{appSwitch.icon}</span>
-                <span className="sidebar-item-label">{appSwitch.label}</span>
-              </button>
-            </div>
-          )}
         </nav>
 
         {/* Footer: cuenta (estilo ChatGPT) o cierre de sesión simple. En modo flotante la cuenta
@@ -640,42 +671,122 @@ export function Sidebar({
         {!floating &&
           (account ? (
             <div className="sidebar-footer" ref={accountRef}>
-              {onLogout && menuOpen && (
+              {menuOpen && (
                 <div
-                  className="sidebar-account-menu"
+                  className={`sidebar-account-menu${menuClosing ? ' sidebar-account-menu--closing' : ''}`}
                   role="menu"
                   aria-label="Cuenta"
                   ref={menuRef}
                   onKeyDown={onMenuKeyDown}
                 >
-                  <button
-                    type="button"
-                    className="sidebar-account-menu-item sidebar-account-menu-item--danger"
-                    role="menuitem"
-                    onClick={() => {
-                      closeMenu();
-                      onLogout();
-                    }}
-                    data-testid="logout"
-                  >
-                    <span className="sidebar-account-menu-icon">
-                      <LogoutGlyph />
-                    </span>
-                    <span>Cerrar sesión</span>
-                  </button>
+                  {onSettings && (
+                    <button
+                      type="button"
+                      className="sidebar-account-menu-item"
+                      role="menuitem"
+                      onClick={() => {
+                        closeMenu();
+                        onSettings();
+                      }}
+                      data-testid="nav-settings"
+                    >
+                      <span className="sidebar-account-menu-icon">
+                        <SettingsGlyph />
+                      </span>
+                      <span>Configuración</span>
+                    </button>
+                  )}
+                  {onLogout && (
+                    <button
+                      type="button"
+                      className="sidebar-account-menu-item sidebar-account-menu-item--danger"
+                      role="menuitem"
+                      onClick={() => {
+                        closeMenu();
+                        onLogout();
+                      }}
+                      data-testid="logout"
+                    >
+                      <span className="sidebar-account-menu-icon">
+                        <LogoutGlyph />
+                      </span>
+                      <span>Cerrar sesión</span>
+                    </button>
+                  )}
                 </div>
+              )}
+              {/* TPV + Ayuda: encima del toggle de tema */}
+              {(appSwitch || postItems.length > 0) && (
+                <div className="sidebar-app-switch">
+                  {appSwitch && (
+                    <button
+                      type="button"
+                      className="sidebar-item sidebar-item--app"
+                      onClick={() => {
+                        appSwitch.onClick();
+                        setMobileOpen(false);
+                      }}
+                      title={appSwitch.label}
+                      data-testid={appSwitch.testId ?? 'sidebar-app-switch'}
+                    >
+                      <span className="sidebar-item-icon">{appSwitch.icon}</span>
+                      <span className="sidebar-item-label">{appSwitch.label}</span>
+                    </button>
+                  )}
+                  {postItems.length > 0 && (
+                    <ul className="sidebar-group-items">
+                      {postItems.map((item, index) => {
+                        const isActive = activeItem === item.id;
+                        const button = (
+                          <button
+                            type="button"
+                            className={`sidebar-item${isActive ? ' active' : ''}`}
+                            onClick={() => handleSelect(item.id)}
+                            title={collapsed ? undefined : item.label}
+                            aria-current={isActive ? 'page' : undefined}
+                            data-testid={`nav-${item.id}`}
+                          >
+                            <span
+                              className="sidebar-item-icon"
+                              style={
+                                { '--sidebar-icon-anim': iconAnimAt(index) } as React.CSSProperties
+                              }
+                            >
+                              {item.icon}
+                            </span>
+                            <span className="sidebar-item-label">{item.label}</span>
+                          </button>
+                        );
+                        return (
+                          <li key={item.id}>
+                            {!collapsed ? <Tooltip label={item.label}>{button}</Tooltip> : button}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
+              {(appSwitch || postItems.length > 0) && (
+                <div className="sidebar-footer-sep" aria-hidden="true" />
               )}
               {/* Toggle de tema ENCIMA de la cuenta, separado por un filete divisor. */}
               <SidebarThemeToggle />
               <div className="sidebar-footer-sep" aria-hidden="true" />
               <button
                 type="button"
-                className={`sidebar-account sidebar-account--footer${menuOpen ? ' open' : ''}`}
+                className={`sidebar-account sidebar-account--footer${menuOpen && !menuClosing ? ' open' : ''}`}
                 ref={accountTriggerRef}
-                onClick={() => setMenuOpen((v) => !v)}
+                onClick={() => {
+                  if (menuOpen && !menuClosing) {
+                    closeMenu();
+                  } else {
+                    openMenu();
+                  }
+                }}
                 data-testid="account-menu"
                 aria-haspopup="menu"
-                aria-expanded={menuOpen}
+                aria-expanded={menuOpen && !menuClosing}
                 title={account.name}
               >
                 <span className="sidebar-account-avatar" aria-hidden="true">

@@ -25,18 +25,21 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeftRight,
   Bell,
-  Boxes,
+  BriefcaseBusiness,
+  Building2,
   CheckSquare,
+  CreditCard,
   Handshake,
   LayoutDashboard,
   LifeBuoy,
-  Monitor,
   Package,
-  Palette,
   Percent,
-  Receipt,
-  ShoppingCart,
+  ScanLine,
+  Settings,
   Store,
+  Tag,
+  TrendingUp,
+  Truck,
   Users,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -78,9 +81,10 @@ import { VerifactuPage } from './VerifactuPage.js';
 // grupos se despliegan como dropdown (hover sostenido >200ms = preview; clic =
 // anclado). El mapa de contenido por grupo es el cerrado en informe_decisiones D-09.
 const NAV_GROUPS: NavGroup[] = [
-  { id: 'inventory', label: 'Catálogo e inventario', icon: <Package size={18} /> },
-  { id: 'commercial', label: 'Ventas y clientes', icon: <Receipt size={18} /> },
-  { id: 'org', label: 'Organización', icon: <Store size={18} /> },
+  { id: 'inventory', label: 'Catálogo e inventario', icon: <Tag size={18} /> },
+  { id: 'commercial', label: 'Ventas y clientes', icon: <TrendingUp size={18} /> },
+  { id: 'org', label: 'Organización', icon: <Building2 size={18} /> },
+  { id: 'rrhh', label: 'RRHH', icon: <BriefcaseBusiness size={18} /> },
 ];
 
 const ALL_NAV: NavItem[] = [
@@ -89,11 +93,11 @@ const ALL_NAV: NavItem[] = [
   // S-02 fase A: una sola entrada "Inventario" monta InventoryPage con vistas
   // segmentadas (Catálogo · Familias · Existencias). Las tres entradas previas se
   // colapsan aquí; sus rutas siguen vivas (deep-link/redirección) pero ocultas del menú.
-  { id: 'inventory', label: 'Inventario', icon: <Boxes size={18} />, group: 'inventory' },
+  { id: 'inventory', label: 'Inventario', icon: <Package size={18} />, group: 'inventory' },
   { id: 'transfers', label: 'Traspasos', icon: <ArrowLeftRight size={18} />, group: 'inventory' },
-  { id: 'suppliers', label: 'Proveedores', icon: <ShoppingCart size={18} />, group: 'inventory' },
+  { id: 'suppliers', label: 'Proveedores', icon: <Truck size={18} />, group: 'inventory' },
   // Ventas y clientes (D-09): Ventas · Clientes B2B · Promociones
-  { id: 'sales', label: 'Ventas', icon: <Receipt size={18} />, group: 'commercial' },
+  { id: 'sales', label: 'Ventas', icon: <CreditCard size={18} />, group: 'commercial' },
   { id: 'b2b', label: 'Clientes B2B', icon: <Handshake size={18} />, group: 'commercial' },
   { id: 'promotions', label: 'Promociones', icon: <Percent size={18} />, group: 'commercial' },
   // Organización (D-09 + U-08): Tiendas · Personal · Ajustes
@@ -102,10 +106,10 @@ const ALL_NAV: NavItem[] = [
   // (Equipo · Fichajes). Las entradas previas Usuarios/Control horario se colapsan
   // aquí; sus rutas siguen vivas (deep-link/redirección) pero ocultas del menú. El flag
   // time_clock pasa a condicionar el segmento Fichajes (P003), no la entrada de menú.
-  { id: 'personal', label: 'Personal', icon: <Users size={18} />, group: 'org' },
-  { id: 'settings', label: 'Ajustes', icon: <Palette size={18} />, group: 'org' },
+  { id: 'personal', label: 'Personal', icon: <Users size={18} />, group: 'rrhh' },
+  { id: 'settings', label: 'Configuración', icon: <Settings size={18} />, group: 'org' },
   { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'org' },
-  { id: 'help', label: 'Ayuda', icon: <LifeBuoy size={18} /> },
+  { id: 'help', label: 'Ayuda', icon: <LifeBuoy size={18} />, afterSwitch: true },
 ];
 
 // VeriFactu se mantiene fuera del menú (backend sin UI). Notificaciones también:
@@ -113,7 +117,7 @@ const ALL_NAV: NavItem[] = [
 // del menú era redundante. Compras dejó de ser una página propia: sus secciones
 // viven ahora dentro de Proveedores (P1-B). El código se conserva para reactivar
 // VeriFactu/Notificaciones quitando su id de este set.
-const HIDDEN_TABS = new Set<Tab>(['notifications', 'verifactu']);
+const HIDDEN_TABS = new Set<Tab>(['notifications', 'verifactu', 'settings']);
 const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab));
 
 // Lee las acciones de la vista activa (cada page las declara con usePageActions) y
@@ -272,11 +276,12 @@ function Home() {
             // La cuenta vive al PIE del sidebar (avatar → menú con cerrar sesión), estilo
             // ChatGPT/Claude; en rail se reduce al avatar. La campana sigue en el topbar.
             account={{ name: 'Administrador', subtitle: 'Central · Admin' }}
+            onSettings={() => navigateTo('settings')}
             onLogout={logout}
             // El TPV es la última entrada del sidebar (appSwitch), separada por una línea y en azul.
             appSwitch={{
               label: 'TPV',
-              icon: <Monitor size={19} aria-hidden="true" />,
+              icon: <ScanLine size={19} aria-hidden="true" />,
               onClick: () => switchApp('tpv'),
               testId: 'switch-tpv',
             }}

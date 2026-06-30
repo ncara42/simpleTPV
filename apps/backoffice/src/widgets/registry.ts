@@ -30,6 +30,11 @@ export const WIDGET_LABELS: Record<string, string> = {
   'lista-familia': 'Ventas por familia',
   'lista-rankings': 'Rankings',
   'lista-mix': 'Mix de ventas',
+  // Sección 04 · Más exploraciones (rediseño)
+  'exp-objetivo': 'Objetivo del periodo',
+  'exp-metodos-pago': 'Métodos de pago',
+  'exp-tickets-recientes': 'Tickets recientes',
+  'exp-acumulado-mes': 'Acumulado del mes',
   // Sección 05 · Compactos (rediseño)
   'cmp-ribbon': 'Banda compacta de métricas',
   'cmp-donut': 'Donut por familia',

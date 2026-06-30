@@ -798,20 +798,48 @@
   background: var(--ui-danger, #ef4444);
 }
 
-/* ── Checks de estado del mensaje ────────────────────────────────────────────────── */
-.msg-status {
-  display: block;
-  flex: none;
-  margin-top: 2px;
+/* ── Separador de fecha/hora ─────────────────────────────────────────────────────── */
+.ticket-daydiv {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+  color: var(--ui-text-soft);
+  font-size: 0.68rem;
+  font-weight: 500;
+  user-select: none;
 }
-.msg-status--sending {
-  color: rgba(255, 255, 255, 0.35);
+.ticket-daydiv::before,
+.ticket-daydiv::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--ui-border);
 }
-.msg-status--received {
+
+/* ── Estado del último mensaje enviado ───────────────────────────────────────────── */
+.ticket-msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: var(--ui-space-1);
+}
+.ticket-msg--user .ticket-msg-meta {
+  justify-content: flex-end;
+}
+.ticket-msg-status {
+  font-size: 0.6875rem;
+  line-height: 1;
+  user-select: none;
+}
+.ticket-msg-status--sending {
+  color: rgba(255, 255, 255, 0.4);
+}
+.ticket-msg-status--received {
   color: rgba(255, 255, 255, 0.6);
 }
-.msg-status--seen {
-  color: #60a5fa;
+.ticket-msg-status--seen {
+  color: #93c5fd;
 }
 
 /* Punto parpadeante: estado Abierto en cabecera del ticket */
@@ -846,12 +874,23 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  overflow: hidden;
+}
+/* Todo el contenido del hero, centrado verticalmente */
+.ticket-hero-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   gap: var(--ui-space-5);
   padding: clamp(2.5rem, 1.4rem + 5vw, 5rem) var(--ui-space-6);
-  width: 100%;
+  /* El carrusel usa márgenes negativos para llegar a los bordes de la card */
 }
 .ticket-hero-eyebrow {
   margin: 0;
@@ -878,25 +917,46 @@
   color: var(--ui-text-muted);
   text-wrap: balance;
 }
-.ticket-hero .ticket-composer {
+.ticket-hero-body .ticket-composer {
   width: 100%;
   max-width: 44rem;
   margin-top: 0;
 }
+/* Carrusel edge-to-edge — clip container, ancho natural del hero */
 .ticket-chips {
+  overflow: hidden;
+  padding: 0.35rem 0 1.25rem;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ticket-chips:active {
+  cursor: grabbing;
+}
+/* Track: posición controlada por rAF en JS, sin CSS animation */
+.ticket-chips-track {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--ui-space-2);
-  justify-content: center;
+  width: max-content;
+  padding: 0 var(--ui-space-6);
+}
+/* Carousel dentro del hero-body: rompe el padding lateral para ir edge-to-edge */
+.ticket-hero-body .ticket-chips {
+  width: calc(100% + 2 * var(--ui-space-6));
+  margin-left: calc(-1 * var(--ui-space-6));
+  margin-right: calc(-1 * var(--ui-space-6));
 }
 .ticket-chip {
+  flex-shrink: 0;
   padding: var(--ui-space-2) var(--ui-space-3);
-  font-size: var(--ui-text-sm);
+  font-size: var(--ui-text-base);
   color: var(--ui-text);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: 999px;
   cursor: pointer;
+  white-space: nowrap;
   transition:
     background 0.15s var(--ui-ease),
     border-color 0.15s var(--ui-ease);
@@ -1147,26 +1207,92 @@
 }
 .ticket-composer-clip {
   position: absolute;
-  left: 1.25rem;
+  left: 0.6rem;
   top: 50%;
   transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 0;
+  border-radius: 8px;
+  background: none;
   color: var(--ui-text-soft);
+  cursor: pointer;
+  transition:
+    color 0.15s var(--ui-ease),
+    background 0.15s var(--ui-ease);
+}
+.ticket-composer-clip:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--ui-surface-hover, color-mix(in srgb, var(--ui-text) 6%, transparent));
+}
+.ticket-composer-clip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.ticket-composer-file {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
   pointer-events: none;
+}
+/* Adjunto seleccionado — chip encima del input */
+.ticket-attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  align-self: flex-start;
+  padding: 0.25rem 0.5rem 0.25rem 0.4rem;
+  margin-bottom: var(--ui-space-2);
+  border-radius: 8px;
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text-soft);
+  font-size: var(--ui-text-xs);
+  max-width: 100%;
+}
+.ticket-attachment-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ui-text);
+}
+.ticket-attachment-remove {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--ui-text-soft);
+  cursor: pointer;
+}
+.ticket-attachment-remove:hover {
+  background: var(--ui-surface-hover, color-mix(in srgb, var(--ui-text) 8%, transparent));
+  color: var(--ui-text);
 }
 .ticket-input {
   width: 100%;
   height: 3.75rem;
-  padding: 0 3.75rem 0 3.25rem;
+  padding: 0 3.75rem 0 1.25rem;
   font: inherit;
   font-size: var(--ui-text-lg);
   color: var(--ui-text);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: 14px;
-  box-shadow: var(--ui-shadow-sm);
   transition:
     border-color 0.18s var(--ui-ease),
     box-shadow 0.18s var(--ui-ease);
+}
+.ticket-composer--has-clip .ticket-input {
+  padding-left: 3.25rem;
 }
 .ticket-input::placeholder {
   color: var(--ui-text-soft);
@@ -1244,5 +1370,8 @@
   }
   .ticket-new-btn:hover {
     transform: none;
+  }
+  .ticket-chips-track {
+    /* rAF loop se detiene externamente — nada que anular aquí */
   }
 }

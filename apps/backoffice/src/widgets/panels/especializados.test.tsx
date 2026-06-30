@@ -127,13 +127,15 @@ describe('Widgets de panel · Sección 11 (Especializados)', () => {
     expect(screen.getByText('Otros 9,10 €')).toBeInTheDocument();
   });
 
-  it('matriz: cabeceras de franja + una fila por tienda', async () => {
+  it('matriz: cabeceras POR HORAS (rango activo) + una fila por tienda', async () => {
     renderWidget(<StoreBandMatrix period="today" store={undefined} />);
     expect(await screen.findByText('Sur')).toBeInTheDocument();
     expect(screen.getByText('Online')).toBeInTheDocument();
-    expect(screen.getByText('Mañana')).toBeInTheDocument();
-    expect(screen.getByText('Mediodía')).toBeInTheDocument();
-    expect(screen.getByText('Tarde')).toBeInTheDocument();
+    // HOURS mockea ventas a las 9, 14 y 18 → el rango activo es 9–18 (cabeceras por hora, sin bandas).
+    expect(screen.getByText('9')).toBeInTheDocument();
+    expect(screen.getByText('14')).toBeInTheDocument();
+    expect(screen.getByText('18')).toBeInTheDocument();
+    expect(screen.queryByText('Mañana')).not.toBeInTheDocument();
   });
 
   it('tiendas: dirección + estado operativo (Operativa / Incidencia)', async () => {

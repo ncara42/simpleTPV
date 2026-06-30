@@ -1,7 +1,8 @@
 import './especializados.css';
 
 import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
-import { Fragment, type ReactElement } from 'react';
+import { Fragment, type ReactElement, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { listStores } from '../../lib/admin.js';
 import {
@@ -70,8 +71,7 @@ export function SupplierComparison(_props: PanelProps): ReactElement {
   return (
     <PanelShell id="esp-proveedores" fit="stretch" bare>
       <div className="sp-card">
-        <div className="sp-title">Comparativa de proveedores</div>
-        <div className="sp-sub">Mejor precio marcado</div>
+        <div className="sp-title sp-title--gap">Comparativa de proveedores</div>
         {rows.map((r) => {
           const best = r.best!;
           // Competidor más cercano: el más barato entre los que no son el mejor.
@@ -97,13 +97,11 @@ export function SupplierComparison(_props: PanelProps): ReactElement {
   );
 }
 
-// ── 2 · Matriz tienda × franja (intensidad de ventas de hoy) ─────────────────────────────────────
-const BANDS = ['Mañana', 'Mediodía', 'Tarde'] as const;
-function bandOf(hour: number): 0 | 1 | 2 {
-  if (hour < 13) return 0;
-  if (hour < 17) return 1;
-  return 2;
-}
+// ── 2 · Matriz tienda × franja (intensidad de ventas de hoy, POR HORAS auto-ajustable) ────────────
+// Ventana por defecto (sin ventas aún): horario comercial 9–21. Con ventas, el rango se ciñe a la 1ª y
+// última hora con actividad de cualquier tienda → columnas que se adaptan a la realidad, sin huecos muertos.
+const MATRIX_DEFAULT_FROM = 9;
+const MATRIX_DEFAULT_TO = 21;
 function cellFill(t: number): string {
   const pct = Math.round(8 + Math.max(0, Math.min(1, t)) * 92);
   return `color-mix(in oklab, var(--ui-brand) ${pct}%, var(--ui-surface))`;
@@ -125,38 +123,80 @@ export function StoreBandMatrix({ store }: PanelProps): ReactElement {
     })),
   });
 
+  // Bubble flotante con el nombre completo al pasar por una etiqueta de tienda truncada (portal a
+  // <body> → no la recorta el overflow del tile). Solo aparece si el nombre está realmente truncado.
+  const [tip, setTip] = useState<{ name: string; x: number; y: number } | null>(null);
+  const showTip = (e: { currentTarget: HTMLSpanElement }, name: string): void => {
+    const el = e.currentTarget;
+    if (el.scrollWidth <= el.clientWidth) return;
+    const r = el.getBoundingClientRect();
+    setTip({ name, x: r.left + r.width / 2, y: r.top });
+  };
+  const hideTip = (): void => setTip(null);
+
+  // Facturación por tienda × hora (0–23).
   const rows = stores.map((s, i) => {
-    const bands: [number, number, number] = [0, 0, 0];
-    for (const h of hourQs[i]?.data ?? []) bands[bandOf(h.hour)] += h.revenue;
-    return { name: s.storeName, bands };
+    const byHour = new Array<number>(24).fill(0);
+    for (const h of hourQs[i]?.data ?? []) byHour[h.hour] = (byHour[h.hour] ?? 0) + h.revenue;
+    return { name: s.storeName, byHour };
   });
-  const max = Math.max(1, ...rows.flatMap((r) => r.bands));
+
+  // Rango activo: de la 1ª a la última hora con ventas (en cualquier tienda); sin ventas → ventana 9–21.
+  let minH = 24;
+  let maxH = -1;
+  for (const r of rows) {
+    for (let h = 0; h < 24; h++) {
+      if (r.byHour[h]! > 0) {
+        if (h < minH) minH = h;
+        if (h > maxH) maxH = h;
+      }
+    }
+  }
+  const fromH = maxH >= minH ? minH : MATRIX_DEFAULT_FROM;
+  const toH = maxH >= minH ? maxH : MATRIX_DEFAULT_TO;
+  const hours = Array.from({ length: toH - fromH + 1 }, (_, k) => fromH + k);
+  const max = Math.max(1, ...rows.flatMap((r) => hours.map((h) => r.byHour[h]!)));
 
   return (
     <PanelShell id="esp-matriz" fit="stretch" bare>
       <div className="sp-card">
-        <div className="sp-title">Matriz tienda × franja</div>
-        <div className="sp-sub">Intensidad de ventas (hoy)</div>
-        <div className="sp-matrix">
+        <div className="sp-title sp-title--gap">Matriz tienda × franja</div>
+        <div
+          className="sp-matrix"
+          style={{ gridTemplateColumns: `74px repeat(${hours.length}, minmax(0, 1fr))` }}
+        >
           <span />
-          {BANDS.map((b) => (
-            <span key={b} className="sp-matrix-head">
-              {b}
+          {hours.map((h) => (
+            <span key={h} className="sp-matrix-head">
+              {h}
             </span>
           ))}
           {rows.map((r) => (
             <Fragment key={r.name}>
-              <span className="sp-matrix-rowlabel">{r.name}</span>
-              {r.bands.map((v, bi) => (
+              <span
+                className="sp-matrix-rowlabel"
+                onMouseEnter={(e) => showTip(e, r.name)}
+                onMouseLeave={hideTip}
+              >
+                {r.name}
+              </span>
+              {hours.map((h) => (
                 <span
-                  key={bi}
+                  key={h}
                   className="sp-matrix-cell"
-                  style={{ background: cellFill(v / max) }}
+                  style={{ background: cellFill(r.byHour[h]! / max) }}
                 />
               ))}
             </Fragment>
           ))}
         </div>
+        {tip &&
+          createPortal(
+            <div className="sp-tip" style={{ left: `${tip.x}px`, top: `${tip.y}px` }}>
+              {tip.name}
+            </div>,
+            document.body,
+          )}
       </div>
     </PanelShell>
   );
@@ -222,7 +262,6 @@ export function ExecutiveSummary(_props: PanelProps): ReactElement {
     `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
   const prevFrom = iso(new Date(y, m - 1, 1));
   const prevTo = iso(new Date(y, m - 1, d));
-  const monthName = new Date(y, m, 1).toLocaleDateString('es-ES', { month: 'long' });
   const prevMonthName = new Date(y, m - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
 
   const salesQ = useQuery({
@@ -257,7 +296,6 @@ export function ExecutiveSummary(_props: PanelProps): ReactElement {
     <PanelShell id="esp-resumen-ejecutivo" fit="stretch" bare>
       <div className="sp-card sp-exec">
         <div className="sp-exec-prose">
-          <div className="sp-exec-eyebrow">Resumen ejecutivo · {monthName}</div>
           <div className="sp-exec-text">
             El mes va a <strong>{nfEur0.format(revenue)}</strong> con un margen del{' '}
             <strong>{nfPct1.format(marginPct)}</strong>

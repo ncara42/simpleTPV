@@ -3847,3 +3847,300 @@
 .sp-cmp-dot.is-mediana {
   background: var(--ui-border-strong);
 }
+
+/* ─── Rediseño Vercel del modal de producto (D-15) ─────────────────────────
+   Cabecera con avatar + subtítulo, cuerpo a dos columnas (Datos básicos ·
+   Clasificación | Precios e IVA + tarjeta de margen) y pie partido con el
+   enlace "Ver movimientos". Acotado a .product-form-modal; el radio único de
+   12px lo aporta el bloque "Estilo Vercel" de más arriba. */
+.product-form-modal {
+  max-width: 44rem;
+}
+.pfm-head {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.85rem;
+}
+.pfm-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.85rem;
+  height: 2.85rem;
+  border-radius: var(--ui-radius-md);
+  background: color-mix(in srgb, var(--ui-brand) 12%, var(--ui-surface));
+  color: var(--ui-brand);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.pfm-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.pfm-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.4rem 2.2rem;
+  align-items: start;
+}
+.pfm-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+.pfm-prices-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+  align-items: start;
+}
+/* Tarjeta de margen: celda inferior derecha del subgrid de precios, junto a IVA. */
+.pfm-margin-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: var(--ui-radius-md);
+  background: color-mix(in srgb, var(--ui-brand) 7%, var(--ui-surface));
+  border: 1px solid color-mix(in srgb, var(--ui-brand) 16%, transparent);
+}
+.pfm-margin-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-muted);
+}
+.pfm-margin-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.pfm-margin-pct {
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ui-brand);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.pfm-margin-pct--empty {
+  color: var(--ui-text-soft);
+}
+.pfm-margin-eur {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ui-brand);
+  font-variant-numeric: tabular-nums;
+}
+.pfm-margin-note {
+  font-size: 0.82rem;
+  color: var(--ui-text-muted);
+}
+.pfm-extra {
+  border-top: 1px solid var(--ui-border);
+  padding-top: 1rem;
+}
+/* Enlace "Ver movimientos" del pie (izquierda del split). */
+.pfm-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ui-brand);
+}
+.pfm-link:hover {
+  text-decoration: underline;
+}
+/* Colapsa a una sola columna en viewports estrechos. */
+@media (max-width: 640px) {
+  .pfm-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* El enlace "Ver movimientos" NO es un botón con borde: gana a la regla amplia
+   `.modal-foot button:not(.ui-btn)` (que estiliza Cancelar) con mayor especificidad. */
+.product-form-modal .modal-foot button.pfm-link {
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--ui-brand);
+  font-weight: 600;
+}
+.product-form-modal .modal-foot button.pfm-link:hover {
+  background: none;
+  text-decoration: underline;
+}
+
+/* ─── Input numérico con spinners personalizados (.pfm-num) ─────────────────
+   Elimina los controles nativos del navegador y coloca dos botones propios
+   (una mitad arriba = incrementar, una mitad abajo = decrementar) pegados
+   al borde derecho interior del input. */
+.pfm-num {
+  position: relative;
+}
+.pfm-num input[type='number']::-webkit-inner-spin-button,
+.pfm-num input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.pfm-num input[type='number'] {
+  -moz-appearance: textfield;
+  padding-right: 2rem;
+}
+/* Contenedor de las dos flechas: se asienta dentro del borde del input. */
+.pfm-spinners {
+  position: absolute;
+  right: 1px;
+  top: 1px;
+  bottom: 1px;
+  width: 1.6rem;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--ui-border-strong);
+  border-radius: 0 9px 9px 0;
+  overflow: hidden;
+}
+/* Cada flecha ocupa exactamente la mitad del alto del input. */
+.pfm-spinner-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  color: var(--ui-text-muted);
+  line-height: 1;
+  transition:
+    background 0.1s,
+    color 0.1s;
+}
+.pfm-spinner-btn:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+.pfm-spinner-btn:active {
+  background: color-mix(in srgb, var(--ui-border-strong) 60%, transparent);
+}
+.pfm-spinner-btn:not(:last-child) {
+  border-bottom: 1px solid var(--ui-border);
+}
+
+/* ─── Sección de movimientos de stock (pfm-extra → ProductMovements) ────────
+   Lista tokenizada: badge de tipo + fecha + cantidad ± coloreada + motivo.
+   Se renderiza dentro de .pfm-extra, que ya aporta el borde superior. */
+.pmv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pmv-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.6rem 0.75rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--ui-border);
+}
+.pmv-row:last-child {
+  border-bottom: none;
+}
+.pmv-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.pmv-badge--sale {
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+}
+.pmv-badge--return {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.pmv-badge--transfer-in {
+  background: var(--ui-brand-soft, color-mix(in srgb, var(--ui-brand) 12%, transparent));
+  color: var(--ui-brand);
+}
+.pmv-badge--transfer-out {
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
+}
+.pmv-badge--purchase {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.pmv-badge--adjustment {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-muted);
+}
+.pmv-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+.pmv-date {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-muted);
+}
+.pmv-reason {
+  font-size: 0.78rem;
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pmv-qty {
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.pmv-qty--pos {
+  color: var(--ui-success);
+}
+.pmv-qty--neg {
+  color: var(--ui-danger);
+}
+.pmv-qty--neu {
+  color: var(--ui-text-muted);
+}
+.pmv-empty {
+  padding: 1.5rem 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--ui-text-soft);
+}
+.pmv-loading {
+  padding: 1.5rem 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--ui-text-muted);
+}

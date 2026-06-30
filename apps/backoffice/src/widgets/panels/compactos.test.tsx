@@ -102,6 +102,5 @@ describe('Widgets de panel · Sección 05 (Compactos)', () => {
     renderWidget(<CompactHero period="month" store={undefined} />);
 
     expect(await screen.findByText('762 tickets')).toBeInTheDocument();
-    expect(screen.getByText('Facturación')).toBeInTheDocument();
   });
 });

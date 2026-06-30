@@ -64,14 +64,12 @@ describe('Widgets de panel · Sección 07 (KPIs · más formatos)', () => {
 
     expect(await screen.findByText('Facturación')).toBeInTheDocument();
     expect(screen.getByText('Beneficio')).toBeInTheDocument();
-    expect(screen.getByText('Dual')).toBeInTheDocument();
   });
 
-  it('KPI con área: % Margen con etiqueta de esquina «Área»', async () => {
+  it('KPI con área: % Margen del periodo', async () => {
     renderWidget(<AreaKpi period="month" store={undefined} />);
 
     expect(await screen.findByText('% Margen')).toBeInTheDocument();
-    expect(screen.getByText('Área')).toBeInTheDocument();
   });
 
   it('KPI de alerta: venta perdida con chip de roturas', async () => {
@@ -79,13 +77,11 @@ describe('Widgets de panel · Sección 07 (KPIs · más formatos)', () => {
 
     expect(await screen.findByText('9 roturas')).toBeInTheDocument();
     expect(screen.getByText('Venta perdida est.')).toBeInTheDocument();
-    expect(screen.getByText('Alerta')).toBeInTheDocument();
   });
 
-  it('KPI 7 días: beneficio con etiqueta de esquina «7 días»', async () => {
+  it('KPI 7 días: beneficio del periodo', async () => {
     renderWidget(<SevenDayKpi period="month" store={undefined} />);
 
-    expect(await screen.findByText('7 días')).toBeInTheDocument();
-    expect(screen.getByText('Beneficio')).toBeInTheDocument();
+    expect(await screen.findByText('Beneficio')).toBeInTheDocument();
   });
 });

@@ -191,6 +191,9 @@
    divisoria y con acento azul (--ui-primary) para distinguirla de la navegación
    propia del backoffice. El icono hereda el color (color: inherit) → sale azul. */
 .sidebar-app-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin-top: 0.45rem;
   padding-top: 0.45rem;
   border-top: 1px solid var(--ui-border);
@@ -333,7 +336,7 @@
    por encima de esta línea y del icono de usuario. */
 .sidebar-footer-sep {
   height: 1px;
-  margin: 0.3rem 0.3rem;
+  margin: 6px 0 0.3rem;
   background: var(--sidebar-border);
 }
 
@@ -355,12 +358,17 @@
   background: none;
   text-align: left;
   cursor: pointer;
-  transition: background 0.13s cubic-bezier(0.2, 0, 0, 1);
+  transition: color 0.13s cubic-bezier(0.2, 0, 0, 1);
 }
 
-.sidebar-account:hover,
-.sidebar-account.open {
-  background: var(--sidebar-item-hover-bg);
+.sidebar-account:hover .sidebar-account-name,
+.sidebar-account.open .sidebar-account-name {
+  color: color-mix(in srgb, var(--ui-text) 70%, var(--ui-text-muted));
+}
+
+.sidebar-account:hover .sidebar-account-avatar,
+.sidebar-account.open .sidebar-account-avatar {
+  filter: brightness(0.88);
 }
 
 .sidebar-account:focus-visible {
@@ -411,13 +419,11 @@
 
 /* Menú de cuenta (popover sobre el footer, abre hacia arriba) */
 /* U-07: piel común de popover (radio 12, borde fuerte, sombra md). */
+/* Menú de cuenta: bloque inline que fluye EN el footer, encima del toggle de tema.
+   No es un popup flotante — crece hacia arriba al insertarse en el DOM. */
 .sidebar-account-menu {
-  position: absolute;
-  z-index: 60;
-  left: 0.6rem;
-  right: 0.6rem;
-  bottom: calc(100% + 0.5rem);
   padding: 0.3rem;
+  margin-bottom: 0.4rem;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border-strong);
   border-radius: 12px;
@@ -426,14 +432,17 @@
 }
 
 @keyframes sidebar-account-pop {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sidebar-account-pop-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(6px); }
+}
+
+.sidebar-account-menu--closing {
+  animation: sidebar-account-pop-out 0.12s var(--ui-ease, ease) forwards;
 }
 
 .sidebar-account-menu-item {
@@ -708,6 +717,23 @@
 }
 .sidebar.collapsed .sidebar-account {
   justify-content: center;
+}
+/* En rail: sin contenedor — botones directos, sin borde ni fondo ni sombra. */
+.sidebar.collapsed .sidebar-account-menu {
+  background: none;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 0;
+}
+.sidebar.collapsed .sidebar-account-menu-item {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+.sidebar.collapsed .sidebar-account-menu-item > span:not(.sidebar-account-menu-icon) {
+  display: none;
 }
 /* Flyout lateral: el acordeón se vuelve popover pegado al rail. */
 .sidebar.collapsed .sidebar-group--dd {

@@ -40,7 +40,6 @@ export function FamilyShare({ period, store }: PanelProps): ReactElement {
     <PanelShell id="lista-familia" fit="stretch" bare>
       <div className="lc-card">
         <h3 className="lc-title">Ventas por familia</h3>
-        <p className="lc-sub">Este mes</p>
         <div className="fam-list" ref={ref}>
           {fams.map((f, i) => (
             <div key={f.familyId ?? f.familyName}>
@@ -117,7 +116,6 @@ export function ProductRanking({ period, store }: PanelProps): ReactElement {
       <div className="lc-card">
         <div className="rk-head">
           <h3 className="lc-title">Rankings</h3>
-          <p className="lc-sub">Top productos · este mes</p>
         </div>
         <div className="rk-tabs" role="tablist" aria-label="Métrica del ranking">
           {RANK_TABS.map((t) => (
@@ -178,10 +176,7 @@ export function SalesMix({ period, store }: PanelProps): ReactElement {
   return (
     <PanelShell id="lista-mix" fit="stretch" bare>
       <div className="lc-card">
-        <h3 className="lc-title">
-          Mix de ventas<span className="lc-badge">ALT</span>
-        </h3>
-        <p className="lc-sub">Barra apilada monocroma — adiós al donut arcoíris</p>
+        <h3 className="lc-title">Mix de ventas</h3>
         <div className="mix-bar" role="img" aria-label="Reparto de ventas por familia">
           {barTop.map((f, i) => (
             <span

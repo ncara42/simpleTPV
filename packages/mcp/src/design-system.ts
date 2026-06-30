@@ -68,4 +68,13 @@ Tú eliges layout, agrupación y qué visualización usar; ese esqueleto es tuyo
 ## Espaciado
 - Escala base de 4px. Padding cómodo de tarjeta 16–20px; aire entre secciones ~24px. Busca ritmo, no el mismo padding en todo.
 
-En una frase: tu composición + esta piel. Azul Geist como ÚNICO acento (resto en gris, monocromía), verde/rojo solo para el signo, hairlines en vez de sombras, sin fondo blanco envolviendo el widget, y tipografía Geist con números tabulares.`;
+## Maquetación (encaje y alineación — sin huecos ni bordes irregulares)
+Monta sobre una REJILLA, no a piezas sueltas: que todo quede ENCAJADO y ALINEADO, ocupando el ancho, sin huecos entre medias ni bordes dentados (es el fallo más común de estos paneles).
+- Usa CSS Grid de 12 columnas con gap (\`display:grid; grid-template-columns:repeat(12,1fr); gap:16px; align-items:stretch\`). Cada pieza ocupa un nº ENTERO de columnas (\`grid-column:span N\`) y las de una misma fila SUMAN 12 → filas llenas a todo el ancho, sin borde derecho irregular. Combinaciones limpias: 12 · 6+6 · 4+4+4 · 8+4 · 3+3+3+3.
+- La banda de KPIs y los banners/títulos de sección van a ANCHO COMPLETO (\`span 12\`), en su propia fila.
+- ALTURA DE FILA UNIFORME: las piezas de una misma fila comparten alto (con \`align-items:stretch\` y/o un alto común por fila) para que sus bordes superior e inferior queden alineados. Agrupa en cada fila piezas de altura/contenido parecido — NO juntes un KPI bajito con una tabla alta.
+- Cada pieza LLENA su celda (\`width:100%; height:100%; box-sizing:border-box\`): estírala o encógela para ocupar el espacio asignado, en vez de dejarla a un tamaño fijo que deje hueco. Pero NO la deformes: mantén los gráficos en una proporción sensata dentro de su celda (\`aspect-ratio\` o un alto mínimo) y respeta un mínimo legible.
+- SIN HUECOS: si una pieza pequeña deja un escalón, rellénalo con otra pieza o reordena; \`grid-auto-flow:dense\` ayuda a tapar huecos con piezas menores. Prefiere pocas filas LLENAS a muchas a medias.
+- Responsive: en pantallas estrechas colapsa a menos columnas (6 ó 1–2) manteniendo estas reglas (filas llenas, alturas alineadas).
+
+En una frase: tu composición + esta piel, ENCAJADA en una rejilla de filas llenas y alineadas (sin huecos ni bordes dentados, cada pieza llena su celda sin deformarse). Azul Geist como ÚNICO acento (resto en gris, monocromía), verde/rojo solo para el signo, hairlines en vez de sombras, sin fondo blanco envolviendo el widget, y tipografía Geist con números tabulares.`;

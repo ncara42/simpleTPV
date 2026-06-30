@@ -1,8 +1,32 @@
 import './help.css';
 
 import { usePageHeader } from '@simpletpv/ui';
-import { ArrowUp, Check, CheckCheck, History, Loader2, Lock, Plus, Search } from 'lucide-react';
-import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { ArrowUp, History, Loader2, Lock, Paperclip, Plus, X } from 'lucide-react';
+import { type ChangeEvent, Fragment, type KeyboardEvent, useEffect, useRef, useState } from 'react';
+
+// ── Sugerencias del carrusel hero (20 preguntas frecuentes) ─────────────────────
+const HELP_SUGGESTIONS = [
+  '¿Cómo funciona el TPV?',
+  '¿Qué puedo hacer en el backoffice?',
+  'Guía rápida de ventas',
+  '¿Cómo gestiono el stock?',
+  '¿Cómo añado un producto?',
+  '¿Cómo creo una promoción?',
+  '¿Cómo gestiono mis proveedores?',
+  'Roles y permisos de usuarios',
+  '¿Cómo funciona el control horario?',
+  '¿Cómo configuro una tienda?',
+  '¿Qué es VeriFactu?',
+  '¿Cómo gestiono los traspasos?',
+  '¿Cómo veo los informes de ventas?',
+  '¿Cómo personalizo el tema?',
+  '¿Cómo funciona el B2B?',
+  'Alertas de stock bajas',
+  '¿Cómo funciona el cierre de caja?',
+  '¿Cómo añado un cliente?',
+  '¿Qué es el ticket Z?',
+  'Comparativa de ventas entre tiendas',
+];
 import { createPortal } from 'react-dom';
 
 import { ChatMarkdown } from './components/chat/ChatMarkdown.js';
@@ -20,20 +44,6 @@ function TicketStatusDot({ status }: { status: 'online' | 'waiting' | 'closed' }
   return <span className={`ticket-agent-dot ticket-agent-dot--${status}`} aria-label={label} />;
 }
 
-// ── Icono de estado del mensaje (check / double-check) ────────────────────────────
-
-function MsgStatusIcon({ status }: { status: MsgStatus }) {
-  if (status === 'seen')
-    return <CheckCheck size={12} className="msg-status msg-status--seen" aria-label="Visto" />;
-  return (
-    <Check
-      size={12}
-      className={`msg-status msg-status--${status}`}
-      aria-label={status === 'received' ? 'Recibido' : 'Enviando'}
-    />
-  );
-}
-
 // ── Composer (textarea + enviar) ─────────────────────────────────────────────────
 
 interface ComposerProps {
@@ -43,19 +53,60 @@ interface ComposerProps {
   pending: boolean;
   placeholder: string;
   autoFocus?: boolean;
+  canAttach?: boolean;
+  onAttach?: (file: File) => void;
 }
 
-function Composer({ value, onChange, onSubmit, pending, placeholder, autoFocus }: ComposerProps) {
+function Composer({
+  value,
+  onChange,
+  onSubmit,
+  pending,
+  placeholder,
+  autoFocus,
+  canAttach,
+  onAttach,
+}: ComposerProps) {
+  const fileRef = useRef<HTMLInputElement>(null);
   const canSend = value.trim().length > 0 && !pending;
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (canSend) onSubmit();
     }
   };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    if (file) onAttach?.(file);
+    e.target.value = '';
+  };
+
   return (
-    <div className="ticket-composer">
-      <Search className="ticket-composer-clip" size={18} aria-hidden="true" />
+    <div className={`ticket-composer${canAttach ? ' ticket-composer--has-clip' : ''}`}>
+      {canAttach && (
+        <>
+          <button
+            type="button"
+            className="ticket-composer-clip"
+            onClick={() => fileRef.current?.click()}
+            disabled={pending}
+            aria-label="Adjuntar archivo"
+          >
+            <Paperclip size={17} aria-hidden="true" />
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            className="ticket-composer-file"
+            onChange={handleFileChange}
+            accept="image/*,.pdf,.doc,.docx,.txt,.csv,.xls,.xlsx"
+            aria-hidden="true"
+            tabIndex={-1}
+          />
+        </>
+      )}
       <input
         className="ticket-input"
         type="text"
@@ -86,26 +137,73 @@ function Composer({ value, onChange, onSubmit, pending, placeholder, autoFocus }
   );
 }
 
+// ── Separador de fecha/hora entre bloques de mensajes ────────────────────────────
+
+const MONTHS_ES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+function fmtDayTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getDate()} de ${MONTHS_ES[d.getMonth()]}, ${hh}:${mm}`;
+}
+
+function needsDivider(prevIso: string, curIso: string): boolean {
+  const a = new Date(prevIso);
+  const b = new Date(curIso);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return false;
+  if (a.toDateString() !== b.toDateString()) return true;
+  return b.getTime() - a.getTime() > 60 * 60 * 1000;
+}
+
 // ── Burbuja de mensaje ───────────────────────────────────────────────────────────
 
 function Bubble({
   message,
   isFirstInBlock,
+  isLast,
   status,
 }: {
   message: SupportMessage;
   isFirstInBlock: boolean;
+  isLast?: boolean;
   status?: MsgStatus;
 }) {
   const mine = message.author === 'user';
   const who = message.author === 'agent' ? 'Soporte' : message.author === 'ai' ? 'Asistente' : 'Tú';
+  const statusLabel =
+    status === 'seen'
+      ? 'Leído'
+      : status === 'received'
+        ? 'Entregado'
+        : status === 'sending'
+          ? 'Enviando…'
+          : null;
   return (
     <div className={`ticket-msg ticket-msg--${mine ? 'user' : message.author}`}>
       {!mine && isFirstInBlock && <span className="ticket-msg-author">{who}</span>}
       <div className="ticket-msg-body">
         {mine ? message.body : <ChatMarkdown>{message.body}</ChatMarkdown>}
       </div>
-      {mine && status !== undefined && <MsgStatusIcon status={status} />}
+      {isLast && mine && statusLabel && (
+        <div className="ticket-msg-meta">
+          <span className={`ticket-msg-status ticket-msg-status--${status}`}>{statusLabel}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -204,6 +302,126 @@ function HistorialDropdown({
   );
 }
 
+// ── Carrusel de sugerencias (auto-scroll, pausa al hover) ────────────────────────
+
+interface SuggestionsCarouselProps {
+  onSelect: (s: string) => void;
+  disabled?: boolean;
+}
+
+const CAROUSEL_DURATION = 120; // segundos para un ciclo completo
+
+function SuggestionsCarousel({ onSelect, disabled }: SuggestionsCarouselProps) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  // Posición en refs — sin getComputedStyle, sin desincronía con la animación
+  const pos = useRef(0);
+  const half = useRef(0);
+  const paused = useRef(false);
+  const dragging = useRef(false);
+  const dragStart = useRef({ x: 0, tx: 0, moved: false });
+
+  const doubled = [...HELP_SUGGESTIONS, ...HELP_SUGGESTIONS];
+
+  // Loop rAF en lugar de CSS animation
+  useEffect(() => {
+    let rafId: number;
+    let lastTs: number | null = null;
+
+    const tick = (ts: number) => {
+      if (!lastTs) lastTs = ts;
+      const dt = (ts - lastTs) / 1000;
+      lastTs = ts;
+
+      if (!paused.current && !dragging.current && half.current > 0) {
+        pos.current -= (half.current / CAROUSEL_DURATION) * dt;
+        if (pos.current < -half.current) pos.current += half.current;
+        if (trackRef.current) trackRef.current.style.transform = `translateX(${pos.current}px)`;
+      }
+
+      rafId = requestAnimationFrame(tick);
+    };
+
+    // Medir half tras el primer paint
+    rafId = requestAnimationFrame(() => {
+      if (trackRef.current) half.current = trackRef.current.scrollWidth / 2;
+      rafId = requestAnimationFrame(tick);
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+
+  // Drag en el documento
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      const dx = e.clientX - dragStart.current.x;
+      if (Math.abs(dx) > 4) dragStart.current.moved = true;
+      pos.current = dragStart.current.tx + dx;
+      if (trackRef.current) trackRef.current.style.transform = `translateX(${pos.current}px)`;
+    };
+
+    const onUp = () => {
+      if (!dragging.current) return;
+      dragging.current = false;
+      // Normalizar al rango [-half, 0)
+      if (half.current > 0)
+        pos.current = (((pos.current % half.current) + half.current) % half.current) - half.current;
+      if (wrapRef.current && !wrapRef.current.matches(':hover')) paused.current = false;
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
+  const handleMouseEnter = () => {
+    paused.current = true;
+  };
+  const handleMouseLeave = () => {
+    if (!dragging.current) paused.current = false;
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault(); // evita drag nativo del browser
+    dragging.current = true;
+    dragStart.current = { x: e.clientX, tx: pos.current, moved: false };
+  };
+
+  const handleChipClick = (sug: string) => () => {
+    if (dragStart.current.moved) return;
+    onSelect(sug);
+  };
+
+  return (
+    <div
+      ref={wrapRef}
+      className="ticket-chips"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onMouseDown={handleMouseDown}
+    >
+      <div ref={trackRef} className="ticket-chips-track">
+        {doubled.map((sug, i) => (
+          <button
+            key={`${sug}-${i}`}
+            type="button"
+            className="ticket-chip"
+            onClick={handleChipClick(sug)}
+            disabled={disabled}
+            draggable={false}
+          >
+            {sug}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Página ───────────────────────────────────────────────────────────────────────
 
 export function HelpPage() {
@@ -212,6 +430,7 @@ export function HelpPage() {
   const view = viewContextFor('help');
   const s = useSupportTickets();
   const [draft, setDraft] = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [historialOpen, setHistorialOpen] = useState(false);
   const historialBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -236,6 +455,7 @@ export function HelpPage() {
     if (!text) return;
     s.send(text);
     setDraft('');
+    setAttachment(null);
   };
 
   const pickSuggestion = (text: string): void => {
@@ -288,33 +508,24 @@ export function HelpPage() {
         {s.selectedId === null ? (
           // ── Nueva consulta ──
           <section className="ticket-hero">
-            <p className="ticket-hero-eyebrow">Centro de ayuda</p>
-            <h1 className="ticket-hero-title">¿En qué podemos ayudarte?</h1>
-            <p className="ticket-hero-subtitle">
-              Pregunta lo que quieras sobre tu TPV y te respondo al momento. Si no puedo resolverlo,
-              lo derivo a una persona del equipo. Soporte de lunes a viernes, de 9:00 a 19:00.
-            </p>
-            {errorBanner}
-            <Composer
-              value={draft}
-              onChange={setDraft}
-              onSubmit={submit}
-              pending={s.pending}
-              placeholder="Escribe tu pregunta..."
-              autoFocus
-            />
-            <div className="ticket-chips">
-              {view.suggestions.map((sug) => (
-                <button
-                  key={sug}
-                  type="button"
-                  className="ticket-chip"
-                  onClick={() => pickSuggestion(sug)}
-                  disabled={s.pending}
-                >
-                  {sug}
-                </button>
-              ))}
+            <div className="ticket-hero-body">
+              <p className="ticket-hero-eyebrow">Centro de ayuda</p>
+              <h1 className="ticket-hero-title">¿En qué podemos ayudarte?</h1>
+              <p className="ticket-hero-subtitle">
+                Pregunta lo que necesites y te respondemos al momento. Si no podemos resolverlo o
+                quieres pedir una funcionalidad nueva, lo escalamos al equipo. Atención de lunes a
+                domingo, de 9 a 22h.
+              </p>
+              {errorBanner}
+              <Composer
+                value={draft}
+                onChange={setDraft}
+                onSubmit={submit}
+                pending={s.pending}
+                placeholder="Escribe tu pregunta..."
+                autoFocus
+              />
+              <SuggestionsCarousel onSelect={pickSuggestion} disabled={s.pending} />
             </div>
           </section>
         ) : (
@@ -336,9 +547,12 @@ export function HelpPage() {
               ) : (
                 <>
                   {threadMessages.map((m, i) => {
+                    const isLast = i === threadMessages.length - 1;
                     const isFirstInBlock = i === 0 || threadMessages[i - 1]?.author !== m.author;
+                    const prev = threadMessages[i - 1];
+                    const showDivider = !prev || needsDivider(prev.createdAt, m.createdAt);
                     let msgStatus: MsgStatus | undefined;
-                    if (m.author === 'user') {
+                    if (isLast && m.author === 'user') {
                       const hasReply = threadMessages
                         .slice(i + 1)
                         .some((msg) => msg.author === 'ai' || msg.author === 'agent');
@@ -351,12 +565,19 @@ export function HelpPage() {
                       }
                     }
                     return (
-                      <Bubble
-                        key={m.id}
-                        message={m}
-                        isFirstInBlock={isFirstInBlock}
-                        {...(msgStatus !== undefined && { status: msgStatus })}
-                      />
+                      <Fragment key={m.id}>
+                        {showDivider && (
+                          <div className="ticket-daydiv">
+                            <span>{fmtDayTime(m.createdAt)}</span>
+                          </div>
+                        )}
+                        <Bubble
+                          message={m}
+                          isFirstInBlock={isFirstInBlock}
+                          isLast={isLast}
+                          {...(msgStatus !== undefined && { status: msgStatus })}
+                        />
+                      </Fragment>
                     );
                   })}
                   {thinking && (
@@ -382,13 +603,31 @@ export function HelpPage() {
             {errorBanner}
 
             {open ? (
-              <Composer
-                value={draft}
-                onChange={setDraft}
-                onSubmit={submit}
-                pending={s.pending}
-                placeholder="Escribe un mensaje…"
-              />
+              <>
+                {attachment && (
+                  <div className="ticket-attachment-chip">
+                    <Paperclip size={12} aria-hidden="true" />
+                    <span className="ticket-attachment-name">{attachment.name}</span>
+                    <button
+                      type="button"
+                      className="ticket-attachment-remove"
+                      onClick={() => setAttachment(null)}
+                      aria-label="Quitar adjunto"
+                    >
+                      <X size={11} aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
+                <Composer
+                  value={draft}
+                  onChange={setDraft}
+                  onSubmit={submit}
+                  pending={s.pending}
+                  placeholder="Escribe un mensaje…"
+                  canAttach={s.selected?.mode === 'human'}
+                  onAttach={setAttachment}
+                />
+              </>
             ) : (
               <div className="ticket-closed-note" data-testid="ticket-closed-note">
                 <Lock size={15} aria-hidden="true" />

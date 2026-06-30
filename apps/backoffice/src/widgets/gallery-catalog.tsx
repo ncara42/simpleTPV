@@ -1221,6 +1221,69 @@ function ThumbEspExec(): ReactNode {
   );
 }
 
+// ── Sección 04 · Más exploraciones ──
+
+// «Objetivo» (exp-objetivo): barra de cumplimiento con tramo actual sólido, proyección tenue y
+// marca de objetivo (línea de tinta).
+function ThumbBullet(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <rect x={8} y={27} width={116} height={15} rx={3} fill="var(--ui-surface-subtle)" />
+      <rect x={8} y={27} width={62} height={15} rx={3} fill="var(--ui-brand)" />
+      <rect x={70} y={27} width={28} height={15} fill={SOFT_BLUE} opacity={0.7} />
+      <line x1={104} y1={21} x2={104} y2={48} stroke="var(--ui-text)" strokeWidth={3} />
+    </svg>
+  );
+}
+
+// «Acumulado del mes» (exp-acumulado-mes): área acumulada actual + línea de comparación (mes
+// anterior) + proyección punteada hasta el borde.
+function ThumbProjArea(): ReactNode {
+  const line = 'M8,52 L34,44 L60,33 L86,25';
+  return (
+    <svg
+      viewBox="0 0 132 64"
+      className="wg-thumb-svg"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <path d={`${line} L86,58 L8,58 Z`} fill="var(--ui-brand-soft)" />
+      <path
+        d="M8,50 L34,47 L60,41 L86,35 L124,27"
+        fill="none"
+        stroke="var(--ui-border-strong)"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+      <path
+        d={line}
+        fill="none"
+        stroke="var(--ui-brand)"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+      <path
+        d="M86,25 L124,13"
+        fill="none"
+        stroke="var(--ui-brand)"
+        strokeWidth={2}
+        strokeDasharray="4 3"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
 // Entradas de la galería (se amplía por tandas).
 export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
   // Sección 01 · KPIs
@@ -1295,6 +1358,35 @@ export const GALLERY_ENTRIES: readonly GalleryEntry[] = [
     category: 'listas',
     description: 'Barra apilada monocroma por familia',
     thumbnail: <ThumbShareBar />,
+  },
+  // Sección 04 · Más exploraciones
+  {
+    id: 'exp-objetivo',
+    label: 'Objetivo del periodo',
+    category: 'exploraciones',
+    description: 'Cumplimiento vs. el periodo anterior, con proyección',
+    thumbnail: <ThumbBullet />,
+  },
+  {
+    id: 'exp-metodos-pago',
+    label: 'Métodos de pago',
+    category: 'exploraciones',
+    description: 'Reparto de la facturación por método de pago',
+    thumbnail: <ThumbDonut />,
+  },
+  {
+    id: 'exp-tickets-recientes',
+    label: 'Tickets recientes',
+    category: 'exploraciones',
+    description: 'Últimas ventas con importe, tienda y hora',
+    thumbnail: <ThumbActivity />,
+  },
+  {
+    id: 'exp-acumulado-mes',
+    label: 'Acumulado del mes',
+    category: 'exploraciones',
+    description: 'Facturación acumulada diaria, este mes vs. el anterior',
+    thumbnail: <ThumbProjArea />,
   },
   // Sección 05 · Compactos
   {
