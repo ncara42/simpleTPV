@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react';
+import { type FacetedColumn, FacetedTable } from '@simpletpv/ui';
 import { type ReactNode, useState } from 'react';
 
 import { ScrollShadowCell } from '../components/ScrollShadowCell.js';
@@ -6,9 +6,59 @@ import { fmtEur } from '../lib/format.js';
 import type { Product } from '../lib/products.js';
 import { type CatalogGroup, LOW_MARGIN_THRESHOLD } from './facets.js';
 
-// Tabla del Catálogo agrupada por familia raíz. Cabecera fija, una cabecera por grupo
-// (familia · nº productos · total de unidades) plegable, y filas de producto con
-// PVP, margen y un tag de stock cuyo color SOLO aparece cuando importa (bajo/agotado).
+// Tabla del Catálogo: variante del componente único (FacetedTable) con selección por
+// checkbox, agrupada por familia raíz. Cabecera fija, una cabecera por grupo (familia ·
+// nº productos · total de unidades) plegable, y filas con PVP, margen y tag de stock
+// cuyo color SOLO aparece cuando importa (bajo/agotado). El carril de facetas y el
+// contenedor con scroll (ScrollShadowCell.cat-main) los aporta la página.
+
+type CatalogRow = CatalogGroup['rows'][number];
+
+const COLUMNS: FacetedColumn<CatalogRow>[] = [
+  {
+    key: 'name',
+    header: 'Producto',
+    variant: 'name',
+    colClassName: 'cat-col-name',
+    render: (r) => r.product.name,
+  },
+  {
+    key: 'sku',
+    header: 'SKU',
+    variant: 'mid',
+    colClassName: 'cat-col-sku',
+    tdClassName: 'cat-cell-sku',
+    render: (r) => r.product.sku ?? '—',
+  },
+  {
+    key: 'pvp',
+    header: 'PVP',
+    variant: 'num',
+    colClassName: 'cat-col-pvp',
+    tdClassName: 'cat-cell-pvp',
+    render: (r) => fmtEur(Number(r.product.salePrice)),
+  },
+  {
+    key: 'margin',
+    header: 'Margen',
+    variant: 'num',
+    colClassName: 'cat-col-margin',
+    tdClassName: 'cat-cell-margin',
+    render: (r) => <MarginTag value={r.margin} />,
+  },
+  {
+    key: 'stock',
+    header: 'Stock',
+    variant: 'num',
+    colClassName: 'cat-col-stock',
+    tdClassName: 'cat-cell-stock',
+    render: (r) => (
+      <span className={`cat-stock-badge cat-stock-${r.state}`} data-testid="catalog-stock">
+        {r.stock}
+      </span>
+    ),
+  },
+];
 
 interface CatalogGroupedTableProps {
   groups: CatalogGroup[];
@@ -34,97 +84,31 @@ export function CatalogGroupedTable({
       return next;
     });
 
-  const isEmpty = groups.length === 0;
+  const fgroups = groups.map((g) => ({
+    key: g.family?.id ?? '__none__',
+    label: g.family?.name ?? 'Sin familia',
+    meta: `${g.rows.length} ${g.rows.length === 1 ? 'producto' : 'productos'}`,
+    metaRight: `${g.totalUnits} uds.`,
+    rows: g.rows,
+  }));
 
   return (
     <ScrollShadowCell className="cat-main" data-testid="catalog-table">
-      <table className="cat-table">
-        <colgroup>
-          <col className="cat-col-name" />
-          <col className="cat-col-sku" />
-          <col className="cat-col-pvp" />
-          <col className="cat-col-margin" />
-          <col className="cat-col-stock" />
-        </colgroup>
-        <thead className="cat-thead">
-          <tr>
-            <th className="cat-th cat-th-name">Producto</th>
-            <th className="cat-th">SKU</th>
-            <th className="cat-th cat-th-num">PVP</th>
-            <th className="cat-th cat-th-num">Margen</th>
-            <th className="cat-th cat-th-num">Stock</th>
-          </tr>
-        </thead>
-        {groups.map((group) => {
-          const key = group.family?.id ?? '__none__';
-          const isCollapsed = collapsed.has(key);
-          return (
-            <tbody key={key} className="cat-group">
-              <tr className="cat-group-head" onClick={() => toggleGroup(key)}>
-                <td className="cat-group-cell" colSpan={5}>
-                  <div className="cat-group-inner">
-                    <ChevronDown
-                      size={15}
-                      className={`cat-group-caret${isCollapsed ? ' is-collapsed' : ''}`}
-                      aria-hidden="true"
-                    />
-                    <span className="cat-group-name">{group.family?.name ?? 'Sin familia'}</span>
-                    <span className="cat-group-count">
-                      {group.rows.length} {group.rows.length === 1 ? 'producto' : 'productos'}
-                    </span>
-                    <span className="cat-group-units">{group.totalUnits} uds.</span>
-                  </div>
-                </td>
-              </tr>
-              {!isCollapsed &&
-                group.rows.map((row) => {
-                  const { product } = row;
-                  const isSelected = selected.has(product.id);
-                  return (
-                    <tr
-                      key={product.id}
-                      className={`cat-row${isSelected ? ' is-selected' : ''}`}
-                      onClick={() => onRowClick(product)}
-                      aria-selected={isSelected}
-                    >
-                      {/* Checkbox como overlay en el sangrado izquierdo de la celda de nombre:
-                          aparece al hover/selección sin desplazar el texto. Al no ser una
-                          columna propia (de ancho automático que variaba con el viewport), el
-                          nombre arranca a un sangrado FIJO → alinea con la cabecera y el grupo
-                          a cualquier ancho. */}
-                      <td className="cat-cell-name">
-                        <input
-                          type="checkbox"
-                          className="cat-row-check"
-                          aria-label={`Seleccionar ${product.name}`}
-                          data-testid="product-select"
-                          checked={isSelected}
-                          onChange={() => onToggleSelect(product.id)}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        {product.name}
-                      </td>
-                      <td className="cat-cell-sku">{product.sku ?? '—'}</td>
-                      <td className="cat-cell-pvp">{fmtEur(Number(product.salePrice))}</td>
-                      <td className="cat-cell-margin">
-                        <MarginTag value={row.margin} />
-                      </td>
-                      <td className="cat-cell-stock">
-                        <span
-                          className={`cat-stock-badge cat-stock-${row.state}`}
-                          data-testid="catalog-stock"
-                        >
-                          {row.stock}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-          );
-        })}
-      </table>
-      {isEmpty && <div className="cat-empty">{empty}</div>}
+      <FacetedTable<CatalogRow>
+        layout="table"
+        groups={fgroups}
+        columns={COLUMNS}
+        rowKey={(r) => r.product.id}
+        collapsedKeys={collapsed}
+        onToggleGroup={toggleGroup}
+        selectable
+        selectedKeys={selected}
+        onToggleSelect={onToggleSelect}
+        selectTestId="product-select"
+        selectAriaLabel={(r) => `Seleccionar ${r.product.name}`}
+        onRowClick={(r) => onRowClick(r.product)}
+        emptyState={empty}
+      />
     </ScrollShadowCell>
   );
 }

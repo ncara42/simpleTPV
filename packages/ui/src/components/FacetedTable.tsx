@@ -2,11 +2,17 @@ import * as React from 'react';
 
 import { cn } from '../lib/cn.js';
 
-// Vista facetada reutilizable (DESIGN_SYSTEM.md §10.11): carril de facetas a la
-// izquierda + tabla agrupada a la derecha dentro de UNA card. Es el lenguaje del
-// Catálogo del backoffice generalizado para cualquier listado navegable (tickets,
-// pedidos…). Componente presentacional puro: el padre filtra/agrupa y pasa los
-// recuentos, la selección y los manejadores. CSS en styles/faceted-table.css.
+// Componente de tabla ÚNICO (DESIGN_SYSTEM.md §10.11): carril de facetas + tabla
+// agrupada. Es la pieza canónica para TODAS las tablas navegables del proyecto; sus
+// variantes se activan por props (no hay tablas hardcodeadas). Cubre:
+//   · agrupación plegable por grupo            (groups + collapsedKeys/onToggleGroup)
+//   · selección múltiple con checkbox          (selectable + selectedKeys/onToggleSelect)
+//   · tonos de fila                            (rowTone)            → p. ej. Existencias
+//   · acciones/badges en celda                 (column.render)     → cualquier variante
+//   · detalle expandible por fila (acordeón)   (renderDetail + expandedKeys/onToggleRow)
+//   · layout 'card' (carril propio) | 'table'  (solo la tabla; la página aporta carril)
+// Componente presentacional puro: el padre filtra/agrupa y pasa selección/manejadores.
+// CSS en styles/faceted-table.css.
 
 export type FacetColumnVariant = 'name' | 'mid' | 'num' | 'state';
 export type FacetColumnWidth = 'mid' | 'num';
@@ -15,11 +21,17 @@ export interface FacetedColumn<Row> {
   key: string;
   header: React.ReactNode;
   render: (row: Row) => React.ReactNode;
-  /** Estilo de celda: 'name' (indentada/bold), 'mid' (atenuada), 'num' (derecha,
-   *  tabular), 'state' (badge a la derecha). Por defecto 'mid'. */
+  /** Estilo de celda: 'name' (indentada/bold; aloja el checkbox si selectable),
+   *  'mid' (atenuada), 'num' (derecha, tabular), 'state' (badge a la derecha). */
   variant?: FacetColumnVariant;
   /** Ancho fijo de la columna vía <colgroup> (9rem 'mid' / 7rem 'num'). */
   width?: FacetColumnWidth;
+  /** Clase extra del <th> (preserva el look exacto de una variante: cat-th-…). */
+  thClassName?: string;
+  /** Clase extra del <td> (preserva el look exacto: cat-cell-sku/pvp/…). */
+  tdClassName?: string;
+  /** Clase del <col> en <colgroup> (anchos a medida: cat-col-sku/pvp/…). */
+  colClassName?: string;
 }
 
 /** Sección de "vistas" (selección única, fila azul activa). */
@@ -44,7 +56,7 @@ export interface FacetChecksSection {
 
 export type FacetSection = FacetViewsSection | FacetChecksSection;
 
-/** Grupo de filas con cabecera plegable (fecha · meta · metaRight). */
+/** Grupo de filas con cabecera plegable (label · meta · metaRight). */
 export interface FacetedGroup<Row> {
   key: string;
   label: React.ReactNode;
@@ -55,28 +67,50 @@ export interface FacetedGroup<Row> {
   rows: Row[];
 }
 
+export type FacetedTableLayout = 'card' | 'table';
+
 export interface FacetedTableProps<Row> {
   columns: FacetedColumn<Row>[];
   groups: FacetedGroup<Row>[];
   rowKey: (row: Row) => string;
   onRowClick?: (row: Row) => void;
   rowTestId?: string;
-  /** Buscador del carril. Si falta, no se pinta. */
+  /** Clase extra por fila (tonos de estado: 'is-low' | 'is-out' …). */
+  rowTone?: (row: Row) => string | undefined;
+  /** Atributos DOM extra por fila (p. ej. { 'data-product': id }). */
+  rowProps?: (row: Row) => Record<string, string | number | undefined>;
+  /** Buscador del carril (solo layout 'card'). Si falta, no se pinta. */
   search?: {
     value: string;
     onChange: (value: string) => void;
     placeholder?: string;
     testId?: string;
   };
-  sections: FacetSection[];
+  /** Secciones del carril (solo layout 'card'). */
+  sections?: FacetSection[];
   /** Grupos plegados (key) + manejador. Si falta el manejador, no son plegables. */
   collapsedKeys?: ReadonlySet<string>;
   onToggleGroup?: (key: string) => void;
+  /** Selección múltiple: pinta un checkbox-overlay en la columna 'name'. */
+  selectable?: boolean;
+  selectedKeys?: ReadonlySet<string>;
+  onToggleSelect?: (key: string) => void;
+  /** data-testid del checkbox de fila (p. ej. 'product-select'). */
+  selectTestId?: string;
+  /** aria-label del checkbox de fila por fila (p. ej. `Seleccionar ${nombre}`). */
+  selectAriaLabel?: (row: Row) => string;
+  /** Detalle expandible (acordeón) por fila. Requiere expandedKeys + onToggleRow. */
+  renderDetail?: (row: Row) => React.ReactNode;
+  expandedKeys?: ReadonlySet<string>;
+  onToggleRow?: (key: string) => void;
   emptyState?: React.ReactNode;
+  /** 'card' (def.): card + carril + tabla. 'table': solo la <table> (la página aporta
+   *  su propio contenedor/carril/scroll, p. ej. ScrollShadowCell.cat-main). */
+  layout?: FacetedTableLayout;
   railLabel?: string;
   railTestId?: string;
   mainTestId?: string;
-  /** Clase extra del wrapper de página (p. ej. para acotar el alto). */
+  /** Clase raíz extra (layout 'card': wrapper de página; 'table': la <table>). */
   className?: string;
 }
 
@@ -175,11 +209,22 @@ export function FacetedTable<Row>({
   rowKey,
   onRowClick,
   rowTestId = 'faceted-row',
+  rowTone,
+  rowProps,
   search,
-  sections,
+  sections = [],
   collapsedKeys,
   onToggleGroup,
+  selectable = false,
+  selectedKeys,
+  onToggleSelect,
+  selectTestId,
+  selectAriaLabel,
+  renderDetail,
+  expandedKeys,
+  onToggleRow,
   emptyState,
+  layout = 'card',
   railLabel,
   railTestId,
   mainTestId,
@@ -187,7 +232,122 @@ export function FacetedTable<Row>({
 }: FacetedTableProps<Row>) {
   const colCount = columns.length;
   const collapsible = onToggleGroup != null;
+  const expandable = renderDetail != null && onToggleRow != null;
 
+  const rowClickHandler = (row: Row, key: string): (() => void) | undefined => {
+    if (expandable) return () => onToggleRow(key);
+    if (onRowClick) return () => onRowClick(row);
+    if (selectable && onToggleSelect) return () => onToggleSelect(key);
+    return undefined;
+  };
+
+  const table = (
+    <table className={cn('cat-table', layout === 'table' && className)}>
+      <colgroup>
+        {columns.map((col) => (
+          <col key={col.key} className={cn(col.width && COL_CLASS[col.width], col.colClassName)} />
+        ))}
+      </colgroup>
+      <thead className="cat-thead">
+        <tr>
+          {columns.map((col) => (
+            <th key={col.key} className={cn(TH_CLASS[col.variant ?? 'mid'], col.thClassName)}>
+              {col.header}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      {groups.map((group) => {
+        const isCollapsed = collapsedKeys?.has(group.key) ?? false;
+        return (
+          <tbody key={group.key} className="cat-group">
+            <tr
+              className="cat-group-head"
+              onClick={collapsible ? () => onToggleGroup(group.key) : undefined}
+            >
+              <td className="cat-group-cell" colSpan={colCount}>
+                <div className="cat-group-inner">
+                  {collapsible && <Caret collapsed={isCollapsed} />}
+                  <span className="cat-group-name">{group.label}</span>
+                  {group.meta !== undefined && (
+                    <span className="cat-group-count">{group.meta}</span>
+                  )}
+                  {group.metaRight !== undefined && (
+                    <span className="cat-group-units">{group.metaRight}</span>
+                  )}
+                </div>
+              </td>
+            </tr>
+            {!isCollapsed &&
+              group.rows.map((row) => {
+                const key = rowKey(row);
+                const selected = selectable && (selectedKeys?.has(key) ?? false);
+                const expanded = expandable && (expandedKeys?.has(key) ?? false);
+                const detail = expandable ? renderDetail(row) : null;
+                const onClick = rowClickHandler(row, key);
+                return (
+                  <React.Fragment key={key}>
+                    <tr
+                      className={cn(
+                        'cat-row',
+                        rowTone?.(row),
+                        selected && 'is-selected',
+                        expandable && 'cat-row--expandable',
+                        expanded && 'is-expanded',
+                      )}
+                      data-testid={rowTestId}
+                      aria-selected={selectable ? selected : undefined}
+                      aria-expanded={expandable ? expanded : undefined}
+                      onClick={onClick}
+                      {...(rowProps?.(row) ?? {})}
+                    >
+                      {columns.map((col) => {
+                        const variant = col.variant ?? 'mid';
+                        return (
+                          <td key={col.key} className={cn(TD_CLASS[variant], col.tdClassName)}>
+                            {variant === 'name' && selectable && (
+                              <input
+                                type="checkbox"
+                                className="cat-row-check"
+                                checked={selected}
+                                onChange={() => onToggleSelect?.(key)}
+                                onClick={(e) => e.stopPropagation()}
+                                data-testid={selectTestId}
+                                aria-label={selectAriaLabel?.(row) ?? 'Seleccionar fila'}
+                              />
+                            )}
+                            {col.render(row)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    {detail != null && detail !== false && expanded && (
+                      <tr className="cat-detail-row">
+                        <td colSpan={colCount}>{detail}</td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+          </tbody>
+        );
+      })}
+    </table>
+  );
+
+  const empty = groups.length === 0 ? <div className="cat-empty">{emptyState}</div> : null;
+
+  // Layout 'table': solo la tabla + vacío; la página aporta carril/contenedor/scroll.
+  if (layout === 'table') {
+    return (
+      <>
+        {table}
+        {empty}
+      </>
+    );
+  }
+
+  // Layout 'card': card + carril propio (búsqueda + secciones) + tabla.
   return (
     <div className={cn('faceted-table', className)}>
       <div className="faceted-table-card">
@@ -214,62 +374,8 @@ export function FacetedTable<Row>({
           </aside>
 
           <div className="cat-main" data-testid={mainTestId}>
-            <table className="cat-table">
-              <colgroup>
-                {columns.map((col) => (
-                  <col key={col.key} className={col.width ? COL_CLASS[col.width] : undefined} />
-                ))}
-              </colgroup>
-              <thead className="cat-thead">
-                <tr>
-                  {columns.map((col) => (
-                    <th key={col.key} className={TH_CLASS[col.variant ?? 'mid']}>
-                      {col.header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              {groups.map((group) => {
-                const isCollapsed = collapsedKeys?.has(group.key) ?? false;
-                return (
-                  <tbody key={group.key} className="cat-group">
-                    <tr
-                      className="cat-group-head"
-                      onClick={collapsible ? () => onToggleGroup(group.key) : undefined}
-                    >
-                      <td className="cat-group-cell" colSpan={colCount}>
-                        <div className="cat-group-inner">
-                          {collapsible && <Caret collapsed={isCollapsed} />}
-                          <span className="cat-group-name">{group.label}</span>
-                          {group.meta !== undefined && (
-                            <span className="cat-group-count">{group.meta}</span>
-                          )}
-                          {group.metaRight !== undefined && (
-                            <span className="cat-group-units">{group.metaRight}</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    {!isCollapsed &&
-                      group.rows.map((row) => (
-                        <tr
-                          key={rowKey(row)}
-                          className="cat-row"
-                          data-testid={rowTestId}
-                          onClick={onRowClick ? () => onRowClick(row) : undefined}
-                        >
-                          {columns.map((col) => (
-                            <td key={col.key} className={TD_CLASS[col.variant ?? 'mid']}>
-                              {col.render(row)}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                  </tbody>
-                );
-              })}
-            </table>
-            {groups.length === 0 && <div className="cat-empty">{emptyState}</div>}
+            {table}
+            {empty}
           </div>
         </div>
       </div>
