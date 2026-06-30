@@ -1,0 +1,12 @@
+/* Sección 04 «Más exploraciones». Bullet (objetivo), donut (métodos de pago) y feed (tickets)
+   encajan vía PanelShell (natural / fill). Solo el área acumulada necesita un ajuste: la molécula
+   ProjectionArea trae un alto en px (inline) y en el tile la queremos a sangre, llenando el alto
+   sin banda blanca → forzamos su contenedor al 100%. */
+.exp-area {
+  /* En modo stretch el cuerpo del panel ya da `flex: 1; min-height: 0` a este hijo directo. */
+  display: flex;
+}
+.exp-area .dv-projarea {
+  height: 100% !important; /* gana al alto en px inline de la molécula para llenar el tile */
+  width: 100%;
+}

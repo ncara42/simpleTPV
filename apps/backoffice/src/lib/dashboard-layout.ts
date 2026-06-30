@@ -66,6 +66,12 @@ export const ITEM_SPECS: Record<string, { w: number; h: number }> = {
   'lista-familia': { w: 16, h: 11 },
   'lista-rankings': { w: 17, h: 11 },
   'lista-mix': { w: 15, h: 9 },
+  // Sección 04 · Más exploraciones (rediseño): objetivo (bullet ancho-bajo), métodos de pago (donut
+  // ≈cuadrado con leyenda), tickets recientes (feed alto) y acumulado del mes (área ancha).
+  'exp-objetivo': { w: 19, h: 6 },
+  'exp-metodos-pago': { w: 13, h: 9 },
+  'exp-tickets-recientes': { w: 15, h: 11 },
+  'exp-acumulado-mes': { w: 22, h: 9 },
   // Sección 05 · Compactos (rediseño): banda, donut (≈cuadrado), treemap (ancho), top y cifra-héroe.
   'cmp-ribbon': { w: 13, h: 7 },
   'cmp-donut': { w: 12, h: 8 }, // anillo + total + leyenda: una fila más para que la leyenda no se corte.

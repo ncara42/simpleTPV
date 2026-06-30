@@ -475,6 +475,17 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/dashboard/sales-by-hour", get(dashboard::sales_by_hour))
         .route("/dashboard/sales-by-day", get(dashboard::sales_by_day))
+        // Sección 04 «Más exploraciones»: pago / tickets / objetivo / acumulado del mes.
+        .route(
+            "/dashboard/sales-by-payment",
+            get(dashboard::sales_by_payment),
+        )
+        .route("/dashboard/recent-sales", get(dashboard::recent_sales))
+        .route("/dashboard/sales-goal", get(dashboard::sales_goal))
+        .route(
+            "/dashboard/cumulative-month",
+            get(dashboard::cumulative_month),
+        )
         .route(
             "/dashboard/discount-by-employee",
             get(dashboard::discount_by_employee),

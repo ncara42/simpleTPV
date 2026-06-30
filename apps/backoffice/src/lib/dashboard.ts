@@ -100,6 +100,50 @@ export interface ArchetypeRotation {
   trend: number[];
 }
 
+// ── Sección 04 «Más exploraciones»: pago / tickets / objetivo / acumulado del mes ──
+
+// Reparto de facturación por método de pago en el periodo (donut). `method` es el enum del
+// backend (CASH/CARD/…); usa PAYMENT_METHOD_LABELS para la etiqueta legible.
+export interface SalesByPayment {
+  method: string;
+  count: number;
+  revenue: number;
+}
+
+// Etiqueta es-ES de cada método de pago del backend (paridad con el enum `PaymentMethod`).
+export const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: 'Efectivo',
+  CARD: 'Tarjeta',
+  TRANSFER: 'Transferencia',
+  BIZUM: 'Bizum',
+  DIRECT_DEBIT: 'Domiciliación',
+};
+
+// Una venta reciente para el feed de actividad (`createdAt` ISO-8601 UTC).
+export interface RecentSale {
+  id: string;
+  ticketNumber: string;
+  storeName: string;
+  total: number;
+  paymentMethod: string;
+  createdAt: string;
+}
+
+// Objetivo del periodo: facturación en curso, objetivo (= periodo anterior completo) y proyección.
+export interface SalesGoal {
+  current: number;
+  target: number;
+  projection: number;
+}
+
+// Acumulado diario del mes en curso (parcial) vs. el mes anterior completo, con proyección.
+export interface CumulativeMonth {
+  actual: number[];
+  compare: number[];
+  projectionEnd: number;
+  totalPoints: number;
+}
+
 const periodQuery = (period: DashboardPeriod, storeId?: string): Record<string, string> => ({
   period,
   ...(storeId ? { storeId } : {}),
@@ -211,4 +255,30 @@ export function getProductRankings(
   storeId?: string,
 ): Promise<ProductRankings> {
   return api.get<ProductRankings>('/dashboard/product-rankings', periodQuery(period, storeId));
+}
+
+// ── Sección 04 «Más exploraciones» ──
+
+export function getSalesByPayment(
+  period: DashboardPeriod,
+  storeId?: string,
+): Promise<SalesByPayment[]> {
+  return api.get<SalesByPayment[]>('/dashboard/sales-by-payment', periodQuery(period, storeId));
+}
+
+// Últimas ventas (feed de actividad). `limit` se acota en el backend a [1, 50].
+export function getRecentSales(limit = 8, storeId?: string): Promise<RecentSale[]> {
+  return api.get<RecentSale[]>('/dashboard/recent-sales', {
+    limit: String(limit),
+    ...(storeId ? { storeId } : {}),
+  });
+}
+
+export function getSalesGoal(period: DashboardPeriod, storeId?: string): Promise<SalesGoal> {
+  return api.get<SalesGoal>('/dashboard/sales-goal', periodQuery(period, storeId));
+}
+
+// Acumulado del mes en curso vs. el anterior (siempre el mes natural; ignora el periodo activo).
+export function getCumulativeMonth(storeId?: string): Promise<CumulativeMonth> {
+  return api.get<CumulativeMonth>('/dashboard/cumulative-month', storeId ? { storeId } : {});
 }
