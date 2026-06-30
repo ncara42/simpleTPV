@@ -454,7 +454,7 @@
 /* Cartera y crédito. */
 .cust-credit {
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg, 0.75rem);
+  border-radius: var(--ui-radius-lg);
   overflow: hidden;
 }
 .cust-credit-head {

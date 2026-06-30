@@ -55,7 +55,7 @@
   gap: 0.4rem;
   height: 32px;
   padding: 0 0.7rem;
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-sm);
   border: 1px solid var(--ui-border);
   background: var(--ui-surface-subtle);
   color: var(--ui-text-muted);
@@ -149,7 +149,7 @@
 .fam-select .ui-select-trigger {
   height: 36px;
   padding: 0 0.85rem 0 0.95rem;
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-sm);
   border-color: var(--ui-border-strong);
   font-size: var(--ui-text-sm);
   font-weight: 500;
@@ -402,7 +402,7 @@
    capsula (especificidad 0,1,1 > la utilidad Tailwind). Scoped: .modal-foot solo
    lo usa el modal de recepción. */
 .modal-foot button {
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-sm);
 }
 
 .cart-table {
@@ -2488,7 +2488,7 @@
   height: 2rem;
   padding: 0 0.9rem;
   border: 1px solid var(--ui-border-strong);
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-sm);
   background: var(--ui-surface);
   color: var(--ui-primary);
   cursor: pointer;
@@ -2617,7 +2617,7 @@
   height: 2rem;
   width: 100%;
   border: 1px solid var(--ui-border);
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-sm);
   background: var(--ui-surface);
   padding: 0 0.55rem;
   font-size: var(--ui-text-sm);
@@ -2744,7 +2744,7 @@
   width: 18rem;
   max-width: 50vw;
   border: 1px solid var(--ui-border-strong);
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-sm);
   padding: 0 1.1rem;
   font-size: 0.9rem;
   letter-spacing: -0.012em;

@@ -17,7 +17,7 @@
   height: 2.5rem;
   padding: 0 0.9rem;
   border: 1px solid var(--ui-border-strong);
-  border-radius: 10px;
+  border-radius: var(--ui-radius-sm);
   background: var(--ui-surface);
   font-size: 0.86rem;
   font-weight: 500;
@@ -97,7 +97,7 @@
   list-style: none;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border-strong);
-  border-radius: 12px;
+  border-radius: var(--ui-radius-lg);
   box-shadow: var(--ui-shadow-md);
   animation: ui-select-pop 0.12s var(--ui-ease, ease);
 }
@@ -119,7 +119,7 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.5rem 0.6rem;
-  border-radius: 8px;
+  border-radius: var(--ui-radius-sm);
   font-size: 0.86rem;
   letter-spacing: -0.012em;
   color: var(--ui-text);

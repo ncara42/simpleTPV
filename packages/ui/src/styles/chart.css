@@ -116,7 +116,7 @@ button.ui-chart-group {
 button.ui-chart-group:focus-visible {
   outline: 2px solid var(--ui-chart-accent);
   outline-offset: 2px;
-  border-radius: var(--ui-radius-sm, 6px);
+  border-radius: var(--ui-radius-sm);
 }
 /* U-01: ninguna columna se atenúa nunca — color constante en reposo, hover y
    selección. El feedback de hover/focus es el tooltip lateral (.ui-chart-tip). */
@@ -324,7 +324,7 @@ button.ui-chart-group:focus-visible {
   padding: 0.4rem 0.65rem;
   background: var(--ui-chart-tip-bg, #0a2540);
   border: 1px solid var(--ui-chart-tip-border, #0a2540);
-  border-radius: var(--ui-radius-sm, 8px);
+  border-radius: var(--ui-radius-sm);
   box-shadow: 0 10px 28px -8px rgb(10 37 64 / 0.4);
   pointer-events: none;
   white-space: nowrap;
@@ -493,7 +493,7 @@ button.ui-chart-group:focus-visible {
 .ui-chart-hotzone:focus-visible {
   outline: 2px solid var(--ui-chart-accent);
   outline-offset: -2px;
-  border-radius: var(--ui-radius-sm, 6px);
+  border-radius: var(--ui-radius-sm);
 }
 
 /* ── Fila de etiquetas (compartida; centros alineados con las columnas) ─────── */

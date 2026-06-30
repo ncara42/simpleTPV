@@ -914,7 +914,7 @@
   --sidebar-avatar-left: calc(
     var(--sidebar-float-gap) + var(--sidebar-tab-w) + var(--sidebar-top-gap)
   );
-  --sidebar-corner: var(--ui-radius-lg, 18px);
+  --sidebar-corner: var(--ui-radius-lg);
   --sidebar-float-top: calc(
     var(--sidebar-float-gap) + var(--sidebar-tab-h) + var(--sidebar-neck-drop)
   );
@@ -1221,9 +1221,7 @@
     position: fixed;
     top: var(--sidebar-float-top);
     left: var(--sidebar-avatar-left);
-    width: calc(
-      var(--sidebar-width-expanded) - var(--sidebar-tab-w) - var(--sidebar-top-gap)
-    );
+    width: calc(var(--sidebar-width-expanded) - var(--sidebar-tab-w) - var(--sidebar-top-gap));
     /* Dentro del contexto del float (z 42): sobre el cuerpo del sidebar (z 40); el avatar (z 2)
        lo corona y su cuello cóncavo cubre la junta. */
     z-index: 1;

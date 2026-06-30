@@ -81,7 +81,7 @@
   width: 280px;
   padding: 0.85rem;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg, 16px);
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-lg, 0 12px 32px rgb(0 0 0 / 14%));
   animation: day-cal-in 0.14s var(--ui-ease, cubic-bezier(0.22, 1, 0.36, 1));

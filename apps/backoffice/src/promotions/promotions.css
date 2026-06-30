@@ -412,7 +412,7 @@
 /* Regla aplicada: condición → recompensa. */
 .promo-rule {
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg, 0.75rem);
+  border-radius: var(--ui-radius-lg);
   overflow: hidden;
 }
 .promo-rule-head {

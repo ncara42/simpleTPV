@@ -709,7 +709,7 @@
 .view-action-highlight {
   scroll-margin-top: 6rem;
   scroll-margin-bottom: 8rem;
-  border-radius: var(--ui-radius-md, 12px);
+  border-radius: var(--ui-radius-md);
   animation: view-action-pulse 2.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 

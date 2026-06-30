@@ -37,7 +37,7 @@ body.tc-dragging .tc-panel {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-xl, 16px);
+  border-radius: var(--ui-radius-xl);
   /* Mismo cristal que el panel del chatbot (.chat-dock__panel): surface 68% + blur 12px. */
   background: color-mix(in srgb, var(--ui-surface) 68%, transparent);
   -webkit-backdrop-filter: blur(12px);
@@ -103,7 +103,7 @@ body.tc-dragging .tc-panel {
   width: 2rem;
   height: 2rem;
   border: none;
-  border-radius: var(--ui-radius-sm, 8px);
+  border-radius: var(--ui-radius-sm);
   background: transparent;
   color: var(--ui-text-muted);
   cursor: pointer;
@@ -206,19 +206,19 @@ body.tc-dragging .tc-panel {
   flex-direction: column;
   gap: 0.4rem;
   padding: 0.5rem 0.7rem;
-  border-radius: var(--ui-radius-lg, 12px);
+  border-radius: var(--ui-radius-lg);
   font-size: 0.875rem;
   line-height: 1.5;
 }
 .tc-msg--peer .tc-bubble {
   background: var(--ui-surface-subtle);
   color: var(--ui-text);
-  border-bottom-left-radius: var(--ui-radius-xs, 6px);
+  border-bottom-left-radius: var(--ui-radius-xs);
 }
 .tc-msg--own .tc-bubble {
   background: var(--ui-brand-soft, color-mix(in srgb, var(--ui-primary) 12%, var(--ui-surface)));
   color: var(--ui-brand-ink, var(--ui-text));
-  border-bottom-right-radius: var(--ui-radius-xs, 6px);
+  border-bottom-right-radius: var(--ui-radius-xs);
 }
 .tc-text {
   white-space: pre-wrap;
@@ -228,7 +228,7 @@ body.tc-dragging .tc-panel {
   padding: 0;
   border: none;
   background: none;
-  border-radius: var(--ui-radius-md, 10px);
+  border-radius: var(--ui-radius-md);
   overflow: hidden;
   cursor: pointer;
   line-height: 0;
@@ -270,7 +270,7 @@ body.tc-dragging .tc-panel {
   width: 3.2rem;
   height: 3.2rem;
   margin-bottom: 0.5rem;
-  border-radius: var(--ui-radius-md, 10px);
+  border-radius: var(--ui-radius-md);
   overflow: hidden;
   border: 1px solid var(--ui-border);
 }
@@ -302,7 +302,7 @@ body.tc-dragging .tc-panel {
   gap: 0.45rem;
   padding: 0.4rem 0.45rem;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-xl, 16px);
+  border-radius: var(--ui-radius-xl);
   background: var(--ui-surface);
   transition:
     border-color 0.12s ease,
@@ -319,7 +319,7 @@ body.tc-dragging .tc-panel {
   justify-content: center;
   width: 2.1rem;
   height: 2.1rem;
-  border-radius: var(--ui-radius-sm, 8px);
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-text-muted);
   cursor: pointer;
   flex-shrink: 0;
@@ -391,7 +391,7 @@ body.tc-dragging .tc-panel {
 .tc-lightbox img {
   max-width: 92vw;
   max-height: 88vh;
-  border-radius: var(--ui-radius-md, 10px);
+  border-radius: var(--ui-radius-md);
 }
 
 /* ─── Asas de redimensión (4 bordes + 4 esquinas) ─────────────────────────────── */

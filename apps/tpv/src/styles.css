@@ -36,14 +36,14 @@
   }
 }
 
-/* ─── Forma pill de Apple en los controles del TPV ───────────────
-   A diferencia del backoffice (que pone TODOS los <button> en cápsula),
-   el TPV es un POS: la cuadrícula de producto (.prod-card es un <button>)
-   y los steppers +/- deben conservar su radio. Por eso la cápsula se
-   aplica de forma SELECTIVA a los desplegables y a los botones de acción.
-   ──────────────────────────────────────────────────────────────── */
+/* ─── Forma de los controles del TPV: 8px (Fundación Geist) ───────────────
+   Alineado con el backoffice (que ya despildoró: .app-shell button y
+   .ui-select-trigger = --ui-radius-sm) y con DESIGN_SYSTEM §5/§12: botones,
+   inputs y selects = 8px, SIN cápsula. Conservan radio propio: la cuadrícula de
+   producto (.prod-card), los steppers +/- y las tabs/segmented (§10.11, cápsula).
+   ──────────────────────────────────────────────────────────────────────── */
 .app-shell .ui-select-trigger {
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-sm);
 }
 
 .cart-checkout,
@@ -66,20 +66,20 @@
 .time-clock-out,
 .time-clock-break,
 .time-clock-pair,
-.tpv-tab,
 .link-btn {
+  border-radius: var(--ui-radius-sm);
+}
+
+/* Tabs/segmented control: conservan la cápsula (DESIGN_SYSTEM §10.11). */
+.tpv-tab {
   border-radius: 9999px;
 }
 
-/* ─── Inputs y campos del TPV en píldora (igualar al panel admin) ─────────
-   Petición: que TODOS los inputs luzcan border-radius 9999 como el backoffice.
-   En los buscadores el borde vive en el wrapper (.sale-search-wrap, .tickets-search,
-   .return-view-search) → la cápsula va ahí; en el resto, en el propio input/select.
-   Se prefija con .app-shell para ganar especificidad sobre las reglas por-componente
-   de sale.css sin depender del orden de carga, y para tocar solo .tickets-search sin
-   afectar a sus hermanas contenedor (.inventory-results / .ticket-detail-card /
-   .inventory-table). Quedan fuera a propósito: la cuadrícula de producto, los
-   steppers +/- (cápsula propia) y los <textarea> (multilínea). */
+/* ─── Inputs y campos del TPV: 8px como el backoffice ─────────
+   Los buscadores llevan el radio en el wrapper (.sale-search-wrap, .tickets-search,
+   .return-view-search); el resto, en el propio input/select. Se prefija con
+   .app-shell para ganar especificidad sobre las reglas por-componente de sale.css.
+   Fuera a propósito: la cuadrícula de producto, los steppers +/- y los <textarea>. */
 .app-shell .sale-search-wrap,
 .app-shell .tickets-search,
 .app-shell .return-view-search,
@@ -93,5 +93,5 @@
 .app-shell .inventory-actions input,
 .app-shell .cash-movement-form input,
 .app-shell .cash-movement-form select {
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-sm);
 }

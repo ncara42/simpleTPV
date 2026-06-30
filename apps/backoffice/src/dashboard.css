@@ -1066,7 +1066,7 @@
   height: calc(100vh - 12rem);
   min-height: 460px;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg, 18px);
+  border-radius: var(--ui-radius-lg);
   background-color: var(--ui-surface-subtle);
   touch-action: none;
   /* En modo normal el fondo NO se arrastra para mover la vista (el pan vive en el botón de la mano
@@ -2354,7 +2354,7 @@
   padding: 14px 16px;
   border: 1px solid color-mix(in srgb, var(--ui-chart-accent) 22%, var(--ui-border));
   border-left: 3px solid var(--ui-chart-accent);
-  border-radius: var(--ui-radius-lg, 16px);
+  border-radius: var(--ui-radius-lg);
   background: color-mix(in srgb, var(--ui-chart-accent) 7%, var(--ui-surface));
 }
 
