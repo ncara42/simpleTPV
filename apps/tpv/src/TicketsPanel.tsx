@@ -1,21 +1,42 @@
-import { ApiError, type Sale, type SaleTicket } from '@simpletpv/auth';
-import { Button, DataTable, Select } from '@simpletpv/ui';
+import { ApiError, type Sale, type SaleSummary, type SaleTicket } from '@simpletpv/auth';
+import { Button } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Check, Download, Printer, RotateCcw } from 'lucide-react';
+import { Ban, Check, ChevronDown, Download, Printer, RotateCcw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { eur } from './lib/format.js';
 import { downloadReceiptHtml, printReceiptHtml } from './lib/receipt.js';
 import { createReturn, listReturns } from './lib/returns.js';
 import { findSaleByTicket, getReceiptHtml, getTicket, listSales } from './lib/sales.js';
 import { returnedBySaleLine } from './return/aggregate.js';
 
+// Vistas (selección única) y métodos (multi-selección) del carril de facetas, igual
+// que las "Vistas guardadas" + facetas del Catálogo del backoffice.
+type TicketView = 'all' | 'completed' | 'voided';
+const VIEWS: ReadonlyArray<{ key: TicketView; label: string }> = [
+  { key: 'all', label: 'Todos los tickets' },
+  { key: 'completed', label: 'Completados' },
+  { key: 'voided', label: 'Anulados' },
+];
+const METHOD_ORDER: readonly string[] = ['CASH', 'CARD', 'DIRECT_DEBIT', 'TRANSFER', 'BIZUM'];
+
+// Grupo de tickets de un mismo día (cabecera plegable: fecha · nº · total).
+interface DayGroup {
+  key: string;
+  label: string;
+  ts: number;
+  rows: SaleSummary[];
+  total: number;
+}
+
 export function TicketsPanel({ storeId }: { storeId: string | null }) {
   usePageHeader('Tickets emitidos', 'Histórico de ventas de la tienda activa');
   const qc = useQueryClient();
   const [q, setQ] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [methodFilter, setMethodFilter] = useState('');
+  const [view, setView] = useState<TicketView>('all');
+  const [methods, setMethods] = useState<ReadonlySet<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [returning, setReturning] = useState(false);
   const [qtys, setQtys] = useState<Record<string, number>>({});
@@ -29,15 +50,84 @@ export function TicketsPanel({ storeId }: { storeId: string | null }) {
   });
 
   const items = useMemo(() => sales.data?.items ?? [], [sales.data]);
+
+  // Recuentos de faceta (sobre el conjunto completo, antes de filtrar) como en el Catálogo.
+  const viewCounts = useMemo(
+    () => ({
+      all: items.length,
+      completed: items.filter((s) => s.status === 'COMPLETED').length,
+      voided: items.filter((s) => s.status === 'VOIDED').length,
+    }),
+    [items],
+  );
+  const methodCounts = useMemo(() => {
+    const counts: Record<string, number> = Object.fromEntries(METHOD_ORDER.map((m) => [m, 0]));
+    for (const s of items) {
+      const current = counts[s.paymentMethod];
+      if (current !== undefined) counts[s.paymentMethod] = current + 1;
+    }
+    return counts;
+  }, [items]);
+
   const visible = useMemo(
     () =>
       items.filter(
         (s) =>
-          (!statusFilter || s.status === statusFilter) &&
-          (!methodFilter || s.paymentMethod === methodFilter),
+          (view === 'all' ||
+            (view === 'completed' && s.status === 'COMPLETED') ||
+            (view === 'voided' && s.status === 'VOIDED')) &&
+          (methods.size === 0 || methods.has(s.paymentMethod)),
       ),
-    [items, statusFilter, methodFilter],
+    [items, view, methods],
   );
+
+  // Agrupa los tickets por día (día más reciente primero; dentro, hora descendente).
+  const groups = useMemo<DayGroup[]>(() => {
+    const map = new Map<string, DayGroup>();
+    for (const item of visible) {
+      const d = new Date(item.createdAt);
+      const key = d.toDateString();
+      let g = map.get(key);
+      if (!g) {
+        const raw = d.toLocaleDateString('es-ES', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        });
+        g = {
+          key,
+          label: raw.charAt(0).toUpperCase() + raw.slice(1),
+          ts: d.getTime(),
+          rows: [],
+          total: 0,
+        };
+        map.set(key, g);
+      }
+      g.rows.push(item);
+      g.total += Number(item.total);
+    }
+    const arr = [...map.values()].sort((a, b) => b.ts - a.ts);
+    for (const g of arr) {
+      g.rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+    return arr;
+  }, [visible]);
+
+  const toggleMethod = (m: string): void =>
+    setMethods((prev) => {
+      const next = new Set(prev);
+      if (next.has(m)) next.delete(m);
+      else next.add(m);
+      return next;
+    });
+  const toggleGroup = (key: string): void =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   const ticket = useQuery({
     queryKey: ['ticket-detail', selectedId],
@@ -144,90 +234,132 @@ export function TicketsPanel({ storeId }: { storeId: string | null }) {
           )}
         </div>
       ) : (
-        <div className="table-panel">
-          <div className="users-toolbar">
-            <div className="sales-filters">
-              <span className="search-field">
-                <input
-                  className="catalog-search"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Ticket, importe, vendedor o producto…"
-                  data-testid="tickets-search"
-                />
-              </span>
-              <Select
-                className="catalog-search"
-                value={statusFilter}
-                onChange={setStatusFilter}
-                ariaLabel="Filtrar por estado"
-                data-testid="tickets-status-filter"
-                options={[
-                  { value: '', label: 'Todos los estados' },
-                  { value: 'COMPLETED', label: 'Completados' },
-                  { value: 'VOIDED', label: 'Anulados' },
-                ]}
-              />
-              <Select
-                className="catalog-search"
-                value={methodFilter}
-                onChange={setMethodFilter}
-                ariaLabel="Filtrar por método"
-                data-testid="tickets-method-filter"
-                options={[
-                  { value: '', label: 'Todos los métodos' },
-                  { value: 'CASH', label: 'Efectivo' },
-                  { value: 'CARD', label: 'Tarjeta' },
-                  { value: 'DIRECT_DEBIT', label: 'Débito directo' },
-                  { value: 'TRANSFER', label: 'Transferencia' },
-                  { value: 'BIZUM', label: 'Bizum' },
-                ]}
-              />
+        <div className="tickets-faceted">
+          <div className="tickets-card">
+            <div className="cat-layout">
+              <aside
+                className="cat-rail"
+                aria-label="Filtros de tickets"
+                data-testid="tickets-facets"
+              >
+                <span className="search-field cat-rail-search">
+                  <input
+                    className="catalog-search"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Buscar ticket…"
+                    data-testid="tickets-search"
+                  />
+                </span>
+
+                <section className="cat-facet">
+                  <h3 className="cat-facet-title">Vistas</h3>
+                  {VIEWS.map((v) => (
+                    <button
+                      key={v.key}
+                      type="button"
+                      className={`cat-view${view === v.key ? ' is-active' : ''}`}
+                      aria-pressed={view === v.key}
+                      onClick={() => setView(v.key)}
+                      data-testid={`tickets-view-${v.key}`}
+                    >
+                      <span className="cat-view-label">{v.label}</span>
+                      <span className="cat-view-count">{viewCounts[v.key]}</span>
+                    </button>
+                  ))}
+                </section>
+
+                <section className="cat-facet">
+                  <h3 className="cat-facet-title">Método de pago</h3>
+                  {METHOD_ORDER.map((m) => (
+                    <FacetOption
+                      key={m}
+                      checked={methods.has(m)}
+                      onToggle={() => toggleMethod(m)}
+                      label={methodLabel(m)}
+                      count={methodCounts[m] ?? 0}
+                    />
+                  ))}
+                </section>
+              </aside>
+
+              <div className="cat-main" data-testid="tickets-list">
+                <table className="cat-table">
+                  <colgroup>
+                    <col />
+                    <col className="cat-col-num" />
+                    <col className="cat-col-mid" />
+                    <col className="cat-col-mid" />
+                    <col className="cat-col-num" />
+                  </colgroup>
+                  <thead className="cat-thead">
+                    <tr>
+                      <th className="cat-th cat-th-name">Ticket</th>
+                      <th className="cat-th">Hora</th>
+                      <th className="cat-th">Método</th>
+                      <th className="cat-th">Estado</th>
+                      <th className="cat-th cat-th-num">Total</th>
+                    </tr>
+                  </thead>
+                  {groups.map((group) => {
+                    const isCollapsed = collapsed.has(group.key);
+                    return (
+                      <tbody key={group.key} className="cat-group">
+                        <tr className="cat-group-head" onClick={() => toggleGroup(group.key)}>
+                          <td className="cat-group-cell" colSpan={5}>
+                            <div className="cat-group-inner">
+                              <ChevronDown
+                                size={15}
+                                className={`cat-group-caret${isCollapsed ? ' is-collapsed' : ''}`}
+                                aria-hidden="true"
+                              />
+                              <span className="cat-group-name">{group.label}</span>
+                              <span className="cat-group-count">
+                                {group.rows.length} {group.rows.length === 1 ? 'ticket' : 'tickets'}
+                              </span>
+                              <span className="cat-group-units">{eur(group.total)} €</span>
+                            </div>
+                          </td>
+                        </tr>
+                        {!isCollapsed &&
+                          group.rows.map((item) => (
+                            <tr
+                              key={item.id}
+                              className="cat-row"
+                              data-testid="ticket-row"
+                              onClick={() => {
+                                setSelectedId(item.id);
+                                setReturning(false);
+                              }}
+                            >
+                              <td className="cat-cell-name">{item.ticketNumber}</td>
+                              <td className="cat-cell-mid">
+                                {new Date(item.createdAt).toLocaleTimeString('es-ES', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </td>
+                              <td className="cat-cell-mid">{methodLabel(item.paymentMethod)}</td>
+                              <td className="cat-cell-state">{statusBadge(item.status)}</td>
+                              <td className="cat-cell-num">{eur(Number(item.total))} €</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    );
+                  })}
+                </table>
+                {groups.length === 0 && (
+                  <div className="cat-empty" data-testid="tickets-empty">
+                    {sales.isLoading
+                      ? 'Cargando…'
+                      : items.length === 0
+                        ? 'Sin tickets.'
+                        : 'Sin tickets que coincidan con el filtro.'}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          <DataTable
-            data-testid="tickets-list"
-            rowTestId="ticket-row"
-            rows={visible}
-            rowKey={(item) => item.id}
-            loading={sales.isLoading}
-            onRowClick={(item) => {
-              setSelectedId(item.id);
-              setReturning(false);
-            }}
-            emptyState={
-              <span className="catalog-empty">
-                {items.length === 0 ? 'Sin tickets.' : 'Sin tickets que coincidan con el filtro.'}
-              </span>
-            }
-            columns={[
-              {
-                key: 'ticket',
-                header: 'Ticket',
-                render: (item) => <strong>{item.ticketNumber}</strong>,
-              },
-              {
-                key: 'date',
-                header: 'Fecha',
-                render: (item) => (
-                  <span className="muted">{new Date(item.createdAt).toLocaleString()}</span>
-                ),
-              },
-              {
-                key: 'method',
-                header: 'Método',
-                render: (item) => methodLabel(item.paymentMethod),
-              },
-              { key: 'status', header: 'Estado', render: (item) => statusBadge(item.status) },
-              {
-                key: 'total',
-                header: 'Total',
-                render: (item) => (
-                  <span className="tabular-nums">{Number(item.total).toFixed(2)} €</span>
-                ),
-              },
-            ]}
-          />
         </div>
       )}
     </div>
@@ -249,16 +381,45 @@ function methodLabel(method: string): string {
 function statusBadge(status: string) {
   const voided = status === 'VOIDED';
   return (
-    <span className={`order-state ${voided ? 'voided' : 'received'}`} data-testid="ticket-status">
-      <span className="order-state__icon">
-        {voided ? (
-          <Ban size={13} strokeWidth={2.5} aria-hidden="true" />
-        ) : (
-          <Check size={13} strokeWidth={3} aria-hidden="true" />
-        )}
-      </span>
+    <span
+      className={`cat-state-badge ${voided ? 'cat-state-void' : 'cat-state-ok'}`}
+      data-testid="ticket-status"
+    >
+      {voided ? (
+        <Ban size={12} strokeWidth={2.5} aria-hidden="true" />
+      ) : (
+        <Check size={12} strokeWidth={3} aria-hidden="true" />
+      )}
       {voided ? 'Anulado' : 'Completado'}
     </span>
+  );
+}
+
+// Opción de faceta (multi-selección) del carril, idéntica a la del Catálogo.
+function FacetOption({
+  checked,
+  onToggle,
+  label,
+  count,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+  label: string;
+  count: number;
+}) {
+  return (
+    <label className={`cat-facet-opt${checked ? ' is-checked' : ''}`}>
+      <input
+        type="checkbox"
+        className="cat-facet-input"
+        checked={checked}
+        onChange={onToggle}
+        data-testid={`tickets-method-${label}`}
+      />
+      <span className="cat-check" aria-hidden="true" />
+      <span className="cat-facet-label">{label}</span>
+      <span className="cat-facet-count">{count}</span>
+    </label>
   );
 }
 

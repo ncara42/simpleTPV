@@ -6,6 +6,7 @@ import '@simpletpv/ui/topbar.css';
 import '@simpletpv/ui/transfer-chat.css';
 import './sale.css';
 import './styles.css';
+import './tickets-faceted.css';
 
 import { LoginForm, type NavItem, Sidebar, TopBar } from '@simpletpv/ui';
 import { PageHeaderProvider, usePageHeaderValue } from '@simpletpv/ui';

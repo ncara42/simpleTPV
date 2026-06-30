@@ -1,0 +1,382 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   TICKETS EMITIDOS — vista facetada idéntica al Catálogo del backoffice: carril de
+   facetas a la izquierda + tabla agrupada por día a la derecha, dentro de UNA sola
+   card. Las clases .cat-* replican el lenguaje de inventory-card.css (Catálogo) para
+   que ambas vistas sean visualmente idénticas. Tokens --ui-* dark-aware.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* Página: ocupa el alto disponible (topbar 60px + paddings del .app-main) para que el
+   carril y la tabla scrolleen DENTRO de la card, igual que en Inventario. */
+.tickets-faceted {
+  height: calc(100dvh - 60px - 5.5rem);
+  min-height: 26rem;
+  display: flex;
+}
+
+/* Card contenedora (= .inv-card del backoffice). */
+.tickets-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.04),
+    0 4px 24px -8px rgb(0 0 0 / 0.1);
+  overflow: hidden;
+}
+
+.cat-layout {
+  display: grid;
+  grid-template-columns: 15.75rem minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+
+/* ─── Carril de facetas ────────────────────────────────────────────────────── */
+.cat-rail {
+  display: flex;
+  flex-direction: column;
+  padding: 1.15rem 1.1rem 1.5rem;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.cat-rail-search {
+  margin-bottom: 1.35rem;
+}
+.cat-rail .catalog-search {
+  height: 36px;
+  width: 100%;
+  border-radius: var(--ui-radius-sm);
+  border: 1px solid var(--ui-border-strong);
+}
+.cat-rail .search-field {
+  display: flex;
+  width: 100%;
+}
+
+.cat-facet {
+  margin-bottom: 1.45rem;
+}
+.cat-facet:last-child {
+  margin-bottom: 0;
+}
+.cat-facet-title {
+  margin: 0 0 0.5rem;
+  padding-left: 0.12rem;
+  font-size: 0.69rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ui-text-soft);
+}
+
+/* Vistas: fila botón con contador; activa = azul de acento, texto blanco. */
+.cat-view {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.42rem 0.6rem;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-size: 0.86rem;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+.cat-view:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+.cat-view.is-active {
+  background: var(--ap-blue, var(--ui-primary));
+  color: #fff;
+  font-weight: 550;
+}
+.cat-view-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cat-view-count {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+.cat-view.is-active .cat-view-count {
+  color: rgba(255 255 255 / 0.62);
+}
+
+/* Opción de faceta: píldora seleccionable (marca azul + etiqueta + contador). */
+.cat-facet-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.42rem 0.6rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.86rem;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease),
+    color var(--ui-motion-fast) var(--ui-ease);
+}
+.cat-facet-opt:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+.cat-facet-opt.is-checked {
+  background: var(--ui-brand-soft);
+}
+.cat-facet-opt.is-checked:hover {
+  background: var(--ui-brand-soft-2);
+}
+.cat-facet-opt.is-checked:has(+ .cat-facet-opt.is-checked) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.cat-facet-opt.is-checked + .cat-facet-opt.is-checked {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.cat-facet-opt:has(.cat-facet-input:focus-visible) {
+  box-shadow: var(--ui-focus);
+}
+.cat-facet-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.cat-check {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  transition: opacity var(--ui-motion-fast) var(--ui-ease);
+}
+.cat-facet-input:checked + .cat-check {
+  background-color: var(--ui-primary);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E")
+    center / 1.1rem 1.1rem no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E")
+    center / 1.1rem 1.1rem no-repeat;
+}
+.cat-facet-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cat-facet-opt.is-checked .cat-facet-label {
+  font-weight: 550;
+  color: var(--ui-text);
+}
+.cat-facet-count {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+.cat-facet-opt.is-checked .cat-facet-count {
+  color: var(--ui-primary);
+}
+
+/* ─── Tabla agrupada ───────────────────────────────────────────────────────── */
+.cat-main {
+  position: relative;
+  overflow-y: auto;
+  border-left: 1px solid var(--ui-border);
+  scrollbar-width: none;
+}
+.cat-rail::-webkit-scrollbar,
+.cat-main::-webkit-scrollbar {
+  display: none;
+}
+.cat-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.cat-col-mid {
+  width: 9rem;
+}
+.cat-col-num {
+  width: 7rem;
+}
+
+.cat-thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--ui-surface);
+  padding: 0.55rem 0.9rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ui-text-soft);
+  text-align: left;
+  border-bottom: 1px solid var(--ui-border);
+  white-space: nowrap;
+}
+.cat-thead .cat-th-num {
+  text-align: right;
+}
+.cat-thead .cat-th-name {
+  padding-left: 3.3rem;
+}
+
+/* Cabecera de grupo (por día): fecha · nº tickets · total. */
+.cat-group-head {
+  cursor: pointer;
+}
+.cat-group-cell {
+  padding: 0;
+  position: sticky;
+  top: 1.95rem;
+  z-index: 1;
+  background: var(--ui-surface-subtle);
+  box-shadow:
+    0 -1px 0 0 var(--ui-border),
+    0 1px 0 0 var(--ui-border);
+}
+.cat-group-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.1rem 0.5rem 3.3rem;
+}
+.cat-group-caret {
+  position: absolute;
+  left: 1.05rem;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-shrink: 0;
+  color: var(--ui-text-soft);
+  transition: transform var(--ui-motion-fast) var(--ui-ease);
+}
+.cat-group-caret.is-collapsed {
+  transform: translateY(-50%) rotate(-90deg);
+}
+.cat-group-name {
+  font-size: 0.9rem;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  color: var(--ui-text);
+}
+.cat-group-count {
+  font-size: 0.82rem;
+  color: var(--ui-text-soft);
+  letter-spacing: -0.01em;
+}
+.cat-group-units {
+  margin-left: auto;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-soft);
+}
+
+/* Filas: hover por relleno, clic abre el detalle del ticket. */
+.cat-row {
+  cursor: pointer;
+  transition: background var(--ui-motion-fast) var(--ui-ease);
+}
+.cat-row:hover {
+  background: var(--ui-surface-subtle);
+}
+.cat-row td {
+  height: 2.75rem;
+  padding: 0 0.9rem;
+  vertical-align: middle;
+  color: var(--ui-text);
+  border-bottom: 1px solid var(--ui-border);
+}
+.cat-row .cat-cell-name {
+  padding-left: 3.3rem;
+  letter-spacing: -0.012em;
+  font-weight: 600;
+}
+.cat-cell-mid {
+  color: var(--ui-text-soft);
+  font-size: 0.85rem;
+}
+.cat-cell-num {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.012em;
+}
+.cat-cell-state {
+  text-align: right;
+}
+
+/* Badge de estado (mismo lenguaje que .cat-stock-badge del Catálogo). */
+.cat-state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 1.95rem;
+  height: 1.55rem;
+  padding: 0 0.5rem;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.cat-state-ok {
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
+}
+.cat-state-void {
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+}
+
+.cat-empty {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  font-size: 0.92rem;
+  color: var(--ui-text-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cat-view,
+  .cat-facet-opt,
+  .cat-check,
+  .cat-group-caret,
+  .cat-row {
+    transition: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .tickets-faceted {
+    height: auto;
+  }
+  .cat-layout {
+    grid-template-columns: 1fr;
+  }
+  .cat-rail {
+    border-bottom: 1px solid var(--ui-border);
+  }
+  .cat-main {
+    border-left: none;
+  }
+}
