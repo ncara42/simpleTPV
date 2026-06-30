@@ -171,6 +171,7 @@ fn body(store: Uuid, product: Uuid, qty: i64, ticket_pct: Option<Decimal>) -> Cr
         customer_name: None,
         channel: None,
         credit_due_date: None,
+        skipped_promotions: vec![],
     }
 }
 

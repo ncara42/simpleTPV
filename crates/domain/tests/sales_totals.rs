@@ -141,6 +141,7 @@ async fn sell(c: &Ctx, product: Uuid, qty: i64) -> Uuid {
             customer_name: None,
             channel: None,
             credit_due_date: None,
+            skipped_promotions: vec![],
         },
     )
     .await
@@ -297,6 +298,7 @@ async fn sell_qty(c: &Ctx, product: Uuid, qty: i64) -> (Uuid, Decimal) {
             customer_name: None,
             channel: None,
             credit_due_date: None,
+            skipped_promotions: vec![],
         },
     )
     .await

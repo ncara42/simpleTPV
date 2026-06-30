@@ -148,6 +148,7 @@ async fn sell(c: &Ctx, product: Uuid, qty: i64, recipient: Option<(&str, &str)>)
             customer_name,
             channel: None,
             credit_due_date: None,
+            skipped_promotions: vec![],
         },
     )
     .await

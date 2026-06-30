@@ -107,7 +107,12 @@ async fn compute_session_expected(
     .fetch_one(&mut **tx)
     .await?;
 
-    Ok(compute_expected(opening_amount, cash_sales, movement_net, cash_refunds))
+    Ok(compute_expected(
+        opening_amount,
+        cash_sales,
+        movement_net,
+        cash_refunds,
+    ))
 }
 
 /// Lock pesimista de la fila de la sesión (serializa cierre vs movimientos).

@@ -142,6 +142,7 @@ async fn sell(c: &Ctx, product: Uuid, qty: i64) -> SaleWithLines {
             customer_name: None,
             channel: None,
             credit_due_date: None,
+            skipped_promotions: vec![],
         },
     )
     .await

@@ -180,6 +180,7 @@ async fn devolucion_con_ticket_crea_registro_rectificativo() {
             customer_name: None,
             channel: None,
             credit_due_date: None,
+            skipped_promotions: vec![],
         },
     )
     .await

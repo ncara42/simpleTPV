@@ -72,6 +72,12 @@ pub struct CreateSale {
     /// la venta nace PENDING de cobro; solo se admite en canal B2B/Online.
     #[serde(default)]
     pub credit_due_date: Option<String>,
+    /// S-22: ids de promociones automáticas que el cajero ha quitado en caja. El
+    /// matching las ignora (decisión de producto: el vendedor puede saltarlas si
+    /// `clerkCanSkip`). El TPV poblará este campo en una fase posterior; hoy el
+    /// hook ya está listo y por defecto vacío (ninguna promo se salta).
+    #[serde(default)]
+    pub skipped_promotions: Vec<Uuid>,
 }
 
 impl CreateSale {
@@ -228,6 +234,7 @@ mod tests {
             customer_name: name.map(str::to_owned),
             channel: None,
             credit_due_date: None,
+            skipped_promotions: vec![],
         }
     }
 

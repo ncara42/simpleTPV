@@ -139,6 +139,7 @@ async fn make_sale(c: &Ctx) -> Uuid {
             customer_name: None,
             channel: None,
             credit_due_date: None,
+            skipped_promotions: vec![],
         },
     )
     .await
