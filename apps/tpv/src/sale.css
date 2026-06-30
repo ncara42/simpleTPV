@@ -1366,14 +1366,31 @@
   padding: 0 0.9rem;
   font-size: var(--ui-text-lg);
   outline: none;
+  /* Sin flechas nativas de incremento (spin buttons) en el importe inicial. */
+  appearance: textfield;
+  -moz-appearance: textfield;
   transition:
     border-color 0.12s,
     box-shadow 0.12s;
 }
 
+.cash-field input::-webkit-outer-spin-button,
+.cash-field input::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .cash-field input:focus {
   border-color: var(--ui-brand);
   box-shadow: var(--ui-focus);
+}
+
+/* Pista del último cierre bajo el importe inicial (apertura más rápida). */
+.cash-field-hint {
+  font-weight: 500;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
 }
 
 .cash-actions {

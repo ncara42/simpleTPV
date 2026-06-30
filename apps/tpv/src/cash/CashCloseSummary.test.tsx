@@ -4,7 +4,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { CashCloseSummary } from './CashCloseSummary.js';
 
-function session(expected: string, closing: string, difference: string): CashSession {
+function session(
+  expected: string,
+  closing: string,
+  difference: string,
+  closingNote: string | null = null,
+): CashSession {
   return {
     id: 'cs1',
     storeId: 's1',
@@ -16,6 +21,7 @@ function session(expected: string, closing: string, difference: string): CashSes
     status: 'CLOSED',
     openedAt: '2026-06-03T08:00:00.000Z',
     closedAt: '2026-06-03T20:00:00.000Z',
+    closingNote,
   };
 }
 
@@ -32,5 +38,20 @@ describe('CashCloseSummary', () => {
     render(<CashCloseSummary session={session('150', '150', '0')} onDismiss={onDismiss} />);
     fireEvent.click(screen.getByTestId('cash-dismiss'));
     expect(onDismiss).toHaveBeenCalledOnce();
+  });
+
+  it('muestra la anotación del descuadre cuando existe', () => {
+    render(
+      <CashCloseSummary
+        session={session('150', '140', '-10', 'Faltaba cambio al abrir')}
+        onDismiss={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('cash-summary-note')).toHaveTextContent('Faltaba cambio al abrir');
+  });
+
+  it('no muestra anotación si el cierre cuadra', () => {
+    render(<CashCloseSummary session={session('150', '150', '0')} onDismiss={vi.fn()} />);
+    expect(screen.queryByTestId('cash-summary-note')).toBeNull();
   });
 });

@@ -1,18 +1,24 @@
 import { useState } from 'react';
 
+import { eur } from '../lib/format.js';
+
 // Formulario de apertura de caja (estado "cerrada"). Autónomo: gestiona el
 // importe inicial y delega la apertura en `onOpen`. El padre pasa pending/error
-// de la mutación.
+// de la mutación. `lastClosingAmount` (importe del último cierre) precarga el
+// campo para abrir más rápido — el padre debe montar este componente con
+// `key={lastClosingAmount}` para que el valor por defecto se aplique al cargar.
 export function CashOpenForm({
   onOpen,
   pending,
   error,
+  lastClosingAmount,
 }: {
   onOpen: (amount: number) => void;
   pending: boolean;
   error: string | null;
+  lastClosingAmount?: string | null;
 }) {
-  const [openingAmount, setOpeningAmount] = useState('');
+  const [openingAmount, setOpeningAmount] = useState(lastClosingAmount ?? '');
   const opening = Number(openingAmount);
   const hasOpening = openingAmount !== '' && !Number.isNaN(opening) && opening >= 0;
 
@@ -44,6 +50,11 @@ export function CashOpenForm({
             onChange={(e) => setOpeningAmount(e.target.value)}
             data-testid="cash-opening-amount"
           />
+          {lastClosingAmount != null && lastClosingAmount !== '' && (
+            <span className="cash-field-hint" data-testid="cash-opening-hint">
+              Último cierre: {eur(Number(lastClosingAmount))} €
+            </span>
+          )}
         </label>
         <div className="cash-actions">
           <button

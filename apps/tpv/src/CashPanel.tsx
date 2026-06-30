@@ -13,6 +13,7 @@ import {
   closeCashSession,
   currentCashSession,
   listCashMovements,
+  listClosedCashSessions,
   openCashSession,
   requestCashMovement,
 } from './lib/cash.js';
@@ -47,6 +48,15 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
     queryFn: () => currentCashSession(storeId as string),
     enabled: storeId !== null,
   });
+
+  // Cierres recientes (misma queryKey que CashClosuresList → se deduplica): el
+  // importe del último cierre precarga la apertura para abrir más rápido.
+  const { data: closedSessions = [] } = useQuery({
+    queryKey: ['cash-closed', storeId],
+    queryFn: () => listClosedCashSessions(storeId as string),
+    enabled: storeId !== null,
+  });
+  const lastClosingAmount = closedSessions[0]?.closingAmount ?? null;
 
   const openMutation = useMutation({
     mutationFn: (amount: number) =>
@@ -110,6 +120,9 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
       setError(null);
       setClosed(result);
       void queryClient.invalidateQueries({ queryKey });
+      // Refresca los cierres recientes para que la próxima apertura precargue
+      // el importe que acabamos de cerrar.
+      void queryClient.invalidateQueries({ queryKey: ['cash-closed', storeId] });
     },
     onError: (e: unknown) => {
       setError(
@@ -312,9 +325,11 @@ export function CashPanel({ storeId }: { storeId: string | null }) {
   return (
     <>
       <CashOpenForm
+        key={lastClosingAmount ?? 'none'}
         onOpen={(amount) => openMutation.mutate(amount)}
         pending={openMutation.isPending}
         error={error}
+        lastClosingAmount={lastClosingAmount}
       />
       <CashClosuresList storeId={storeId} />
     </>
