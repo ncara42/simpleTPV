@@ -26,15 +26,16 @@ import {
   ArrowLeftRight,
   Bell,
   Boxes,
+  BriefcaseBusiness,
   CheckSquare,
   Handshake,
   LayoutDashboard,
   LifeBuoy,
   Monitor,
   Package,
-  Palette,
   Percent,
   Receipt,
+  Settings,
   ShoppingCart,
   Store,
   Users,
@@ -81,6 +82,7 @@ const NAV_GROUPS: NavGroup[] = [
   { id: 'inventory', label: 'Catálogo e inventario', icon: <Package size={18} /> },
   { id: 'commercial', label: 'Ventas y clientes', icon: <Receipt size={18} /> },
   { id: 'org', label: 'Organización', icon: <Store size={18} /> },
+  { id: 'rrhh', label: 'RRHH', icon: <BriefcaseBusiness size={18} /> },
 ];
 
 const ALL_NAV: NavItem[] = [
@@ -102,10 +104,10 @@ const ALL_NAV: NavItem[] = [
   // (Equipo · Fichajes). Las entradas previas Usuarios/Control horario se colapsan
   // aquí; sus rutas siguen vivas (deep-link/redirección) pero ocultas del menú. El flag
   // time_clock pasa a condicionar el segmento Fichajes (P003), no la entrada de menú.
-  { id: 'personal', label: 'Personal', icon: <Users size={18} />, group: 'org' },
-  { id: 'settings', label: 'Ajustes', icon: <Palette size={18} />, group: 'org' },
+  { id: 'personal', label: 'Personal', icon: <Users size={18} />, group: 'rrhh' },
+  { id: 'settings', label: 'Configuración', icon: <Settings size={18} />, group: 'org' },
   { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'org' },
-  { id: 'help', label: 'Ayuda', icon: <LifeBuoy size={18} /> },
+  { id: 'help', label: 'Ayuda', icon: <LifeBuoy size={18} />, afterSwitch: true },
 ];
 
 // VeriFactu se mantiene fuera del menú (backend sin UI). Notificaciones también:
@@ -113,7 +115,7 @@ const ALL_NAV: NavItem[] = [
 // del menú era redundante. Compras dejó de ser una página propia: sus secciones
 // viven ahora dentro de Proveedores (P1-B). El código se conserva para reactivar
 // VeriFactu/Notificaciones quitando su id de este set.
-const HIDDEN_TABS = new Set<Tab>(['notifications', 'verifactu']);
+const HIDDEN_TABS = new Set<Tab>(['notifications', 'verifactu', 'settings']);
 const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab));
 
 // Lee las acciones de la vista activa (cada page las declara con usePageActions) y
@@ -272,6 +274,7 @@ function Home() {
             // La cuenta vive al PIE del sidebar (avatar → menú con cerrar sesión), estilo
             // ChatGPT/Claude; en rail se reduce al avatar. La campana sigue en el topbar.
             account={{ name: 'Administrador', subtitle: 'Central · Admin' }}
+            onSettings={() => navigateTo('settings')}
             onLogout={logout}
             // El TPV es la última entrada del sidebar (appSwitch), separada por una línea y en azul.
             appSwitch={{
