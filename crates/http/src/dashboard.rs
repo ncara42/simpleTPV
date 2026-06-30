@@ -7,12 +7,13 @@ use serde::Deserialize;
 use serde::Serialize;
 use simpletpv_auth::Role;
 use simpletpv_domain::dashboard::period::{
-    resolve_period, CompareMode, DashboardPeriod, DateRange,
+    period_full_end, previous_full_period, resolve_period, CompareMode, DashboardPeriod, DateRange,
 };
 use simpletpv_domain::dashboard::{
-    service, ArchetypeRotationItem, DiscountByEmployeeItem, MarginKpis, ProductRankings,
-    ProductRotationItem, RankedProduct, RankedProducts, SalesByDayItem, SalesByEmployeeItem,
-    SalesByFamilyItem, SalesByHourItem, SalesByStoreItem, SalesKpis, SalesToday, StockoutKpis,
+    service, ArchetypeRotationItem, CumulativeMonth, DiscountByEmployeeItem, MarginKpis,
+    ProductRankings, ProductRotationItem, RankedProduct, RankedProducts, RecentSaleItem,
+    SalesByDayItem, SalesByEmployeeItem, SalesByFamilyItem, SalesByHourItem, SalesByPaymentItem,
+    SalesByStoreItem, SalesGoal, SalesKpis, SalesToday, StockoutKpis,
 };
 use simpletpv_shared::AppError;
 use uuid::Uuid;
@@ -75,18 +76,41 @@ pub enum RankingsResponse {
 
 /// Resuelve el `DateRange` del periodo desde una `PeriodQuery` (valida `custom`).
 impl PeriodQuery {
-    fn range(&self) -> Result<DateRange, ApiError> {
-        let period = match self.period.as_deref() {
+    /// Token del periodo → enum (Today por defecto). Lo usa `sales-goal` para resolver también
+    /// el periodo anterior completo y el fin de periodo, no solo el rango.
+    fn period_enum(&self) -> Result<DashboardPeriod, ApiError> {
+        Ok(match self.period.as_deref() {
             None => DashboardPeriod::Today,
             Some(s) => DashboardPeriod::parse(s).ok_or(AppError::BadRequest)?,
-        };
+        })
+    }
+
+    fn range(&self) -> Result<DateRange, ApiError> {
         Ok(resolve_period(
-            period,
+            self.period_enum()?,
             now_utc(),
             self.from.as_deref(),
             self.to.as_deref(),
         )?)
     }
+}
+
+/// Solo filtro de tienda (sin periodo): `cumulative-month` siempre opera sobre el mes en curso.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoreQuery {
+    #[serde(default)]
+    store_id: Option<Uuid>,
+}
+
+/// `recent-sales`: nº de tickets a devolver (por defecto 8, acotado en el servicio) + tienda.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentSalesQuery {
+    #[serde(default)]
+    store_id: Option<Uuid>,
+    #[serde(default)]
+    limit: Option<i64>,
 }
 
 /// `GET /dashboard/sales-today?compare=&storeId=`.
@@ -178,6 +202,77 @@ pub async fn sales_by_day(
     let range = q.range()?;
     Ok(Json(
         service::sales_by_day(state.db(), user.organization_id, range, q.store_id).await?,
+    ))
+}
+
+/// `GET /dashboard/sales-by-payment` — reparto por método de pago (donut, sección 04).
+pub async fn sales_by_payment(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<PeriodQuery>,
+) -> Result<Json<Vec<SalesByPaymentItem>>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    let range = q.range()?;
+    Ok(Json(
+        service::sales_by_payment(state.db(), user.organization_id, range, q.store_id).await?,
+    ))
+}
+
+/// `GET /dashboard/recent-sales?limit=&storeId=` — últimas ventas (feed de actividad, sección 04).
+pub async fn recent_sales(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<RecentSalesQuery>,
+) -> Result<Json<Vec<RecentSaleItem>>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    Ok(Json(
+        service::recent_sales(
+            state.db(),
+            user.organization_id,
+            q.limit.unwrap_or(8),
+            q.store_id,
+        )
+        .await?,
+    ))
+}
+
+/// `GET /dashboard/sales-goal?period=&storeId=` — objetivo vs. periodo anterior (bullet, sección
+/// 04). Resuelve aquí el periodo en curso, el periodo anterior completo (objetivo) y el fin de
+/// periodo (denominador de la proyección), todo con las primitivas puras de `period`.
+pub async fn sales_goal(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<PeriodQuery>,
+) -> Result<Json<SalesGoal>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    let period = q.period_enum()?;
+    let now = now_utc();
+    let current = resolve_period(period, now, q.from.as_deref(), q.to.as_deref())?;
+    let prev_full = previous_full_period(period, now, q.from.as_deref(), q.to.as_deref())?;
+    let full_end = period_full_end(period, now, q.from.as_deref(), q.to.as_deref())?;
+    Ok(Json(
+        service::sales_goal(
+            state.db(),
+            user.organization_id,
+            current,
+            prev_full,
+            full_end,
+            now,
+            q.store_id,
+        )
+        .await?,
+    ))
+}
+
+/// `GET /dashboard/cumulative-month?storeId=` — acumulado del mes con proyección (área, sección 04).
+pub async fn cumulative_month(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<StoreQuery>,
+) -> Result<Json<CumulativeMonth>, ApiError> {
+    user.require_role(&MGMT_ROLES)?;
+    Ok(Json(
+        service::cumulative_month(state.db(), user.organization_id, now_utc(), q.store_id).await?,
     ))
 }
 

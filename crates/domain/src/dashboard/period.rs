@@ -190,6 +190,89 @@ pub fn previous_range(range: DateRange) -> DateRange {
     }
 }
 
+/// Periodo ANTERIOR COMPLETO equivalente, usado como OBJETIVO natural («lo que hiciste el
+/// periodo pasado»). Para los periodos «hasta hoy» (today/week/month/quarter/year) devuelve
+/// el periodo cerrado inmediatamente anterior completo (ayer / semana / mes / trimestre / año
+/// pasados). Para periodos ya cerrados o `custom`, retrocede el rango su propia duración.
+pub fn previous_full_period(
+    period: DashboardPeriod,
+    now: PrimitiveDateTime,
+    custom_from: Option<&str>,
+    custom_to: Option<&str>,
+) -> Result<DateRange, AppError> {
+    let prev = match period {
+        DashboardPeriod::Today => Some(DashboardPeriod::Yesterday),
+        DashboardPeriod::Week => Some(DashboardPeriod::LastWeek),
+        DashboardPeriod::Month => Some(DashboardPeriod::LastMonth),
+        DashboardPeriod::Quarter => Some(DashboardPeriod::LastQuarter),
+        DashboardPeriod::Year => Some(DashboardPeriod::LastYear),
+        _ => None,
+    };
+    match prev {
+        Some(p) => resolve_period(p, now, None, None),
+        None => Ok(previous_range(resolve_period(
+            period,
+            now,
+            custom_from,
+            custom_to,
+        )?)),
+    }
+}
+
+/// Fin (exclusivo) del periodo EN CURSO completo. Para los periodos «hasta hoy» es el borde
+/// FUTURO del periodo natural (fin de día/semana/mes/trimestre/año); para periodos cerrados o
+/// `custom`, su propio `to`. Es el denominador de la proyección por ritmo (cuánto queda).
+pub fn period_full_end(
+    period: DashboardPeriod,
+    now: PrimitiveDateTime,
+    custom_from: Option<&str>,
+    custom_to: Option<&str>,
+) -> Result<PrimitiveDateTime, AppError> {
+    Ok(match period {
+        DashboardPeriod::Today => add_days(start_of_day(now), 1),
+        DashboardPeriod::Week => add_days(start_of_week(now), 7),
+        DashboardPeriod::Month => add_months_first(start_of_month(now), 1),
+        DashboardPeriod::Quarter => add_months_first(start_of_quarter(now), 3),
+        DashboardPeriod::Year => add_years_first(start_of_year(now), 1),
+        _ => resolve_period(period, now, custom_from, custom_to)?.to,
+    })
+}
+
+/// Anclajes del «acumulado del mes vs. mes anterior»: rangos diarios del mes en curso (hasta
+/// hoy) y del mes anterior COMPLETO, más el nº de días de cada uno. Todo en UTC (misma
+/// convención que el resto del módulo).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MonthCumulativeBounds {
+    pub cur_start: PrimitiveDateTime,
+    /// Fin exclusivo «hasta hoy» (mañana 00:00).
+    pub cur_to_date_end: PrimitiveDateTime,
+    /// Fin exclusivo del mes en curso completo (día 1 del mes siguiente).
+    pub month_end: PrimitiveDateTime,
+    pub prev_start: PrimitiveDateTime,
+    /// Fin exclusivo del mes anterior (= `cur_start`).
+    pub prev_end: PrimitiveDateTime,
+    /// Días naturales del mes en curso (28–31).
+    pub days_in_month: i64,
+    /// Días transcurridos del mes en curso, hoy incluido (= día del mes de `now`).
+    pub elapsed_days: i64,
+}
+
+pub fn month_cumulative_bounds(now: PrimitiveDateTime) -> MonthCumulativeBounds {
+    let cur_start = start_of_month(now);
+    let month_end = add_months_first(cur_start, 1);
+    let prev_start = add_months_first(cur_start, -1);
+    let cur_to_date_end = add_days(start_of_day(now), 1);
+    MonthCumulativeBounds {
+        cur_start,
+        cur_to_date_end,
+        month_end,
+        prev_start,
+        prev_end: cur_start,
+        days_in_month: (month_end - cur_start).whole_days(),
+        elapsed_days: (cur_to_date_end - cur_start).whole_days(),
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompareMode {
     Day,
@@ -383,5 +466,45 @@ mod tests {
         assert_eq!(delta_pct(150.0, 100.0), Some(50.0));
         assert_eq!(delta_pct(80.0, 100.0), Some(-20.0));
         assert_eq!(delta_pct(10.0, 0.0), None);
+    }
+
+    #[test]
+    fn previous_full_period_de_to_date_usa_periodo_cerrado_anterior() {
+        // Mes en curso (junio) → objetivo = mayo COMPLETO; fin del periodo = 1-jul.
+        let pf = previous_full_period(DashboardPeriod::Month, now(), None, None).unwrap();
+        assert_eq!(pf.from, datetime!(2026-05-01 0:00));
+        assert_eq!(pf.to, datetime!(2026-06-01 0:00));
+        assert_eq!(
+            period_full_end(DashboardPeriod::Month, now(), None, None).unwrap(),
+            datetime!(2026-07-01 0:00),
+        );
+
+        // Hoy → objetivo = ayer; fin del periodo = mañana.
+        let pft = previous_full_period(DashboardPeriod::Today, now(), None, None).unwrap();
+        assert_eq!(pft.from, datetime!(2026-06-16 0:00));
+        assert_eq!(pft.to, datetime!(2026-06-17 0:00));
+        assert_eq!(
+            period_full_end(DashboardPeriod::Today, now(), None, None).unwrap(),
+            datetime!(2026-06-18 0:00),
+        );
+    }
+
+    #[test]
+    fn previous_full_period_de_periodo_cerrado_retrocede_su_duracion() {
+        // Ayer (cerrado) → retrocede su duración: anteayer.
+        let pf = previous_full_period(DashboardPeriod::Yesterday, now(), None, None).unwrap();
+        assert_eq!(pf.from, datetime!(2026-06-15 0:00));
+        assert_eq!(pf.to, datetime!(2026-06-16 0:00));
+    }
+
+    #[test]
+    fn month_cumulative_bounds_junio() {
+        let b = month_cumulative_bounds(now()); // miércoles 2026-06-17
+        assert_eq!(b.cur_start, datetime!(2026-06-01 0:00));
+        assert_eq!(b.month_end, datetime!(2026-07-01 0:00));
+        assert_eq!(b.prev_start, datetime!(2026-05-01 0:00));
+        assert_eq!(b.prev_end, datetime!(2026-06-01 0:00));
+        assert_eq!(b.days_in_month, 30); // junio tiene 30 días
+        assert_eq!(b.elapsed_days, 17); // del 1 al 17 incluido
     }
 }

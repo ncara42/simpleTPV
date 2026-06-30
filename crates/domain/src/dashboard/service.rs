@@ -16,12 +16,15 @@ use uuid::Uuid;
 use crate::store_access::has_store_access;
 
 use super::model::{
-    ArchetypeRotationItem, DiscountByEmployeeItem, MarginKpis, PeriodTotals, ProductRankings,
-    ProductRotationItem, RankByMargin, RankBySales, RankByUnits, SalesByDayItem,
-    SalesByEmployeeItem, SalesByFamilyItem, SalesByHourItem, SalesByStoreItem, SalesKpiSeries,
-    SalesKpis, SalesToday, StockoutKpis, StoreSales,
+    ArchetypeRotationItem, CumulativeMonth, DiscountByEmployeeItem, MarginKpis, PeriodTotals,
+    ProductRankings, ProductRotationItem, RankByMargin, RankBySales, RankByUnits, RecentSaleItem,
+    SalesByDayItem, SalesByEmployeeItem, SalesByFamilyItem, SalesByHourItem, SalesByPaymentItem,
+    SalesByStoreItem, SalesGoal, SalesKpiSeries, SalesKpis, SalesToday, StockoutKpis, StoreSales,
 };
-use super::period::{comparison_starts, delta_pct, CompareMode, DateRange};
+use super::period::{
+    comparison_starts, delta_pct, month_cumulative_bounds, CompareMode, DateRange,
+};
+use crate::sales::model::PaymentMethod;
 
 const ROTATION_LIMIT: i64 = 8;
 const NEW_PRODUCT_DAYS: i64 = 21;
@@ -522,6 +525,251 @@ pub async fn sales_by_day(
                 revenue: f(revenue),
             })
             .collect())
+    })
+    .await
+}
+
+// ── sección 04 «Más exploraciones»: pago / tickets / objetivo / acumulado ────
+// Suma de facturación COMPLETED en un rango (helper de `sales_goal`), sobre la tx del tenant.
+async fn sum_revenue(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    org: Uuid,
+    range: DateRange,
+    store_id: Option<Uuid>,
+) -> Result<f64, sqlx::Error> {
+    let total: Decimal = sqlx::query_scalar(
+        r#"SELECT COALESCE(SUM(total), 0) FROM "Sale"
+           WHERE "organizationId" = $1 AND status = 'COMPLETED'::"SaleStatus"
+             AND "createdAt" >= $2 AND "createdAt" < $3
+             AND ($4::uuid IS NULL OR "storeId" = $4)"#,
+    )
+    .bind(org)
+    .bind(range.from)
+    .bind(range.to)
+    .bind(store_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    Ok(f(total))
+}
+
+// Facturación COMPLETED por día-del-mes (1..31) en un rango (helper de `cumulative_month`).
+async fn daily_by_dom(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    org: Uuid,
+    range: DateRange,
+    store_id: Option<Uuid>,
+) -> Result<Vec<(i32, f64)>, sqlx::Error> {
+    let rows: Vec<(i32, Decimal)> = sqlx::query_as(
+        r#"SELECT EXTRACT(DAY FROM "createdAt")::int AS dom, COALESCE(SUM(total), 0) AS revenue
+           FROM "Sale"
+           WHERE "organizationId" = $1 AND status = 'COMPLETED'::"SaleStatus"
+             AND "createdAt" >= $2 AND "createdAt" < $3
+             AND ($4::uuid IS NULL OR "storeId" = $4)
+           GROUP BY dom ORDER BY dom"#,
+    )
+    .bind(org)
+    .bind(range.from)
+    .bind(range.to)
+    .bind(store_id)
+    .fetch_all(&mut **tx)
+    .await?;
+    Ok(rows.into_iter().map(|(dom, rev)| (dom, f(rev))).collect())
+}
+
+/// Reparto de facturación por método de pago en el periodo (mayor a menor). Cada fila: método,
+/// nº de tickets e importe. Base del donut «Métodos de pago» (#264, sección 04).
+pub async fn sales_by_payment(
+    pool: &PgPool,
+    org: Uuid,
+    range: DateRange,
+    store_id: Option<Uuid>,
+) -> Result<Vec<SalesByPaymentItem>, AppError> {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        let rows: Vec<(PaymentMethod, i64, Decimal)> = sqlx::query_as(
+            r#"SELECT "paymentMethod"::text AS method, COUNT(*) AS count,
+                 COALESCE(SUM(total), 0) AS revenue
+               FROM "Sale"
+               WHERE "organizationId" = $1 AND status = 'COMPLETED'::"SaleStatus"
+                 AND "createdAt" >= $2 AND "createdAt" < $3
+                 AND ($4::uuid IS NULL OR "storeId" = $4)
+               GROUP BY "paymentMethod" ORDER BY revenue DESC"#,
+        )
+        .bind(org)
+        .bind(range.from)
+        .bind(range.to)
+        .bind(store_id)
+        .fetch_all(&mut **tx)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(method, count, revenue)| SalesByPaymentItem {
+                method,
+                count,
+                revenue: f(revenue),
+            })
+            .collect())
+    })
+    .await
+}
+
+/// Últimas ventas COMPLETED (feed de actividad, sección 04). `limit` se acota a [1, 50].
+pub async fn recent_sales(
+    pool: &PgPool,
+    org: Uuid,
+    limit: i64,
+    store_id: Option<Uuid>,
+) -> Result<Vec<RecentSaleItem>, AppError> {
+    let lim = limit.clamp(1, 50);
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        let rows: Vec<(
+            Uuid,
+            String,
+            String,
+            Decimal,
+            PaymentMethod,
+            PrimitiveDateTime,
+        )> = sqlx::query_as(
+            r#"SELECT sa.id, sa."ticketNumber", s.name AS store_name, sa.total,
+                     sa."paymentMethod"::text AS payment_method, sa."createdAt"
+                   FROM "Sale" sa
+                   JOIN "Store" s ON s.id = sa."storeId"
+                   WHERE sa."organizationId" = $1 AND sa.status = 'COMPLETED'::"SaleStatus"
+                     AND ($2::uuid IS NULL OR sa."storeId" = $2)
+                   ORDER BY sa."createdAt" DESC
+                   LIMIT $3"#,
+        )
+        .bind(org)
+        .bind(store_id)
+        .bind(lim)
+        .fetch_all(&mut **tx)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(
+                |(id, ticket_number, store_name, total, payment_method, created_at)| {
+                    RecentSaleItem {
+                        id,
+                        ticket_number,
+                        store_name,
+                        total: f(total),
+                        payment_method,
+                        created_at,
+                    }
+                },
+            )
+            .collect())
+    })
+    .await
+}
+
+/// Objetivo del periodo (sección 04): facturación en curso (`current`), objetivo = periodo
+/// anterior COMPLETO (`target`) y proyección a fin de periodo extrapolando por el tiempo
+/// transcurrido (`projection`). `current`, `prev_full`, `full_end` y `now` los resuelve el
+/// handler con las primitivas de `period` (`previous_full_period` / `period_full_end`).
+pub async fn sales_goal(
+    pool: &PgPool,
+    org: Uuid,
+    current: DateRange,
+    prev_full: DateRange,
+    full_end: PrimitiveDateTime,
+    now: PrimitiveDateTime,
+    store_id: Option<Uuid>,
+) -> Result<SalesGoal, AppError> {
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        let current_rev = sum_revenue(tx, org, current, store_id).await?;
+        let target = sum_revenue(tx, org, prev_full, store_id).await?;
+        // Fracción de periodo transcurrida, acotada a (0, 1]: la proyección extrapola lo
+        // facturado y nunca cae por debajo de lo ya hecho.
+        let elapsed = (now - current.from).as_seconds_f64();
+        let full = (full_end - current.from).as_seconds_f64();
+        let frac = if full > 0.0 {
+            (elapsed / full).clamp(1e-6, 1.0)
+        } else {
+            1.0
+        };
+        Ok(SalesGoal {
+            current: round2(current_rev),
+            target: round2(target),
+            projection: round2((current_rev / frac).max(current_rev)),
+        })
+    })
+    .await
+}
+
+/// Acumulado diario del mes en curso (parcial) vs. el mes anterior completo, con proyección a
+/// fin de mes (sección 04). Las series son acumulados crecientes en euros; la proyección sigue
+/// la FORMA del mes anterior (acumulado anterior a la misma altura), con run-rate lineal de
+/// reserva si el mes anterior no tiene datos a esa altura. `now` lo pasa el handler (testeable).
+pub async fn cumulative_month(
+    pool: &PgPool,
+    org: Uuid,
+    now: PrimitiveDateTime,
+    store_id: Option<Uuid>,
+) -> Result<CumulativeMonth, AppError> {
+    let b = month_cumulative_bounds(now);
+    with_tenant_tx(pool, org, async move |tx, _after| {
+        let cur_daily = daily_by_dom(
+            tx,
+            org,
+            DateRange {
+                from: b.cur_start,
+                to: b.cur_to_date_end,
+            },
+            store_id,
+        )
+        .await?;
+        let prev_daily = daily_by_dom(
+            tx,
+            org,
+            DateRange {
+                from: b.prev_start,
+                to: b.prev_end,
+            },
+            store_id,
+        )
+        .await?;
+
+        // Densifica por día-del-mes (días sin ventas = 0) y acumula.
+        let cumulate = |daily: &[(i32, f64)], days: i64| -> Vec<f64> {
+            let mut by_dom = vec![0.0_f64; (days.max(0) as usize) + 1];
+            for &(dom, rev) in daily {
+                if dom >= 1 && (dom as i64) <= days {
+                    by_dom[dom as usize] += rev;
+                }
+            }
+            let mut acc = 0.0;
+            let mut out = Vec::with_capacity(days.max(0) as usize);
+            for slot in by_dom.iter().skip(1) {
+                acc += *slot;
+                out.push(round2(acc));
+            }
+            out
+        };
+
+        let actual = cumulate(&cur_daily, b.elapsed_days);
+        let prev_days = (b.prev_end - b.prev_start).whole_days();
+        let compare = cumulate(&prev_daily, prev_days);
+
+        let actual_last = actual.last().copied().unwrap_or(0.0);
+        let prev_at_elapsed = compare
+            .get((b.elapsed_days as usize).saturating_sub(1))
+            .copied()
+            .unwrap_or(0.0);
+        let prev_full = compare.last().copied().unwrap_or(0.0);
+        let projection_end = if prev_at_elapsed > 0.0 {
+            actual_last * (prev_full / prev_at_elapsed)
+        } else if b.elapsed_days > 0 {
+            actual_last / b.elapsed_days as f64 * b.days_in_month as f64
+        } else {
+            actual_last
+        };
+
+        Ok(CumulativeMonth {
+            actual,
+            compare,
+            projection_end: round2(projection_end.max(actual_last)),
+            total_points: b.days_in_month,
+        })
     })
     .await
 }

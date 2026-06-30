@@ -7,7 +7,9 @@ use simpletpv_domain::dashboard::period::{
     resolve_period, CompareMode, DashboardPeriod, DateRange,
 };
 use simpletpv_domain::dashboard::service;
+use simpletpv_domain::sales::model::PaymentMethod;
 use sqlx::postgres::{PgPool, PgPoolOptions};
+use time::macros::datetime;
 use time::{OffsetDateTime, PrimitiveDateTime};
 use uuid::Uuid;
 
@@ -573,6 +575,256 @@ async fn sales_by_day_agrupa_por_dia_natural() {
         .expect("aparece el día de la venta reciente");
     assert!((hoy_row.revenue - 45.0).abs() < 1e-9, "ese día factura 45");
     assert_eq!(hoy_row.count, 1, "un ticket ese día");
+
+    teardown(&c).await;
+}
+
+// ── sección 04 «Más exploraciones» ───────────────────────────────────────────
+
+/// Venta COMPLETED mínima (sin línea) con método de pago e instante concretos. Suficiente para
+/// las agregaciones de la sección 04 (que solo leen `Sale`).
+async fn insert_sale_pm(
+    c: &Ctx,
+    ticket: &str,
+    total: &str,
+    method: &str,
+    created: PrimitiveDateTime,
+) {
+    sqlx::query(
+        r#"INSERT INTO "Sale"
+             (id, "organizationId", "storeId", "userId", "ticketNumber", status, "paymentMethod",
+              subtotal, total, "discountTotal", "createdAt")
+           VALUES ($1, $2, $3, $4, $5, 'COMPLETED'::"SaleStatus", $6::"PaymentMethod",
+              $7::numeric, $7::numeric, 0, $8)"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(c.org)
+    .bind(c.store)
+    .bind(c.user)
+    .bind(ticket)
+    .bind(method)
+    .bind(total)
+    .bind(created)
+    .execute(&c.admin)
+    .await
+    .unwrap();
+}
+
+/// `sales_by_payment` agrupa por método, suma importe y nº de tickets y ordena por importe desc.
+#[tokio::test]
+async fn sales_by_payment_agrupa_por_metodo() {
+    let c = setup().await;
+    let pfx = &c.store.simple().to_string()[..8];
+    let t = now_utc() - time::Duration::minutes(10);
+    insert_sale_pm(&c, &format!("P{pfx}-1"), "30.00", "CASH", t).await;
+    insert_sale_pm(&c, &format!("P{pfx}-2"), "20.00", "CASH", t).await;
+    insert_sale_pm(&c, &format!("P{pfx}-3"), "70.00", "CARD", t).await;
+
+    let range = DateRange {
+        from: PrimitiveDateTime::new(
+            (now_utc() - time::Duration::days(1)).date(),
+            time::Time::MIDNIGHT,
+        ),
+        to: PrimitiveDateTime::new(
+            (now_utc() + time::Duration::days(1)).date(),
+            time::Time::MIDNIGHT,
+        ),
+    };
+    let by_pm = service::sales_by_payment(&c.app, c.org, range, Some(c.store))
+        .await
+        .unwrap();
+
+    // CARD (70) primero por importe; CASH agrega los dos tickets (50, 2 tickets).
+    assert_eq!(by_pm.len(), 2, "dos métodos con ventas: {by_pm:?}");
+    assert!(matches!(by_pm[0].method, PaymentMethod::Card));
+    assert!((by_pm[0].revenue - 70.0).abs() < 1e-9);
+    assert_eq!(by_pm[0].count, 1);
+    assert!(matches!(by_pm[1].method, PaymentMethod::Cash));
+    assert!((by_pm[1].revenue - 50.0).abs() < 1e-9);
+    assert_eq!(by_pm[1].count, 2);
+
+    teardown(&c).await;
+}
+
+/// `recent_sales` devuelve las últimas N ventas (más reciente primero) con tienda y método.
+#[tokio::test]
+async fn recent_sales_ordena_y_acota() {
+    let c = setup().await;
+    let pfx = &c.store.simple().to_string()[..8];
+    let t = now_utc();
+    insert_sale_pm(
+        &c,
+        &format!("R{pfx}-old"),
+        "10.00",
+        "CASH",
+        t - time::Duration::hours(3),
+    )
+    .await;
+    insert_sale_pm(
+        &c,
+        &format!("R{pfx}-mid"),
+        "20.00",
+        "CARD",
+        t - time::Duration::hours(2),
+    )
+    .await;
+    insert_sale_pm(
+        &c,
+        &format!("R{pfx}-new"),
+        "30.00",
+        "BIZUM",
+        t - time::Duration::hours(1),
+    )
+    .await;
+
+    let recent = service::recent_sales(&c.app, c.org, 2, Some(c.store))
+        .await
+        .unwrap();
+
+    assert_eq!(recent.len(), 2, "limit=2 acota a las dos más recientes");
+    assert_eq!(recent[0].ticket_number, format!("R{pfx}-new"));
+    assert!((recent[0].total - 30.0).abs() < 1e-9);
+    assert!(matches!(recent[0].payment_method, PaymentMethod::Bizum));
+    assert!(
+        !recent[0].store_name.is_empty(),
+        "incluye el nombre de tienda"
+    );
+    assert_eq!(recent[1].ticket_number, format!("R{pfx}-mid"));
+
+    teardown(&c).await;
+}
+
+/// `sales_goal`: `current` = periodo en curso, `target` = periodo anterior completo, `projection`
+/// = extrapolación por fracción transcurrida (a mitad de periodo, duplica lo facturado).
+#[tokio::test]
+async fn sales_goal_objetivo_y_proyeccion() {
+    let c = setup().await;
+    let pfx = &c.store.simple().to_string()[..8];
+    let base = PrimitiveDateTime::new(
+        (now_utc() - time::Duration::days(40)).date(),
+        time::Time::MIDNIGHT,
+    );
+    let now = base + time::Duration::days(5); // mitad de un periodo de 10 días
+    let current = DateRange {
+        from: base,
+        to: now,
+    };
+    let full_end = base + time::Duration::days(10);
+    let prev_full = DateRange {
+        from: base - time::Duration::days(10),
+        to: base,
+    };
+
+    // En curso: 100 € dentro de [base, now). Anterior completo: 200 €.
+    insert_sale_pm(
+        &c,
+        &format!("G{pfx}-1"),
+        "60.00",
+        "CASH",
+        base + time::Duration::days(1),
+    )
+    .await;
+    insert_sale_pm(
+        &c,
+        &format!("G{pfx}-2"),
+        "40.00",
+        "CASH",
+        base + time::Duration::days(3),
+    )
+    .await;
+    insert_sale_pm(
+        &c,
+        &format!("G{pfx}-3"),
+        "200.00",
+        "CASH",
+        base - time::Duration::days(5),
+    )
+    .await;
+
+    let goal = service::sales_goal(
+        &c.app,
+        c.org,
+        current,
+        prev_full,
+        full_end,
+        now,
+        Some(c.store),
+    )
+    .await
+    .unwrap();
+
+    assert!((goal.current - 100.0).abs() < 1e-9, "en curso = 60 + 40");
+    assert!(
+        (goal.target - 200.0).abs() < 1e-9,
+        "objetivo = periodo anterior completo"
+    );
+    // frac = 5/10 = 0,5 → proyección = 100 / 0,5 = 200.
+    assert!(
+        (goal.projection - 200.0).abs() < 1e-6,
+        "proj={}",
+        goal.projection
+    );
+
+    teardown(&c).await;
+}
+
+/// `cumulative_month`: acumulados crecientes del mes en curso (parcial) y del anterior (completo),
+/// con proyección por la FORMA del mes anterior (150 × 200/80 = 375 a fin de mes).
+#[tokio::test]
+async fn cumulative_month_acumula_y_proyecta() {
+    let c = setup().await;
+    let pfx = &c.store.simple().to_string()[..8];
+    let now = datetime!(2026-06-15 12:00);
+    // Mes en curso (junio): 100 el día 5, 50 el día 10 → acumulado a día 15 = 150.
+    insert_sale_pm(
+        &c,
+        &format!("M{pfx}-1"),
+        "100.00",
+        "CASH",
+        datetime!(2026-06-05 9:00),
+    )
+    .await;
+    insert_sale_pm(
+        &c,
+        &format!("M{pfx}-2"),
+        "50.00",
+        "CASH",
+        datetime!(2026-06-10 9:00),
+    )
+    .await;
+    // Mes anterior (mayo): 80 el día 10, 120 el día 20 → a día 15 lleva 80; total 200.
+    insert_sale_pm(
+        &c,
+        &format!("M{pfx}-3"),
+        "80.00",
+        "CASH",
+        datetime!(2026-05-10 9:00),
+    )
+    .await;
+    insert_sale_pm(
+        &c,
+        &format!("M{pfx}-4"),
+        "120.00",
+        "CASH",
+        datetime!(2026-05-20 9:00),
+    )
+    .await;
+
+    let cm = service::cumulative_month(&c.app, c.org, now, Some(c.store))
+        .await
+        .unwrap();
+
+    assert_eq!(cm.total_points, 30, "junio tiene 30 días");
+    assert_eq!(cm.actual.len(), 15, "acumulado del 1 al 15");
+    assert!((cm.actual.last().copied().unwrap() - 150.0).abs() < 1e-9);
+    assert_eq!(cm.compare.len(), 31, "mayo completo (31 días)");
+    assert!((cm.compare.last().copied().unwrap() - 200.0).abs() < 1e-9);
+    // Forma del mes anterior: 150 × (200 / 80) = 375.
+    assert!(
+        (cm.projection_end - 375.0).abs() < 1e-6,
+        "proj={}",
+        cm.projection_end
+    );
 
     teardown(&c).await;
 }

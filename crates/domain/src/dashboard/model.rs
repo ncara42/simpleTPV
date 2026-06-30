@@ -5,6 +5,8 @@
 use serde::Serialize;
 use uuid::Uuid;
 
+use crate::sales::model::PaymentMethod;
+
 // ── sales-today (comparativa por tienda + intradía) ──────────────────────────
 
 #[derive(Debug, Clone, Serialize)]
@@ -85,6 +87,55 @@ pub struct SalesByDayItem {
     pub day: String,
     pub count: i64,
     pub revenue: f64,
+}
+
+// ── sales-by-payment / recent-sales / sales-goal / cumulative-month ──────────
+// Datos «honestos» para la sección 04 «Más exploraciones» del rediseño: reparto por método de
+// pago (donut), últimas ventas (feed), objetivo vs. periodo anterior (bullet) y acumulado del
+// mes con proyección (área). Todo agregado real de `Sale` — sin datos inventados.
+
+/// Reparto de facturación por método de pago en el periodo (mayor a menor).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SalesByPaymentItem {
+    pub method: PaymentMethod,
+    pub count: i64,
+    pub revenue: f64,
+}
+
+/// Una venta reciente para el feed de actividad (`createdAt` ISO-8601 UTC).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentSaleItem {
+    pub id: Uuid,
+    pub ticket_number: String,
+    pub store_name: String,
+    pub total: f64,
+    pub payment_method: PaymentMethod,
+    #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
+    pub created_at: time::PrimitiveDateTime,
+}
+
+/// Objetivo del periodo: facturación en curso (`current`), objetivo = periodo anterior completo
+/// (`target`) y proyección a fin de periodo por ritmo transcurrido (`projection`).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SalesGoal {
+    pub current: f64,
+    pub target: f64,
+    pub projection: f64,
+}
+
+/// Acumulado diario del mes en curso (`actual`, parcial) vs. el mes anterior completo
+/// (`compare`), con proyección a fin de mes (`projection_end`) y nº de días del mes en curso
+/// (`total_points`). Series acumuladas crecientes, en euros.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CumulativeMonth {
+    pub actual: Vec<f64>,
+    pub compare: Vec<f64>,
+    pub projection_end: f64,
+    pub total_points: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]

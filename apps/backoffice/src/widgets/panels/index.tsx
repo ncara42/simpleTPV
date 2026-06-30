@@ -16,6 +16,12 @@ import {
   SupplierComparison,
 } from './especializados.js';
 import { ComplianceChecks, OperationalStatus, StepProgress } from './estado.js';
+import {
+  ExpCumulativeMonth,
+  ExpGoal,
+  ExpPaymentMethods,
+  ExpRecentTickets,
+} from './exploraciones.js';
 import { HourArea, HourHeatmap, StoreBars } from './graficas.js';
 import { ClassicKpiCard, ConnectedKpiGrid } from './kpis.js';
 import { AlertKpi, AreaKpi, DualKpi, SevenDayKpi } from './kpis-formatos.js';
@@ -56,6 +62,11 @@ export const WIDGET_PANELS: Record<string, (props: PanelProps) => ReactElement> 
   'lista-familia': FamilyShare,
   'lista-rankings': ProductRanking,
   'lista-mix': SalesMix,
+  // Sección 04 · Más exploraciones
+  'exp-objetivo': ExpGoal,
+  'exp-metodos-pago': ExpPaymentMethods,
+  'exp-tickets-recientes': ExpRecentTickets,
+  'exp-acumulado-mes': ExpCumulativeMonth,
   // Sección 05 · Compactos
   'cmp-ribbon': CompactRibbon,
   'cmp-donut': CompactDonut,
