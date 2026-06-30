@@ -551,13 +551,19 @@
   font-size: 0.9rem;
   color: var(--ui-text-soft);
 }
-.store-log-table th,
-.store-log-table td {
-  padding: 0.6rem 0.7rem;
+/* Tabla agrupada del registro de fichajes (FacetedTable) dentro del drawer:
+   ocupa el alto disponible y scrollea por dentro (thead/cabecera de grupo sticky).
+   Sin la sangría de 3.3rem del catálogo: el drawer es estrecho. */
+.store-log-main {
+  flex: 1;
+  min-height: 0;
 }
-.store-log-table th:first-child,
-.store-log-table td:first-child {
-  padding-left: 0;
+.store-log-main .cat-thead .cat-th-name,
+.store-log-main .cat-row .cat-cell-name {
+  padding-left: 0.9rem;
+}
+.store-log-main .cat-group-inner {
+  padding-left: 0.9rem;
 }
 .store-log-time {
   font-variant-numeric: tabular-nums;

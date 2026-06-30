@@ -1,10 +1,11 @@
-import { DataTable } from '@simpletpv/ui';
+import { type FacetedColumn, FacetedTable } from '@simpletpv/ui';
 
 import { fmtDayMonth } from '../lib/format.js';
 import type { StoreLogEntry } from '../lib/time-clock.js';
 
-// Pop-up lateral (derecha) con el registro de fichajes de una tienda: tabla con
-// empleado, fecha, hora y movimiento (apertura/cierre). Presentacional.
+// Pop-up lateral (derecha) con el registro de fichajes de una tienda: tabla
+// agrupada por día (mismo lenguaje que Fichajes/Inventario) con empleado, hora y
+// movimiento (apertura/cierre). Presentacional.
 export function StoreLogDrawer({
   storeName,
   entries,
@@ -14,6 +15,42 @@ export function StoreLogDrawer({
   entries: StoreLogEntry[];
   onClose: () => void;
 }) {
+  const columns: FacetedColumn<StoreLogEntry>[] = [
+    { key: 'name', header: 'Empleado', variant: 'name', render: (e) => e.name },
+    {
+      key: 'time',
+      header: 'Hora',
+      variant: 'mid',
+      render: (e) => <span className="store-log-time">{e.time}</span>,
+    },
+    {
+      key: 'type',
+      header: 'Movimiento',
+      variant: 'state',
+      render: (e) => (
+        <span className={`store-log-tag ${e.type === 'apertura' ? 'is-open' : 'is-close'}`}>
+          {e.type === 'apertura' ? 'Apertura' : 'Cierre'}
+        </span>
+      ),
+    },
+  ];
+
+  // Grupos por día, conservando el orden de llegada (más reciente primero).
+  const groups = (() => {
+    const byDate = new Map<string, StoreLogEntry[]>();
+    for (const e of entries) {
+      const arr = byDate.get(e.date);
+      if (arr) arr.push(e);
+      else byDate.set(e.date, [e]);
+    }
+    return [...byDate.entries()].map(([date, rows]) => ({
+      key: date,
+      label: fmtDayMonth(date),
+      meta: `${rows.length} ${rows.length === 1 ? 'registro' : 'registros'}`,
+      rows,
+    }));
+  })();
+
   return (
     <div className="drawer-backdrop" onClick={onClose}>
       <aside
@@ -44,36 +81,13 @@ export function StoreLogDrawer({
             Sin registros de fichaje.
           </p>
         ) : (
-          <div className="store-log-table-wrap">
-            <DataTable
-              className="store-log-table"
-              data-testid="store-log-table"
-              rows={entries}
-              rowKey={(e) => `${e.date}-${e.time}-${e.type}`}
-              columns={[
-                { key: 'name', header: 'Empleado', render: (e) => e.name },
-                {
-                  key: 'date',
-                  header: 'Fecha',
-                  render: (e) => <span className="muted">{fmtDayMonth(e.date)}</span>,
-                },
-                {
-                  key: 'time',
-                  header: 'Hora',
-                  render: (e) => <span className="store-log-time">{e.time}</span>,
-                },
-                {
-                  key: 'type',
-                  header: 'Movimiento',
-                  render: (e) => (
-                    <span
-                      className={`store-log-tag ${e.type === 'apertura' ? 'is-open' : 'is-close'}`}
-                    >
-                      {e.type === 'apertura' ? 'Apertura' : 'Cierre'}
-                    </span>
-                  ),
-                },
-              ]}
+          <div className="cat-main cat-main--solo store-log-main" data-testid="store-log-table">
+            <FacetedTable<StoreLogEntry>
+              layout="table"
+              columns={columns}
+              groups={groups}
+              rowKey={(e) => `${e.date}-${e.time}-${e.type}-${e.name}`}
+              rowTestId="store-log-row"
             />
           </div>
         )}
