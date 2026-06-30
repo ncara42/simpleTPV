@@ -3,8 +3,8 @@ import {
   type DataTableColumn,
   type FacetedColumn,
   FacetedTable,
+  type FacetSection,
   Input,
-  Select,
 } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,6 +12,7 @@ import { Check, Plus, SlidersHorizontal, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { CsvActionButton } from './components/CsvActionButton.js';
+import { FacetRail } from './components/FacetRail.js';
 import { ImportExportModal } from './components/ImportExportModal.js';
 import { Modal } from './components/Modal.js';
 import { ScrollShadowCell } from './components/ScrollShadowCell.js';
@@ -101,9 +102,16 @@ export function UsersPage() {
       else next.add(key);
       return next;
     });
-  // Filtros de la barra superior (espejo de la toolbar de stock).
+  // Facetas del carril: búsqueda por nombre + rol/tienda en multi-selección (vacío = todos).
   const [search, setSearch] = useState('');
-  const [storeFilter, setStoreFilter] = useState('');
+  const [roleSet, setRoleSet] = useState<ReadonlySet<string>>(new Set());
+  const [storeSet, setStoreSet] = useState<ReadonlySet<string>>(new Set());
+  const toggleInSet = (set: ReadonlySet<string>, key: string): Set<string> => {
+    const next = new Set(set);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
+  };
   // Selección múltiple por fila (ids marcados).
   const [selected, setSelected] = useState<string[]>([]);
 
@@ -123,17 +131,59 @@ export function UsersPage() {
     [users],
   );
 
-  // Búsqueda por nombre + filtro por tienda. Los ADMIN acceden a todas las
-  // tiendas (storeIds vacío), así que aparecen en cualquier filtro de tienda.
+  // Conjunto tras la búsqueda (alimenta los recuentos de las facetas).
+  const searched = useMemo<UserWithStores[]>(
+    () => allUsers.filter((u) => !search || u.name.toLowerCase().includes(search.toLowerCase())),
+    [allUsers, search],
+  );
+
+  // Búsqueda + rol + tienda (multi). Los ADMIN acceden a todas las tiendas (storeIds
+  // vacío), así que entran en cualquier filtro de tienda.
   const filtered = useMemo<UserWithStores[]>(
     () =>
-      allUsers.filter((u) => {
-        if (search && !u.name.toLowerCase().includes(search.toLowerCase())) return false;
-        if (storeFilter && u.role !== 'ADMIN' && !(u.storeIds ?? []).includes(storeFilter))
+      searched.filter((u) => {
+        if (roleSet.size > 0 && !roleSet.has(u.role)) return false;
+        if (
+          storeSet.size > 0 &&
+          u.role !== 'ADMIN' &&
+          !(u.storeIds ?? []).some((s) => storeSet.has(s))
+        )
           return false;
         return true;
       }),
-    [allUsers, search, storeFilter],
+    [searched, roleSet, storeSet],
+  );
+
+  // Secciones del carril: Rol (checks) + Tienda (checks), con recuentos sobre `searched`.
+  const railSections = useMemo<FacetSection[]>(
+    () => [
+      {
+        kind: 'checks',
+        title: 'Rol',
+        options: ROLES.map((r) => ({
+          key: r.value,
+          label: r.label,
+          count: searched.filter((u) => u.role === r.value).length,
+        })),
+        selected: roleSet,
+        onToggle: (key) => setRoleSet((prev) => toggleInSet(prev, key)),
+        testIdPrefix: 'users-role',
+      },
+      {
+        kind: 'checks',
+        title: 'Tienda',
+        options: stores.map((s) => ({
+          key: s.id,
+          label: s.name,
+          count: searched.filter((u) => u.role === 'ADMIN' || (u.storeIds ?? []).includes(s.id))
+            .length,
+        })),
+        selected: storeSet,
+        onToggle: (key) => setStoreSet((prev) => toggleInSet(prev, key)),
+        testIdPrefix: 'users-store',
+      },
+    ],
+    [searched, roleSet, storeSet, stores],
   );
 
   usePageHeader('Usuarios', `${allUsers.length} usuarios`, 'users-count');
@@ -380,32 +430,80 @@ export function UsersPage() {
       rows: g.rows,
     }));
 
+  // Acciones de la TopBar: con selección, acciones en lote (Editar/Borrar/Quitar);
+  // sin selección, exportar/importar/columnas + alta (no hay toolbar en la card).
   usePageActions(
-    <>
-      <CsvActionButton
-        kind="export"
-        label="Exportar"
-        onClick={() => setDataModal('export')}
-        testId="users-export"
-      />
-      <CsvActionButton
-        kind="import"
-        label="Importar"
-        onClick={() => setDataModal('import')}
-        testId="users-import"
-      />
-      <button
-        type="button"
-        className={`float-action-btn${columnsEditorOpen ? ' is-active' : ''}`}
-        onClick={toggleColumnsEditor}
-        aria-label="Ajustar columnas"
-        title="Columnas"
-        aria-expanded={columnsEditorOpen}
-        data-testid="users-columns-toggle"
-      >
-        <SlidersHorizontal size={17} aria-hidden="true" />
-      </button>
-    </>,
+    selected.length > 0 ? (
+      <>
+        {!allFilteredSelected && (
+          <button
+            type="button"
+            className="users-sel-btn"
+            onClick={selectAllFiltered}
+            data-testid="users-select-all"
+          >
+            Seleccionar todo
+          </button>
+        )}
+        <button
+          type="button"
+          className="users-sel-btn"
+          onClick={clearSelection}
+          data-testid="users-clear"
+        >
+          Quitar selección
+        </button>
+        <button
+          type="button"
+          className="users-bulk-edit"
+          onClick={openBulkEdit}
+          data-testid="users-edit"
+        >
+          Editar{selected.length > 1 ? ` (${selected.length})` : ''}
+        </button>
+        <button
+          type="button"
+          className="users-bulk-del"
+          onClick={removeSelected}
+          data-testid="users-delete"
+        >
+          Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
+        </button>
+      </>
+    ) : (
+      <>
+        <CsvActionButton
+          kind="export"
+          label="Exportar"
+          onClick={() => setDataModal('export')}
+          testId="users-export"
+        />
+        <CsvActionButton
+          kind="import"
+          label="Importar"
+          onClick={() => setDataModal('import')}
+          testId="users-import"
+        />
+        <button
+          type="button"
+          className={`float-action-btn${columnsEditorOpen ? ' is-active' : ''}`}
+          onClick={toggleColumnsEditor}
+          aria-label="Ajustar columnas"
+          title="Columnas"
+          aria-expanded={columnsEditorOpen}
+          data-testid="users-columns-toggle"
+        >
+          <SlidersHorizontal size={17} aria-hidden="true" />
+        </button>
+        <Button
+          onClick={openCreate}
+          data-testid="new-user"
+          icon={<Plus size={16} aria-hidden="true" />}
+        >
+          Nuevo usuario
+        </Button>
+      </>
+    ),
   );
 
   return (
@@ -413,104 +511,39 @@ export function UsersPage() {
       {columnsEditor}
 
       <div className="inv-card">
-        <div className="cat-card-toolbar">
-          <div className="users-toolbar">
-            <div className="sales-filters">
-              <span className="search-field">
-                <Input
-                  className="catalog-search"
-                  placeholder="Buscar por nombre…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  data-testid="users-search"
-                />
-              </span>
-              <Select
-                className="catalog-search"
-                value={storeFilter}
-                onChange={setStoreFilter}
-                ariaLabel="Filtrar por tienda"
-                data-testid="users-store"
-                options={[
-                  { value: '', label: 'Todas las tiendas' },
-                  ...stores.map((s) => ({ value: s.id, label: s.name })),
-                ]}
-              />
-              {selected.length > 0 && (
-                <>
-                  {!allFilteredSelected && (
-                    <button
-                      type="button"
-                      className="users-sel-btn"
-                      onClick={selectAllFiltered}
-                      data-testid="users-select-all"
-                    >
-                      Seleccionar todo
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="users-sel-btn"
-                    onClick={clearSelection}
-                    data-testid="users-clear"
-                  >
-                    Quitar selección
-                  </button>
-                </>
-              )}
-            </div>
-            {selected.length > 0 ? (
-              <div className="ui-dt-toolbar-actions">
-                <button
-                  type="button"
-                  className="users-bulk-edit"
-                  onClick={openBulkEdit}
-                  data-testid="users-edit"
-                >
-                  Editar{selected.length > 1 ? ` (${selected.length})` : ''}
-                </button>
-                <button
-                  type="button"
-                  className="users-bulk-del"
-                  onClick={removeSelected}
-                  data-testid="users-delete"
-                >
-                  Borrar{selected.length > 1 ? ` (${selected.length})` : ''}
-                </button>
-              </div>
-            ) : (
-              <div className="ui-dt-toolbar-actions">
-                <Button
-                  onClick={openCreate}
-                  data-testid="new-user"
-                  icon={<Plus size={16} aria-hidden="true" />}
-                >
-                  Nuevo usuario
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-        <ScrollShadowCell className="cat-main cat-main--solo" data-testid="users-table">
-          <FacetedTable<UserWithStores>
-            layout="table"
-            columns={facetedColumns}
-            groups={groups}
-            rowKey={(u) => u.id}
-            loading={isLoading}
-            selectable
-            selectedKeys={selectedSet}
-            onToggleSelect={toggleSelect}
-            selectTestId="user-select"
-            selectAriaLabel={(u) => `Seleccionar ${u.name}`}
-            collapsedKeys={collapsedRoles}
-            onToggleGroup={toggleGroup}
-            rowTestId="user-row"
-            emptyState={
-              <span data-testid="users-empty">Sin usuarios para los filtros seleccionados.</span>
-            }
+        <div className="cat-layout">
+          <FacetRail
+            ariaLabel="Filtros de usuarios"
+            testId="users-facets"
+            search={{
+              value: search,
+              onChange: setSearch,
+              placeholder: 'Buscar por nombre…',
+              testId: 'users-search',
+            }}
+            sections={railSections}
           />
-        </ScrollShadowCell>
+          <ScrollShadowCell className="cat-main" data-testid="users-table">
+            <FacetedTable<UserWithStores>
+              layout="table"
+              columns={facetedColumns}
+              groups={groups}
+              rowKey={(u) => u.id}
+              loading={isLoading}
+              selectable
+              selectedKeys={selectedSet}
+              onToggleSelect={toggleSelect}
+              selectTestId="user-select"
+              selectAriaLabel={(u) => `Seleccionar ${u.name}`}
+              collapsedKeys={collapsedRoles}
+              onToggleGroup={toggleGroup}
+              rowTestId="user-row"
+              emptyState={
+                <span data-testid="users-empty">Sin usuarios para los filtros seleccionados.</span>
+              }
+            />
+          </ScrollShadowCell>
+        </div>
       </div>
 
       {form && (

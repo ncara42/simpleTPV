@@ -599,24 +599,29 @@ test('Proveedores: vista detalle — datos editables, tarifa con import CSV y pe
   await expect(page.getByTestId('sp-table')).toContainText('3,21');
 });
 
-test('Control horario muestra la tabla de fichajes con totales', async ({ page }) => {
+test('Control horario muestra la tabla de fichajes agrupada por día', async ({ page }) => {
   await navTo(page, 'timeclock');
   await expect(page.getByTestId('timeclock-table')).toBeVisible();
   await expect(page.getByTestId('timeclock-row').first()).toBeVisible();
   expect(await page.getByTestId('timeclock-row').count()).toBeGreaterThan(0);
-  await expect(page.getByTestId('timeclock-totals')).toContainText('jornada');
+  // Carril de facetas + cabeceras de grupo por día (mismo aspecto que Inventario).
+  await expect(page.getByTestId('timeclock-facets')).toBeVisible();
+  await expect(page.locator('.cat-group-name').first()).toBeVisible();
 });
 
-test('Control horario: filtro por empleado reduce las jornadas', async ({ page }) => {
+test('Control horario: faceta de empleado reduce las jornadas', async ({ page }) => {
   await navTo(page, 'timeclock');
   await expect(page.getByTestId('timeclock-table')).toBeVisible();
-  // Filtrar por la encargada (tiene jornadas en el seed): solo aparecen las suyas.
-  await selectByLabel(page, 'timeclock-employee', 'Encargada');
+  // Filtrar por la encargada desde el carril (faceta del empleado): solo sus jornadas.
+  const encargada = page
+    .getByTestId('timeclock-facets')
+    .locator('label.cat-facet-opt', { hasText: 'Encargada' });
+  await encargada.click();
   const rows = page.getByTestId('timeclock-row');
   expect(await rows.count()).toBeGreaterThan(0);
   await expect(rows.first()).toContainText('Encargada');
-  // Limpiar el filtro vuelve a mostrar jornadas.
-  await page.getByTestId('timeclock-clear').click();
+  // Quitar la faceta vuelve a mostrar todas las jornadas.
+  await encargada.click();
   expect(await page.getByTestId('timeclock-row').count()).toBeGreaterThan(0);
 });
 
