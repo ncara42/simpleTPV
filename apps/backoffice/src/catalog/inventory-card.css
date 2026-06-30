@@ -349,6 +349,20 @@
   display: none;
 }
 
+/* Shell facetado AUTÓNOMO (no depende de un padre flex): card full-height para
+   tablas facetadas que viven dentro de una `.catalog` normal (p. ej. Pedidos y
+   Tarifas en el shell de Proveedores). La sección `.catalog` anula su ancho máximo
+   centrado al contener uno, igual que `.catalog:has(.suppliers-shell)`. */
+.faceted-page {
+  height: calc(100dvh - 60px - 1.9rem);
+  display: flex;
+  flex-direction: column;
+}
+.catalog:has(.faceted-page) {
+  max-width: none;
+  margin: 0;
+}
+
 /* ─── Card facetada SIN carril (toolbar + tabla agrupada + footer) ────────────
    Variantes navegables con filtros tipo dropdown (Fichajes, Pedidos, Tarifas,
    Usuarios): conservan su toolbar/footer como bandas y la tabla agrupada llena la

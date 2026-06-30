@@ -845,3 +845,13 @@
     transition: none;
   }
 }
+
+/* Banda sobre la card facetada de Tarifas (pestaña): sub-nav de vistas
+   (Tarifas/Comparativa) a la izquierda + «Añadir tarifa» a la derecha. */
+.sp-tab-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}

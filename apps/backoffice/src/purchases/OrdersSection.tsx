@@ -1,9 +1,18 @@
 import type { PurchaseOrder, PurchaseOrderStatus } from '@simpletpv/auth';
-import { Button, DataTable, type FacetedColumn, FacetedTable, Input } from '@simpletpv/ui';
+import {
+  Button,
+  DataTable,
+  type FacetedColumn,
+  FacetedTable,
+  type FacetSection,
+  Input,
+} from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 
+import { FacetRail } from '../components/FacetRail.js';
 import { Modal } from '../components/Modal.js';
+import { ScrollShadowCell } from '../components/ScrollShadowCell.js';
 import {
   confirmPurchaseOrder,
   getPurchaseOrder,
@@ -30,6 +39,8 @@ export function OrdersSection({
   const qc = useQueryClient();
   const [detailId, setDetailId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  // Faceta «Estado» del carril (solo en la pestaña; '' = todos los estados).
+  const [view, setView] = useState<string>('');
   const toggleGroup = (key: string): void =>
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -48,10 +59,12 @@ export function OrdersSection({
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['purchase-orders'] }),
   });
 
+  // En la pestaña, la faceta «Estado» filtra; en la ficha no hay carril (view = '').
+  const shown = view ? orders.filter((o) => o.status === view) : orders;
   // Grupos por estado (solo los presentes), pedidos recientes primero dentro de cada uno.
   const groups = STATUS_ORDER.map((status) => ({
     status,
-    rows: orders
+    rows: shown
       .filter((o) => o.status === status)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
   }))
@@ -101,48 +114,89 @@ export function OrdersSection({
     },
   ];
 
+  const emptyState: ReactNode = supplierId ? (
+    <span className="catalog-empty" data-testid="orders-empty">
+      Este proveedor no tiene pedidos de compra.
+    </span>
+  ) : (
+    <div className="purchases-empty" data-testid="orders-empty">
+      <span className="purchases-empty-icon" aria-hidden="true">
+        <svg
+          width="26"
+          height="26"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+          <path d="M3.27 6.96 12 12.01l8.73-5.05" />
+        </svg>
+      </span>
+      <p className="purchases-empty-title">Sin pedidos abiertos</p>
+      <p className="purchases-empty-text">
+        Genera una propuesta automática a partir de ventas, rotación y mínimos.
+      </p>
+    </div>
+  );
+
+  const table = (
+    <FacetedTable<PurchaseOrder>
+      layout="table"
+      columns={columns}
+      groups={groups}
+      rowKey={(o) => o.id}
+      rowTestId="order-row"
+      loading={isLoading}
+      collapsedKeys={collapsed}
+      onToggleGroup={toggleGroup}
+      emptyState={emptyState}
+    />
+  );
+
+  // Contexto embebido (ficha de proveedor): tabla agrupada simple, sin carril.
+  if (supplierId) {
+    return (
+      <>
+        <div className="table-panel">{table}</div>
+        {detailId && <OrderDetailModal id={detailId} onClose={() => setDetailId(null)} />}
+      </>
+    );
+  }
+
+  // Contexto de pestaña: carril de facetas (Estado) + tabla agrupada, full-height,
+  // mismo aspecto que Existencias/Proveedores.
+  const sections: FacetSection[] = [
+    {
+      kind: 'views',
+      title: 'Estado',
+      options: [
+        { key: '', label: 'Todos los pedidos', count: orders.length },
+        ...STATUS_ORDER.filter((s) => orders.some((o) => o.status === s)).map((s) => ({
+          key: s,
+          label: STATUS_LABEL[s],
+          count: orders.filter((o) => o.status === s).length,
+        })),
+      ],
+      active: view,
+      onSelect: setView,
+      testIdPrefix: 'orders-view',
+    },
+  ];
+
   return (
     <>
-      <div className="table-panel">
-        <FacetedTable<PurchaseOrder>
-          layout="table"
-          columns={columns}
-          groups={groups}
-          rowKey={(o) => o.id}
-          rowTestId="order-row"
-          loading={isLoading}
-          collapsedKeys={collapsed}
-          onToggleGroup={toggleGroup}
-          emptyState={
-            supplierId ? (
-              <span className="catalog-empty" data-testid="orders-empty">
-                Este proveedor no tiene pedidos de compra.
-              </span>
-            ) : (
-              <div className="purchases-empty" data-testid="orders-empty">
-                <span className="purchases-empty-icon" aria-hidden="true">
-                  <svg
-                    width="26"
-                    height="26"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                    <path d="M3.27 6.96 12 12.01l8.73-5.05" />
-                  </svg>
-                </span>
-                <p className="purchases-empty-title">Sin pedidos abiertos</p>
-                <p className="purchases-empty-text">
-                  Genera una propuesta automática a partir de ventas, rotación y mínimos.
-                </p>
-              </div>
-            )
-          }
-        />
+      <div className="faceted-page">
+        <div className="inv-card">
+          <div className="cat-layout">
+            <FacetRail ariaLabel="Filtros de pedidos" testId="orders-facets" sections={sections} />
+            <ScrollShadowCell className="cat-main" data-testid="orders-table">
+              {table}
+            </ScrollShadowCell>
+          </div>
+        </div>
       </div>
       {detailId && <OrderDetailModal id={detailId} onClose={() => setDetailId(null)} />}
     </>

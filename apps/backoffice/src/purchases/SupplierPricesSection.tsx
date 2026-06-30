@@ -5,6 +5,7 @@ import {
   type DataTableColumn,
   type FacetedColumn,
   FacetedTable,
+  type FacetSection,
   Input,
   Select,
 } from '@simpletpv/ui';
@@ -13,7 +14,9 @@ import { Plus, SlidersHorizontal, Upload } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 import { CsvDropzone } from '../components/CsvDropzone.js';
+import { FacetRail } from '../components/FacetRail.js';
 import { Modal } from '../components/Modal.js';
+import { ScrollShadowCell } from '../components/ScrollShadowCell.js';
 import { useTableColumns } from '../components/useTableColumns.js';
 import { listFamilies } from '../lib/families.js';
 import { flattenTree } from '../lib/family-tree.js';
@@ -50,6 +53,8 @@ export function SupplierPricesSection({
   const [familyId, setFamilyId] = useState('');
   const [importing, setImporting] = useState(false);
   const [adding, setAdding] = useState(false);
+  // Búsqueda del carril (por producto/SKU) en la vista de tarifas.
+  const [tarifaSearch, setTarifaSearch] = useState('');
   // Proveedores plegados (key = supplierId): cabeceras de grupo plegables.
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const toggleGroup = (key: string): void =>
@@ -148,10 +153,18 @@ export function SupplierPricesSection({
     },
   ];
 
+  // Filtro del carril por producto/SKU (búsqueda).
+  const tq = tarifaSearch.trim().toLowerCase();
+  const shownPrices = tq
+    ? prices.filter(
+        (p) => p.productName.toLowerCase().includes(tq) || (p.sku ?? '').toLowerCase().includes(tq),
+      )
+    : prices;
+
   // Grupos por proveedor (productos ordenados alfabéticamente dentro de cada uno).
   const priceGroups = (() => {
     const bySupplier = new Map<string, { name: string; rows: PriceRow[] }>();
-    for (const p of prices) {
+    for (const p of shownPrices) {
       const entry = bySupplier.get(p.supplierId) ?? { name: p.supplierName, rows: [] };
       entry.rows.push(p);
       bySupplier.set(p.supplierId, entry);
@@ -165,6 +178,36 @@ export function SupplierPricesSection({
         rows: [...e.rows].sort((a, b) => a.productName.localeCompare(b.productName)),
       }));
   })();
+
+  // Tabla agrupada de tarifas (común a la pestaña y a la ficha de proveedor).
+  const priceTable = (
+    <FacetedTable<PriceRow>
+      layout="table"
+      columns={facetedColumns}
+      groups={priceGroups}
+      rowKey={(r) => r.id}
+      loading={pricesLoading}
+      collapsedKeys={collapsed}
+      onToggleGroup={toggleGroup}
+      rowTestId="sp-row"
+      emptyState={<span data-testid="sp-empty">Sin tarifas. Añade una o impórtalas por CSV.</span>}
+    />
+  );
+
+  // Carril de la pestaña: Proveedor (selección única) + búsqueda por producto.
+  const tarifaSections: FacetSection[] = [
+    {
+      kind: 'views',
+      title: 'Proveedor',
+      options: [
+        { value: '', label: 'Todos los proveedores' },
+        ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+      ].map((o) => ({ key: o.value, label: o.label })),
+      active: supplierId,
+      onSelect: setSupplierId,
+      testIdPrefix: 'sp-view-supplier',
+    },
+  ];
 
   // ── Comparativa gráfica ──
   // S-25 (DR-06/P154): la comparativa de precios entre proveedores SIEMPRE se
@@ -278,57 +321,71 @@ export function SupplierPricesSection({
   return (
     <section className="catalog">
       {view === 'tarifas' ? (
-        <>
-          {columnsEditor}
-
-          <div className="table-panel">
-            {renderHeader(
-              <div className="users-toolbar">
-                <div className="sales-filters">
-                  {!fixedSupplierId && (
-                    <Select
-                      className="catalog-search"
-                      value={supplierId}
-                      onChange={setSupplierId}
-                      ariaLabel="Proveedor"
-                      data-testid="sp-supplier"
-                      options={[
-                        { value: '', label: 'Todos los proveedores' },
-                        ...suppliers.map((s) => ({ value: s.id, label: s.name })),
-                      ]}
-                    />
-                  )}
+        fixedSupplierId ? (
+          // Ficha de proveedor (embebido): tabla agrupada simple, sin carril.
+          <>
+            {columnsEditor}
+            <div className="table-panel">
+              <div className="dt-header-row">
+                <div className="users-toolbar">
+                  <div className="sales-filters" />
+                  <div className="ui-dt-toolbar-actions">
+                    <Button
+                      type="button"
+                      disabled={!supplierId}
+                      onClick={() => setAdding(true)}
+                      data-testid="sp-add"
+                      icon={<Plus size={16} aria-hidden="true" />}
+                    >
+                      Añadir tarifa
+                    </Button>
+                  </div>
                 </div>
-                <div className="ui-dt-toolbar-actions">
-                  <Button
-                    type="button"
-                    disabled={!supplierId}
-                    onClick={() => setAdding(true)}
-                    data-testid="sp-add"
-                    icon={<Plus size={16} aria-hidden="true" />}
-                  >
-                    Añadir tarifa
-                  </Button>
-                </div>
-              </div>,
-            )}
-            <div className="cat-main cat-main--solo" data-testid="sp-table">
-              <FacetedTable<PriceRow>
-                layout="table"
-                columns={facetedColumns}
-                groups={priceGroups}
-                rowKey={(r) => r.id}
-                loading={pricesLoading}
-                collapsedKeys={collapsed}
-                onToggleGroup={toggleGroup}
-                rowTestId="sp-row"
-                emptyState={
-                  <span data-testid="sp-empty">Sin tarifas. Añade una o impórtalas por CSV.</span>
-                }
-              />
+              </div>
+              <div className="cat-main cat-main--solo" data-testid="sp-table">
+                {priceTable}
+              </div>
             </div>
-          </div>
-        </>
+          </>
+        ) : (
+          // Pestaña: carril (Proveedor + búsqueda) + tabla agrupada full-height,
+          // mismo aspecto que Existencias/Proveedores.
+          <>
+            {columnsEditor}
+            <div className="faceted-page">
+              <div className="sp-tab-bar">
+                {subViewNav}
+                <Button
+                  type="button"
+                  disabled={!supplierId}
+                  onClick={() => setAdding(true)}
+                  data-testid="sp-add"
+                  icon={<Plus size={16} aria-hidden="true" />}
+                >
+                  Añadir tarifa
+                </Button>
+              </div>
+              <div className="inv-card">
+                <div className="cat-layout">
+                  <FacetRail
+                    ariaLabel="Filtros de tarifas"
+                    testId="sp-facets"
+                    search={{
+                      value: tarifaSearch,
+                      onChange: setTarifaSearch,
+                      placeholder: 'Buscar producto…',
+                      testId: 'sp-search',
+                    }}
+                    sections={tarifaSections}
+                  />
+                  <ScrollShadowCell className="cat-main" data-testid="sp-table">
+                    {priceTable}
+                  </ScrollShadowCell>
+                </div>
+              </div>
+            </div>
+          </>
+        )
       ) : (
         <>
           <div className="table-panel">
