@@ -1,4 +1,13 @@
-import { Button, Chart, DataTable, type DataTableColumn, Input, Select } from '@simpletpv/ui';
+import type { SupplierPriceRow } from '@simpletpv/auth';
+import {
+  Button,
+  Chart,
+  type DataTableColumn,
+  type FacetedColumn,
+  FacetedTable,
+  Input,
+  Select,
+} from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, SlidersHorizontal, Upload } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
@@ -41,7 +50,15 @@ export function SupplierPricesSection({
   const [familyId, setFamilyId] = useState('');
   const [importing, setImporting] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | undefined>(undefined);
+  // Proveedores plegados (key = supplierId): cabeceras de grupo plegables.
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  const toggleGroup = (key: string): void =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   const [addProduct, setAddProduct] = useState('');
   const [addPrice, setAddPrice] = useState('');
 
@@ -79,22 +96,16 @@ export function SupplierPricesSection({
 
   const supplierName = (id: string): string => suppliers.find((s) => s.id === id)?.name ?? '—';
 
-  // Columnas del DataTable de tarifas (D-12: Producto · SKU · Precio; Proveedor
-  // visible y ocultable). La acción Borrar va fija.
-  type PriceRow = (typeof prices)[number];
+  // Columnas configurables de la tarifa (D-12: Producto · SKU · Precio). El Proveedor
+  // ya no es columna: sube a la cabecera de grupo (la tabla se agrupa por proveedor).
+  type PriceRow = SupplierPriceRow;
   const dataColumns: DataTableColumn<PriceRow>[] = [
-    { key: 'product', header: 'Producto', sortable: true, render: (r) => r.productName },
+    { key: 'product', header: 'Producto', render: (r) => r.productName },
     { key: 'sku', header: 'SKU', render: (r) => <span className="muted">{r.sku ?? '—'}</span> },
-    {
-      key: 'supplier',
-      header: 'Proveedor',
-      render: (r) => <span className="muted">{r.supplierName}</span>,
-    },
     {
       key: 'price',
       header: 'Precio compra',
       align: 'right',
-      sortable: true,
       render: (r) => fmtEur(r.price),
     },
   ];
@@ -107,29 +118,53 @@ export function SupplierPricesSection({
     editorTestId: 'sp-columns-editor',
     title: 'Columnas de tarifas',
   });
-  const deleteColumn: DataTableColumn<PriceRow> = {
-    key: 'actions',
-    header: '',
-    width: '6rem',
-    align: 'right',
-    render: (r) => (
-      <button
-        type="button"
-        className="link-btn danger"
-        onClick={() => deleteMut.mutate(r.id)}
-        data-testid="sp-delete"
-      >
-        Borrar
-      </button>
-    ),
-  };
-  const priceSorted = sort
-    ? [...prices].sort((a, b) => {
-        const dir = sort.dir === 'desc' ? -1 : 1;
-        if (sort.key === 'price') return (a.price - b.price) * dir;
-        return a.productName.localeCompare(b.productName) * dir;
-      })
-    : prices;
+
+  // Mapea las columnas efectivas (DataTableColumn del editor) a FacetedColumn: el
+  // producto es la columna 'name' (indentada/bold), el precio 'num' (derecha), el
+  // resto 'mid'. Cierra con la acción Borrar fija ('num', a la derecha).
+  const variantOf = (key: string): 'name' | 'num' | 'mid' =>
+    key === 'product' ? 'name' : key === 'price' ? 'num' : 'mid';
+  const facetedColumns: FacetedColumn<PriceRow>[] = [
+    ...effectiveColumns.map((c) => ({
+      key: c.key,
+      header: c.header,
+      variant: variantOf(c.key),
+      render: (r: PriceRow) => c.render?.(r, 0) ?? '',
+    })),
+    {
+      key: 'actions',
+      header: '',
+      variant: 'num' as const,
+      render: (r: PriceRow) => (
+        <button
+          type="button"
+          className="link-btn danger"
+          onClick={() => deleteMut.mutate(r.id)}
+          data-testid="sp-delete"
+        >
+          Borrar
+        </button>
+      ),
+    },
+  ];
+
+  // Grupos por proveedor (productos ordenados alfabéticamente dentro de cada uno).
+  const priceGroups = (() => {
+    const bySupplier = new Map<string, { name: string; rows: PriceRow[] }>();
+    for (const p of prices) {
+      const entry = bySupplier.get(p.supplierId) ?? { name: p.supplierName, rows: [] };
+      entry.rows.push(p);
+      bySupplier.set(p.supplierId, entry);
+    }
+    return [...bySupplier.entries()]
+      .sort((a, b) => a[1].name.localeCompare(b[1].name))
+      .map(([id, e]) => ({
+        key: id,
+        label: e.name,
+        meta: `${e.rows.length} ${e.rows.length === 1 ? 'tarifa' : 'tarifas'}`,
+        rows: [...e.rows].sort((a, b) => a.productName.localeCompare(b.productName)),
+      }));
+  })();
 
   // ── Comparativa gráfica ──
   // S-25 (DR-06/P154): la comparativa de precios entre proveedores SIEMPRE se
@@ -247,55 +282,51 @@ export function SupplierPricesSection({
           {columnsEditor}
 
           <div className="table-panel">
-            <DataTable
-              header={renderHeader(
-                <div className="users-toolbar">
-                  <div className="sales-filters">
-                    {!fixedSupplierId && (
-                      <Select
-                        className="catalog-search"
-                        value={supplierId}
-                        onChange={setSupplierId}
-                        ariaLabel="Proveedor"
-                        data-testid="sp-supplier"
-                        options={[
-                          { value: '', label: 'Todos los proveedores' },
-                          ...suppliers.map((s) => ({ value: s.id, label: s.name })),
-                        ]}
-                      />
-                    )}
-                  </div>
-                  <div className="ui-dt-toolbar-actions">
-                    <Button
-                      type="button"
-                      disabled={!supplierId}
-                      onClick={() => setAdding(true)}
-                      data-testid="sp-add"
-                      icon={<Plus size={16} aria-hidden="true" />}
-                    >
-                      Añadir tarifa
-                    </Button>
-                  </div>
-                </div>,
-              )}
-              columns={[...effectiveColumns, deleteColumn]}
-              rows={priceSorted}
-              rowKey={(r) => r.id}
-              loading={pricesLoading}
-              {...(sort ? { sort } : {})}
-              onSortChange={(key) =>
-                setSort((cur) =>
-                  cur?.key === key
-                    ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' }
-                    : { key, dir: 'asc' },
-                )
-              }
-              rowTestId="sp-row"
-              emptyState={
-                <span data-testid="sp-empty">Sin tarifas. Añade una o impórtalas por CSV.</span>
-              }
-              data-testid="sp-table"
-            />
+            {renderHeader(
+              <div className="users-toolbar">
+                <div className="sales-filters">
+                  {!fixedSupplierId && (
+                    <Select
+                      className="catalog-search"
+                      value={supplierId}
+                      onChange={setSupplierId}
+                      ariaLabel="Proveedor"
+                      data-testid="sp-supplier"
+                      options={[
+                        { value: '', label: 'Todos los proveedores' },
+                        ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+                      ]}
+                    />
+                  )}
+                </div>
+                <div className="ui-dt-toolbar-actions">
+                  <Button
+                    type="button"
+                    disabled={!supplierId}
+                    onClick={() => setAdding(true)}
+                    data-testid="sp-add"
+                    icon={<Plus size={16} aria-hidden="true" />}
+                  >
+                    Añadir tarifa
+                  </Button>
+                </div>
+              </div>,
+            )}
+            <div className="cat-main cat-main--solo" data-testid="sp-table">
+              <FacetedTable<PriceRow>
+                layout="table"
+                columns={facetedColumns}
+                groups={priceGroups}
+                rowKey={(r) => r.id}
+                loading={pricesLoading}
+                collapsedKeys={collapsed}
+                onToggleGroup={toggleGroup}
+                rowTestId="sp-row"
+                emptyState={
+                  <span data-testid="sp-empty">Sin tarifas. Añade una o impórtalas por CSV.</span>
+                }
+              />
+            </div>
           </div>
         </>
       ) : (
