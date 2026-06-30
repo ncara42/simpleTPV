@@ -246,6 +246,24 @@
 .tr-row.is-incid:hover {
   background: color-mix(in srgb, var(--ui-danger-soft) 80%, var(--ui-surface));
 }
+
+/* Traspasos migrada al componente único (FacetedTable): las filas son `.cat-row` y el
+   detalle expandible una `.cat-detail-row`. Reproduce los estados y el contenedor del
+   acordeón. Scoped a `.tr-main` para no afectar a otras tablas `.cat-row`. */
+.tr-main .cat-row.is-expanded {
+  background: var(--ui-brand-soft);
+}
+.tr-main .cat-row.is-incid {
+  background: color-mix(in srgb, var(--ui-danger-soft) 55%, var(--ui-surface));
+}
+.tr-main .cat-row.is-incid:hover {
+  background: color-mix(in srgb, var(--ui-danger-soft) 80%, var(--ui-surface));
+}
+.tr-main .cat-detail-row > td {
+  padding: 0;
+  background: var(--ui-surface-subtle);
+  border-bottom: 1px solid var(--ui-border);
+}
 .tr-row > td {
   /* Misma altura compacta que las filas de Inventario/Existencias (.cat-row td / .ex-row td). */
   height: 2.75rem;
