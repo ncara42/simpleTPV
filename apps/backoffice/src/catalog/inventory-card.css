@@ -421,11 +421,12 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  /* Sin punto de familia: el nombre arranca al MISMO sangrado que los nombres de producto
-     (3.3rem) y el caret va en absoluto dentro del canalón izquierdo (alineado con el
-     checkbox-overlay de las filas). Así familia y productos comparten borde izquierdo.
+  /* Header de grupo a nivel "padre": indent MENOR (2.2rem) que los nombres de producto
+     (3.3rem) para que las filas queden anidadas a su derecha (misma jerarquía que la tabla
+     facetada del TPV). El caret va en absoluto dentro del canalón izquierdo; el
+     checkbox-overlay de las filas (.cat-row-check) y los nombres se quedan en 3.3rem.
      Padding vertical compacto (0.5rem), igual que la cabecera de grupo de Existencias. */
-  padding: 0.5rem 1.1rem 0.5rem 3.3rem;
+  padding: 0.5rem 1.1rem 0.5rem 2.2rem;
 }
 .cat-group-caret {
   position: absolute;
