@@ -263,7 +263,11 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 1.1rem 0.5rem 3.3rem;
+  /* Header de grupo (con caret) a nivel "padre": indent menor que las filas
+     (cat-cell-name a 3.3rem) para que los ítems del grupo queden anidados a su
+     derecha. Nada de wrap. */
+  padding: 0.5rem 1.1rem 0.5rem 2.2rem;
+  white-space: nowrap;
 }
 .cat-group-caret {
   position: absolute;
@@ -309,11 +313,15 @@
   vertical-align: middle;
   color: var(--ui-text);
   border-bottom: 1px solid var(--ui-border);
+  /* Ningún contenido de fila hace wrap dentro de la card. */
+  white-space: nowrap;
 }
 .cat-row .cat-cell-name {
   padding-left: 3.3rem;
   letter-spacing: -0.012em;
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .cat-cell-mid {
   color: var(--ui-text-soft);

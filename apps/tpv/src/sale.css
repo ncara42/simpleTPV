@@ -2477,9 +2477,14 @@
 
 /* Acción de fila en píldora (idéntica al "Enviar" de Traspasos). Scoped a
    .table-panel para no chocar con el .link-btn global del TPV (enlace subrayado). */
-.table-panel .link-btn {
+/* Píldora de acción de fila: aplica tanto en .table-panel (DataTable) como en
+   .faceted-table (FacetedTable). Sin esta segunda regla, el botón caía al
+   .link-btn global (enlace subrayado) y el icono+texto se apilaban (wrap). */
+.table-panel .link-btn,
+.faceted-table .link-btn {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
   height: 2rem;
   padding: 0 0.9rem;
   border: 1px solid var(--ui-border-strong);
@@ -2489,26 +2494,29 @@
   cursor: pointer;
   font-size: 0.85rem;
   letter-spacing: -0.012em;
+  white-space: nowrap;
   text-decoration: none;
   transition:
     background 0.12s,
     border-color 0.12s;
 }
-.table-panel .link-btn:hover {
+.table-panel .link-btn:hover,
+.faceted-table .link-btn:hover {
   background: var(--ap-blue-soft);
   border-color: var(--ui-primary);
 }
-.table-panel .link-btn:disabled {
+.table-panel .link-btn:disabled,
+.faceted-table .link-btn:disabled {
   opacity: 0.5;
   cursor: default;
 }
 
-/* Botón de acción de fila "Recibir": píldora (heredada de .table-panel
-   .link-btn) con icono. La columna de acción se alinea a la derecha. */
+/* Botón de acción de fila "Recibir": píldora con icono. */
 .catalog-table__action {
   text-align: right;
 }
-.table-panel .link-btn--receive {
+.table-panel .link-btn--receive,
+.faceted-table .link-btn--receive {
   gap: 0.4rem;
 }
 
