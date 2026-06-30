@@ -326,6 +326,52 @@
   pointer-events: auto;
 }
 
+/* ─── Sub-barra contextual de la vista («topbar de la tabla») ──────────────────
+   Un escalón POR DEBAJO de la banda flotante: sub-navegación de la vista (izquierda)
+   + acciones de la tabla activa (derecha: nueva tarifa · exportar CSV…). Separa la
+   jerarquía → arriba lo del PROGRAMA (campana · búsqueda · cuenta, siempre iguales),
+   aquí lo que CAMBIA con la tabla. Misma lengua «floating» del topbar: la banda es
+   transparente y deja pasar el ratón; solo flotan sus piezas. La app no la monta si
+   no hay contenido (ViewToolbar → null), así que nunca queda una banda vacía. */
+.topbar-tablebar {
+  position: sticky;
+  top: 3.05rem;
+  z-index: 29;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: 40px;
+  /* Pegada a la banda de navegación: se lee como su segundo piso, no como otra barra. */
+  margin-top: -0.55rem;
+  padding: 0 1.25rem 0.4rem;
+  pointer-events: none;
+}
+.topbar-tablebar > * {
+  pointer-events: auto;
+}
+/* Sub-navegación de la tabla (pestañas Catálogo/Familias…): extremo izquierdo. */
+.topbar-tablebar-nav {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+/* Acciones de la tabla: extremo derecho. `margin-left:auto` las ancla a la derecha
+   aunque la sub-navegación esté vacía. No parten su texto. */
+.topbar-tablebar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  white-space: nowrap;
+}
+/* <Button> (ui-btn) de las acciones: normalizado a 30px (= logo del sidebar), igual
+   que cuando vivían en el clúster derecho del topbar. */
+.topbar-tablebar-actions .ui-btn {
+  height: 30px;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
 /* ─── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 767px) {
   .topbar {
@@ -342,6 +388,12 @@
   }
   .topbar-account-btn {
     padding: 0 0.3rem;
+  }
+  /* En móvil la sub-barra de la tabla envuelve (sub-nav arriba, acciones abajo) en
+     vez de comprimirse: el texto de las acciones no se parte. */
+  .topbar-tablebar {
+    flex-wrap: wrap;
+    row-gap: 0.4rem;
   }
 }
 

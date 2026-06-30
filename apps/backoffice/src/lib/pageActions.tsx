@@ -3,7 +3,7 @@ import { createContext, type ReactNode, useContext, useLayoutEffect, useState } 
 // Dos contextos separados para evitar el bucle de re-render:
 // - SetContext: provee el setter estable (useState dispatch, misma referencia siempre).
 //   Los pages son consumidores de este y NUNCA se re-renderizan cuando cambian las actions.
-// - ValueContext: provee el valor actual. Solo PageActionsSlot (en el topbar) lo consume y se re-renderiza.
+// - ValueContext: provee el valor actual. Solo ViewToolbar (la sub-barra de la tabla) lo consume y se re-renderiza.
 const PageActionsSetContext = createContext<((a: ReactNode) => void) | null>(null);
 const PageActionsValueContext = createContext<ReactNode>(null);
 
@@ -18,7 +18,7 @@ export function PageActionsProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Lo lee FloatingActions para pintar los botones de la view activa. */
+/** Lo lee ViewToolbar (sub-barra de la tabla) para pintar los botones de la view activa. */
 export function usePageActionsValue(): ReactNode {
   return useContext(PageActionsValueContext);
 }

@@ -2,7 +2,7 @@ import { createContext, type ReactNode, useContext, useLayoutEffect, useState } 
 
 // Mismo patrón que pageActions: dos contextos separados para evitar re-renders.
 //  · SetContext: setter estable que los pages consumen para registrar su sub-nav.
-//  · ValueContext: solo lo lee PageNavSlot en la TopBar.
+//  · ValueContext: solo lo lee ViewToolbar (la sub-barra de la tabla).
 const PageNavSetContext = createContext<((n: ReactNode) => void) | null>(null);
 const PageNavValueContext = createContext<ReactNode>(null);
 

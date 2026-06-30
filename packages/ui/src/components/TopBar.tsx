@@ -29,6 +29,11 @@ export interface TopBarProps {
   pageActions?: React.ReactNode;
   /** Sub-navegación de la vista activa (pestañas Catálogo/Familias…): columna izquierda. */
   pageNav?: React.ReactNode;
+  /** Sub-barra contextual de la vista, un escalón POR DEBAJO de la banda flotante: aloja la
+   * «topbar de la tabla» (su sub-navegación y sus acciones: nueva tarifa, exportar CSV…). Separa
+   * la jerarquía → arriba lo del programa (campana · búsqueda · cuenta), debajo lo relativo a la
+   * tabla activa. Si se omite (o su contenido es vacío), no se pinta ninguna fila. */
+  subBar?: React.ReactNode;
   /** Lanzador de búsqueda (⌘K): botón independiente en el clúster derecho. */
   search?: React.ReactNode;
   /** Acciones DENTRO de la isla central, tras el título (p. ej. lanzador del asistente de IA):
@@ -172,68 +177,74 @@ export function TopBar({
   notificationsActive = false,
   pageActions,
   pageNav,
+  subBar,
   search,
   islandActions,
   endSlot,
   account,
 }: TopBarProps) {
   return (
-    <header className="topbar" data-testid="topbar">
-      {/* Columna izquierda: sub-navegación de la vista activa (pestañas Catálogo/Familias…). */}
-      {pageNav && <div className="topbar-page-nav">{pageNav}</div>}
-      {/* Isla central: atrás · título (centrado) · tema · campana. */}
-      <div className="topbar-island">
-        {onBack && (
-          <button
-            type="button"
-            className="topbar-icon-btn topbar-island-back"
-            onClick={onBack}
-            aria-label="Volver"
-            title="Volver"
-            data-testid="topbar-back"
-          >
-            <BackGlyph />
-          </button>
-        )}
-        <h1 className="topbar-title" data-testid={titleTestId} title={title}>
-          {title}
-        </h1>
-        {/* Acciones de la isla (p. ej. robot del asistente): tras el título, separadas por un
-            filete vertical → «atrás · vista ┊ acción». */}
-        {islandActions && <div className="topbar-island-actions">{islandActions}</div>}
-      </div>
-
-      {/* Clúster derecho: acciones de vista · campana · búsqueda · extras · cuenta. */}
-      {(pageActions || onNotifications || search || endSlot || account) && (
-        <div className="topbar-right">
-          {pageActions && <div className="topbar-page-actions">{pageActions}</div>}
-          {onNotifications && (
+    <>
+      <header className="topbar" data-testid="topbar">
+        {/* Columna izquierda: sub-navegación de la vista activa (pestañas Catálogo/Familias…). */}
+        {pageNav && <div className="topbar-page-nav">{pageNav}</div>}
+        {/* Isla central: atrás · título (centrado) · tema · campana. */}
+        <div className="topbar-island">
+          {onBack && (
             <button
               type="button"
-              className={`topbar-icon-btn${notificationsActive ? ' is-active' : ''}`}
-              onClick={onNotifications}
-              aria-label={
-                notificationCount > 0
-                  ? `Notificaciones (${notificationCount} sin leer)`
-                  : 'Notificaciones'
-              }
-              aria-pressed={notificationsActive}
-              title="Notificaciones"
-              data-testid="topbar-notifications"
+              className="topbar-icon-btn topbar-island-back"
+              onClick={onBack}
+              aria-label="Volver"
+              title="Volver"
+              data-testid="topbar-back"
             >
-              <BellGlyph />
-              {notificationCount > 0 && (
-                <span className="topbar-notif-badge" data-testid="topbar-notifications-badge">
-                  {notificationCount}
-                </span>
-              )}
+              <BackGlyph />
             </button>
           )}
-          {search}
-          {endSlot}
-          {account && <AccountMenu account={account} />}
+          <h1 className="topbar-title" data-testid={titleTestId} title={title}>
+            {title}
+          </h1>
+          {/* Acciones de la isla (p. ej. robot del asistente): tras el título, separadas por un
+            filete vertical → «atrás · vista ┊ acción». */}
+          {islandActions && <div className="topbar-island-actions">{islandActions}</div>}
         </div>
-      )}
-    </header>
+
+        {/* Clúster derecho: acciones de vista · campana · búsqueda · extras · cuenta. */}
+        {(pageActions || onNotifications || search || endSlot || account) && (
+          <div className="topbar-right">
+            {pageActions && <div className="topbar-page-actions">{pageActions}</div>}
+            {onNotifications && (
+              <button
+                type="button"
+                className={`topbar-icon-btn${notificationsActive ? ' is-active' : ''}`}
+                onClick={onNotifications}
+                aria-label={
+                  notificationCount > 0
+                    ? `Notificaciones (${notificationCount} sin leer)`
+                    : 'Notificaciones'
+                }
+                aria-pressed={notificationsActive}
+                title="Notificaciones"
+                data-testid="topbar-notifications"
+              >
+                <BellGlyph />
+                {notificationCount > 0 && (
+                  <span className="topbar-notif-badge" data-testid="topbar-notifications-badge">
+                    {notificationCount}
+                  </span>
+                )}
+              </button>
+            )}
+            {search}
+            {endSlot}
+            {account && <AccountMenu account={account} />}
+          </div>
+        )}
+      </header>
+      {/* Sub-barra contextual de la vista (sub-nav + acciones de la tabla), un escalón por
+          debajo de la banda flotante. La compone la app (en backoffice: ViewToolbar). */}
+      {subBar}
+    </>
   );
 }
