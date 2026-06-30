@@ -28,6 +28,7 @@ import {
   updateUser,
   type User,
 } from './lib/admin.js';
+import { useAuthStore } from './lib/auth.js';
 import { formErrorMessage } from './lib/form-error.js';
 import { usePageActions } from './lib/pageActions.js';
 
@@ -88,6 +89,10 @@ function toForm(u: UserWithStores): UserForm {
 
 export function UsersPage() {
   const qc = useQueryClient();
+  // Id del usuario conectado (claim `sub` del JWT). Su propia fila no ofrece el
+  // toggle de baja: un usuario no puede desactivarse a sí mismo (se quedaría sin
+  // poder volver a entrar). La autoridad real es el backend; esto es solo la UI.
+  const currentUserId = useAuthStore((s) => s.getUserId());
   const [form, setForm] = useState<UserForm | null>(null);
   // Modo asistente (edición en lote). null → alta de un usuario nuevo.
   const [wizard, setWizard] = useState<EditWizard | null>(null);
@@ -255,8 +260,11 @@ export function UsersPage() {
     ]).then(invalidate);
   };
 
-  // Activa/desactiva un usuario desde su badge en la tabla.
+  // Activa/desactiva un usuario desde su badge en la tabla. Un usuario no puede
+  // desactivarse a sí mismo (perdería el acceso): su fila ni siquiera pinta el
+  // toggle, pero se blinda aquí también por si llega por otra vía.
   const toggleActive = (id: string): void => {
+    if (id === currentUserId) return;
     const current = allUsers.find((u) => u.id === id);
     if (!current) return;
     void updateUser(id, { active: !current.active }).then(invalidate);
@@ -364,32 +372,54 @@ export function UsersPage() {
     {
       key: 'active',
       header: 'Estado',
-      render: (u) => (
-        <button
-          type="button"
-          className={`user-state ${u.active ? 'on' : 'off'}`}
-          title={u.active ? 'Activo — pulsa para desactivar' : 'Inactivo — pulsa para activar'}
-          aria-label={u.active ? 'Activo' : 'Inactivo'}
-          aria-pressed={u.active}
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleActive(u.id);
-          }}
-        >
-          <Check
-            className="user-state__icon user-state__icon--on"
-            size={14}
-            strokeWidth={3}
-            aria-hidden="true"
-          />
-          <X
-            className="user-state__icon user-state__icon--off"
-            size={14}
-            strokeWidth={3}
-            aria-hidden="true"
-          />
-        </button>
-      ),
+      render: (u) => {
+        const isSelf = u.id === currentUserId;
+        const icons = (
+          <>
+            <Check
+              className="user-state__icon user-state__icon--on"
+              size={14}
+              strokeWidth={3}
+              aria-hidden="true"
+            />
+            <X
+              className="user-state__icon user-state__icon--off"
+              size={14}
+              strokeWidth={3}
+              aria-hidden="true"
+            />
+          </>
+        );
+        // El usuario conectado no puede darse de baja a sí mismo: su estado se
+        // muestra como indicador estático (sin botón de toggle).
+        if (isSelf) {
+          return (
+            <span
+              className={`user-state user-state--self ${u.active ? 'on' : 'off'}`}
+              title="No puedes darte de baja a ti mismo"
+              aria-label={u.active ? 'Activo (tu cuenta)' : 'Inactivo (tu cuenta)'}
+              data-testid="user-state-self"
+            >
+              {icons}
+            </span>
+          );
+        }
+        return (
+          <button
+            type="button"
+            className={`user-state ${u.active ? 'on' : 'off'}`}
+            title={u.active ? 'Activo — pulsa para desactivar' : 'Inactivo — pulsa para activar'}
+            aria-label={u.active ? 'Activo' : 'Inactivo'}
+            aria-pressed={u.active}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleActive(u.id);
+            }}
+          >
+            {icons}
+          </button>
+        );
+      },
     },
   ];
   const {

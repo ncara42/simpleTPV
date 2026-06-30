@@ -38,3 +38,24 @@ describe('auth-store getRole', () => {
     expect(store.getState().getRole()).toBeNull();
   });
 });
+
+describe('auth-store getUserId', () => {
+  it('devuelve null sin sesión', () => {
+    const store = createAuthStore('test-uid-none');
+    expect(store.getState().getUserId()).toBeNull();
+  });
+
+  it('extrae el id de usuario del claim sub', () => {
+    const store = createAuthStore('test-uid-ok');
+    store.getState().setTokens({
+      accessToken: fakeJwt({ sub: 'user-123', organizationId: 'o1', role: 'ADMIN' }),
+    });
+    expect(store.getState().getUserId()).toBe('user-123');
+  });
+
+  it('devuelve null ante un token malformado', () => {
+    const store = createAuthStore('test-uid-bad');
+    store.getState().setTokens({ accessToken: 'no-es-un-jwt' });
+    expect(store.getState().getUserId()).toBeNull();
+  });
+});

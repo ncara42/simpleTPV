@@ -16,15 +16,22 @@ export interface AuthState {
   clear: () => void;
   isAuthenticated: () => boolean;
   getRole: () => UserRole | null;
+  getUserId: () => string | null;
 }
 
-// SOLO PARA UI. Lee el claim `role` del payload del JWT SIN verificar la firma:
-// un cliente podría falsificarlo, así que getRole() jamás debe usarse como
-// frontera de seguridad. La autoridad real es el backend, que verifica la firma
-// del token (AuthGuard) y el rol (@Roles) en CADA petición — un rol falseado aquí
-// solo cambia qué se pinta; toda acción/lectura protegida sigue devolviendo 403.
-// No uses getRole() para decidir algo que sustituya una llamada a la API.
-function decodeRole(token: string | null): UserRole | null {
+// SOLO PARA UI. Lee claims del payload del JWT SIN verificar la firma: un cliente
+// podría falsificarlos, así que decodeClaims() jamás debe usarse como frontera de
+// seguridad. La autoridad real es el backend, que verifica la firma del token
+// (AuthGuard) y el rol (@Roles) en CADA petición — un claim falseado aquí solo
+// cambia qué se pinta; toda acción/lectura protegida sigue devolviendo 403.
+// No uses estos getters para decidir algo que sustituya una llamada a la API.
+interface TokenClaims {
+  role?: UserRole;
+  // `sub` (subject) = id del usuario, según firma AccessClaims del backend.
+  sub?: string;
+}
+
+function decodeClaims(token: string | null): TokenClaims | null {
   if (!token) {
     return null;
   }
@@ -33,10 +40,7 @@ function decodeRole(token: string | null): UserRole | null {
     return null;
   }
   try {
-    const json = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as {
-      role?: UserRole;
-    };
-    return json.role ?? null;
+    return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as TokenClaims;
   } catch {
     return null;
   }
@@ -60,7 +64,8 @@ export function createAuthStore(storageKey: string) {
         setAccessToken: (accessToken) => set({ accessToken }),
         clear: () => set({ accessToken: null }),
         isAuthenticated: () => get().accessToken !== null,
-        getRole: () => decodeRole(get().accessToken),
+        getRole: () => decodeClaims(get().accessToken)?.role ?? null,
+        getUserId: () => decodeClaims(get().accessToken)?.sub ?? null,
       }),
       { name: storageKey },
     ),

@@ -80,6 +80,16 @@
   background: var(--ui-danger);
 }
 
+/* Fila del propio usuario: indicador estático (no puede darse de baja a sí
+   mismo). Sin cursor de acción ni hover/scale; queda como mero estado. */
+.user-state--self {
+  cursor: default;
+}
+.user-state--self:hover,
+.user-state--self:active {
+  transform: none;
+}
+
 /* Tick y cruz apilados en la misma celda de grid: crossfade con giro al
    alternar estado. place-items del botón los centra y deja el transform libre. */
 .user-state__icon {
