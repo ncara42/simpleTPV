@@ -31,7 +31,7 @@ import {
   CreditCard,
   Handshake,
   LayoutDashboard,
-  Lifebuoy,
+  LifeBuoy,
   Package,
   Percent,
   ScanLine,
@@ -109,7 +109,7 @@ const ALL_NAV: NavItem[] = [
   { id: 'personal', label: 'Personal', icon: <Users size={18} />, group: 'rrhh' },
   { id: 'settings', label: 'Configuración', icon: <Settings size={18} />, group: 'org' },
   { id: 'verifactu', label: 'VeriFactu', icon: <CheckSquare size={18} />, group: 'org' },
-  { id: 'help', label: 'Ayuda', icon: <Lifebuoy size={18} />, afterSwitch: true },
+  { id: 'help', label: 'Ayuda', icon: <LifeBuoy size={18} />, afterSwitch: true },
 ];
 
 // VeriFactu se mantiene fuera del menú (backend sin UI). Notificaciones también:
