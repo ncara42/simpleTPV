@@ -200,7 +200,7 @@
 }
 .store-card-name {
   font-size: 1.02rem;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--ui-text);
   white-space: nowrap;
@@ -2045,7 +2045,7 @@
 }
 .sales-stats-kpi-value {
   font-size: 1.5rem;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.1;
   color: var(--ui-text);
   font-variant-numeric: tabular-nums;
@@ -2287,7 +2287,7 @@
 }
 .stock-metric-val {
   font-size: 1.5rem;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.025em;
   line-height: 1;
   color: var(--ui-text);

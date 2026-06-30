@@ -10,7 +10,7 @@ import {
 } from '@simpletpv/ui';
 import { usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Clock, MessageCircle, PackageCheck, X } from 'lucide-react';
+import { Check, MessageCircle, PackageCheck, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { listStores } from './lib/sales.js';
@@ -244,16 +244,10 @@ export function StoreOrderReceivePanel() {
         const received = t.status === 'RECEIVED';
         return (
           <span
-            className={`order-state ${received ? 'received' : 'pending'}`}
+            className={`cat-state-badge ${received ? 'cat-state-ok' : 'cat-state-warn'}`}
             data-testid="store-order-status"
           >
-            <span className="order-state__icon">
-              {received ? (
-                <Check size={13} strokeWidth={3} aria-hidden="true" />
-              ) : (
-                <Clock size={13} strokeWidth={2.5} aria-hidden="true" />
-              )}
-            </span>
+            {received && <Check size={12} strokeWidth={3} aria-hidden="true" />}
             {received ? 'Recibido' : 'Pendiente'}
           </span>
         );

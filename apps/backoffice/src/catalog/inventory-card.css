@@ -9,24 +9,24 @@
 /* Light: colores calibrados para texto sobre fondo claro (WCAG AA ≥ 4.5:1).
    Dark:  equivalentes del modo oscuro de Radix, más claros para el fondo oscuro. */
 :root {
-  --fam-c-0: #0D74CE; /* Blue    */
-  --fam-c-1: #6550B9; /* Violet  */
-  --fam-c-2: #CB1D63; /* Crimson */
+  --fam-c-0: #0d74ce; /* Blue    */
+  --fam-c-1: #6550b9; /* Violet  */
+  --fam-c-2: #cb1d63; /* Crimson */
   --fam-c-3: #008573; /* Teal    */
-  --fam-c-4: #AD5700; /* Amber   */
+  --fam-c-4: #ad5700; /* Amber   */
   --fam-c-5: #218358; /* Green   */
-  --fam-c-6: #BD4B00; /* Orange  */
-  --fam-c-7: #9C2BAD; /* Plum    */
+  --fam-c-6: #bd4b00; /* Orange  */
+  --fam-c-7: #9c2bad; /* Plum    */
 }
 :root[data-theme='dark'] {
-  --fam-c-0: #70B8FF;
-  --fam-c-1: #BAA7FF;
-  --fam-c-2: #FF92AD;
-  --fam-c-3: #0BD8B6;
-  --fam-c-4: #FFB224;
-  --fam-c-5: #46A758;
-  --fam-c-6: #FF8B3E;
-  --fam-c-7: #DF74FF;
+  --fam-c-0: #70b8ff;
+  --fam-c-1: #baa7ff;
+  --fam-c-2: #ff92ad;
+  --fam-c-3: #0bd8b6;
+  --fam-c-4: #ffb224;
+  --fam-c-5: #46a758;
+  --fam-c-6: #ff8b3e;
+  --fam-c-7: #df74ff;
 }
 
 /* ─── Card contenedora ─────────────────────────────────────────────────────── */
@@ -51,10 +51,11 @@
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-xl);
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.04), 0 4px 24px -8px rgb(0 0 0 / 0.10);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.04),
+    0 4px 24px -8px rgb(0 0 0 / 0.1);
   overflow: hidden;
 }
-
 
 /* ─── Pestañas flotantes independientes en la TopBar (slot pageNav) ─────────── */
 .inv-nav-tabs {
@@ -161,13 +162,13 @@
 .cat-rail {
   display: flex;
   flex-direction: column;
-  padding: 1.15rem 1.1rem 1.5rem;
+  padding: 1.5rem 1.35rem 1.75rem;
   overflow-y: auto;
   /* Barra de scroll oculta (el scroll sigue activo: rueda/trackpad/teclado). */
   scrollbar-width: none;
 }
 .cat-rail-search {
-  margin-bottom: 1.35rem;
+  margin-bottom: 1.75rem;
 }
 /* Búsqueda del carril: input Geist (alto 36, radio 8) en vez de la píldora por defecto. */
 .cat-rail .catalog-search {
@@ -185,13 +186,13 @@
 }
 
 .cat-facet {
-  margin-bottom: 1.45rem;
+  margin-bottom: 1.75rem;
 }
 .cat-facet:last-child {
   margin-bottom: 0;
 }
 .cat-facet-title {
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.7rem;
   padding-left: 0.12rem;
   font-size: 0.69rem;
   font-weight: 600;
@@ -440,7 +441,7 @@
 }
 .cat-group-name {
   font-size: 0.9rem;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.012em;
   color: var(--ui-text);
 }

@@ -247,7 +247,7 @@
 
 .prod-stock {
   font-size: var(--ui-text-xs);
-  font-weight: 700;
+  font-weight: 600;
   padding: 0.12rem 0.45rem;
   border-radius: var(--ui-radius-xs);
   font-variant-numeric: tabular-nums;
@@ -530,7 +530,7 @@
 
 .cart-title {
   font-size: var(--ui-text-lg);
-  font-weight: 700;
+  font-weight: 600;
   margin: 0;
 }
 
@@ -643,7 +643,7 @@
   border: 1px solid var(--ui-primary);
   background: var(--ui-primary);
   color: var(--ui-primary-fg);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--ui-text-md);
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
@@ -1088,7 +1088,7 @@
 /* Nombre de la tienda activa cuando solo hay una (sin selector): chip de solo
    lectura para que el cajero siempre vea en qué tienda opera (#1). */
 .sale-store-name {
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--ui-text-sm);
   color: var(--ui-text);
   padding: 0.2rem 0.6rem;
@@ -1113,7 +1113,7 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: var(--ui-text-xs);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ui-text-soft);
 }
 
@@ -1160,7 +1160,7 @@
 .cash-closures-title {
   margin: 0 0 0.6rem;
   font-size: var(--ui-text-sm);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--ui-text-soft);
@@ -2243,7 +2243,7 @@
 /* Contador de tiempo trabajado; avanza en vivo mientras está fichado. En la barra
    fina del fichaje es más discreto que su tamaño base. */
 .time-clock-counter {
-  font-size: 2rem;
+  font-size: var(--ui-text-4xl);
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--ui-text);
@@ -2251,7 +2251,7 @@
 }
 
 .time-clock-bar .time-clock-counter {
-  font-size: 1.25rem;
+  font-size: var(--ui-text-xl);
 }
 
 .time-clock-actions {
@@ -2501,35 +2501,6 @@
 .table-panel .link-btn:disabled {
   opacity: 0.5;
   cursor: default;
-}
-
-/* Estado del pedido: tick circular como el "estado de usuario" del admin.
-   Verde = Recibido · Naranja = Pendiente. */
-.order-state {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--ui-text);
-}
-.order-state__icon {
-  display: inline-grid;
-  place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 50%;
-  color: #fff;
-  flex-shrink: 0;
-}
-.order-state.received .order-state__icon {
-  background: var(--ui-success);
-}
-.order-state.pending .order-state__icon {
-  background: var(--ui-warning);
-}
-.order-state.voided .order-state__icon {
-  background: var(--ui-danger);
 }
 
 /* Botón de acción de fila "Recibir": píldora (heredada de .table-panel
