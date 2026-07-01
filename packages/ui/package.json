@@ -16,7 +16,6 @@
     "./multiselect.css": "./src/styles/multiselect.css",
     "./sidebar.css": "./src/styles/sidebar.css",
     "./theme.css": "./src/styles/theme.css",
-    "./theme-apple.css": "./src/styles/theme-apple.css",
     "./theme-geist.css": "./src/styles/theme-geist.css",
     "./topbar.css": "./src/styles/topbar.css",
     "./transfer-chat.css": "./src/styles/transfer-chat.css"

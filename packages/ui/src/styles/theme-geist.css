@@ -7,9 +7,9 @@
    data-viz MONOCROMÁTICA (gris + azul, color solo con significado), modo claro
    primero. NO es una copia: reproduce el look con tokens propios --ui-*.
 
-   Re-mapea los tokens --ui-* / --ap-* / --tpv-* sobre @simpletpv/ui/theme.css.
-   IMPÓRTESE DESPUÉS de theme.css para que estos valores ganen. Sustituye a
-   theme-apple.css (mismo contrato de tokens + mismas reglas de chrome).
+   Re-mapea los tokens --ui-* / --ap-* sobre @simpletpv/ui/theme.css. IMPÓRTESE
+   DESPUÉS de theme.css para que estos valores ganen. Única fundación visual del
+   producto (sustituyó a la antigua "Fundación Apple", ya retirada del repo).
 
    Lo específico de cada app (escala @theme inline del TPV, .app-main/.bo-main,
    .topbar-eyebrow del backoffice y el scoping de la forma pill) sigue en el
@@ -173,11 +173,6 @@
      soplo mínimo para controles pequeños. */
   --ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
   --ui-shadow-panel: none;
-
-  /* ─── Fallbacks --tpv-* usados inline en varias páginas ─── */
-  --tpv-line: var(--gst-200);
-  --tpv-teal-500: var(--gst-blue-hover);
-  --tpv-teal-700: var(--gst-blue);
 
   /* ─── Sidebar ───────────────────────────────────────────── */
   --sidebar-bg: #ffffff;
