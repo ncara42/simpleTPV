@@ -34,6 +34,7 @@ import { viewContextFor } from './components/chat/view-context.js';
 import { useSupportTickets } from './components/support/useSupportTickets.js';
 import { usePageNav } from './lib/pageNav.js';
 import type { SupportMessage, Ticket } from './lib/support.js';
+import { useTableShellHeight } from './lib/useTableShellHeight.js';
 
 type MsgStatus = 'sending' | 'received' | 'seen';
 
@@ -433,6 +434,7 @@ export function HelpPage() {
   const [attachment, setAttachment] = useState<File | null>(null);
   const [historialOpen, setHistorialOpen] = useState(false);
   const historialBtnRef = useRef<HTMLButtonElement>(null);
+  const shellHeight = useTableShellHeight();
 
   usePageNav(
     s.tickets.length > 0 ? (
@@ -488,7 +490,7 @@ export function HelpPage() {
   const typingLabel = s.selected?.mode === 'human' ? 'Escribiendo…' : 'Pensando…';
 
   return (
-    <section className="help-centered" data-testid="help-page">
+    <section className="help-centered" data-testid="help-page" style={{ height: shellHeight }}>
       {historialOpen && (
         <HistorialDropdown
           tickets={s.tickets}

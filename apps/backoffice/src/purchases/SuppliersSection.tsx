@@ -18,6 +18,7 @@ import {
   listSuppliers,
   updateSupplier,
 } from '../lib/purchases.js';
+import { useTableShellHeight } from '../lib/useTableShellHeight.js';
 import { OrdersSection } from './OrdersSection.js';
 import { SupplierFacets } from './SupplierFacets.js';
 import { SupplierFormModal } from './SupplierFormModal.js';
@@ -60,6 +61,7 @@ export function SuppliersSection() {
   // Vista detalle completa (I-18/D-07): edición + tarifa + pedidos. Se abre desde el
   // botón «Editar proveedor» del acordeón de la fila.
   const [detailId, setDetailId] = useState<string | null>(null);
+  const shellHeight = useTableShellHeight();
 
   const { data: suppliers = [], isLoading } = useQuery({
     queryKey: ['suppliers'],
@@ -158,7 +160,11 @@ export function SuppliersSection() {
   const toggleExpand = (id: string): void => setExpandedId((cur) => (cur === id ? null : id));
 
   return (
-    <div className="suppliers-shell" data-testid="suppliers-section">
+    <div
+      className="suppliers-shell"
+      data-testid="suppliers-section"
+      style={{ height: shellHeight }}
+    >
       <div className="sup-card">
         <div className="sup-body">
           <SupplierFacets

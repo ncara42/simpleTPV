@@ -22,6 +22,7 @@ import {
   type Promotion,
   updatePromotion,
 } from './lib/promotions.js';
+import { useTableShellHeight } from './lib/useTableShellHeight.js';
 import {
   activeFacetCount,
   activeSavedView,
@@ -120,6 +121,7 @@ export function PromotionsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState<PromoForm | null>(null);
   const [dataModal, setDataModal] = useState<'export' | null>(null);
+  const shellHeight = useTableShellHeight();
 
   // ── Filtrado + orden + selección ────────────────────────────────────────────
   const filtered = useMemo(
@@ -326,7 +328,7 @@ export function PromotionsPage() {
   const hasFilters = activeFacetCount(facets) > 0 || facets.search.trim() !== '';
 
   return (
-    <div className="promo-page" data-testid="promotions-page">
+    <div className="promo-page" data-testid="promotions-page" style={{ height: shellHeight }}>
       <div className="promo-card">
         <div className="promo-layout">
           <PromotionFacets

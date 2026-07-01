@@ -18,6 +18,7 @@ import {
 import { formErrorMessage } from '../lib/form-error.js';
 import { usePageActions } from '../lib/pageActions.js';
 import { listProducts } from '../lib/products.js';
+import { useTableShellHeight } from '../lib/useTableShellHeight.js';
 import {
   activeFacetCount,
   daysSince,
@@ -191,6 +192,7 @@ export function OrdersSection() {
   const [sortDesc, setSortDesc] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const shellHeight = useTableShellHeight();
 
   const { data: orders = [] } = useQuery({
     queryKey: ['b2b-orders'],
@@ -362,7 +364,7 @@ export function OrdersSection() {
   const hasFilters = activeFacetCount(facets) > 0 || facets.search.trim() !== '';
 
   return (
-    <div className="b2b-orders-page">
+    <div className="b2b-orders-page" style={{ height: shellHeight }}>
       <div className="cust-card">
         <div className="pl-layout">
           <OrderFacets

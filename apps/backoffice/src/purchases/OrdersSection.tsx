@@ -19,6 +19,7 @@ import {
   listPurchaseOrders,
   receivePurchaseOrder,
 } from '../lib/purchases.js';
+import { useTableShellHeight } from '../lib/useTableShellHeight.js';
 import { STATUS_LABEL } from './labels.js';
 
 // Orden de los grupos por estado: lo accionable primero (Borrador → Confirmado →
@@ -41,6 +42,7 @@ export function OrdersSection({
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   // Faceta «Estado» del carril (solo en la pestaña; '' = todos los estados).
   const [view, setView] = useState<string>('');
+  const shellHeight = useTableShellHeight();
   const toggleGroup = (key: string): void =>
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -188,7 +190,7 @@ export function OrdersSection({
 
   return (
     <>
-      <div className="faceted-page">
+      <div className="faceted-page" style={{ height: shellHeight }}>
         <div className="inv-card">
           <div className="cat-layout">
             <FacetRail ariaLabel="Filtros de pedidos" testId="orders-facets" sections={sections} />
