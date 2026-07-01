@@ -51,42 +51,9 @@ const WIDGET_CATALOG: &[(&str, &str)] = &[
     ("geist-spark-ticket", "Tendencia del ticket medio"),
     ("geist-bars-profit", "Beneficio por día (barras)"),
     ("geist-feed-alerts", "Avisos de stock"),
-    // Bloques pre-cableados (#205): un panel AGRUPADO ya diseñado con UNA llamada. SOLO a petición
-    // explícita («un panel/bloque que junte…»); por defecto se colocan widgets independientes.
-    (
-        "block:sales-overview",
-        "BLOQUE — Resumen de ventas (KPIs + tendencia por hora)",
-    ),
-    (
-        "block:stock-risk",
-        "BLOQUE — Riesgo de stock (venta perdida + alertas + caducidades)",
-    ),
-    (
-        "block:staff-performance",
-        "BLOQUE — Rendimiento del equipo (ranking de ventas por vendedor)",
-    ),
-    (
-        "block:product-ranking",
-        "BLOQUE — Ranking de productos por ventas",
-    ),
-    ("block:top-margin", "BLOQUE — Top de productos por margen"),
-    ("block:dead-stock", "BLOQUE — Peor rotación (stock muerto)"),
-    (
-        "block:profitability",
-        "BLOQUE — Rentabilidad (facturación + beneficio + % margen + ventas por familia)",
-    ),
-    (
-        "block:discount-control",
-        "BLOQUE — Control de descuento (tasas de descuento/devolución + descuento por empleado)",
-    ),
-    (
-        "block:sales-mix",
-        "BLOQUE — Mix de ventas (donut de ventas por familia + facturación y ticket medio)",
-    ),
-    (
-        "block:store-comparison",
-        "BLOQUE — Comparativa entre tiendas (ranking de facturación + margen por tienda)",
-    ),
+    // Bloques pre-cableados (#205) RETIRADOS: el catálogo del frontend (dashboard-blocks.ts) y el
+    // contrato (docs/contracts/dataviz-contract.json → "blocks": []) se vaciaron; el agente compone
+    // solo con widgets independientes + gen:panel a medida.
     (
         "gen:panel",
         "Panel a medida por receta + piezas (combina varias métricas en una tarjeta)",
@@ -207,7 +174,7 @@ motor — no intentes colocar a píxel.
 esas operaciones no se deshacen al editar o regenerar el historial.
 7. Por defecto una métrica = un widget independiente: usa varias `add_widget` con ids de catálogo \
 (kpi-*, dash-*, rank-*), o un `gen:panel` de UNA sola pieza por métrica si no hay tile de catálogo. \
-Agrupa en un solo bloque/panel (`block:*` o `gen:panel` multi-pieza) SOLO a petición explícita; sus \
+Agrupa en un solo `gen:panel` multi-pieza SOLO a petición explícita; sus \
 piezas solo pueden apuntar a endpoints de la lista permitida.
 8. Cuando uses herramientas de canvas, explica brevemente al usuario lo que añades o modificas.
 9. No calcules ni inventes cifras tú: las herramientas ya las computan; tú solo las narras. \
@@ -231,20 +198,17 @@ de mando) y ofrécele ayuda concreta.";
 const PANEL_GUIDE: &str = r#"## Paneles a medida y bloques (playbook de composición)
 
 Por DEFECTO compones con WIDGETS INDEPENDIENTES (una métrica = una tarjeta). Solo agrupas en un
-bloque/panel a petición. NUNCA emitas geometría (w/h/span/gap) ni color: cada widget/pieza trae su
+`gen:panel` a medida a petición. NUNCA emitas geometría (w/h/span/gap) ni color: cada widget/pieza trae su
 diseño horneado.
 
 ### A) Por DEFECTO — widgets INDEPENDIENTES (una métrica = una tarjeta movible/borrable por separado)
 Coloca cada métrica/gráfica con su propio `add_widget` usando los ids del catálogo de arriba (dash-bars,
 dash-hour y los `geist-*`); varias llamadas en el mismo turno se escalonan solas, sin solaparse. Para una
 métrica SIN tile de catálogo (comparar tiendas, una pieza a medida) usa un `gen:panel` de UNA
-pieza (ver C): también es independiente. `period`/`store_id` van en cada llamada. Ej.: «¿qué tienda va
+pieza (ver B): también es independiente. `period`/`store_id` van en cada llamada. Ej.: «¿qué tienda va
 por detrás?» → `gen:panel` de UNA pieza `comparisonBars` sobre `/dashboard/sales-by-store`.
 
-### B) Bloque AGRUPADO (`block:*`) — SOLO a petición explícita de «un panel/bloque que junte…»
-`add_widget` con `widget_id` uno de los `block:*` del catálogo de arriba; `period`/`store_id` se heredan.
-
-### C) Panel a medida (`gen:panel`) — una pieza suelta, o un grupo a medida a petición
+### B) Panel a medida (`gen:panel`) — una pieza suelta, o un grupo a medida a petición
 `add_widget` con `widget_id` "gen:panel" y `generic_spec`: `kind`:"panel"; `recipe` (DICTA el layout);
 `density`:"comfortable"|"compact"; `title`; `slots`:{ "kpis":[kpiTile…], "charts":[gráficas/listas/tabla…] }.
 
@@ -268,9 +232,9 @@ Elige la pieza por la INTENCIÓN, no por los datos:
 
 Reglas de diseño (duras):
 - Las GRÁFICAS (comparisonBars/trend*/shareDonut/rankBarList/segmentBar/progressMeter/stockAlertList/dataGrid) necesitan endpoints de LISTA: sales-by-family, sales-by-hour, sales-by-employee, sales-by-store (desglose por tienda), discount-by-employee, product-rankings (da el top por ventas), stock/alerts, stock/expiring, products, product-families, suppliers. Los endpoints de KPI (sales-kpis, margin-kpis, stockout-kpis) son ESCALARES: úsalos SOLO en `kpiTile`/`progressMeter`, nunca en una gráfica (no se renderiza).
-- Peticiones amplias («un dashboard de X», «cierre de mes») → coloca VARIOS widgets independientes que cubran la intención (p. ej. geist-stat-today + geist-hero-profit + geist-gauge-margin + dash-hour + geist-treemap-family + geist-leaderboard-products), no un bloque gigante. Solo agrupa en `block:*`/`gen:panel` multi-pieza (≤4 piezas) a petición explícita de un panel.
+- Peticiones amplias («un dashboard de X», «cierre de mes») → coloca VARIOS widgets independientes que cubran la intención (p. ej. geist-stat-today + geist-hero-profit + geist-gauge-margin + dash-hour + geist-treemap-family + geist-leaderboard-products), no un panel gigante. Solo agrupa en un `gen:panel` multi-pieza (≤4 piezas) a petición explícita de un panel.
 - Barras para comparar magnitudes y rankings (`comparisonBars` ordena desc y muestra hasta 8 barras; para más categorías o un ranking explícito usa `rankBarList`); donut SOLO para snapshot de reparto con ≤6 partes (con más degrada a barras); NUNCA donut para evolución, ranking ni comparar magnitudes.
-- Periodo por defecto: `today` para "hoy/flash", `month` para "resumen / cómo vamos / cierre de mes / control o seguimiento", `year` para tendencias largas. Tienda: todas salvo que se nombre una. Para COMPARAR tiendas («qué tienda sube/baja», «el rezagado», «por tienda») usa un `gen:panel` de UNA pieza `comparisonBars` sobre `/dashboard/sales-by-store` (independiente), que desglosa facturación/ticket medio/margen por tienda; no enfoques una sola tienda ni inventes el desglose. (`block:store-comparison` solo si pide un panel agrupado.)
+- Periodo por defecto: `today` para "hoy/flash", `month` para "resumen / cómo vamos / cierre de mes / control o seguimiento", `year` para tendencias largas. Tienda: todas salvo que se nombre una. Para COMPARAR tiendas («qué tienda sube/baja», «el rezagado», «por tienda») usa un `gen:panel` de UNA pieza `comparisonBars` sobre `/dashboard/sales-by-store` (independiente), que desglosa facturación/ticket medio/margen por tienda; no enfoques una sola tienda ni inventes el desglose.
 - `format` (eur, percent, percentRatio, decimal, units, integer) opcional: si lo omites se infiere por el nombre del campo. Tasas del dashboard (discountRate, returnRate, avgDiscountPct, marginPct, rate) son fracción 0..1 → `percentRatio` (×100); `percent` es para 0..100. Pásalo explícito cuando el campo sea ambiguo.
 - El `period`/`store_id` van en `params` de cada pieza. Una pieza en slot equivocado se reubica; un endpoint fuera de la allowlist se descarta.
 
@@ -487,7 +451,7 @@ ELEGIR y ENSAMBLAR con criterio, nunca maquetar ni inventar estilo.\n\n\
 Antes de tocar el lienzo, decide en silencio (no narres el plan):\n\
 1. ¿Qué pregunta de negocio hay detrás?\n\
 2. ¿Qué métricas y dimensiones la responden?\n\
-3. ¿Un BLOQUE pre-cableado lo resuelve? (preferido) Si no, ¿un panel a medida (`gen:panel`)?\n\
+3. ¿Lo resuelven varios widgets independientes del catálogo? Si no, ¿un panel a medida (`gen:panel`)?\n\
 4. ¿Qué receta, qué piezas, qué periodo y qué tienda?\n\
 Luego ejecútalo en UNA sola tanda de herramientas y resume en una frase qué añadiste. Éxito = un \
 dashboard que se renderiza y responde la pregunta, no un JSON válido. El lienzo REPARA tu spec \
@@ -612,18 +576,15 @@ mod tests {
         let p = build_system_prompt(&sample_org(), true, None, None, None);
         assert!(p.contains("dash-bars"));
         assert!(p.contains("geist-treemap-family"));
-        // Todos los ids del catálogo (widgets + bloques + gen:panel) aparecen listados.
+        // Todos los ids del catálogo (widgets + gen:panel) aparecen listados. Los bloques `block:*`
+        // (#205) se retiraron: catálogo vacío en frontend y contrato (ver WIDGET_CATALOG).
         for (id, _) in WIDGET_CATALOG {
             assert!(p.contains(id), "falta el widget {id} en el prompt");
         }
-        // Los bloques nuevos (#201) están en el catálogo del prompt.
-        for block in [
-            "block:profitability",
-            "block:discount-control",
-            "block:sales-mix",
-        ] {
-            assert!(p.contains(block), "falta el bloque {block} en el prompt");
-        }
+        assert!(
+            !p.contains("block:"),
+            "los bloques block:* deben estar retirados del prompt"
+        );
     }
 
     #[test]
@@ -720,10 +681,8 @@ mod tests {
     fn incluye_seccion_de_paneles_v2_con_bloques_recetas_y_piezas() {
         let p = build_system_prompt(&sample_org(), true, None, None, None);
         assert!(p.contains("Paneles a medida y bloques"));
-        // Superficie v2: gen:panel + bloques pre-cableados.
+        // Superficie v2: gen:panel a medida (los bloques `block:*` pre-cableados se retiraron, #205).
         assert!(p.contains("gen:panel"));
-        assert!(p.contains("block:sales-overview"));
-        assert!(p.contains("block:stock-risk"));
         // Recetas y piezas (vocabulario v2), no nodos del árbol v1.
         assert!(p.contains("kpiRow+twoCharts"));
         assert!(p.contains("kpiTile"));
@@ -740,9 +699,9 @@ mod tests {
     #[test]
     fn el_prompt_no_se_dispara_en_tamano() {
         // El playbook de diseño (#201: planificación + tabla intención→pieza + principios +
-        // few-shots) + el catálogo de 10 bloques (#224/#225) + las reglas de narración-en-chat,
-        // campos/preferir-bloque del ranking y las de tono/no-internos/confidencialidad suben el
-        // prompt a ~16,8k chars (~4,2k tokens). Es una inversión deliberada: el system prompt es la
+        // few-shots) + el catálogo de widgets + las reglas de narración-en-chat, campos del ranking
+        // y las de tono/no-internos/confidencialidad mantienen el prompt en ~15k chars (~3,8k tokens;
+        // bajó al retirar los bloques `block:*`). Es una inversión deliberada: el system prompt es la
         // palanca de calidad del agente. Cota a 17k = guardia anti-runaway (que no se duplique por
         // accidente), no una restricción de coste.
         let p = build_system_prompt(&sample_org(), true, None, None, None);

@@ -19,6 +19,7 @@ import { usePageActions } from './lib/pageActions.js';
 import { usePageNav } from './lib/pageNav.js';
 import { parsePeriod, periodToRange } from './lib/period.js';
 import { collectSale, getReceiptHtml, getTicket } from './lib/sales.js';
+import { useTableShellHeight } from './lib/useTableShellHeight.js';
 import {
   CHANNEL_LABELS,
   COBRO_LABELS,
@@ -82,6 +83,7 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
   // Deep-link de tienda ("Ver ventas" desde Tiendas): acota el ledger en servidor.
   const [serverStoreId, setServerStoreId] = useState<string | null>(initialStoreId ?? null);
   const [dataModal, setDataModal] = useState<'export' | null>(null);
+  const shellHeight = useTableShellHeight();
 
   const features = useFeatures();
   usePageHeader('Ventas', 'Historial de tickets y facturas · cobro y estado en un vistazo');
@@ -240,7 +242,7 @@ export function SalesHistoryPage({ initialStoreId }: { initialStoreId?: string |
   );
 
   return (
-    <div className="ventas-page" data-testid="sales-page">
+    <div className="ventas-page" data-testid="sales-page" style={{ height: shellHeight }}>
       <div className="ventas-card">
         <div className="ventas-layout">
           <SalesFacets

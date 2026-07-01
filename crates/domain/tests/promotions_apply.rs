@@ -244,6 +244,8 @@ fn sale_body(c: &Ctx, lines: Vec<CreateSaleLine>) -> CreateSale {
         ticket_discount_amt: None,
         customer_tax_id: None,
         customer_name: None,
+        channel: None,
+        credit_due_date: None,
         skipped_promotions: vec![],
     }
 }

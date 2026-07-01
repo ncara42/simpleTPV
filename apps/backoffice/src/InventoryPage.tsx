@@ -7,6 +7,7 @@ import { FamiliesPage } from './FamiliesPage.js';
 import { listFamilies } from './lib/families.js';
 import { usePageNav } from './lib/pageNav.js';
 import { listProducts } from './lib/products.js';
+import { useTableShellHeight } from './lib/useTableShellHeight.js';
 import { StockPage } from './StockPage.js';
 
 type Vista = 'catalogo' | 'familias' | 'existencias';
@@ -66,7 +67,9 @@ export function InventoryPage({ initialStoreId, onOpenCatalogFamily }: Inventory
   const setFamily = (value: string): void => setParam('family', value);
   const selectVista = (next: Vista): void => setParam('vista', next);
 
-  // Inyecta las pestañas en la columna izquierda de la TopBar.
+  const shellHeight = useTableShellHeight();
+
+  // Inyecta las pestañas en la sub-barra de la tabla (topbar-tablebar).
   usePageNav(
     <div className="inv-nav-tabs" role="tablist" aria-label="Vista de inventario">
       {VISTAS.map(({ id, label }) => (
@@ -86,7 +89,7 @@ export function InventoryPage({ initialStoreId, onOpenCatalogFamily }: Inventory
   );
 
   return (
-    <div className="inventory-page" data-testid="inventory-page">
+    <div className="inventory-page" data-testid="inventory-page" style={{ height: shellHeight }}>
       <div className="inv-card">
         <div className={`inv-card-body inv-card-body--${vista}`}>
           {vista === 'catalogo' && (

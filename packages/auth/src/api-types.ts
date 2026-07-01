@@ -119,6 +119,20 @@ export interface SalesTodayResponse {
   intraday?: number[];
 }
 
+// Desglose de ventas por tienda para un periodo arbitrario (#224). La sirve
+// GET /dashboard/sales-by-store (backoffice, ADMIN/MANAGER). A diferencia de
+// SalesTodayResponse.byStore (fijo a hoy/ayer), acepta cualquier `period` vía
+// PeriodQuery. Incluye las tiendas activas de la org, con 0 si no tuvieron ventas.
+export interface SalesByStoreItem {
+  storeId: string;
+  storeName: string;
+  revenue: number;
+  salesCount: number;
+  avgTicket: number;
+  margin: number;
+  marginPct: number;
+}
+
 export interface Store {
   id: string;
   name: string;

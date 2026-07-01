@@ -68,6 +68,7 @@ export type {
   Rotation,
   Sale,
   SaleLine,
+  SalesByStoreItem,
   SalesPage,
   SalesQueryInput,
   SalesSeriesPoint,

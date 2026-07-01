@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 
 import { useFeatures } from './lib/features.js';
+import { useTableShellHeight } from './lib/useTableShellHeight.js';
 import { TimeClockPage } from './TimeClockPage.js';
 import { UsersPage } from './UsersPage.js';
 
@@ -43,8 +44,10 @@ export function PersonalPage() {
     setParams(updated, { replace: true });
   };
 
+  const shellHeight = useTableShellHeight();
+
   return (
-    <div className="inventory-page" data-testid="personal-page">
+    <div className="inventory-page" data-testid="personal-page" style={{ height: shellHeight }}>
       <div className="inventory-views bo-tabs" role="tablist" aria-label="Vista de personal">
         {vistas.map(({ id, label }) => (
           <button

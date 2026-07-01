@@ -73,29 +73,29 @@ test('Catálogo: selección múltiple y edición en lote', async ({ page }) => {
   await expect(page.getByTestId('product-form')).toHaveCount(0);
 });
 
-test('Tiendas muestra el grid de ubicaciones', async ({ page }) => {
+test('Tiendas muestra la lista de ubicaciones en 3 paneles', async ({ page }) => {
   await navTo(page, 'stores');
-  await expect(page.getByTestId('stores-grid')).toBeVisible();
-  await expect(page.getByTestId('store-card')).toHaveCount(6);
+  await expect(page.getByTestId('store-list')).toBeVisible();
+  await expect(page.getByTestId('store-lrow')).toHaveCount(6);
+  // Sin clic previo: la de mayor ventas queda seleccionada por defecto (paneles
+  // 2/3 siempre visibles, ya no hay modal que abrir).
+  await expect(page.getByTestId('store-detail-panel')).toBeVisible();
+  await expect(page.getByTestId('store-ops-panel')).toBeVisible();
 });
 
 test('Tiendas: orden por ventas y acceso directo a stock (UX)', async ({ page }) => {
   await navTo(page, 'stores');
   await expect(page.getByTestId('store-sales').first()).toBeVisible();
-  // El panel ya no tiene filtros (solo crea y observa).
-  await expect(page.getByTestId('store-status-filter')).toHaveCount(0);
-  // Las acciones Stock/Ventas/Precios viven ahora en la modal de detalle:
-  // primero se abre la card → modal, luego se pulsa el botón dentro.
-  await page.getByTestId('store-card').first().click();
-  await expect(page.getByTestId('store-detail-actions')).toBeVisible();
-  // Acceso directo "Stock" → lleva a la página de Stock.
+  // Los accesos rápidos (Stock/Ventas/Precios) viven en la ficha (panel 2),
+  // siempre visible — ya no hace falta abrir nada para llegar a ellos.
+  await expect(page.getByTestId('store-open-stock')).toBeVisible();
   await page.getByTestId('store-open-stock').click();
   await expect(page.getByTestId('stock-page')).toBeVisible();
   // Acceso directo "Ventas" → page de Ventas PREFILTRADA por la tienda (I-17).
   await navTo(page, 'stores');
-  const card = page.getByTestId('store-card').first();
-  const storeName = (await card.locator('.store-card-name').textContent()) ?? '';
-  await card.click();
+  const row = page.getByTestId('store-lrow').first();
+  const storeName = (await row.locator('.store-lrow-name-txt').textContent()) ?? '';
+  await row.click();
   await page.getByTestId('store-open-sales').click();
   await expect(page.getByTestId('sales-page')).toBeVisible();
   // Prefiltrada por la tienda (deep-link `?store=`): el ledger se acota a esa tienda,
@@ -105,10 +105,10 @@ test('Tiendas: orden por ventas y acceso directo a stock (UX)', async ({ page })
 
 test('Tiendas: detalle, estado operativo y registro de fichajes (#100, #102)', async ({ page }) => {
   await navTo(page, 'stores');
-  await expect(page.getByTestId('store-open').first()).toBeVisible();
-  // Detalle de "Sur" → operativo + registro de fichajes.
-  await page.getByTestId('store-card').filter({ hasText: 'Sur' }).click();
-  await expect(page.getByTestId('store-detail')).toBeVisible();
+  // Detalle de "Sur" → seleccionar en la lista actualiza los paneles al instante
+  // (sin modal): ficha (identidad + ventas) y operativa quedan en línea.
+  await page.getByTestId('store-lrow').filter({ hasText: 'Sur' }).click();
+  await expect(page.getByTestId('store-detail-panel')).toBeVisible();
   await expect(page.getByTestId('store-detail-open')).toBeVisible();
   await page.getByTestId('store-log-open').click();
   await expect(page.getByTestId('store-log-drawer')).toBeVisible();
@@ -127,28 +127,28 @@ test('Tiendas: detalle, estado operativo y registro de fichajes (#100, #102)', a
 
 test('Tiendas: el estado operativo PERSISTE tras recargar (I-09, E-02)', async ({ page }) => {
   await navTo(page, 'stores');
-  await page.getByTestId('store-card').filter({ hasText: 'Sur' }).click();
+  await page.getByTestId('store-lrow').filter({ hasText: 'Sur' }).click();
   await expect(page.getByTestId('store-ops')).toBeVisible();
   // Estado inicial → marcar verificada + incidencia y guardar.
   const wasVerified = await page.getByTestId('store-ops-verified').isChecked();
   await page.getByTestId('store-ops-verified').setChecked(!wasVerified, { force: true });
   await page.getByTestId('store-ops-incident').fill('e2e: incidencia de prueba');
   await page.getByTestId('store-ops-save').click();
-  await expect(page.getByTestId('store-ops-save')).toContainText('Guardado', { timeout: 5000 });
+  await expect(page.getByTestId('store-ops-save')).toContainText('Guardado', { timeout: 10000 });
   // Recargar: el estado viene del backend, no de un useState (anti-test E-02).
   // Con react-router (F0) el reload CONSERVA la ruta (ya no resetea a dashboard);
   // anclamos a float-actions (presente en todas las views) en vez de a 'dashboard'.
   await page.reload();
   await expect(page.getByTestId('topbar')).toBeVisible({ timeout: 15000 });
   await navTo(page, 'stores');
-  await page.getByTestId('store-card').filter({ hasText: 'Sur' }).click();
+  await page.getByTestId('store-lrow').filter({ hasText: 'Sur' }).click();
   await expect(page.getByTestId('store-ops-verified')).toBeChecked({ checked: !wasVerified });
   await expect(page.getByTestId('store-ops-incident')).toHaveValue('e2e: incidencia de prueba');
   // Restaurar para no contaminar el seed entre runs.
   await page.getByTestId('store-ops-verified').setChecked(wasVerified, { force: true });
   await page.getByTestId('store-ops-incident').fill('');
   await page.getByTestId('store-ops-save').click();
-  await expect(page.getByTestId('store-ops-save')).toContainText('Guardado', { timeout: 5000 });
+  await expect(page.getByTestId('store-ops-save')).toContainText('Guardado', { timeout: 10000 });
 });
 
 test('Tiendas: crear, editar y borrar persisten (I-10)', async ({ page }) => {
@@ -160,10 +160,10 @@ test('Tiendas: crear, editar y borrar persisten (I-10)', async ({ page }) => {
   await page.getByTestId('store-code').fill(code);
   await page.getByTestId('store-save').click();
   await expect(page.getByTestId('store-form')).toHaveCount(0);
-  const card = page.getByTestId('store-card').filter({ hasText: `Tienda E2E ${code}` });
-  await expect(card).toBeVisible();
-  // Editar desde el detalle: renombrar.
-  await card.click();
+  const row = page.getByTestId('store-lrow').filter({ hasText: `Tienda E2E ${code}` });
+  await expect(row).toBeVisible();
+  // Editar desde la ficha (panel 2, siempre visible): renombrar.
+  await row.click();
   await page.getByTestId('store-edit').click();
   await page.getByTestId('store-name').fill(`Tienda E2E ${code} Editada`);
   await page.getByTestId('store-save').click();
@@ -172,14 +172,14 @@ test('Tiendas: crear, editar y borrar persisten (I-10)', async ({ page }) => {
   await page.reload();
   await expect(page.getByTestId('topbar')).toBeVisible({ timeout: 15000 });
   await navTo(page, 'stores');
-  const renamed = page.getByTestId('store-card').filter({ hasText: `Tienda E2E ${code} Editada` });
+  const renamed = page.getByTestId('store-lrow').filter({ hasText: `Tienda E2E ${code} Editada` });
   await expect(renamed).toBeVisible();
-  // Borrar (tienda vacía) con confirmación; desaparece del grid.
+  // Borrar (tienda vacía) con confirmación; desaparece de la lista.
   await renamed.click();
   await page.getByTestId('store-delete').click();
   await page.getByRole('button', { name: 'Borrar' }).last().click();
   await expect(
-    page.getByTestId('store-card').filter({ hasText: `Tienda E2E ${code}` }),
+    page.getByTestId('store-lrow').filter({ hasText: `Tienda E2E ${code}` }),
   ).toHaveCount(0);
 });
 

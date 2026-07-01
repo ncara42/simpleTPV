@@ -32,6 +32,7 @@ import {
   listSupplierPrices,
   upsertSupplierPrice,
 } from '../lib/supplier-prices.js';
+import { useTableShellHeight } from '../lib/useTableShellHeight.js';
 
 // Tarifas de compra por proveedor (P1-B): alta/edición de precio por producto,
 // import CSV por SKU y comparativa de precios entre proveedores por arquetipo.
@@ -49,6 +50,7 @@ export function SupplierPricesSection({
 } = {}) {
   const qc = useQueryClient();
   const [view, setView] = useState<'tarifas' | 'comparativa'>(initialView ?? 'tarifas');
+  const shellHeight = useTableShellHeight();
   const [supplierId, setSupplierId] = useState(fixedSupplierId ?? '');
   const [familyId, setFamilyId] = useState('');
   const [importing, setImporting] = useState(false);
@@ -352,7 +354,7 @@ export function SupplierPricesSection({
           // mismo aspecto que Existencias/Proveedores.
           <>
             {columnsEditor}
-            <div className="faceted-page">
+            <div className="faceted-page" style={{ height: shellHeight }}>
               <div className="sp-tab-bar">
                 {subViewNav}
                 <Button

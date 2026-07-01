@@ -22,6 +22,7 @@ import {
 import { exportRowsToCsv, importRowsViaCreate } from '../lib/csv.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { usePageActions } from '../lib/pageActions.js';
+import { useTableShellHeight } from '../lib/useTableShellHeight.js';
 import {
   activeFacetCount,
   activeSavedView,
@@ -139,6 +140,7 @@ export function CustomersSection() {
   const [sortAsc, setSortAsc] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [collectingId, setCollectingId] = useState<string | null>(null);
+  const shellHeight = useTableShellHeight();
 
   const { data: customers = [] } = useQuery({
     queryKey: ['b2b-customers'],
@@ -485,7 +487,7 @@ export function CustomersSection() {
     );
 
   return (
-    <div className="b2b-customers-page">
+    <div className="b2b-customers-page" style={{ height: shellHeight }}>
       {/* Card full-bleed (como Ventas): solo el maestro-detalle de 3 columnas. Las
           sub-pestañas y el «Nuevo cliente» viven en la TopBar (pageNav + pageActions). */}
       <div className="cust-card">

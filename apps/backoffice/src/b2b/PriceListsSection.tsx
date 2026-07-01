@@ -21,6 +21,7 @@ import {
 } from '../lib/b2b.js';
 import { formErrorMessage } from '../lib/form-error.js';
 import { usePageActions } from '../lib/pageActions.js';
+import { useTableShellHeight } from '../lib/useTableShellHeight.js';
 import {
   activeFacetCount,
   activeSavedView,
@@ -65,6 +66,7 @@ export function PriceListsSection() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tariffForm, setTariffForm] = useState<TariffForm | null>(null);
   const [itemForm, setItemForm] = useState<ItemForm | null>(null);
+  const shellHeight = useTableShellHeight();
 
   const { data: priceLists = [] } = useQuery({
     queryKey: ['b2b-pricelists'],
@@ -337,7 +339,7 @@ export function PriceListsSection() {
     Number(itemPrice) >= 0;
 
   return (
-    <div className="b2b-pricelists-page">
+    <div className="b2b-pricelists-page" style={{ height: shellHeight }}>
       <div className="cust-card">
         <div className="pl-layout">
           <PriceListFacets

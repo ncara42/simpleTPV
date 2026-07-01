@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Store } from './lib/admin.js';
@@ -57,45 +58,60 @@ vi.mock('./lib/products.js', () => ({
 }));
 
 import { ConfirmProvider } from './components/ConfirmProvider.js';
+import { PageActionsProvider, usePageActionsValue } from './lib/pageActions.js';
 import { StoresPage } from './StoresPage.js';
+
+// Las acciones («Nueva tienda», exportar CSV) viven en el slot de la TopBar
+// (usePageActions), no en la card. Montamos el provider + un slot que pinta su
+// valor para poder asertarlas (mismo patrón que TransfersPage.test.tsx).
+function ActionsSlot() {
+  return <>{usePageActionsValue()}</>;
+}
 
 function renderPage(): void {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <ConfirmProvider>
-        <StoresPage onOpenStoreView={vi.fn()} />
-      </ConfirmProvider>
+      <MemoryRouter>
+        <ConfirmProvider>
+          <PageActionsProvider>
+            <ActionsSlot />
+            <StoresPage onOpenStoreView={vi.fn()} />
+          </PageActionsProvider>
+        </ConfirmProvider>
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
 describe('StoresPage', () => {
-  it('renderiza la cabecera y las tarjetas de tienda (sin filtros)', async () => {
+  it('renderiza la lista y selecciona la primera tienda por defecto (3 paneles)', async () => {
     renderPage();
     expect(screen.getByTestId('new-store')).toBeInTheDocument();
-    // Ya no hay filtros de estado/periodo: el panel solo crea y observa.
-    expect(screen.queryByTestId('store-status-filter')).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.getAllByTestId('store-card')).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByTestId('store-lrow')).toHaveLength(2));
+    // Sin selección explícita en la URL, cae a la primera de la lista (paneles 2/3).
+    expect(await screen.findByTestId('store-detail-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('store-ops-panel')).toBeInTheDocument();
   });
 
-  it('abre el detalle al pulsar una tarjeta', async () => {
+  it('selecciona una tienda de la lista y actualiza los paneles de detalle/operativa', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('store-card').length).toBeGreaterThan(0));
-    fireEvent.click(screen.getAllByTestId('store-card')[0]!);
-    expect(screen.getByTestId('store-detail')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByTestId('store-lrow').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByTestId('store-lrow')[1]!);
+    await waitFor(() =>
+      expect(screen.getByTestId('store-detail-panel')).toHaveTextContent('Norte'),
+    );
+    expect(screen.getByTestId('store-ops-panel')).toHaveTextContent('Norte');
   });
 
-  it('abre el modal de precios por tienda al pulsar "Precios" (#127 A)', async () => {
+  it('abre el modal de precios por tienda al pulsar "Precios" sin ocultar los paneles (#127 A)', async () => {
     renderPage();
-    // Las acciones viven ahora en la modal de detalle: abrir la card → modal y
-    // pulsar "Precios" dentro.
-    await waitFor(() => expect(screen.getAllByTestId('store-card').length).toBeGreaterThan(0));
-    fireEvent.click(screen.getAllByTestId('store-card')[0]!);
+    await waitFor(() => expect(screen.getAllByTestId('store-lrow').length).toBeGreaterThan(0));
     const pricesBtn = await screen.findByTestId('store-open-prices');
     fireEvent.click(pricesBtn);
-    // Decisión (a): al abrir precios se cierra el detalle, no quedan dos modales.
     expect(await screen.findByTestId('store-prices-detail')).toBeInTheDocument();
-    expect(screen.queryByTestId('store-detail')).not.toBeInTheDocument();
+    // A diferencia de la modal anterior, los paneles permanentes NO se ocultan al
+    // abrir Precios (ya no hay dos modales que apilar, solo un overlay sobre ellos).
+    expect(screen.getByTestId('store-detail-panel')).toBeInTheDocument();
   });
 });

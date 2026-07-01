@@ -120,16 +120,23 @@ const ALL_NAV: NavItem[] = [
 const HIDDEN_TABS = new Set<Tab>(['notifications', 'verifactu', 'settings']);
 const NAV: NavItem[] = ALL_NAV.filter((item) => !HIDDEN_TABS.has(item.id as Tab));
 
-// Lee las acciones de la vista activa (cada page las declara con usePageActions) y
-// las inyecta en el clúster derecho del topbar (antes vivían en el clúster flotante).
-function PageActionsSlot() {
-  return <>{usePageActionsValue()}</>;
-}
-
-// Lee la sub-navegación de la vista activa (pestañas Catálogo/Familias…) y la
-// inyecta en la columna izquierda del topbar.
-function PageNavSlot() {
-  return <>{usePageNavValue()}</>;
+// «Topbar de la tabla»: sub-barra contextual un escalón POR DEBAJO de la banda flotante.
+// Reúne lo que CAMBIA según la tabla activa: la sub-navegación de la vista (pestañas
+// Catálogo/Familias…) a la izquierda y sus acciones (nueva tarifa · exportar CSV…) a la
+// derecha. Lo del PROGRAMA (campana · búsqueda · cuenta) se queda en la banda de arriba.
+// Lee ambos contextos (usePageNav/usePageActions); si la vista no declara ninguno no monta
+// nada (sin banda vacía). El dashboard no usa estos contextos → nunca la pinta (conserva sus
+// herramientas de lienzo en la banda flotante).
+function ViewToolbar() {
+  const nav = usePageNavValue();
+  const actions = usePageActionsValue();
+  if (!nav && !actions) return null;
+  return (
+    <div className="topbar-tablebar" role="toolbar" aria-label="Acciones de la vista">
+      {nav && <div className="topbar-tablebar-nav">{nav}</div>}
+      {actions && <div className="topbar-tablebar-actions">{actions}</div>}
+    </div>
+  );
 }
 
 function Home() {
@@ -290,8 +297,9 @@ function Home() {
           puntitos va full-bleed y el sidebar flota por encima (como en el Dashboard). */}
           <div className={`app-content${isCanvas ? '' : ' app-content--surface'}`}>
             <PageHeaderProvider>
-              {/* Topbar flotante siempre presente: isla central (atrás · nombre de la vista ·
-              tema · campana) + clúster derecho (acciones de la vista · búsqueda ⌘K · cuenta).
+              {/* Topbar flotante siempre presente (solo PROGRAMA): isla central (atrás · nombre de
+              la vista · 🤖) + clúster derecho (campana · búsqueda ⌘K · cuenta). Lo relativo a la
+              tabla (sub-nav + acciones) baja a la sub-barra contextual (subBar → ViewToolbar).
               El nombre de la vista es el label del menú (en el Dashboard: «Asistente de IA»). */}
               <TopBar
                 title={activeLabel}
@@ -307,12 +315,14 @@ function Home() {
                 // separado por un filete (← Inventario ┊ 🤖). Togglea el asistente (useAssistantStore).
                 // Presente en TODAS las views, incluido el Dashboard.
                 islandActions={<AssistantLauncher />}
-                pageActions={<PageActionsSlot />}
+                // Las acciones de la vista (nueva tarifa · exportar CSV…) y la sub-navegación de la
+                // tabla YA NO van en esta banda flotante: bajan a la sub-barra contextual (subBar →
+                // ViewToolbar), un escalón por debajo. Aquí arriba solo queda lo del PROGRAMA.
                 pageNav={
                   // En el lienzo del dashboard, las herramientas (Editar/Mover/Goma) viven DENTRO
-                  // del topbar, en la columna izquierda (a la altura de la isla central de
-                  // navegación), no en una sub-barra aparte. El resto de vistas usan su
-                  // sub-navegación normal (pestañas Catálogo/Familias…).
+                  // del topbar, en la columna izquierda (a la altura de la isla central), no en la
+                  // sub-barra. El resto de vistas dejan esta columna vacía: su sub-navegación
+                  // (pestañas Catálogo/Familias…) baja a la sub-barra de la tabla (ViewToolbar).
                   tab === 'dashboard' && canvasBinding ? (
                     <CanvasToolsMenu
                       canvasRef={canvasBinding.canvasRef}
@@ -322,10 +332,11 @@ function Home() {
                       mode={canvasBinding.canvasMeta.mode}
                       zoomPct={canvasBinding.canvasMeta.zoomPct}
                     />
-                  ) : (
-                    <PageNavSlot />
-                  )
+                  ) : undefined
                 }
+                // Sub-barra contextual «topbar de la tabla»: sub-navegación + acciones de la vista
+                // activa, un escalón por debajo de la banda flotante (ver ViewToolbar).
+                subBar={<ViewToolbar />}
                 // Solo en el dashboard: botón «+» de añadir widget (como la campana) + conmutador
                 // cuadrícula↔lienzo, ambos arriba-derecha del topbar (clúster derecho).
                 endSlot={

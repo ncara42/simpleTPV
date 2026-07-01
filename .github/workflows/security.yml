@@ -62,6 +62,15 @@ jobs:
           persist-credentials: false
 
       - name: Run Semgrep
+        # Excepciones de reglas (misma política que .trivyignore.yaml: documentar id y
+        # razón). La familia `package_managers.*` de p/nodejs son sugerencias de
+        # *hardening de configuración* del gestor de paquetes (dependabot.yml, .npmrc,
+        # pnpm-workspace.yaml), no vulnerabilidades de código. Adoptarlas (minimumReleaseAge,
+        # trustPolicy: no-downgrade, cooldowns, block-exotic-sub-dependencies) obliga a
+        # re-resolver TODO el lockfile con metadatos de procedencia — hoy 7 entradas fallan
+        # `no-downgrade` y `minimumReleaseAge: 10080` re-resolvería a ciegas paquetes <7 días —
+        # rompiendo la reproducibilidad de --frozen-lockfile en el resto de jobs. Se excluyen
+        # aquí; adoptar el endurecimiento del gestor de paquetes es un cambio deliberado aparte.
         run: |
           semgrep scan \
             --config=p/typescript \
@@ -69,6 +78,11 @@ jobs:
             --config=p/secrets \
             --config=p/owasp-top-ten \
             --error \
+            --exclude-rule=package_managers.dependabot.dependabot-missing-cooldown.dependabot-missing-cooldown \
+            --exclude-rule=package_managers.npm.npm-missing-minimum-release-age.npm-missing-minimum-release-age \
+            --exclude-rule=package_managers.pnpm.pnpm-block-exotic-sub-dependencies.pnpm-block-exotic-sub-dependencies \
+            --exclude-rule=package_managers.pnpm.pnpm-missing-minimum-release-age.pnpm-minimum-release-age \
+            --exclude-rule=package_managers.pnpm.pnpm-trust-policy.pnpm-trust-policy \
             --exclude=node_modules \
             --exclude=dist \
             --exclude=build \

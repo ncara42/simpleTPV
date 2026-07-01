@@ -155,6 +155,7 @@ async fn sell_cash(c: &Ctx, product: Uuid, qty: i64) -> Sale {
             customer_name: None,
             channel: None,
             credit_due_date: None,
+            skipped_promotions: vec![],
         },
     )
     .await
@@ -188,6 +189,7 @@ async fn sell_credit(c: &Ctx, product: Uuid, qty: i64, due: &str) -> Sale {
             customer_name: None,
             channel: Some(SaleChannel::B2b),
             credit_due_date: Some(due.to_owned()),
+            skipped_promotions: vec![],
         },
     )
     .await
