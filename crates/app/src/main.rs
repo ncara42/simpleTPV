@@ -635,6 +635,11 @@ async fn run_migrations(pool: &sqlx::PgPool) -> anyhow::Result<()> {
             20260629170000,
             "support_tickets"
         ),
+        m!(
+            "../migrations/20260630120000_cash_closing_note.sql",
+            20260630120000,
+            "cash_closing_note"
+        ),
     ];
 
     for m in migrations {
