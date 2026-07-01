@@ -131,6 +131,11 @@ async fn teardown(c: &Ctx, products: &[Uuid]) {
             .await
             .unwrap();
     }
+    sqlx::query(r#"DELETE FROM "SupplierPrice" WHERE "supplierId" = $1"#)
+        .bind(c.supplier)
+        .execute(&c.admin)
+        .await
+        .unwrap();
     sqlx::query(r#"DELETE FROM "Supplier" WHERE id = $1"#)
         .bind(c.supplier)
         .execute(&c.admin)
@@ -320,4 +325,133 @@ async fn sugerencia_de_reposicion() {
     assert_eq!(mine.cantidad_sugerida, Decimal::from(15));
 
     teardown(&c, &[product]).await;
+}
+
+/// Con proveedor: la propuesta se acota a los productos que sirve (SupplierPrice) y
+/// amplía el horizonte con su `leadTimeDays`. Sin proveedor: toda la tienda, sin lead.
+#[tokio::test]
+async fn sugerencia_por_proveedor_filtra_y_aplica_lead_time() {
+    let c = setup().await;
+    // Lead time explícito (no depender del default del setup).
+    sqlx::query(r#"UPDATE "Supplier" SET "leadTimeDays" = 7 WHERE id = $1"#)
+        .bind(c.supplier)
+        .execute(&c.admin)
+        .await
+        .unwrap();
+
+    // A: servido por el proveedor. B: NO servido, pese a tener ventas y déficit.
+    let prod_a = make_product(&c).await;
+    let prod_b = make_product(&c).await;
+    for p in [prod_a, prod_b] {
+        stock::adjust(
+            &c.app,
+            c.org,
+            c.user,
+            Adjust {
+                product_id: p,
+                store_id: c.store,
+                new_quantity: Decimal::from(5),
+                reason: "init".into(),
+            },
+        )
+        .await
+        .unwrap();
+        stock::set_min(
+            &c.app,
+            c.org,
+            SetMin {
+                product_id: p,
+                store_id: c.store,
+                min_stock: Decimal::from(20),
+            },
+        )
+        .await
+        .unwrap();
+        // Venta de 60 uds dentro de la ventana → venta media 2/día.
+        sqlx::query(
+            r#"INSERT INTO "StockMovement" (id, "organizationId", "productId", "storeId", type, quantity)
+               VALUES ($1, $2, $3, $4, 'SALE'::"MovementType", $5)"#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(c.org)
+        .bind(p)
+        .bind(c.store)
+        .bind(Decimal::from(-60))
+        .execute(&c.admin)
+        .await
+        .unwrap();
+    }
+    // Solo A tiene tarifa con el proveedor.
+    sqlx::query(
+        r#"INSERT INTO "SupplierPrice" (id, "organizationId", "supplierId", "productId", price, "updatedAt")
+           VALUES ($1, $2, $3, $4, $5, now())"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(c.org)
+    .bind(c.supplier)
+    .bind(prod_a)
+    .bind(Decimal::from(5))
+    .execute(&c.admin)
+    .await
+    .unwrap();
+
+    // Con proveedor: solo A, con lead time → 20-5 + 2·(10+7) = 15 + 34 = 49.
+    let con_prov = service::suggest(
+        &c.app,
+        c.org,
+        SuggestPurchase {
+            store_id: c.store,
+            supplier_id: Some(c.supplier),
+            days_coverage: Some(10),
+        },
+    )
+    .await
+    .unwrap();
+    let a = con_prov
+        .iter()
+        .find(|r| r.product_id == prod_a)
+        .expect("A en la propuesta del proveedor");
+    assert_eq!(a.cantidad_sugerida, Decimal::from(49));
+    assert!(
+        con_prov.iter().all(|r| r.product_id != prod_b),
+        "B no lo sirve el proveedor: debe quedar fuera"
+    );
+
+    // Sin proveedor: A y B, sin lead time → 20-5 + 2·10 = 35 cada uno.
+    let sin_prov = service::suggest(
+        &c.app,
+        c.org,
+        SuggestPurchase {
+            store_id: c.store,
+            supplier_id: None,
+            days_coverage: Some(10),
+        },
+    )
+    .await
+    .unwrap();
+    for p in [prod_a, prod_b] {
+        let r = sin_prov
+            .iter()
+            .find(|r| r.product_id == p)
+            .expect("producto en la propuesta de tienda");
+        assert_eq!(r.cantidad_sugerida, Decimal::from(35));
+    }
+
+    // Proveedor inexistente → BadRequest (fail-fast).
+    assert_eq!(
+        service::suggest(
+            &c.app,
+            c.org,
+            SuggestPurchase {
+                store_id: c.store,
+                supplier_id: Some(Uuid::new_v4()),
+                days_coverage: Some(10),
+            },
+        )
+        .await
+        .err(),
+        Some(AppError::BadRequest)
+    );
+
+    teardown(&c, &[prod_a, prod_b]).await;
 }

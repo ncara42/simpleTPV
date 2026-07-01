@@ -74,7 +74,9 @@ export function SuggestSection() {
                   <Button
                     type="button"
                     disabled={!storeId || suggestMut.isPending}
-                    onClick={() => suggestMut.mutate({ storeId })}
+                    onClick={() =>
+                      suggestMut.mutate(supplierId ? { storeId, supplierId } : { storeId })
+                    }
                     data-testid="suggest-generate"
                     icon={<Sparkles size={16} aria-hidden="true" />}
                   >

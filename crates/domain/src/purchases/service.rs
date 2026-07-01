@@ -3,6 +3,8 @@
 //! stock destino (PURCHASE_RECEIPT, con lote si el producto lo exige) y recalcula
 //! el estado. Incluye la propuesta de reposición (#45). Todo bajo `with_tenant_tx`.
 
+use std::collections::HashMap;
+
 use rust_decimal::Decimal;
 use simpletpv_db::with_tenant_tx;
 use simpletpv_shared::AppError;
@@ -214,6 +216,11 @@ pub async fn confirm(
 }
 
 /// `POST /purchase-orders/suggest` — propuesta de reposición de una tienda (#45).
+///
+/// Con `supplier_id`, la propuesta se acota a los productos que ese proveedor sirve
+/// (tabla `SupplierPrice`) y usa su `leadTimeDays` para ampliar el horizonte de
+/// demanda —evita la rotura de stock durante el tránsito del pedido—. Sin proveedor
+/// cubre toda la tienda y sin plazo de entrega (comportamiento previo).
 pub async fn suggest(
     pool: &sqlx::PgPool,
     org: Uuid,
@@ -231,67 +238,113 @@ pub async fn suggest(
         PrimitiveDateTime::new(d, now.time())
     };
     let store_id = input.store_id;
-    with_tenant_tx(pool, org, async move |tx, _after| {
-        let stock_rows: Vec<(Uuid, Decimal, Decimal, String)> = sqlx::query_as(
-            r#"SELECT s."productId", s.quantity, s."minStock", p.name
-               FROM "Stock" s JOIN "Product" p ON p.id = s."productId"
-               WHERE s."storeId" = $1 AND s."organizationId" = $2"#,
-        )
-        .bind(store_id)
-        .bind(org)
-        .fetch_all(&mut **tx)
-        .await?;
-        let sales: Vec<(Uuid, Decimal)> = sqlx::query_as(
-            r#"SELECT "productId", quantity FROM "StockMovement"
-               WHERE "storeId" = $1 AND "organizationId" = $2
-                 AND type = 'SALE'::"MovementType" AND "createdAt" >= $3"#,
-        )
-        .bind(store_id)
-        .bind(org)
-        .bind(since)
-        .fetch_all(&mut **tx)
-        .await?;
-
-        let window = Decimal::from(SALES_WINDOW_DAYS);
-        let mut rows: Vec<SuggestionRow> = stock_rows
-            .into_iter()
-            .map(|(product_id, stock_actual, min_stock, product_name)| {
-                let sold30: Decimal = sales
-                    .iter()
-                    .filter(|(p, _)| *p == product_id)
-                    .map(|(_, q)| q.abs())
-                    .sum();
-                let venta_media_diaria = (sold30 / window).round_dp(3);
-                let cantidad_sugerida =
-                    suggest_quantity(min_stock, stock_actual, venta_media_diaria, days);
-                let rotacion = if stock_actual > Decimal::ZERO {
-                    Some((venta_media_diaria / stock_actual).round_dp(3))
-                } else {
-                    None
-                };
-                let cobertura_dias = if venta_media_diaria > Decimal::ZERO {
-                    Some((stock_actual / venta_media_diaria).round_dp(3))
-                } else {
-                    None
-                };
-                SuggestionRow {
-                    product_id,
-                    product_name,
-                    stock_actual,
-                    min_stock,
-                    venta_media_30d: sold30,
-                    venta_media_diaria,
-                    rotacion,
-                    cobertura_dias,
-                    cantidad_sugerida,
+    let supplier_id = input.supplier_id;
+    let result: Result<Vec<SuggestionRow>, AppError> =
+        with_tenant_tx(pool, org, async move |tx, _after| {
+            // Lead time del proveedor si se filtra por él; proveedor inexistente o
+            // fuera del tenant → BadRequest (fail-fast, no una propuesta vacía muda).
+            let lead_time_days: i64 = if let Some(sup) = supplier_id {
+                let row: Option<(i32,)> = sqlx::query_as(
+                    r#"SELECT "leadTimeDays" FROM "Supplier" WHERE id = $1 AND "organizationId" = $2"#,
+                )
+                .bind(sup)
+                .bind(org)
+                .fetch_optional(&mut **tx)
+                .await?;
+                match row {
+                    Some((lt,)) => i64::from(lt),
+                    None => return Ok(Err(AppError::BadRequest)),
                 }
-            })
-            .filter(|r| r.cantidad_sugerida > Decimal::ZERO)
-            .collect();
-        rows.sort_by_key(|r| std::cmp::Reverse(r.cantidad_sugerida));
-        Ok(rows)
-    })
-    .await
+            } else {
+                0
+            };
+
+            // Stock de la tienda; con proveedor, solo los productos que sirve
+            // (SupplierPrice) — no tiene sentido proponerle lo que no vende.
+            let mut qb: sqlx::QueryBuilder<sqlx::Postgres> = sqlx::QueryBuilder::new(
+                r#"SELECT s."productId", s.quantity, s."minStock", p.name
+                   FROM "Stock" s JOIN "Product" p ON p.id = s."productId"
+                   WHERE s."storeId" = "#,
+            );
+            qb.push_bind(store_id)
+                .push(r#" AND s."organizationId" = "#)
+                .push_bind(org);
+            if let Some(sup) = supplier_id {
+                qb.push(
+                    r#" AND EXISTS (SELECT 1 FROM "SupplierPrice" sp
+                        WHERE sp."productId" = s."productId" AND sp."organizationId" = "#,
+                )
+                .push_bind(org)
+                .push(r#" AND sp."supplierId" = "#)
+                .push_bind(sup)
+                .push(")");
+            }
+            let stock_rows: Vec<(Uuid, Decimal, Decimal, String)> =
+                qb.build_query_as().fetch_all(&mut **tx).await?;
+
+            let sales: Vec<(Uuid, Decimal)> = sqlx::query_as(
+                r#"SELECT "productId", quantity FROM "StockMovement"
+                   WHERE "storeId" = $1 AND "organizationId" = $2
+                     AND type = 'SALE'::"MovementType" AND "createdAt" >= $3"#,
+            )
+            .bind(store_id)
+            .bind(org)
+            .bind(since)
+            .fetch_all(&mut **tx)
+            .await?;
+
+            // Agrega las ventas por producto UNA vez (O(N+M)); antes se recorría el
+            // vector de ventas entero por cada producto (O(N·M)).
+            let mut sold_by_product: HashMap<Uuid, Decimal> = HashMap::new();
+            for (product_id, quantity) in sales {
+                *sold_by_product.entry(product_id).or_insert(Decimal::ZERO) += quantity.abs();
+            }
+
+            let window = Decimal::from(SALES_WINDOW_DAYS);
+            let mut rows: Vec<SuggestionRow> = stock_rows
+                .into_iter()
+                .map(|(product_id, stock_actual, min_stock, product_name)| {
+                    let sold30 = sold_by_product
+                        .get(&product_id)
+                        .copied()
+                        .unwrap_or(Decimal::ZERO);
+                    let venta_media_diaria = (sold30 / window).round_dp(3);
+                    let cantidad_sugerida = suggest_quantity(
+                        min_stock,
+                        stock_actual,
+                        venta_media_diaria,
+                        days,
+                        lead_time_days,
+                    );
+                    let rotacion = if stock_actual > Decimal::ZERO {
+                        Some((venta_media_diaria / stock_actual).round_dp(3))
+                    } else {
+                        None
+                    };
+                    let cobertura_dias = if venta_media_diaria > Decimal::ZERO {
+                        Some((stock_actual / venta_media_diaria).round_dp(3))
+                    } else {
+                        None
+                    };
+                    SuggestionRow {
+                        product_id,
+                        product_name,
+                        stock_actual,
+                        min_stock,
+                        venta_media_30d: sold30,
+                        venta_media_diaria,
+                        rotacion,
+                        cobertura_dias,
+                        cantidad_sugerida,
+                    }
+                })
+                .filter(|r| r.cantidad_sugerida > Decimal::ZERO)
+                .collect();
+            rows.sort_by_key(|r| std::cmp::Reverse(r.cantidad_sugerida));
+            Ok(Ok(rows))
+        })
+        .await?;
+    result
 }
 
 /// `GET /purchase-orders/:id/export` — CSV del pedido (producto, pedido, recibido,

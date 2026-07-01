@@ -8,6 +8,11 @@ use time::PrimitiveDateTime;
 pub const DEFAULT_DAYS_COVERAGE: i64 = 14;
 /// Ventana (días) sobre la que se promedia la venta diaria.
 pub const SALES_WINDOW_DAYS: i64 = 30;
+/// Techo (días) del horizonte de demanda proyectada (cobertura + lead time). Cota
+/// defensiva: la validación del proveedor solo veta lead times negativos, no un
+/// máximo, así que un `leadTimeDays` corrupto en BD nunca debe desbordar la
+/// aritmética `Decimal` ni generar una propuesta absurda. 10 años.
+pub const MAX_HORIZON_DAYS: i64 = 3_650;
 
 /// `fillRate = round3(recibido / pedido)` en 0..1; `None` si nada pedido.
 pub fn fill_rate(ordered: Decimal, received: Decimal) -> Option<Decimal> {
@@ -34,16 +39,35 @@ pub fn lead_time_days(
 }
 
 /// Cantidad sugerida a pedir (#45): cubre el mínimo + la demanda esperada durante
-/// la cobertura, descontando el stock actual. Nunca negativa.
-/// `max(0, round3(min − stock + ventaMediaDiaria · diasCobertura))`.
+/// el horizonte de reposición —cobertura **más** el plazo de entrega del proveedor
+/// (`lead_time_days`)—, descontando el stock actual. Nunca negativa.
+///
+/// `max(0, round3(min − stock + ventaMediaDiaria · (diasCobertura + leadTime)))`.
+///
+/// Incluir el lead time evita la rotura de stock durante el tránsito del pedido:
+/// sin él la propuesta solo repone para la cobertura y el stock cae por debajo del
+/// mínimo mientras la mercancía viaja. El horizonte se acota a [`MAX_HORIZON_DAYS`]
+/// y toda la aritmética es comprobada (`checked_*`), de modo que datos extremos
+/// (p. ej. un `leadTimeDays` corrupto) nunca provocan un panic por desbordamiento;
+/// el caso inalcanzable degrada a `0` (fail-safe: jamás propone un pedido absurdo).
 pub fn suggest_quantity(
     min_stock: Decimal,
     stock_actual: Decimal,
     venta_media_diaria: Decimal,
     dias_cobertura: i64,
+    lead_time_days: i64,
 ) -> Decimal {
-    let raw =
-        (min_stock - stock_actual + venta_media_diaria * Decimal::from(dias_cobertura)).round_dp(3);
+    let horizon = dias_cobertura
+        .saturating_add(lead_time_days.max(0))
+        .clamp(0, MAX_HORIZON_DAYS);
+    let demanda = venta_media_diaria
+        .checked_mul(Decimal::from(horizon))
+        .unwrap_or(Decimal::ZERO);
+    let raw = min_stock
+        .checked_sub(stock_actual)
+        .and_then(|deficit| deficit.checked_add(demanda))
+        .map(|v| v.round_dp(3))
+        .unwrap_or(Decimal::ZERO);
     raw.max(Decimal::ZERO)
 }
 
@@ -73,15 +97,40 @@ mod tests {
 
     #[test]
     fn cantidad_sugerida() {
-        // min 10, stock 3, venta 2/día, cobertura 14 → 10-3+28 = 35.
+        // min 10, stock 3, venta 2/día, cobertura 14, sin lead → 10-3+28 = 35.
         assert_eq!(
-            suggest_quantity(dec("10"), dec("3"), dec("2"), 14),
+            suggest_quantity(dec("10"), dec("3"), dec("2"), 14, 0),
             dec("35")
         );
         // Nunca negativa: stock alto.
         assert_eq!(
-            suggest_quantity(dec("5"), dec("100"), dec("0"), 14),
+            suggest_quantity(dec("5"), dec("100"), dec("0"), 14, 0),
             Decimal::ZERO
+        );
+    }
+
+    #[test]
+    fn cantidad_sugerida_incluye_lead_time() {
+        // El lead time amplía el horizonte: cobertura 14 + lead 7 = 21 días.
+        // 10 - 3 + 2·21 = 7 + 42 = 49 (34 más que sin lead → cubre el tránsito).
+        assert_eq!(
+            suggest_quantity(dec("10"), dec("3"), dec("2"), 14, 7),
+            dec("49")
+        );
+        // Un lead time negativo (dato corrupto) se ignora, no resta: 10-3+2·14 = 35.
+        assert_eq!(
+            suggest_quantity(dec("10"), dec("3"), dec("2"), 14, -100),
+            dec("35")
+        );
+    }
+
+    #[test]
+    fn cantidad_sugerida_nunca_desborda() {
+        // Lead time absurdo (i64::MAX): el horizonte se acota a MAX_HORIZON_DAYS y
+        // la aritmética comprobada no paniquea. 0 - 0 + 1·3650 = 3650.
+        assert_eq!(
+            suggest_quantity(Decimal::ZERO, Decimal::ZERO, dec("1"), 0, i64::MAX),
+            Decimal::from(MAX_HORIZON_DAYS)
         );
     }
 }
