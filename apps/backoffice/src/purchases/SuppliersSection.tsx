@@ -3,7 +3,7 @@ import './suppliers.css';
 import type { Supplier } from '@simpletpv/auth';
 import { Button, Input } from '@simpletpv/ui';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { CsvActionButton } from '../components/CsvActionButton.js';
@@ -279,9 +279,16 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
     <div data-testid="supplier-detail">
       <header className="catalog-head">
         <div className="supplier-detail-title">
-          <button type="button" className="link-btn" onClick={onBack} data-testid="supplier-back">
-            ← Volver
-          </button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            icon={<ArrowLeft size={16} />}
+            onClick={onBack}
+            data-testid="supplier-back"
+          >
+            Volver
+          </Button>
           <h2>{supplier.name}</h2>
         </div>
       </header>
