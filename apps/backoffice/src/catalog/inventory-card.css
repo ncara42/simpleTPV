@@ -596,7 +596,8 @@
   font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
 }
-.cat-cell-pvp {
+.cat-cell-pvp,
+.cat-cell-num {
   text-align: right;
   font-weight: 600;
   font-variant-numeric: tabular-nums;

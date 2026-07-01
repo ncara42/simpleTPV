@@ -908,18 +908,22 @@
 .modal-foot {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 0.6rem;
   margin-top: 0.5rem;
 }
 /* Botones secundarios del pie de modal: los <button> crudos (Cancelar/Cerrar).
    Se excluye `.ui-btn` para no pisar el estilo del <Button> compartido, que
    aporta el suyo propio (su CSS vive en una @layer de Tailwind y, al ser
-   catalog.css sin capa, un selector amplio aquí ganaría la cascada). */
+   catalog.css sin capa, un selector amplio aquí ganaría la cascada).
+   Radio `--ui-radius-sm`: Fundación Geist NO usa cápsula en botones (§"Botones,
+   inputs, selects = 8px, NO cápsula" de DESIGN_SYSTEM.md); `999px` era el radio
+   de la Fundación Apple previa a la migración. */
 .modal-foot button:not(.ui-btn) {
   height: var(--bo-control-height);
   padding: 0 1.1rem;
   border: 1px solid var(--ui-border-strong);
-  border-radius: 9999px;
+  border-radius: var(--ui-radius-sm);
   background: var(--ui-surface);
   font-weight: 500;
   font-size: 0.9rem;
@@ -1119,7 +1123,9 @@
   position: relative;
   width: 40px;
   height: 24px;
-  border-radius: 9999px;
+  /* Fundación Geist NO usa cápsula (ver .modal-foot button:not(.ui-btn) más
+     abajo): 9999px era el radio de la Fundación Apple previa a la migración. */
+  border-radius: var(--ui-radius-sm);
   background: var(--ui-border-strong);
   transition: background 0.16s;
   flex-shrink: 0;
@@ -1130,7 +1136,7 @@
   left: 2px;
   width: 20px;
   height: 20px;
-  border-radius: 50%;
+  border-radius: var(--ui-radius-xs);
   background: #fff;
   transition: transform 0.16s;
 }
@@ -2401,6 +2407,7 @@
 .link-btn {
   display: inline-flex;
   align-items: center;
+  gap: 0.35rem;
   height: 2rem;
   padding: 0 0.9rem;
   border: 1px solid var(--ui-border-strong);
@@ -2548,6 +2555,35 @@
   max-width: 26rem;
 }
 
+/* Cabecera del confirm: icono de acento + título en fila (mismo patrón de
+   chip circular soft+ink que los rankings del dashboard, §10.16). */
+.modal-head--confirm {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.85rem;
+}
+.confirm-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--bo-control-height);
+  height: var(--bo-control-height);
+  border-radius: 50%;
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-ink);
+}
+.confirm-icon--danger {
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+}
+.confirm-message {
+  margin: 0;
+  font-size: var(--ui-text-base);
+  line-height: 1.5;
+  color: var(--ui-text-muted);
+}
+
 /* El Centro de ayuda (.help-*) vive ahora en su propia hoja: ./help.css.
    Aquí solo queda lo demás del catálogo/stock. */
 
@@ -2683,8 +2719,40 @@
 }
 
 /* B-04: modal unificado Importar/Exportar. */
+.iemodal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-space-3, 0.75rem);
+}
+.iemodal-head h3 {
+  margin: 0;
+}
+/* Cierre en cabecera (icono, sin texto): mismo patrón que .wg-close (galería de
+   widgets), así el "Cerrar" del pie (redundante con Escape/click-fuera) desaparece
+   y el modal deja de arrastrar aire muerto al final. */
+.iemodal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  margin: -0.3rem -0.4rem 0 0;
+  border: none;
+  border-radius: var(--ui-radius-sm, 8px);
+  background: transparent;
+  color: var(--ui-text-soft);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.iemodal-close:hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
 .import-export-modal .iemodal-panel {
-  margin-top: var(--ui-space-4);
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-4);
@@ -3077,21 +3145,18 @@
   font-weight: 600;
 }
 
-/* ─── Estilo Vercel: radio único en TODO el modal de producto ───
-   Todos los elementos del ProductFormModal comparten el mismo radio
-   (--ui-radius-md = 12px en el tema Geist): panel, inputs, select,
-   tarjeta de margen y botones (Cancelar crudo + Guardar <Button>).
-   Se de-pildoran los botones SOLO aquí; el <Button> compartido y el
-   resto de la app/TPV conservan su forma. Reglas sin @layer, así que
-   ganan a las utilidades Tailwind (rounded-full / rounded-[10px]) de
-   <Button>/<Input>, que viven en una capa de menor prioridad. */
+/* ─── Radio del modal de producto ───
+   El panel, inputs, select y tarjeta de margen del ProductFormModal usan
+   radio md (--ui-radius-md = 12px en el tema Geist). Los botones (Cancelar
+   crudo + Guardar <Button>) ya NO se fijan aquí: siguen el radio global de
+   8px (--ui-radius-sm) del <Button> y del pie de modal, de-pildorado en Geist,
+   para que todos los modales compartan el mismo estilo de botón. Reglas sin
+   @layer, así que ganan a las utilidades Tailwind de <Input>/<Select>. */
 .modal.product-form-modal {
   border-radius: var(--ui-radius-md);
 }
 .product-form-modal .ui-input,
-.product-form-modal .ui-select-trigger,
-.product-form-modal .modal-foot button:not(.ui-btn),
-.product-form-modal .modal-foot .ui-btn {
+.product-form-modal .ui-select-trigger {
   border-radius: var(--ui-radius-md);
 }
 

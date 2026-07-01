@@ -855,3 +855,65 @@
   gap: 1rem;
   margin-bottom: 0.75rem;
 }
+
+/* Periodicidad de compra del proveedor: preset + días personalizados en línea. */
+.order-frequency-field {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.order-frequency-field > :first-child {
+  flex: 1;
+}
+
+.order-frequency-field input {
+  width: 5.5rem;
+}
+
+/* ─── Propuesta: MISMO shell que Proveedores (`.suppliers-shell`/`.sup-card`/
+   `.sup-body`/`.sup-rail`/`.sup-main`) → misma altura y misma tabla. El carril usa
+   facetas de botones (`.sup-view`), sin desplegables: Tienda · Proveedor ·
+   Periodicidad para generar, y Estado para filtrar la propuesta ya generada. ───── */
+
+/* Botón de acción a ancho completo del carril («Generar propuesta» / «Crear pedido»). */
+.suggest-rail-btn {
+  width: 100%;
+  margin-top: 0.85rem;
+}
+
+/* Días personalizados de cobertura (aparece bajo la faceta «Personalizada»). */
+.suggest-custom-days {
+  margin-top: 0.4rem;
+}
+
+/* Bloque de pedido al pie del carril: horizonte + total + «Crear pedido». */
+.suggest-order {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--ui-border);
+}
+.suggest-horizon {
+  font-size: 0.8rem;
+  color: var(--ui-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+.suggest-total {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.suggest-order-hint {
+  font-size: 0.78rem;
+  color: var(--ui-text-soft);
+}
+
+/* Buscador del carril de la propuesta: mismo patrón que `.sup-rail-search`, con más
+   aire arriba al venir tras la faceta de Periodicidad. */
+.suggest-rail-search {
+  margin-top: 1.35rem;
+}

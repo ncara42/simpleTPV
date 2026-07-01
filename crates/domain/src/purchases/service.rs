@@ -218,18 +218,20 @@ pub async fn confirm(
 /// `POST /purchase-orders/suggest` — propuesta de reposición de una tienda (#45).
 ///
 /// Con `supplier_id`, la propuesta se acota a los productos que ese proveedor sirve
-/// (tabla `SupplierPrice`) y usa su `leadTimeDays` para ampliar el horizonte de
-/// demanda —evita la rotura de stock durante el tránsito del pedido—. Sin proveedor
-/// cubre toda la tienda y sin plazo de entrega (comportamiento previo).
+/// (tabla `SupplierPrice`), usa su `leadTimeDays` para ampliar el horizonte de
+/// demanda —evita la rotura de stock durante el tránsito del pedido— y anota su
+/// tarifa (`precioUnitario`/`costeEstimado`). La cobertura es, por prioridad: la
+/// pedida (`daysCoverage`) → la periodicidad de compra del proveedor
+/// (`orderFrequencyDays`: semanal, quincenal, mensual…) → el default. Descuenta lo
+/// ya pedido y pendiente de recibir (no propone dos veces lo que está en tránsito)
+/// e ignora productos desactivados. Sin proveedor cubre toda la tienda activa, sin
+/// plazo de entrega ni tarifas.
 pub async fn suggest(
     pool: &sqlx::PgPool,
     org: Uuid,
     input: SuggestPurchase,
 ) -> Result<Vec<SuggestionRow>, AppError> {
     input.validate()?;
-    let days = input
-        .days_coverage
-        .unwrap_or(super::domain::DEFAULT_DAYS_COVERAGE);
     let now = OffsetDateTime::now_utc();
     let since = {
         let d = now
@@ -239,32 +241,41 @@ pub async fn suggest(
     };
     let store_id = input.store_id;
     let supplier_id = input.supplier_id;
+    let days_coverage = input.days_coverage;
     let result: Result<Vec<SuggestionRow>, AppError> =
         with_tenant_tx(pool, org, async move |tx, _after| {
-            // Lead time del proveedor si se filtra por él; proveedor inexistente o
-            // fuera del tenant → BadRequest (fail-fast, no una propuesta vacía muda).
-            let lead_time_days: i64 = if let Some(sup) = supplier_id {
-                let row: Option<(i32,)> = sqlx::query_as(
-                    r#"SELECT "leadTimeDays" FROM "Supplier" WHERE id = $1 AND "organizationId" = $2"#,
-                )
-                .bind(sup)
-                .bind(org)
-                .fetch_optional(&mut **tx)
-                .await?;
-                match row {
-                    Some((lt,)) => i64::from(lt),
-                    None => return Ok(Err(AppError::BadRequest)),
-                }
-            } else {
-                0
-            };
+            // Lead time y periodicidad del proveedor si se filtra por él; proveedor
+            // inexistente o fuera del tenant → BadRequest (fail-fast, no una
+            // propuesta vacía muda).
+            let (lead_time_days, supplier_frequency): (i64, Option<i64>) =
+                if let Some(sup) = supplier_id {
+                    let row: Option<(i32, Option<i32>)> = sqlx::query_as(
+                        r#"SELECT "leadTimeDays", "orderFrequencyDays"
+                           FROM "Supplier" WHERE id = $1 AND "organizationId" = $2"#,
+                    )
+                    .bind(sup)
+                    .bind(org)
+                    .fetch_optional(&mut **tx)
+                    .await?;
+                    match row {
+                        Some((lt, freq)) => (i64::from(lt), freq.map(i64::from)),
+                        None => return Ok(Err(AppError::BadRequest)),
+                    }
+                } else {
+                    (0, None)
+                };
+            // Cobertura efectiva: explícita → periodicidad del proveedor → default.
+            let days = days_coverage
+                .or(supplier_frequency)
+                .unwrap_or(super::domain::DEFAULT_DAYS_COVERAGE);
 
-            // Stock de la tienda; con proveedor, solo los productos que sirve
-            // (SupplierPrice) — no tiene sentido proponerle lo que no vende.
+            // Stock de la tienda (solo productos activos: lo descatalogado no se
+            // repone); con proveedor, solo los productos que sirve (SupplierPrice)
+            // — no tiene sentido proponerle lo que no vende — con su tarifa.
             let mut qb: sqlx::QueryBuilder<sqlx::Postgres> = sqlx::QueryBuilder::new(
                 r#"SELECT s."productId", s.quantity, s."minStock", p.name
                    FROM "Stock" s JOIN "Product" p ON p.id = s."productId"
-                   WHERE s."storeId" = "#,
+                   WHERE p.active = true AND s."storeId" = "#,
             );
             qb.push_bind(store_id)
                 .push(r#" AND s."organizationId" = "#)
@@ -281,6 +292,40 @@ pub async fn suggest(
             }
             let stock_rows: Vec<(Uuid, Decimal, Decimal, String)> =
                 qb.build_query_as().fetch_all(&mut **tx).await?;
+
+            // Tarifa del proveedor por producto (precio y coste estimado por línea).
+            let prices_by_product: HashMap<Uuid, Decimal> = if let Some(sup) = supplier_id {
+                let rows: Vec<(Uuid, Decimal)> = sqlx::query_as(
+                    r#"SELECT "productId", price FROM "SupplierPrice"
+                       WHERE "supplierId" = $1 AND "organizationId" = $2"#,
+                )
+                .bind(sup)
+                .bind(org)
+                .fetch_all(&mut **tx)
+                .await?;
+                rows.into_iter().collect()
+            } else {
+                HashMap::new()
+            };
+
+            // Unidades ya pedidas y aún no recibidas en la tienda (pedidos
+            // CONFIRMED/PARTIALLY_RECEIVED): están en tránsito y se descuentan de
+            // la necesidad. Los DRAFT no cuentan (pueden no confirmarse nunca).
+            let pending_rows: Vec<(Uuid, Decimal)> = sqlx::query_as(
+                r#"SELECT l."productId",
+                          SUM(l."quantityOrdered" - l."quantityReceived") AS pending
+                   FROM "PurchaseOrderLine" l
+                   JOIN "PurchaseOrder" o ON o.id = l."purchaseOrderId"
+                   WHERE o."storeId" = $1 AND o."organizationId" = $2
+                     AND o.status IN ('CONFIRMED'::"PurchaseOrderStatus",
+                                      'PARTIALLY_RECEIVED'::"PurchaseOrderStatus")
+                   GROUP BY l."productId""#,
+            )
+            .bind(store_id)
+            .bind(org)
+            .fetch_all(&mut **tx)
+            .await?;
+            let pending_by_product: HashMap<Uuid, Decimal> = pending_rows.into_iter().collect();
 
             let sales: Vec<(Uuid, Decimal)> = sqlx::query_as(
                 r#"SELECT "productId", quantity FROM "StockMovement"
@@ -301,6 +346,9 @@ pub async fn suggest(
             }
 
             let window = Decimal::from(SALES_WINDOW_DAYS);
+            let horizonte_dias = days
+                .saturating_add(lead_time_days.max(0))
+                .clamp(0, super::domain::MAX_HORIZON_DAYS);
             let mut rows: Vec<SuggestionRow> = stock_rows
                 .into_iter()
                 .map(|(product_id, stock_actual, min_stock, product_name)| {
@@ -309,9 +357,15 @@ pub async fn suggest(
                         .copied()
                         .unwrap_or(Decimal::ZERO);
                     let venta_media_diaria = (sold30 / window).round_dp(3);
+                    let pendiente_recibir = pending_by_product
+                        .get(&product_id)
+                        .copied()
+                        .unwrap_or(Decimal::ZERO)
+                        .max(Decimal::ZERO);
                     let cantidad_sugerida = suggest_quantity(
                         min_stock,
                         stock_actual,
+                        pendiente_recibir,
                         venta_media_diaria,
                         days,
                         lead_time_days,
@@ -326,6 +380,10 @@ pub async fn suggest(
                     } else {
                         None
                     };
+                    let precio_unitario = prices_by_product.get(&product_id).copied();
+                    let coste_estimado = precio_unitario
+                        .and_then(|p| p.checked_mul(cantidad_sugerida))
+                        .map(|c| c.round_dp(2));
                     SuggestionRow {
                         product_id,
                         product_name,
@@ -335,6 +393,10 @@ pub async fn suggest(
                         venta_media_diaria,
                         rotacion,
                         cobertura_dias,
+                        pendiente_recibir,
+                        horizonte_dias,
+                        precio_unitario,
+                        coste_estimado,
                         cantidad_sugerida,
                     }
                 })

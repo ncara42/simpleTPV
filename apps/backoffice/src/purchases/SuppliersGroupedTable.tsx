@@ -8,6 +8,7 @@ import { fmtEur } from '../lib/format.js';
 import { listPurchaseOrders } from '../lib/purchases.js';
 import { listSupplierPrices } from '../lib/supplier-prices.js';
 import { STATUS_LABEL } from './labels.js';
+import { frequencyLabel } from './OrderFrequencyField.js';
 import type { SupplierGroup, SupplierMetrics, SupplierRow } from './suppliers-view.js';
 
 // Tabla de Proveedores: variante del componente único (FacetedTable) con detalle EN
@@ -206,6 +207,7 @@ function SupplierRowDetail({
     { label: 'Email', value: supplier.email ?? '—' },
     { label: 'Teléfono', value: supplier.phone ?? '—' },
     { label: 'Lead time', value: `${supplier.leadTimeDays} días` },
+    { label: 'Periodicidad', value: frequencyLabel(supplier.orderFrequencyDays) },
     { label: 'Estado', value: supplier.active ? 'Activo' : 'Inactivo' },
     { label: 'Pedidos', value: String(metrics.totalOrders) },
   ];

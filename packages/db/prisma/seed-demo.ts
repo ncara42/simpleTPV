@@ -1286,9 +1286,10 @@ async function seedPromotions(orgId: string): Promise<void> {
  */
 async function seedSuppliers(orgId: string): Promise<void> {
   const suppliers = [
-    { name: 'Distribuciones Norte', nif: 'B12121212', leadTimeDays: 5 },
-    { name: 'Mayorista Sur', nif: 'B34343434', leadTimeDays: 9 },
-    { name: 'Importaciones García', nif: 'B56565656', leadTimeDays: 14 },
+    // Periodicidad de compra: semanal, quincenal y mensual (una de cada para la demo).
+    { name: 'Distribuciones Norte', nif: 'B12121212', leadTimeDays: 5, orderFrequencyDays: 7 },
+    { name: 'Mayorista Sur', nif: 'B34343434', leadTimeDays: 9, orderFrequencyDays: 14 },
+    { name: 'Importaciones García', nif: 'B56565656', leadTimeDays: 14, orderFrequencyDays: 30 },
   ];
   const created = [];
   for (const s of suppliers) {

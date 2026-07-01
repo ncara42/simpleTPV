@@ -91,6 +91,18 @@ pub struct SuggestionRow {
     pub rotacion: Option<Decimal>,
     #[serde(serialize_with = "crate::serde_helpers::decimal_opt_float")]
     pub cobertura_dias: Option<Decimal>,
+    /// Unidades ya pedidas (CONFIRMED/PARTIALLY_RECEIVED) aún sin recibir en la
+    /// tienda; se descuentan de la necesidad para no pedirlas dos veces.
+    #[serde(serialize_with = "crate::serde_helpers::decimal_float")]
+    pub pendiente_recibir: Decimal,
+    /// Días de demanda proyectada usados en el cálculo (cobertura + lead time).
+    pub horizonte_dias: i64,
+    /// Tarifa del proveedor (`SupplierPrice`); solo con propuesta por proveedor.
+    #[serde(serialize_with = "crate::serde_helpers::decimal_opt_float")]
+    pub precio_unitario: Option<Decimal>,
+    /// `precioUnitario · cantidadSugerida`, redondeado a 2 decimales.
+    #[serde(serialize_with = "crate::serde_helpers::decimal_opt_float")]
+    pub coste_estimado: Option<Decimal>,
     #[serde(serialize_with = "crate::serde_helpers::decimal_float")]
     pub cantidad_sugerida: Decimal,
 }

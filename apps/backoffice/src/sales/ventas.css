@@ -277,6 +277,7 @@
 .ventas-avatar {
   display: inline-grid;
   place-items: center;
+  flex-shrink: 0;
   width: 2.1rem;
   height: 2.1rem;
   border-radius: 9px;

@@ -16,7 +16,8 @@ use super::input::{CreateSupplier, UpdateSupplier, UpsertSupplierPrice};
 use super::model::{ComparisonRow, PriceEntry, Supplier, SupplierPriceRow};
 
 const SUPPLIER_COLS: &str = r#"id, "organizationId" AS organization_id, name, nif, email, phone,
-    "leadTimeDays" AS lead_time_days, active, "createdAt" AS created_at"#;
+    "leadTimeDays" AS lead_time_days, "orderFrequencyDays" AS order_frequency_days,
+    active, "createdAt" AS created_at"#;
 
 const PRICE_COLS: &str = r#"sp.id, sp."supplierId" AS supplier_id, s.name AS supplier_name,
     sp."productId" AS product_id, p.name AS product_name, p.sku, sp.price"#;
@@ -31,8 +32,8 @@ pub async fn create(pool: &PgPool, org: Uuid, input: CreateSupplier) -> Result<S
     input.validate()?;
     with_tenant_tx(pool, org, async move |tx, _after| {
         let s: Supplier = sqlx::query_as(&format!(
-            r#"INSERT INTO "Supplier" (id, "organizationId", name, nif, email, phone, "leadTimeDays")
-               VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 7))
+            r#"INSERT INTO "Supplier" (id, "organizationId", name, nif, email, phone, "leadTimeDays", "orderFrequencyDays")
+               VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 7), NULLIF($8, 0))
                RETURNING {SUPPLIER_COLS}"#,
         ))
         .bind(Uuid::new_v4())
@@ -42,6 +43,7 @@ pub async fn create(pool: &PgPool, org: Uuid, input: CreateSupplier) -> Result<S
         .bind(input.email)
         .bind(input.phone)
         .bind(input.lead_time_days)
+        .bind(input.order_frequency_days)
         .fetch_one(&mut **tx)
         .await?;
         Ok(s)
@@ -91,7 +93,9 @@ pub async fn update(
                  nif = COALESCE($3, nif),
                  email = COALESCE($4, email),
                  phone = COALESCE($5, phone),
-                 "leadTimeDays" = COALESCE($6, "leadTimeDays")
+                 "leadTimeDays" = COALESCE($6, "leadTimeDays"),
+                 -- Periodicidad: NULL = sin cambios; 0 = quitar (queda NULL); n>0 = fijar.
+                 "orderFrequencyDays" = CASE WHEN $7::int IS NULL THEN "orderFrequencyDays" ELSE NULLIF($7, 0) END
                WHERE id = $1
                RETURNING {SUPPLIER_COLS}"#,
         ))
@@ -101,6 +105,7 @@ pub async fn update(
         .bind(input.email)
         .bind(input.phone)
         .bind(input.lead_time_days)
+        .bind(input.order_frequency_days)
         .fetch_optional(&mut **tx)
         .await?;
         Ok(row)

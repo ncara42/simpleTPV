@@ -796,6 +796,9 @@ export interface Supplier {
   email: string | null;
   phone: string | null;
   leadTimeDays: number;
+  /** Periodicidad de compra (días): 7 semanal, 14 quincenal, 30 mensual…
+   *  null = sin definir (la propuesta usa su cobertura por defecto). */
+  orderFrequencyDays: number | null;
   active: boolean;
 }
 
@@ -805,6 +808,8 @@ export interface SupplierInput {
   email?: string;
   phone?: string;
   leadTimeDays?: number;
+  /** En update: 0 = quitar la periodicidad; undefined = sin cambios. */
+  orderFrequencyDays?: number;
 }
 
 export type PurchaseOrderStatus = 'DRAFT' | 'CONFIRMED' | 'PARTIALLY_RECEIVED' | 'RECEIVED';
@@ -876,6 +881,14 @@ export interface SuggestionRow {
   ventaMediaDiaria: number;
   rotacion: number | null;
   coberturaDias: number | null;
+  /** Unidades ya pedidas y aún sin recibir (en tránsito); ya descontadas. */
+  pendienteRecibir: number;
+  /** Días de demanda proyectada usados en el cálculo (cobertura + lead time). */
+  horizonteDias: number;
+  /** Tarifa del proveedor; solo en propuestas por proveedor. */
+  precioUnitario: number | null;
+  /** precioUnitario · cantidadSugerida (2 decimales). */
+  costeEstimado: number | null;
   cantidadSugerida: number;
 }
 

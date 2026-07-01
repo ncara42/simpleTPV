@@ -19,6 +19,7 @@ import {
   updateSupplier,
 } from '../lib/purchases.js';
 import { useTableShellHeight } from '../lib/useTableShellHeight.js';
+import { OrderFrequencyField } from './OrderFrequencyField.js';
 import { OrdersSection } from './OrdersSection.js';
 import { SupplierFacets } from './SupplierFacets.js';
 import { SupplierFormModal } from './SupplierFormModal.js';
@@ -105,9 +106,15 @@ export function SuppliersSection() {
     (filters.view !== 'all' ? 1 : 0) + filters.status.size + filters.lead.size;
 
   // Exportación de proveedores: cabeceras + filas (filtradas por búsqueda) para el modal.
-  const exportHeaders = ['Nombre', 'Lead time (días)'];
+  const exportHeaders = ['Nombre', 'Lead time (días)', 'Periodicidad (días)'];
   const buildExportRows = (): string[][] =>
-    groups.flatMap((g) => g.rows.map((r) => [r.supplier.name, String(r.supplier.leadTimeDays)]));
+    groups.flatMap((g) =>
+      g.rows.map((r) => [
+        r.supplier.name,
+        String(r.supplier.leadTimeDays),
+        r.supplier.orderFrequencyDays != null ? String(r.supplier.orderFrequencyDays) : '',
+      ]),
+    );
 
   // Import por-fila (sin endpoint bulk): cada fila se da de alta con createSupplier.
   const onImportCsv = (csv: string) =>
@@ -116,9 +123,11 @@ export function SuppliersSection() {
       (row) => {
         const name = (row.nombre ?? row.name ?? '').trim();
         if (!name) throw new Error('Nombre vacío');
+        const frequency = Number(row.periodicidaddias ?? row.periodicidad ?? '');
         return {
           name,
           leadTimeDays: Number(row.leadtimedias ?? row['lead time'] ?? row.leadtime ?? 7),
+          ...(Number.isFinite(frequency) && frequency > 0 ? { orderFrequencyDays: frequency } : {}),
         };
       },
       createSupplier,
@@ -200,7 +209,13 @@ export function SuppliersSection() {
         <SupplierFormModal
           onClose={() => setCreating(false)}
           onSubmit={(form) =>
-            createMut.mutate({ name: form.name, leadTimeDays: Number(form.leadTimeDays) })
+            createMut.mutate({
+              name: form.name,
+              leadTimeDays: Number(form.leadTimeDays),
+              ...(form.orderFrequencyDays
+                ? { orderFrequencyDays: Number(form.orderFrequencyDays) }
+                : {}),
+            })
           }
           pending={createMut.isPending}
           error={
@@ -222,13 +237,14 @@ export function SuppliersSection() {
             filenameBase: 'proveedores',
           }}
           importConfig={{
-            columns: ['nombre', 'leadtimedias'],
-            example: ['Distribuciones Norte', '7'],
+            columns: ['nombre', 'leadtimedias', 'periodicidaddias'],
+            example: ['Distribuciones Norte', '7', '14'],
             templateBase: 'proveedores',
             instructions: (
               <>
-                Columnas: <code>nombre,leadtimedias</code>. Solo <code>nombre</code> es obligatorio.
-                Lead time por defecto: 7 días.
+                Columnas: <code>nombre,leadtimedias,periodicidaddias</code>. Solo{' '}
+                <code>nombre</code> es obligatorio. Lead time por defecto: 7 días; periodicidad de
+                compra (7 semanal, 14 quincenal, 30 mensual…) vacía = sin definir.
               </>
             ),
             onImport: onImportCsv,
@@ -252,6 +268,8 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
     email: supplier.email ?? '',
     phone: supplier.phone ?? '',
     leadTimeDays: String(supplier.leadTimeDays),
+    orderFrequencyDays:
+      supplier.orderFrequencyDays != null ? String(supplier.orderFrequencyDays) : '',
   });
   const [saved, setSaved] = useState(false);
   const set = (patch: Partial<typeof form>): void => {
@@ -268,6 +286,8 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
         ...(form.email ? { email: form.email } : {}),
         ...(form.phone ? { phone: form.phone } : {}),
         leadTimeDays: Number(form.leadTimeDays),
+        // 0 = quitar la periodicidad (el backend la deja a NULL).
+        orderFrequencyDays: form.orderFrequencyDays ? Number(form.orderFrequencyDays) : 0,
       }),
     onSuccess: () => {
       setSaved(true);
@@ -343,6 +363,14 @@ function SupplierDetail({ supplier, onBack }: { supplier: Supplier; onBack: () =
             value={form.leadTimeDays}
             onChange={(e) => set({ leadTimeDays: e.target.value })}
             data-testid="sd-leadtime"
+          />
+        </label>
+        <label>
+          Periodicidad de compra
+          <OrderFrequencyField
+            value={form.orderFrequencyDays}
+            onChange={(orderFrequencyDays) => set({ orderFrequencyDays })}
+            testId="sd-frequency"
           />
         </label>
         <Button

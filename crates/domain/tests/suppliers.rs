@@ -93,11 +93,13 @@ async fn crud_proveedor() {
             email: Some("prov@x.test".into()),
             phone: None,
             lead_time_days: None,
+            order_frequency_days: Some(7),
         },
     )
     .await
     .unwrap();
     assert_eq!(sup.lead_time_days, 7, "default 7 días");
+    assert_eq!(sup.order_frequency_days, Some(7), "periodicidad semanal");
 
     let all = service::find_all(&c.app, c.org).await.unwrap();
     assert!(all.iter().any(|s| s.id == sup.id));
@@ -112,12 +114,54 @@ async fn crud_proveedor() {
             email: None,
             phone: None,
             lead_time_days: Some(14),
+            order_frequency_days: None,
         },
     )
     .await
     .unwrap();
     assert_eq!(upd.name, "Proveedor Editado");
     assert_eq!(upd.lead_time_days, 14);
+    assert_eq!(
+        upd.order_frequency_days,
+        Some(7),
+        "None = periodicidad sin cambios"
+    );
+
+    // 0 = quitar la periodicidad (vuelve a NULL); fuera de rango → BadRequest.
+    let sin_frecuencia = service::update(
+        &c.app,
+        c.org,
+        sup.id,
+        UpdateSupplier {
+            name: None,
+            nif: None,
+            email: None,
+            phone: None,
+            lead_time_days: None,
+            order_frequency_days: Some(0),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(sin_frecuencia.order_frequency_days, None);
+    assert_eq!(
+        service::update(
+            &c.app,
+            c.org,
+            sup.id,
+            UpdateSupplier {
+                name: None,
+                nif: None,
+                email: None,
+                phone: None,
+                lead_time_days: None,
+                order_frequency_days: Some(366),
+            },
+        )
+        .await
+        .err(),
+        Some(AppError::BadRequest)
+    );
 
     service::remove(&c.app, c.org, sup.id).await.unwrap();
     assert_eq!(
@@ -138,6 +182,7 @@ async fn tarifas_upsert_list_comparativa_import() {
             email: None,
             phone: None,
             lead_time_days: None,
+            order_frequency_days: None,
         },
     )
     .await

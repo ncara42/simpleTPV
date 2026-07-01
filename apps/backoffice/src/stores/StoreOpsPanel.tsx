@@ -1,5 +1,6 @@
 import { Button, Input } from '@simpletpv/ui';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { KeyRound } from 'lucide-react';
 import { useState } from 'react';
 
 import { useConfirm } from '../components/ConfirmProvider.js';
@@ -18,6 +19,8 @@ interface StoreOpsPanelProps {
 // Panel 3 (operativa): estado operativo (verificada + incidencia), tienda central,
 // dispositivos de fichaje y actividad reciente. Reencarnación EN LÍNEA de la mitad
 // "administrativa" de StoreDetailModal — mismas mutaciones/claves de invalidación.
+// Las cuatro secciones viven en tarjetas hermanas de las del resto de paneles
+// (superficie + hairline + radio lg) sobre el fondo recesado de la columna.
 export function StoreOpsPanel({ store, devices, log }: StoreOpsPanelProps) {
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -73,60 +76,72 @@ export function StoreOpsPanel({ store, devices, log }: StoreOpsPanelProps) {
   const lastOpen = log.find((e) => e.type === 'apertura') ?? null;
   const lastClose = log.find((e) => e.type === 'cierre') ?? null;
 
+  const saveLabel = opsMut.isPending
+    ? 'Guardando…'
+    : opsMut.isSuccess && !opsDirty
+      ? 'Guardado ✓'
+      : 'Guardar estado';
+
   return (
     <div className="store-ops-panel" data-testid="store-ops-panel">
-      <div className="store-ops-head">
-        <span className="store-ops-title">Operativa · {store.name}</span>
-        <span className="store-ops-hint">Detalle en profundidad</span>
-      </div>
+      <header className="store-ops-head">
+        <span className="store-ops-title">Operativa</span>
+        <span className="store-ops-hint">Estado, dispositivos y actividad de {store.name}</span>
+      </header>
 
-      <div className="store-ops-sec" data-testid="store-ops">
+      <section className="store-ops-card" data-testid="store-ops">
         <h4 className="store-sec-title">Estado operativo</h4>
-        <div className="store-ops-sec-body">
-          <label className="switch">
-            <input
-              type="checkbox"
-              checked={opsVerified}
-              onChange={(e) => setOpsVerified(e.target.checked)}
-              data-testid="store-ops-verified"
-            />
-            <span className="switch-track">
-              <span className="switch-thumb" />
-            </span>
-            <span className="switch-text">Tienda verificada</span>
-          </label>
-          <label>
-            Incidencias / notas
-            <Input
-              placeholder="p. ej. persiana rota, obras en la calle…"
-              value={opsIncident}
-              onChange={(e) => setOpsIncident(e.target.value)}
-              data-testid="store-ops-incident"
-            />
-          </label>
-          {opsMut.isError && (
-            <p className="form-error">
-              {formErrorMessage(opsMut.error, 'No se pudo guardar el estado.')}
-            </p>
-          )}
+        <label className="switch store-ops-toggle">
+          <span className="store-ops-toggle-text">
+            <span className="store-ops-toggle-name">Tienda verificada</span>
+            <span className="store-ops-toggle-desc">Revisada y lista para operar.</span>
+          </span>
+          <input
+            type="checkbox"
+            checked={opsVerified}
+            onChange={(e) => setOpsVerified(e.target.checked)}
+            data-testid="store-ops-verified"
+          />
+          <span className="switch-track">
+            <span className="switch-thumb" />
+          </span>
+        </label>
+        <label className="store-ops-field">
+          Incidencias / notas
+          <Input
+            placeholder="p. ej. persiana rota, obras en la calle…"
+            value={opsIncident}
+            onChange={(e) => setOpsIncident(e.target.value)}
+            data-testid="store-ops-incident"
+          />
+        </label>
+        {opsMut.isError && (
+          <p className="form-error">
+            {formErrorMessage(opsMut.error, 'No se pudo guardar el estado.')}
+          </p>
+        )}
+        <div className="store-ops-actions">
           <Button
             type="button"
+            size="sm"
             disabled={!opsDirty || opsMut.isPending}
             onClick={() => opsMut.mutate()}
             data-testid="store-ops-save"
           >
-            {opsMut.isPending
-              ? 'Guardando…'
-              : opsMut.isSuccess && !opsDirty
-                ? 'Guardado ✓'
-                : 'Guardar estado'}
+            {saveLabel}
           </Button>
         </div>
-      </div>
+      </section>
 
-      <div className="store-ops-sec" data-testid="store-central">
+      <section className="store-ops-card" data-testid="store-central">
         <h4 className="store-sec-title">Tienda central</h4>
-        <label className="switch">
+        <label className="switch store-ops-toggle">
+          <span className="store-ops-toggle-text">
+            <span className="store-ops-toggle-name">Destino de traspasos</span>
+            <span className="store-ops-toggle-desc">
+              Recibe el efectivo transferido desde el resto de tiendas.
+            </span>
+          </span>
           <input
             type="checkbox"
             checked={store.isCentral}
@@ -137,16 +152,15 @@ export function StoreOpsPanel({ store, devices, log }: StoreOpsPanelProps) {
           <span className="switch-track">
             <span className="switch-thumb" />
           </span>
-          <span className="switch-text">Destino de los traspasos de efectivo</span>
         </label>
         {centralMut.isError && (
           <p className="form-error">
             {formErrorMessage(centralMut.error, 'No se pudo cambiar la central.')}
           </p>
         )}
-      </div>
+      </section>
 
-      <div className="store-ops-sec" data-testid="store-device">
+      <section className="store-ops-card" data-testid="store-device">
         <h4 className="store-sec-title">Dispositivos de fichaje</h4>
         {devices.length === 0 ? (
           <p className="store-device-note is-warn" data-testid="store-device-warn">
@@ -183,7 +197,7 @@ export function StoreOpsPanel({ store, devices, log }: StoreOpsPanelProps) {
                   </span>
                   <button
                     type="button"
-                    className="link-btn danger"
+                    className="store-ops-revoke"
                     onClick={() => void askRevoke(d.id, d.name)}
                     data-testid="store-device-revoke"
                   >
@@ -194,26 +208,31 @@ export function StoreOpsPanel({ store, devices, log }: StoreOpsPanelProps) {
             </ul>
           </>
         )}
-        <button
-          type="button"
-          className="link-btn"
-          onClick={() => createMut.mutate()}
-          disabled={createMut.isPending}
-          data-testid="store-gen-token"
-        >
-          {createMut.isPending ? 'Generando…' : 'Generar token de fichaje'}
-        </button>
+        <div className="store-ops-actions">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            icon={<KeyRound size={15} aria-hidden="true" />}
+            onClick={() => createMut.mutate()}
+            disabled={createMut.isPending}
+            data-testid="store-gen-token"
+          >
+            {createMut.isPending ? 'Generando…' : 'Generar token de fichaje'}
+          </Button>
+        </div>
         {createMut.isError && (
           <p className="form-error">
             {formErrorMessage(createMut.error, 'No se pudo generar el token.')}
           </p>
         )}
         {token && (
-          <p className="muted" data-testid="store-token-value">
-            Token (se muestra una sola vez — introdúcelo en el TPV): <code>{token}</code>{' '}
+          <p className="store-ops-token" data-testid="store-token-value">
+            <span className="store-ops-token-label">Token · se muestra una sola vez</span>
+            <code>{token}</code>
             <button
               type="button"
-              className="link-btn"
+              className="store-ops-revoke store-ops-token-copy"
               onClick={() => void navigator.clipboard?.writeText(token)}
               data-testid="store-token-copy"
             >
@@ -221,43 +240,36 @@ export function StoreOpsPanel({ store, devices, log }: StoreOpsPanelProps) {
             </button>
           </p>
         )}
-      </div>
+      </section>
 
       {(lastOpen || lastClose) && (
-        <div className="store-ops-sec">
-          <h4 className="store-sec-title">Actividad</h4>
-          <div className="store-tl">
-            <div className="store-tl-step">
-              <div className="store-tl-rail">
-                <span className={`store-tl-dot store-tl-dot--${lastOpen ? 'ok' : 'pending'}`}>
-                  {lastOpen ? '↑' : '·'}
+        <section className="store-ops-card">
+          <h4 className="store-sec-title">Actividad reciente</h4>
+          <div className="store-log-summary">
+            <div className="store-log-summary-row">
+              <span className="store-log-tag is-open">Apertura</span>
+              <span className="store-log-summary-who">
+                {lastOpen ? lastOpen.name : 'Sin registro'}
+              </span>
+              {lastOpen && (
+                <span className="store-log-summary-when">
+                  {fmtDayMonth(lastOpen.date)} · {lastOpen.time}
                 </span>
-                <span className="store-tl-line" />
-              </div>
-              <div className="store-tl-body">
-                <span className="store-tl-label">
-                  Apertura — {lastOpen ? lastOpen.name : 'Sin registro'}
-                </span>
-                <span className="store-tl-when">
-                  {lastOpen ? `${fmtDayMonth(lastOpen.date)} · ${lastOpen.time}` : '—'}
-                </span>
-              </div>
+              )}
             </div>
-            <div className="store-tl-step">
-              <div className="store-tl-rail">
-                <span className="store-tl-dot store-tl-dot--done">↓</span>
-              </div>
-              <div className="store-tl-body">
-                <span className="store-tl-label">
-                  Cierre — {lastClose ? lastClose.name : 'Sin registro'}
+            <div className="store-log-summary-row">
+              <span className="store-log-tag is-close">Cierre</span>
+              <span className="store-log-summary-who">
+                {lastClose ? lastClose.name : 'Sin registro'}
+              </span>
+              {lastClose && (
+                <span className="store-log-summary-when">
+                  {fmtDayMonth(lastClose.date)} · {lastClose.time}
                 </span>
-                <span className="store-tl-when">
-                  {lastClose ? `${fmtDayMonth(lastClose.date)} · ${lastClose.time}` : '—'}
-                </span>
-              </div>
+              )}
             </div>
           </div>
-        </div>
+        </section>
       )}
     </div>
   );

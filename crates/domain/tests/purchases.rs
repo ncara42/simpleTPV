@@ -455,3 +455,273 @@ async fn sugerencia_por_proveedor_filtra_y_aplica_lead_time() {
 
     teardown(&c, &[prod_a, prod_b]).await;
 }
+
+/// Lo ya pedido y pendiente de recibir (CONFIRMED/PARTIALLY_RECEIVED) se descuenta
+/// de la propuesta —no se propone dos veces la mercancía en tránsito—; los DRAFT
+/// no cuentan (pueden no confirmarse nunca).
+#[tokio::test]
+async fn sugerencia_descuenta_pendiente_de_recibir() {
+    let c = setup().await;
+    let product = make_product(&c).await;
+    // Stock 5, mínimo 20, sin ventas → necesidad base 15.
+    stock::adjust(
+        &c.app,
+        c.org,
+        c.user,
+        Adjust {
+            product_id: product,
+            store_id: c.store,
+            new_quantity: Decimal::from(5),
+            reason: "init".into(),
+        },
+    )
+    .await
+    .unwrap();
+    stock::set_min(
+        &c.app,
+        c.org,
+        SetMin {
+            product_id: product,
+            store_id: c.store,
+            min_stock: Decimal::from(20),
+        },
+    )
+    .await
+    .unwrap();
+
+    let suggest_input = || SuggestPurchase {
+        store_id: c.store,
+        supplier_id: None,
+        days_coverage: None,
+    };
+    let mine = |rows: &[simpletpv_domain::purchases::model::SuggestionRow]| {
+        rows.iter().find(|r| r.product_id == product).cloned()
+    };
+
+    // Pedido de 10 uds en DRAFT: aún no cuenta → sigue proponiendo 15.
+    let po = service::create(
+        &c.app,
+        c.org,
+        c.user,
+        CreatePurchaseOrder {
+            supplier_id: c.supplier,
+            store_id: c.store,
+            notes: None,
+            lines: vec![CreatePurchaseOrderLine {
+                product_id: product,
+                quantity_ordered: Decimal::from(10),
+                unit_cost: None,
+            }],
+        },
+    )
+    .await
+    .unwrap();
+    let rows = service::suggest(&c.app, c.org, suggest_input())
+        .await
+        .unwrap();
+    let r = mine(&rows).expect("draft no descuenta");
+    assert_eq!(r.cantidad_sugerida, Decimal::from(15));
+    assert_eq!(r.pendiente_recibir, Decimal::ZERO);
+
+    // Confirmado: 10 en tránsito → 20 - (5+10) = 5.
+    service::confirm(&c.app, c.org, po.order.id).await.unwrap();
+    let rows = service::suggest(&c.app, c.org, suggest_input())
+        .await
+        .unwrap();
+    let r = mine(&rows).expect("aún hay déficit");
+    assert_eq!(r.pendiente_recibir, Decimal::from(10));
+    assert_eq!(r.cantidad_sugerida, Decimal::from(5));
+
+    // Recepción parcial de 4: quedan 6 en tránsito y stock 9 → 20 - (9+6) = 5.
+    let line_id = po.lines[0].id;
+    service::receive(
+        &c.app,
+        c.org,
+        c.user,
+        po.order.id,
+        ReceivePurchaseOrder {
+            lines: vec![ReceivePurchaseOrderLine {
+                line_id,
+                quantity_received: Decimal::from(4),
+                lot_code: None,
+                expiry_date: None,
+            }],
+        },
+    )
+    .await
+    .unwrap();
+    let rows = service::suggest(&c.app, c.org, suggest_input())
+        .await
+        .unwrap();
+    let r = mine(&rows).expect("aún hay déficit");
+    assert_eq!(r.pendiente_recibir, Decimal::from(6));
+    assert_eq!(r.cantidad_sugerida, Decimal::from(5));
+
+    teardown(&c, &[product]).await;
+}
+
+/// La periodicidad de compra del proveedor (`orderFrequencyDays`) es la cobertura
+/// por defecto de su propuesta; un `daysCoverage` explícito la pisa. Las filas
+/// anotan la tarifa del proveedor (precio y coste estimado) y el horizonte usado.
+#[tokio::test]
+async fn sugerencia_usa_periodicidad_y_tarifa_del_proveedor() {
+    let c = setup().await;
+    // Proveedor semanal (7 días) con 3 de lead time.
+    sqlx::query(
+        r#"UPDATE "Supplier" SET "leadTimeDays" = 3, "orderFrequencyDays" = 7 WHERE id = $1"#,
+    )
+    .bind(c.supplier)
+    .execute(&c.admin)
+    .await
+    .unwrap();
+
+    let product = make_product(&c).await;
+    stock::adjust(
+        &c.app,
+        c.org,
+        c.user,
+        Adjust {
+            product_id: product,
+            store_id: c.store,
+            new_quantity: Decimal::from(5),
+            reason: "init".into(),
+        },
+    )
+    .await
+    .unwrap();
+    stock::set_min(
+        &c.app,
+        c.org,
+        SetMin {
+            product_id: product,
+            store_id: c.store,
+            min_stock: Decimal::from(20),
+        },
+    )
+    .await
+    .unwrap();
+    // 60 uds vendidas en la ventana → venta media 2/día.
+    sqlx::query(
+        r#"INSERT INTO "StockMovement" (id, "organizationId", "productId", "storeId", type, quantity)
+           VALUES ($1, $2, $3, $4, 'SALE'::"MovementType", $5)"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(c.org)
+    .bind(product)
+    .bind(c.store)
+    .bind(Decimal::from(-60))
+    .execute(&c.admin)
+    .await
+    .unwrap();
+    // Tarifa del proveedor: 2.50 €/ud.
+    sqlx::query(
+        r#"INSERT INTO "SupplierPrice" (id, "organizationId", "supplierId", "productId", price, "updatedAt")
+           VALUES ($1, $2, $3, $4, $5, now())"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(c.org)
+    .bind(c.supplier)
+    .bind(product)
+    .bind(Decimal::new(250, 2))
+    .execute(&c.admin)
+    .await
+    .unwrap();
+
+    // Sin daysCoverage: cobertura = periodicidad 7 + lead 3 = horizonte 10 →
+    // 20 - 5 + 2·10 = 35. Coste estimado: 35 · 2.50 = 87.50.
+    let rows = service::suggest(
+        &c.app,
+        c.org,
+        SuggestPurchase {
+            store_id: c.store,
+            supplier_id: Some(c.supplier),
+            days_coverage: None,
+        },
+    )
+    .await
+    .unwrap();
+    let r = rows
+        .iter()
+        .find(|r| r.product_id == product)
+        .expect("propuesta del proveedor");
+    assert_eq!(r.cantidad_sugerida, Decimal::from(35));
+    assert_eq!(r.horizonte_dias, 10);
+    assert_eq!(r.precio_unitario, Some(Decimal::new(250, 2)));
+    assert_eq!(r.coste_estimado, Some(Decimal::new(8750, 2)));
+
+    // daysCoverage explícito (14) pisa la periodicidad: 20 - 5 + 2·(14+3) = 49.
+    let rows = service::suggest(
+        &c.app,
+        c.org,
+        SuggestPurchase {
+            store_id: c.store,
+            supplier_id: Some(c.supplier),
+            days_coverage: Some(14),
+        },
+    )
+    .await
+    .unwrap();
+    let r = rows
+        .iter()
+        .find(|r| r.product_id == product)
+        .expect("propuesta del proveedor");
+    assert_eq!(r.cantidad_sugerida, Decimal::from(49));
+    assert_eq!(r.horizonte_dias, 17);
+
+    teardown(&c, &[product]).await;
+}
+
+/// Los productos desactivados (descatalogados) no se reponen: fuera de la propuesta
+/// aunque tengan déficit.
+#[tokio::test]
+async fn sugerencia_ignora_productos_inactivos() {
+    let c = setup().await;
+    let product = make_product(&c).await;
+    stock::adjust(
+        &c.app,
+        c.org,
+        c.user,
+        Adjust {
+            product_id: product,
+            store_id: c.store,
+            new_quantity: Decimal::from(5),
+            reason: "init".into(),
+        },
+    )
+    .await
+    .unwrap();
+    stock::set_min(
+        &c.app,
+        c.org,
+        SetMin {
+            product_id: product,
+            store_id: c.store,
+            min_stock: Decimal::from(20),
+        },
+    )
+    .await
+    .unwrap();
+    sqlx::query(r#"UPDATE "Product" SET active = false WHERE id = $1"#)
+        .bind(product)
+        .execute(&c.admin)
+        .await
+        .unwrap();
+
+    let rows = service::suggest(
+        &c.app,
+        c.org,
+        SuggestPurchase {
+            store_id: c.store,
+            supplier_id: None,
+            days_coverage: None,
+        },
+    )
+    .await
+    .unwrap();
+    assert!(
+        rows.iter().all(|r| r.product_id != product),
+        "un producto inactivo no debe reponerse"
+    );
+
+    teardown(&c, &[product]).await;
+}

@@ -1,5 +1,5 @@
 import type { ImportResult } from '@simpletpv/auth';
-import { Download } from 'lucide-react';
+import { Download, X } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 import { exportRows, type SpreadsheetFormat } from '../lib/spreadsheet.js';
@@ -79,13 +79,24 @@ export function ImportExportModal({
       ariaLabel={`Importar o exportar ${title}`}
       {...(testId ? { testId } : {})}
     >
-      <h3>
-        {canImport && canExport
-          ? `${title}: importar o exportar`
-          : canImport
-            ? `Importar ${title}`
-            : `Exportar ${title}`}
-      </h3>
+      <header className="iemodal-head">
+        <h3>
+          {canImport && canExport
+            ? `${title}: importar o exportar`
+            : canImport
+              ? `Importar ${title}`
+              : `Exportar ${title}`}
+        </h3>
+        <button
+          type="button"
+          className="iemodal-close"
+          aria-label="Cerrar"
+          onClick={onClose}
+          data-testid="iemodal-close"
+        >
+          <X size={18} aria-hidden="true" />
+        </button>
+      </header>
 
       {canImport && canExport && (
         <nav className="bo-tabs" data-testid="iemodal-tabs">
@@ -151,12 +162,6 @@ export function ImportExportModal({
           </div>
         </div>
       )}
-
-      <div className="modal-foot">
-        <button type="button" onClick={onClose}>
-          Cerrar
-        </button>
-      </div>
     </Modal>
   );
 }

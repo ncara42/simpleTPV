@@ -16,6 +16,15 @@ fn opt_email_ok(v: &Option<String>) -> bool {
     v.as_ref().map(|s| valid_email(s)).unwrap_or(true)
 }
 
+/// Tope de la periodicidad de compra (días). Alineado con el máximo de cobertura
+/// de la propuesta (`MAX_COVERAGE_DAYS` en compras): un año.
+const MAX_ORDER_FREQUENCY_DAYS: i32 = 365;
+
+/// Periodicidad válida: `None` = sin tocar, `0` = quitar, `1..=365` = fijar.
+fn order_frequency_ok(v: Option<i32>) -> bool {
+    v.is_none_or(|d| (0..=MAX_ORDER_FREQUENCY_DAYS).contains(&d))
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSupplier {
@@ -24,6 +33,8 @@ pub struct CreateSupplier {
     pub email: Option<String>,
     pub phone: Option<String>,
     pub lead_time_days: Option<i32>,
+    /// Periodicidad de compra (días): 7 semanal, 14 quincenal, 30 mensual…
+    pub order_frequency_days: Option<i32>,
 }
 
 impl CreateSupplier {
@@ -35,6 +46,7 @@ impl CreateSupplier {
             || !opt_email_ok(&self.email)
             || !opt_len_ok(&self.phone, MAX_PHONE_LENGTH)
             || self.lead_time_days.is_some_and(|d| d < 0)
+            || !order_frequency_ok(self.order_frequency_days)
         {
             return Err(AppError::BadRequest);
         }
@@ -50,6 +62,8 @@ pub struct UpdateSupplier {
     pub email: Option<String>,
     pub phone: Option<String>,
     pub lead_time_days: Option<i32>,
+    /// `None` = sin cambios; `0` = quitar la periodicidad; `1..=365` = fijarla.
+    pub order_frequency_days: Option<i32>,
 }
 
 impl UpdateSupplier {
@@ -63,6 +77,7 @@ impl UpdateSupplier {
             || !opt_email_ok(&self.email)
             || !opt_len_ok(&self.phone, MAX_PHONE_LENGTH)
             || self.lead_time_days.is_some_and(|d| d < 0)
+            || !order_frequency_ok(self.order_frequency_days)
         {
             return Err(AppError::BadRequest);
         }

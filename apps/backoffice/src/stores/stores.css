@@ -38,7 +38,9 @@
 /* ─── Rejilla de 3 columnas: lista · ficha · operativa (una sola fila) ────────── */
 .stores-layout {
   display: grid;
-  grid-template-columns: 19.5rem 23.5rem minmax(0, 1fr);
+  /* Mismas anchuras que el maestro-detalle de 3 columnas de referencia
+     (.ventas-layout en sales/ventas.css): 15.75rem lista + 24rem ficha + resto. */
+  grid-template-columns: 15.75rem 24rem minmax(0, 1fr);
   flex: 1;
   min-height: 0;
 }
@@ -440,23 +442,59 @@
 }
 
 /* ─── Panel 3 · operativa ──────────────────────────────────────────────────────── */
+/* Columna recesada (fondo subtle) montada como una pila de tarjetas hermanas de las
+   del resto de paneles: cada concern (estado · central · dispositivos · actividad)
+   vive en su propia superficie con hairline y radio lg. Los switches se presentan
+   como filas de ajuste (nombre + descripción · toggle) y los CTAs usan el <Button>
+   del design system, no botones sueltos, para un vocabulario único. */
 .store-ops-panel {
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
-  padding: 1.1rem 1.25rem 1.4rem;
-  gap: 1.35rem;
+  padding: 1.15rem 1.15rem 1.5rem;
+  gap: 0.8rem;
   background: var(--ui-surface-subtle);
   scrollbar-width: none;
 }
 .store-ops-panel::-webkit-scrollbar {
   display: none;
 }
-/* El `.switch` compartido (catalog.css) solo se estiliza escopado a `.modal--form`
-   (todos sus demás usos viven dentro de una modal); aquí vive en un panel permanente,
-   no en una modal, así que replicamos el mismo tratamiento (layout + ocultar el
-   checkbox nativo) escopado a este panel. */
+.store-ops-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0 0.2rem 0.3rem;
+}
+.store-ops-title {
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--ui-text);
+  line-height: 1.15;
+}
+.store-ops-hint {
+  font-size: 0.76rem;
+  color: var(--ui-text-soft);
+}
+
+/* Tarjeta de sección: misma piel que .stores-card/.store-device-item, radio lg. */
+.store-ops-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.9rem 1rem 1rem;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+}
+.store-ops-card .store-sec-title {
+  margin: 0;
+}
+
+/* Fila de ajuste (verificada · central): texto a la izquierda, toggle a la derecha.
+   Reutiliza .switch (catalog.css) para el checkbox oculto + track/thumb; solo se
+   sobrescribe el layout (mayor especificidad que `.store-ops-panel .switch`). */
 .store-ops-panel .switch {
   display: inline-flex;
   flex-direction: row;
@@ -480,97 +518,126 @@
   white-space: nowrap;
   border: 0;
 }
-.store-ops-head {
+.store-ops-panel .switch.store-ops-toggle {
   display: flex;
-  align-items: baseline;
   justify-content: space-between;
-  gap: 0.5rem;
-  margin: -0.15rem 0 -0.35rem;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
 }
-.store-ops-title {
-  font-size: 0.82rem;
-  font-weight: 650;
+.store-ops-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+.store-ops-toggle-name {
+  font-size: 0.86rem;
+  font-weight: 550;
+  letter-spacing: -0.012em;
   color: var(--ui-text);
-  letter-spacing: -0.01em;
 }
-.store-ops-hint {
-  font-size: 0.7rem;
+.store-ops-toggle-desc {
+  font-size: 0.74rem;
+  line-height: 1.35;
   color: var(--ui-text-soft);
-}
-.store-ops-sec {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-}
-.store-ops-sec-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
 }
 
-/* Timeline de actividad (última apertura/cierre + arqueo). */
-.store-tl {
+/* Label de campo de texto (Incidencias/notas): micro-tipografía alineada con
+   .store-sec-title/.store-meta-label; sin ella el <label> cae al tamaño del navegador. */
+.store-ops-field {
   display: flex;
   flex-direction: column;
-}
-.store-tl-step {
-  display: flex;
-  gap: 0.7rem;
-}
-.store-tl-rail {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 0 0 auto;
-}
-.store-tl-dot {
-  display: inline-grid;
-  place-items: center;
-  width: 1.3rem;
-  height: 1.3rem;
-  border-radius: 50%;
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-.store-tl-dot--ok {
-  background: var(--ui-success);
-  color: #fff;
-}
-.store-tl-dot--done {
-  background: var(--ui-success-soft);
-  color: var(--ui-success);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-success) 30%, transparent);
-}
-.store-tl-dot--transit {
-  background: var(--ui-brand-soft);
-  color: var(--ui-brand-ink);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-brand) 25%, transparent);
-}
-.store-tl-dot--pending {
-  background: var(--ui-surface-subtle);
+  gap: 0.4rem;
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--ui-text-soft);
-  box-shadow: inset 0 0 0 1px var(--ui-border);
 }
-.store-tl-line {
-  width: 2px;
-  flex: 1;
-  min-height: 0.85rem;
-  background: var(--ui-border);
-}
-.store-tl-body {
+
+/* Barra de acción de la tarjeta: CTA del design system alineado a la derecha. */
+.store-ops-actions {
   display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
-  padding-bottom: 0.8rem;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.1rem;
 }
-.store-tl-label {
-  font-size: 0.81rem;
+
+/* Lista de dispositivos dentro de la tarjeta: sin marco propio (lo aporta la
+   tarjeta), filas separadas por hairline en vez de cajas individuales. */
+.store-ops-card .store-device-list {
+  margin: 0;
+}
+.store-ops-card .store-device-item {
+  border: none;
+  border-radius: 0;
+  padding: 0.5rem 0.1rem;
+  gap: 0.6rem;
+}
+.store-ops-card .store-device-item + .store-device-item {
+  border-top: 1px solid var(--ui-border);
+}
+
+/* Botón discreto de acción por fila (Revocar) y copiar-token: texto neutro que
+   vira a peligro al hover — sin la píldora .link-btn, que rompía el vocabulario. */
+.store-ops-revoke {
+  border: none;
+  background: none;
+  padding: 0.2rem 0.4rem;
+  font: inherit;
+  font-size: 0.78rem;
   font-weight: 500;
-  color: var(--ui-text);
-}
-.store-tl-when {
-  font-size: 0.72rem;
   color: var(--ui-text-soft);
+  cursor: pointer;
+  border-radius: var(--ui-radius-xs);
+  transition:
+    background var(--ui-motion-fast, 0.12s) var(--ui-ease),
+    color var(--ui-motion-fast, 0.12s) var(--ui-ease);
+}
+.store-ops-revoke:hover {
+  color: var(--ui-danger);
+  background: var(--ui-danger-soft);
+}
+.store-ops-revoke:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+/* Callout del token recién emitido (se muestra una sola vez). */
+.store-ops-token {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.55rem;
+  margin: 0;
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-brand-soft);
+}
+.store-ops-token-label {
+  flex-basis: 100%;
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-brand-ink);
+}
+.store-ops-token code {
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ui-brand-ink);
+  background: var(--ui-surface);
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--ui-radius-xs);
+}
+.store-ops-token-copy {
+  color: var(--ui-brand-ink);
+}
+.store-ops-token-copy:hover {
+  color: var(--ui-brand-ink);
+  background: color-mix(in srgb, var(--ui-brand) 16%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

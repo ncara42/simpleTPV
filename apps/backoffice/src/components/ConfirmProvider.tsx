@@ -1,4 +1,5 @@
 import { Button } from '@simpletpv/ui';
+import { CircleHelp, TriangleAlert } from 'lucide-react';
 import { createContext, type ReactNode, useCallback, useContext, useState } from 'react';
 
 import { Modal } from './Modal.js';
@@ -46,11 +47,17 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           testId="confirm-dialog"
           ariaLabel={pending.opts.title ?? 'Confirmar'}
         >
-          <header className="modal-head">
+          <header className="modal-head modal-head--confirm">
+            <span
+              className={`confirm-icon${pending.opts.danger ? ' confirm-icon--danger' : ''}`}
+              aria-hidden="true"
+            >
+              {pending.opts.danger ? <TriangleAlert size={20} /> : <CircleHelp size={20} />}
+            </span>
             <h3>{pending.opts.title ?? 'Confirmar'}</h3>
           </header>
           <div className="modal-body">
-            <p>{pending.opts.message}</p>
+            <p className="confirm-message">{pending.opts.message}</p>
           </div>
           <div className="modal-foot modal-foot-actions">
             <button type="button" onClick={() => close(false)} data-testid="confirm-cancel">

@@ -13,8 +13,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, SlidersHorizontal, Upload } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
-import { CsvDropzone } from '../components/CsvDropzone.js';
 import { FacetRail } from '../components/FacetRail.js';
+import { ImportExportModal } from '../components/ImportExportModal.js';
 import { Modal } from '../components/Modal.js';
 import { ScrollShadowCell } from '../components/ScrollShadowCell.js';
 import { useTableColumns } from '../components/useTableColumns.js';
@@ -569,33 +569,24 @@ export function SupplierPricesSection({
       )}
 
       {importing && (
-        <Modal
+        <ImportExportModal
+          title={`tarifa · ${supplierName(supplierId)}`}
           onClose={() => setImporting(false)}
-          className="modal--form"
           testId="sp-import-modal"
-          ariaLabel="Importar tarifa desde CSV"
-        >
-          <h3>Importar tarifa · {supplierName(supplierId)}</h3>
-          <CsvDropzone
-            columns={['sku', 'price']}
-            example={['SKU-001', '3.50']}
-            templateName="plantilla_tarifa_proveedor.csv"
-            testId="sp-csv"
-            help={
+          importConfig={{
+            columns: ['sku', 'price'],
+            example: ['SKU-001', '3.50'],
+            templateBase: 'plantilla_tarifa_proveedor',
+            instructions: (
               <>
                 Columnas: <code>sku,price</code>. Cada fila fija el precio de compra del producto
                 con ese SKU para <strong>{supplierName(supplierId)}</strong>.
               </>
-            }
-            onImport={(csv) => importSupplierPricesCsv(supplierId, csv)}
-            onImported={invalidate}
-          />
-          <div className="modal-foot">
-            <button type="button" onClick={() => setImporting(false)}>
-              Cerrar
-            </button>
-          </div>
-        </Modal>
+            ),
+            onImport: (csv) => importSupplierPricesCsv(supplierId, csv),
+            onImported: invalidate,
+          }}
+        />
       )}
     </section>
   );

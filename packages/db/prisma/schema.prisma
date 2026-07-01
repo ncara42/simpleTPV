@@ -697,6 +697,9 @@ model Supplier {
   email          String?
   phone          String?
   leadTimeDays   Int      @default(7)
+  // Periodicidad de compra (días): 7 semanal, 14 quincenal, 30 mensual… Cobertura
+  // por defecto de la propuesta de pedido y base de la futura automatización.
+  orderFrequencyDays Int?
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
 

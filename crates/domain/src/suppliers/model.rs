@@ -16,6 +16,9 @@ pub struct Supplier {
     pub email: Option<String>,
     pub phone: Option<String>,
     pub lead_time_days: i32,
+    /// Periodicidad de compra (días): 7 semanal, 14 quincenal, 30 mensual…
+    /// `None` = sin definir (la propuesta usa su cobertura por defecto).
+    pub order_frequency_days: Option<i32>,
     pub active: bool,
     #[serde(serialize_with = "crate::serde_helpers::iso_utc")]
     pub created_at: PrimitiveDateTime,

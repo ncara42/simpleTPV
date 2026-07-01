@@ -39,20 +39,24 @@ pub fn lead_time_days(
 }
 
 /// Cantidad sugerida a pedir (#45): cubre el mínimo + la demanda esperada durante
-/// el horizonte de reposición —cobertura **más** el plazo de entrega del proveedor
-/// (`lead_time_days`)—, descontando el stock actual. Nunca negativa.
+/// el horizonte de reposición —cobertura (periodicidad de compra) **más** el plazo
+/// de entrega del proveedor (`lead_time_days`)—, descontando el stock disponible:
+/// el actual **y** lo ya pedido pendiente de recibir (`pendiente_recibir`), para no
+/// volver a pedir mercancía que ya está en tránsito. Nunca negativa.
 ///
-/// `max(0, round3(min − stock + ventaMediaDiaria · (diasCobertura + leadTime)))`.
+/// `max(0, round3(min − (stock + pendiente) + ventaMediaDiaria · (diasCobertura + leadTime)))`.
 ///
-/// Incluir el lead time evita la rotura de stock durante el tránsito del pedido:
-/// sin él la propuesta solo repone para la cobertura y el stock cae por debajo del
-/// mínimo mientras la mercancía viaja. El horizonte se acota a [`MAX_HORIZON_DAYS`]
-/// y toda la aritmética es comprobada (`checked_*`), de modo que datos extremos
+/// Es una política de revisión periódica (R, S): la cobertura es el intervalo entre
+/// pedidos al proveedor (7 semanal, 14 quincenal, 30 mensual…) y el lead time evita
+/// la rotura durante el tránsito. El horizonte se acota a [`MAX_HORIZON_DAYS`] y
+/// toda la aritmética es comprobada (`checked_*`), de modo que datos extremos
 /// (p. ej. un `leadTimeDays` corrupto) nunca provocan un panic por desbordamiento;
 /// el caso inalcanzable degrada a `0` (fail-safe: jamás propone un pedido absurdo).
+/// Un `pendiente_recibir` negativo (dato corrupto) se ignora, nunca infla el pedido.
 pub fn suggest_quantity(
     min_stock: Decimal,
     stock_actual: Decimal,
+    pendiente_recibir: Decimal,
     venta_media_diaria: Decimal,
     dias_cobertura: i64,
     lead_time_days: i64,
@@ -63,8 +67,11 @@ pub fn suggest_quantity(
     let demanda = venta_media_diaria
         .checked_mul(Decimal::from(horizon))
         .unwrap_or(Decimal::ZERO);
+    let disponible = stock_actual
+        .checked_add(pendiente_recibir.max(Decimal::ZERO))
+        .unwrap_or(stock_actual);
     let raw = min_stock
-        .checked_sub(stock_actual)
+        .checked_sub(disponible)
         .and_then(|deficit| deficit.checked_add(demanda))
         .map(|v| v.round_dp(3))
         .unwrap_or(Decimal::ZERO);
@@ -99,12 +106,12 @@ mod tests {
     fn cantidad_sugerida() {
         // min 10, stock 3, venta 2/día, cobertura 14, sin lead → 10-3+28 = 35.
         assert_eq!(
-            suggest_quantity(dec("10"), dec("3"), dec("2"), 14, 0),
+            suggest_quantity(dec("10"), dec("3"), Decimal::ZERO, dec("2"), 14, 0),
             dec("35")
         );
         // Nunca negativa: stock alto.
         assert_eq!(
-            suggest_quantity(dec("5"), dec("100"), dec("0"), 14, 0),
+            suggest_quantity(dec("5"), dec("100"), Decimal::ZERO, dec("0"), 14, 0),
             Decimal::ZERO
         );
     }
@@ -114,12 +121,31 @@ mod tests {
         // El lead time amplía el horizonte: cobertura 14 + lead 7 = 21 días.
         // 10 - 3 + 2·21 = 7 + 42 = 49 (34 más que sin lead → cubre el tránsito).
         assert_eq!(
-            suggest_quantity(dec("10"), dec("3"), dec("2"), 14, 7),
+            suggest_quantity(dec("10"), dec("3"), Decimal::ZERO, dec("2"), 14, 7),
             dec("49")
         );
         // Un lead time negativo (dato corrupto) se ignora, no resta: 10-3+2·14 = 35.
         assert_eq!(
-            suggest_quantity(dec("10"), dec("3"), dec("2"), 14, -100),
+            suggest_quantity(dec("10"), dec("3"), Decimal::ZERO, dec("2"), 14, -100),
+            dec("35")
+        );
+    }
+
+    #[test]
+    fn cantidad_sugerida_descuenta_pendiente_de_recibir() {
+        // Ya hay 30 uds pedidas en tránsito: 10 - (3+30) + 2·14 = -23+28 = 5.
+        assert_eq!(
+            suggest_quantity(dec("10"), dec("3"), dec("30"), dec("2"), 14, 0),
+            dec("5")
+        );
+        // El pendiente cubre toda la necesidad → 0, no negativa.
+        assert_eq!(
+            suggest_quantity(dec("10"), dec("3"), dec("100"), dec("2"), 14, 0),
+            Decimal::ZERO
+        );
+        // Pendiente negativo (dato corrupto) se ignora, no infla: = caso base 35.
+        assert_eq!(
+            suggest_quantity(dec("10"), dec("3"), dec("-50"), dec("2"), 14, 0),
             dec("35")
         );
     }
@@ -129,7 +155,14 @@ mod tests {
         // Lead time absurdo (i64::MAX): el horizonte se acota a MAX_HORIZON_DAYS y
         // la aritmética comprobada no paniquea. 0 - 0 + 1·3650 = 3650.
         assert_eq!(
-            suggest_quantity(Decimal::ZERO, Decimal::ZERO, dec("1"), 0, i64::MAX),
+            suggest_quantity(
+                Decimal::ZERO,
+                Decimal::ZERO,
+                Decimal::ZERO,
+                dec("1"),
+                0,
+                i64::MAX
+            ),
             Decimal::from(MAX_HORIZON_DAYS)
         );
     }

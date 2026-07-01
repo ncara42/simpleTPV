@@ -2,10 +2,13 @@ import { Button, Input } from '@simpletpv/ui';
 import { useState } from 'react';
 
 import { Modal } from '../components/Modal.js';
+import { OrderFrequencyField } from './OrderFrequencyField.js';
 
 export interface SupplierForm {
   name: string;
   leadTimeDays: string;
+  /** Periodicidad de compra en días; '' = sin definir. */
+  orderFrequencyDays: string;
 }
 
 // Modal de alta de proveedor. Mismo patrón que StoreFormModal: autónomo, gestiona
@@ -23,7 +26,11 @@ export function SupplierFormModal({
   pending: boolean;
   error: string | null;
 }) {
-  const [form, setForm] = useState<SupplierForm>({ name: '', leadTimeDays: '7' });
+  const [form, setForm] = useState<SupplierForm>({
+    name: '',
+    leadTimeDays: '7',
+    orderFrequencyDays: '',
+  });
 
   return (
     <Modal
@@ -55,6 +62,14 @@ export function SupplierFormModal({
           value={form.leadTimeDays}
           onChange={(e) => setForm({ ...form, leadTimeDays: e.target.value })}
           data-testid="supplier-leadtime"
+        />
+      </label>
+      <label>
+        Periodicidad de compra
+        <OrderFrequencyField
+          value={form.orderFrequencyDays}
+          onChange={(orderFrequencyDays) => setForm({ ...form, orderFrequencyDays })}
+          testId="supplier-frequency"
         />
       </label>
       {error && <p className="form-error">{error}</p>}

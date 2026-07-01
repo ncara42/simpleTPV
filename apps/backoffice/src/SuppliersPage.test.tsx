@@ -28,8 +28,9 @@ vi.mock('./lib/supplier-prices.js', () => ({
   importSupplierPricesCsv: vi.fn(),
 }));
 
+import { listStores } from './lib/admin.js';
 import { PageNavProvider, usePageNavValue } from './lib/pageNav.js';
-import { listSuppliers } from './lib/purchases.js';
+import { listSuppliers, suggestPurchase } from './lib/purchases.js';
 import { compareSupplierPrices } from './lib/supplier-prices.js';
 import { SuppliersPage } from './SuppliersPage.js';
 
@@ -85,6 +86,7 @@ describe('SuppliersPage', () => {
         email: null,
         phone: null,
         leadTimeDays: 5,
+        orderFrequencyDays: null,
         active: true,
       },
     ]);
@@ -162,5 +164,57 @@ describe('SuppliersPage', () => {
     expect(avgChart).toHaveClass('ui-chart-bars');
     expect(avgChart).not.toHaveClass('ui-chart-line');
     vi.mocked(compareSupplierPrices).mockResolvedValue([]);
+  });
+
+  // ── Propuesta: periodicidad elegible + coste estimado ───────────────────────
+  it('la propuesta envía la periodicidad elegida y muestra tránsito, coste y total estimado', async () => {
+    vi.mocked(listStores).mockResolvedValue([{ id: 'st1', name: 'Central' }] as never);
+    vi.mocked(suggestPurchase).mockResolvedValue([
+      {
+        productId: 'p1',
+        productName: 'Aceite CBD 10%',
+        stockActual: 5,
+        minStock: 20,
+        ventaMedia30d: 60,
+        ventaMediaDiaria: 2,
+        rotacion: 0.4,
+        coberturaDias: 2.5,
+        pendienteRecibir: 6,
+        horizonteDias: 10,
+        precioUnitario: 2.5,
+        costeEstimado: 87.5,
+        cantidadSugerida: 35,
+      },
+    ]);
+    renderPage({ initialSection: 'suggest' });
+
+    // Tienda y periodicidad semanal desde las facetas de botones del carril (sin
+    // desplegables: mismo carril que Proveedores).
+    fireEvent.click(await screen.findByTestId('suggest-store-st1'));
+    fireEvent.click(screen.getByTestId('suggest-coverage-7'));
+    fireEvent.click(screen.getByTestId('suggest-generate'));
+
+    await waitFor(() => expect(screen.getAllByTestId('suggest-row')).toHaveLength(1));
+    // La periodicidad viaja como daysCoverage; sin proveedor no se envía supplierId.
+    expect(suggestPurchase).toHaveBeenCalledWith(
+      { storeId: 'st1', daysCoverage: 7 },
+      expect.anything(),
+    );
+    // Horizonte usado por el cálculo + unidades en tránsito + total estimado.
+    expect(screen.getByTestId('suggest-horizon')).toHaveTextContent('Horizonte de demanda: 10 d');
+    expect(screen.getByTestId('suggest-pending')).toHaveTextContent('6');
+    expect(screen.getByTestId('suggest-total')).toHaveTextContent('87,50');
+
+    // Carril de filtros (igual que Proveedores): la faceta «En tránsito» sí conserva
+    // la fila (tiene pendiente), «Con tarifa» también; una búsqueda que no casa la oculta.
+    expect(screen.getByTestId('suggest-facets')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('suggest-estado-transit'));
+    expect(screen.getAllByTestId('suggest-row')).toHaveLength(1);
+    fireEvent.change(screen.getByTestId('suggest-search'), { target: { value: 'zzz' } });
+    expect(screen.queryByTestId('suggest-row')).not.toBeInTheDocument();
+    expect(screen.getByTestId('suggest-empty')).toHaveTextContent('Ningún producto coincide');
+
+    vi.mocked(listStores).mockResolvedValue([]);
+    vi.mocked(suggestPurchase).mockResolvedValue([]);
   });
 });
