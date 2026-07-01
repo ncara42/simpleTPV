@@ -64,18 +64,10 @@ pub const WIDGETABLE_ENDPOINTS: &[&str] = &[
     "/product-families",
     "/suppliers",
 ];
-pub const BLOCK_IDS: &[&str] = &[
-    "block:sales-overview",
-    "block:stock-risk",
-    "block:staff-performance",
-    "block:product-ranking",
-    "block:top-margin",
-    "block:dead-stock",
-    "block:profitability",
-    "block:discount-control",
-    "block:sales-mix",
-    "block:store-comparison",
-];
+// Bloques pre-cableados (#205) RETIRADOS: el frontend (dashboard-blocks.ts) y el contrato
+// (docs/contracts/dataviz-contract.json → "blocks": []) los vaciaron. Se mantiene la constante
+// (vacía) por el test de paridad con el contrato; el agente compone con widgets + gen:panel.
+pub const BLOCK_IDS: &[&str] = &[];
 
 // Esquema de una hoja-pieza para un slot. `pieces` acota el enum admitido (kpis vs charts).
 fn piece_item_schema(pieces: &[&str]) -> Value {
@@ -102,13 +94,13 @@ pub fn canvas_tools() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "add_widget",
-                "description": "Añade un widget al dashboard. Por DEFECTO compón con WIDGETS DEL CATÁLOGO independientes (widget_id 'dash-bars', 'dash-hour', 'geist-stat-today', 'geist-treemap-family', …): una métrica = una tarjeta; varias llamadas en el turno se escalonan solas. Usa un BLOQUE pre-cableado (widget_id 'block:<id>', un panel agrupado ya diseñado) SOLO si el usuario pide explícitamente «un panel/bloque que junte…». Usa un PANEL a medida (widget_id 'gen:panel' + generic_spec con kind 'panel', recipe y slots) solo si ningún catálogo/bloque encaja. NO emitas geometría (w/h/span/gap): la receta dicta el layout.",
+                "description": "Añade un widget al dashboard. Por DEFECTO compón con WIDGETS DEL CATÁLOGO independientes (widget_id 'dash-bars', 'dash-hour', 'geist-stat-today', 'geist-treemap-family', …): una métrica = una tarjeta; varias llamadas en el turno se escalonan solas. Usa un PANEL a medida (widget_id 'gen:panel' + generic_spec con kind 'panel', recipe y slots) solo si ningún widget del catálogo encaja. NO emitas geometría (w/h/span/gap): la receta dicta el layout.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "widget_id": {
                             "type": "string",
-                            "description": "ID del widget. Catálogo independiente (POR DEFECTO, una métrica cada uno): 'dash-bars', 'dash-hour', 'geist-stat-today', 'geist-hero-profit', 'geist-dual-margin', 'geist-gauge-margin', 'geist-treemap-family', 'geist-donut-family', 'geist-share-stores', 'geist-leaderboard-sellers', 'geist-leaderboard-products', 'geist-heat-hours', 'geist-feed-alerts', etc. Bloques (un panel AGRUPADO ya diseñado, SOLO a petición explícita de un panel): 'block:sales-overview', 'block:stock-risk', 'block:staff-performance', 'block:product-ranking', 'block:top-margin', 'block:dead-stock', 'block:profitability', 'block:discount-control', 'block:sales-mix', 'block:store-comparison'. Panel a medida (si nada encaja): 'gen:panel'."
+                            "description": "ID del widget. Catálogo independiente (POR DEFECTO, una métrica cada uno): 'dash-bars', 'dash-hour', 'geist-stat-today', 'geist-hero-profit', 'geist-dual-margin', 'geist-gauge-margin', 'geist-treemap-family', 'geist-donut-family', 'geist-share-stores', 'geist-leaderboard-sellers', 'geist-leaderboard-products', 'geist-heat-hours', 'geist-feed-alerts', etc. Panel a medida (si nada encaja): 'gen:panel'."
                         },
                         "position": {
                             "type": "string",
