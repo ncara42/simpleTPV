@@ -1,10 +1,10 @@
-import type { SalesTodayResponse } from '@simpletpv/auth';
+import type { SalesByStoreItem, SalesTodayResponse } from '@simpletpv/auth';
 
 import { api } from './auth.js';
 
 // Tipo compartido (fuente de verdad en @simpletpv/auth): lo re-exportamos para no
 // romper los imports existentes (`./lib/dashboard`) de StoresPage/DashboardPage.
-export type { SalesTodayResponse };
+export type { SalesByStoreItem, SalesTodayResponse };
 
 export type DashboardPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'year';
 
@@ -205,6 +205,16 @@ export function getSalesByEmployee(
   storeId?: string,
 ): Promise<SalesByEmployee[]> {
   return api.get<SalesByEmployee[]>('/dashboard/sales-by-employee', periodQuery(period, storeId));
+}
+
+// Desglose de ventas por tienda (#224): facturación, nº tickets, ticket medio y margen
+// por tienda, para cualquier periodo (a diferencia de getSalesToday, fijo a hoy/ayer).
+// Lo usa la vista Tiendas (lista + hero de la ficha) al cambiar de periodo.
+export function getSalesByStore(
+  period: DashboardPeriod,
+  storeId?: string,
+): Promise<SalesByStoreItem[]> {
+  return api.get<SalesByStoreItem[]>('/dashboard/sales-by-store', periodQuery(period, storeId));
 }
 
 export function getProductRotation(

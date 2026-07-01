@@ -1,28 +1,45 @@
-import { Button } from '@simpletpv/ui';
-import { usePageHeader } from '@simpletpv/ui';
+import './stores/stores.css';
+
+import { Button, usePageHeader } from '@simpletpv/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { useConfirm } from './components/ConfirmProvider.js';
+import { PeriodSegmented } from './components/PeriodSegmented.js';
 import { createStore, deleteStore, listStores, type Store, updateStore } from './lib/admin.js';
 import { exportRowsToCsv } from './lib/csv.js';
-import { getSalesToday } from './lib/dashboard.js';
+import type { DashboardPeriod } from './lib/dashboard.js';
+import { getSalesByStore } from './lib/dashboard.js';
+import { listDevices } from './lib/devices.js';
 import { formErrorMessage } from './lib/form-error.js';
 import { fmtEur } from './lib/format.js';
 import { usePageActions } from './lib/pageActions.js';
-import { StoreCard } from './stores/StoreCard.js';
-import { StoreDetailModal } from './stores/StoreDetailModal.js';
+import { usePageNav } from './lib/pageNav.js';
+import { parsePeriod, PERIOD_OPTIONS } from './lib/period.js';
+import { listStoreLog } from './lib/time-clock.js';
+import { useTableShellHeight } from './lib/useTableShellHeight.js';
+import { StoreDetailPanel } from './stores/StoreDetailPanel.js';
 import { type StoreForm, StoreFormModal } from './stores/StoreFormModal.js';
+import { StoreList } from './stores/StoreList.js';
+import { StoreOpsPanel } from './stores/StoreOpsPanel.js';
 import { StorePricesModal } from './stores/StorePricesModal.js';
 
-export type StoreSalesPeriod = 'today' | 'week' | 'month';
-
-const SALES_LABEL: Record<StoreSalesPeriod, string> = {
-  today: 'Ventas de hoy',
-  week: 'Ventas · últimos 7 días',
-  month: 'Ventas de este mes',
+// Etiqueta del periodo para el hero de ventas de la ficha («Ventas · Hoy»).
+const PERIOD_LABEL: Record<DashboardPeriod, string> = {
+  today: 'Hoy',
+  yesterday: 'Ayer',
+  week: 'Semana',
+  month: 'Mes',
+  year: 'Año',
 };
+// El diseño pide Hoy/7 días/Mes; el sistema real solo entiende Hoy/Semana(ISO)/Mes/Año
+// (lib/period.ts), así que se usa el subconjunto y la semántica REALES (sin inventar
+// una "semana de 7 días" que no existe en ningún otro sitio de la app).
+const STORE_PERIOD_OPTIONS = PERIOD_OPTIONS.filter((o) =>
+  (['today', 'week', 'month'] as DashboardPeriod[]).includes(o.value),
+);
 
 export function StoresPage({
   onOpenStoreView,
@@ -31,26 +48,88 @@ export function StoresPage({
 }) {
   const qc = useQueryClient();
   const confirm = useConfirm();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const period = parsePeriod(searchParams.get('period'), 'today');
+  const setPeriod = (next: DashboardPeriod): void => {
+    setSearchParams(
+      (prev) => {
+        const updated = new URLSearchParams(prev);
+        updated.set('period', next);
+        return updated;
+      },
+      { replace: true },
+    );
+  };
+
+  const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Store | null>(null);
-  const period: StoreSalesPeriod = 'today';
-  const [detail, setDetail] = useState<Store | null>(null);
   const [pricesFor, setPricesFor] = useState<Store | null>(null);
 
   const { data: stores = [], isLoading } = useQuery({
     queryKey: ['stores'],
     queryFn: listStores,
   });
-  // Ventas de hoy por tienda (GET /dashboard/sales-today) → métrica de la card + orden.
-  const { data: salesToday } = useQuery({
-    queryKey: ['dashboard-sales-today'],
-    queryFn: () => getSalesToday(),
+  // Ventas del periodo activo por tienda (#224): desglose real, no solo "hoy".
+  const { data: salesRows } = useQuery({
+    queryKey: ['sales-by-store', period],
+    queryFn: () => getSalesByStore(period),
   });
   const salesByStore = useMemo(
-    () => new Map((salesToday?.byStore ?? []).map((b) => [b.storeId, b.today])),
-    [salesToday],
+    () => new Map((salesRows ?? []).map((r) => [r.storeId, r.revenue])),
+    [salesRows],
   );
-  const invalidate = () => void qc.invalidateQueries({ queryKey: ['stores'] });
+
+  // Búsqueda cliente (nombre/dirección/código) + orden por ventas del periodo (desc).
+  const visibleStores = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtered = q
+      ? stores.filter(
+          (s) =>
+            s.name.toLowerCase().includes(q) ||
+            (s.address ?? '').toLowerCase().includes(q) ||
+            s.code.toLowerCase().includes(q),
+        )
+      : stores;
+    return [...filtered].sort(
+      (a, b) =>
+        (salesByStore.get(b.id) ?? 0) - (salesByStore.get(a.id) ?? 0) ||
+        a.name.localeCompare(b.name),
+    );
+  }, [stores, query, salesByStore]);
+
+  // Tienda seleccionada vía URL (?store=); por defecto la de mayor ventas. La ficha
+  // mantiene la selección aunque la búsqueda la saque de la lista visible (busca sobre
+  // `stores`, no sobre `visibleStores`).
+  const selectedId = searchParams.get('store') ?? visibleStores[0]?.id ?? null;
+  const selected = stores.find((s) => s.id === selectedId) ?? visibleStores[0] ?? stores[0] ?? null;
+  const selectStore = (id: string): void => {
+    setSearchParams(
+      (prev) => {
+        const updated = new URLSearchParams(prev);
+        updated.set('store', id);
+        return updated;
+      },
+      { replace: true },
+    );
+  };
+
+  // Dispositivos y registro de fichajes de la tienda seleccionada: elevados aquí (antes
+  // vivían dentro de la modal) para pasarlos a AMBOS paneles (ficha + operativa) sin
+  // duplicar peticiones.
+  const { data: devices = [] } = useQuery({
+    queryKey: ['devices', selected?.id],
+    queryFn: () => listDevices(selected?.id),
+    enabled: selected != null,
+  });
+  const { data: log = [] } = useQuery({
+    queryKey: ['store-log', selected?.id],
+    queryFn: () => listStoreLog(selected!.id),
+    enabled: selected != null,
+  });
+
+  const invalidate = (): void => void qc.invalidateQueries({ queryKey: ['stores'] });
 
   const createMut = useMutation({
     mutationFn: (s: StoreForm) =>
@@ -64,7 +143,6 @@ export function StoresPage({
       invalidate();
     },
   });
-  // Edición y borrado REALES (I-10): el backend ya tenía PATCH/DELETE.
   const updateMut = useMutation({
     mutationFn: ({ id, form }: { id: string; form: StoreForm }) =>
       updateStore(id, {
@@ -74,14 +152,22 @@ export function StoresPage({
       }),
     onSuccess: () => {
       setEditing(null);
-      setDetail(null);
       invalidate();
     },
   });
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteStore(id),
     onSuccess: () => {
-      setDetail(null);
+      // Al borrar la seleccionada, se libera el `?store=` para que caiga a la
+      // siguiente por defecto (mayor ventas) en vez de apuntar a un id borrado.
+      setSearchParams(
+        (prev) => {
+          const updated = new URLSearchParams(prev);
+          updated.delete('store');
+          return updated;
+        },
+        { replace: true },
+      );
       invalidate();
     },
   });
@@ -95,19 +181,6 @@ export function StoresPage({
     if (ok) deleteMut.mutate(s.id);
   };
 
-  // Orden por ventas de hoy (desc); empate o sin ventas → por nombre estable.
-  const visibleStores = useMemo(
-    () =>
-      [...stores].sort(
-        (a, b) =>
-          (salesByStore.get(b.id) ?? 0) - (salesByStore.get(a.id) ?? 0) ||
-          a.name.localeCompare(b.name),
-      ),
-    [stores, salesByStore],
-  );
-
-  // Exporta las tiendas visibles (ya ordenadas por ventas de hoy). El importe de
-  // ventas se formatea en euros con el mapa de ventas de hoy; '—' si no hay dato.
   const handleExport = (): void => {
     const rows = visibleStores.map((s) => [
       s.name,
@@ -115,58 +188,100 @@ export function StoresPage({
       s.active ? 'Activa' : 'Dormida',
       fmtEur(salesByStore.get(s.id) ?? 0),
     ]);
-    exportRowsToCsv('tiendas.csv', ['Nombre', 'Dirección', 'Estado', 'Ventas hoy'], rows);
+    exportRowsToCsv(
+      'tiendas.csv',
+      ['Nombre', 'Dirección', 'Estado', `Ventas ${PERIOD_LABEL[period]}`],
+      rows,
+    );
   };
 
   usePageHeader('Tiendas', `${stores.length} ubicaciones`);
+  usePageNav(
+    <PeriodSegmented
+      value={period}
+      onChange={setPeriod}
+      options={STORE_PERIOD_OPTIONS}
+      label="Periodo"
+    />,
+  );
   usePageActions(
-    <button
-      type="button"
-      className="float-action-btn"
-      onClick={handleExport}
-      aria-label="Exportar CSV"
-      title="Exportar CSV"
-      data-testid="stores-export"
-    >
-      <Download size={17} aria-hidden="true" />
-    </button>,
+    <>
+      <button
+        type="button"
+        className="float-action-btn"
+        onClick={handleExport}
+        aria-label="Exportar CSV"
+        title="Exportar CSV"
+        data-testid="stores-export"
+      >
+        <Download size={17} aria-hidden="true" />
+      </button>
+      <Button
+        onClick={() => setCreating(true)}
+        data-testid="new-store"
+        icon={<Plus size={16} aria-hidden="true" />}
+      >
+        Nueva tienda
+      </Button>
+    </>,
   );
 
-  return (
-    <section className="catalog">
-      <div className="users-toolbar">
-        <div className="sales-filters" />
-        <div className="ui-dt-toolbar-actions">
-          <Button
-            onClick={() => setCreating(true)}
-            data-testid="new-store"
-            icon={<Plus size={16} aria-hidden="true" />}
-          >
-            Nueva tienda
-          </Button>
-        </div>
-      </div>
+  const shellHeight = useTableShellHeight();
+  const q = query.trim();
+  const countLabel = q
+    ? `${visibleStores.length} de ${stores.length}`
+    : `${stores.length} ubicaciones`;
+  const totalStr = fmtEur(visibleStores.reduce((sum, s) => sum + (salesByStore.get(s.id) ?? 0), 0));
 
-      {isLoading ? (
-        <p className="catalog-empty">Cargando…</p>
-      ) : stores.length === 0 ? (
-        <p className="catalog-empty" data-testid="stores-empty">
-          Sin tiendas. Crea la primera.
-        </p>
-      ) : (
-        <div className="store-grid" data-testid="stores-grid">
-          {visibleStores.map((s) => (
-            <StoreCard
-              key={s.id}
-              store={s}
-              active={s.active}
-              sales={salesByStore.get(s.id) ?? 0}
-              periodLabel={SALES_LABEL[period]}
-              onSelect={() => setDetail(s)}
+  return (
+    <div className="stores-page" style={{ height: shellHeight }}>
+      <div className="stores-card">
+        {isLoading ? (
+          <p className="catalog-empty">Cargando…</p>
+        ) : stores.length === 0 ? (
+          <p className="catalog-empty" data-testid="stores-empty">
+            Sin tiendas. Crea la primera.
+          </p>
+        ) : (
+          <div className="stores-layout">
+            <StoreList
+              stores={visibleStores}
+              salesByStore={salesByStore}
+              query={query}
+              onSearch={setQuery}
+              selectedId={selected?.id ?? null}
+              onSelect={selectStore}
+              countLabel={countLabel}
+              totalStr={totalStr}
             />
-          ))}
-        </div>
-      )}
+            {selected && (
+              <>
+                <StoreDetailPanel
+                  store={selected}
+                  sales={salesByStore.get(selected.id) ?? 0}
+                  periodCaption={`Ventas · ${PERIOD_LABEL[period]}`}
+                  devices={devices}
+                  log={log}
+                  onEdit={() => setEditing(selected)}
+                  onDelete={() => void askDelete(selected)}
+                  deleteError={
+                    deleteMut.isError
+                      ? formErrorMessage(deleteMut.error, 'No se pudo borrar.')
+                      : null
+                  }
+                  onOpenStock={() => onOpenStoreView('stock', selected.id)}
+                  onOpenSales={() => onOpenStoreView('sales', selected.id)}
+                  onOpenPrices={() => setPricesFor(selected)}
+                />
+                {/* `key` fuerza remount al cambiar de tienda: el panel deriva su estado
+                    inicial (opsVerified/opsIncident/opsBaseline) de `store` vía useState,
+                    que NO se re-sincroniza solo porque cambien las props. */}
+                <StoreOpsPanel key={selected.id} store={selected} devices={devices} log={log} />
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       {creating && (
         <StoreFormModal
@@ -174,26 +289,6 @@ export function StoresPage({
           onSubmit={(f) => createMut.mutate(f)}
           pending={createMut.isPending}
           error={createMut.isError ? formErrorMessage(createMut.error, 'No se pudo crear.') : null}
-        />
-      )}
-
-      {detail && (
-        <StoreDetailModal
-          store={detail}
-          onEdit={() => setEditing(detail)}
-          onDelete={() => void askDelete(detail)}
-          deleteError={
-            deleteMut.isError ? formErrorMessage(deleteMut.error, 'No se pudo borrar.') : null
-          }
-          onClose={() => setDetail(null)}
-          onOpenStock={() => onOpenStoreView('stock', detail.id)}
-          onOpenSales={() => onOpenStoreView('sales', detail.id)}
-          // Decisión (a) del plan: cerrar el detalle al abrir Precios para no apilar
-          // dos modales. StorePricesModal se renderiza desde esta página.
-          onOpenPrices={() => {
-            setPricesFor(detail);
-            setDetail(null);
-          }}
         />
       )}
 
@@ -210,6 +305,6 @@ export function StoresPage({
       )}
 
       {pricesFor && <StorePricesModal store={pricesFor} onClose={() => setPricesFor(null)} />}
-    </section>
+    </div>
   );
 }
