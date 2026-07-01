@@ -1,7 +1,8 @@
 import type { ImportResult } from '@simpletpv/auth';
 import { Button, DataTable, Input, Select } from '@simpletpv/ui';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { Plus, Upload } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 import { CsvDropzone } from '../components/CsvDropzone.js';
 import { Modal } from '../components/Modal.js';
@@ -63,6 +64,14 @@ export function CreateTransferModal({
   );
   const [importOpen, setImportOpen] = useState(false);
 
+  // Alta gráfica de varios productos a la vez (S-24): buscador + lista de
+  // checkboxes con cantidad editable por fila, alternativa a repetir el alta
+  // manual una a una o exigir CSV para más de un producto.
+  const [multiAddOpen, setMultiAddOpen] = useState(false);
+  const [multiAddSearch, setMultiAddSearch] = useState('');
+  const [multiAddChecked, setMultiAddChecked] = useState<ReadonlySet<string>>(new Set());
+  const [multiAddQty, setMultiAddQty] = useState<Record<string, string>>({});
+
   const sendNow = mode === 'sendNow';
   const mutation = useMutation({
     mutationFn: async (input: Parameters<typeof createTransfer>[0]) => {
@@ -92,6 +101,37 @@ export function CreateTransferModal({
     addLine(productId, Number(qty));
     setProductId('');
     setQty('1');
+  };
+
+  const filteredMultiAddProducts = useMemo(() => {
+    const term = multiAddSearch.trim().toLowerCase();
+    if (!term) return products;
+    return products.filter(
+      (p) => p.name.toLowerCase().includes(term) || (p.sku ?? '').toLowerCase().includes(term),
+    );
+  }, [products, multiAddSearch]);
+
+  const toggleMultiAddCheck = (id: string): void =>
+    setMultiAddChecked((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const closeMultiAdd = (): void => {
+    setMultiAddOpen(false);
+    setMultiAddSearch('');
+    setMultiAddChecked(new Set());
+    setMultiAddQty({});
+  };
+
+  const confirmMultiAdd = (): void => {
+    multiAddChecked.forEach((id) => {
+      const q = Number(multiAddQty[id] ?? '1');
+      addLine(id, q > 0 ? q : 1);
+    });
+    closeMultiAdd();
   };
 
   // Import CSV (sku,qty) en cliente: resuelve cada SKU contra el catálogo cargado y
@@ -246,15 +286,98 @@ export function CreateTransferModal({
             />
           )}
 
-          <button
-            type="button"
-            className="link-btn"
-            onClick={() => setImportOpen((o) => !o)}
-            aria-expanded={importOpen}
-            data-testid="transfer-import-toggle"
-          >
-            {importOpen ? 'Ocultar importación CSV' : 'Añadir productos por CSV'}
-          </button>
+          <div className="transfer-batch-actions">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              icon={<Plus size={16} />}
+              onClick={() => setMultiAddOpen((o) => !o)}
+              aria-expanded={multiAddOpen}
+              data-testid="transfer-multi-add-toggle"
+            >
+              {multiAddOpen ? 'Ocultar selección múltiple' : 'Añadir varios productos'}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              icon={<Upload size={16} />}
+              onClick={() => setImportOpen((o) => !o)}
+              aria-expanded={importOpen}
+              data-testid="transfer-import-toggle"
+            >
+              {importOpen ? 'Ocultar importación CSV' : 'Añadir productos por CSV'}
+            </Button>
+          </div>
+
+          {multiAddOpen && (
+            <div className="transfer-multi-add" data-testid="transfer-multi-add-panel">
+              <Input
+                type="search"
+                placeholder="Buscar producto por nombre o SKU…"
+                value={multiAddSearch}
+                onChange={(e) => setMultiAddSearch(e.target.value)}
+                aria-label="Buscar producto"
+                data-testid="transfer-multi-add-search"
+              />
+              {filteredMultiAddProducts.length === 0 ? (
+                <p className="catalog-empty" data-testid="transfer-multi-add-empty">
+                  Sin productos para la búsqueda.
+                </p>
+              ) : (
+                <ul className="fam-add-existing-list" data-testid="transfer-multi-add-list">
+                  {filteredMultiAddProducts.map((p) => {
+                    const checked = multiAddChecked.has(p.id);
+                    return (
+                      <li
+                        key={p.id}
+                        className="fam-add-existing-item"
+                        data-testid="transfer-multi-add-item"
+                      >
+                        <label className="transfer-multi-add-row">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleMultiAddCheck(p.id)}
+                            data-testid="transfer-multi-add-check"
+                            aria-label={`Seleccionar ${p.name}`}
+                          />
+                          <span className="fam-product-name">{p.name}</span>
+                          <Input
+                            type="number"
+                            min={1}
+                            className="w-20"
+                            value={multiAddQty[p.id] ?? '1'}
+                            onChange={(e) =>
+                              setMultiAddQty((cur) => ({ ...cur, [p.id]: e.target.value }))
+                            }
+                            aria-label={`Cantidad de ${p.name}`}
+                            data-testid="transfer-multi-add-qty"
+                          />
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <div className="transfer-multi-add-actions">
+                <button type="button" className="link-btn" onClick={closeMultiAdd}>
+                  Cancelar
+                </button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={confirmMultiAdd}
+                  disabled={multiAddChecked.size === 0}
+                  data-testid="transfer-multi-add-confirm"
+                >
+                  {multiAddChecked.size > 0 ? `Añadir ${multiAddChecked.size}` : 'Añadir'}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {importOpen && (
             <CsvDropzone
               columns={['sku', 'qty']}

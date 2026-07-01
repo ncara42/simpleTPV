@@ -1080,7 +1080,15 @@
 }
 .modal-foot-actions {
   display: flex;
+  align-items: center;
   gap: 0.6rem;
+}
+/* Iguala la altura del <button> crudo (Cancelar) a la del <Button> compartido
+   (tamaño md = h-9 = 2.25rem), que aquí es siempre su pareja en la fila. Sin
+   esto, `.modal-foot button:not(.ui-btn)` usa --bo-control-height (~37.76px)
+   y el texto de los dos botones queda a distinta altura. */
+.modal-foot-actions button:not(.ui-btn) {
+  height: 2.25rem;
 }
 
 /* ─── Switch (Usuario activo) — scope .modal--form para ganar a `.modal label` ─── */
@@ -2453,6 +2461,42 @@
   display: flex;
   gap: 0.6rem;
   align-items: center;
+}
+
+/* S-24: alta de varios productos a la vez en un traspaso (buscador + lista de
+   checkboxes con cantidad por fila), junto al toggle de importación CSV. */
+.transfer-batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+.transfer-multi-add {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-subtle);
+}
+.transfer-multi-add-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: 0.35rem 0.45rem;
+  cursor: pointer;
+}
+.transfer-multi-add-row input[type='checkbox'] {
+  width: auto;
+  margin: 0;
+}
+.transfer-multi-add-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
 }
 
 /* ── API keys (IT-18) ───────────────────────────────────────────────────────
