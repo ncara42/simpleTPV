@@ -71,6 +71,10 @@ export async function startHttpServer(): Promise<void> {
 
   const app = express();
   app.disable('x-powered-by');
+  // Detrás de Cloudflare Tunnel + Traefik el request llega con X-Forwarded-For.
+  // Sin esto, el rate-limiter del SDK (express-rate-limit) lanza
+  // ERR_ERL_UNEXPECTED_X_FORWARDED_FOR y devuelve 500 en /register, /token, etc.
+  app.set('trust proxy', 1);
 
   // Detrás de un proxy inverso (Traefik/Cloudflare) llega `X-Forwarded-For`. El
   // rate-limiter que el SDK monta en /register /token /authorize exige saber en

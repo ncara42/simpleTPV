@@ -209,7 +209,7 @@ async fn devolucion_con_ticket_crea_registro_rectificativo() {
         Option<String>,
     ) = sqlx::query_as(
         r#"SELECT count(*)::bigint, MAX(hash),
-                      MAX(payload->>'total'), MAX(payload->>'invoiceNumber')
+                      MAX(payload->>'importeTotal'), MAX(payload->>'numSerieFactura')
                FROM "VerifactuRecord"
                WHERE "returnId" = $1 AND type = 'RECTIFICATION'::"VerifactuType""#,
     )
@@ -222,9 +222,9 @@ async fn devolucion_con_ticket_crea_registro_rectificativo() {
 
     // El importe del rectificativo es un abono: negativo y exactamente -total devuelto.
     let payload_total: Decimal = total_str
-        .expect("payload->>'total' presente")
+        .expect("payload->>'importeTotal' presente")
         .parse()
-        .expect("total numérico en el payload");
+        .expect("importeTotal numérico en el payload");
     assert!(payload_total < Decimal::ZERO, "abono: importe negativo");
     assert_eq!(
         payload_total, -ret.return_.total,
